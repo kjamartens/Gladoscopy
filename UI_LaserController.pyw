@@ -93,7 +93,7 @@ def ChangeIntensityLaserEditField(laserID):
 
 def InitFilterWheelRadioCheckbox():
     #Get the current names from the JSON for the filterwheel positions
-    for i in range(0,5):
+    for i in range(0,6):
         exec("form.FW_radioButton_"+str(i)+".setText(\"" + MM_JSON["filter_wheel"]["Label"+str(i)] + "\")")
         #Reset colours - not needed for now, but still keeping
         #exec("form.FW_radioButton_"+str(i)+".setStyleSheet(\"color:black;\")")
@@ -161,7 +161,7 @@ for i in [0,1,3,4]:
     exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
 
 #Set FilterWheel Clickable commands
-for i in range(0,5):
+for i in range(0,6):
     #Change on-off state when button is pressed
     exec("form.FW_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeFilterWheelFromRadioCheckBox(" + str(i) + "));")
 

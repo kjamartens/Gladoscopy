@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>859</width>
+    <width>711</width>
     <height>386</height>
    </rect>
   </property>
@@ -1159,6 +1159,19 @@
        <rect>
         <x>20</x>
         <y>50</y>
+        <width>82</width>
+        <height>17</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>RadioButton</string>
+      </property>
+     </widget>
+     <widget class="QRadioButton" name="FW_radioButton_5">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>130</y>
         <width>82</width>
         <height>17</height>
        </rect>
