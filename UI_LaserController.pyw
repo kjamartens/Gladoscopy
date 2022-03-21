@@ -7,6 +7,8 @@ from pycromanager import *
 import numpy as np
 import sys
 import os
+import time
+import asyncio
 
 
 def SwitchOnOffLaser(laserID):
@@ -89,6 +91,23 @@ def ChangeIntensityLaserEditField(laserID):
         #Do nothing
         pass
 
+def InitFilterWheelRadioCheckbox():
+    #Get the current names from the JSON for the filterwheel positions
+    for i in range(0,5):
+        exec("form.FW_radioButton_"+str(i)+".setText(\"" + MM_JSON["filter_wheel"]["Label"+str(i)] + "\")")
+        #Reset colours - not needed for now, but still keeping
+        #exec("form.FW_radioButton_"+str(i)+".setStyleSheet(\"color:black;\")")
+    #Get the current filterwheel from MM
+    curSelectedState = core.get_property(MM_JSON["filter_wheel"]["MM_Property_Name"], MM_JSON["filter_wheel"]["MM_Property_State_Name"])
+    #Set the correct checkbox
+    exec("form.FW_radioButton_" + str(curSelectedState) + ".setChecked(1)")
+
+def ChangeFilterWheelFromRadioCheckBox(FW_id):
+    #Give the command to MM
+    core.set_property(MM_JSON["filter_wheel"]["MM_Property_Name"], MM_JSON["filter_wheel"]["MM_Property_State_Name"],FW_id)
+    #Refresh everything
+    InitFilterWheelRadioCheckbox()
+
 def GetRGBFromLambda(w):
     r=0.0; g=0.0; b=0.0;
     if w >= 380 and w < 440:
@@ -130,7 +149,7 @@ form.setupUi(window)
 #Get onoff and intensity from MM
 InitLaserButtonLabels(MM_JSON)
 InitLaserSliders(MM_JSON)
-
+InitFilterWheelRadioCheckbox()
 #Laser control integration
 #For all non-AOTF lasers
 for i in [0,1,3,4]:
@@ -141,7 +160,10 @@ for i in [0,1,3,4]:
     #Change intensity when intensity edit field is changed
     exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
 
-
+#Set FilterWheel Clickable commands
+for i in range(0,5):
+    #Change on-off state when button is pressed
+    exec("form.FW_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeFilterWheelFromRadioCheckBox(" + str(i) + "));")
 
 #Show window and start app
 window.show()
