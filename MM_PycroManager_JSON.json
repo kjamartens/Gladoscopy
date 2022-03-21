@@ -1,0 +1,32 @@
+{
+    "lasers": {
+		"MM_Property_OnOff_Name": "State",
+		"MM_Property_Intensity_Name": "Volts",
+		"MM_Property_OnOff_OnValue": "1",
+		"MM_Property_OnOff_OffValue": "0",
+		"Laser0": {
+            "Wavelength": 405,
+			"MM_Property_Name": "TS_DAC01_405Laser",
+			"Intensity_offset": 0,
+			"Intensity_slope": 0.05
+        },
+		"Laser1": {
+            "Wavelength": 488,
+			"MM_Property_Name": "TS_DAC02_488Laser",
+			"Intensity_offset": 0,
+			"Intensity_slope": 0.05
+        },
+		"Laser3": {
+            "Wavelength": 638,
+			"MM_Property_Name": "TS_DAC04_638Laser",
+			"Intensity_offset": 0,
+			"Intensity_slope": 0.05
+        },
+		"Laser4": {
+            "Wavelength": 750,
+			"MM_Property_Name": "TS_DAC05_750Laser",
+			"Intensity_offset": 0,
+			"Intensity_slope": 0.05
+        }
+    }
+}
