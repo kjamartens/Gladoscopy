@@ -20,29 +20,58 @@ from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
-def drawplot(xdatalist,ydatalist,collist):
-    nrlines = len(xdatalist)
-    if len(ydatalist) != nrlines:
-        print("ERROR! Not correct nr of x and y data lists")
-
-    print("Plotting " + str(nrlines) + " lines")
+def drawplot():
     #Initialise graph widget
     form.graphWidget.setBackground('w')
-    form.graphWidget.setTitle("New title", color="k")
+    form.graphWidget.setTitle("Laser trigger scheme", color="k")
     labelstyle = {'color':'k', 'font-size':'10px'}
-    form.graphWidget.setLabel('left', 'Temperature (°C)', **labelstyle)
-    form.graphWidget.setLabel('bottom', 'Hour (H)', **labelstyle)
-    form.graphWidget.showGrid(x=True, y=True)
+    form.graphWidget.setLabel('left', 'Relative power', **labelstyle)
+    form.graphWidget.setLabel('bottom', 'Time (ms)', **labelstyle)
+    form.graphWidget.showGrid(x=False, y=False)
 
-    #Draw individual lines
-    for i in range(0,nrlines):
-        #pen = pg.mkPen(color=(255, 0, 0), width=5)
-        #my_line_ref = form.graphWidget.plot([1,2,3,4,5,6,7,8,9,10], [30,32,34,32,33,31,29,32,35,45], pen=pen)
-        drawsingleline(xdatalist[i],ydatalist[i],collist[i])
+    frameduration = 10 #ms
+    drawnrframes = 10
+
+    form.graphWidget.setXRange(0, frameduration*drawnrframes, padding=0.01)
+    form.graphWidget.setYRange(0,1, padding=0.005)
+    #Draw individual laser line
+    drawsinglelaserint(4,2,1,2,'c',frameduration,drawnrframes)
+    drawsinglelaserint(4,2,1,1,'r',frameduration,drawnrframes)
+    #Draw frame lines
+    penFrameLine = pg.mkPen(color=(200,200,200), width=1, style=QtCore.Qt.DashLine)
+    for i in range(0,drawnrframes+1):
+        form.graphWidget.plot([i*frameduration,i*frameduration], [-1, 2], pen=penFrameLine)
 
 def drawsingleline(xdata,ydata,col):
     pen = pg.mkPen(color=col, width=2)
     form.graphWidget.plot(xdata, ydata, pen=pen)
+
+def drawsinglelaserint(delay,duration,intensity,everyxframes,col,frameduration,nrdrawframes):
+    #Set colour
+    penLaserLine = pg.mkPen(color=col, width=2)
+    #Draw every frame individually
+    for i in range(0,nrdrawframes):
+        #Check if this frame should be included in 'on' state
+        if i % everyxframes == 0:
+            #Draw the line
+            #Flat part
+            if delay > 0.001:
+                form.graphWidget.plot([i*frameduration,delay+i*frameduration],[0, 0], pen=penLaserLine)
+            #Rising edge
+            if delay > 0.001:
+                form.graphWidget.plot([delay+i*frameduration,delay+i*frameduration],[0, intensity], pen=penLaserLine)
+            #Flat part
+            form.graphWidget.plot([delay+i*frameduration, delay+duration+i*frameduration],[intensity, intensity], pen=penLaserLine)
+            #Falling edge
+            if delay+duration > frameduration:
+                duration = frameduration-delay
+            form.graphWidget.plot([delay+duration+i*frameduration, delay+duration+i*frameduration],[intensity, 0], pen=penLaserLine)
+            #Flat part
+            if (delay+duration) < (frameduration-0.001):
+                form.graphWidget.plot([delay+duration+i*frameduration, (i+1)*frameduration],[0, 0], pen=penLaserLine)
+        else:
+            #Draw a flat line for this frame
+            form.graphWidget.plot([i*frameduration,(i+1)*frameduration],[0, 0], pen=penLaserLine)
 #--------------------------------------------------------------------------------------
 #End of functions
 #--------------------------------------------------------------------------------------
@@ -59,7 +88,7 @@ form = Form()
 form.setupUi(window)
 
 #Also see https://www.pythonguis.com/tutorials/plotting-pyqtgraph/
-drawplot([[1,2,3],[1,2,3]],[[1,2,3],[3,2,1]],['k','b'])
+drawplot()
 
 #Show window and start app
 window.show()
