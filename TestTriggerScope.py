@@ -73,8 +73,8 @@ if tgS.isOpen():
 
         print(writetgs('PAC4\r\n')) #CLEAR settings
         print(writetgs('PAO4-0-65535\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
-        print(writetgs('BAD4-1\r\n')) #To set a 5 ms delay before turning on DAC1 after the start of the high TTL
-        print(writetgs('BAL4-50000\r\n')) #Laser on for only 10 ms
+        print(writetgs('BAD4-0\r\n')) #To set a 5 ms delay before turning on DAC1 after the start of the high TTL
+        print(writetgs('BAL4-0\r\n')) #Laser on for only 10 ms
         print(writetgs('PAS4-1-1\r\n')) #Trigger transition at DAC 1 - starting (1 middle) on rising edge (1 end)
         print(writetgs('BAO4-1-0\n')) #Add the blanking mode - now it turns off when no high TTL is received
         #time.sleep(5)

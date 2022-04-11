@@ -9,6 +9,18 @@ import sys
 import os
 import time
 import asyncio
+import pyqtgraph as pg
+
+#For drawing
+import matplotlib
+matplotlib.use('Qt5Agg')
+from PyQt5 import QtCore, QtWidgets
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# General switching functions - MM hooks
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 def SwitchOnOffLaser(laserID):
@@ -126,9 +138,109 @@ def GetRGBFromLambda(w):
         R = 0.0;    G = 0.0;    B = 0.0;
     multoffset = 0.7;
     return [R*255*multoffset,G*255*multoffset,B*255*multoffset]
-#--------------------------------------------------------------------------------------
+
+#Function that adds text to the verbose text output box
+def addToVerboseBoxText(text):
+    form.VerboseBox.setPlainText(text+'\r\n'+form.VerboseBox.toPlainText());
+
+#Specifically get TriggerScope response to verboxe text box
+def TS_Response_verbose():
+    addToVerboseBoxText(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Laser trigger drawing functions
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+def drawplot():
+    #Initialise graph widget
+    form.graphWidget.setBackground('k')
+    form.graphWidget.setTitle("Laser trigger scheme", color="w")
+    form.graphWidget.setLabel('left', '<span style=\"color:white;font-size:10px\">Relative power</span>')
+    form.graphWidget.setLabel('bottom', '<span style=\"color:white;font-size:10px\">Time (ms)</span>')
+    form.graphWidget.showGrid(x=False, y=False)
+
+    frameduration = 10 #ms
+    drawnrframes = 10
+    nrlasersdrawn = 5;
+
+    form.graphWidget.setXRange(0, frameduration*drawnrframes, padding=0.01)
+    form.graphWidget.setYRange(0,1*nrlasersdrawn, padding=0.005)
+
+    #Draw frame lines
+    penFrameLine = pg.mkPen(color=(200,200,200), width=1, style=QtCore.Qt.DashLine)
+    for i in range(0,drawnrframes+1):
+        form.graphWidget.plot([i*frameduration,i*frameduration], [-1, nrlasersdrawn+1], pen=penFrameLine)
+
+    #Draw individual laser lines
+    drawsinglelaserint(4,2,1,1,1,'c',frameduration,drawnrframes)
+    drawsinglelaserint(4,2,1,2,2,[255,255,0],frameduration,drawnrframes)
+    drawsinglelaserint(0,frameduration,1,3,3,'r',frameduration,drawnrframes)
+    drawsinglelaserint(5,5,1,4,2,[90,255,48],frameduration,drawnrframes)
+    drawsinglelaserint(0,frameduration,1,5,1,[0,84,120],frameduration,drawnrframes)
+
+def drawsingleline(xdata,ydata,col):
+    pen = pg.mkPen(color=col, width=2)
+    form.graphWidget.plot(xdata, ydata, pen=pen)
+
+def drawsinglelaserint(delay,duration,intensity,laserID,everyxframes,col,frameduration,nrdrawframes):
+    intensity *= 0.9; #Lower slightly
+    LowPoint = (laserID-1)*1;
+    HighPoint = LowPoint+intensity;
+    #Set colour
+    penLaserLine = pg.mkPen(color=col, width=2)
+    #Draw every frame individually
+    for i in range(0,nrdrawframes):
+        #Check if this frame should be included in 'on' state
+        if i % everyxframes == 0:
+            #Draw the line
+            #Flat part
+            if delay > 0.1:
+                form.graphWidget.plot([i*frameduration,delay+i*frameduration],[LowPoint, LowPoint], pen=penLaserLine)
+            #Rising edge
+            if delay > 0.1:
+                form.graphWidget.plot([delay+i*frameduration,delay+i*frameduration],[LowPoint, HighPoint], pen=penLaserLine)
+            #Flat part
+            if duration > 0.1:
+                form.graphWidget.plot([delay+i*frameduration, delay+duration+i*frameduration],[HighPoint, HighPoint], pen=penLaserLine)
+            #Falling edge
+            if delay+duration > frameduration:
+                duration = frameduration-delay
+            if duration > 0.1 and duration < frameduration:
+                form.graphWidget.plot([delay+duration+i*frameduration, delay+duration+i*frameduration],[HighPoint, LowPoint], pen=penLaserLine)
+            #Flat part
+            if (delay+duration) < (frameduration-0.1):
+                form.graphWidget.plot([delay+duration+i*frameduration, (i+1)*frameduration],[LowPoint, LowPoint], pen=penLaserLine)
+
+        else:
+            #Draw a flat line for this frame
+            form.graphWidget.plot([i*frameduration,(i+1)*frameduration],[LowPoint, LowPoint], pen=penLaserLine)
+
+            #Extra lines if trigger is switching on frame start or frame end
+            #if the laser didn't trigger on the previous frame
+            if (i-1) % everyxframes == 0:
+                if delay == 0:
+                    form.graphWidget.plot([i*frameduration, i*frameduration],[LowPoint, HighPoint], pen=penLaserLine)
+            if (i+1) % everyxframes == 0:
+                if duration == frameduration:
+                    form.graphWidget.plot([(i+1)*frameduration, (i+1)*frameduration],[LowPoint, HighPoint], pen=penLaserLine)
+
+
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Functions that instruct strobo + blanking of lasers
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def ResetLasersTrigger():
+    #Testing for now
+    for i in range(0,5):
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
+        TS_Response_verbose();
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-0')
+        TS_Response_verbose();
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-0')
+        TS_Response_verbose();
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', '*')
+    TS_Response_verbose();
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #End of functions
-#--------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # get object representing MMCore, used throughout
 core = Core()
@@ -164,6 +276,13 @@ for i in [0,1,3,4]:
 for i in range(0,6):
     #Change on-off state when button is pressed
     exec("form.FW_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeFilterWheelFromRadioCheckBox(" + str(i) + "));")
+
+#Draw the laser trigger plot
+#Also see https://www.pythonguis.com/tutorials/plotting-pyqtgraph/
+drawplot()
+
+#Button that resets laser triggering
+form.resetLasersTriggerButton.clicked.connect(lambda: ResetLasersTrigger());
 
 #Show window and start app
 window.show()

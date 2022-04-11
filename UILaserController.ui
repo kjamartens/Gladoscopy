@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>711</width>
-    <height>386</height>
+    <height>685</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>0</x>
      <y>0</y>
      <width>691</width>
-     <height>351</height>
+     <height>681</height>
     </rect>
    </property>
    <property name="currentIndex">
@@ -1181,6 +1181,39 @@
       </property>
      </widget>
     </widget>
+    <widget class="PlotWidget" name="graphWidget" native="true">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>320</y>
+       <width>671</width>
+       <height>211</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="resetLasersTriggerButton">
+     <property name="geometry">
+      <rect>
+       <x>250</x>
+       <y>630</y>
+       <width>141</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Reset Laser Triggers</string>
+     </property>
+    </widget>
+    <widget class="QTextBrowser" name="VerboseBox">
+     <property name="geometry">
+      <rect>
+       <x>410</x>
+       <y>540</y>
+       <width>261</width>
+       <height>101</height>
+      </rect>
+     </property>
+    </widget>
    </widget>
    <widget class="QWidget" name="tab_autonomous">
     <attribute name="title">
@@ -1189,6 +1222,14 @@
    </widget>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>pyqtgraph</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
