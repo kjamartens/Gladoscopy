@@ -1084,9 +1084,9 @@
      <property name="geometry">
       <rect>
        <x>520</x>
-       <y>9</y>
+       <y>139</y>
        <width>151</width>
-       <height>291</height>
+       <height>161</height>
       </rect>
      </property>
      <property name="title">
@@ -1453,6 +1453,32 @@
         </widget>
        </item>
       </layout>
+     </widget>
+    </widget>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="geometry">
+      <rect>
+       <x>520</x>
+       <y>20</y>
+       <width>151</width>
+       <height>111</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>FrameTime info</string>
+     </property>
+     <widget class="QLineEdit" name="frameTime_editBox">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="geometry">
+       <rect>
+        <x>80</x>
+        <y>79</y>
+        <width>61</width>
+        <height>21</height>
+       </rect>
+      </property>
      </widget>
     </widget>
    </widget>
