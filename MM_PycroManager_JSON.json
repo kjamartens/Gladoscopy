@@ -16,6 +16,12 @@
 			"Intensity_offset": 0,
 			"Intensity_slope": 0.05
         },
+		"Laser2": {
+            "Wavelength": 561,
+			"MM_Property_Name": "TS_DAC02_561Laser",
+			"Intensity_offset": 0,
+			"Intensity_slope": 0.05
+        },
 		"Laser3": {
             "Wavelength": 638,
 			"MM_Property_Name": "TS_DAC04_638Laser",
