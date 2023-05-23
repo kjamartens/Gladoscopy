@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 #with open('C:/Data/Koen/20220322/QD_60pctGlyc_10kdil_HiLo_15ms_230mWreadout_405_61075Emm_1/QD_60pctGlyc_10kdil_HiLo_15ms_230mWreadout_405_61075Emm_1_MMStack_Pos0_metadata.txt', 'r') as f:
 #  MM_JSON = json.load(f)
 
-with open('C:/Users/SMIPC2/Documents/Microscope Software/Accent_sCMOScalib/TimingTest/500ms_1/500ms_1_MMStack_Pos0_metadata.txt', 'r') as f:
+with open('//Smi2pc/e/Data/Koen/20220420/QDs_40pctGly_1msStroboCenter_SingleBE_488_400mW_10msFrameTimeMM_61075_1/QDs_40pctGly_1msStroboCenter_SingleBE_488_400mW_10msFrameTimeMM_61075_1_MMStack_Pos0_metadata.txt', 'r') as f:
   MM_JSON = json.load(f)
 
 #Get nr of frames
