@@ -17,11 +17,24 @@ matplotlib.use('Qt5Agg')
 from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+import time
+from PyQt5.QtCore import QTimer,QDateTime
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # General switching functions - MM hooks
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def timerloop():
+    getFrameTimeInfo();
 
+def getFrameTimeInfo():
+    ft = core.get_exposure();
+    form.frameTime_editBox.setText(str(ft));
+    frameduration_new = ft;
+    try:
+        drawplot(frameduration_new)
+    except:
+        print('No plot drawn')
+    return frameduration_new
 
 def SwitchOnOffLaser(laserID):
     MM_Property_OnOff_Name = MM_JSON["lasers"]["MM_Property_OnOff_Name"]
@@ -49,6 +62,7 @@ def InitLaserButtonLabels(MM_JSON):
             exec("form.PushLaser_"+str(i)+".setText(\"Now Off\")")
         #Set the label of the laser at get_property
         exec("form.NameLaser_"+str(i)+".setText(\""+str(MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"])+" nm\")")
+        exec("form.NameLaser_"+str(i)+"_2.setText(\""+str(MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"])+" nm\")")
 
         #Set colours
         wvlngth = MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"]
@@ -150,16 +164,18 @@ def TS_Response_verbose():
 # Laser trigger drawing functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def drawplot():
+def drawplot(frameduration):
+    #print(frameduration)
     #Initialise graph widget
+    form.graphWidget.clear()
     form.graphWidget.setBackground('k')
     form.graphWidget.setTitle("Laser trigger scheme", color="w")
     form.graphWidget.setLabel('left', '<span style=\"color:white;font-size:10px\">Relative power</span>')
     form.graphWidget.setLabel('bottom', '<span style=\"color:white;font-size:10px\">Time (ms)</span>')
     form.graphWidget.showGrid(x=False, y=False)
 
-    frameduration = 10 #ms
-    drawnrframes = 10
+    #frameduration = 100 #ms
+    drawnrframes = 5
     nrlasersdrawn = 5;
 
     form.graphWidget.setXRange(0, frameduration*drawnrframes, padding=0.01)
@@ -171,11 +187,20 @@ def drawplot():
         form.graphWidget.plot([i*frameduration,i*frameduration], [-1, nrlasersdrawn+1], pen=penFrameLine)
 
     #Draw individual laser lines
-    drawsinglelaserint(4,2,1,1,1,'c',frameduration,drawnrframes)
-    drawsinglelaserint(4,2,1,2,2,[255,255,0],frameduration,drawnrframes)
-    drawsinglelaserint(0,frameduration,1,3,3,'r',frameduration,drawnrframes)
-    drawsinglelaserint(5,5,1,4,2,[90,255,48],frameduration,drawnrframes)
-    drawsinglelaserint(0,frameduration,1,5,1,[0,84,120],frameduration,drawnrframes)
+    for i in range(0,5):
+        #Get the info from the boxes above
+        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
+        exec("global duration; duration = int(form.Length_Edit_Laser_"+str(i)+".text())");
+        if duration == 0:
+            drawduration = frameduration-delay/1000;
+        else:
+            drawduration = duration/1000;
+        exec("global everyxframes; everyxframes = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())");
+        #Get wavelength to enable correct colours
+        wvlngth = MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"]
+
+        drawsinglelaserint(delay/1000,drawduration,1,i+1,everyxframes,GetRGBFromLambda(wvlngth),frameduration,drawnrframes)
+
 
 def drawsingleline(xdata,ydata,col):
     pen = pg.mkPen(color=col, width=2)
@@ -193,21 +218,21 @@ def drawsinglelaserint(delay,duration,intensity,laserID,everyxframes,col,framedu
         if i % everyxframes == 0:
             #Draw the line
             #Flat part
-            if delay > 0.1:
+            if delay > 0.0001:
                 form.graphWidget.plot([i*frameduration,delay+i*frameduration],[LowPoint, LowPoint], pen=penLaserLine)
             #Rising edge
-            if delay > 0.1:
+            if delay > 0.0001:
                 form.graphWidget.plot([delay+i*frameduration,delay+i*frameduration],[LowPoint, HighPoint], pen=penLaserLine)
             #Flat part
-            if duration > 0.1:
+            if duration > 0.0001:
                 form.graphWidget.plot([delay+i*frameduration, delay+duration+i*frameduration],[HighPoint, HighPoint], pen=penLaserLine)
             #Falling edge
             if delay+duration > frameduration:
                 duration = frameduration-delay
-            if duration > 0.1 and duration < frameduration:
+            if duration > 0.0001 and duration < frameduration:
                 form.graphWidget.plot([delay+duration+i*frameduration, delay+duration+i*frameduration],[HighPoint, LowPoint], pen=penLaserLine)
             #Flat part
-            if (delay+duration) < (frameduration-0.1):
+            if (delay+duration) < (frameduration-0.0001):
                 form.graphWidget.plot([delay+duration+i*frameduration, (i+1)*frameduration],[LowPoint, LowPoint], pen=penLaserLine)
 
         else:
@@ -229,15 +254,67 @@ def drawsinglelaserint(delay,duration,intensity,laserID,everyxframes,col,framedu
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def ResetLasersTrigger():
     #Testing for now
-    for i in range(0,5):
+    for i in [0,1,3,4]:
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
         TS_Response_verbose();
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-0')
         TS_Response_verbose();
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-0')
         TS_Response_verbose();
+        SwitchOnOffLaser(i)
+        SwitchOnOffLaser(i)
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', '*')
+    initLaserTrigEditBoxes()
     TS_Response_verbose();
+
+#Set all boxes to zeros and such
+def initLaserTrigEditBoxes():
+    for i in range(0,5):
+        exec("form.Length_Edit_Laser_"+str(i)+".setText(\"" +str(0)+"\")");
+        exec("form.Delay_Edit_Laser_"+str(i)+".setText(\"" +str(0)+"\")");
+        exec("form.BlinkFrames_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
+
+#Arm the laser triggering based on boxes input
+def armLaserTriggering():
+    print('NEWARM')
+    for i in [1,3]:
+        #Loop over number of frames after which it repeats
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
+
+        #print(writetgs('PAO2-0-65535\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
+        #print(writetgs('PAO2-1-0\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
+    #!PAO2-0-1-1
+    #!PAO2-1-1-2
+
+        exec("global nrframesrepeat; nrframesrepeat = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())")
+        for k in range(0,nrframesrepeat):
+            if k == 0:
+                print('PAO'+str(i+1)+'-0-65535')
+                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-65535')
+                TS_Response_verbose();
+            else:
+                time.sleep(0.1)
+                print('PAO'+str(i+1)+'-'+str(k)+'-0')
+                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-'+str(k)+'-20000')
+                TS_Response_verbose();
+                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
+                TS_Response_verbose();
+
+
+                #if k == nrframesrepeat:
+                #    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
+                #    TS_Response_verbose();
+                #print(writetgs('PAS2-1-1\r\n')) #Trigger transition at DAC 1 - starting (1 middle) on rising edge (1 end)
+                #print(writetgs('BAO2-1-0\n')) #Add the blanking mode - now it turns off when no high TTL is received
+
+        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-'+str(delay))
+        TS_Response_verbose();
+        exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-'+str(length))
+        TS_Response_verbose();
+
+        # #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #End of functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -258,10 +335,20 @@ window = Window()
 form = Form()
 form.setupUi(window)
 
+timer = QTimer(app)
+timer.timeout.connect(lambda: timerloop())
+#Update the timer every 500 ms
+timer.start(500)
+
 #Get onoff and intensity from MM
 InitLaserButtonLabels(MM_JSON)
 InitLaserSliders(MM_JSON)
 InitFilterWheelRadioCheckbox()
+
+#Get frametimeinfo
+global frameduration;
+frameduration = getFrameTimeInfo();
+
 #Laser control integration
 #For all non-AOTF lasers
 for i in [0,1,3,4]:
@@ -277,13 +364,28 @@ for i in range(0,6):
     #Change on-off state when button is pressed
     exec("form.FW_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeFilterWheelFromRadioCheckBox(" + str(i) + "));")
 
+#Initialise the laser triggering boxes
+initLaserTrigEditBoxes();
 #Draw the laser trigger plot
 #Also see https://www.pythonguis.com/tutorials/plotting-pyqtgraph/
-drawplot()
+drawplot(frameduration)
+
+#Change laser trigger scheme when values in boxes are changed
+for i in range(0,5):
+    exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+    exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+    exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+
+#Arm lasers button
+form.ARMlaserTriggerPushButton.clicked.connect(lambda: armLaserTriggering());
 
 #Button that resets laser triggering
 form.resetLasersTriggerButton.clicked.connect(lambda: ResetLasersTrigger());
 
 #Show window and start app
 window.show()
+
+
+#Reset laser triggers when startup for properly expected behaviour
+ResetLasersTrigger();
 app.exec()
