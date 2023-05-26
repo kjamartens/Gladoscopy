@@ -1,2 +1,2 @@
-def Multiply(a,b):
+def MultiplyCSS(a,b):
     return a*b
