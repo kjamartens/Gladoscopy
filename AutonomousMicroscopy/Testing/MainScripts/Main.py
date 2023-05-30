@@ -77,23 +77,34 @@ def functionNamesFromDir(dirname):
     return functionnamearr
 
 #Obtain the help-file and info on kwargs on a specific function
-#TODO: the same, but for a specific sub-function (i.e. StarDistSegment rather than StarDist parent)
 #Optional: Boolean kwarg showKwargs & Boolean kwarg showHelp
 def infoFromMetadata(functionname,**kwargs):
     showKwargs = kwargs.get('showKwargs', True)
     showHelp = kwargs.get('showHelp', True)
     try:
-        functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
-        finaltext = f"""\
-        --------------------------------------------------------------------------------------
-        {functionname} contains {len(functionMetadata)} callable functions: {", ".join(str(singlefunctiondata) for singlefunctiondata in functionMetadata)}
-        --------------------------------------------------------------------------------------
-        """
+        #Check if parent function
+        if not '.' in functionname:
+            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            finaltext = f"""\
+            --------------------------------------------------------------------------------------
+            {functionname} contains {len(functionMetadata)} callable functions: {", ".join(str(singlefunctiondata) for singlefunctiondata in functionMetadata)}
+            --------------------------------------------------------------------------------------
+            """
+            #Loop over all entries
+            looprange = range(0,len(functionMetadata))
+        else: #or specific sub-function
+            #get the parent info
+            functionparent = functionname.split('.')[0]
+            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            #sub-select the looprange
+            loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
+            looprange = range(loopv,loopv+1)
+            finaltext = ""
         name_arr = []
         help_arr = []
         rkwarr_arr = []
         okwarr_arr = []
-        for i in range(0,len(functionMetadata)):
+        for i in looprange:
             #Get name text for all entries
             name_arr.append([list(functionMetadata.keys())[i]])
             #Get help text for all entries
@@ -182,7 +193,7 @@ def evalFunctionWithKwargs(functionname,**kwargs):
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-print(infoFromMetadata("StarDist",showKwargs=True,showHelp=True))
+print(infoFromMetadata("StarDist.StarDistSegment",showKwargs=True,showHelp=True))
 
 fn = functionNamesFromDir("CellSegmentScripts")
 print(fn)
@@ -193,7 +204,6 @@ testImageLoc = "./ExampleData/BF_test_avg.tiff"
 with tifffile.TiffFile(testImageLoc) as tiff:
     # Read the image data
     ImageData = tiff.asarray()
-
 
 #Example of non-preloaded stardistsegmentation
 l,d = evalFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2")
@@ -210,17 +220,5 @@ export_imagej_rois("./ExampleData/example_rois.zip",d)
 save_tiff_imagej_compatible('./ExampleData/example_labels.tif', l, axes='YX')
 
 
-
-
-
-# #For now, test run all of them
-# # print(fn)
-# for i in range(0,len(fn)):
-#     print(fn[i])
-
-    
 fn = functionNamesFromDir("ROICalcScripts")
-# #For now, test run all of them
-# # print(fn)
-# for i in range(0,len(fn)):
-#     print(fn[i])
+print(fn)
