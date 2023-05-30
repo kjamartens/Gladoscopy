@@ -7,16 +7,11 @@ from stardist.models import StarDist2D
 #Import all scripts in the custom script folders
 from CellSegmentScripts import *
 from ROICalcScripts import *
-
+#Obtain the helperfunctions
 import HelperFunctions
 
 #Required PIPs:
-# pip install stardist
-# pip install tensorflow
-# pip install matplotlib
-# pip install tifffile
-# pip install csbdeep
-# pip install numpy
+# pip install csbdeep stardist tensorflow matplotlib tifffile numpy
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
