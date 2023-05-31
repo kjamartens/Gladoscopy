@@ -25,7 +25,12 @@ def function_exists(obj):
 #Returns whether a subfunction exists specifically in module_name and is callable
 def subfunction_exists(module_name, subfunction_name):
     try:
-        module = importlib.import_module(module_name)
+        if module_name.endswith('.py'):
+            # Module path is provided
+            loader = importlib.machinery.SourceFileLoader('', module_name)
+            module = loader.load_module()
+        else:
+            module = importlib.import_module(module_name)
         a = hasattr(module, subfunction_name)
         b = callable(getattr(module, subfunction_name))
         return hasattr(module, subfunction_name) and callable(getattr(module, subfunction_name))
@@ -34,10 +39,12 @@ def subfunction_exists(module_name, subfunction_name):
     
 # Return all functions that are found in a specific directory
 def functionNamesFromDir(dirname):
+    #Get the absolute path, assuming that this file will stay in the sister-folder
+    absolute_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),dirname)
     #initialise empty array
     functionnamearr = []
     #Loop over all files
-    for file in os.listdir("./"+dirname):
+    for file in os.listdir(absolute_path):
         #Check if they're .py files
         if file.endswith(".py"):
             #Check that they're not init files or similar
@@ -50,7 +57,7 @@ def functionNamesFromDir(dirname):
                     for singlefunctiondata in functionMetadata:
                         #Also check this against the actual sub-routines and raise an error (this should also be present in the __init__ of the folders)
                         subroutineName = f"{functionName}.{singlefunctiondata}"
-                        if subfunction_exists(f'{dirname}.{functionName}',singlefunctiondata):
+                        if subfunction_exists(f'{absolute_path}\{functionName}.py',singlefunctiondata):
                             functionnamearr.append(subroutineName)
                         else:
                             warnings.warn(f"Warning: {subroutineName} is present in __function_metadata__ but not in the actual file!")

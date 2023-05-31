@@ -6,10 +6,11 @@ from stardist.models import StarDist2D
 import sys, os
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"CellSegmentScripts"))
 
 #Import all scripts in the custom script folders
-from CellSegmentScripts import * #doesn't work
-from ROICalcScripts import * #doesn't work 
+from CellSegmentScripts import *
+from ROICalcScripts import *
 #Obtain the helperfunctions
 import HelperFunctions #works
 
@@ -22,10 +23,13 @@ import HelperFunctions #works
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 print(HelperFunctions.infoFromMetadata("StarDist.StarDistSegment",showKwargs=True,showHelp=True))
 
-# fn = functionNamesFromDir("CellSegmentScripts")
-# print(fn)
+#Need something with relative loc here?
+fn = HelperFunctions.functionNamesFromDir("CellSegmentScripts")
+print(fn)
 
 testImageLoc = "./AutonomousMicroscopy/Testing/ExampleData/BF_test_avg.tiff"
 
