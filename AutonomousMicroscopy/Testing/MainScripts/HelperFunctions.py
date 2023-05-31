@@ -11,6 +11,7 @@ from stardist.models import StarDist2D
 #Import all scripts in the custom script folders
 from CellSegmentScripts import *
 from ROICalcScripts import *
+from CellScoringScripts import *
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------

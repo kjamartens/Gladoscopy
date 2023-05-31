@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 #Import all scripts in the custom script folders
 from CellSegmentScripts import *
+from CellScoringScripts import *
 from ROICalcScripts import *
 #Obtain the helperfunctions
 import HelperFunctions #works
@@ -25,10 +26,9 @@ import HelperFunctions #works
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-print(HelperFunctions.infoFromMetadata("StarDist.StarDistSegment",showKwargs=True,showHelp=True))
+print(HelperFunctions.infoFromMetadata("SimpleCellOperants.CellArea_lowerUpperBound",showKwargs=True,showHelp=True))
 
-#Need something with relative loc here?
-fn = HelperFunctions.functionNamesFromDir("CellSegmentScripts")
+fn = HelperFunctions.functionNamesFromDir("CellScoringScripts")
 print(fn)
 
 testImageLoc = "./AutonomousMicroscopy/Testing/ExampleData/BF_test_avg.tiff"
