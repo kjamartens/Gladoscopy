@@ -3,12 +3,15 @@ from stardist import _draw_polygons, export_imagej_rois
 import tifffile
 
 from stardist.models import StarDist2D
+import sys, os
+# Add the folder 2 folders up to the system path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 #Import all scripts in the custom script folders
-from CellSegmentScripts import *
-from ROICalcScripts import *
+from CellSegmentScripts import * #doesn't work
+from ROICalcScripts import * #doesn't work 
 #Obtain the helperfunctions
-import HelperFunctions
+import HelperFunctions #works
 
 #Required PIPs:
 # pip install csbdeep stardist tensorflow matplotlib tifffile numpy
@@ -24,7 +27,7 @@ print(HelperFunctions.infoFromMetadata("StarDist.StarDistSegment",showKwargs=Tru
 # fn = functionNamesFromDir("CellSegmentScripts")
 # print(fn)
 
-testImageLoc = "./ExampleData/BF_test_avg.tiff"
+testImageLoc = "./AutonomousMicroscopy/Testing/ExampleData/BF_test_avg.tiff"
 
 # Open the TIFF file
 with tifffile.TiffFile(testImageLoc) as tiff:
@@ -32,18 +35,18 @@ with tifffile.TiffFile(testImageLoc) as tiff:
     ImageData = tiff.asarray()
 
 #Example of non-preloaded stardistsegmentation
-l,d = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
+l,d = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/Testing/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
 
 #Load the model outside the function - heavy speed increase for gridding specifically
-stardistModel = StarDist2D(None,name='StarDistModel',basedir="./ExampleData")
+stardistModel = StarDist2D(None,name='StarDistModel',basedir="./AutonomousMicroscopy/Testing/ExampleData")
 #Run the stardistsegment with a preloaded model
 l,d = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment_preloadedModel",image_data="ImageData",model="stardistModel",prob_thresh="0.35",nms_thresh="0.2"))
 
 #Export the ROIs for ImageJ
-export_imagej_rois("./ExampleData/example_rois.zip",d)
+export_imagej_rois("./AutonomousMicroscopy/Testing/ExampleData/example_rois.zip",d)
 
 #Export the labeled image
-save_tiff_imagej_compatible('./ExampleData/example_labels.tif', l, axes='YX')
+save_tiff_imagej_compatible('./AutonomousMicroscopy/Testing/ExampleData/example_labels.tif', l, axes='YX')
 
 
 # fn = functionNamesFromDir("ROICalcScripts")
