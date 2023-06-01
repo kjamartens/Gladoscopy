@@ -103,6 +103,7 @@ def infoFromMetadata(functionname,**kwargs):
         help_arr = []
         rkwarr_arr = []
         okwarr_arr = []
+        loopindex = 0
         for i in looprange:
             #Get name text for all entries
             name_arr.append([list(functionMetadata.keys())[i]])
@@ -129,19 +130,20 @@ def infoFromMetadata(functionname,**kwargs):
             if showHelp or showKwargs:
                 finaltext += f"""
                 -------------------------------------------
-                {name_arr[i][0]} information:
+                {name_arr[loopindex][0]} information:
                 -------------------------------------------"""
             if showHelp:
                 finaltext += f"""
-                {help_arr[i]}"""
+                {help_arr[loopindex]}"""
             if showKwargs:
                 finaltext += f"""
                 ----------
                 Required keyword arguments (kwargs):
-                {rkwarr_arr[i]}----------
+                {rkwarr_arr[loopindex]}----------
                 Optional keyword arguments (kwargs):
-                {okwarr_arr[i]}"""
+                {okwarr_arr[loopindex]}"""
             finaltext += "\n"
+            loopindex+=1
         
         finaltext += "--------------------------------------------------------------------------------------\n"
         #Remove left-leading spaces
