@@ -24,8 +24,20 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Prints eccentricity of all ROIs"
+        },
+        "Temp_printnearestneighbour": {
+            "required_kwargs": [
+                {"name": "outline_coords", "description": "List of outline coordinates belonging to individual cells."},
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Prints nearest neighbour of all ROIs"
         }
     }
+
+#-------------------------------------------------------------------------------------------------------------------------------
+#Helper functions
+#-------------------------------------------------------------------------------------------------------------------------------
 
 #Get the rotation (in degrees!) of a ROI
 def getRotation(ROI):
@@ -58,12 +70,54 @@ def getLongShortAxisRatio(ROI):
     #Return the ratio of the axes
     return rotated_long_axis/rotated_short_axis
 
+#Get the area of an ROI
+def getArea(ROI):
+    return Polygon(ROI).area
+
+#Get the minimum distance between ROI and otherROI
+def distanceROItoOther(ROI,otherROI):
+    return Polygon(ROI).distance(Polygon(otherROI))
+
+#Get the hausdorff distance between ROI and otherROI
+def hausdorff_distanceROItoOther(ROI,otherROI):
+    return Polygon(ROI).hausdorff_distance(Polygon(otherROI))
+
+#Get the distance (in px) to the nearest neighbouring ROI
+def shortestDistanceToNeighbourROI(ROI,allROIs):
+    currmindist = 1e9
+    currmindistId = -1
+    #Loop over all other ROIs
+    for i in range(0,len(allROIs)):
+        #Check the distance via distance
+        foundmindist = distanceROItoOther(ROI,StarDistCoords_to_xyCoords(allROIs[i]))
+        #Check if it's a new minimum, and if so, save this
+        if foundmindist < currmindist and not  np.array_equal(ROI,StarDistCoords_to_xyCoords(allROIs[i])):
+            currmindist = foundmindist
+            currmindistId = i
+    #return the
+    return currmindist,currmindistId
+
 #Small wrapper for stardist-coordinate system (required input) to xyCoords
 def StarDistCoords_to_xyCoords(StarDistCoords):
     return np.rot90(StarDistCoords)
 
+#-------------------------------------------------------------------------------------------------------------------------------
+#Callable functions
+#-------------------------------------------------------------------------------------------------------------------------------
+
 def CellArea_lowerUpperBound(**kwargs):
     return 1
+
+def Temp_printnearestneighbour(**kwargs):
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    for i in range(0,len(kwargs["outline_coords"])):
+        [currmindist,currmindistId] = shortestDistanceToNeighbourROI(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]),kwargs["outline_coords"])
+        print(i)
+        print(currmindist)
+        print(currmindistId)
+        print('----')
+
 
 def Temp_printEccentricity(**kwargs):
     #Check if we have the required kwargs

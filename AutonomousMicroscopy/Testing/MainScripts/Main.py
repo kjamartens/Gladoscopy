@@ -41,7 +41,7 @@ with tifffile.TiffFile(testImageLoc) as tiff:
 l,d = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/Testing/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
 
 #print eccentricities for now
-eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.Temp_printEccentricity",outline_coords="d"))
+eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.Temp_printnearestneighbour",outline_coords="d"))
 print(HelperFunctions.infoFromMetadata("SimpleCellOperants.Temp_printEccentricity",showKwargs=True,showHelp=True))
 
 z=2
