@@ -9,14 +9,14 @@ from stardist.models import StarDist2D
 import sys, os
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"CellSegmentScripts"))
 
 #Import all scripts in the custom script folders
 from CellSegmentScripts import *
 from CellScoringScripts import *
 from ROICalcScripts import *
+from ScoringMetrics import *
 #Obtain the helperfunctions
-import HelperFunctions #works
+import HelperFunctions
 
 #Required PIPs:
 # pip install csbdeep stardist tensorflow matplotlib tifffile numpy shapely
@@ -26,9 +26,6 @@ import HelperFunctions #works
 # Main script
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-print(Polygon([[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]).area)
 
 testImageLoc = "./AutonomousMicroscopy/Testing/ExampleData/BF_test_avg.tiff"
 
@@ -41,16 +38,21 @@ with tifffile.TiffFile(testImageLoc) as tiff:
 l,d = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/Testing/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
 
 #print eccentricities for now
-eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.Temp_printnearestneighbour",outline_coords="d"))
-print(HelperFunctions.infoFromMetadata("SimpleCellOperants.Temp_printEccentricity",showKwargs=True,showHelp=True))
+eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.nrneighbours_basedonCellWidth",outline_coords="d",multiple_cellWidth_lookup="1"))
+print(HelperFunctions.infoFromMetadata("DefaultScoringMetrics",showKwargs=True,showHelp=True))
+
+kk=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.lowerUpperBound",value="1",lower_bound="0",upper_bound="2"))
+kk=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.gaussScore",value="[-5,-4,-3,-2,-1,0,1,2,3,4,5,99]",meanVal="2",sigmaVal="2"))
+print(kk)
+
+fn = HelperFunctions.functionNamesFromDir("ScoringMetrics")
+print(fn)
 
 z=2
 # parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # print(HelperFunctions.infoFromMetadata("SimpleCellOperants.CellArea_lowerUpperBound",showKwargs=True,showHelp=True))
 
-# fn = HelperFunctions.functionNamesFromDir("CellScoringScripts")
-# print(fn)
 
 # #Load the model outside the function - heavy speed increase for gridding specifically
 # stardistModel = StarDist2D(None,name='StarDistModel',basedir="./AutonomousMicroscopy/Testing/ExampleData")

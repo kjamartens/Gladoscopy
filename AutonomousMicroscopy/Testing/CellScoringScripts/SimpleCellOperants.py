@@ -32,7 +32,18 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Prints nearest neighbour of all ROIs"
+        },
+        "nrneighbours_basedonCellWidth": {
+            "required_kwargs": [
+                {"name": "outline_coords", "description": "List of outline coordinates belonging to individual cells."},
+                {"name":"multiple_cellWidth_lookup","description":"Multiple of cell_width equavalent to which it considers a close-by cell a 'neighbour'"}
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Returns the number of neighbours of every cell that is within multiple_cellWidth_lookup small-axis sizes of the cell."
         }
+
+        
     }
 
 #-------------------------------------------------------------------------------------------------------------------------------
@@ -104,6 +115,26 @@ def StarDistCoords_to_xyCoords(StarDistCoords):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+
+def nrneighbours_basedonCellWidth(**kwargs):
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    nr_neighbours = np.empty(len(kwargs["outline_coords"]))
+    #Loop over all ROIs
+    for i in range(0,len(kwargs["outline_coords"])):
+        #Get axis lengths
+        [celllongaxis, cellshortaxis] = getLongAndShortAxis(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]))
+        #Loop over all other ROIs
+        for j in range(0,len(kwargs["outline_coords"])):
+            if i != j:
+                #Get the minimum distance to the other ROI
+                celltocelldist = distanceROItoOther(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]),StarDistCoords_to_xyCoords(kwargs["outline_coords"][j]))
+                #If it's small enough, we have another neighbour
+                if celltocelldist < cellshortaxis*kwargs["multiple_cellWidth_lookup"]:
+                    nr_neighbours[i]+=1
+    
+    print(np.int_(nr_neighbours))
+
 
 def CellArea_lowerUpperBound(**kwargs):
     return 1
