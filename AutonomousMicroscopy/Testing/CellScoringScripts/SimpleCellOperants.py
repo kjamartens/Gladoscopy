@@ -8,30 +8,29 @@ import inspect
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
-        "CellArea_lowerUpperBound": {
+        "lengthWidthRatio": {
             "required_kwargs": [
                 {"name": "outline_coords", "description": "List of outline coordinates belonging to individual cells."},
-                {"name": "size_bounds", "description": "[lower, upper] bounds in pixel units"}
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Score cells 1 or 0 based on whether they are within area lower/upper bounds."
+            "help_string": "Returns the ratio between length and width of individual cells"
         },
-        "Temp_printEccentricity": {
+        "cellArea": {
             "required_kwargs": [
                 {"name": "outline_coords", "description": "List of outline coordinates belonging to individual cells."},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Prints eccentricity of all ROIs"
+            "help_string": "Returns the area of individual cells"
         },
-        "Temp_printnearestneighbour": {
+        "distToNearestNeighbour": {
             "required_kwargs": [
                 {"name": "outline_coords", "description": "List of outline coordinates belonging to individual cells."},
             ],
             "optional_kwargs": [
             ],
-            "help_string": "Prints nearest neighbour of all ROIs"
+            "help_string": "Returns the distance to the nearest neighbour cell"
         },
         "nrneighbours_basedonCellWidth": {
             "required_kwargs": [
@@ -115,7 +114,6 @@ def StarDistCoords_to_xyCoords(StarDistCoords):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-
 def nrneighbours_basedonCellWidth(**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
@@ -133,28 +131,29 @@ def nrneighbours_basedonCellWidth(**kwargs):
                 if celltocelldist < cellshortaxis*kwargs["multiple_cellWidth_lookup"]:
                     nr_neighbours[i]+=1
     
-    print(np.int_(nr_neighbours))
+    return np.int_(nr_neighbours)
 
-
-def CellArea_lowerUpperBound(**kwargs):
-    return 1
-
-def Temp_printnearestneighbour(**kwargs):
+def distToNearestNeighbour(**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    dist_to_nn = np.empty(len(kwargs["outline_coords"]))
     for i in range(0,len(kwargs["outline_coords"])):
         [currmindist,currmindistId] = shortestDistanceToNeighbourROI(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]),kwargs["outline_coords"])
-        print(i)
-        print(currmindist)
-        print(currmindistId)
-        print('----')
+        dist_to_nn[i] = currmindist
+    return dist_to_nn
 
-
-def Temp_printEccentricity(**kwargs):
+def lengthWidthRatio(**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    lwratio = np.empty(len(kwargs["outline_coords"]))
     for i in range(0,len(kwargs["outline_coords"])):
-        print(i)
-        # print(getRotation(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i])))
-        # print(getLongAndShortAxis(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i])))
-        print(getLongShortAxisRatio(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i])))
+        lwratio[i] = getLongShortAxisRatio(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]))
+    return lwratio
+
+def cellArea(**kwargs):
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    cellarea = np.empty(len(kwargs["outline_coords"]))
+    for i in range(0,len(kwargs["outline_coords"])):
+        cellarea[i] = getArea(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]))
+    return cellarea
