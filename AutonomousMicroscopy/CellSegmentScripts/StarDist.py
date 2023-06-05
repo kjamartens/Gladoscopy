@@ -56,8 +56,8 @@ def StarDistSegment(**kwargs):
     #Extract detailed info
     coord, points, prob = details['coord'], details['points'], details['prob']
 
-    #Return the labeled image, and the coordinates of the ROIs
-    return [labels,coord]
+    #Return the coordinates of the ROIs (could also return the labeled inage via 'labels')
+    return coord
 
 def StarDistSegment_preloadedModel(**kwargs):
     #Check if we have the required kwargs
@@ -79,5 +79,5 @@ def StarDistSegment_preloadedModel(**kwargs):
     #Extract detailed info
     coord, points, prob = details['coord'], details['points'], details['prob']
 
-    #Return the labeled image, and the coordinates of the ROIs
-    return [labels,coord]
+    #Return the coordinates of the ROIs (could also return the labeled inage via 'labels')
+    return coord
