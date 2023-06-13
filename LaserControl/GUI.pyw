@@ -328,7 +328,7 @@ try:
         MM_JSON = json.load(f)
 
     #Load UI settings
-    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'UILaserController.ui'))
+    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
 
     #Setup UI
     app = QApplication([])
@@ -399,7 +399,7 @@ except:
         MM_JSON = json.load(f)
 
     #Load UI settings
-    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'UILaserController.ui'))
+    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
 
     #Setup UI
     app = QApplication([])

@@ -21,7 +21,7 @@ from ScoringMetrics import *
 import HelperFunctions
 
 #Required PIPs:
-# pip install csbdeep stardist tensorflow matplotlib tifffile numpy shapely
+# pip install csbdeep stardist tensorflow matplotlib tifffile numpy shapely pyqt5 pyqtgraph pycromanager
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
