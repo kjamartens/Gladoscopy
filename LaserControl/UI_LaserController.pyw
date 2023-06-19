@@ -378,6 +378,21 @@ def armLaser(i):
     TS_Response_verbose();
 
     # #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Other functions
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#UV blinking function
+def blinkUV(duration):
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC9')
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'SAO9-65535')
+    TS_Response_verbose()
+    addToVerboseBoxText('UV LED on for '+str(duration)+' microseconds');
+    print('UV LED on for '+str(duration)+' microseconds');
+    time.sleep(duration/1000)
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'SAO9-0')
+    TS_Response_verbose()
+
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #End of functions
@@ -459,9 +474,11 @@ try:
     #Button that resets laser triggering
     form.resetLasersTriggerButton.clicked.connect(lambda: ResetLasersTrigger());
 
-
     #Button that resets laser triggering
     form.resetLasersTriggerButton.clicked.connect(lambda: ResetLasersTriggerButtonPress(frameduration));
+
+    #UV LED Button run
+    form.PushUVLED.clicked.connect(lambda: blinkUV(float(form.UVLED_duration_EditField.text())));
 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #UI-based things
