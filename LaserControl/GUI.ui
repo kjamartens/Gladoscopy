@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>Laser_Controller</class>
- <widget class="QDialog" name="Laser_Controller">
+ <widget class="QMainWindow" name="Laser_Controller">
+  <property name="windowModality">
+   <enum>Qt::NonModal</enum>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
