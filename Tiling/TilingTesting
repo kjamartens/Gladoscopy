@@ -1,0 +1,9 @@
+
+from TilingFunctions import *
+
+mainFolder = "E:/Data/Scope/Tiling/Hfx_20220810/ImSize512_Overlap10/220810_1642/"
+
+SegmentAllBFImages(mainFolder,"",22,22)
+#RenameToXYZ(mainFolder,"/Tiling/",14,14)
+RunRGStitchingAlgorithmInImageJ(1,1,mainFolder,"",22,22,10);
+CombineROIsAfterStitching(mainFolder,"",512,22*22);

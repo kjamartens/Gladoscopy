@@ -23,18 +23,34 @@ from PyQt5.QtCore import QTimer,QDateTime
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # General switching functions - MM hooks
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-def timerloop():
-    getFrameTimeInfo();
+def timerloop(frameduration):
+    getFrameTimeInfo(frameduration);
 
-def getFrameTimeInfo():
+def updateColorArming(Boolean):
+    #print('Updating Warning'+str(Boolean))
+    if Boolean == True:
+        form.ARMlaserTriggerPushButton.setStyleSheet("color:red;")
+    else:
+        form.ARMlaserTriggerPushButton.setStyleSheet("color:black;")
+
+
+def getFrameTimeInfo(frameduration):
     ft = core.get_exposure();
     form.frameTime_editBox.setText(str(ft));
     frameduration_new = ft;
     try:
-        drawplot(frameduration_new)
+        if frameduration_new != frameduration:
+            drawplot(frameduration_new)
     except:
         print('No plot drawn')
     return frameduration_new
+
+def SwitchOffLaser(laserID):
+    MM_Property_OnOff_Name = MM_JSON["lasers"]["MM_Property_OnOff_Name"]
+    MM_Property_Name = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
+    core.set_property(MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"], MM_Property_OnOff_Name, 0)
+    #Update button labels
+    InitLaserButtonLabels(MM_JSON)
 
 def SwitchOnOffLaser(laserID):
     MM_Property_OnOff_Name = MM_JSON["lasers"]["MM_Property_OnOff_Name"]
@@ -52,7 +68,7 @@ def SwitchOnOffLaser(laserID):
 def InitLaserButtonLabels(MM_JSON):
     #Get last part of property name in MM
     MMprop_onoff = MM_JSON["lasers"]["MM_Property_OnOff_Name"]
-    for i in [0,1,3,4]:
+    for i in [0,1,2,3,4]:
         #Get first part of property name in MM
         propertyname = MM_JSON["lasers"]["Laser"+str(i)]["MM_Property_Name"]
         #Set the label of the button depending on onoff state
@@ -70,47 +86,62 @@ def InitLaserButtonLabels(MM_JSON):
         exec("form.PushLaser_"+str(i)+".setStyleSheet(\"color:white; background-color: rgb(\"+str(rgbval[0])+\",\"+str(rgbval[1])+\",\"+str(rgbval[2])+\")\")")
 
 def InitLaserSliders(MM_JSON):
-    #Get property name for the intensity
-    MMprop_intensity_name = MM_JSON["lasers"]["MM_Property_Intensity_Name"]
-    for i in [0,1,3,4]:
-        #Get first part of property name in MM
-        propertyname = MM_JSON["lasers"]["Laser"+str(i)]["MM_Property_Name"]
-        #Get the value 0-5 from MM
-        ValIntMM = float(core.get_property(propertyname, MMprop_intensity_name))
-        #Translate the value to 0-100 in here
-        ValIntPerc = ValIntMM/float(MM_JSON["lasers"]["Laser"+str(i)]["Intensity_slope"])+float(MM_JSON["lasers"]["Laser"+str(i)]["Intensity_offset"])
+    for i in [0,1,2,3,4]:
+        ValIntPerc = MMJSON_to_ValIntPerc(MM_JSON,i);
         exec("form.SliderLaser_"+str(i)+".setValue(" + str(int(ValIntPerc)) + ")")
         #Get the intensity as a value from the slider
         exec("form.EditIntensity_Laser_"+str(i)+".setText(\"" +str(int(ValIntPerc))+"\")")
 
-def ChangeIntensityLaser(laserID):
+def MMJSON_to_ValIntPerc(MM_JSON,i):
+    #Get property name for the intensity
+    MMprop_intensity_name = MM_JSON["lasers"]["MM_Property_Intensity_Name"]
+    #Get first part of property name in MM
+    propertyname = MM_JSON["lasers"]["Laser"+str(i)]["MM_Property_Name"]
+    #Get the value 0-5 from MM
+    ValIntMM = float(core.get_property(propertyname, MMprop_intensity_name))
+    #Translate the value to 0-100 in here
+    ValIntPerc = ValIntMM/float(MM_JSON["lasers"]["Laser"+str(i)]["Intensity_slope"])+float(MM_JSON["lasers"]["Laser"+str(i)]["Intensity_offset"])
+    return ValIntPerc;
+
+def GetIntensityLaser(MM_JSON,laserID):
+    return MMJSON_to_ValIntPerc(MM_JSON,laserID);
+
+
+def ChangeIntensityLaser(laserID, ValIntPerc):
     #Get relevant names from JSON
     propertyname = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
     MMprop_intensity_name = MM_JSON["lasers"]["MM_Property_Intensity_Name"]
+
+    #Translate the value to 0-5
+    ValIntMM = ValIntPerc*float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_slope"])-float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_offset"])
+    #Set value in Micromanager
+    (core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM)))
+
+    #Change the PAC of the laser if it's triggering and such
+    if form.advancedLasers_RadioButton.isChecked():
+        drawplot(frameduration);
+        armLaser(laserID);
+        updateColorArming(0);
+
+def ChangeIntensityLaser_Slider(laserID):
     #Create ValIntPerc variable and extract
     exec("global ValInt; ValInt = form.SliderLaser_"+str(laserID)+".value()");
     #I don't want 99 percentages...
     ValIntPerc = ValInt
     if ValInt == 99:
         ValIntPerc = ValInt+1
-    #Translate the value to 0-5
-    ValIntMM = ValIntPerc*float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_slope"])-float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_offset"])
-    #Set value in Micromanager
-    (core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM)))
+    #Change the intensity
+    ChangeIntensityLaser(laserID, ValIntPerc);
     #Update labels
     InitLaserSliders(MM_JSON)
 
+
 def ChangeIntensityLaserEditField(laserID):
     try:
-        #Get relevant names from JSON
-        propertyname = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
-        MMprop_intensity_name = MM_JSON["lasers"]["MM_Property_Intensity_Name"]
         #Create ValIntPerc variable and extract
         exec("global ValIntPerc; ValIntPerc = int(form.EditIntensity_Laser_"+str(laserID)+".text())");
-        #Translate the value to 0-5
-        ValIntMM = ValIntPerc*float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_slope"])-float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_offset"])
-        #Set value in Micromanager
-        (core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM)))
+        #Change the intensity
+        ChangeIntensityLaser(laserID, ValIntPerc);
         #Update labels
         InitLaserSliders(MM_JSON)
     except:
@@ -159,12 +190,16 @@ def addToVerboseBoxText(text):
 
 #Specifically get TriggerScope response to verboxe text box
 def TS_Response_verbose():
+    core.get_property('TriggerScopeMM-Hub', 'Serial Receive');
     addToVerboseBoxText(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
+    print(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Laser trigger drawing functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 def drawplot(frameduration):
+    #print('CallingDrawPlot')
+    #We're changing something, so warning user that it's not yet armed
+    updateColorArming(1);
     #print(frameduration)
     #Initialise graph widget
     form.graphWidget.clear()
@@ -192,14 +227,20 @@ def drawplot(frameduration):
         exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
         exec("global duration; duration = int(form.Length_Edit_Laser_"+str(i)+".text())");
         if duration == 0:
-            drawduration = frameduration-delay/1000;
+            drawduration = 0;#frameduration-delay/1000;
         else:
             drawduration = duration/1000;
         exec("global everyxframes; everyxframes = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())");
         #Get wavelength to enable correct colours
         wvlngth = MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"]
+        #Get intensity from slider
+        #if i == 2:
+        #    intensity = 100;
+        #else:
+        intensity = GetIntensityLaser(MM_JSON,i);
 
-        drawsinglelaserint(delay/1000,drawduration,1,i+1,everyxframes,GetRGBFromLambda(wvlngth),frameduration,drawnrframes)
+
+        drawsinglelaserint(delay/1000,drawduration,intensity/100,i+1,everyxframes,GetRGBFromLambda(wvlngth),frameduration,drawnrframes)
 
 
 def drawsingleline(xdata,ydata,col):
@@ -222,7 +263,8 @@ def drawsinglelaserint(delay,duration,intensity,laserID,everyxframes,col,framedu
                 form.graphWidget.plot([i*frameduration,delay+i*frameduration],[LowPoint, LowPoint], pen=penLaserLine)
             #Rising edge
             if delay > 0.0001:
-                form.graphWidget.plot([delay+i*frameduration,delay+i*frameduration],[LowPoint, HighPoint], pen=penLaserLine)
+                if duration > 0.0001:
+                    form.graphWidget.plot([delay+i*frameduration,delay+i*frameduration],[LowPoint, HighPoint], pen=penLaserLine)
             #Flat part
             if duration > 0.0001:
                 form.graphWidget.plot([delay+i*frameduration, delay+duration+i*frameduration],[HighPoint, HighPoint], pen=penLaserLine)
@@ -252,83 +294,104 @@ def drawsinglelaserint(delay,duration,intensity,laserID,everyxframes,col,framedu
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Functions that instruct strobo + blanking of lasers
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def ResetLasersTriggerButtonPress(frameduration):
+    ResetLasersTrigger();
+    initLaserTrigEditBoxes();
+    #Draw the laser trigger plot
+    #Also see https://www.pythonguis.com/tutorials/plotting-pyqtgraph/
+    drawplot(frameduration)
+
 def ResetLasersTrigger():
     #Testing for now
-    for i in [0,1,3,4]:
+    for i in [0,1,2,3,4]:
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
         TS_Response_verbose();
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-0')
         TS_Response_verbose();
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-0')
         TS_Response_verbose();
+        #if (i != 2):
         SwitchOnOffLaser(i)
         SwitchOnOffLaser(i)
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', '*')
-    initLaserTrigEditBoxes()
     TS_Response_verbose();
 
 #Set all boxes to zeros and such
 def initLaserTrigEditBoxes():
     for i in range(0,5):
         exec("form.Length_Edit_Laser_"+str(i)+".setText(\"" +str(0)+"\")");
-        exec("form.Delay_Edit_Laser_"+str(i)+".setText(\"" +str(0)+"\")");
+        exec("form.Delay_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
         exec("form.BlinkFrames_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
 
 #Arm the laser triggering based on boxes input
 def armLaserTriggering():
     print('NEWARM')
-    for i in [1,3]:
-        #Loop over number of frames after which it repeats
-        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
+    for i in [0,1,2,3,4]:
+        armLaser(i);
+    #remove arming warning
+    updateColorArming(0);
 
-        #print(writetgs('PAO2-0-65535\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
-        #print(writetgs('PAO2-1-0\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
-    #!PAO2-0-1-1
-    #!PAO2-1-1-2
+#Arm a single laser
+def armLaser(i):
+    #Loop over number of frames after which it repeats
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
+    TS_Response_verbose();
 
-        exec("global nrframesrepeat; nrframesrepeat = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())")
-        for k in range(0,nrframesrepeat):
-            if k == 0:
-                print('PAO'+str(i+1)+'-0-65535')
-                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-65535')
+    #print(writetgs('PAO2-0-65535\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
+    #print(writetgs('PAO2-1-0\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
+#!PAO2-0-1-1
+#!PAO2-1-1-2
+
+    exec("global nrframesrepeat; nrframesrepeat = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())")
+    for k in range(0,nrframesrepeat):
+        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
+        exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
+        if k == 0:
+            if length>0:
+                print('PAO'+str(i+1)+'-0-' + str(round(65535*0.01*GetIntensityLaser(MM_JSON,i))))
+                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-' + str(round(65535*0.01*GetIntensityLaser(MM_JSON,i))))
                 TS_Response_verbose();
             else:
-                time.sleep(0.1)
-                print('PAO'+str(i+1)+'-'+str(k)+'-0')
-                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-'+str(k)+'-20000')
+                print('PAO'+str(i+1)+'-0' + str(round(0)))
+                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-' + str(round(0)))
                 TS_Response_verbose();
-                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
-                TS_Response_verbose();
+        else:
+            time.sleep(0.1)
+            #print('PAO'+str(i+1)+'-'+str(k)+'-0')
+            core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-'+str(k)+'-0')
+            TS_Response_verbose();
 
-
-                #if k == nrframesrepeat:
-                #    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
-                #    TS_Response_verbose();
-                #print(writetgs('PAS2-1-1\r\n')) #Trigger transition at DAC 1 - starting (1 middle) on rising edge (1 end)
-                #print(writetgs('BAO2-1-0\n')) #Add the blanking mode - now it turns off when no high TTL is received
-
-        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
-        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-'+str(delay))
-        TS_Response_verbose();
-        exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
-        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-'+str(length))
+        #print('PAS'+str(i+1)+'-1-1');
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
         TS_Response_verbose();
 
-        # #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
+
+            #if k == nrframesrepeat:
+            #    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
+            #    TS_Response_verbose();
+            #print(writetgs('PAS2-1-1\r\n')) #Trigger transition at DAC 1 - starting (1 middle) on rising edge (1 end)
+            #print(writetgs('BAO2-1-0\n')) #Add the blanking mode - now it turns off when no high TTL is received
+
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-'+str(delay))
+    TS_Response_verbose();
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-'+str(length))
+    TS_Response_verbose();
+
+    # #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
+
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #End of functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 # get object representing MMCore, used throughout
 try:
     core = Core()
-    
+
     #Open JSON file with MM settings
     with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
         MM_JSON = json.load(f)
 
     #Load UI settings
-    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'UILaserController.ui'))
+    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
 
     #Setup UI
     app = QApplication([])
@@ -336,34 +399,47 @@ try:
     form = Form()
     form.setupUi(window)
 
-    timer = QTimer(app)
-    timer.timeout.connect(lambda: timerloop())
-    #Update the timer every 500 ms
-    timer.start(500)
-
     #Get onoff and intensity from MM
     InitLaserButtonLabels(MM_JSON)
     InitLaserSliders(MM_JSON)
     InitFilterWheelRadioCheckbox()
-
+    
     #Get frametimeinfo
     global frameduration;
-    frameduration = getFrameTimeInfo();
+    frameduration = getFrameTimeInfo(0);
 
-    #Laser control integration
-    #For all non-AOTF lasers
-    for i in [0,1,3,4]:
-        #Change on-off state when button is pressed
-        exec("form.PushLaser_" + str(i) + ".clicked.connect(lambda: SwitchOnOffLaser(" + str(i) + "));")
-        #Change intensity when slider is changed
-        exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser(" + str(i) + "));")
-        #Change intensity when intensity edit field is changed
-        exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
+    timer = QTimer(app)
+    timer.timeout.connect(lambda: timerloop(frameduration))
+
+    #Update the timer every 500 ms
+    timer.start(500)
+
+    # #Laser control integration
+    # #For all non-AOTF lasers
+    # for i in [0,1,3,4]:
+    #     #Change on-off state when button is pressed
+    #     exec("form.PushLaser_" + str(i) + ".clicked.connect(lambda: SwitchOnOffLaser(" + str(i) + "));")
+    #     #Change intensity when slider is changed
+    #     exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser(" + str(i) + "));")
+    #     #Change intensity when intensity edit field is changed
+    #     exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
 
     #Set FilterWheel Clickable commands
     for i in range(0,6):
         #Change on-off state when button is pressed
         exec("form.FW_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeFilterWheelFromRadioCheckBox(" + str(i) + "));")
+    
+    #Laser control integration
+    #For all lasers
+    for i in [0,1,2,3,4]:
+        #Change on-off state when button is pressed
+        exec("form.PushLaser_" + str(i) + ".clicked.connect(lambda: SwitchOnOffLaser(" + str(i) + "));")
+        #Change intensity when slider is changed
+        exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser(" + str(i) + "));")
+        exec("form.SliderLaser_" + str(i) + ".sliderReleased.connect(lambda: ChangeIntensityLaser_Slider(" + str(i) + "));")
+        #Change intensity when intensity edit field is changed
+        exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
+    # >>>>>>> Stashed changes:UI_LaserController.pyw
 
     #Initialise the laser triggering boxes
     initLaserTrigEditBoxes();
@@ -383,12 +459,41 @@ try:
     #Button that resets laser triggering
     form.resetLasersTriggerButton.clicked.connect(lambda: ResetLasersTrigger());
 
+
+    #Button that resets laser triggering
+    form.resetLasersTriggerButton.clicked.connect(lambda: ResetLasersTriggerButtonPress(frameduration));
+
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #UI-based things
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    #Activate/deactivate either the advanced lasers or simple laser scheme based on radio Button
+    def SimpleLasers():
+        form.LaserTriggerSchemeBox.setEnabled(0);
+        for i in range(0,5):
+            exec("form.PushLaser_" + str(i) + ".setEnabled(1);");
+        ResetLasersTrigger();
+
+    def AdvancedLasers():
+        form.LaserTriggerSchemeBox.setEnabled(1);
+        for i in range(0,5):
+            exec("form.PushLaser_" + str(i) + ".setEnabled(0);");
+            SwitchOffLaser(i);
+        armLaserTriggering();
+
+    form.simpleLasers_RadioButton.clicked.connect(lambda: SimpleLasers());
+    form.advancedLasers_RadioButton.clicked.connect(lambda: AdvancedLasers());
+
+    #Don't display warning
+    updateColorArming(0)
+
     #Show window and start app
     window.show()
 
-
     #Reset laser triggers when startup for properly expected behaviour
     ResetLasersTrigger();
+    #Initialise laser trigger edit buttons
+    initLaserTrigEditBoxes();
     app.exec()
 
 except:
@@ -399,7 +504,7 @@ except:
         MM_JSON = json.load(f)
 
     #Load UI settings
-    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'UILaserController.ui'))
+    Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
 
     #Setup UI
     app = QApplication([])
@@ -407,10 +512,10 @@ except:
     form = Form()
     form.setupUi(window)
 
-
     #Show window and start app
     window.show()
 
-
     #Reset laser triggers when startup for properly expected behaviour
     app.exec()
+
+

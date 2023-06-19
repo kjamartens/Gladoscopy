@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>711</width>
-    <height>843</height>
+    <height>914</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>0</x>
      <y>0</y>
      <width>691</width>
-     <height>781</height>
+     <height>841</height>
     </rect>
    </property>
    <property name="currentIndex">
@@ -35,7 +35,7 @@
        <x>10</x>
        <y>10</y>
        <width>491</width>
-       <height>291</height>
+       <height>321</height>
       </rect>
      </property>
      <property name="title">
@@ -1079,6 +1079,48 @@
        </item>
       </layout>
      </widget>
+     <widget class="QGroupBox" name="groupBox_easyAdvancedLasers">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>260</y>
+        <width>371</width>
+        <height>51</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Simple / Advanced lasers</string>
+      </property>
+      <widget class="QRadioButton" name="simpleLasers_RadioButton">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>20</y>
+         <width>111</width>
+         <height>17</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Simple Lasers (top)</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+      <widget class="QRadioButton" name="advancedLasers_RadioButton">
+       <property name="geometry">
+        <rect>
+         <x>150</x>
+         <y>20</y>
+         <width>171</width>
+         <height>17</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Advanced lasers (bottom)</string>
+       </property>
+      </widget>
+     </widget>
     </widget>
     <widget class="QGroupBox" name="FWBox">
      <property name="geometry">
@@ -1182,12 +1224,15 @@
      </widget>
     </widget>
     <widget class="QGroupBox" name="LaserTriggerSchemeBox">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>310</y>
+       <y>350</y>
        <width>661</width>
-       <height>441</height>
+       <height>451</height>
       </rect>
      </property>
      <property name="title">
@@ -1421,7 +1466,7 @@
        <string>Arm lasers</string>
       </property>
      </widget>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <property name="geometry">
        <rect>
         <x>10</x>
