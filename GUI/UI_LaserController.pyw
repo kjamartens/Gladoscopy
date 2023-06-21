@@ -123,6 +123,11 @@ def ChangeIntensityLaser(laserID, ValIntPerc):
         armLaser(laserID);
         updateColorArming(0);
 
+#Change intensityslider only when simple laser is checked
+def ChangeIntensityLaser_Slider_onlySimple(laserID):
+    if form.simpleLasers_RadioButton.isChecked():
+        ChangeIntensityLaser_Slider(laserID)
+
 def ChangeIntensityLaser_Slider(laserID):
     #Create ValIntPerc variable and extract
     exec("global ValInt; ValInt = form.SliderLaser_"+str(laserID)+".value()");
@@ -234,11 +239,7 @@ def drawplot(frameduration):
         #Get wavelength to enable correct colours
         wvlngth = MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"]
         #Get intensity from slider
-        #if i == 2:
-        #    intensity = 100;
-        #else:
         intensity = GetIntensityLaser(MM_JSON,i);
-
 
         drawsinglelaserint(delay/1000,drawduration,intensity/100,i+1,everyxframes,GetRGBFromLambda(wvlngth),frameduration,drawnrframes)
 
@@ -302,7 +303,6 @@ def ResetLasersTriggerButtonPress(frameduration):
     drawplot(frameduration)
 
 def ResetLasersTrigger():
-    #Testing for now
     for i in [0,1,2,3,4]:
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
         TS_Response_verbose();
@@ -336,11 +336,6 @@ def armLaser(i):
     #Loop over number of frames after which it repeats
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
     TS_Response_verbose();
-
-    #print(writetgs('PAO2-0-65535\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
-    #print(writetgs('PAO2-1-0\r\n')) #Set DAC1 to switch between 20000 and 0 Starting at sequence 0
-#!PAO2-0-1-1
-#!PAO2-1-1-2
 
     exec("global nrframesrepeat; nrframesrepeat = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())")
     for k in range(0,nrframesrepeat):
@@ -429,16 +424,6 @@ try:
     #Update the timer every 500 ms
     timer.start(500)
 
-    # #Laser control integration
-    # #For all non-AOTF lasers
-    # for i in [0,1,3,4]:
-    #     #Change on-off state when button is pressed
-    #     exec("form.PushLaser_" + str(i) + ".clicked.connect(lambda: SwitchOnOffLaser(" + str(i) + "));")
-    #     #Change intensity when slider is changed
-    #     exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser(" + str(i) + "));")
-    #     #Change intensity when intensity edit field is changed
-    #     exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
-
     #Set FilterWheel Clickable commands
     for i in range(0,6):
         #Change on-off state when button is pressed
@@ -450,12 +435,11 @@ try:
         #Change on-off state when button is pressed
         exec("form.PushLaser_" + str(i) + ".clicked.connect(lambda: SwitchOnOffLaser(" + str(i) + "));")
         #Change intensity when slider is changed
-        exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser(" + str(i) + "));")
         exec("form.SliderLaser_" + str(i) + ".sliderReleased.connect(lambda: ChangeIntensityLaser_Slider(" + str(i) + "));")
+        exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser_Slider_onlySimple(" + str(i) + "));")
         #Change intensity when intensity edit field is changed
         exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
-    # >>>>>>> Stashed changes:UI_LaserController.pyw
-
+    
     #Initialise the laser triggering boxes
     initLaserTrigEditBoxes();
     #Draw the laser trigger plot
