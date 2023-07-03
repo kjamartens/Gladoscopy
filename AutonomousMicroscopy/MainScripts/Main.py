@@ -19,7 +19,7 @@ from ScoringMetrics import *
 #Obtain the helperfunctions
 import HelperFunctions
 
-#Created Conda environment (Python 3.8.16)
+#Created Conda environment (Python 3.10.11)
 #Required PIPs:
 # pip install --upgrade setuptools
 # pip install csbdeep tensorflow matplotlib tifffile numpy shapely pyqt5 pyqtgraph pycromanager stardist pyqt5 pyqtgraph
