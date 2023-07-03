@@ -1,16 +1,15 @@
-from csbdeep.io import save_tiff_imagej_compatible
-from stardist import _draw_polygons, export_imagej_rois
-import tifffile
-from shapely import Polygon, affinity
-import numpy as np
-import math
-import matplotlib.pyplot as plt
-from matplotlib import colormaps
-
-from stardist.models import StarDist2D
+# from csbdeep.io import save_tiff_imagej_compatible
+# from stardist import _draw_polygons, export_imagej_rois
 import sys, os
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import tifffile
+# from shapely import Polygon, affinity
+# import numpy as np
+# import math
+# from stardist.models import StarDist2D
+import matplotlib.pyplot as plt
+from matplotlib import colormaps
 
 #Import all scripts in the custom script folders
 from CellSegmentScripts import *
@@ -20,8 +19,10 @@ from ScoringMetrics import *
 #Obtain the helperfunctions
 import HelperFunctions
 
+#Created Conda environment (Python 3.8.16)
 #Required PIPs:
-# pip install csbdeep stardist tensorflow matplotlib tifffile numpy shapely pyqt5 pyqtgraph pycromanager
+# pip install --upgrade setuptools
+# pip install csbdeep tensorflow matplotlib tifffile numpy shapely pyqt5 pyqtgraph pycromanager stardist pyqt5 pyqtgraph
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
