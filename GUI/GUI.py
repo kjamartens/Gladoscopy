@@ -1,7 +1,7 @@
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QLabel
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QResizeEvent
+from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap
 from PyQt5 import uic
 # import PyQt5.QtWidgets
 import json
@@ -30,7 +30,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         #Load the UI
         self.load_ui()
-        #Setup the dynamic interface
+        #Set Icon
+        #For some reason, this needs abs path rather than rel, so os.path
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        self.setWindowIcon(QIcon(os.path.join(dir_path,"Icons/GladosIcon.png")))
+        # #Setup the dynamic interface
         self.setup_dynamic_interface()
 
     def load_ui(self):
@@ -147,8 +151,8 @@ if __name__ == "__main__":
 
         #Show window and start app
         window.show()
-        # app.exec()
-        sys.exit(app.exec_())
+        app.exec()
+        # sys.exit(app.exec_())
 
     except:
         print('No micromanager, test mode!')

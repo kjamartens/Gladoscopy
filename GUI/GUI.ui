@@ -6,25 +6,39 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>747</width>
-    <height>898</height>
+    <width>738</width>
+    <height>902</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>747</width>
-    <height>561</height>
+    <width>667</width>
+    <height>352</height>
    </size>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>GladOS Laser Controller</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="GladOS">
+    <normalon>:/MainIcon/MainIcon</normalon>
+   </iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_5">
     <item>
      <widget class="QTabWidget" name="tabWidget">
+      <property name="tabPosition">
+       <enum>QTabWidget::North</enum>
+      </property>
+      <property name="tabShape">
+       <enum>QTabWidget::Rounded</enum>
+      </property>
       <property name="currentIndex">
        <number>0</number>
+      </property>
+      <property name="usesScrollButtons">
+       <bool>true</bool>
       </property>
       <widget class="QWidget" name="tab_manual">
        <attribute name="title">
@@ -33,6 +47,9 @@
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <widget class="QScrollArea" name="scrollArea">
+          <property name="frameShadow">
+           <enum>QFrame::Plain</enum>
+          </property>
           <property name="widgetResizable">
            <bool>true</bool>
           </property>
@@ -41,8 +58,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>686</width>
-             <height>839</height>
+             <width>694</width>
+             <height>818</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -51,10 +68,10 @@
               <item>
                <layout class="QHBoxLayout" name="horizontalLayout" stretch="3,1">
                 <item>
-                 <widget class="QGroupBox" name="LaserBox_2">
+                 <widget class="QGroupBox" name="LaserBox">
                   <property name="minimumSize">
                    <size>
-                    <width>0</width>
+                    <width>477</width>
                     <height>305</height>
                    </size>
                   </property>
@@ -70,9 +87,9 @@
                      <height>231</height>
                     </rect>
                    </property>
-                   <layout class="QVBoxLayout" name="verticalLayout0_6">
+                   <layout class="QVBoxLayout" name="verticalLayout0">
                     <item>
-                     <widget class="QLabel" name="NameLaser_35">
+                     <widget class="QLabel" name="NameLaser_0">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -100,7 +117,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QLineEdit" name="EditIntensity_Laser_25">
+                       <widget class="QLineEdit" name="EditIntensity_Laser_0">
                         <property name="maximumSize">
                          <size>
                           <width>30</width>
@@ -146,7 +163,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QSlider" name="SliderLaser_25">
+                       <widget class="QSlider" name="SliderLaser_0">
                         <property name="orientation">
                          <enum>Qt::Vertical</enum>
                         </property>
@@ -174,7 +191,7 @@
                      </layout>
                     </item>
                     <item>
-                     <widget class="QPushButton" name="PushLaser_25">
+                     <widget class="QPushButton" name="PushLaser_0">
                       <property name="palette">
                        <palette>
                         <active>
@@ -612,9 +629,9 @@
                      <height>231</height>
                     </rect>
                    </property>
-                   <layout class="QVBoxLayout" name="verticalLayout1_6">
+                   <layout class="QVBoxLayout" name="verticalLayout1">
                     <item>
-                     <widget class="QLabel" name="NameLaser_36">
+                     <widget class="QLabel" name="NameLaser_1">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -642,7 +659,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QLineEdit" name="EditIntensity_Laser_26">
+                       <widget class="QLineEdit" name="EditIntensity_Laser_1">
                         <property name="maximumSize">
                          <size>
                           <width>30</width>
@@ -685,7 +702,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QSlider" name="SliderLaser_26">
+                       <widget class="QSlider" name="SliderLaser_1">
                         <property name="orientation">
                          <enum>Qt::Vertical</enum>
                         </property>
@@ -713,7 +730,7 @@
                      </layout>
                     </item>
                     <item>
-                     <widget class="QPushButton" name="PushLaser_26">
+                     <widget class="QPushButton" name="PushLaser_1">
                       <property name="font">
                        <font>
                         <weight>75</weight>
@@ -736,9 +753,9 @@
                      <height>231</height>
                     </rect>
                    </property>
-                   <layout class="QVBoxLayout" name="verticalLayout2_6">
+                   <layout class="QVBoxLayout" name="verticalLayout2">
                     <item>
-                     <widget class="QLabel" name="NameLaser_37">
+                     <widget class="QLabel" name="NameLaser_2">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -766,7 +783,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QLineEdit" name="EditIntensity_Laser_27">
+                       <widget class="QLineEdit" name="EditIntensity_Laser_2">
                         <property name="maximumSize">
                          <size>
                           <width>30</width>
@@ -809,7 +826,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QSlider" name="SliderLaser_27">
+                       <widget class="QSlider" name="SliderLaser_2">
                         <property name="orientation">
                          <enum>Qt::Vertical</enum>
                         </property>
@@ -837,7 +854,7 @@
                      </layout>
                     </item>
                     <item>
-                     <widget class="QPushButton" name="PushLaser_27">
+                     <widget class="QPushButton" name="PushLaser_2">
                       <property name="font">
                        <font>
                         <weight>75</weight>
@@ -860,9 +877,9 @@
                      <height>231</height>
                     </rect>
                    </property>
-                   <layout class="QVBoxLayout" name="verticalLayout3_6">
+                   <layout class="QVBoxLayout" name="verticalLayout3">
                     <item>
-                     <widget class="QLabel" name="NameLaser_38">
+                     <widget class="QLabel" name="NameLaser_3">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -890,7 +907,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QLineEdit" name="EditIntensity_Laser_28">
+                       <widget class="QLineEdit" name="EditIntensity_Laser_3">
                         <property name="maximumSize">
                          <size>
                           <width>30</width>
@@ -933,7 +950,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QSlider" name="SliderLaser_28">
+                       <widget class="QSlider" name="SliderLaser_3">
                         <property name="orientation">
                          <enum>Qt::Vertical</enum>
                         </property>
@@ -961,7 +978,7 @@
                      </layout>
                     </item>
                     <item>
-                     <widget class="QPushButton" name="PushLaser_28">
+                     <widget class="QPushButton" name="PushLaser_3">
                       <property name="font">
                        <font>
                         <weight>75</weight>
@@ -984,9 +1001,9 @@
                      <height>231</height>
                     </rect>
                    </property>
-                   <layout class="QVBoxLayout" name="verticalLayout4_6">
+                   <layout class="QVBoxLayout" name="verticalLayout4">
                     <item>
-                     <widget class="QLabel" name="NameLaser_39">
+                     <widget class="QLabel" name="NameLaser_4">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -1014,7 +1031,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QLineEdit" name="EditIntensity_Laser_29">
+                       <widget class="QLineEdit" name="EditIntensity_Laser_4">
                         <property name="maximumSize">
                          <size>
                           <width>30</width>
@@ -1057,7 +1074,7 @@
                        </spacer>
                       </item>
                       <item>
-                       <widget class="QSlider" name="SliderLaser_29">
+                       <widget class="QSlider" name="SliderLaser_4">
                         <property name="orientation">
                          <enum>Qt::Vertical</enum>
                         </property>
@@ -1085,7 +1102,7 @@
                      </layout>
                     </item>
                     <item>
-                     <widget class="QPushButton" name="PushLaser_29">
+                     <widget class="QPushButton" name="PushLaser_4">
                       <property name="font">
                        <font>
                         <weight>75</weight>
@@ -1099,7 +1116,7 @@
                     </item>
                    </layout>
                   </widget>
-                  <widget class="QGroupBox" name="groupBox_easyAdvancedLasers_6">
+                  <widget class="QGroupBox" name="groupBox_easyAdvancedLasers">
                    <property name="geometry">
                     <rect>
                      <x>30</x>
@@ -1111,7 +1128,7 @@
                    <property name="title">
                     <string>Simple / Advanced lasers</string>
                    </property>
-                   <widget class="QRadioButton" name="simpleLasers_RadioButton_6">
+                   <widget class="QRadioButton" name="simpleLasers_RadioButton">
                     <property name="geometry">
                      <rect>
                       <x>10</x>
@@ -1127,7 +1144,7 @@
                      <bool>true</bool>
                     </property>
                    </widget>
-                   <widget class="QRadioButton" name="advancedLasers_RadioButton_6">
+                   <widget class="QRadioButton" name="advancedLasers_RadioButton">
                     <property name="geometry">
                      <rect>
                       <x>150</x>
@@ -1146,11 +1163,11 @@
                 <item>
                  <layout class="QVBoxLayout" name="verticalLayout_4" stretch="1,3">
                   <item>
-                   <widget class="QGroupBox" name="groupBox_2">
+                   <widget class="QGroupBox" name="groupBox">
                     <property name="title">
                      <string>FrameTime info</string>
                     </property>
-                    <widget class="QLineEdit" name="frameTime_editBox_6">
+                    <widget class="QLineEdit" name="frameTime_editBox">
                      <property name="enabled">
                       <bool>false</bool>
                      </property>
@@ -1166,11 +1183,11 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QGroupBox" name="FWBox_2">
+                   <widget class="QGroupBox" name="FWBox">
                     <property name="title">
                      <string>Emission Filters</string>
                     </property>
-                    <widget class="QRadioButton" name="FW_radioButton_24">
+                    <widget class="QRadioButton" name="FW_radioButton_0">
                      <property name="geometry">
                       <rect>
                        <x>20</x>
@@ -1193,7 +1210,7 @@
                       <bool>true</bool>
                      </property>
                     </widget>
-                    <widget class="QRadioButton" name="FW_radioButton_25">
+                    <widget class="QRadioButton" name="FW_radioButton_3">
                      <property name="geometry">
                       <rect>
                        <x>20</x>
@@ -1206,7 +1223,7 @@
                       <string>RadioButton</string>
                      </property>
                     </widget>
-                    <widget class="QRadioButton" name="FW_radioButton_26">
+                    <widget class="QRadioButton" name="FW_radioButton_4">
                      <property name="geometry">
                       <rect>
                        <x>20</x>
@@ -1219,7 +1236,7 @@
                       <string>RadioButton</string>
                      </property>
                     </widget>
-                    <widget class="QRadioButton" name="FW_radioButton_27">
+                    <widget class="QRadioButton" name="FW_radioButton_2">
                      <property name="geometry">
                       <rect>
                        <x>20</x>
@@ -1232,7 +1249,7 @@
                       <string>RadioButton</string>
                      </property>
                     </widget>
-                    <widget class="QRadioButton" name="FW_radioButton_28">
+                    <widget class="QRadioButton" name="FW_radioButton_1">
                      <property name="geometry">
                       <rect>
                        <x>20</x>
@@ -1245,7 +1262,7 @@
                       <string>RadioButton</string>
                      </property>
                     </widget>
-                    <widget class="QRadioButton" name="FW_radioButton_29">
+                    <widget class="QRadioButton" name="FW_radioButton_5">
                      <property name="geometry">
                       <rect>
                        <x>20</x>
@@ -1265,7 +1282,7 @@
                </layout>
               </item>
               <item>
-               <widget class="QGroupBox" name="LaserTriggerSchemeBox_2">
+               <widget class="QGroupBox" name="LaserTriggerSchemeBox">
                 <property name="enabled">
                  <bool>false</bool>
                 </property>
@@ -1278,7 +1295,7 @@
                 <property name="title">
                  <string>Laser Triggering Scheme Setup</string>
                 </property>
-                <widget class="PlotWidget" name="graphWidget_5" native="true">
+                <widget class="PlotWidget" name="graphWidget" native="true">
                  <property name="geometry">
                   <rect>
                    <x>10</x>
@@ -1288,7 +1305,7 @@
                   </rect>
                  </property>
                 </widget>
-                <widget class="QPushButton" name="resetLasersTriggerButton_5">
+                <widget class="QPushButton" name="resetLasersTriggerButton">
                  <property name="geometry">
                   <rect>
                    <x>240</x>
@@ -1301,7 +1318,7 @@
                   <string>Reset Laser Triggers</string>
                  </property>
                 </widget>
-                <widget class="QTextBrowser" name="VerboseBox_5">
+                <widget class="QTextBrowser" name="VerboseBox">
                  <property name="geometry">
                   <rect>
                    <x>390</x>
@@ -1324,7 +1341,7 @@
                   <item>
                    <layout class="QVBoxLayout" name="verticalLayout_25">
                     <item>
-                     <widget class="QLabel" name="NameLaser_2_6">
+                     <widget class="QLabel" name="NameLaser_2_2">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -1334,13 +1351,13 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Length_Edit_Laser_20"/>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_2"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Delay_Edit_Laser_20"/>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_2"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_20"/>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_2"/>
                     </item>
                    </layout>
                   </item>
@@ -1359,7 +1376,7 @@
                   <item>
                    <layout class="QVBoxLayout" name="verticalLayout_26">
                     <item>
-                     <widget class="QLabel" name="NameLaser_3_6">
+                     <widget class="QLabel" name="NameLaser_3_2">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -1369,13 +1386,13 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Length_Edit_Laser_21"/>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_3"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Delay_Edit_Laser_21"/>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_3"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_21"/>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_3"/>
                     </item>
                    </layout>
                   </item>
@@ -1394,7 +1411,7 @@
                   <item>
                    <layout class="QVBoxLayout" name="verticalLayout_27">
                     <item>
-                     <widget class="QLabel" name="NameLaser_4_6">
+                     <widget class="QLabel" name="NameLaser_4_2">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -1404,13 +1421,13 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Length_Edit_Laser_22"/>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_4"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Delay_Edit_Laser_22"/>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_4"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_22"/>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_4"/>
                     </item>
                    </layout>
                   </item>
@@ -1429,7 +1446,7 @@
                   <item>
                    <layout class="QVBoxLayout" name="verticalLayout_28">
                     <item>
-                     <widget class="QLabel" name="NameLaser_1_6">
+                     <widget class="QLabel" name="NameLaser_1_2">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -1439,13 +1456,13 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Length_Edit_Laser_23"/>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_1"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Delay_Edit_Laser_23"/>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_1"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_23"/>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_1"/>
                     </item>
                    </layout>
                   </item>
@@ -1464,7 +1481,7 @@
                   <item>
                    <layout class="QVBoxLayout" name="verticalLayout_29">
                     <item>
-                     <widget class="QLabel" name="NameLaser_0_6">
+                     <widget class="QLabel" name="NameLaser_0_2">
                       <property name="text">
                        <string>TextLabel</string>
                       </property>
@@ -1474,19 +1491,19 @@
                      </widget>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Length_Edit_Laser_24"/>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_0"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="Delay_Edit_Laser_24"/>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_0"/>
                     </item>
                     <item>
-                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_24"/>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_0"/>
                     </item>
                    </layout>
                   </item>
                  </layout>
                 </widget>
-                <widget class="QPushButton" name="ARMlaserTriggerPushButton_5">
+                <widget class="QPushButton" name="ARMlaserTriggerPushButton">
                  <property name="geometry">
                   <rect>
                    <x>554</x>
@@ -1546,17 +1563,17 @@
                 <property name="minimumSize">
                  <size>
                   <width>0</width>
-                  <height>80</height>
+                  <height>50</height>
                  </size>
                 </property>
                 <property name="title">
                  <string>UV LED</string>
                 </property>
-                <widget class="QPushButton" name="PushUVLED_5">
+                <widget class="QPushButton" name="PushUVLED">
                  <property name="geometry">
                   <rect>
-                   <x>50</x>
-                   <y>50</y>
+                   <x>200</x>
+                   <y>20</y>
                    <width>89</width>
                    <height>23</height>
                   </rect>
@@ -1582,7 +1599,7 @@
                  </property>
                  <layout class="QHBoxLayout" name="horizontalLayout_81">
                   <item>
-                   <widget class="QLabel" name="NameLaser_33">
+                   <widget class="QLabel" name="QLabelUV0">
                     <property name="text">
                      <string>Duration:</string>
                     </property>
@@ -1592,7 +1609,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="UVLED_duration_EditField_5">
+                   <widget class="QLineEdit" name="UVLED_duration_EditField">
                     <property name="maximumSize">
                      <size>
                       <width>60</width>
@@ -1608,7 +1625,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLabel" name="NameLaser_34">
+                   <widget class="QLabel" name="QLabelUV1">
                     <property name="text">
                      <string>milliseconds</string>
                     </property>
@@ -1648,6 +1665,8 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
- <resources/>
+ <resources>
+  <include location="Icons/GUI_resourceFileIcons.qrc"/>
+ </resources>
  <connections/>
 </ui>

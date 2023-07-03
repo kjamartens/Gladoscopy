@@ -20,7 +20,7 @@
             "Wavelength": 561,
 			"MM_Property_Name": "TS_DAC03_561Laser",
 			"Intensity_offset": 0,
-			"Intensity_slope": 0.05
+			"Intensity_slope": 0.005
         },
 		"Laser3": {
             "Wavelength": 638,
