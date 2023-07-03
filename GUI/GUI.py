@@ -122,52 +122,52 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    # try:
-    # get object representing MMCore, used throughout
-    core = Core()
+    try:
+        # get object representing MMCore, used throughout
+        core = Core()
 
-    #Open JSON file with MM settings
-    with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
-        MM_JSON = json.load(f)
+        #Open JSON file with MM settings
+        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+            MM_JSON = json.load(f)
 
-    #Load UI settings
-    # Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
+        #Load UI settings
+        # Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
 
-    #Setup UI
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    # app = QApplication(sys.argv)
-    # window = Window()
-    # form = Form()
-    # form.setupUi(window)
-    z=2
-    #Run the laserController UI
-    runlaserControllerUI(core,MM_JSON,window,app)
-
-    #Show window and start app
-    window.show()
-    # app.exec()
-    sys.exit(app.exec_())
-
-    # except:
-        # print('No micromanager, test mode!')
-
-        # #Open JSON file with MM settings
-        # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
-        #     MM_JSON = json.load(f)
-
-        # #Load UI settings
-        # # Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
-
-        # #Setup UI
+        #Setup UI
+        app = QApplication(sys.argv)
+        window = MainWindow()
+        window.show()
         # app = QApplication(sys.argv)
-        # window = MainWindow()
-        # window.show()
+        # window = Window()
+        # form = Form()
+        # form.setupUi(window)
+        z=2
+        #Run the laserController UI
+        runlaserControllerUI(core,MM_JSON,window,app)
 
-        # #Show window and start app
-        # window.show()
-        # # app.exec()
-        # sys.exit(app.exec_())
+        #Show window and start app
+        window.show()
+        # app.exec()
+        sys.exit(app.exec_())
+
+    except:
+        print('No micromanager, test mode!')
+
+        #Open JSON file with MM settings
+        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+            MM_JSON = json.load(f)
+
+        #Load UI settings
+        # Form, Window = uic.loadUiType(os.path.join(sys.path[0], 'GUI.ui'))
+
+        #Setup UI
+        app = QApplication(sys.argv)
+        window = MainWindow()
+        window.show()
+
+        #Show window and start app
+        window.show()
+        # app.exec()
+        sys.exit(app.exec_())
 
 
