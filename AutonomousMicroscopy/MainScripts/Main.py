@@ -9,7 +9,7 @@ import tifffile
 # import math
 # from stardist.models import StarDist2D
 import matplotlib.pyplot as plt
-from matplotlib import colormaps
+from matplotlib import colormaps # type: ignore
 
 #Import all scripts in the custom script folders
 from CellSegmentScripts import *
