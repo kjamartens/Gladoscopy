@@ -46,5 +46,11 @@
 		"Label4": "LP655",
 		"Label5": "Empty",
 		"ChangeWaitTimeMs": "2000"
+	},
+	"BF_radioLabels": {
+		"Label0": "BF Off",
+		"Label1": "BF On",
+		"Label2": "BF High",
+		"ChangeWaitTimeMs": "2000"
 	}
 }

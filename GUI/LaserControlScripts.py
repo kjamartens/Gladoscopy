@@ -168,6 +168,37 @@ def ChangeFilterWheelFromRadioCheckBox(FW_id):
     #Refresh everything
     InitFilterWheelRadioCheckbox()
 
+def InitBFRadioCheckbox():
+    #Get the current names from the JSON for the filterwheel positions
+    for i in range(0,3):
+        exec("form.FW_radioButton_"+str(i)+".setText(\"" + MM_JSON["BF_radioLabels"]["Label"+str(i)] + "\")")
+    #Get the current BF state from MM
+    try:
+        curBFstate = core.get_property('TIDiaLamp','Intensity')
+    except:
+        curBFstate = 0
+        print('errored BF')
+    print(curBFstate)
+    if curBFstate == 0:
+        curSelectedState = 0 #off
+    elif curBFstate < 7:
+        curSelectedState = 1 #on
+    else:
+        curSelectedState = 2 #high
+    #Set the correct checkbox
+    exec("form.BF_radioButton_" + str(curSelectedState) + ".setChecked(1)")
+
+def ChangeBFFromRadioCheckBox(FW_id):
+    #Give the command to MM
+    if FW_id == 0: #off
+        core.set_config('BF_Mode', 'BF_Off')
+    elif FW_id == 1:
+        core.set_config('BF_Mode', 'BF_On')
+    elif FW_id == 2:
+        core.set_config('BF_Mode', 'BF_High')
+    #Refresh everything
+    InitBFRadioCheckbox()
+
 def GetRGBFromLambda(w):
     r=0.0; g=0.0; b=0.0;
     if w >= 380 and w < 440:
@@ -403,6 +434,7 @@ def runlaserControllerUI(score,sMM_JSON,sform,sapp):
     InitLaserButtonLabels(MM_JSON)
     InitLaserSliders(MM_JSON)
     InitFilterWheelRadioCheckbox()
+    InitBFRadioCheckbox()
 
     #Get frametimeinfo
     global frameduration;
@@ -418,6 +450,11 @@ def runlaserControllerUI(score,sMM_JSON,sform,sapp):
     for i in range(0,6):
         #Change on-off state when button is pressed
         exec("form.FW_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeFilterWheelFromRadioCheckBox(" + str(i) + "));")
+
+    #Set Brightfield Clickable commands
+    for i in range(0,3):
+        #Change on-off state when button is pressed
+        exec("form.BF_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeBFFromRadioCheckBox(" + str(i) + "));")
 
     #Laser control integration
     #For all lasers
