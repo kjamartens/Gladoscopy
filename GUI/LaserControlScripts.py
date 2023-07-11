@@ -85,7 +85,7 @@ def InitLaserButtonLabels(MM_JSON):
 
 def InitLaserSliders(MM_JSON):
     for i in [0,1,2,3,4]:
-        ValIntPerc = MMJSON_to_ValIntPerc(MM_JSON,i);
+        ValIntPerc = min(100,MMJSON_to_ValIntPerc(MM_JSON,i));
         exec("form.SliderLaser_"+str(i)+".setValue(" + str(int(ValIntPerc)) + ")")
         #Get the intensity as a value from the slider
         exec("form.EditIntensity_Laser_"+str(i)+".setText(\"" +str(int(ValIntPerc))+"\")")
@@ -171,14 +171,14 @@ def ChangeFilterWheelFromRadioCheckBox(FW_id):
 def InitBFRadioCheckbox():
     #Get the current names from the JSON for the filterwheel positions
     for i in range(0,3):
-        exec("form.FW_radioButton_"+str(i)+".setText(\"" + MM_JSON["BF_radioLabels"]["Label"+str(i)] + "\")")
+        exec("form.BF_radioButton_"+str(i)+".setText(\"" + MM_JSON["BF_radioLabels"]["Label"+str(i)] + "\")")
     #Get the current BF state from MM
     try:
-        curBFstate = core.get_property('TIDiaLamp','Intensity')
+        curBFstate = float(core.get_property('TIDiaLamp','Intensity')) #Get the intensity of the BF lamp
     except:
         curBFstate = 0
-        print('errored BF')
-    print(curBFstate)
+    
+    #Set a certain BF state
     if curBFstate == 0:
         curSelectedState = 0 #off
     elif curBFstate < 7:
