@@ -76,6 +76,55 @@ def functionNamesFromDir(dirname):
     #return all functions
     return functionnamearr
 
+#Obtain the kwargs from a function. Results in an array with entries
+def kwargsFromFunction(functionname):
+    try:
+        #Check if parent function
+        if not '.' in functionname:
+            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            #Loop over all entries
+            looprange = range(0,len(functionMetadata))
+        else: #or specific sub-function
+            #get the parent info
+            functionparent = functionname.split('.')[0]
+            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            #sub-select the looprange
+            loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
+            looprange = range(loopv,loopv+1)
+        name_arr = []
+        help_arr = []
+        rkwarr_arr = []
+        okwarr_arr = []
+        loopindex = 0
+        for i in looprange:
+            #Get name text for all entries
+            name_arr.append([list(functionMetadata.keys())[i]])
+            #Get help text for all entries
+            help_arr.append(functionMetadata[list(functionMetadata.keys())[i]]["help_string"])
+            #Get text for all the required kwarrs
+            txt = ""
+            #Loop over the number or rkwarrs
+            for k in range(0,len(functionMetadata[list(functionMetadata.keys())[i]]["required_kwargs"])):
+                zz = functionMetadata[list(functionMetadata.keys())[i]]["required_kwargs"][k]
+                for key, value in functionMetadata[list(functionMetadata.keys())[i]]["required_kwargs"][k].items():
+                    txt += f"{key}: {value}\n"
+            rkwarr_arr.append(txt)
+            #Get text for all the optional kwarrs
+            txt = ""
+            #Loop over the number of okwarrs
+            for k in range(0,len(functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"])):
+                zz = functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k]
+                for key, value in functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k].items():
+                    txt += f"{key}: {value}\n"
+            okwarr_arr.append(txt)
+    #Error handling if __function_metadata__ doesn't exist
+    except AttributeError:
+        rkwarr_arr = []
+        okwarr_arr = []
+        return f"No __function_metadata__ in {functionname}"
+            
+    return [rkwarr_arr, okwarr_arr]
+
 #Obtain the help-file and info on kwargs on a specific function
 #Optional: Boolean kwarg showKwargs & Boolean kwarg showHelp
 def infoFromMetadata(functionname,**kwargs):
