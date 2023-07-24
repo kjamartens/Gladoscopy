@@ -91,7 +91,7 @@ class MainWindow(QMainWindow):
         
         #Create add/remove buttons
         add_button = QPushButton(f"Add {className} Layout", self)
-        remove_button = QPushButton(f"Remove {className} Layout", self)
+        
         
         #Add a Horizontal box
         button_Hbox = QHBoxLayout()
@@ -100,13 +100,14 @@ class MainWindow(QMainWindow):
         # Add buttons to the segments layout
         # button_Hbox.addWidget(dropdown, 2) #,1 is weight=1
         button_Hbox.addWidget(add_button, 1) #,1 is weight=1
-        button_Hbox.addWidget(remove_button, 1) #,1 is weight=1
+        # button_Hbox.addWidget(remove_button, 1) #,1 is weight=1
 
         # Connect button signals to slots
         add_button.clicked.connect(lambda: self.add_layout(className))
-        remove_button.clicked.connect(lambda: self.remove_layout(className))
+        
 
     def add_layout(self,className):
+        global UNIQUE_ID
         # Create a new layout
         layout_new = QGridLayout()
         
@@ -116,9 +117,15 @@ class MainWindow(QMainWindow):
         
         #Add a QLabel TitleWidget for identification
         #Add a title to this label
-        labelTitle = QLabel(f"<b>{className} - entry {1+len(self.layouts_dict[className])}</b>")
-        labelTitle.setObjectName(f"titleLabel_{className}")
-        layout_new.addWidget(labelTitle,0,0)
+        # labelTitle = QLabel(f"<b>{className}{UNIQUE_ID}</b>")
+        # labelTitle.setObjectName(f"titleLabel_{className}{UNIQUE_ID}");UNIQUE_ID+=1
+        # layout_new.addWidget(labelTitle,0,0,1,3)
+        
+        #Add the remove-button
+        remove_button = QPushButton(f"Remove", self)
+        layout_new.addWidget(remove_button,1,5)
+        remove_button.setObjectName(f"{className}_remove_KEEP")
+        remove_button.clicked.connect(lambda: self.remove_this(layout_new,className))
         
         # Create a QComboBox and add options - this is the METHOD dropdown
         methodDropdown = QComboBox(self)
@@ -302,6 +309,30 @@ class MainWindow(QMainWindow):
         
         # Append the new layout to the list
         self.layouts_dict[className].append(layout_new)
+    
+    def remove_this(self,layout_name,className):
+        # Get the segments_layout
+        tab_widget = self.findChild(QWidget, "tab_autonomous")
+        curr_layout = tab_widget.findChild(QVBoxLayout, f"layout_main_{className}")
+        # Get the last added layout from the list
+        for i in self.layouts_dict[className]:
+            if layout_name == i:
+                layout = self.layouts_dict[className].remove(i)
+                
+                # Remove labels from the layout
+                while i.count():
+                    item = i.takeAt(0)
+                    widget = item.widget()
+                    if widget is not None:
+                        widget.deleteLater()
+            
+                # Remove the layout from the segments layout
+                curr_layout.removeItem(i)
+                i.deleteLater()
+                
+        # print(self.layouts_dict[className])
+        # print(layout_name)
+        # layout_name.deleteLater()
         
     def remove_layout(self,className):
         if len(self.layouts_dict[className]) > 0:
