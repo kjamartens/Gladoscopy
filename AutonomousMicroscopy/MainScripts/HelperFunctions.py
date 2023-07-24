@@ -4,7 +4,7 @@ import inspect
 import importlib
 from csbdeep.io import save_tiff_imagej_compatible
 from stardist import _draw_polygons, export_imagej_rois
-
+import re
 
 from stardist.models import StarDist2D
 
@@ -75,6 +75,26 @@ def functionNamesFromDir(dirname):
                     warnings.warn(f"Warning: {str(functionName)} does not have the required __function_metadata__ ! All functions that are found in this module are added! They are {subroutines}")
     #return all functions
     return functionnamearr
+
+#Returns the 'names' of the required kwargs of a function
+def reqKwargsFromFunction(functionname):
+    #Get all kwarg info
+    allkwarginfo = kwargsFromFunction(functionname)
+    #Perform a regex match on 'name'
+    name_pattern = r"name:\s*(\S+)"
+    #Get the names of the req_kwargs (allkwarginfo[0])
+    names = re.findall(name_pattern, allkwarginfo[0][0])
+    return names
+
+#Returns the 'names' of the optional kwargs of a function
+def optKwargsFromFunction(functionname):
+    #Get all kwarg info
+    allkwarginfo = kwargsFromFunction(functionname)
+    #Perform a regex match on 'name'
+    name_pattern = r"name:\s*(\S+)"
+    #Get the names of the optional kwargs (allkwarginfo[1])
+    names = re.findall(name_pattern, allkwarginfo[1][0])
+    return names
 
 #Obtain the kwargs from a function. Results in an array with entries
 def kwargsFromFunction(functionname):

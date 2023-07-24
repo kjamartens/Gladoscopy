@@ -144,9 +144,16 @@ class MainWindow(QMainWindow):
                 if widget.objectName() == f"{className}_dropdown":
                     curr_dropdown = widget
         
+        #Get the arguments
+        
+        
         #To test, add a widget:
         label1 = QLabel(f"Current selected: {curr_dropdown.currentText()}")
+        label2 = QLabel(f"ReqKwargs: {HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())}" )
+        label3 = QLabel(f"OptKwargs: {HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())}" )
         curr_layout.addWidget(label1)
+        curr_layout.addWidget(label2)
+        curr_layout.addWidget(label3)
 
     #Remove everythign in this layout except className_dropdown
     def resetLayout(self,curr_layout,className):

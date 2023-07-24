@@ -30,6 +30,9 @@ import HelperFunctions
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 
+HelperFunctions.reqKwargsFromFunction("StarDist.StarDistSegment")
+
+
 testImageLoc = "./AutonomousMicroscopy/ExampleData/BF_test_avg.tiff"
 
 # Open the TIFF file
