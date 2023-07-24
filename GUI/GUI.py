@@ -1,5 +1,5 @@
 
-from PyQt5.QtWidgets import QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap
 from PyQt5 import uic
@@ -12,12 +12,15 @@ import numpy as np
 import time
 import asyncio
 import pyqtgraph as pg
+import matplotlib.pyplot as plt
+from matplotlib import colormaps # type: ignore
 #For drawing
 import matplotlib
 matplotlib.use('Qt5Agg')
 # from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+import tifffile
 import time
 from PyQt5.QtCore import QTimer,QDateTime
 
@@ -66,6 +69,13 @@ class MainWindow(QMainWindow):
         
         tab_widget.setLayout(main_layout)
         
+        #Add a button below for testing atm
+        Test_run_button = QPushButton('Test')
+        # Add buttons to the segments layout
+        main_layout.addWidget(Test_run_button, 1) #,1 is weight=1
+
+        # Connect button signals to slots
+        Test_run_button.clicked.connect(lambda: self.test_run())
         # Add an additional widget below the layouts
         # additional_widget = QLabel("Additional Widget")
         # self.addWidget(additional_widget)
@@ -92,20 +102,16 @@ class MainWindow(QMainWindow):
         #Create add/remove buttons
         add_button = QPushButton(f"Add {className} Layout", self)
         
-        
         #Add a Horizontal box
         button_Hbox = QHBoxLayout()
         class_layout.addLayout(button_Hbox)
         
         # Add buttons to the segments layout
-        # button_Hbox.addWidget(dropdown, 2) #,1 is weight=1
         button_Hbox.addWidget(add_button, 1) #,1 is weight=1
-        # button_Hbox.addWidget(remove_button, 1) #,1 is weight=1
 
         # Connect button signals to slots
         add_button.clicked.connect(lambda: self.add_layout(className))
         
-
     def add_layout(self,className):
         global UNIQUE_ID
         # Create a new layout
@@ -120,6 +126,9 @@ class MainWindow(QMainWindow):
         # labelTitle = QLabel(f"<b>{className}{UNIQUE_ID}</b>")
         # labelTitle.setObjectName(f"titleLabel_{className}{UNIQUE_ID}");UNIQUE_ID+=1
         # layout_new.addWidget(labelTitle,0,0,1,3)
+        
+        #Add info to layout_new via the setObjectName:
+        layout_new.setObjectName(f"mainLayout_{className}_{UNIQUE_ID}");UNIQUE_ID+=1
         
         #Add the remove-button
         remove_button = QPushButton(f"Remove", self)
@@ -175,7 +184,7 @@ class MainWindow(QMainWindow):
             label = QLabel(f"<b>{reqKwargs[k]}</b>")
             curr_layout.addWidget(label,2+(k),0)
             line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{reqKwargs[k]}")
+            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
             UNIQUE_ID+=1
             curr_layout.addWidget(line_edit,2+k,1)
             
@@ -189,7 +198,7 @@ class MainWindow(QMainWindow):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
             curr_layout.addWidget(label,2+(k)+len(reqKwargs),0)
             line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{optKwargs[k]}")
+            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
             UNIQUE_ID+=1
             curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs),1)
         
@@ -270,46 +279,6 @@ class MainWindow(QMainWindow):
                 if not ("methodDropdown" in widget.objectName()) and not ("scoringDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
                     widget.deleteLater()
         
-    def add_layout_OLD(self,className):
-        # Create a new layout (QHBoxLayout) with a unique name
-        layout_new = QVBoxLayout()
-        
-        # Get the segments layout
-        tab_widget = self.findChild(QWidget, "tab_autonomous")
-        main_layout = tab_widget.layout()
-        father_layout = tab_widget.findChild(QVBoxLayout, f"layout_main_{className}")
-        
-        #Figure out which drop-down is used
-        # Loop through the child widgets and print information about each widget
-        segments_dropdown=[]
-        #itemAt(0) points towards a HBox inside father_layout
-        for index in range(father_layout.itemAt(0).count()):
-            widget_item = father_layout.itemAt(0).itemAt(index)
-            # Check if the item is a widget (as opposed to a layout)
-            # print(f"WidgetItem at index {index}: {type(widget_item).__name__}")
-            if widget_item.widget() is not None:
-                widget = widget_item.widget()
-                #If it's the dropdown segment, label it as such
-                if widget.objectName() == f"{className}_dropdown":
-                    father_dropdown = widget
-
-        
-        # Create labels for the layout
-        label1 = QLabel(f"Current selected: {father_dropdown.currentText()}")
-        label2 = QLabel(f"Label 2 - Segment layout {HelperFunctions.kwargsFromFunction(father_dropdown.currentText())}")
-        label3 = QLabel(f"All Segment options: {HelperFunctions.functionNamesFromDir(className)}")
-        
-        # Add the labels to the layout
-        layout_new.addWidget(label1)
-        layout_new.addWidget(label2)
-        layout_new.addWidget(label3)
-        
-        # Add the layout to the layouts layout
-        father_layout.addLayout(layout_new)
-        
-        # Append the new layout to the list
-        self.layouts_dict[className].append(layout_new)
-    
     def remove_this(self,layout_name,className):
         # Get the segments_layout
         tab_widget = self.findChild(QWidget, "tab_autonomous")
@@ -317,7 +286,8 @@ class MainWindow(QMainWindow):
         # Get the last added layout from the list
         for i in self.layouts_dict[className]:
             if layout_name == i:
-                layout = self.layouts_dict[className].remove(i)
+                #remove from the array
+                self.layouts_dict[className].remove(i)
                 
                 # Remove labels from the layout
                 while i.count():
@@ -356,6 +326,116 @@ class MainWindow(QMainWindow):
                 curr_layout.removeItem(layout)
                 layout.deleteLater()
 
+    def test_run(self):
+        testImageLoc = "./AutonomousMicroscopy/ExampleData/BF_test_avg.tiff"
+        # Open the TIFF file
+        with tifffile.TiffFile(testImageLoc) as tiff:
+            # Read the image data
+            ImageData = tiff.asarray()
+            
+            
+        #Let's try to print all info of all CellSegmentScripts layouts
+        #First, we find all widgets on tab_autonomous:
+        all_layouts = self.findChild(QWidget, "tab_autonomous").findChildren(QLayout)
+        for layout in all_layouts:
+            #Select only the correct layout
+            if ("mainLayout" in layout.objectName()) and ("CellSegmentScripts" in layout.objectName()):
+                print(f'Widgets in {layout.objectName()}:')
+                #Prepare the method kwarg arrays (and an empty name)
+                methodKwargNames = []
+                methodKwargValues = []
+                methodName = ''
+                for index in range(layout.count()):
+                    item = layout.itemAt(index)
+                    widget = item.widget()
+                    
+                    if ("LineEdit" in widget.objectName()):
+                        # The objectName willb e along the lines of foo#bar#str
+                        split_list = widget.objectName().split('#')
+                        methodName = split_list[1]
+                        methodKwargNames.append(split_list[2])
+                        methodKwargValues.append(widget.text())
+                
+                #Now we should have the method name and all its kwargs, so:
+                if len(methodName)>0:
+                    #Check if all req. kwargs have some value
+                    reqKwargs = HelperFunctions.reqKwargsFromFunction(methodName)
+                    
+                    allreqKwargsHaveValue = True
+                    for id in range(0,len(reqKwargs)):
+                        kwargvalue = methodKwargValues[id]
+                        if kwargvalue == '':
+                            allreqKwargsHaveValue = False
+                            print('EMPTY VALUE, NOT CONTINUING')
+                    if allreqKwargsHaveValue:
+                        #If we're at this point, all req kwargs have a value, so we can run!
+                        #Get the string for the required kwargs
+                        partialString = ''
+                        for id in range(0,len(reqKwargs)):
+                            kwargvalue = methodKwargValues[id]
+                            if partialString != '':
+                                partialString+=","
+                            if reqKwargs[id] == 'image_data':
+                                partialString+=reqKwargs[id]+"="+kwargvalue+""
+                            else:
+                                partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
+                        #Add the optional kwargs if they have a value
+                        optKwargs = HelperFunctions.optKwargsFromFunction(methodName)
+                        for id in range(0,len(optKwargs)):
+                            if methodKwargValues[id+len(reqKwargs)] != '':
+                                if partialString != '':
+                                    partialString+=","
+                                partialString+=optKwargs[id]+"=\""+methodKwargValues[id+len(reqKwargs)]+"\""
+                        
+                        print(partialString)
+                        
+                        
+                        # coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
+
+
+                        #And RUN
+                        print(methodName+"("+partialString+")")
+                        coords = eval(methodName+"("+partialString+")")
+                        
+                        
+                        # coords = eval(HelperFunctions.createFunctionWithKwargs(
+                        #     methodName,image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
+    
+        
+                        # 
+
+
+                        #Non-preloaded stardistsegmentation
+                        # coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
+
+                        #Get cell image
+                        cellIm = ImageData
+                        # #start creating celloverlayimage
+                        # cellOverlayIm = np.zeros(l.shape)
+                        # for i in range(1,np.amax(l)):
+                        #     cellOverlayIm[l==i] = scoreVisual[i-1]
+
+                        # Create a figure with two subplots
+                        fig, axs = plt.subplots(2, 2)
+
+                        # Plot the first image in the left subplot
+                        axs[0,0].imshow(cellIm, cmap='gray')
+                        axs[0,0].axis('off')
+
+                        cmap = colormaps.get_cmap('bwr')
+                        # Plot the second image in the right subplot
+                        im = axs[0,1].imshow(cellIm, cmap='gray')
+                        # Plot colorful outlines on the image
+                        for i in range(0,len(coords)):
+                            contour = coords[i]
+                            axs[0,1].plot(contour[1], contour[0]) #color=cmap(cellCrowdedness_gauss[i])
+                        axs[0,1].set_xlim(0, cellIm.shape[1])
+                        axs[0,1].set_ylim(cellIm.shape[0], 0)
+                        axs[0,1].axis('off')
+                        axs[0,1].set_title('cellCrowdedness_gauss')
+                        plt.show()
+        print('RUN SCRIPTS HERE')
+        
 if __name__ == "__main__":
     try:
         # get object representing MMCore, used throughout
