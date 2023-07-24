@@ -1,5 +1,5 @@
 
-from PyQt5.QtWidgets import QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap
 from PyQt5 import uic
@@ -36,10 +36,15 @@ import HelperFunctions
 from LaserControlScripts import *
 
 
+
+#Create a global UNIQUE value that is needed here and there
+UNIQUE_ID = 1
+
 class MainWindow(QMainWindow):
     #Intialisation
     def __init__(self):
         super().__init__()
+        
         #Load the UI
         self.load_ui()
         #Set Icon
@@ -102,38 +107,125 @@ class MainWindow(QMainWindow):
         remove_button.clicked.connect(lambda: self.remove_layout(className))
 
     def add_layout(self,className):
-        # Create a new layout (QHBoxLayout) with a unique name
+        # Create a new layout
         layout_new = QGridLayout()
         
-        # Get the segments layout
+        # Find the father layout
         tab_widget = self.findChild(QWidget, "tab_autonomous")
-        main_layout = tab_widget.layout()
         father_layout = tab_widget.findChild(QVBoxLayout, f"layout_main_{className}")
         
-        # Create a QComboBox and add options
-        dropdown = QComboBox(self)
+        #Add a QLabel TitleWidget for identification
+        #Add a title to this label
+        labelTitle = QLabel(f"<b>{className} - entry {1+len(self.layouts_dict[className])}</b>")
+        labelTitle.setObjectName(f"titleLabel_{className}")
+        layout_new.addWidget(labelTitle,0,0)
+        
+        # Create a QComboBox and add options - this is the METHOD dropdown
+        methodDropdown = QComboBox(self)
         options = HelperFunctions.functionNamesFromDir(className)
-        dropdown.setObjectName(f"{className}_dropdown")
-        dropdown.addItems(options)
+        methodDropdown.setObjectName(f"{className}_methodDropdown")
+        methodDropdown.addItems(options)
+        #Add the methodDropdown to the layout
+        layout_new.addWidget(methodDropdown,1,0,1,2)
+        #Activation for methodDropdown.activated
+        methodDropdown.activated.connect(lambda: self.changeLayout_choice(layout_new,className))
         
-        #Add the dropdown to the layout and go
-        layout_new.addWidget(dropdown)
-        
-        #What to do if something is chosen?
-        dropdown.activated.connect(lambda: self.changeLayout_choice(layout_new,className))
-        #Also do this for the default choice
-        self.changeLayout_choice(layout_new,className)
+        if className != 'CellSegmentScripts':
+            # Create a QComboBox and add options - this is the SCORING dropdown
+            scoringDropdown = QComboBox(self)
+            options = HelperFunctions.functionNamesFromDir("ScoringMetrics")
+            scoringDropdown.setObjectName(f"{className}_scoringDropdown")
+            scoringDropdown.addItems(options)
+            #Add the methodDropdown to the layout
+            layout_new.addWidget(scoringDropdown,1,2,1,2)
+            #Activation for methodDropdown.activated
+            scoringDropdown.activated.connect(lambda: self.changeLayout_choice(layout_new,className))
 
+        #Most entries are filled in changeLayout_choice!
+
+        #On startup/initiatlisation: also do changeLayout_choice
+        self.changeLayout_choice(layout_new,className)
+        
         # Add the layout to the father layout
         father_layout.addLayout(layout_new)
-        
-        # Append the new layout to the list
+        # Append the new layout to the list so it can be easily found/removed.
         self.layouts_dict[className].append(layout_new)
 
+    #Main def that interacts with a new layout based on whatever entries we have!
+    #We assume a X-by-4 (4 columns) size, where 1/2 are used for Operation, and 3/4 are used for Value-->Score conversion
     def changeLayout_choice(self,curr_layout,className):
+        global UNIQUE_ID
+        
         #This removes everything except the first entry (i.e. the drop-down menu)
         self.resetLayout(curr_layout,className)
         #Get the dropdown info
+        curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
+        
+        #Get the kw-arguments from the current dropdown.
+        reqKwargs = HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())
+        #Add a widget-pair for every kwarg
+        for k in range(len(reqKwargs)):
+            label = QLabel(f"<b>{reqKwargs[k]}</b>")
+            curr_layout.addWidget(label,2+(k),0)
+            line_edit = QLineEdit()
+            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{reqKwargs[k]}")
+            UNIQUE_ID+=1
+            curr_layout.addWidget(line_edit,2+k,1)
+            
+            
+        labelTitle = QLabel(f"Current selected: {curr_dropdown.currentText()}")
+            
+        #Get the optional kw-arguments from the current dropdown.
+        optKwargs = HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())
+        #Add a widget-pair for every kwarg
+        for k in range(len(optKwargs)):
+            label = QLabel(f"<i>{optKwargs[k]}</i>")
+            curr_layout.addWidget(label,2+(k)+len(reqKwargs),0)
+            line_edit = QLineEdit()
+            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{optKwargs[k]}")
+            UNIQUE_ID+=1
+            curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs),1)
+        
+        try:
+            #Get the dropdown info
+            curr_dropdown = self.getScoringDropdownInfo(curr_layout,className)
+            
+            #Get the kw-arguments from the current dropdown.
+            reqKwargs = HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())
+            #Add a widget-pair for every kwarg
+            for k in range(len(reqKwargs)):
+                label = QLabel(f"<b>{reqKwargs[k]}</b>")
+                curr_layout.addWidget(label,2+(k),2)
+                line_edit = QLineEdit()
+                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{reqKwargs[k]}")
+                UNIQUE_ID+=1
+                curr_layout.addWidget(line_edit,2+k,3)
+                
+            #Get the optional kw-arguments from the current dropdown.
+            optKwargs = HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())
+            #Add a widget-pair for every kwarg
+            for k in range(len(optKwargs)):
+                label = QLabel(f"<i>{optKwargs[k]}</i>")
+                curr_layout.addWidget(label,2+(k)+len(reqKwargs),2)
+                line_edit = QLineEdit()
+                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{optKwargs[k]}")
+                UNIQUE_ID+=1
+                curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs),3)
+        except:
+            print('Scoring Dropdown not found!')
+        
+        
+        #Add a horizontal line
+        horizontal_line = QFrame()
+        horizontal_line.setFrameShape(QFrame.HLine)
+        horizontal_line.setFrameShadow(QFrame.Sunken)
+        horizontal_line.setObjectName("HorLine")
+        
+        #Set the final line widget
+        curr_layout.addWidget(horizontal_line,99,0,2,0)
+
+    def getMethodDropdownInfo(self,curr_layout,className):
+        curr_dropdown = []
         #Look through all widgets in the current layout
         for index in range(curr_layout.count()):
             widget_item = curr_layout.itemAt(index)
@@ -141,20 +233,25 @@ class MainWindow(QMainWindow):
             if widget_item.widget() is not None:
                 widget = widget_item.widget()
                 #If it's the dropdown segment, label it as such
-                if widget.objectName() == f"{className}_dropdown":
+                if (className in widget.objectName()) and ("methodDropdown" in widget.objectName()):
                     curr_dropdown = widget
-        
-        #Get the arguments
-        
-        
-        #To test, add a widget:
-        label1 = QLabel(f"Current selected: {curr_dropdown.currentText()}")
-        label2 = QLabel(f"ReqKwargs: {HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())}" )
-        label3 = QLabel(f"OptKwargs: {HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())}" )
-        curr_layout.addWidget(label1)
-        curr_layout.addWidget(label2)
-        curr_layout.addWidget(label3)
-
+        #Return the dropdown
+        return curr_dropdown
+    
+    def getScoringDropdownInfo(self,curr_layout,className):
+        curr_dropdown = []
+        #Look through all widgets in the current layout
+        for index in range(curr_layout.count()):
+            widget_item = curr_layout.itemAt(index)
+            #Check if it's fair to check
+            if widget_item.widget() is not None:
+                widget = widget_item.widget()
+                #If it's the dropdown segment, label it as such
+                if (className in widget.objectName()) and ("scoringDropdown" in widget.objectName()):
+                    curr_dropdown = widget
+        #Return the dropdown
+        return curr_dropdown
+                    
     #Remove everythign in this layout except className_dropdown
     def resetLayout(self,curr_layout,className):
         for index in range(curr_layout.count()):
@@ -163,7 +260,7 @@ class MainWindow(QMainWindow):
             if widget_item.widget() is not None:
                 widget = widget_item.widget()
                 #If it's the dropdown segment, label it as such
-                if widget.objectName() != f"{className}_dropdown":
+                if not ("methodDropdown" in widget.objectName()) and not ("scoringDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
                     widget.deleteLater()
         
     def add_layout_OLD(self,className):
