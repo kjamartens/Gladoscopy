@@ -67,18 +67,17 @@ class MainWindow(QMainWindow):
         self.create_main_layout_class(main_layout,"CellSegmentScripts")
         self.create_main_layout_class(main_layout,"CellScoringScripts")
         
-        tab_widget.setLayout(main_layout)
-        
         #Add a button below for testing atm
         Test_run_button = QPushButton('Test')
-        # Add buttons to the segments layout
         main_layout.addWidget(Test_run_button, 1) #,1 is weight=1
-
         # Connect button signals to slots
         Test_run_button.clicked.connect(lambda: self.test_run())
-        # Add an additional widget below the layouts
-        # additional_widget = QLabel("Additional Widget")
-        # self.addWidget(additional_widget)
+        
+        #Add a stretch at the bottom so everything is pushed to the top
+        main_layout.addStretch()
+        
+        #Set the layout
+        tab_widget.setLayout(main_layout)
 
     def load_ui(self):
         uic.loadUi(os.path.join(sys.path[0], 'GUI.ui'), self)  # Load the UI file
@@ -86,6 +85,7 @@ class MainWindow(QMainWindow):
     def create_main_layout_class(self,main_layout,className):
         layout_main_segment = QVBoxLayout()
         layout_main_segment.setObjectName("layout_main_"+className)
+        layout_main_segment.setAlignment(Qt.AlignTop)
         main_layout.addLayout(layout_main_segment)
         # Initialize a list to keep track of added layouts
         self.layouts_dict[className] = []
@@ -180,13 +180,18 @@ class MainWindow(QMainWindow):
         #Get the kw-arguments from the current dropdown.
         reqKwargs = HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())
         #Add a widget-pair for every kwarg
+        labelposoffset = 0
         for k in range(len(reqKwargs)):
-            label = QLabel(f"<b>{reqKwargs[k]}</b>")
-            curr_layout.addWidget(label,2+(k),0)
-            line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
-            UNIQUE_ID+=1
-            curr_layout.addWidget(line_edit,2+k,1)
+            #Value is used for scoring, and takes the output of the method
+            if reqKwargs[k] != 'methodValue':
+                label = QLabel(f"<b>{reqKwargs[k]}</b>")
+                curr_layout.addWidget(label,2+(k)+labelposoffset,0)
+                line_edit = QLineEdit()
+                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                UNIQUE_ID+=1
+                curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
+            else:
+                labelposoffset -= 1
             
             
         labelTitle = QLabel(f"Current selected: {curr_dropdown.currentText()}")
@@ -196,11 +201,11 @@ class MainWindow(QMainWindow):
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
-            curr_layout.addWidget(label,2+(k)+len(reqKwargs),0)
+            curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
             line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
             UNIQUE_ID+=1
-            curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs),1)
+            curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
         
         try:
             #Get the dropdown info
@@ -209,24 +214,28 @@ class MainWindow(QMainWindow):
             #Get the kw-arguments from the current dropdown.
             reqKwargs = HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())
             #Add a widget-pair for every kwarg
+            labelposoffset = 0
             for k in range(len(reqKwargs)):
-                label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                curr_layout.addWidget(label,2+(k),2)
-                line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{reqKwargs[k]}")
-                UNIQUE_ID+=1
-                curr_layout.addWidget(line_edit,2+k,3)
+                if reqKwargs[k] != 'methodValue':
+                    label = QLabel(f"<b>{reqKwargs[k]}</b>")
+                    curr_layout.addWidget(label,2+(k)+labelposoffset,2)
+                    line_edit = QLineEdit()
+                    line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                    UNIQUE_ID+=1
+                    curr_layout.addWidget(line_edit,2+k+labelposoffset,3)
+                else:
+                    labelposoffset -= 1
                 
             #Get the optional kw-arguments from the current dropdown.
             optKwargs = HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())
             #Add a widget-pair for every kwarg
             for k in range(len(optKwargs)):
                 label = QLabel(f"<i>{optKwargs[k]}</i>")
-                curr_layout.addWidget(label,2+(k)+len(reqKwargs),2)
+                curr_layout.addWidget(label,2+(k)+labelposoffset+len(reqKwargs),2)
                 line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}_{curr_dropdown.currentText()}_{optKwargs[k]}")
+                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
                 UNIQUE_ID+=1
-                curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs),3)
+                curr_layout.addWidget(line_edit,2+(k)+labelposoffset+len(reqKwargs),3)
         except:
             print('Scoring Dropdown not found!')
         
@@ -338,7 +347,7 @@ class MainWindow(QMainWindow):
         #First, we find all widgets on tab_autonomous:
         all_layouts = self.findChild(QWidget, "tab_autonomous").findChildren(QLayout)
         for layout in all_layouts:
-            #Select only the correct layout
+            #Select only the correct layout - segmenting
             if ("mainLayout" in layout.objectName()) and ("CellSegmentScripts" in layout.objectName()):
                 print(f'Widgets in {layout.objectName()}:')
                 #Prepare the method kwarg arrays (and an empty name)
@@ -387,53 +396,164 @@ class MainWindow(QMainWindow):
                                     partialString+=","
                                 partialString+=optKwargs[id]+"=\""+methodKwargValues[id+len(reqKwargs)]+"\""
                         
-                        print(partialString)
-                        
-                        
-                        # coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
-
-
-                        #And RUN
+                        print('SEGMENT STRING:')
                         print(methodName+"("+partialString+")")
-                        coords = eval(methodName+"("+partialString+")")
-                        
-                        
-                        # coords = eval(HelperFunctions.createFunctionWithKwargs(
-                        #     methodName,image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
-    
+                        methodName_segment = methodName
+                        input_segment = partialString
         
-                        # 
+        #Now do the CellScoring method - atm assuming there's only one, and if outline_coords is segmentResult, it'll work                
+        for layout in all_layouts:
+            #Select only the correct layout - segmenting
+            if ("mainLayout" in layout.objectName()) and ("CellScoringScript" in layout.objectName()):
+                print(f'Widgets in {layout.objectName()}:')
+                #Prepare the method kwarg arrays (and an empty name)
+                methodKwargNames_method = []
+                methodKwargValues_method = []
+                methodName_method = ''
+                methodKwargNames_scoring = []
+                methodKwargValues_scoring = []
+                methodName_scoring = ''
+                for index in range(layout.count()):
+                    item = layout.itemAt(index)
+                    widget = item.widget()
+                    
+                    if ("LineEdit" in widget.objectName()):
+                        # The objectName will be along the lines of foo#bar#str
+                        #Check if the objectname is part of a method or part of a scoring
+                        z=2
+                        print(HelperFunctions.functionNamesFromDir('./ScoringMetrics'))
+                        split_list = widget.objectName().split('#')
+                        print(widget.objectName())
+                        if split_list[1] in HelperFunctions.functionNamesFromDir('./ScoringMetrics'):
+                            methodName_scoring = split_list[1]
+                            methodKwargNames_scoring.append(split_list[2])
+                            methodKwargValues_scoring.append(widget.text())
+                        else:
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+                            methodKwargValues_method.append(widget.text())
+                
+                #Now we should have the method name and all its kwargs, so:
+                
+                #First method calculation
+                if len(methodName_method)>0:
+                    #Check if all req. kwargs have some value
+                    reqKwargs = HelperFunctions.reqKwargsFromFunction(methodName_method)
+                    
+                    allreqKwargsHaveValue = True
+                    for id in range(0,len(reqKwargs)):
+                        kwargvalue = methodKwargValues_method[id]
+                        if kwargvalue == '':
+                            allreqKwargsHaveValue = False
+                            print('EMPTY VALUE, NOT CONTINUING')
+                    if allreqKwargsHaveValue:
+                        #If we're at this point, all req kwargs have a value, so we can run!
+                        #Get the string for the required kwargs
+                        partialString = ''
+                        for id in range(0,len(reqKwargs)):
+                            kwargvalue = methodKwargValues_method[id]
+                            if partialString != '':
+                                partialString+=","
+                            if reqKwargs[id] == 'outline_coords':
+                                partialString+=reqKwargs[id]+"="+kwargvalue+""
+                            else:
+                                partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
+                        #Add the optional kwargs if they have a value
+                        optKwargs = HelperFunctions.optKwargsFromFunction(methodName_method)
+                        for id in range(0,len(optKwargs)):
+                            if methodKwargValues_method[id+len(reqKwargs)] != '':
+                                if partialString != '':
+                                    partialString+=","
+                                partialString+=optKwargs[id]+"=\""+methodKwargValues_method[id+len(reqKwargs)]+"\""
+                        
+                        print('Method string:')
+                        print(methodName_method+"("+partialString+")")
+                        methodName_ScoreMethod = methodName_method
+                        input_ScoreMethod = partialString
+                        # segmentResult = eval(methodName+"("+partialString+")")
+                
+                #And scoring calculation
+                if len(methodName_scoring)>0:
+                    #Check if all req. kwargs have some value
+                    reqKwargs = HelperFunctions.reqKwargsFromFunction(methodName_scoring)
+                    #Remove 'value' from this array
+                    if 'methodValue' in reqKwargs:
+                        reqKwargs.remove('methodValue')
+                    allreqKwargsHaveValue = True
+                    for id in range(0,len(reqKwargs)):
+                        kwargvalue = methodKwargValues_scoring[id]
+                        if kwargvalue == '':
+                            allreqKwargsHaveValue = False
+                            print('EMPTY VALUE, NOT CONTINUING')
+                    if allreqKwargsHaveValue:
+                        #If we're at this point, all req kwargs have a value, so we can run!
+                        #Get the string for the required kwargs
+                        partialString = 'methodValue=methodOutput'
+                        for id in range(0,len(reqKwargs)):
+                            kwargvalue = methodKwargValues_scoring[id]
+                            if partialString != '':
+                                partialString+=","
+                            partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
+                        #Add the optional kwargs if they have a value
+                        optKwargs = HelperFunctions.optKwargsFromFunction(methodName_scoring)
+                        for id in range(0,len(optKwargs)):
+                            if methodKwargValues_scoring[id+len(reqKwargs)] != '':
+                                if partialString != '':
+                                    partialString+=","
+                                partialString+=optKwargs[id]+"=\""+methodKwargValues_scoring[id+len(reqKwargs)]+"\""
+                        
+                        print('scoring string:')
+                        print(methodName_scoring+"("+partialString+")")
+                        methodName_ScoreScoring = methodName_scoring
+                        input_ScoreScoring = partialString
+
+        #Now we can do the calculation!
+        k = 1
+        #Segmenting
+        segmentResult = eval(methodName_segment+"("+input_segment+")")
+        #Scoring - method
+        methodOutput = eval(methodName_ScoreMethod+"("+input_ScoreMethod+")")
+        #Scoring - score
+        scoreOutput = eval(methodName_ScoreScoring+"("+input_ScoreScoring+")")
+        print('Segmenting performed')
+        cellIm = ImageData
+        coords = segmentResult
+                        
+        # coords = eval(HelperFunctions.createFunctionWithKwargs(
+        #     methodName,image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
 
 
-                        #Non-preloaded stardistsegmentation
-                        # coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
+        # 
 
-                        #Get cell image
-                        cellIm = ImageData
-                        # #start creating celloverlayimage
-                        # cellOverlayIm = np.zeros(l.shape)
-                        # for i in range(1,np.amax(l)):
-                        #     cellOverlayIm[l==i] = scoreVisual[i-1]
 
-                        # Create a figure with two subplots
-                        fig, axs = plt.subplots(2, 2)
+        #Non-preloaded stardistsegmentation
+        # coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
 
-                        # Plot the first image in the left subplot
-                        axs[0,0].imshow(cellIm, cmap='gray')
-                        axs[0,0].axis('off')
+        #Get cell image
+        # #start creating celloverlayimage
+        # cellOverlayIm = np.zeros(l.shape)
+        # for i in range(1,np.amax(l)):
+        #     cellOverlayIm[l==i] = scoreVisual[i-1]
 
-                        cmap = colormaps.get_cmap('bwr')
-                        # Plot the second image in the right subplot
-                        im = axs[0,1].imshow(cellIm, cmap='gray')
-                        # Plot colorful outlines on the image
-                        for i in range(0,len(coords)):
-                            contour = coords[i]
-                            axs[0,1].plot(contour[1], contour[0]) #color=cmap(cellCrowdedness_gauss[i])
-                        axs[0,1].set_xlim(0, cellIm.shape[1])
-                        axs[0,1].set_ylim(cellIm.shape[0], 0)
-                        axs[0,1].axis('off')
-                        axs[0,1].set_title('cellCrowdedness_gauss')
-                        plt.show()
+        # Create a figure with two subplots
+        fig, axs = plt.subplots(2, 2)
+
+        # Plot the first image in the left subplot
+        axs[0,0].imshow(cellIm, cmap='gray')
+        axs[0,0].axis('off')
+
+        cmap = colormaps.get_cmap('bwr')
+        # Plot the second image in the right subplot
+        im = axs[0,1].imshow(cellIm, cmap='gray')
+        # Plot colorful outlines on the image
+        for i in range(0,len(coords)):
+            contour = coords[i]
+            axs[0,1].plot(contour[1], contour[0], color=cmap(scoreOutput[i]))
+        axs[0,1].set_xlim(0, cellIm.shape[1])
+        axs[0,1].set_ylim(cellIm.shape[0], 0)
+        axs[0,1].axis('off')
+        axs[0,1].set_title('cellCrowdedness_gauss')
+        plt.show()
         print('RUN SCRIPTS HERE')
         
 if __name__ == "__main__":

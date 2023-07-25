@@ -128,7 +128,7 @@ def nrneighbours_basedonCellWidth(**kwargs):
                 #Get the minimum distance to the other ROI
                 celltocelldist = distanceROItoOther(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]),StarDistCoords_to_xyCoords(kwargs["outline_coords"][j]))
                 #If it's small enough, we have another neighbour
-                if celltocelldist < cellshortaxis*kwargs["multiple_cellWidth_lookup"]:
+                if celltocelldist < cellshortaxis*float(kwargs["multiple_cellWidth_lookup"]):
                     nr_neighbours[i]+=1
     
     return np.int_(nr_neighbours)
