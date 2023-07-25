@@ -396,7 +396,7 @@ class MainWindow(QMainWindow):
                                     partialString+=","
                                 partialString+=optKwargs[id]+"=\""+methodKwargValues[id+len(reqKwargs)]+"\""
                         
-                        print('SEGMENT STRING:')
+                        print('Segment string:')
                         print(methodName+"("+partialString+")")
                         methodName_segment = methodName
                         input_segment = partialString
@@ -420,10 +420,7 @@ class MainWindow(QMainWindow):
                     if ("LineEdit" in widget.objectName()):
                         # The objectName will be along the lines of foo#bar#str
                         #Check if the objectname is part of a method or part of a scoring
-                        z=2
-                        print(HelperFunctions.functionNamesFromDir('./ScoringMetrics'))
                         split_list = widget.objectName().split('#')
-                        print(widget.objectName())
                         if split_list[1] in HelperFunctions.functionNamesFromDir('./ScoringMetrics'):
                             methodName_scoring = split_list[1]
                             methodKwargNames_scoring.append(split_list[2])
@@ -470,7 +467,6 @@ class MainWindow(QMainWindow):
                         print(methodName_method+"("+partialString+")")
                         methodName_ScoreMethod = methodName_method
                         input_ScoreMethod = partialString
-                        # segmentResult = eval(methodName+"("+partialString+")")
                 
                 #And scoring calculation
                 if len(methodName_scoring)>0:
