@@ -532,25 +532,26 @@ class MainWindow(QMainWindow):
         #     cellOverlayIm[l==i] = scoreVisual[i-1]
 
         # Create a figure with two subplots
-        fig, axs = plt.subplots(2, 2)
+        fig, axs = plt.subplots(1,2)
 
         # Plot the first image in the left subplot
-        axs[0,0].imshow(cellIm, cmap='gray')
-        axs[0,0].axis('off')
+        axs[0].imshow(cellIm, cmap='gray')
+        axs[0].axis('off')
 
         cmap = colormaps.get_cmap('bwr')
         # Plot the second image in the right subplot
-        im = axs[0,1].imshow(cellIm, cmap='gray')
+        im = axs[1].imshow(cellIm, cmap='gray')
         # Plot colorful outlines on the image
         for i in range(0,len(coords)):
             contour = coords[i]
-            axs[0,1].plot(contour[1], contour[0], color=cmap(scoreOutput[i]))
-        axs[0,1].set_xlim(0, cellIm.shape[1])
-        axs[0,1].set_ylim(cellIm.shape[0], 0)
-        axs[0,1].axis('off')
-        axs[0,1].set_title('cellCrowdedness_gauss')
+            axs[1].plot(contour[1], contour[0], color=cmap(scoreOutput[i]))
+        axs[1].set_xlim(0, cellIm.shape[1])
+        axs[1].set_ylim(cellIm.shape[0], 0)
+        axs[1].axis('off')
+        axs[1].set_title(methodName_ScoreMethod)
         plt.show()
-        print('RUN SCRIPTS HERE')
+        
+        print('All run correctly!')
         
 if __name__ == "__main__":
     try:

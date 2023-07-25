@@ -145,9 +145,12 @@ def distToNearestNeighbour(**kwargs):
 def lengthWidthRatio(**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    #Create an empty array for the length-to-width ratio
     lwratio = np.empty(len(kwargs["outline_coords"]))
+    #Calculate the ratio via internal function for every cell
     for i in range(0,len(kwargs["outline_coords"])):
         lwratio[i] = getLongShortAxisRatio(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]))
+    #return this
     return lwratio
 
 def cellArea(**kwargs):
