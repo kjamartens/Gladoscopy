@@ -335,6 +335,87 @@ class MainWindow(QMainWindow):
                 curr_layout.removeItem(layout)
                 layout.deleteLater()
 
+    def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, methodTypeString, partialStringStart=None, removeKwargs=None):
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
+    #methodKwargNames: found kwarg NAMES from the GUI
+    #methodKwargValues: found kwarg VALUES from the GUI
+    #methodTypeString: type of method, i.e. 'function Type' (e.g. CellSegmentScripts, CellScoringScripts etc)'
+    #Optionals: partialStringStart: gives a different start to the partial eval-string
+    #Optionals: removeKwargs: removes kwargs from assessment (i.e. for scoring script, where this should always be changed by partialStringStart)
+    #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        #We define special cases as function of methodTypeString:
+        if methodTypeString == 'CellSegmentScripts':
+            specialcaseKwarg = ['image_data'] #Kwarg where the special case is used
+            specialcaseKwargPartialStringAddition = ["reqKwargs[id]+\"=\"+kwargvalue"] #text to be eval-ed in case this kwarg is found
+        elif methodTypeString == 'CellScoringScripts':
+            specialcaseKwarg = ['outline_coords'] #Kwarg where the special case is used
+            specialcaseKwargPartialStringAddition = ["reqKwargs[id]+\"=\"+kwargvalue"] #text to be eval-ed in case this kwarg is found
+        else:
+            specialcaseKwarg = [] #Kwarg where the special case is used
+            specialcaseKwargPartialStringAddition = [] #text to be eval-ed in case this kwarg is found
+        #We have the method name and all its kwargs, so:
+        if len(methodName)>0: #if the method exists
+            #Check if all req. kwargs have some value
+            reqKwargs = HelperFunctions.reqKwargsFromFunction(methodName)
+            #Remove values from this array if wanted
+            if removeKwargs is not None:
+                for removeKwarg in removeKwargs:
+                    if removeKwarg in reqKwargs:
+                        reqKwargs.remove(removeKwarg)
+                    else:
+                        #nothing, but want to make a note of this (log message)
+                        reqKwargs = reqKwargs
+            #Stupid dummy-check whether we have the reqKwargs in the methodKwargNames, which we should (basically by definition)
+            if all(elem in set(methodKwargNames) for elem in reqKwargs):
+                allreqKwargsHaveValue = True
+                for id in range(0,len(reqKwargs)):
+                    #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. They should be the same, but you never know
+                    GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
+                    #Get the value of the kwarg - we know the name already now due to reqKwargs.
+                    kwargvalue = methodKwargValues[GUIbasedIndex]
+                    if kwargvalue == '':
+                        allreqKwargsHaveValue = False
+                        print(f'EMPTY VALUE of {kwargvalue}, NOT CONTINUING')
+                if allreqKwargsHaveValue:
+                    #If we're at this point, all req kwargs have a value, so we can run!
+                    #Get the string for the required kwargs
+                    if partialStringStart is not None:
+                        partialString = partialStringStart
+                    else:
+                        partialString = ''
+                    for id in range(0,len(reqKwargs)):
+                        #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. They should be the same, but you never know
+                        GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
+                        #Get the value of the kwarg - we know the name already now due to reqKwargs.
+                        kwargvalue = methodKwargValues[GUIbasedIndex]
+                        #Add a comma if there is some info in the partialString already
+                        if partialString != '':
+                            partialString+=","
+                        #Check for special requests of kwargs, this is normally used when pointing to the output of a different value
+                        if reqKwargs[id] in specialcaseKwarg:
+                            #Get the index
+                            ps_index = specialcaseKwarg.index(reqKwargs[id])
+                            #Change the partialString with the special case
+                            partialString+=eval(specialcaseKwargPartialStringAddition[ps_index])
+                        else:
+                            partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
+                    #Add the optional kwargs if they have a value
+                    optKwargs = HelperFunctions.optKwargsFromFunction(methodName)
+                    for id in range(0,len(optKwargs)):
+                        if methodKwargValues[id+len(reqKwargs)] != '':
+                            if partialString != '':
+                                partialString+=","
+                            partialString+=optKwargs[id]+"=\""+methodKwargValues[id+len(reqKwargs)]+"\""
+                segmentEval = methodName+"("+partialString+")"
+                print('Segment string:')
+                print(segmentEval)
+                
+                return segmentEval
+            else:
+                print('SOMETHING VERY STUPID HAPPENED')
+                return None
+
     def test_run(self):
         testImageLoc = "./AutonomousMicroscopy/ExampleData/BF_test_avg.tiff"
         # Open the TIFF file
@@ -365,42 +446,9 @@ class MainWindow(QMainWindow):
                         methodKwargNames.append(split_list[2])
                         methodKwargValues.append(widget.text())
                 
-                #Now we should have the method name and all its kwargs, so:
-                if len(methodName)>0:
-                    #Check if all req. kwargs have some value
-                    reqKwargs = HelperFunctions.reqKwargsFromFunction(methodName)
-                    
-                    allreqKwargsHaveValue = True
-                    for id in range(0,len(reqKwargs)):
-                        kwargvalue = methodKwargValues[id]
-                        if kwargvalue == '':
-                            allreqKwargsHaveValue = False
-                            print('EMPTY VALUE, NOT CONTINUING')
-                    if allreqKwargsHaveValue:
-                        #If we're at this point, all req kwargs have a value, so we can run!
-                        #Get the string for the required kwargs
-                        partialString = ''
-                        for id in range(0,len(reqKwargs)):
-                            kwargvalue = methodKwargValues[id]
-                            if partialString != '':
-                                partialString+=","
-                            if reqKwargs[id] == 'image_data':
-                                partialString+=reqKwargs[id]+"="+kwargvalue+""
-                            else:
-                                partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
-                        #Add the optional kwargs if they have a value
-                        optKwargs = HelperFunctions.optKwargsFromFunction(methodName)
-                        for id in range(0,len(optKwargs)):
-                            if methodKwargValues[id+len(reqKwargs)] != '':
-                                if partialString != '':
-                                    partialString+=","
-                                partialString+=optKwargs[id]+"=\""+methodKwargValues[id+len(reqKwargs)]+"\""
+                #Function call: get the to-be-evaluated text out, giving the methodName, methodKwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)'
+                segmentEval = self.getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 'CellSegmentScripts')
                         
-                        print('Segment string:')
-                        print(methodName+"("+partialString+")")
-                        methodName_segment = methodName
-                        input_segment = partialString
-        
         #Now do the CellScoring method - atm assuming there's only one, and if outline_coords is segmentResult, it'll work                
         for layout in all_layouts:
             #Select only the correct layout - segmenting
@@ -431,86 +479,19 @@ class MainWindow(QMainWindow):
                             methodKwargValues_method.append(widget.text())
                 
                 #Now we should have the method name and all its kwargs, so:
+                foundMethodEval = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,'CellScoringScripts')
                 
-                #First method calculation
-                if len(methodName_method)>0:
-                    #Check if all req. kwargs have some value
-                    reqKwargs = HelperFunctions.reqKwargsFromFunction(methodName_method)
-                    
-                    allreqKwargsHaveValue = True
-                    for id in range(0,len(reqKwargs)):
-                        kwargvalue = methodKwargValues_method[id]
-                        if kwargvalue == '':
-                            allreqKwargsHaveValue = False
-                            print('EMPTY VALUE, NOT CONTINUING')
-                    if allreqKwargsHaveValue:
-                        #If we're at this point, all req kwargs have a value, so we can run!
-                        #Get the string for the required kwargs
-                        partialString = ''
-                        for id in range(0,len(reqKwargs)):
-                            kwargvalue = methodKwargValues_method[id]
-                            if partialString != '':
-                                partialString+=","
-                            if reqKwargs[id] == 'outline_coords':
-                                partialString+=reqKwargs[id]+"="+kwargvalue+""
-                            else:
-                                partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
-                        #Add the optional kwargs if they have a value
-                        optKwargs = HelperFunctions.optKwargsFromFunction(methodName_method)
-                        for id in range(0,len(optKwargs)):
-                            if methodKwargValues_method[id+len(reqKwargs)] != '':
-                                if partialString != '':
-                                    partialString+=","
-                                partialString+=optKwargs[id]+"=\""+methodKwargValues_method[id+len(reqKwargs)]+"\""
-                        
-                        print('Method string:')
-                        print(methodName_method+"("+partialString+")")
-                        methodName_ScoreMethod = methodName_method
-                        input_ScoreMethod = partialString
+                #Scoring calculation
+                foundScoringEval = self.getEvalTextFromGUIFunction(methodName_scoring, methodKwargNames_scoring, methodKwargValues_scoring,'ScoringMetrics',partialStringStart='methodValue=methodOutput',removeKwargs=['methodValue'])
                 
-                #And scoring calculation
-                if len(methodName_scoring)>0:
-                    #Check if all req. kwargs have some value
-                    reqKwargs = HelperFunctions.reqKwargsFromFunction(methodName_scoring)
-                    #Remove 'value' from this array
-                    if 'methodValue' in reqKwargs:
-                        reqKwargs.remove('methodValue')
-                    allreqKwargsHaveValue = True
-                    for id in range(0,len(reqKwargs)):
-                        kwargvalue = methodKwargValues_scoring[id]
-                        if kwargvalue == '':
-                            allreqKwargsHaveValue = False
-                            print('EMPTY VALUE, NOT CONTINUING')
-                    if allreqKwargsHaveValue:
-                        #If we're at this point, all req kwargs have a value, so we can run!
-                        #Get the string for the required kwargs
-                        partialString = 'methodValue=methodOutput'
-                        for id in range(0,len(reqKwargs)):
-                            kwargvalue = methodKwargValues_scoring[id]
-                            if partialString != '':
-                                partialString+=","
-                            partialString+=reqKwargs[id]+"=\""+kwargvalue+"\""
-                        #Add the optional kwargs if they have a value
-                        optKwargs = HelperFunctions.optKwargsFromFunction(methodName_scoring)
-                        for id in range(0,len(optKwargs)):
-                            if methodKwargValues_scoring[id+len(reqKwargs)] != '':
-                                if partialString != '':
-                                    partialString+=","
-                                partialString+=optKwargs[id]+"=\""+methodKwargValues_scoring[id+len(reqKwargs)]+"\""
-                        
-                        print('scoring string:')
-                        print(methodName_scoring+"("+partialString+")")
-                        methodName_ScoreScoring = methodName_scoring
-                        input_ScoreScoring = partialString
-
         #Now we can do the calculation!
         k = 1
         #Segmenting
-        segmentResult = eval(methodName_segment+"("+input_segment+")")
+        segmentResult = eval(segmentEval)
         #Scoring - method
-        methodOutput = eval(methodName_ScoreMethod+"("+input_ScoreMethod+")")
+        methodOutput = eval(foundMethodEval)
         #Scoring - score
-        scoreOutput = eval(methodName_ScoreScoring+"("+input_ScoreScoring+")")
+        scoreOutput = eval(foundScoringEval)
         print('Segmenting performed')
         cellIm = ImageData
         coords = segmentResult
@@ -548,11 +529,12 @@ class MainWindow(QMainWindow):
         axs[1].set_xlim(0, cellIm.shape[1])
         axs[1].set_ylim(cellIm.shape[0], 0)
         axs[1].axis('off')
-        axs[1].set_title(methodName_ScoreMethod)
+        axs[1].set_title(foundMethodEval)
         plt.show()
         
         print('All run correctly!')
-        
+
+
 if __name__ == "__main__":
     try:
         # get object representing MMCore, used throughout
