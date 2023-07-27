@@ -20,8 +20,8 @@
             "Wavelength": 561,
 			"MM_Property_Name": "TS_DAC03_561Laser",
 			"Intensity_offset": 0,
-			"Intensity_slope": 0.0034,
-			"_COMMENT": "//70pct seems to be max, so corr for that --> 0.0035, otherwise would be 0.005"
+			"Intensity_slope": 0.00375,
+			"_COMMENT": "//75pct seems to be max, so corr for that --> 0.0034, otherwise would be 0.005"
         },
 		"Laser3": {
             "Wavelength": 638,
