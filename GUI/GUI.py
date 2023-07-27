@@ -335,6 +335,53 @@ class MainWindow(QMainWindow):
                 curr_layout.removeItem(layout)
                 layout.deleteLater()
 
+    def getAllEvalsFromModule(self, moduleName):
+        #Create an empty array in which we store all the Eval-texts belonging to this module
+        moduleMethodEvalTexts = []
+        moduleScoringEvalTexts = []
+        #First, we find all widgets on tab_autonomous:
+        all_layouts = self.findChild(QWidget, "tab_autonomous").findChildren(QLayout)
+        for layout in all_layouts:
+            #Select only the correct layout - segmenting
+            if ("mainLayout" in layout.objectName()) and (moduleName in layout.objectName()):
+                print(f'Widgets in {layout.objectName()}:')
+                #Prepare the method kwarg arrays (and an empty name)
+                methodKwargNames_scoring = []
+                methodKwargValues_scoring = []
+                methodName_scoring = ''
+                methodKwargNames_method = []
+                methodKwargValues_method = []
+                methodName_method = ''
+                for index in range(layout.count()):
+                    item = layout.itemAt(index)
+                    widget = item.widget()
+                    
+                    if ("LineEdit" in widget.objectName()):
+                        # The objectName will be along the lines of foo#bar#str
+                        #Check if the objectname is part of a method or part of a scoring
+                        split_list = widget.objectName().split('#')
+                        if split_list[1] in HelperFunctions.functionNamesFromDir('./ScoringMetrics'):
+                            methodName_scoring = split_list[1]
+                            methodKwargNames_scoring.append(split_list[2])
+                            methodKwargValues_scoring.append(widget.text())
+                        else:
+                            methodName_method = split_list[1]
+                            methodKwargNames_method.append(split_list[2])
+                            methodKwargValues_method.append(widget.text())
+                
+                #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+                if methodName_method != '':
+                    EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method, moduleName)
+                    #append this to moduleEvalTexts
+                    moduleMethodEvalTexts.append(EvalTextMethod)
+                if methodName_scoring != '':
+                    EvalTextScoring = self.getEvalTextFromGUIFunction(methodName_scoring, methodKwargNames_scoring, methodKwargValues_scoring, 'ScoringMetrics', partialStringStart='methodValue=methodOutput',removeKwargs=['methodValue'])
+                    #append this to moduleEvalTexts
+                    moduleScoringEvalTexts.append(EvalTextScoring)
+        
+        #Return all eval text arrays
+        return moduleMethodEvalTexts, moduleScoringEvalTexts
+    
     def getEvalTextFromGUIFunction(self, methodName, methodKwargNames, methodKwargValues, methodTypeString, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
@@ -408,9 +455,6 @@ class MainWindow(QMainWindow):
                                 partialString+=","
                             partialString+=optKwargs[id]+"=\""+methodKwargValues[id+len(reqKwargs)]+"\""
                 segmentEval = methodName+"("+partialString+")"
-                print('Segment string:')
-                print(segmentEval)
-                
                 return segmentEval
             else:
                 print('SOMETHING VERY STUPID HAPPENED')
@@ -422,96 +466,26 @@ class MainWindow(QMainWindow):
         with tifffile.TiffFile(testImageLoc) as tiff:
             # Read the image data
             ImageData = tiff.asarray()
-            
-            
-        #Let's try to print all info of all CellSegmentScripts layouts
+        
         #First, we find all widgets on tab_autonomous:
         all_layouts = self.findChild(QWidget, "tab_autonomous").findChildren(QLayout)
-        for layout in all_layouts:
-            #Select only the correct layout - segmenting
-            if ("mainLayout" in layout.objectName()) and ("CellSegmentScripts" in layout.objectName()):
-                print(f'Widgets in {layout.objectName()}:')
-                #Prepare the method kwarg arrays (and an empty name)
-                methodKwargNames = []
-                methodKwargValues = []
-                methodName = ''
-                for index in range(layout.count()):
-                    item = layout.itemAt(index)
-                    widget = item.widget()
-                    
-                    if ("LineEdit" in widget.objectName()):
-                        # The objectName willb e along the lines of foo#bar#str
-                        split_list = widget.objectName().split('#')
-                        methodName = split_list[1]
-                        methodKwargNames.append(split_list[2])
-                        methodKwargValues.append(widget.text())
-                
-                #Function call: get the to-be-evaluated text out, giving the methodName, methodKwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)'
-                segmentEval = self.getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 'CellSegmentScripts')
-                        
-        #Now do the CellScoring method - atm assuming there's only one, and if outline_coords is segmentResult, it'll work                
-        for layout in all_layouts:
-            #Select only the correct layout - segmenting
-            if ("mainLayout" in layout.objectName()) and ("CellScoringScript" in layout.objectName()):
-                print(f'Widgets in {layout.objectName()}:')
-                #Prepare the method kwarg arrays (and an empty name)
-                methodKwargNames_method = []
-                methodKwargValues_method = []
-                methodName_method = ''
-                methodKwargNames_scoring = []
-                methodKwargValues_scoring = []
-                methodName_scoring = ''
-                for index in range(layout.count()):
-                    item = layout.itemAt(index)
-                    widget = item.widget()
-                    
-                    if ("LineEdit" in widget.objectName()):
-                        # The objectName will be along the lines of foo#bar#str
-                        #Check if the objectname is part of a method or part of a scoring
-                        split_list = widget.objectName().split('#')
-                        if split_list[1] in HelperFunctions.functionNamesFromDir('./ScoringMetrics'):
-                            methodName_scoring = split_list[1]
-                            methodKwargNames_scoring.append(split_list[2])
-                            methodKwargValues_scoring.append(widget.text())
-                        else:
-                            methodName_method = split_list[1]
-                            methodKwargNames_method.append(split_list[2])
-                            methodKwargValues_method.append(widget.text())
-                
-                #Now we should have the method name and all its kwargs, so:
-                foundMethodEval = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,'CellScoringScripts')
-                
-                #Scoring calculation
-                foundScoringEval = self.getEvalTextFromGUIFunction(methodName_scoring, methodKwargNames_scoring, methodKwargValues_scoring,'ScoringMetrics',partialStringStart='methodValue=methodOutput',removeKwargs=['methodValue'])
+        # Function to get all segmentEvals from all CellSegmentScripts in the GUI
+        segmentMethodEvalArr, segmentScoreEvalArr = self.getAllEvalsFromModule("CellSegmentScripts")
+
+        # Function to get all segmentEvals from all CellScoringScripts in the GUI
+        cellScoreMethodEvalArr, cellScoreScoreArr = self.getAllEvalsFromModule("CellScoringScripts")
                 
         #Now we can do the calculation!
-        k = 1
         #Segmenting
-        segmentResult = eval(segmentEval)
+        segmentResult = eval(segmentMethodEvalArr[0])
         #Scoring - method
-        methodOutput = eval(foundMethodEval)
-        #Scoring - score
-        scoreOutput = eval(foundScoringEval)
+        methodOutput = eval(cellScoreMethodEvalArr[0])
+        #Scoring - score - requires atm 'methodOutput', but should be changed.
+        scoreOutput = eval(cellScoreScoreArr[0])
         print('Segmenting performed')
         cellIm = ImageData
         coords = segmentResult
                         
-        # coords = eval(HelperFunctions.createFunctionWithKwargs(
-        #     methodName,image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
-
-
-        # 
-
-
-        #Non-preloaded stardistsegmentation
-        # coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
-
-        #Get cell image
-        # #start creating celloverlayimage
-        # cellOverlayIm = np.zeros(l.shape)
-        # for i in range(1,np.amax(l)):
-        #     cellOverlayIm[l==i] = scoreVisual[i-1]
-
         # Create a figure with two subplots
         fig, axs = plt.subplots(1,2)
 
@@ -529,7 +503,7 @@ class MainWindow(QMainWindow):
         axs[1].set_xlim(0, cellIm.shape[1])
         axs[1].set_ylim(cellIm.shape[0], 0)
         axs[1].axis('off')
-        axs[1].set_title(foundMethodEval)
+        axs[1].set_title(cellScoreMethodEvalArr[0])
         plt.show()
         
         print('All run correctly!')
