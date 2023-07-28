@@ -1,5 +1,5 @@
 
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QScrollArea, QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap
 from PyQt5 import uic
@@ -56,14 +56,13 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(os.path.join(dir_path,"Icons/GladosIcon.png")))
         
         
-        # Create a QVBoxLayout for the tab_autonomous widget
-        # Get the tab_autonomous widget
-        tab_widget = self.findChild(QWidget, "tab_autonomous")
-        main_layout = QVBoxLayout(tab_widget)
+        # Create the main_layout in which the autonomous GUI will be placed
+        main_layout = QVBoxLayout(self.findChild(QWidget, "tab_autonomous"))
         main_layout.setAlignment(Qt.AlignTop)
         
         self.layouts_dict = {}
         
+        #Create the main layout classes
         self.create_main_layout_class(main_layout,"CellSegmentScripts")
         self.create_main_layout_class(main_layout,"CellScoringScripts")
         
@@ -76,8 +75,19 @@ class MainWindow(QMainWindow):
         #Add a stretch at the bottom so everything is pushed to the top
         main_layout.addStretch()
         
-        #Set the layout
-        tab_widget.setLayout(main_layout)
+        #Create a scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)  # Allows the scroll area to resize its widget
+        scroll_area.setVerticalScrollBarPolicy(0x0002)  # Always show the vertical scrollbar
+        #Add a content_widget who's only job it is to contain the main_layout
+        content_widget = QWidget()
+        content_widget.setLayout(main_layout)
+        #Add this content_widget to the scroll_area
+        scroll_area.setWidget(content_widget)
+        #Add a new tab_layout to the tab_autonomous tab in the main GUI
+        tab_layout = QVBoxLayout(self.findChild(QWidget, "tab_autonomous"))
+        #And give this the scroll_area widget
+        tab_layout.addWidget(scroll_area)
 
     def load_ui(self):
         uic.loadUi(os.path.join(sys.path[0], 'GUI.ui'), self)  # Load the UI file
