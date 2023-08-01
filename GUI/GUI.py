@@ -1,19 +1,25 @@
+#Warning suppression
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportMissingImports=false
 
-from PyQt5.QtWidgets import QScrollArea, QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
-from PyQt5.QtCore import Qt
+
+from PyQt5.QtWidgets import QScrollArea, QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, qApp
+from PyQt5.QtCore import QFileInfo, Qt, QSettings
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap
-from PyQt5 import uic
+from PyQt5 import uic, QtGui
 import sys
 import os
 # import PyQt5.QtWidgets
 import json
-from pycromanager import *
+import shutil
+from pycromanager import * #type:ignore
 import numpy as np
 import time
 import asyncio
 import pyqtgraph as pg
 import matplotlib.pyplot as plt
-from matplotlib import colormaps # type: ignore
+import pickle
+from matplotlib import colormaps
 #For drawing
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -48,6 +54,19 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
+        settings_file_path = "./temp/autonomous_settings.ini"
+        # Remove the settings file if it exists
+        if os.path.exists(settings_file_path):
+            try:
+                os.remove(settings_file_path)
+                print("Settings file removed successfully.")
+            except OSError as e:
+                print(f"Error while removing the settings file: {e}")
+
+        #Create settings? 
+        self.autonomous_settings = QSettings(settings_file_path, QSettings.IniFormat)
+        self.autonomous_settings.sync()
+        
         #Load the UI
         self.load_ui()
         #Set Icon
@@ -58,7 +77,7 @@ class MainWindow(QMainWindow):
         
         # Create the main_layout in which the autonomous GUI will be placed
         main_layout = QVBoxLayout(self.findChild(QWidget, "tab_autonomous"))
-        main_layout.setAlignment(Qt.AlignTop)
+        main_layout.setAlignment(Qt.AlignTop) #type: ignore
         
         self.layouts_dict = {}
         
@@ -72,30 +91,46 @@ class MainWindow(QMainWindow):
         # Connect button signals to slots
         Test_run_button.clicked.connect(lambda: self.test_run())
         
+        # #Add a button below for testing atm
+        # Save_layout_button = QPushButton('Save layout')
+        # main_layout.addWidget(Save_layout_button, 1) #,1 is weight=1
+        # # Connect button signals to slots
+        # Save_layout_button.clicked.connect(lambda: self.save(self.autonomous_settings)) #,parent=self.findChild(QWidget, "tab_autonomous"))
+        # #Add a button below for testing atm
+        # Load_layout_button = QPushButton('Load layout')
+        # main_layout.addWidget(Load_layout_button, 1) #,1 is weight=1
+        # # Connect button signals to slots
+        # Load_layout_button.clicked.connect(lambda: self.restore(self.autonomous_settings))#parent=self.findChild(QWidget, "tab_autonomous"))
+        
         #Add a stretch at the bottom so everything is pushed to the top
         main_layout.addStretch()
         
         #Create a scroll area
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)  # Allows the scroll area to resize its widget
-        scroll_area.setVerticalScrollBarPolicy(0x0002)  # Always show the vertical scrollbar
+        scroll_area.setVerticalScrollBarPolicy(0x0002)  # Always show the vertical scrollbar  #type: ignore
         #Add a content_widget who's only job it is to contain the main_layout
         content_widget = QWidget()
         content_widget.setLayout(main_layout)
         #Add this content_widget to the scroll_area
         scroll_area.setWidget(content_widget)
         #Add a new tab_layout to the tab_autonomous tab in the main GUI
-        tab_layout = QVBoxLayout(self.findChild(QWidget, "tab_autonomous"))
+        tab_layout = QVBoxLayout(self.findChild(QWidget, "tab_autonomous")) #type: ignore
         #And give this the scroll_area widget
         tab_layout.addWidget(scroll_area)
-
+        
+    def value_is_valid(self,val):
+        if isinstance(val, QtGui.QPixmap):
+            return not val.isNull()
+        return True
+    
     def load_ui(self):
         uic.loadUi(os.path.join(sys.path[0], 'GUI.ui'), self)  # Load the UI file
 
     def create_main_layout_class(self,main_layout,className):
         layout_main_segment = QVBoxLayout()
         layout_main_segment.setObjectName("layout_main_"+className)
-        layout_main_segment.setAlignment(Qt.AlignTop)
+        layout_main_segment.setAlignment(Qt.AlignTop) #type: ignore
         main_layout.addLayout(layout_main_segment)
         # Initialize a list to keep track of added layouts
         self.layouts_dict[className] = []
@@ -106,7 +141,7 @@ class MainWindow(QMainWindow):
         # Create buttons
         # Get the segments_layout
         tab_widget = self.findChild(QWidget, "tab_autonomous")
-        main_layout = tab_widget.layout()
+        main_layout = tab_widget.layout() #type: ignore
         class_layout = tab_widget.findChild(QVBoxLayout, f"layout_main_{className}")
         
         #Create add/remove buttons
@@ -114,7 +149,7 @@ class MainWindow(QMainWindow):
         
         #Add a Horizontal box
         button_Hbox = QHBoxLayout()
-        class_layout.addLayout(button_Hbox)
+        class_layout.addLayout(button_Hbox) #type: ignore
         
         # Add buttons to the segments layout
         button_Hbox.addWidget(add_button, 1) #,1 is weight=1
@@ -173,7 +208,7 @@ class MainWindow(QMainWindow):
         self.changeLayout_choice(layout_new,className)
         
         # Add the layout to the father layout
-        father_layout.addLayout(layout_new)
+        father_layout.addLayout(layout_new) #type: ignore
         # Append the new layout to the list so it can be easily found/removed.
         self.layouts_dict[className].append(layout_new)
 
@@ -195,6 +230,7 @@ class MainWindow(QMainWindow):
             #Value is used for scoring, and takes the output of the method
             if reqKwargs[k] != 'methodValue':
                 label = QLabel(f"<b>{reqKwargs[k]}</b>")
+                label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
                 curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                 line_edit = QLineEdit()
                 line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
@@ -205,12 +241,14 @@ class MainWindow(QMainWindow):
             
             
         labelTitle = QLabel(f"Current selected: {curr_dropdown.currentText()}")
-            
+
+
         #Get the optional kw-arguments from the current dropdown.
         optKwargs = HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())
         #Add a widget-pair for every kwarg
         for k in range(len(optKwargs)):
             label = QLabel(f"<i>{optKwargs[k]}</i>")
+            label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
             curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
             line_edit = QLineEdit()
             line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
@@ -228,6 +266,7 @@ class MainWindow(QMainWindow):
             for k in range(len(reqKwargs)):
                 if reqKwargs[k] != 'methodValue':
                     label = QLabel(f"<b>{reqKwargs[k]}</b>")
+                    label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
                     curr_layout.addWidget(label,2+(k)+labelposoffset,2)
                     line_edit = QLineEdit()
                     line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
@@ -241,6 +280,7 @@ class MainWindow(QMainWindow):
             #Add a widget-pair for every kwarg
             for k in range(len(optKwargs)):
                 label = QLabel(f"<i>{optKwargs[k]}</i>")
+                label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
                 curr_layout.addWidget(label,2+(k)+labelposoffset+len(reqKwargs),2)
                 line_edit = QLineEdit()
                 line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
@@ -295,8 +335,9 @@ class MainWindow(QMainWindow):
             if widget_item.widget() is not None:
                 widget = widget_item.widget()
                 #If it's the dropdown segment, label it as such
-                if not ("methodDropdown" in widget.objectName()) and not ("scoringDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                if not ("methodDropdown" in widget.objectName()) and not ("scoringDropdown" in widget.objectName())and widget.objectName() != f"Label_{className}" and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
                     widget.deleteLater()
+                    # widget.setParent(None)
         
     def remove_this(self,layout_name,className):
         # Get the segments_layout
@@ -314,10 +355,12 @@ class MainWindow(QMainWindow):
                     widget = item.widget()
                     if widget is not None:
                         widget.deleteLater()
+                        # widget.setParent(None)
             
                 # Remove the layout from the segments layout
                 curr_layout.removeItem(i)
                 i.deleteLater()
+                # i.setParent(None)
                 
         # print(self.layouts_dict[className])
         # print(layout_name)
@@ -340,10 +383,12 @@ class MainWindow(QMainWindow):
                     widget = item.widget()
                     if widget is not None:
                         widget.deleteLater()
+                        # widget.setParent(None)
                 
                 # Remove the layout from the segments layout
                 curr_layout.removeItem(layout)
                 layout.deleteLater()
+                # layout.setParent(None)
 
     def getAllEvalsFromModule(self, moduleName):
         #Create an empty array in which we store all the Eval-texts belonging to this module
@@ -434,13 +479,13 @@ class MainWindow(QMainWindow):
                     if kwargvalue == '':
                         allreqKwargsHaveValue = False
                         print(f'EMPTY VALUE of {kwargvalue}, NOT CONTINUING')
+                #Get started with empty string for the eval-function
+                partialString = ''
                 if allreqKwargsHaveValue:
                     #If we're at this point, all req kwargs have a value, so we can run!
                     #Get the string for the required kwargs
                     if partialStringStart is not None:
                         partialString = partialStringStart
-                    else:
-                        partialString = ''
                     for id in range(0,len(reqKwargs)):
                         #First find the index of the function-based reqKwargs in the GUI-based methodKwargNames. They should be the same, but you never know
                         GUIbasedIndex = methodKwargNames.index(reqKwargs[id])

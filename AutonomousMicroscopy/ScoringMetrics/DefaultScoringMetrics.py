@@ -46,7 +46,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 def lowerUpperBound(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     if "outside_bounds_score" in provided_optional_args:
         outsideboundsscore = float(kwargs["outside_bounds_score"])
     else:
@@ -59,14 +59,14 @@ def lowerUpperBound(**kwargs):
 
 def gaussScore(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     #Calculate the gaussian score of the value(s)
     score = np.exp((-1*(np.array(kwargs["methodValue"])-float(kwargs["meanVal"]))**2)/(2*float(kwargs["sigmaVal"])**2))
     return score
 
 def relativeToMaxScore(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     if "max_value" in provided_optional_args:
         max_value = float(kwargs["max_value"])
     else:

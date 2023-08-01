@@ -29,7 +29,7 @@ def subfunction_exists(module_name, subfunction_name):
     try:
         if module_name.endswith('.py'):
             # Module path is provided
-            loader = importlib.machinery.SourceFileLoader('', module_name)
+            loader = importlib.machinery.SourceFileLoader('', module_name) #type:ignore
             module = loader.load_module()
         else:
             module = importlib.import_module(module_name)
@@ -59,7 +59,7 @@ def functionNamesFromDir(dirname):
                     for singlefunctiondata in functionMetadata:
                         #Also check this against the actual sub-routines and raise an error (this should also be present in the __init__ of the folders)
                         subroutineName = f"{functionName}.{singlefunctiondata}"
-                        if subfunction_exists(f'{absolute_path}\{functionName}.py',singlefunctiondata):
+                        if subfunction_exists(f'{absolute_path}\{functionName}.py',singlefunctiondata): #type:ignore
                             functionnamearr.append(subroutineName)
                         else:
                             warnings.warn(f"Warning: {subroutineName} is present in __function_metadata__ but not in the actual file!")
@@ -110,7 +110,7 @@ def kwargsFromFunction(functionname):
             functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
-            looprange = range(loopv,loopv+1)
+            looprange = range(loopv,loopv+1) #type:ignore
         name_arr = []
         help_arr = []
         rkwarr_arr = []
@@ -167,7 +167,7 @@ def infoFromMetadata(functionname,**kwargs):
             functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
-            looprange = range(loopv,loopv+1)
+            looprange = range(loopv,loopv+1) #type:ignore
             finaltext = ""
         name_arr = []
         help_arr = []
