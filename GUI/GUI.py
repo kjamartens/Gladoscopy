@@ -230,11 +230,6 @@ class MainWindow(QMainWindow):
                 if isinstance(layout,QLineEdit):
                     print(layout.text())
             
-            
-            #Also look for LineEdits and remember their info
-            # self.find_layoutsOrWidgets_with_type(layout.parentWidget(), QComboBox)
-            # self.find_layoutsOrWidgets_with_objectname(self.findChild(QWidget, "tab_autonomous"),"LineEdit")
-            #And store this as a variable.
 
     def list_layout_children(self,layout):
         num_children = layout.count()
@@ -471,31 +466,22 @@ class MainWindow(QMainWindow):
                     # widget.setParent(None)
         
     def remove_this(self,layout_name,className):
-        # Get the segments_layout
-        tab_widget = self.findChild(QWidget, "tab_autonomous")
-        curr_layout = tab_widget.findChild(QVBoxLayout, f"layout_main_{className}")
-        # Get the last added layout from the list
-        for i in self.layouts_dict[className]:
-            if layout_name == i:
-                #remove from the array
-                self.layouts_dict[className].remove(i)
-                
-                # Remove labels from the layout
-                while i.count():
-                    item = i.takeAt(0)
-                    widget = item.widget()
-                    if widget is not None:
-                        widget.deleteLater()
-                        # widget.setParent(None)
-            
-                # Remove the layout from the segments layout
-                curr_layout.removeItem(i)
-                i.deleteLater()
-                # i.setParent(None)
-                
-        # print(self.layouts_dict[className])
-        # print(layout_name)
-        # layout_name.deleteLater()
+        
+        #Get all the widgets in here
+        allWidgets = self.find_widgets_in_grid_layout(layout_name)
+        for ms in range(len(allWidgets)):
+            for widget in allWidgets[ms]:
+                if widget is not None:
+                    widget.deleteLater()
+                    # widget.setParent(None)
+        
+        #Also delete the Remove button... and horizontal line
+        
+        
+        allRemainingWidgets = self.find_children_by_type(layout_name,QWidget)
+        for rw in allRemainingWidgets:
+            rw.deleteLater()
+        
         
     def remove_layout(self,className):
         if len(self.layouts_dict[className]) > 0:
