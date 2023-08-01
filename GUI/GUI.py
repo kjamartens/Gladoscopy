@@ -91,11 +91,11 @@ class MainWindow(QMainWindow):
         # Connect button signals to slots
         Test_run_button.clicked.connect(lambda: self.test_run())
         
-        # #Add a button below for testing atm
-        # Save_layout_button = QPushButton('Save layout')
-        # main_layout.addWidget(Save_layout_button, 1) #,1 is weight=1
-        # # Connect button signals to slots
-        # Save_layout_button.clicked.connect(lambda: self.save(self.autonomous_settings)) #,parent=self.findChild(QWidget, "tab_autonomous"))
+        #Add a button below for testing atm
+        Save_layout_button = QPushButton('Save layout')
+        main_layout.addWidget(Save_layout_button, 1) #,1 is weight=1
+        # Connect button signals to slots
+        Save_layout_button.clicked.connect(lambda: self.save()) #,parent=self.findChild(QWidget, "tab_autonomous"))
         # #Add a button below for testing atm
         # Load_layout_button = QPushButton('Load layout')
         # main_layout.addWidget(Load_layout_button, 1) #,1 is weight=1
@@ -124,6 +124,95 @@ class MainWindow(QMainWindow):
             return not val.isNull()
         return True
     
+    # def find_widgets_with_objectname(self, widget, object_name):
+    #     layouts = []
+    #     if object_name in widget.objectName():
+    #         layouts.append(widget.layout())
+
+    #     if isinstance(widget, QWidget):
+    #         for child in widget.children():
+    #             layouts.extend(self.find_widgets_with_objectname(child, object_name))
+
+    #     return layouts
+    
+    #Function to find layouts with a certain objectname.
+    #Need to input the parent layoutOrWidget, and the name to search for
+    def find_layoutsOrWidgets_with_objectname(self, layoutOrWidget, object_name):
+        layouts = []
+        if layoutOrWidget != None:
+            if object_name in layoutOrWidget.objectName():
+                layouts.append(layoutOrWidget)
+                print(layoutOrWidget.objectName())
+
+            if isinstance(layoutOrWidget, QWidget):
+                for child in layoutOrWidget.children():
+                    layouts.extend(self.find_layoutsOrWidgets_with_objectname(child, object_name))
+            if isinstance(layoutOrWidget,QLayout):
+                for i in range(layoutOrWidget.count()):
+                    item = layoutOrWidget.itemAt(i)
+                    layouts.extend(self.find_layoutsOrWidgets_with_objectname(item.layout(), object_name))
+
+        return layouts
+    
+    #Function to find layouts with a certain type
+    #Need to input the parent layoutOrWidget, and the type to search for
+    def find_layoutsOrWidgets_with_type(self, layoutOrWidget, type_name):
+        layouts = []
+        if layoutOrWidget != None:
+            print(layoutOrWidget.objectName())
+            if isinstance(layoutOrWidget,type_name):
+                layouts.append(layoutOrWidget)
+                print(f"Found: {layoutOrWidget.objectName()}")
+
+            if isinstance(layoutOrWidget, QWidget):
+                for child in layoutOrWidget.children():
+                    layouts.extend(self.find_layoutsOrWidgets_with_type(child, type_name))
+            if isinstance(layoutOrWidget,QLayout):
+                for i in range(layoutOrWidget.count()):
+                    item = layoutOrWidget.itemAt(i)
+                    layouts.extend(self.find_layoutsOrWidgets_with_type(item.layout(), type_name))
+
+        return layouts
+    
+    #Find all children of a layout with a certain type (i.e. QComboBox, QLineEdit)
+    def find_children_by_type(self,layout_search,type):
+        childrenArr = []
+        for children in self.list_layout_children(layout_search):
+            if isinstance(children,type):
+                childrenArr.append(children)
+        return childrenArr
+    
+    def save(self):
+        self.layouts_dict
+        #Looks for all layouts (or widgets, but shouldn't find any) that have the name 'mainClassLayout' in them
+        layoutsToLookInto = self.find_layoutsOrWidgets_with_objectname(self.findChild(QWidget, "tab_autonomous"),"mainClassLayout")
+        #Next, in these layouts look for children of specific types
+        for layout in layoutsToLookInto:
+            # look for drop-down menus and remember their choice
+            for child in self.find_children_by_type(layout,QComboBox):
+                print(child.currentText())
+            for child in self.find_children_by_type(layout,QLineEdit):
+                print(child.text())
+            
+            
+            #Also look for LineEdits and remember their info
+            # self.find_layoutsOrWidgets_with_type(layout.parentWidget(), QComboBox)
+            # self.find_layoutsOrWidgets_with_objectname(self.findChild(QWidget, "tab_autonomous"),"LineEdit")
+            #And store this as a variable.
+
+    def list_layout_children(self,layout):
+        num_children = layout.count()
+        children = []
+
+        for i in range(num_children):
+            item = layout.itemAt(i)
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    children.append(widget)
+
+        return children
+
     def load_ui(self):
         uic.loadUi(os.path.join(sys.path[0], 'GUI.ui'), self)  # Load the UI file
 
@@ -173,7 +262,7 @@ class MainWindow(QMainWindow):
         # layout_new.addWidget(labelTitle,0,0,1,3)
         
         #Add info to layout_new via the setObjectName:
-        layout_new.setObjectName(f"mainLayout_{className}_{UNIQUE_ID}");UNIQUE_ID+=1
+        layout_new.setObjectName(f"mainClassLayout_{className}_{UNIQUE_ID}");UNIQUE_ID+=1
         
         #Add the remove-button
         remove_button = QPushButton(f"Remove", self)
