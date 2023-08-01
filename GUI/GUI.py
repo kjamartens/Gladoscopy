@@ -135,14 +135,47 @@ class MainWindow(QMainWindow):
 
     #     return layouts
     
+    
+    # def find_widgets_method_scoring_from_objectName(self, parent, object_name):
+    #     layouts = []
+    #     if parent != None:
+    #         if object_name in parent.objectName():
+    #             layouts.extend(self.find_widgets_in_grid_layout(parent))
+    #     return layouts
+    
+    def find_widgets_in_grid_layout(self,layout):
+        widgetsMain = []
+        if isinstance(layout, QGridLayout):
+            #We look in the first grid layout - this has all the cellSegmentScript possibilities
+            for row in range(layout.rowCount()):
+                for column in range(layout.columnCount()):
+                    item = layout.itemAtPosition(row, column)
+                    if item is not None:
+                        layout2 = item.layout()
+                        if layout2 is not None:
+                            #If we find a layout in there, we know that it's the entry of a new cellSegmentScript variables
+                            widgets = []
+                            #We loop over all row/columns and add
+                            for row2 in range(layout2.rowCount()):
+                                for column2 in range(layout2.columnCount()):
+                                    item = layout2.itemAtPosition(row2, column2)
+                                    if item is not None:
+                                        widget = item.widget()
+                                        if widget is not None:
+                                            widgets.append(widget)
+                            #and we add the widgets to the widgetsMain
+                            widgetsMain.append(widgets)
+        return widgetsMain
+    
     #Function to find layouts with a certain objectname.
     #Need to input the parent layoutOrWidget, and the name to search for
     def find_layoutsOrWidgets_with_objectname(self, layoutOrWidget, object_name):
         layouts = []
         if layoutOrWidget != None:
             if object_name in layoutOrWidget.objectName():
-                layouts.append(layoutOrWidget)
-                print(layoutOrWidget.objectName())
+                # layouts.append(layoutOrWidget)
+                layouts.extend(self.find_widgets_in_grid_layout(layoutOrWidget))
+                # print(layoutOrWidget.objectName())
 
             if isinstance(layoutOrWidget, QWidget):
                 for child in layoutOrWidget.children():
@@ -183,16 +216,19 @@ class MainWindow(QMainWindow):
         return childrenArr
     
     def save(self):
-        self.layouts_dict
         #Looks for all layouts (or widgets, but shouldn't find any) that have the name 'mainClassLayout' in them
+        # layoutsToLookInto = self.find_layoutsOrWidgets_with_objectname(self.findChild(QWidget, "tab_autonomous"),"mainClassLayout")
         layoutsToLookInto = self.find_layoutsOrWidgets_with_objectname(self.findChild(QWidget, "tab_autonomous"),"mainClassLayout")
         #Next, in these layouts look for children of specific types
-        for layout in layoutsToLookInto:
-            # look for drop-down menus and remember their choice
-            for child in self.find_children_by_type(layout,QComboBox):
-                print(child.currentText())
-            for child in self.find_children_by_type(layout,QLineEdit):
-                print(child.text())
+        #Now, each of these layouts should contain 1 or 2 gridLayouts - method and (maybe) scoring.
+        for ms in range(len(layoutsToLookInto)):
+            #And then we loop over all layouts in this array
+            for layout in layoutsToLookInto[ms]:
+                #and for now print if they're doing something interesting
+                if isinstance(layout,QComboBox):
+                    print(layout.currentText())
+                if isinstance(layout,QLineEdit):
+                    print(layout.text())
             
             
             #Also look for LineEdits and remember their info
@@ -266,20 +302,29 @@ class MainWindow(QMainWindow):
         
         #Add the remove-button
         remove_button = QPushButton(f"Remove", self)
-        layout_new.addWidget(remove_button,1,5)
+        layout_new.addWidget(remove_button,1,3)
         remove_button.setObjectName(f"{className}_remove_KEEP")
         remove_button.clicked.connect(lambda: self.remove_this(layout_new,className))
         
+        #Create a method-only gridbox
+        method_Grid = QGridLayout()
+        layout_new.addLayout(method_Grid,1,1)
         # Create a QComboBox and add options - this is the METHOD dropdown
         methodDropdown = QComboBox(self)
         options = HelperFunctions.functionNamesFromDir(className)
         methodDropdown.setObjectName(f"{className}_methodDropdown")
         methodDropdown.addItems(options)
         #Add the methodDropdown to the layout
-        layout_new.addWidget(methodDropdown,1,0,1,2)
+        method_Grid.addWidget(methodDropdown,1,0,1,2)
         #Activation for methodDropdown.activated
-        methodDropdown.activated.connect(lambda: self.changeLayout_choice(layout_new,className))
+        methodDropdown.activated.connect(lambda: self.changeLayout_choice(method_Grid,className,'method'))
+        #On startup/initiatlisation: also do changeLayout_choice
+        self.changeLayout_choice(method_Grid,className,'method')
         
+        #Create a scoring-only gridbox
+        scoring_Grid = QGridLayout()
+        layout_new.addLayout(scoring_Grid,1,2)
+        #Fill it if it's not segmention
         if className != 'CellSegmentScripts':
             # Create a QComboBox and add options - this is the SCORING dropdown
             scoringDropdown = QComboBox(self)
@@ -287,15 +332,22 @@ class MainWindow(QMainWindow):
             scoringDropdown.setObjectName(f"{className}_scoringDropdown")
             scoringDropdown.addItems(options)
             #Add the methodDropdown to the layout
-            layout_new.addWidget(scoringDropdown,1,2,1,2)
+            scoring_Grid.addWidget(scoringDropdown,1,0,1,2)
             #Activation for methodDropdown.activated
-            scoringDropdown.activated.connect(lambda: self.changeLayout_choice(layout_new,className))
+            scoringDropdown.activated.connect(lambda: self.changeLayout_choice(scoring_Grid,className,'scoring'))
+            #On startup/initiatlisation: also do changeLayout_choice
+            self.changeLayout_choice(scoring_Grid,className,'scoring')
 
-        #Most entries are filled in changeLayout_choice!
-
-        #On startup/initiatlisation: also do changeLayout_choice
-        self.changeLayout_choice(layout_new,className)
         
+        #Add a horizontal line
+        horizontal_line = QFrame()
+        horizontal_line.setFrameShape(QFrame.HLine)
+        horizontal_line.setFrameShadow(QFrame.Sunken)
+        horizontal_line.setObjectName("HorLine")
+        
+        #Set the final line widget
+        layout_new.addWidget(horizontal_line,99,0,2,0)
+
         # Add the layout to the father layout
         father_layout.addLayout(layout_new) #type: ignore
         # Append the new layout to the list so it can be easily found/removed.
@@ -303,48 +355,49 @@ class MainWindow(QMainWindow):
 
     #Main def that interacts with a new layout based on whatever entries we have!
     #We assume a X-by-4 (4 columns) size, where 1/2 are used for Operation, and 3/4 are used for Value-->Score conversion
-    def changeLayout_choice(self,curr_layout,className):
+    def changeLayout_choice(self,curr_layout,className,methodorscoring):
         global UNIQUE_ID
         
         #This removes everything except the first entry (i.e. the drop-down menu)
         self.resetLayout(curr_layout,className)
-        #Get the dropdown info
-        curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
         
-        #Get the kw-arguments from the current dropdown.
-        reqKwargs = HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())
-        #Add a widget-pair for every kwarg
-        labelposoffset = 0
-        for k in range(len(reqKwargs)):
-            #Value is used for scoring, and takes the output of the method
-            if reqKwargs[k] != 'methodValue':
-                label = QLabel(f"<b>{reqKwargs[k]}</b>")
-                label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
-                curr_layout.addWidget(label,2+(k)+labelposoffset,0)
+        if methodorscoring == 'method':
+            #Get the dropdown info
+            curr_dropdown = self.getMethodDropdownInfo(curr_layout,className)
+            #Get the kw-arguments from the current dropdown.
+            reqKwargs = HelperFunctions.reqKwargsFromFunction(curr_dropdown.currentText())
+            #Add a widget-pair for every kwarg
+            labelposoffset = 0
+            for k in range(len(reqKwargs)):
+                #Value is used for scoring, and takes the output of the method
+                if reqKwargs[k] != 'methodValue':
+                    label = QLabel(f"<b>{reqKwargs[k]}</b>")
+                    label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                    curr_layout.addWidget(label,2+(k)+labelposoffset,0)
+                    line_edit = QLineEdit()
+                    line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                    UNIQUE_ID+=1
+                    curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
+                else:
+                    labelposoffset -= 1
+                
+                
+            labelTitle = QLabel(f"Current selected: {curr_dropdown.currentText()}")
+
+
+            #Get the optional kw-arguments from the current dropdown.
+            optKwargs = HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())
+            #Add a widget-pair for every kwarg
+            for k in range(len(optKwargs)):
+                label = QLabel(f"<i>{optKwargs[k]}</i>")
+                label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
+                curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
                 line_edit = QLineEdit()
-                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
+                line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
                 UNIQUE_ID+=1
-                curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
-            else:
-                labelposoffset -= 1
-            
-            
-        labelTitle = QLabel(f"Current selected: {curr_dropdown.currentText()}")
-
-
-        #Get the optional kw-arguments from the current dropdown.
-        optKwargs = HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())
-        #Add a widget-pair for every kwarg
-        for k in range(len(optKwargs)):
-            label = QLabel(f"<i>{optKwargs[k]}</i>")
-            label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
-            curr_layout.addWidget(label,2+(k)+len(reqKwargs)+labelposoffset,0)
-            line_edit = QLineEdit()
-            line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
-            UNIQUE_ID+=1
-            curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
+                curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
         
-        try:
+        elif methodorscoring == 'scoring':
             #Get the dropdown info
             curr_dropdown = self.getScoringDropdownInfo(curr_layout,className)
             
@@ -356,11 +409,11 @@ class MainWindow(QMainWindow):
                 if reqKwargs[k] != 'methodValue':
                     label = QLabel(f"<b>{reqKwargs[k]}</b>")
                     label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
-                    curr_layout.addWidget(label,2+(k)+labelposoffset,2)
+                    curr_layout.addWidget(label,2+(k)+labelposoffset,0)
                     line_edit = QLineEdit()
                     line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{reqKwargs[k]}")
                     UNIQUE_ID+=1
-                    curr_layout.addWidget(line_edit,2+k+labelposoffset,3)
+                    curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
                 else:
                     labelposoffset -= 1
                 
@@ -370,23 +423,12 @@ class MainWindow(QMainWindow):
             for k in range(len(optKwargs)):
                 label = QLabel(f"<i>{optKwargs[k]}</i>")
                 label.setObjectName(f"Label_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
-                curr_layout.addWidget(label,2+(k)+labelposoffset+len(reqKwargs),2)
+                curr_layout.addWidget(label,2+(k)+labelposoffset+len(reqKwargs),0)
                 line_edit = QLineEdit()
                 line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
                 UNIQUE_ID+=1
-                curr_layout.addWidget(line_edit,2+(k)+labelposoffset+len(reqKwargs),3)
-        except:
-            print('Scoring Dropdown not found!')
+                curr_layout.addWidget(line_edit,2+(k)+labelposoffset+len(reqKwargs),1)
         
-        
-        #Add a horizontal line
-        horizontal_line = QFrame()
-        horizontal_line.setFrameShape(QFrame.HLine)
-        horizontal_line.setFrameShadow(QFrame.Sunken)
-        horizontal_line.setObjectName("HorLine")
-        
-        #Set the final line widget
-        curr_layout.addWidget(horizontal_line,99,0,2,0)
 
     def getMethodDropdownInfo(self,curr_layout,className):
         curr_dropdown = []
@@ -484,44 +526,45 @@ class MainWindow(QMainWindow):
         moduleMethodEvalTexts = []
         moduleScoringEvalTexts = []
         #First, we find all widgets on tab_autonomous:
-        all_layouts = self.findChild(QWidget, "tab_autonomous").findChildren(QLayout)
-        for layout in all_layouts:
-            #Select only the correct layout - segmenting
-            if ("mainLayout" in layout.objectName()) and (moduleName in layout.objectName()):
-                print(f'Widgets in {layout.objectName()}:')
-                #Prepare the method kwarg arrays (and an empty name)
-                methodKwargNames_scoring = []
-                methodKwargValues_scoring = []
-                methodName_scoring = ''
-                methodKwargNames_method = []
-                methodKwargValues_method = []
-                methodName_method = ''
-                for index in range(layout.count()):
-                    item = layout.itemAt(index)
-                    widget = item.widget()
-                    
-                    if ("LineEdit" in widget.objectName()):
-                        # The objectName will be along the lines of foo#bar#str
-                        #Check if the objectname is part of a method or part of a scoring
-                        split_list = widget.objectName().split('#')
-                        if split_list[1] in HelperFunctions.functionNamesFromDir('./ScoringMetrics'):
-                            methodName_scoring = split_list[1]
-                            methodKwargNames_scoring.append(split_list[2])
-                            methodKwargValues_scoring.append(widget.text())
-                        else:
-                            methodName_method = split_list[1]
-                            methodKwargNames_method.append(split_list[2])
-                            methodKwargValues_method.append(widget.text())
-                
-                #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
-                if methodName_method != '':
-                    EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method, moduleName)
-                    #append this to moduleEvalTexts
-                    moduleMethodEvalTexts.append(EvalTextMethod)
-                if methodName_scoring != '':
-                    EvalTextScoring = self.getEvalTextFromGUIFunction(methodName_scoring, methodKwargNames_scoring, methodKwargValues_scoring, 'ScoringMetrics', partialStringStart='methodValue=methodOutput',removeKwargs=['methodValue'])
-                    #append this to moduleEvalTexts
-                    moduleScoringEvalTexts.append(EvalTextScoring)
+        # all_layouts = self.findChild(QWidget, "tab_autonomous").findChildren(QLayout)
+        evalModules = self.find_layoutsOrWidgets_with_objectname(self.findChild(QWidget, "tab_autonomous"),f"mainClassLayout_{moduleName}")
+        if evalModules != []:
+            #Prepare the method kwarg arrays (and an empty name)
+            methodKwargNames_scoring = []
+            methodKwargValues_scoring = []
+            methodName_scoring = ''
+            methodKwargNames_method = []
+            methodKwargValues_method = []
+            methodName_method = ''
+            #First scoring modules
+            for widget in evalModules[0]:
+                if ("LineEdit" in widget.objectName()):
+                    # The objectName will be along the lines of foo#bar#str
+                    #Check if the objectname is part of a method or part of a scoring
+                    split_list = widget.objectName().split('#')
+                    methodName_method = split_list[1]
+                    methodKwargNames_method.append(split_list[2])
+                    methodKwargValues_method.append(widget.text())
+            for widget in evalModules[1]:
+                if ("LineEdit" in widget.objectName()):
+                    # The objectName will be along the lines of foo#bar#str
+                    #Check if the objectname is part of a method or part of a scoring
+                    split_list = widget.objectName().split('#')
+                    methodName_scoring = split_list[1]
+                    methodKwargNames_scoring.append(split_list[2])
+                    methodKwargValues_scoring.append(widget.text())
+        
+            #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+            if methodName_method != '':
+                EvalTextMethod = self.getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method, moduleName)
+                #append this to moduleEvalTexts
+                moduleMethodEvalTexts.append(EvalTextMethod)
+            if methodName_scoring != '':
+                EvalTextScoring = self.getEvalTextFromGUIFunction(methodName_scoring, methodKwargNames_scoring, methodKwargValues_scoring, 'ScoringMetrics', partialStringStart='methodValue=methodOutput',removeKwargs=['methodValue'])
+                #append this to moduleEvalTexts
+                moduleScoringEvalTexts.append(EvalTextScoring)
+        else:
+            print(f'NO MODULES FOUND WITH {moduleName}')
         
         #Return all eval text arrays
         return moduleMethodEvalTexts, moduleScoringEvalTexts
