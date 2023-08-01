@@ -103,6 +103,12 @@ class MainWindow(QMainWindow):
         # Load_layout_button.clicked.connect(lambda: self.restore(self.autonomous_settings))#parent=self.findChild(QWidget, "tab_autonomous"))
         
         #Add a stretch at the bottom so everything is pushed to the top
+        #Add a couple empty widgets to push all to top
+        for i in range(0,10):
+            empty_space = QWidget()  # Empty widget for stretch
+            empty_space.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
+            main_layout.addWidget(empty_space)
+        #And add a good stretch
         main_layout.addStretch()
         
         #Create a scroll area
@@ -298,7 +304,7 @@ class MainWindow(QMainWindow):
         #Add the remove-button
         remove_button = QPushButton(f"Remove", self)
         layout_new.addWidget(remove_button,1,3)
-        remove_button.setObjectName(f"{className}_remove_KEEP")
+        remove_button.setObjectName(f"{className}_remove")
         remove_button.clicked.connect(lambda: self.remove_this(layout_new,className))
         
         #Create a method-only gridbox
@@ -318,6 +324,7 @@ class MainWindow(QMainWindow):
         
         #Create a scoring-only gridbox
         scoring_Grid = QGridLayout()
+        layout_new.setAlignment(scoring_Grid,Qt.AlignTop)
         layout_new.addLayout(scoring_Grid,1,2)
         #Fill it if it's not segmention
         if className != 'CellSegmentScripts':
@@ -375,11 +382,7 @@ class MainWindow(QMainWindow):
                     curr_layout.addWidget(line_edit,2+k+labelposoffset,1)
                 else:
                     labelposoffset -= 1
-                
-                
-            labelTitle = QLabel(f"Current selected: {curr_dropdown.currentText()}")
-
-
+        
             #Get the optional kw-arguments from the current dropdown.
             optKwargs = HelperFunctions.optKwargsFromFunction(curr_dropdown.currentText())
             #Add a widget-pair for every kwarg
@@ -391,6 +394,11 @@ class MainWindow(QMainWindow):
                 line_edit.setObjectName(f"LineEdit_{UNIQUE_ID}#{curr_dropdown.currentText()}#{optKwargs[k]}")
                 UNIQUE_ID+=1
                 curr_layout.addWidget(line_edit,2+(k)+len(reqKwargs)+labelposoffset,1)
+                
+            #Add empty widget to push all to top
+            empty_space = QWidget()  # Empty widget for stretch
+            empty_space.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
+            curr_layout.addWidget(empty_space,99,0)
         
         elif methodorscoring == 'scoring':
             #Get the dropdown info
@@ -424,6 +432,10 @@ class MainWindow(QMainWindow):
                 UNIQUE_ID+=1
                 curr_layout.addWidget(line_edit,2+(k)+labelposoffset+len(reqKwargs),1)
         
+            #Add empty widget to push all to top
+            empty_space = QWidget()  # Empty widget for stretch
+            empty_space.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
+            curr_layout.addWidget(empty_space,99,0)
 
     def getMethodDropdownInfo(self,curr_layout,className):
         curr_dropdown = []
@@ -466,7 +478,6 @@ class MainWindow(QMainWindow):
                     # widget.setParent(None)
         
     def remove_this(self,layout_name,className):
-        
         #Get all the widgets in here
         allWidgets = self.find_widgets_in_grid_layout(layout_name)
         for ms in range(len(allWidgets)):
@@ -475,9 +486,7 @@ class MainWindow(QMainWindow):
                     widget.deleteLater()
                     # widget.setParent(None)
         
-        #Also delete the Remove button... and horizontal line
-        
-        
+        #Also delete the Remove button and horizontal line
         allRemainingWidgets = self.find_children_by_type(layout_name,QWidget)
         for rw in allRemainingWidgets:
             rw.deleteLater()
@@ -514,6 +523,11 @@ class MainWindow(QMainWindow):
         #First, we find all widgets on tab_autonomous:
         # all_layouts = self.findChild(QWidget, "tab_autonomous").findChildren(QLayout)
         evalModules = self.find_layoutsOrWidgets_with_objectname(self.findChild(QWidget, "tab_autonomous"),f"mainClassLayout_{moduleName}")
+        #If the first one is removed, it could give empty results
+        while evalModules[0] == [] and evalModules[1] == [] and len(evalModules) > 1:
+            #Remove the top 2 entries, and then it'll check again
+            evalModules.pop(0)
+            evalModules.pop(0)
         if evalModules != []:
             #Prepare the method kwarg arrays (and an empty name)
             methodKwargNames_scoring = []
