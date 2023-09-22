@@ -1,0 +1,18 @@
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in C:\Users\SMIPC2\Documents\GitHub\ScopeGUI\Testing\keys.txt.
+Your public key has been saved in C:\Users\SMIPC2\Documents\GitHub\ScopeGUI\Testing\keys.txt.pub.
+The key fingerprint is:
+SHA256:WtXUn0rCHhblSUpNyReZlIWVoGOCesaFmZEPAJg8NYs smipc2@SMI2PC
+The key's randomart image is:
++---[RSA 3072]----+
+|. ++.....  .**+=X|
+| =. o  o* .+=++* |
+| E..   =ooo=oo...|
+|      o .oo=.. ..|
+|     . +S o + .  |
+|      oo   . .   |
+|      .          |
+|                 |
+|                 |
++----[SHA256]-----+
