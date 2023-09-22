@@ -116,7 +116,7 @@ def StarDistCoords_to_xyCoords(StarDistCoords):
 #-------------------------------------------------------------------------------------------------------------------------------
 def nrneighbours_basedonCellWidth(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     nr_neighbours = np.empty(len(kwargs["outline_coords"]))
     #Loop over all ROIs
     for i in range(0,len(kwargs["outline_coords"])):
@@ -135,7 +135,7 @@ def nrneighbours_basedonCellWidth(**kwargs):
 
 def distToNearestNeighbour(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     dist_to_nn = np.empty(len(kwargs["outline_coords"]))
     for i in range(0,len(kwargs["outline_coords"])):
         [currmindist,currmindistId] = shortestDistanceToNeighbourROI(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]),kwargs["outline_coords"])
@@ -144,7 +144,7 @@ def distToNearestNeighbour(**kwargs):
 
 def lengthWidthRatio(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     #Create an empty array for the length-to-width ratio
     lwratio = np.empty(len(kwargs["outline_coords"]))
     #Calculate the ratio via internal function for every cell
@@ -155,7 +155,7 @@ def lengthWidthRatio(**kwargs):
 
 def cellArea(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     cellarea = np.empty(len(kwargs["outline_coords"]))
     for i in range(0,len(kwargs["outline_coords"])):
         cellarea[i] = getArea(StarDistCoords_to_xyCoords(kwargs["outline_coords"][i]))

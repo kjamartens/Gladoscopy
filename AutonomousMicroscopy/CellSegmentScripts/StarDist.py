@@ -34,34 +34,34 @@ def __function_metadata__():
 #Normal stardist segmentation, requires image_data and modelStorageLoc as required kwargs
 def StarDistSegment(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
     modelDirectory = kwargs["modelStorageLoc"].rsplit('/', 1)
     #Load the model - better to do this out of the loop for time reasons
-    stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/")
+    stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
 
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}, nms_thresh changed to {str(kwargs["nms_thresh"])}')
-        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"]),prob_thresh=kwargs["prob_thresh"], nms_thresh=kwargs["nms_thresh"])
+        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"]),prob_thresh=kwargs["prob_thresh"], nms_thresh=kwargs["nms_thresh"]) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
-        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"]),prob_thresh=kwargs["prob_thresh"])
+        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"]),prob_thresh=kwargs["prob_thresh"]) #type:ignore
     elif "prob_thresh" not in provided_optional_args and "nms_thresh" in provided_optional_args:
         print(f'nms_thresh changed to {str(kwargs["nms_thresh"])}')
-        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"]),nms_thresh=kwargs["nms_thresh"])
+        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"]),nms_thresh=kwargs["nms_thresh"]) #type:ignore
     else:
-        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"]))
+        labels, details = stardistModel.predict_instances(normalize(kwargs["image_data"])) #type:ignore
     
     #Extract detailed info
-    coord, points, prob = details['coord'], details['points'], details['prob']
+    coord, points, prob = details['coord'], details['points'], details['prob'] #type:ignore
 
     #Return the coordinates of the ROIs (could also return the labeled inage via 'labels')
     return coord
 
 def StarDistSegment_preloadedModel(**kwargs):
     #Check if we have the required kwargs
-    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs)
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
