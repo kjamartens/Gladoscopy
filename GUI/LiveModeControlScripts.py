@@ -99,56 +99,42 @@ def getLayerIdFromName(layer_name):
     ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, '_name') and layer._name == layer_name]
     return ImageLayer
 
-def napariUpdateLive(liveImage):
-    if liveImage is None:
-        return
+def TestRandomTextOverlay(layer_name):
+    pos = [100,100]
+    polygons = [np.array([[pos[0], pos[1]], [pos[0], pos[1]], [pos[0], pos[1]], [pos[0], pos[1]]])]
+    
+    # create properties
+    properties = {
+        'empty': [chr(random.randint(ord('a'), ord('z')))],
+    }
+    text_properties = {
+        'text': 'Test {empty}',
+        'anchor': 'upper_left',
+        'translation': [-5, 0],
+        'size': 10,
+        'color': 'white',
+    }
 
-    liveImageLayer = getLayerIdFromName('liveImage')
-
-    #If it's the first liveImageLayer
-    if not liveImageLayer:
-        layer = napariViewer.add_image(liveImage, rendering='attenuated_mip')
-        #Set correct scale - in nm
-        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
-        layer._keep_auto_contrast = True
-        napariViewer.reset_view()
-    #Else if the layer already exists, replace it!
-    else:
-        # layer is present, replace its data
-        layer = napariViewer.layers[liveImageLayer[0]]
-        # image_shape = layer.data.shape[1:]
-        # image_dtype = layer.data.dtype
-        layer.data = liveImage#da.concatenate((layer.data, delayed_image), axis=2)
-
-    # we want to show the last file added in the viewer to do so we want to
-    # put the slider at the very end. But, sometimes when user is scrolling
-    # through the previous slide then it is annoying to jump to last
-    # stack as it gets added. To avoid that jump we 1st check where
-    # the scroll is and if its not at the last slide then don't move the slider.
-    # if napariViewer.dims.point[0] >= layer.data.shape[0] - 2:
-    #     napariViewer.dims.set_point(0, layer.data.shape[0] - 1)
-
-@thread_worker(connect={'yielded': napariUpdateLive})
-def buttonPressliveStateToggle():
-    global livestate
-    print(livestate)
-    if livestate:
-        livestate = False
-    else:
-        livestate = True
-
-    while livestate == True:
-        core.snap_image()
-        tagged_image = core.get_tagged_image()
-        # get the pixels in numpy array and reshape it according to its height and width
-        image_array = np.reshape(
-            tagged_image.pix,
-            newshape=[-1, tagged_image.tags["Height"], tagged_image.tags["Width"]],
+    #See if layer exists
+    shapeLayer = getLayerIdFromName(layer_name)
+    if not shapeLayer:
+        shapes_layer = napariViewer.add_shapes(
+            polygons,
+            properties=properties,
+            name=layer_name,
+            text = text_properties,
+            opacity = 1
         )
-        # for display, we can scale the image into the range of 0~255
-        # image_array = (image_array / image_array.max() * 255).astype("uint8")
-        yield image_array[0,:,:]
+    else:
+        #delete shapelayer
+        napariViewer.layers.pop(shapeLayer[0])
+        TestRandomTextOverlay(layer_name)
 
+@thread_worker(connect={'yielded': TestRandomTextOverlay})
+def threadForText():
+    print('Threadfortext')
+    yield 'Test'
+    
 def InitateNapariUI(napariViewer):
     #Turn on scalebar
     napariViewer.scale_bar.visible = True
@@ -178,18 +164,99 @@ def TestLiveOverlay(layer_name):
         polygons,
         shape_type='polygon',
         edge_width=5,
-        edge_color='class',
-        face_color='transparent',
+        edge_color='yellow',
+        face_color='red',
     )
 
+
+
+def napariUpdateLive(liveImage):
+    if liveImage is None:
+        return
+
+    liveImageLayer = getLayerIdFromName('liveImage')
+
+    #If it's the first liveImageLayer
+    if not liveImageLayer:
+        nrLayersBefore = len(napariViewer.layers)
+        print(nrLayersBefore)
+        layer = napariViewer.add_image(liveImage, rendering='attenuated_mip')
+        #Set correct scale - in nm
+        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
+        layer._keep_auto_contrast = True
+        napariViewer.reset_view()
+        napariViewer.layers.move_multiple([nrLayersBefore,0])
+    #Else if the layer already exists, replace it!
+    else:
+        # layer is present, replace its data
+        layer = napariViewer.layers[liveImageLayer[0]]
+        # image_shape = layer.data.shape[1:]
+        # image_dtype = layer.data.dtype
+        layer.data = liveImage#da.concatenate((layer.data, delayed_image), axis=2)
+
+    #Update the random text layer
+    # TestRandomTextOverlay('TestText',[100,100])
+    asyncio.run(my_async_function())
+    
+    # we want to show the last file added in the viewer to do so we want to
+    # put the slider at the very end. But, sometimes when user is scrolling
+    # through the previous slide then it is annoying to jump to last
+    # stack as it gets added. To avoid that jump we 1st check where
+    # the scroll is and if its not at the last slide then don't move the slider.
+    # if napariViewer.dims.point[0] >= layer.data.shape[0] - 2:
+    #     napariViewer.dims.set_point(0, layer.data.shape[0] - 1)
+
+
+@thread_worker(connect={'yielded': napariUpdateLive})
+def buttonPressliveStateToggle():
+    global livestate
+    print(livestate)
+    if livestate:
+        livestate = False
+    else:
+        livestate = True
+
+    while livestate == True:
+        core.snap_image()
+        tagged_image = core.get_tagged_image()
+        # get the pixels in numpy array and reshape it according to its height and width
+        image_array = np.reshape(
+            tagged_image.pix,
+            newshape=[-1, tagged_image.tags["Height"], tagged_image.tags["Width"]],
+        )
+        # for display, we can scale the image into the range of 0~255
+        # image_array = (image_array / image_array.max() * 255).astype("uint8")
+        yield image_array[0,:,:]
+        
+async def my_async_function():
+    global livetextupdater
+
+    # Check if the function is already running
+    if livetextupdater:
+        print("Function is already running. Skipping...")
+        return
+    
+    try:
+        # Set the flag variable to indicate that the function is running
+        livetextupdater = True
+
+        # Your async code here
+        print("Running async function...")
+        await asyncio.sleep(5)  # Simulating some long-running task
+    
+    finally:
+        # Reset the flag variable when the function is done running
+        livetextupdater = False
+        
 def runLiveModeUI(score,sMM_JSON,sform,sapp):
     #Go from self to global variables
-    global core, MM_JSON, form, app, livestate, napariViewer
+    global core, MM_JSON, form, app, livestate, napariViewer, livetextupdater
     core = score
     MM_JSON = sMM_JSON
     form = sform
     app = sapp
     livestate = False
+    livetextupdater = False #function is not running atm
 
     #Napari start
     napariViewer = napari.Viewer()
@@ -201,7 +268,8 @@ def runLiveModeUI(score,sMM_JSON,sform,sapp):
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
 
-    TestLiveOverlay('liverOverlay')
+    TestLiveOverlay('liveOverlay')
+    sl = TestRandomTextOverlay('TestText')
 
     breakpoint
 
