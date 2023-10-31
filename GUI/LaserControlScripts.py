@@ -130,9 +130,9 @@ def ChangeIntensityLaser_Slider(laserID):
     #Create ValIntPerc variable and extract
     exec("global ValInt; ValInt = form.SliderLaser_"+str(laserID)+".value()");
     #I don't want 99 percentages...
-    ValIntPerc = ValInt
-    if ValInt == 99:
-        ValIntPerc = ValInt+1
+    ValIntPerc = ValInt #type:ignore
+    if ValInt == 99: #type:ignore
+        ValIntPerc = ValInt+1 #type:ignore
     #Change the intensity
     ChangeIntensityLaser(laserID, ValIntPerc);
     #Update labels
@@ -144,7 +144,7 @@ def ChangeIntensityLaserEditField(laserID):
         #Create ValIntPerc variable and extract
         exec("global ValIntPerc; ValIntPerc = int(form.EditIntensity_Laser_"+str(laserID)+".text())");
         #Change the intensity
-        ChangeIntensityLaser(laserID, ValIntPerc);
+        ChangeIntensityLaser(laserID, ValIntPerc); #type:ignore
         #Update labels
         InitLaserSliders(MM_JSON)
     except:
@@ -251,7 +251,7 @@ def drawplot(frameduration):
     form.graphWidget.setYRange(0,1*nrlasersdrawn, padding=0.005)
 
     #Draw frame lines
-    penFrameLine = pg.mkPen(color=(200,200,200), width=1, style=QtCore.Qt.DashLine)
+    penFrameLine = pg.mkPen(color=(200,200,200), width=1, style=QtCore.Qt.DashLine) #type:ignore
     for i in range(0,drawnrframes+1):
         form.graphWidget.plot([i*frameduration,i*frameduration], [-1, nrlasersdrawn+1], pen=penFrameLine)
 
@@ -260,17 +260,17 @@ def drawplot(frameduration):
         #Get the info from the boxes above
         exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
         exec("global duration; duration = int(form.Length_Edit_Laser_"+str(i)+".text())");
-        if duration == 0:
+        if duration == 0: #type:ignore
             drawduration = 0;#frameduration-delay/1000;
         else:
-            drawduration = duration/1000;
+            drawduration = duration/1000; #type:ignore
         exec("global everyxframes; everyxframes = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())");
         #Get wavelength to enable correct colours
         wvlngth = MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"]
         #Get intensity from slider
         intensity = GetIntensityLaser(MM_JSON,i);
 
-        drawsinglelaserint(delay/1000,drawduration,intensity/100,i+1,everyxframes,GetRGBFromLambda(wvlngth),frameduration,drawnrframes)
+        drawsinglelaserint(delay/1000,drawduration,intensity/100,i+1,everyxframes,GetRGBFromLambda(wvlngth),frameduration,drawnrframes) #type:ignore
 
 
 def drawsingleline(xdata,ydata,col):
@@ -367,11 +367,11 @@ def armLaser(i):
     TS_Response_verbose();
 
     exec("global nrframesrepeat; nrframesrepeat = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())")
-    for k in range(0,nrframesrepeat):
+    for k in range(0,nrframesrepeat): #type:ignore
         exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
         exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
         if k == 0:
-            if length>0:
+            if length>0: #type:ignore
                 print('PAO'+str(i+1)+'-0-' + str(round(65535*0.01*GetIntensityLaser(MM_JSON,i))))
                 core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-' + str(round(65535*0.01*GetIntensityLaser(MM_JSON,i))))
                 TS_Response_verbose();
@@ -396,9 +396,9 @@ def armLaser(i):
             #print(writetgs('PAS2-1-1\r\n')) #Trigger transition at DAC 1 - starting (1 middle) on rising edge (1 end)
             #print(writetgs('BAO2-1-0\n')) #Add the blanking mode - now it turns off when no high TTL is received
 
-    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-'+str(delay))
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-'+str(delay)) #type:ignore
     TS_Response_verbose();
-    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-'+str(length))
+    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-'+str(length)) #type:ignore
     TS_Response_verbose();
 
     # #Set DAC1 to switch between 20000 and 0 Starting at sequence 0

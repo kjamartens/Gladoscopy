@@ -462,7 +462,7 @@ class MainWindow(QMainWindow):
                 return None
 
     def test_run(self):
-        testImageLoc = "./AutonomousMicroscopy/ExampleData/BF_test_avg.tiff"
+        testImageLoc = "C:/Users/SMIPC2/Documents/GitHub/ScopeGUI/AutonomousMicroscopy/ExampleData/BF_test_avg.tiff"
         # Open the TIFF file
         with tifffile.TiffFile(testImageLoc) as tiff:
             # Read the image data

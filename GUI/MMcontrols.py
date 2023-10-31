@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap
 from PyQt5 import uic
 import sys
@@ -153,7 +153,7 @@ class MMConfigUI:
         #Add a button spanning the total columns at the bottom
         self.configLayout.addWidget(self.refreshButton,totalRowsAdded+1,0,1,self.number_columns)
         #Connect the button:
-        self.refreshButton.clicked.connect(lambda index: self.updateAllFromMM())
+        self.refreshButton.clicked.connect(lambda index: self.updateConfigsFromMM())
         
         #Add the stages widget to the right of this if wanted
         if showStages:
@@ -161,6 +161,9 @@ class MMConfigUI:
             #Now add the stages widget
             # self.stagesWidget()
             self.mainLayout.addLayout(self.stagesLayout(), 0, 2)
+            
+        #Update everything for good measure at the end of init
+        self.updateAllMMinfo()
             
     def Vseparator_line(self):
         separator_line = QFrame()
@@ -186,35 +189,48 @@ class MMConfigUI:
         
         #Widget itself is a vertical layout with 7 vertical entries: up+3,+2,+1,-1,-2,-3, and a center for horizontal movement+info
         XYStageLayout = QGridLayout()
+        XYStageLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         horizontalMoverLayout = QGridLayout()
+        horizontalMoverLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         #XY move buttons
         self.XYmoveButtons = {}
         for m in range(1,4):
             #Initialize buttons
-            self.XYmoveButtons[f'Up_{m}'] = QPushButton(f"Up_{m}")
+            self.XYmoveButtons[f'Up_{m}'] = QPushButton("⮝"*(4-m))
             self.XYmoveButtons[f'Up_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,field_size_um[1]*field_move_fraction[m-1]))
-            self.XYmoveButtons[f'Down_{m}'] = QPushButton(f"Down_{m}")
+            self.XYmoveButtons[f'Down_{m}'] = QPushButton("⮟"*(4-m))
             self.XYmoveButtons[f'Down_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,-field_size_um[1]*field_move_fraction[m-1]))
-            self.XYmoveButtons[f'Left_{m}'] = QPushButton(f"Left_{m}")
+            self.XYmoveButtons[f'Left_{m}'] = QPushButton("⮜"*(4-m))
             self.XYmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(-field_size_um[0]*field_move_fraction[m-1],0))
-            self.XYmoveButtons[f'Right_{m}'] = QPushButton(f"Right_{m}")
+            self.XYmoveButtons[f'Right_{m}'] = QPushButton("⮞"*(4-m))
             self.XYmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(field_size_um[0]*field_move_fraction[m-1],0))
             
             #Add buttons to layout
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,0)
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,0)
+            XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
             horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],0,m-1)
             horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],0,8-m)
-            XYStageLayout.addLayout(horizontalMoverLayout,4,0,1,8)
+            XYStageLayout.addLayout(horizontalMoverLayout,4,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
+            
+        #Add a central label for info
+        #this label contains the XY stage name, then an enter, then the current position:
+        self.XYStageInfoWidget = QLabel(f"{XYStageName}: {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+        horizontalMoverLayout.addWidget(self.XYStageInfoWidget,0,4)
         
         return XYStageLayout
     
+    def updateXYStageInfoWidget(self):#Obtain the stage info from MM:
+        XYStageName = self.core.get_xy_stage_device()
+        #Get the stage position
+        XYStagePos = self.core.get_xy_stage_position(XYStageName)
+        self.XYStageInfoWidget.setText(f"{XYStageName}: {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+        
     def moveXYStage(self,relX,relY):
-        print(relX)
-        print(relY)
         #Move XY stage with um positions in relx, rely:
         self.core.set_relative_xy_position(relX,relY)
+        #Update the XYStageInfoWidget (if it exists)
+        self.updateXYStageInfoWidget()
     
     def addRow(self,config_id):
         #Add a new row in the configLayout which will be populated with a label-dropdown/slider/inputField combination
@@ -277,13 +293,18 @@ class MMConfigUI:
         pass
     
     #Update all configs based on current value in MM
-    def updateAllFromMM(self):
+    def updateConfigsFromMM(self):
         #Update all values from MM:
         for config_id in range(len(self.config_groups)):
             self.updateValuefromMM(config_id)
         pass
-        
     
+    #Update everything there is update-able
+    def updateAllMMinfo(self):
+        print('Updating all MM info')
+        self.updateConfigsFromMM()
+        self.updateXYStageInfoWidget()
+
 def microManagerControlsUI(core,MM_JSON,main_layout):
     # Get all config groups
     allConfigGroups={}
@@ -294,6 +315,8 @@ def microManagerControlsUI(core,MM_JSON,main_layout):
     #Create the MM config via all config groups
     MMconfig = MMConfigUI(allConfigGroups)
     main_layout.addLayout(MMconfig.mainLayout)
+    
+    return MMconfig
     
     #Test line:
     # breakpoint

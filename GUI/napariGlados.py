@@ -280,8 +280,10 @@ class dockWidget_MMcontrol(QMainWindow):
         self.layout = QVBoxLayout(self.central_widget) #type:ignore
         
         #Add the full micro manager controls UI
-        microManagerControlsUI(core,MM_JSON,self.layout)
+        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout)
     
+    def getDockWidget(self):
+        return self.dockWidget
     
 # Start a separate analysis thread
 analysis_thread = AnalysisThread()
@@ -311,6 +313,6 @@ def runNapariMicroManager(score,sMM_JSON,sshared_data):
     napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
 
     # breakpoint
-    return napariViewer
+    return napariViewer, custom_widget_MMcontrols.getDockWidget()
 
     
