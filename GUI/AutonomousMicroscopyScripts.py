@@ -37,7 +37,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.p
 import HelperFunctions
 
 from LaserControlScripts import *
-from LiveModeControlScripts import *
+from napariGlados import *
 
 
 
@@ -510,10 +510,9 @@ class MainWindow(QMainWindow):
         print('All run correctly!')
 
 
-def runAutonomousMicroscopyUI(score,sMM_JSON,sform,sapp):
+def runAutonomousMicroscopyUI(score,sMM_JSON,sform):
     #Go from self to global variables
-    global core, MM_JSON, form, app
+    global core, MM_JSON, form
     core = score
     MM_JSON = sMM_JSON
     form = sform
-    app = sapp

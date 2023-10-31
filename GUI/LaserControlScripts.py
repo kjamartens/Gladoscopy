@@ -418,17 +418,26 @@ def blinkUV(duration):
     TS_Response_verbose()
 
 
+def buttonPressliveStateToggle():
+    print('buttonPressliveStateToggle run')
+    global shared_data
+    if shared_data.liveMode == False:
+        shared_data.liveMode = True
+    else:
+        shared_data.liveMode = False
+    print('livestate now LaserControlScripts ', shared_data.liveMode)
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #End of functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def runlaserControllerUI(score,sMM_JSON,sform,sapp):
+def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
     #Go from self to global variables
-    global core, MM_JSON, form, app
+    global core, MM_JSON, form, app, shared_data
     core = score
     MM_JSON = sMM_JSON
     form = sform
-    app = sapp
+    # app = sapp
+    shared_data = sshared_data
 
     #Get onoff and intensity from MM
     InitLaserButtonLabels(MM_JSON)
@@ -440,11 +449,11 @@ def runlaserControllerUI(score,sMM_JSON,sform,sapp):
     global frameduration;
     frameduration = getFrameTimeInfo(0);
 
-    timer = QTimer(app)
-    timer.timeout.connect(lambda: timerloop(frameduration))
+    # timer = QTimer(app)
+    # timer.timeout.connect(lambda: timerloop(frameduration))
 
-    #Update the timer every 500 ms
-    timer.start(500)
+    # #Update the timer every 500 ms
+    # timer.start(500)
 
     #Set FilterWheel Clickable commands
     for i in range(0,6):
@@ -491,6 +500,9 @@ def runlaserControllerUI(score,sMM_JSON,sform,sapp):
     #UV LED Button run
     form.PushUVLED.clicked.connect(lambda: blinkUV(float(form.UVLED_duration_EditField.text())));
 
+    #Live button testing
+    form.liveview_PushButton.clicked.connect(lambda: buttonPressliveStateToggle())
+    
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #UI-based things
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------

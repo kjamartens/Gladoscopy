@@ -1715,6 +1715,11 @@
         </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="tab_MMControls">
+       <attribute name="title">
+        <string>MM controls</string>
+       </attribute>
+      </widget>
       <widget class="QWidget" name="tab_autonomous">
        <attribute name="title">
         <string>Autonomous</string>
