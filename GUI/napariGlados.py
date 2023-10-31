@@ -28,7 +28,7 @@ image_queue_analysis = queue.Queue()
 analysis_done_signal = pyqtSignal(object)
 
 #Sleep time to keep responsiveness
-sleep_time = 0.05
+sleep_time = 0.1
 
 
 """
