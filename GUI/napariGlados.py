@@ -208,8 +208,8 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     InitateNapariUI(napariViewer)
     
     # Start separate analysis threads
-    create_analysis_thread(image_queue_analysis,shared_data)
-    create_analysis_thread(image_queue_analysis,shared_data,overlayInfo='OtherOverlay')
+    create_analysis_thread(image_queue_analysis,shared_data,analysisInfo='AvgGrayValueText')
+    # create_analysis_thread(image_queue_analysis,shared_data,overlayInfo='OtherOverlay')
     
     #Add widgets as wanted
     custom_widget_MMcontrols = dockWidget_MMcontrol()
