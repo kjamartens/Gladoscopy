@@ -237,27 +237,6 @@ def InitateNapariUI(napariViewer):
 """ 
 Napari widgets
 """
-class dockWidget_liveMode(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Combined Functions")
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
-        self.button_one = QPushButton("Startstoplive", self)
-        self.button_one.clicked.connect(lambda: self.run_function(1))
-        self.layout.addWidget(self.button_one)
-        
-    def change_button_label(self, new_label):
-        # Update the label of the button
-        self.button_one.setText(new_label)
-    
-    def run_function(self,button_number):
-        global livestate,shared_data
-        if shared_data.liveMode == False:
-            shared_data.liveMode = True
-        else:
-            shared_data.liveMode = False
    
 class dockWidget_fullGladosUI(QMainWindow):
     def __init__(self): 
@@ -308,8 +287,6 @@ def runNapariMicroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     #Add widgets as wanted
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="MMcontrols")
-    # custom_widget_liveMode = dockWidget_liveMode()
-    # napariViewer.window.add_dock_widget(custom_widget_liveMode, area="right", name="Live Mode")
     if includecustomUI:
         custom_widget_gladosUI = dockWidget_fullGladosUI()
         napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
