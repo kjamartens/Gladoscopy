@@ -190,8 +190,8 @@ class MMConfigUI:
         #Widget itself is a vertical layout with 7 vertical entries: up+3,+2,+1,-1,-2,-3, and a center for horizontal movement+info
         XYStageLayout = QGridLayout()
         XYStageLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        horizontalMoverLayout = QGridLayout()
-        horizontalMoverLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # horizontalMoverLayout = QGridLayout()
+        # horizontalMoverLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         #XY move buttons
         self.XYmoveButtons = {}
@@ -207,16 +207,18 @@ class MMConfigUI:
             self.XYmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(field_size_um[0]*field_move_fraction[m-1],0))
             
             #Add buttons to layout
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
-            horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],0,m-1)
-            horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],0,8-m)
-            XYStageLayout.addLayout(horizontalMoverLayout,4,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4,8-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            # horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],0,m-1)
+            # horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],0,8-m)
+            # XYStageLayout.addLayout(horizontalMoverLayout,4,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
             
         #Add a central label for info
         #this label contains the XY stage name, then an enter, then the current position:
         self.XYStageInfoWidget = QLabel(f"{XYStageName}: {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
-        horizontalMoverLayout.addWidget(self.XYStageInfoWidget,0,4)
+        XYStageLayout.addWidget(self.XYStageInfoWidget,4,4)
         
         return XYStageLayout
     
