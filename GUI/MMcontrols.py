@@ -421,6 +421,7 @@ class MMConfigUI:
         print('Updating all MM info')
         self.updateConfigsFromMM()
         self.updateXYStageInfoWidget()
+        self.updateOneDstageLayout()
 
 def microManagerControlsUI(core,MM_JSON,main_layout):
     # Get all config groups
