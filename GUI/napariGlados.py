@@ -1,22 +1,20 @@
 import numpy as np
-from PyQt5.QtCore import QThread, pyqtSignal
-import asyncio
+from PyQt5.QtCore import pyqtSignal
 import napari
 from napari.qt import thread_worker
-import random
-import threading
 import time
 import queue
 from PyQt5.QtWidgets import QMainWindow
 from pycromanager import core
 from magicgui import magicgui
-from qtpy.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 
 from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *
 from MMcontrols import *
+from AnalysisClass import *
 
 # Define a flag to control the continuous task
 stop_continuous_task = False
@@ -64,9 +62,16 @@ def napariUpdateLive(liveImage):
     # Check if the queue is empty
     if image_queue_analysis.empty():
         image_queue_analysis.put(liveImage)
-        # Start the analysis thread if it's not already running
-        if not analysis_thread.isRunning():
-            analysis_thread.start()
+        #Start all analysisthreads
+        for analysisThread in shared_data.analysisThreads:
+            if not analysisThread.isRunning():
+                analysisThread.start()
+        # # Start the analysis thread if it's not already running
+        # if not analysis_thread.isRunning():
+        #     analysis_thread.start()
+        # # Start the analysis thread if it's not already running
+        # if not analysis_thread2.isRunning():
+        #     analysis_thread2.start()
             
         
 def grab_image(image, metadata,event_queue):
@@ -75,9 +80,6 @@ def grab_image(image, metadata,event_queue):
         Inputs: array image: image from micromanager
                 metadata from micromanager
         """
-    # size = np.shape(image)
-    # image_clipped = image[(size[0]-clip[0])//2:(size[0]+clip[0])//2,
-    #                   (size[1]-clip[1])//2:(size[1]+clip[1])//2]
     global livestate
     if img_queue.qsize() < 2:
         img_queue.put((image))
@@ -136,84 +138,7 @@ def liveModeChanged():
         worker2 = yield_img(img_queue) #type:ignore
         worker1.start() #type:ignore
 
-"""
-Live overlay definitions - maybe switch to other file later
-"""
 
-def drawRandomOverlay(layer_name):
-    # create a list of polygons
-    p = [(random.randint(0, 1024), random.randint(0, 1024)) for _ in range(4)]
-
-    polygons = [np.array([[p[0][0], p[1][1]], [p[1][0], p[1][1]], [p[1][0], p[0][1]], [p[0][0], p[0][1]]])]
-    
-    #See if layer exists
-    shapeLayer = getLayerIdFromName(layer_name)
-    if not shapeLayer:
-        print('First ever shapelayer')
-        shapes_layer = napariViewer.add_shapes(
-            name=layer_name,
-        )
-    else:
-        #delete shapelayer
-        napariViewer.layers[shapeLayer[0]].data = []
-        shapes_layer = napariViewer.layers[shapeLayer[0]]
-
-    # add polygons
-    shapes_layer.add( #type:ignore
-        polygons,
-        shape_type='polygon',
-        edge_width=5,
-        edge_color='yellow',
-        face_color='red',
-    )
-            
-def drawTextOverlay(layer_name,textv):
-    polygons = [np.array([[0, 0], [10, 10], [20, 20], [30, 30]])]
-    #See if layer exists
-    shapeLayer = getLayerIdFromName(layer_name)
-
-    textstring = {
-        'string': 'TEST',
-        'anchor': 'upper_left',
-        'translation': [0, 0],
-        'size': 100,
-        'color': 'red',
-    }
-    
-    #Add a layer if it doesn't exist yet
-    if not shapeLayer:
-        shapes_layer = napariViewer.add_shapes(
-            polygons,
-            shape_type='polygon',
-            edge_width=5,
-            edge_color='yellow',
-            face_color='red',
-            name = layer_name,
-            text = textstring
-        )
-    else:
-        #delete info in the layer and go from there
-        napariViewer.layers[shapeLayer[0]].data = []
-        shapes_layer = napariViewer.layers[shapeLayer[0]]
-        # shapes_layer.text.values[0] = str(textv)
-
- 
-#This code gets some image and does some analysis on this
-class AnalysisThread(QThread):
-    # Create a signal to communicate between threads
-    analysis_done_signal = pyqtSignal(object)
-    
-    def run(self):
-        while True:
-            liveImage = image_queue_analysis.get()
-            analysis_result = np.mean(np.mean(liveImage))
-            self.analysis_done_signal.emit(analysis_result)
-
-def Visualise_Analysis_results(analysis_result):
-    # print(analysis_result)
-    drawTextOverlay('Text_overlay',analysis_result)
-    # drawRandomOverlay('live_overlay')
-           
 """ 
 General napari functions
 """
@@ -265,12 +190,9 @@ class dockWidget_MMcontrol(QMainWindow):
     def getDockWidget(self):
         return self.dockWidget
     
-# Start a separate analysis thread
-analysis_thread = AnalysisThread()
-analysis_thread.analysis_done_signal.connect(Visualise_Analysis_results)
 
 
-def runNapariMicroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
+def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
     core = score
@@ -280,9 +202,14 @@ def runNapariMicroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
 
     #Napari start
     napariViewer = napari.Viewer()
+    shared_data.napariViewer = napariViewer
     
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
+    
+    # Start separate analysis threads
+    create_analysis_thread(image_queue_analysis,shared_data)
+    create_analysis_thread(image_queue_analysis,shared_data,overlayInfo='OtherOverlay')
     
     #Add widgets as wanted
     custom_widget_MMcontrols = dockWidget_MMcontrol()
@@ -291,7 +218,10 @@ def runNapariMicroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
         custom_widget_gladosUI = dockWidget_fullGladosUI()
         napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
 
-    breakpoint
-    return napariViewer, custom_widget_MMcontrols.getDockWidget()
+    returnInfo = {}
+    returnInfo['napariViewer'] = napariViewer
+    returnInfo['MMcontrolWidget'] = custom_widget_MMcontrols.getDockWidget()
+    # breakpoint
+    return returnInfo
 
     

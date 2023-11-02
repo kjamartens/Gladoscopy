@@ -1,32 +1,11 @@
-from pycromanager import core
+from pycromanager import Core
+import os
+import json
+import sys
+from PyQt5.QtWidgets import QApplication
 
-from LaserControlScripts import *
-from AutonomousMicroscopyScripts import *
-from MMcontrols import *
-from napariGlados import *
-
-class Shared_data:
-    def __init__(self):
-        self._liveMode = False
-    @property
-    def liveMode(self):
-        return self._liveMode
-    @liveMode.setter
-    def liveMode(self, new_value):
-        if new_value != self._liveMode:
-            self._liveMode = new_value
-            self.on_value_change()
-    def on_value_change(self):
-        # This is the function that will be called when the 'value' changes
-        liveModeChanged()
-
-def periodicallyUpdate(updateFunction,timing = 5000):
-    # Create a QTimer to periodically update MM info
-    timer = QTimer()
-    timer.setInterval(timing)
-    timer.timeout.connect(updateFunction)
-    timer.start()
-    return timer
+from napariGlados import runNapariPycroManager
+from sharedFunctions import Shared_data, periodicallyUpdate
 
 if __name__ == "__main__":
     # Create an instance of the shared_data class
@@ -41,10 +20,10 @@ if __name__ == "__main__":
         MM_JSON = json.load(f)
 
     #Run the live mode UI
-    napariViewer, MMcontrolsWidget = runNapariMicroManager(core,MM_JSON,shared_data)
+    nPM = runNapariPycroManager(core,MM_JSON,shared_data)
 
     #Periodically update the MM info of the MMcontrolsWidget
-    timer = periodicallyUpdate(MMcontrolsWidget.updateAllMMinfo)
+    periodicallyUpdate(updateFunction=nPM['MMcontrolWidget'].updateAllMMinfo)
 
     #Ensure it stays open?
     app = QApplication([])
