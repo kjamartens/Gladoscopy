@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread
-from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap
+from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont
 from PyQt5 import uic
 import sys
 import os
@@ -131,7 +131,7 @@ class ConfigInfo:
 
 #Create a big MM config ui and add all config groups with options
 class MMConfigUI:
-    def __init__(self, config_groups,showStages=True,number_config_columns=5):
+    def __init__(self, config_groups,showStages=True,showROIoptions=True,number_config_columns=5):
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.core = self.config_groups[0].core
@@ -161,12 +161,43 @@ class MMConfigUI:
             #Now add the stages widget
             # self.stagesWidget()
             self.mainLayout.addLayout(self.stagesLayout(), 0, 2)
+        
+        if showROIoptions:
+            self.mainLayout.addWidget(self.Vseparator_line(),0,3)
+            #Now add the ROI options widget
+            self.mainLayout.addLayout(self.ROIoptionsLayout(),0,4)
             
-            
-        self.getDevicesOfDeviceType('StageDevice')
         
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
+        
+        #Change the font of everything in the layout
+        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 5))
+    
+    #Set the font of all buttons/labels in the layout recursively
+    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
+        if widget is None:
+            return
+        
+        if isinstance(widget, (QLabel, QPushButton, QComboBox)):
+            widget.setFont(font)
+            widget.setContentsMargins(0, 0, 0, 0)
+            widget.setMinimumSize(0, 0)
+            widget.setSizePolicy(
+                QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            )
+
+        if hasattr(widget, 'layout'):
+            layout = widget.layout()
+            if layout:
+                layout.setContentsMargins(0, 0, 0, 0)
+                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
+                for i in range(layout.count()):
+                    item = layout.itemAt(i)
+                    if hasattr(item, 'widget'):
+                        self.set_font_and_margins_recursive(item.widget(), font=font)
+                    if hasattr(item, 'layout'):
+                        self.set_font_and_margins_recursive(item.layout(), font=font)
     
     #Unused, but helpfull piece of code
     def get_device_properties(self):
@@ -217,6 +248,78 @@ class MMConfigUI:
         separator_line.setFrameShape(QFrame.VLine)
         separator_line.setFrameShadow(QFrame.Sunken)
         return separator_line
+    
+    def ROIoptionsLayout(self):
+        #Create a Grid layout:
+        ROIoptionsLayout = QGridLayout()
+        self.ROIoptionsButtons = {}
+        #Following options should be added:
+        #Reset ROI to max size
+        self.ROIoptionsButtons['Reset'] = QPushButton("Reset ROI")
+        self.ROIoptionsButtons['Reset'].clicked.connect(lambda index: self.resetROI())
+        ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)
+        #Zoom in once to center
+        self.ROIoptionsButtons['ZoomIn'] = QPushButton("Zoom In")
+        self.ROIoptionsButtons['ZoomIn'].clicked.connect(lambda index: self.zoomROI('ZoomIn'))
+        ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomIn'],1,0)
+        #Zoom out once from center
+        self.ROIoptionsButtons['ZoomOut'] = QPushButton("Zoom Out")
+        self.ROIoptionsButtons['ZoomOut'].clicked.connect(lambda index: self.zoomROI('ZoomOut'))
+        ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomOut'],2,0)
+        return ROIoptionsLayout
+    
+    #Reset the ROI to full frame
+    def resetROI(self):
+        self.core.clear_roi()
+    
+    def zoomROI(self,option):
+        #Get the current ROI info
+        #[x,y,width,height]
+        roiv = [self.core.get_roi().x,self.core.get_roi().y,self.core.get_roi().width,self.core.get_roi().height]
+        print('roiv'+str(roiv))
+        if option == 'ZoomIn':
+            #zoom in twice
+            try:
+                #Get current widht/height and new width/height
+                curTotWidth = roiv[2]
+                curTotHeight = roiv[3]
+                newTotWidth = int(curTotWidth/2)
+                newTotHeight = int(curTotHeight/2)
+                newX = int(roiv[0]+(curTotWidth-newTotWidth)/2)
+                newY = int(roiv[1]+(curTotHeight-newTotHeight)/2)
+                #Set the new ROI size
+                self.setROI([newX,newY,newTotWidth,newTotHeight])
+            except:
+                print('ZOOMING IN DIDN\'T WORK!')
+        elif option == 'ZoomOut':
+            #zoom in twice
+            try:
+                #Get current widht/height and new width/height
+                curTotWidth = roiv[2]
+                curTotHeight = roiv[3]
+                newTotWidth = int(curTotWidth*2)
+                newTotHeight = int(curTotHeight*2)
+                newX = int(roiv[0]-(newTotWidth-curTotWidth)/2)
+                newY = int(roiv[1]-(newTotHeight-curTotHeight)/2)
+                #Set the new ROI size
+                self.setROI([newX,newY,newTotWidth,newTotHeight])
+            except:
+                print('ZOOMING IN DIDN\'T WORK!')
+    
+    def setROI(self,ROIpos):
+        #ROIpos should be a list of [x,y,width,height]
+        print('Zooming ROI to ' + str(ROIpos))
+        try:
+            if shared_data.liveMode == False:
+                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3])
+                self.core.wait_for_system()
+            else:
+                shared_data.liveMode = False
+                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3])
+                time.sleep(0.5)
+                shared_data.liveMode = True
+        except:
+            print('ZOOMING DIDN\'T WORK!')
     
     def stagesLayout(self):
         stageLayout = QVBoxLayout()
@@ -423,7 +526,9 @@ class MMConfigUI:
         self.updateXYStageInfoWidget()
         self.updateOneDstageLayout()
 
-def microManagerControlsUI(core,MM_JSON,main_layout):
+def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
+    global shared_data
+    shared_data = sshared_data
     # Get all config groups
     allConfigGroups={}
     nrconfiggroups = core.get_available_config_groups().size()

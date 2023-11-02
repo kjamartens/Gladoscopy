@@ -281,7 +281,7 @@ class dockWidget_MMcontrol(QMainWindow):
         self.layout = QVBoxLayout(self.central_widget) #type:ignore
         
         #Add the full micro manager controls UI
-        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout)
+        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)
     
     def getDockWidget(self):
         return self.dockWidget
@@ -291,7 +291,7 @@ analysis_thread = AnalysisThread()
 analysis_thread.analysis_done_signal.connect(Visualise_Analysis_results)
 
 
-def runNapariMicroManager(score,sMM_JSON,sshared_data):
+def runNapariMicroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
     core = score
@@ -308,10 +308,11 @@ def runNapariMicroManager(score,sMM_JSON,sshared_data):
     #Add widgets as wanted
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="MMcontrols")
-    custom_widget_liveMode = dockWidget_liveMode()
-    napariViewer.window.add_dock_widget(custom_widget_liveMode, area="right", name="Live Mode")
-    custom_widget_gladosUI = dockWidget_fullGladosUI()
-    napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
+    # custom_widget_liveMode = dockWidget_liveMode()
+    # napariViewer.window.add_dock_widget(custom_widget_liveMode, area="right", name="Live Mode")
+    if includecustomUI:
+        custom_widget_gladosUI = dockWidget_fullGladosUI()
+        napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
 
     breakpoint
     return napariViewer, custom_widget_MMcontrols.getDockWidget()
