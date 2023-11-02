@@ -93,7 +93,8 @@ def append_img(img_queue):
     # start microscope data acquisition
     global livestate
     while livestate:
-        with Acquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
+        #JavaBackendAcquisition is an acquisition on a different thread to not block napari
+        with JavaBackendAcquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
             events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0.0)
             acq.acquire(events) #type:ignore
         # time.sleep(sleep_time)
@@ -312,7 +313,7 @@ def runNapariMicroManager(score,sMM_JSON,sshared_data):
     custom_widget_gladosUI = dockWidget_fullGladosUI()
     napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
 
-    # breakpoint
+    breakpoint
     return napariViewer, custom_widget_MMcontrols.getDockWidget()
 
     

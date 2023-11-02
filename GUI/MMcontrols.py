@@ -162,9 +162,56 @@ class MMConfigUI:
             # self.stagesWidget()
             self.mainLayout.addLayout(self.stagesLayout(), 0, 2)
             
+            
+        self.getDevicesOfDeviceType('StageDevice')
+        
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
-            
+    
+    #Unused, but helpfull piece of code
+    def get_device_properties(self):
+        core = self.core
+        devices = core.get_loaded_devices()
+        devices = [devices.get(i) for i in range(devices.size())]
+        device_items = []
+        for device in devices:
+            print('Device: '+device)
+            names = core.get_device_property_names(device)
+            props = [names.get(i) for i in range(names.size())]
+            property_items = []
+            for prop in props:
+                print('Property',prop)
+                value = core.get_property(device, prop)
+                is_read_only = core.is_property_read_only(device, prop)
+                if core.has_property_limits(device, prop):
+                    lower = core.get_property_lower_limit(device, prop)
+                    upper = core.get_property_upper_limit(device, prop)
+                    allowed = {
+                    "type": "range",
+                    "min": lower,
+                    "max": upper,
+                    "readOnly": is_read_only,
+                    }
+                else:
+                    allowed = core.get_allowed_property_values(device, prop)
+                    allowed = {
+                    "type": "enum",
+                    "options": [allowed.get(i) for i in range(allowed.size())],"readOnly": is_read_only,
+                    }
+                    property_items.append(
+                    {"device": device, "name": prop, "value": value, "allowed": allowed}
+                    )
+                    print('===>', device, prop, value, allowed)
+            if len(property_items) > 0:
+                device_items.append(
+                {
+                "name": device,
+                "value": "{} properties".format(len(props)),
+                "items": property_items,
+                }
+                )
+        return device_items
+
     def Vseparator_line(self):
         separator_line = QFrame()
         separator_line.setFrameShape(QFrame.VLine)
@@ -172,8 +219,9 @@ class MMConfigUI:
         return separator_line
     
     def stagesLayout(self):
-        stageLayout = QHBoxLayout()
+        stageLayout = QVBoxLayout()
         stageLayout.addLayout(self.XYstageLayout())
+        stageLayout.addLayout(self.oneDstageLayout())
         return stageLayout
     
     def XYstageLayout(self):
@@ -187,11 +235,9 @@ class MMConfigUI:
         field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]
         field_move_fraction = [1,.5,.1]
         
-        #Widget itself is a vertical layout with 7 vertical entries: up+3,+2,+1,-1,-2,-3, and a center for horizontal movement+info
+        #Widget itself is a grid layout with 7x7 entries
         XYStageLayout = QGridLayout()
         XYStageLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # horizontalMoverLayout = QGridLayout()
-        # horizontalMoverLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         #XY move buttons
         self.XYmoveButtons = {}
@@ -211,10 +257,7 @@ class MMConfigUI:
             XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             XYStageLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             XYStageLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4,8-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            # horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],0,m-1)
-            # horizontalMoverLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],0,8-m)
-            # XYStageLayout.addLayout(horizontalMoverLayout,4,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
-            
+                        
         #Add a central label for info
         #this label contains the XY stage name, then an enter, then the current position:
         self.XYStageInfoWidget = QLabel(f"{XYStageName}: {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
@@ -222,6 +265,78 @@ class MMConfigUI:
         
         return XYStageLayout
     
+    def getDevicesOfDeviceType(self,devicetype):
+        #Find all devices that have a specific devicetype
+        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+        #for all devicetypes
+        #Get devices
+        devices = self.core.get_loaded_devices()
+        devices = [devices.get(i) for i in range(devices.size())]
+        devicesOfType = []
+        #Loop over devices
+        for device in devices:
+            if self.core.get_device_type(device).to_string() == devicetype:
+                print(device)
+                devicesOfType.append(device)
+        return devicesOfType
+    
+    def oneDstageLayout(self):
+        #Create a layout
+        self.oneDStageLayout = QGridLayout()
+        
+        #Creates a UI layout to move all found 1D stages
+        #Find all 1D stages
+        allStages = self.getDevicesOfDeviceType('StageDevice')
+        
+        #Create a drop-down menu that has these stages as options
+        self.oneDstageDropdown = QComboBox()
+        for stage in allStages:
+            self.oneDstageDropdown.addItem(stage)
+        #If it changes, call the update routine
+        self.oneDstageDropdown.currentTextChanged.connect(lambda index: self.updateOneDstageLayout())
+        #Add the dropdown to the layout:
+        self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0)
+        
+        #Add left/right buttons and a label for the position
+        self.oneDmoveButtons = {}
+        for m in range(1,3):
+            #Initialize buttons
+            self.oneDmoveButtons[f'Left_{m}'] = QPushButton("⮜"*(4-m))
+            self.oneDmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(-m))
+            self.oneDmoveButtons[f'Right_{m}'] = QPushButton("⮞"*(4-m))
+            self.oneDmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(m))
+            
+            #Add buttons to layout
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],1,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],1,6-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        #Get current info of the widget
+        self.oneDinfoWidget = QLabel(f"{self.oneDstageDropdown.currentText()}: {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
+        self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,3)
+        
+        return self.oneDStageLayout
+    
+    def updateOneDstageLayout(self):
+        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}: {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
+    
+    def moveOneDStage(self,amount):
+        #Get the currently selected one-D stage:
+        selectedStage = self.oneDstageDropdown.currentText()
+        
+        self.moveoneDstagesmallAmount = 10
+        self.moveoneDstagelargeAmount = 100
+        
+        print(amount)
+        print(np.sign(amount))
+        print((np.sign(amount)*self.moveoneDstagesmallAmount).astype(float))
+        
+        #Move the stage relatively
+        if abs(amount) == 1:
+            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float))
+        elif abs(amount) == 2:
+            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float))
+        self.updateOneDstageLayout()
+        
     def updateXYStageInfoWidget(self):#Obtain the stage info from MM:
         XYStageName = self.core.get_xy_stage_device()
         #Get the stage position
