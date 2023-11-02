@@ -131,7 +131,7 @@ class ConfigInfo:
 
 #Create a big MM config ui and add all config groups with options
 class MMConfigUI:
-    def __init__(self, config_groups,showStages=True,showROIoptions=True,number_config_columns=5):
+    def __init__(self, config_groups,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5):
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.core = self.config_groups[0].core
@@ -166,14 +166,38 @@ class MMConfigUI:
             self.mainLayout.addWidget(self.Vseparator_line(),0,3)
             #Now add the ROI options widget
             self.mainLayout.addLayout(self.ROIoptionsLayout(),0,4)
-            
+        
+        if showLiveMode:
+            self.mainLayout.addWidget(self.Vseparator_line(),0,5)
+            #Now add the live mode widget
+            self.mainLayout.addLayout(self.liveModeLayout(),0,6)
         
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
         
         #Change the font of everything in the layout
-        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 5))
+        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
     
+    
+    #Live mode UI
+    def liveModeLayout(self):
+        #Create a Grid layout:
+        liveModeLayout = QGridLayout()
+        self.LiveModeButton = QPushButton("Start/Stop Live Mode")
+        #add a connection to the button:
+        self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
+        #Add the button to the layout:
+        liveModeLayout.addWidget(self.LiveModeButton,0,0)
+        #Return the layout
+        return liveModeLayout
+    
+    #Changes live mode
+    def changeLiveMode(self):
+        if shared_data.liveMode == False:
+            shared_data.liveMode = True
+        else:
+            shared_data.liveMode = False
+                
     #Set the font of all buttons/labels in the layout recursively
     def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
         if widget is None:
@@ -183,9 +207,9 @@ class MMConfigUI:
             widget.setFont(font)
             widget.setContentsMargins(0, 0, 0, 0)
             widget.setMinimumSize(0, 0)
-            widget.setSizePolicy(
-                QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-            )
+            # widget.setSizePolicy(
+            #     QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            # )
 
         if hasattr(widget, 'layout'):
             layout = widget.layout()
@@ -247,6 +271,7 @@ class MMConfigUI:
         separator_line = QFrame()
         separator_line.setFrameShape(QFrame.VLine)
         separator_line.setFrameShadow(QFrame.Sunken)
+        separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 2px;")
         return separator_line
     
     def ROIoptionsLayout(self):
