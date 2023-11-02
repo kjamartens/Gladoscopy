@@ -271,7 +271,7 @@ class MMConfigUI:
         separator_line = QFrame()
         separator_line.setFrameShape(QFrame.VLine)
         separator_line.setFrameShadow(QFrame.Sunken)
-        separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 2px;")
+        separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
         return separator_line
     
     def ROIoptionsLayout(self):
@@ -347,7 +347,7 @@ class MMConfigUI:
             print('ZOOMING DIDN\'T WORK!')
     
     def stagesLayout(self):
-        stageLayout = QVBoxLayout()
+        stageLayout = QHBoxLayout()
         stageLayout.addLayout(self.XYstageLayout())
         stageLayout.addLayout(self.oneDstageLayout())
         return stageLayout
@@ -388,8 +388,10 @@ class MMConfigUI:
                         
         #Add a central label for info
         #this label contains the XY stage name, then an enter, then the current position:
-        self.XYStageInfoWidget = QLabel(f"{XYStageName}: {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+        self.XYStageInfoWidget = QLabel()
         XYStageLayout.addWidget(self.XYStageInfoWidget,4,4)
+        #Update the text of it
+        self.updateXYStageInfoWidget()
         
         return XYStageLayout
     
@@ -429,23 +431,25 @@ class MMConfigUI:
         self.oneDmoveButtons = {}
         for m in range(1,3):
             #Initialize buttons
-            self.oneDmoveButtons[f'Left_{m}'] = QPushButton("⮜"*(4-m))
+            self.oneDmoveButtons[f'Left_{m}'] = QPushButton("⮝"*(3-m))
             self.oneDmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(-m))
-            self.oneDmoveButtons[f'Right_{m}'] = QPushButton("⮞"*(4-m))
+            self.oneDmoveButtons[f'Right_{m}'] = QPushButton("⮟"*(3-m))
             self.oneDmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(m))
             
             #Add buttons to layout
-            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],1,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],1,6-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],m-1+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],5-m+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
         
         #Get current info of the widget
-        self.oneDinfoWidget = QLabel(f"{self.oneDstageDropdown.currentText()}: {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
-        self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,3)
+        self.oneDinfoWidget = QLabel()
+        self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,0)
+        #update the text
+        self.updateOneDstageLayout()
         
         return self.oneDStageLayout
     
     def updateOneDstageLayout(self):
-        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}: {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
+        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
     
     def moveOneDStage(self,amount):
         #Get the currently selected one-D stage:
@@ -459,9 +463,9 @@ class MMConfigUI:
         print((np.sign(amount)*self.moveoneDstagesmallAmount).astype(float))
         
         #Move the stage relatively
-        if abs(amount) == 1:
+        if abs(amount) == 2:
             self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float))
-        elif abs(amount) == 2:
+        elif abs(amount) == 1:
             self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float))
         self.updateOneDstageLayout()
         
@@ -469,7 +473,7 @@ class MMConfigUI:
         XYStageName = self.core.get_xy_stage_device()
         #Get the stage position
         XYStagePos = self.core.get_xy_stage_position(XYStageName)
-        self.XYStageInfoWidget.setText(f"{XYStageName}: {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+        self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
         
     def moveXYStage(self,relX,relY):
         #Move XY stage with um positions in relx, rely:
