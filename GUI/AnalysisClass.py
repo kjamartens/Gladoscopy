@@ -12,7 +12,7 @@ from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from napari.layers import Shapes
-from typing import Union
+from typing import Union, Tuple, List
 
 #Class for overlays and their update and such
 class napariOverlay():
@@ -36,13 +36,13 @@ class napariOverlay():
     
     def drawTextOverlay_init(self):
         polygons = [
-            np.array([[225, 146], [283, 146], [283, 211], [225, 211]])
+            np.array([[0, 0], [0, 1], [1, 1], [1, 0]])
         ]
         # create properties
         properties = {'value': [0]}
 
         text_properties = {
-            'text': '{value:0.1f}%',
+            'text': '{value:0.1f}',
             # 'text': 'Test',
             'anchor': 'upper_left',
             'translation': [-5, 0],
@@ -103,18 +103,21 @@ class napariOverlay():
         # new layer with polygons and text
         self.layer = self.napariViewer.add_shapes(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',name=self.layer_name)
     
-    def drawShapesOverlay(self,shapePosList = [[0,0,10,10]],shapeCol = 'black'):
+    def drawShapesOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
         #ShapePosList should be a [[x,y,w,h],[x,y,w,h],...] array
         #ShapeCol should be a single entry or an array with same size as shapeposlist
         
         #Update the shapes
         polygons = []
         for p in range(len(shapePosList)):
-            polygons.append(np.array([[225, 146], [283, 146], [283, 211], [225, 211]]))
+            polygons.append(np.array([[shapePosList[p][0], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]+shapePosList[p][3]], [shapePosList[p][0], shapePosList[p][1]+shapePosList[p][3]]]))
         #Remove the old polygon
         self.layer.data = []
         # add the new polygon
-        self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
+        if len(shapeCol) == 1:
+            self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol[0])
+        else:
+            self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
     
 #This code gets some image and does some analysis on this
 class AnalysisThread(QThread):
@@ -145,7 +148,7 @@ class AnalysisThread(QThread):
     
     #Analysis is split into two parts: obtaining the analysis result and displaying this.
     #Here, we calculate the analysis result based on the analysisInfo
-    def runAnalysis(self,image):
+    def runAnalysis(self,image): 
         #Maybe add here that the layer should also be open?
         if self.analysisInfo is not None:
             #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
@@ -175,32 +178,6 @@ class AnalysisThread(QThread):
             # drawTextOverlay('Text_overlay',analysis_result)
                 self.visualiseRandomOverlay()
     
-    
-    # def drawRandomOverlay(self,layer_name):
-    #     # create a list of polygons
-    #     p = [(random.randint(0, 1024), random.randint(0, 1024)) for _ in range(4)]
-
-    #     polygons = [np.array([[p[0][0], p[1][1]], [p[1][0], p[1][1]], [p[1][0], p[0][1]], [p[0][0], p[0][1]]])]
-        
-    #     #See if layer exists
-    #     if not self.layer:
-    #         print('First ever shapelayer')
-    #         self.layer = self.napariViewer.add_shapes(
-    #             name=layer_name,
-    #         )
-    #     else:
-    #         #delete shapelayer
-    #         self.layer.data = []
-
-    #     # add polygons
-    #     self.layer.add( #type:ignore
-    #         polygons,
-    #         shape_type='polygon',
-    #         edge_width=5,
-    #         edge_color='yellow',
-    #         face_color='red',
-    #     )
-    
     """
     Average gray value calculation and display
     """
@@ -221,7 +198,7 @@ class AnalysisThread(QThread):
     Random overlay display
     """   
     def visualiseRandomOverlay(self,analysis_result=None):
-        self.napariOverlay.drawShapesOverlay()
+        self.napariOverlay.drawShapesOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
         
     def initRandomOverlay(self):
         self.napariOverlay.changeName('RandomOverlay')
