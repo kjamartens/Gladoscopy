@@ -15,6 +15,7 @@ from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *
 from MMcontrols import *
 from AnalysisClass import *
+from Analysis_dockWidgets import *
 
 # Define a flag to control the continuous task
 stop_continuous_task = False
@@ -190,7 +191,20 @@ class dockWidget_MMcontrol(QMainWindow):
     def getDockWidget(self):
         return self.dockWidget
     
-
+class dockWidget_analysisThreads(QMainWindow):
+    def __init__(self): 
+        super().__init__()
+        #Add a central widget in napari
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
+        #add a layout in this central widget
+        self.layout = QVBoxLayout(self.central_widget) #type:ignore
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
+    
+    def getDockWidget(self):
+        return self.dockWidget
 
 def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     #Go from self to global variables
@@ -208,12 +222,16 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     InitateNapariUI(napariViewer)
     
     # Start separate analysis threads
-    create_analysis_thread(image_queue_analysis,shared_data,analysisInfo='AvgGrayValueText')
-    # create_analysis_thread(image_queue_analysis,shared_data,overlayInfo='OtherOverlay')
+    # create_analysis_thread(image_queue_analysis,shared_data,analysisInfo='AvgGrayValueText')
+    create_analysis_thread(image_queue_analysis,shared_data,analysisInfo=None)
     
     #Add widgets as wanted
+    custom_widget_analysisThreads = dockWidget_analysisThreads()
+    napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="analysisThreads",tabify=True)
+    
     custom_widget_MMcontrols = dockWidget_MMcontrol()
-    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="MMcontrols")
+    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="MMcontrols",tabify=True)
+    
     if includecustomUI:
         custom_widget_gladosUI = dockWidget_fullGladosUI()
         napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
@@ -224,4 +242,6 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     # breakpoint
     return returnInfo
 
-    
+def obtain_imageQueueAnalysis():
+    global image_queue_analysis
+    return image_queue_analysis

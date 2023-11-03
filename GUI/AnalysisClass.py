@@ -12,44 +12,26 @@ from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from napari.layers import Shapes
+from typing import Union
 
 #Class for overlays and their update and such
 class napariOverlay():
-    def __init__(self,layer_name='new Layer'):
+    def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer'):
+        self.napariViewer = napariViewer
         self.layer_name = layer_name
-        self.layer = napariViewer.add_shapes(
+        #Create the layer if layer_name is not none
+        #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
+        if layer_name is not None:
+            self.layer = napariViewer.add_shapes(
                 name=self.layer_name,
             )
+        
     
     #Update the name of the overlay
     def changeName(self,new_name):
         self.layer_name = new_name
         self.layer.name = self.layer_name
     
-    def drawRandomOverlay(self):
-        # create a list of polygons
-        p = [(random.randint(0, 1024), random.randint(0, 1024)) for _ in range(4)]
-
-        polygons = [np.array([[p[0][0], p[1][1]], [p[1][0], p[1][1]], [p[1][0], p[0][1]], [p[0][0], p[0][1]]])]
-        
-        #See if layer exists
-        if not self.layer:
-            print('First ever shapelayer')
-            self.layer = napariViewer.add_shapes(
-                name=self.layer_name,
-            )
-        else:
-            #delete shapelayer
-            self.layer.data = []
-
-        # add polygons
-        self.layer.add( #type:ignore
-            polygons,
-            shape_type='polygon',
-            edge_width=5,
-            edge_color='yellow',
-            face_color='red',
-        )
     
     
     def drawTextOverlay_init(self):
@@ -112,21 +94,48 @@ class napariOverlay():
         self.layer.text = text_properties
         
 
+    def shapesOverlay_init(self):
+        #Initialise an overlay that only has shapes
+        #Create a single shape (polygon) and show it
+        polygons = [np.array([[225, 146], [283, 146], [283, 211], [225, 211]])]
+        #Remove old layer
+        self.napariViewer.layers.remove(self.layer)
+        # new layer with polygons and text
+        self.layer = self.napariViewer.add_shapes(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',name=self.layer_name)
+    
+    def drawShapesOverlay(self,shapePosList = [[0,0,10,10]],shapeCol = 'black'):
+        #ShapePosList should be a [[x,y,w,h],[x,y,w,h],...] array
+        #ShapeCol should be a single entry or an array with same size as shapeposlist
+        
+        #Update the shapes
+        polygons = []
+        for p in range(len(shapePosList)):
+            polygons.append(np.array([[225, 146], [283, 146], [283, 211], [225, 211]]))
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
+    
 #This code gets some image and does some analysis on this
 class AnalysisThread(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     
-    def __init__(self,analysisInfo='Random',visualisationInfo='Random'):
+    def __init__(self,napariViewer,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random'):
         super().__init__()	
         self.analysisInfo=analysisInfo
         self.visualisationInfo = visualisationInfo
-        #Create an empty overlay
-        if visualisationInfo != None:
-            self.napariOverlay = napariOverlay()
-            self.initialise_napariLayer()
-            # self.napariOverlay.changeName('RandomOverlay')
+        self.napariViewer = napariViewer
+        if analysisInfo == None:
+            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+        else:
+            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
+            #Create an empty overlay
+            if visualisationInfo != None:
+                #Activate layer
+                self.initialise_napariLayer()
+                # self.napariOverlay.changeName('RandomOverlay')
     
     def run(self):
         while True:
@@ -137,27 +146,60 @@ class AnalysisThread(QThread):
     #Analysis is split into two parts: obtaining the analysis result and displaying this.
     #Here, we calculate the analysis result based on the analysisInfo
     def runAnalysis(self,image):
-        #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
-        if self.analysisInfo == 'AvgGrayValueText':
-            time.sleep(0.5)
-            analysisResult = self.calcAnalysisAvgGrayValue(image)
+        #Maybe add here that the layer should also be open?
+        if self.analysisInfo is not None:
+            #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
+            if self.analysisInfo == 'AvgGrayValueText':
+                analysisResult = self.calcAnalysisAvgGrayValue(image)
+            else:
+                analysisResult = None
+            return analysisResult
         else:
-            analysisResult = None
-        return analysisResult
+            return None
 
     #And here we perform the visualisation - can be fully separate from performing tha analysis
     #Initialisation is called upon creation
     def initialise_napariLayer(self):
         if self.visualisationInfo == 'AvgGrayValueText':
             self.initAvgGrayValueText()
+        else:
+            self.initRandomOverlay()
+            
     #Update ir called every time the analysis is done
     def update_napariLayer(self,analysis_result):
         # print(analysis_result)
-        if self.visualisationInfo == 'AvgGrayValueText':
-            self.visualiseAvgGrayValueText(analysis_result)
-        # drawTextOverlay('Text_overlay',analysis_result)
-        # drawRandomOverlay('live_overlay')
+        if self.analysisInfo is not None:
+            if self.visualisationInfo == 'AvgGrayValueText':
+                self.visualiseAvgGrayValueText(analysis_result)
+            else:
+            # drawTextOverlay('Text_overlay',analysis_result)
+                self.visualiseRandomOverlay()
     
+    
+    # def drawRandomOverlay(self,layer_name):
+    #     # create a list of polygons
+    #     p = [(random.randint(0, 1024), random.randint(0, 1024)) for _ in range(4)]
+
+    #     polygons = [np.array([[p[0][0], p[1][1]], [p[1][0], p[1][1]], [p[1][0], p[0][1]], [p[0][0], p[0][1]]])]
+        
+    #     #See if layer exists
+    #     if not self.layer:
+    #         print('First ever shapelayer')
+    #         self.layer = self.napariViewer.add_shapes(
+    #             name=layer_name,
+    #         )
+    #     else:
+    #         #delete shapelayer
+    #         self.layer.data = []
+
+    #     # add polygons
+    #     self.layer.add( #type:ignore
+    #         polygons,
+    #         shape_type='polygon',
+    #         edge_width=5,
+    #         edge_color='yellow',
+    #         face_color='red',
+    #     )
     
     """
     Average gray value calculation and display
@@ -166,23 +208,33 @@ class AnalysisThread(QThread):
     def calcAnalysisAvgGrayValue(self,image):
         return np.mean(np.mean(image))
     
-    def visualiseAvgGrayValueText(self,analysis_result):
+    def visualiseAvgGrayValueText(self,analysis_result='Random'):
         self.napariOverlay.drawTextOverlay(text='Mean gray value: {:.0f}'.format(analysis_result),pos=[0,0],textCol='white',textSize=12)
         
     def initAvgGrayValueText(self):
         self.napariOverlay.changeName('Average Gray Value')
         self.napariOverlay.drawTextOverlay_init()
+     
+     
+    
+    """
+    Random overlay display
+    """   
+    def visualiseRandomOverlay(self,analysis_result=None):
+        self.napariOverlay.drawShapesOverlay()
+        
+    def initRandomOverlay(self):
+        self.napariOverlay.changeName('RandomOverlay')
+        self.napariOverlay.shapesOverlay_init()    
         
         
         
-        
-        
-def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = 'Random',visualisationInfo = None):
+def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = None,visualisationInfo = None):
     global image_queue_analysis, napariViewer
     napariViewer = shared_data.napariViewer
     image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal
-    analysis_thread = AnalysisThread(analysisInfo=analysisInfo,visualisationInfo=analysisInfo)
+    analysis_thread = AnalysisThread(napariViewer,analysisInfo=analysisInfo,visualisationInfo=analysisInfo)
     analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
     
     #Append it to the list of analysisThreads
