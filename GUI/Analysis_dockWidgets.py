@@ -22,6 +22,11 @@ class analysisDockWidget:
         self.analysisLayout.addWidget(self.Button2,2,0)
         #add a connection to the button:
         self.Button2.clicked.connect(lambda index: self.startThread('Random'))
+        
+        self.Button2 = QPushButton('GrayValOverlay')
+        self.analysisLayout.addWidget(self.Button2,3,0)
+        #add a connection to the button:
+        self.Button2.clicked.connect(lambda index: self.startThread('GrayValueOverlay'))
     
     def startThread(self,analysisInfo):
         print('Starting analysis ' + analysisInfo)
