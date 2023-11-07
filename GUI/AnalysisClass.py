@@ -13,6 +13,17 @@ import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from napari.layers import Shapes
 from typing import Union, Tuple, List
+from stardist.models import StarDist2D
+from PIL import Image, ImageDraw
+
+sys.path.append('AutonomousMicroscopy')
+#Import all scripts in the custom script folders
+from CellSegmentScripts import * #type: ignore
+from CellScoringScripts import * #type: ignore
+from ROICalcScripts import * #type: ignore
+from ScoringMetrics import * #type: ignore
+#Obtain the helperfunctions
+import HelperFunctions  #type: ignore
 
 #Class for overlays and their update and such
 class napariOverlay():
@@ -73,7 +84,7 @@ class napariOverlay():
         self.layer = self.napariViewer.add_shapes(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',name=self.layer_name,scale=self.layer_scale)
     
     #Update routine for an overlay that only has shapes
-    def drawShapesOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
+    def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
         #ShapePosList should be a [[x,y,w,h],[x,y,w,h],...] array
         #ShapeCol should be a single entry or an array with same size as shapeposlist
         
@@ -81,6 +92,22 @@ class napariOverlay():
         polygons = []
         for p in range(len(shapePosList)):
             polygons.append(np.array([[shapePosList[p][0], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]+shapePosList[p][3]], [shapePosList[p][0], shapePosList[p][1]+shapePosList[p][3]]]))
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        if len(shapeCol) == 1:
+            self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol[0])
+        else:
+            self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
+    
+    
+    #Update routine for an overlay that only has shapes
+    def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
+        
+        #Update the shapes
+        polygons = []
+        for p in range((shapePosList.shape[2])):
+            polygons.append(shapePosList[:,:,p])
         #Remove the old polygon
         self.layer.data = []
         # add the new polygon
@@ -120,6 +147,11 @@ class AnalysisThread(QThread):
         self.analysisInfo=analysisInfo
         self.visualisationInfo = visualisationInfo
         self.napariViewer = napariViewer
+        if self.analysisInfo == 'CellSegmentOverlay':
+            storageloc = './AutonomousMicroscopy/ExampleData/StarDistModel'
+            modelDirectory = storageloc.rsplit('/', 1)
+            #Load the model - better to do this out of the loop for time reasons
+            self.stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
         if analysisInfo == None:
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
         else:
@@ -151,6 +183,8 @@ class AnalysisThread(QThread):
                 analysisResult = self.calcAnalysisAvgGrayValue(image)
             elif self.analysisInfo == 'GrayValueOverlay':
                 analysisResult = self.calcGrayValueOverlay(image)
+            elif self.analysisInfo == 'CellSegmentOverlay':
+                analysisResult = self.calcCellSegmentOverlay(image)
             else:
                 analysisResult = None
             return analysisResult
@@ -164,6 +198,8 @@ class AnalysisThread(QThread):
             self.initAvgGrayValueText()
         elif self.analysisInfo == 'GrayValueOverlay':
             self.initGrayScaleImageOverlay()
+        elif self.analysisInfo == 'CellSegmentOverlay':
+            self.initCellSegmentOverlay()
         else:
             self.initRandomOverlay()
             
@@ -175,8 +211,31 @@ class AnalysisThread(QThread):
                 self.visualiseAvgGrayValueText(analysis_result)
             elif self.analysisInfo == 'GrayValueOverlay':
                 self.visualiseGrayScaleImageOverlay(analysis_result)
+            elif self.analysisInfo == 'CellSegmentOverlay':
+                self.visualiseCellSegmentOverlay(analysis_result)
             else:
                 self.visualiseRandomOverlay()
+    
+    def outlineCoordinatesToImage(self,coords):
+    # Create a blank grayscale image with a white background
+        image = Image.new("L", (512, 512), "black")
+        draw = ImageDraw.Draw(image)
+
+        # Iterate over each n in N
+        for n in range(coords.shape[0]):
+            # Get the x and y coordinates for the current n
+            x = coords[n, 0, :]
+            y = coords[n, 1, :]
+
+            # Create a list of (x, y) tuples for drawing the lines
+            points = [(x[i], y[i]) for i in range(len(x))]
+
+            # Draw the lines on the image
+            draw.line(points, fill="white",width=2)  # Use black for the lines
+
+        # Convert the image to grayscale mode (L)
+        grayscale_image = image.convert("L")
+        return np.fliplr(np.rot90(np.array(grayscale_image),k=3))
     
     """
     Average gray value calculation and display
@@ -196,7 +255,7 @@ class AnalysisThread(QThread):
     Random overlay display
     """   
     def visualiseRandomOverlay(self,analysis_result=None):
-        self.napariOverlay.drawShapesOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
+        self.napariOverlay.drawSquaresOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
         
     def initRandomOverlay(self):
         self.napariOverlay.changeName('RandomOverlay')
@@ -206,7 +265,7 @@ class AnalysisThread(QThread):
     Testing overlay of image - based on grayscale value
     """
     def calcGrayValueOverlay(self,image):
-        #Get an image that simply provides a 1 based on percentile:
+        #Get an image that simply provides a Boolean based on percentile:
         image2 = np.where(image<np.percentile(image,25),1,0)
         return image2
     
@@ -216,8 +275,27 @@ class AnalysisThread(QThread):
         self.napariOverlay.drawImageOverlay(im=analysis_result)
     
     def initGrayScaleImageOverlay(self):
-        self.napariOverlay.changeName('Grayscale Image Overlay')
         self.napariOverlay.imageOverlay_init()
+        self.napariOverlay.changeName('Grayscale Image Overlay')
+        
+    """
+    Testing cell segmentation
+    """
+    
+    def calcCellSegmentOverlay(self,image):
+        coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment_preloadedModel",image_data="image",model="self.stardistModel",prob_thresh="0.35",nms_thresh="0.2"))
+        #Get image from this coords:
+        outimage = self.outlineCoordinatesToImage(coords)
+        return outimage
+        
+    def visualiseCellSegmentOverlay(self,analysis_result=None):
+        # self.napariOverlay.drawShapesOverlay(shapePosList=analysis_result,shapeCol=['red'])
+        self.napariOverlay.drawImageOverlay(im=analysis_result)
+        
+    def initCellSegmentOverlay(self):
+        # self.napariOverlay.shapesOverlay_init()
+        self.napariOverlay.imageOverlay_init()
+        self.napariOverlay.changeName('Cell Segment Overlay')
         
 def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = None,visualisationInfo = None):
     global image_queue_analysis, napariViewer

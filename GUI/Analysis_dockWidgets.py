@@ -27,6 +27,11 @@ class analysisDockWidget:
         self.analysisLayout.addWidget(self.Button2,3,0)
         #add a connection to the button:
         self.Button2.clicked.connect(lambda index: self.startThread('GrayValueOverlay'))
+        
+        self.Button2 = QPushButton('Cell Segment Overlay')
+        self.analysisLayout.addWidget(self.Button2,4,0)
+        #add a connection to the button:
+        self.Button2.clicked.connect(lambda index: self.startThread('CellSegmentOverlay'))
     
     def startThread(self,analysisInfo):
         print('Starting analysis ' + analysisInfo)

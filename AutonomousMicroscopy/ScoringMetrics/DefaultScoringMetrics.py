@@ -72,5 +72,5 @@ def relativeToMaxScore(**kwargs):
     else:
         max_value = max(kwargs["methodValue"])
     #Calculate the proportional value(s) compared to max_value
-    score = float(kwargs["methodValue"])/max_value
+    score = kwargs["methodValue"]/max_value
     return score

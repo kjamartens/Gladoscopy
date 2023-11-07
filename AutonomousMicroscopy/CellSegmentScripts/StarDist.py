@@ -33,6 +33,10 @@ def __function_metadata__():
 
 #Normal stardist segmentation, requires image_data and modelStorageLoc as required kwargs
 def StarDistSegment(**kwargs):
+    # print('Running stardistsegment')
+    # print(kwargs["image_data"])
+    
+    
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
