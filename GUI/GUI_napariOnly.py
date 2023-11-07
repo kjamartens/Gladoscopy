@@ -14,6 +14,8 @@ if __name__ == "__main__":
         
     # get object representing MMCore, used throughout
     core = Core()
+    
+    shared_data.core = core
 
     #Open JSON file with MM settings
     with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
