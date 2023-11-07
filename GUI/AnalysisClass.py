@@ -142,12 +142,12 @@ class AnalysisThread(QThread):
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     
-    def __init__(self,napariViewer,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random'):
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random'):
         super().__init__()	
         self.shared_data = shared_data
         self.analysisInfo=analysisInfo
         self.visualisationInfo = visualisationInfo
-        self.napariViewer = napariViewer
+        self.napariViewer = shared_data.napariViewer
         if self.analysisInfo == 'CellSegmentOverlay':
             storageloc = './AutonomousMicroscopy/ExampleData/StarDistModel'
             modelDirectory = storageloc.rsplit('/', 1)
@@ -284,7 +284,7 @@ class AnalysisThread(QThread):
     """
     
     def calcCellSegmentOverlay(self,image):
-        coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment_preloadedModel",image_data="image",model="self.stardistModel",prob_thresh="0.35",nms_thresh="0.2"))
+        coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment_preloadedModel",image_data="image",model="self.stardistModel"))
         #Get image from this coords:
         outimage = self.outlineCoordinatesToImage(coords)
         return outimage
@@ -303,7 +303,7 @@ def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = None,
     napariViewer = shared_data.napariViewer
     image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal
-    analysis_thread = AnalysisThread(napariViewer,shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo)
+    analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo)
     analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
     
     #Append it to the list of analysisThreads
