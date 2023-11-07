@@ -206,6 +206,28 @@ class dockWidget_analysisThreads(QMainWindow):
     def getDockWidget(self):
         return self.dockWidget
 
+def layer_removed_event_callback(event, shared_data):
+    #The name of the layer that is being removed:
+    # try:
+    layerRemoved = shared_data.napariViewer.layers[event.index].name
+    # print('layer remove callback event called')
+    # print(layerRemoved)
+    #Find this layer in the analysis threads
+    for l in shared_data.analysisThreads:
+        if l.getLayer() is not None:
+            # print('Info on this layer:')
+            # print('this layer name: '+l.getLayer().name)
+            # print('layer to be removed name: '+layerRemoved)
+            # print('Equality of these: '+l.getLayer() == layerRemoved)
+            # print('Equality of these: '+str(l.getLayer() == layerRemoved))
+            if l.getLayer().name == layerRemoved:
+                print('found a layer that should be destroyed')
+                #Destroy the analysis thread
+                l.destroy()
+                shared_data.analysisThreads.remove(l)
+    # except:
+    #     print('some error in layer_removed_event_callback')
+
 def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
@@ -216,6 +238,8 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
 
     #Napari start
     napariViewer = napari.Viewer()
+    #Add a connect event if a layer is removed - to potentially stop background processes
+    napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
     
     #Set some common things for the UI (scale bar on and such)

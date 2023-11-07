@@ -47,6 +47,12 @@ class Shared_data:
             self.on_analysisThreads_value_change()
     def on_analysisThreads_value_change(self):
         print('Analysis Threads now: '+str(self._analysisThreads))
+        removed_entry = None
+        if len(self._analysisThreads) < len(self.analysisThreads):
+            removed_entry = [entry for entry in self.analysisThreads if entry not in self._analysisThreads][0]
+        print('Analysis Threads now: ' + str(self._analysisThreads))
+        if removed_entry is not None:
+            print('Removed entry: ' + str(removed_entry))
         
     #core property        
     @property

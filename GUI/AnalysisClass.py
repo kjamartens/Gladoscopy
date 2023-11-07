@@ -103,6 +103,8 @@ class napariOverlay():
     
     #Update routine for an overlay that only has shapes
     def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
+        #Draw true polygon shapes
+        #Expected input shapePosList: a [[x1-1,y1-1],[x1-2,y1-2],...],[[x2-1,y2-1],[x2-2,y2-2],...] array of size [n,2,m], drawing m shapes with n points each
         
         #Update the shapes
         polygons = []
@@ -115,7 +117,14 @@ class napariOverlay():
             self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol[0])
         else:
             self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
-     
+    
+    #Return the layer
+    def getLayer(self):
+        if hasattr(self, 'layer'):
+            return self.layer
+        else:
+            return None
+    
     #Initialise an overlay that only shows an image
     def imageOverlay_init(self):
         #Initialise an overlay that only has shapes
@@ -144,6 +153,8 @@ class AnalysisThread(QThread):
     
     def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random'):
         super().__init__()	
+        self.is_running = True
+        self.analysis_ongoing = False
         self.shared_data = shared_data
         self.analysisInfo=analysisInfo
         self.visualisationInfo = visualisationInfo
@@ -163,22 +174,39 @@ class AnalysisThread(QThread):
                 self.initialise_napariLayer()
     
     def run(self):
-        while True:
+        while self.is_running:
             #Run analysis on the image from the queue
             self.analysis_result = self.runAnalysis(image_queue_analysis.get())
             self.analysis_done_signal.emit(self.analysis_result)
+            self.finished.emit()
+    
+    def stop(self):
+        self.is_running = False
     
     def destroy(self):
-        self.analysis_done_signal.disconnect(self.update_napariLayer)
-        self.analysisInfo = None
-        self.napariOverlay.destroy()
-        del self
-        
+        try:
+            print('Destroying '+str(self.analysisInfo))
+        except:
+            print('Destroying some analysis thread')
+        self.stop()
+        # self.analysis_done_signal.disconnect(self.update_napariLayer)
+        # self.analysisInfo = None
+        #Wait for the thread to be finished
+        # self.napariOverlay.destroy()
+        self.quit()
+        self.wait()
+        self.deleteLater()
+    
+    #Get corresponding layer of napariOverlay
+    def getLayer(self):
+        return self.napariOverlay.getLayer()
+    
     #Analysis is split into two parts: obtaining the analysis result and displaying this.
     #Here, we calculate the analysis result based on the analysisInfo
     def runAnalysis(self,image): 
         #Maybe add here that the layer should also be open?
         if self.analysisInfo is not None:
+            print('layer running analysis')
             #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
             if self.analysisInfo == 'AvgGrayValueText':
                 analysisResult = self.calcAnalysisAvgGrayValue(image)
