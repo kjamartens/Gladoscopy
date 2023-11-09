@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.10.0" />
+<title>AnalysisClass API documentation</title>
+<meta name="description" content="" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>AnalysisClass</code></h1>
+</header>
+<section id="section-intro">
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import numpy as np
+from PyQt5.QtCore import pyqtSignal, QThread
+import random
+import napari
+from napari.qt import thread_worker
+import time
+import queue
+from PyQt5.QtWidgets import QMainWindow
+from pycromanager import Core
+from magicgui import magicgui
+from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
+import sys
+from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+from napari.layers import Shapes
+from typing import Union, Tuple, List
+from stardist.models import StarDist2D
+from PIL import Image, ImageDraw
+
+sys.path.append(&#39;AutonomousMicroscopy&#39;)
+sys.path.append(&#39;AutonomousMicroscopy/MainScripts&#39;)
+#Import all scripts in the custom script folders
+from CellSegmentScripts import * #type: ignore
+from CellScoringScripts import * #type: ignore
+from ROICalcScripts import * #type: ignore
+from ScoringMetrics import * #type: ignore
+#Obtain the helperfunctions
+import HelperFunctions  #type: ignore
+
+#Class for overlays and their update and such
+class napariOverlay():
+    def __init__(self,napariViewer,layer_name:Union[str,None]=&#39;new Layer&#39;):
+        &#34;&#34;&#34;
+        Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
+
+        Args:
+            napariViewer (napari.Viewer): The napari viewer object.
+            layer_name (Union[str, None], optional): The name of the layer. Defaults to &#39;new Layer&#39;.
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        self.napariViewer = napariViewer
+        self.layer_name = layer_name
+        try:
+            self.layer_scale = napariViewer.layers[0].scale
+        except:
+            self.layer_scale = [1,1]
+        #Create the layer if layer_name is not none
+        #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
+        if layer_name is not None:
+            self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+        
+    #Update the name of the overlay
+    def changeName(self,new_name):
+        &#34;&#34;&#34;
+        Change the name of the napariOverlay
+
+        Args:
+            new_name (str): The new name for the napariOverlay.
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        self.layer_name = new_name
+        self.layer.name = self.layer_name
+        #Return the layer
+        
+    def getLayer(self):
+        &#34;&#34;&#34;
+        Returns the layer attribute of the object.
+
+        Args:
+            None
+
+        Returns:
+            layer (object or None): The layer attribute of the object if it exists, None otherwise.
+        &#34;&#34;&#34;
+        if hasattr(self, &#39;layer&#39;):
+            return self.layer
+        else:
+            return None
+        
+    #Initialise drawing a text overly (single string of text)
+    def drawTextOverlay_init(self):
+        &#34;&#34;&#34;
+        Initializes the text overlay for drawing text on the napari viewer.
+
+        Args:
+            None
+        
+        Returns:
+            None
+        &#34;&#34;&#34;
+        polygons = [np.array([[0, 0], [0, 1], [1, 1], [1, 0]])]
+        # create properties
+        properties = {&#39;value&#39;: [0]}
+        text_properties = {&#39;text&#39;: &#39;{value:0.1f}&#39;,&#39;anchor&#39;: &#39;upper_left&#39;,&#39;translation&#39;: [-5, 0],&#39;size&#39;: 8,&#39;color&#39;: &#39;green&#39;,}
+        #Remove old layer
+        napariViewer.layers.remove(self.layer)
+        # new layer with polygons and text
+        self.layer = napariViewer.add_shapes(polygons,properties=properties,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,text=text_properties,name=self.layer_name,scale=self.layer_scale,)
+        # change some properties of the layer
+        self.layer.opacity = 1
+    
+    #Update routine for drawing a text overly (single string of text)
+    def drawTextOverlay(self,text=&#39;&#39;,pos=[0,0],textCol=&#39;red&#39;,textSize=8):
+        &#34;&#34;&#34;
+        Running loop to draw/update the text overlay. Requires drawTextOverlay_init to be ran beforehand
+
+        Args:
+            text (str): The text to be displayed on the overlay. Defaults to an empty string.
+            pos ([int of size (2,1)]): The position of the overlay on the image. Defaults to [0, 0].
+            textCol (str): The color of the text. Defaults to &#39;red&#39;.
+            textSize (int): The size of the text. Defaults to 8.
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        # Update the properties - this contains the text
+        new_properties = {&#39;text&#39;: [text]}
+        self.layer.properties = new_properties
+        #update the polygon - this contains the position
+        pseudo_size = 0.1
+        polygons = [np.array([[pos[0], pos[1]], [pos[0]+pseudo_size, pos[1]], [pos[0]+pseudo_size, pos[1]+pseudo_size], [pos[0], pos[1]+pseudo_size]])]
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,)
+        #Update the text surrounding the invisible shape
+        text_properties = {&#39;text&#39;: &#39;{text}&#39;,&#39;anchor&#39;: &#39;upper_left&#39;,&#39;translation&#39;: [0, 0],&#39;size&#39;: textSize,&#39;color&#39;: textCol}
+        self.layer.text = text_properties
+        
+    #Initialise an overlay that only has shapes
+    def shapesOverlay_init(self):
+        &#34;&#34;&#34;
+        Initialise an overlay that only draws shapes.
+
+        Args:
+            None
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Initialise an overlay that only has shapes
+        #Create a single shape (polygon) and show it
+        polygons = [np.array([[225, 146], [283, 146], [283, 211], [225, 211]])]
+        #Remove old layer
+        self.napariViewer.layers.remove(self.layer)
+        # new layer with polygons and text
+        self.layer = self.napariViewer.add_shapes(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,name=self.layer_name,scale=self.layer_scale)
+    
+    #Update routine for an overlay that only has shapes
+    def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = [&#39;black&#39;]):
+        &#34;&#34;&#34;
+        Running loop to draw/update and overlay with one or multiple rectangles. Requires shapesOverlay_init to be ran beforehand
+
+        Args:
+            shapePosList (List[List[int]]): A list of shape positions in the format [[x, y, w, h], [x, y, w, h], ...].
+                Default is [[0, 0, 10, 10]].
+            shapeCol (List[Union[str, Tuple[float, float, float]]]): A single entry or an array with the same size as shapePosList.
+                Default is [&#39;black&#39;].
+
+        Returns:
+            None
+        &#34;&#34;&#34;        
+        #Update the shapes
+        polygons = []
+        for p in range(len(shapePosList)):
+            polygons.append(np.array([[shapePosList[p][0], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]+shapePosList[p][3]], [shapePosList[p][0], shapePosList[p][1]+shapePosList[p][3]]]))
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        if len(shapeCol) == 1:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol[0])
+        else:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol)
+    
+    
+    #Update routine for an overlay that only has shapes
+    def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = [&#39;black&#39;]):
+        &#34;&#34;&#34;
+        Running loop to draw arbitrary-shaped polygon shapes. Requires shapesOverlay_init to be ran beforehand
+
+        Args:
+            shapePosList (List[List[float]]): A list of shape positions. A [[x1-1,y1-1],[x1-2,y1-2],...],[[x2-1,y2-1],[x2-2,y2-2],...] array of size [n,2,m], drawing m shapes with n points each. Default is [[0,0],[0,10],[10,10],[10,0]].
+            shapeCol (List[Union[str, Tuple[float, float, float]]]): A list of shape colors. Default is [&#39;black&#39;].
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Update the shapes
+        polygons = []
+        for p in range((shapePosList.shape[2])):
+            polygons.append(shapePosList[:,:,p])
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        if len(shapeCol) == 1:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol[0])
+        else:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol)
+    
+    #Initialise an overlay that only shows an image
+    def imageOverlay_init(self):
+        &#34;&#34;&#34;
+        Initialize a napari overlay that only draws an image
+
+        Args:
+            None
+        
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Initialise an overlay that only has shapes
+        #Load image
+        im = np.random.random((300, 300))
+        #Remove old layer
+        self.napariViewer.layers.remove(self.layer)
+        # new layer with polygons and text
+        self.layer = self.napariViewer.add_image(im,scale=self.layer_scale)
+        
+    #Update an overlay that shows an image
+    def drawImageOverlay(self,im=np.zeros((300,300))):
+        &#34;&#34;&#34;
+        Running loop to draw an image as napari overlay. Requires imageOverlay_init to be ran beforehand
+
+        Parameters:
+            im (numpy.ndarray): The image to be overlaid. Default is np.zeros((300, 300)).
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Remove the old image
+        self.layer.data = np.ones(np.shape(self.layer.data))
+        #Update the image
+        self.layer.data = im
+        
+    def destroy(self):
+        &#34;&#34;&#34;
+        Deletes the instance of the class.
+        &#34;&#34;&#34;
+        del self
+        
+#This code gets some image and does some analysis on this
+class AnalysisThread(QThread):
+    # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
+    # Create a signal to communicate between threads
+    analysis_done_signal = pyqtSignal(object)
+    
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = &#39;Random&#39;,visualisationInfo: Union[str, None] = &#39;Random&#39;):
+        super().__init__()      
+        self.is_running = True
+        self.analysis_ongoing = False
+        self.shared_data = shared_data
+        self.analysisInfo=analysisInfo
+        self.visualisationInfo = visualisationInfo
+        self.napariViewer = shared_data.napariViewer
+        if self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+            storageloc = &#39;./AutonomousMicroscopy/ExampleData/StarDistModel&#39;
+            modelDirectory = storageloc.rsplit(&#39;/&#39;, 1)
+            #Load the model - better to do this out of the loop for time reasons
+            self.stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+&#34;/&#34;) #type:ignore
+        if analysisInfo == None:
+            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+        else:
+            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
+            #Create an empty overlay
+            if visualisationInfo != None:
+                #Activate layer
+                self.initialise_napariLayer()
+    
+    def run(self):
+        while self.is_running:
+            #Run analysis on the image from the queue
+            self.analysis_result = self.runAnalysis(image_queue_analysis.get())
+            self.analysis_done_signal.emit(self.analysis_result)
+            self.finished.emit()
+    
+    def stop(self):
+        self.is_running = False
+    
+    def destroy(self):
+        try:
+            print(&#39;Destroying &#39;+str(self.analysisInfo))
+        except:
+            print(&#39;Destroying some analysis thread&#39;)
+        self.stop()
+        # self.analysis_done_signal.disconnect(self.update_napariLayer)
+        # self.analysisInfo = None
+        #Wait for the thread to be finished
+        # self.napariOverlay.destroy()
+        self.quit()
+        self.wait()
+        self.deleteLater()
+    
+    #Get corresponding layer of napariOverlay
+    def getLayer(self):
+        return self.napariOverlay.getLayer()
+    
+    #Analysis is split into two parts: obtaining the analysis result and displaying this.
+    #Here, we calculate the analysis result based on the analysisInfo
+    def runAnalysis(self,image): 
+        #Maybe add here that the layer should also be open?
+        if self.analysisInfo is not None:
+            print(&#39;layer running analysis&#39;)
+            #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
+            if self.analysisInfo == &#39;AvgGrayValueText&#39;:
+                analysisResult = self.calcAnalysisAvgGrayValue(image)
+            elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+                analysisResult = self.calcGrayValueOverlay(image)
+            elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+                analysisResult = self.calcCellSegmentOverlay(image)
+            else:
+                analysisResult = None
+            return analysisResult
+        else:
+            return None
+
+    #And here we perform the visualisation - can be fully separate from performing tha analysis
+    #Initialisation is called upon creation
+    def initialise_napariLayer(self):
+        if self.visualisationInfo == &#39;AvgGrayValueText&#39;:
+            self.initAvgGrayValueText()
+        elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+            self.initGrayScaleImageOverlay()
+        elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+            self.initCellSegmentOverlay()
+        else:
+            self.initRandomOverlay()
+            
+    #Update ir called every time the analysis is done
+    def update_napariLayer(self,analysis_result):
+        # print(analysis_result)
+        if self.analysisInfo is not None:
+            if self.visualisationInfo == &#39;AvgGrayValueText&#39;:
+                self.visualiseAvgGrayValueText(analysis_result)
+            elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+                self.visualiseGrayScaleImageOverlay(analysis_result)
+            elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+                self.visualiseCellSegmentOverlay(analysis_result)
+            else:
+                self.visualiseRandomOverlay()
+    
+    def outlineCoordinatesToImage(self,coords):
+    # Create a blank grayscale image with a white background
+        image = Image.new(&#34;L&#34;, (self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height), &#34;black&#34;)
+        draw = ImageDraw.Draw(image)
+
+        # Iterate over each n in N
+        for n in range(coords.shape[0]):
+            # Get the x and y coordinates for the current n
+            x = coords[n, 0, :]
+            y = coords[n, 1, :]
+
+            # Create a list of (x, y) tuples for drawing the lines
+            points = [(x[i], y[i]) for i in range(len(x))]
+
+            # Draw the lines on the image
+            draw.line(points, fill=&#34;white&#34;,width=2)  # Use black for the lines
+
+        # Convert the image to grayscale mode (L)
+        grayscale_image = image.convert(&#34;L&#34;)
+        return np.fliplr(np.rot90(np.array(grayscale_image),k=3))
+    
+    &#34;&#34;&#34;
+    Average gray value calculation and display
+    &#34;&#34;&#34;
+    #Calculating average gray value of an image
+    def calcAnalysisAvgGrayValue(self,image):
+        return np.mean(np.mean(image))
+    
+    def visualiseAvgGrayValueText(self,analysis_result=&#39;Random&#39;):
+        self.napariOverlay.drawTextOverlay(text=&#39;Mean gray value: {:.0f}&#39;.format(analysis_result),pos=[0,0],textCol=&#39;white&#39;,textSize=12)
+        
+    def initAvgGrayValueText(self):
+        self.napariOverlay.changeName(&#39;Average Gray Value&#39;)
+        self.napariOverlay.drawTextOverlay_init()
+    
+    &#34;&#34;&#34;
+    Random overlay display
+    &#34;&#34;&#34;   
+    def visualiseRandomOverlay(self,analysis_result=None):
+        self.napariOverlay.drawSquaresOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
+        
+    def initRandomOverlay(self):
+        self.napariOverlay.changeName(&#39;RandomOverlay&#39;)
+        self.napariOverlay.shapesOverlay_init()    
+    
+    &#34;&#34;&#34;
+    Testing overlay of image - based on grayscale value
+    &#34;&#34;&#34;
+    def calcGrayValueOverlay(self,image):
+        #Get an image that simply provides a Boolean based on percentile:
+        image2 = np.where(image&lt;np.percentile(image,25),1,0)
+        return image2
+    
+    def visualiseGrayScaleImageOverlay(self,analysis_result=None):
+        #Expected analysis_result is a boolean image.
+        #Create an image overlay from napari
+        self.napariOverlay.drawImageOverlay(im=analysis_result)
+    
+    def initGrayScaleImageOverlay(self):
+        self.napariOverlay.imageOverlay_init()
+        self.napariOverlay.changeName(&#39;Grayscale Image Overlay&#39;)
+        
+    &#34;&#34;&#34;
+    Testing cell segmentation
+    &#34;&#34;&#34;
+    
+    def calcCellSegmentOverlay(self,image):
+        coords = eval(HelperFunctions.createFunctionWithKwargs(&#34;StarDist.StarDistSegment_preloadedModel&#34;,image_data=&#34;image&#34;,model=&#34;self.stardistModel&#34;))
+        #Get image from this coords:
+        outimage = self.outlineCoordinatesToImage(coords)
+        return outimage
+        
+    def visualiseCellSegmentOverlay(self,analysis_result=None):
+        # self.napariOverlay.drawShapesOverlay(shapePosList=analysis_result,shapeCol=[&#39;red&#39;])
+        self.napariOverlay.drawImageOverlay(im=analysis_result)
+        
+    def initCellSegmentOverlay(self):
+        # self.napariOverlay.shapesOverlay_init()
+        self.napariOverlay.imageOverlay_init()
+        self.napariOverlay.changeName(&#39;Cell Segment Overlay&#39;)
+        
+def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = None,visualisationInfo = None):
+    global image_queue_analysis, napariViewer
+    napariViewer = shared_data.napariViewer
+    image_queue_analysis = image_queue_transfer
+    #Instantiate an analysis thread and add a signal
+    analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo)
+    analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
+    
+    #Append it to the list of analysisThreads
+    shared_data.analysisThreads.append(analysis_thread)
+     
+    return analysis_thread </code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="AnalysisClass.create_analysis_thread"><code class="name flex">
+<span>def <span class="ident">create_analysis_thread</span></span>(<span>image_queue_transfer, shared_data, analysisInfo=None, visualisationInfo=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = None,visualisationInfo = None):
+    global image_queue_analysis, napariViewer
+    napariViewer = shared_data.napariViewer
+    image_queue_analysis = image_queue_transfer
+    #Instantiate an analysis thread and add a signal
+    analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo)
+    analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
+    
+    #Append it to the list of analysisThreads
+    shared_data.analysisThreads.append(analysis_thread)
+     
+    return analysis_thread </code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="AnalysisClass.AnalysisThread"><code class="flex name class">
+<span>class <span class="ident">AnalysisThread</span></span>
+<span>(</span><span>shared_data, analysisInfo: Optional[str] = 'Random', visualisationInfo: Optional[str] = 'Random')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>QThread(parent: typing.Optional[QObject] = None)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AnalysisThread(QThread):
+    # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
+    # Create a signal to communicate between threads
+    analysis_done_signal = pyqtSignal(object)
+    
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = &#39;Random&#39;,visualisationInfo: Union[str, None] = &#39;Random&#39;):
+        super().__init__()      
+        self.is_running = True
+        self.analysis_ongoing = False
+        self.shared_data = shared_data
+        self.analysisInfo=analysisInfo
+        self.visualisationInfo = visualisationInfo
+        self.napariViewer = shared_data.napariViewer
+        if self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+            storageloc = &#39;./AutonomousMicroscopy/ExampleData/StarDistModel&#39;
+            modelDirectory = storageloc.rsplit(&#39;/&#39;, 1)
+            #Load the model - better to do this out of the loop for time reasons
+            self.stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+&#34;/&#34;) #type:ignore
+        if analysisInfo == None:
+            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+        else:
+            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
+            #Create an empty overlay
+            if visualisationInfo != None:
+                #Activate layer
+                self.initialise_napariLayer()
+    
+    def run(self):
+        while self.is_running:
+            #Run analysis on the image from the queue
+            self.analysis_result = self.runAnalysis(image_queue_analysis.get())
+            self.analysis_done_signal.emit(self.analysis_result)
+            self.finished.emit()
+    
+    def stop(self):
+        self.is_running = False
+    
+    def destroy(self):
+        try:
+            print(&#39;Destroying &#39;+str(self.analysisInfo))
+        except:
+            print(&#39;Destroying some analysis thread&#39;)
+        self.stop()
+        # self.analysis_done_signal.disconnect(self.update_napariLayer)
+        # self.analysisInfo = None
+        #Wait for the thread to be finished
+        # self.napariOverlay.destroy()
+        self.quit()
+        self.wait()
+        self.deleteLater()
+    
+    #Get corresponding layer of napariOverlay
+    def getLayer(self):
+        return self.napariOverlay.getLayer()
+    
+    #Analysis is split into two parts: obtaining the analysis result and displaying this.
+    #Here, we calculate the analysis result based on the analysisInfo
+    def runAnalysis(self,image): 
+        #Maybe add here that the layer should also be open?
+        if self.analysisInfo is not None:
+            print(&#39;layer running analysis&#39;)
+            #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
+            if self.analysisInfo == &#39;AvgGrayValueText&#39;:
+                analysisResult = self.calcAnalysisAvgGrayValue(image)
+            elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+                analysisResult = self.calcGrayValueOverlay(image)
+            elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+                analysisResult = self.calcCellSegmentOverlay(image)
+            else:
+                analysisResult = None
+            return analysisResult
+        else:
+            return None
+
+    #And here we perform the visualisation - can be fully separate from performing tha analysis
+    #Initialisation is called upon creation
+    def initialise_napariLayer(self):
+        if self.visualisationInfo == &#39;AvgGrayValueText&#39;:
+            self.initAvgGrayValueText()
+        elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+            self.initGrayScaleImageOverlay()
+        elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+            self.initCellSegmentOverlay()
+        else:
+            self.initRandomOverlay()
+            
+    #Update ir called every time the analysis is done
+    def update_napariLayer(self,analysis_result):
+        # print(analysis_result)
+        if self.analysisInfo is not None:
+            if self.visualisationInfo == &#39;AvgGrayValueText&#39;:
+                self.visualiseAvgGrayValueText(analysis_result)
+            elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+                self.visualiseGrayScaleImageOverlay(analysis_result)
+            elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+                self.visualiseCellSegmentOverlay(analysis_result)
+            else:
+                self.visualiseRandomOverlay()
+    
+    def outlineCoordinatesToImage(self,coords):
+    # Create a blank grayscale image with a white background
+        image = Image.new(&#34;L&#34;, (self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height), &#34;black&#34;)
+        draw = ImageDraw.Draw(image)
+
+        # Iterate over each n in N
+        for n in range(coords.shape[0]):
+            # Get the x and y coordinates for the current n
+            x = coords[n, 0, :]
+            y = coords[n, 1, :]
+
+            # Create a list of (x, y) tuples for drawing the lines
+            points = [(x[i], y[i]) for i in range(len(x))]
+
+            # Draw the lines on the image
+            draw.line(points, fill=&#34;white&#34;,width=2)  # Use black for the lines
+
+        # Convert the image to grayscale mode (L)
+        grayscale_image = image.convert(&#34;L&#34;)
+        return np.fliplr(np.rot90(np.array(grayscale_image),k=3))
+    
+    &#34;&#34;&#34;
+    Average gray value calculation and display
+    &#34;&#34;&#34;
+    #Calculating average gray value of an image
+    def calcAnalysisAvgGrayValue(self,image):
+        return np.mean(np.mean(image))
+    
+    def visualiseAvgGrayValueText(self,analysis_result=&#39;Random&#39;):
+        self.napariOverlay.drawTextOverlay(text=&#39;Mean gray value: {:.0f}&#39;.format(analysis_result),pos=[0,0],textCol=&#39;white&#39;,textSize=12)
+        
+    def initAvgGrayValueText(self):
+        self.napariOverlay.changeName(&#39;Average Gray Value&#39;)
+        self.napariOverlay.drawTextOverlay_init()
+    
+    &#34;&#34;&#34;
+    Random overlay display
+    &#34;&#34;&#34;   
+    def visualiseRandomOverlay(self,analysis_result=None):
+        self.napariOverlay.drawSquaresOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
+        
+    def initRandomOverlay(self):
+        self.napariOverlay.changeName(&#39;RandomOverlay&#39;)
+        self.napariOverlay.shapesOverlay_init()    
+    
+    &#34;&#34;&#34;
+    Testing overlay of image - based on grayscale value
+    &#34;&#34;&#34;
+    def calcGrayValueOverlay(self,image):
+        #Get an image that simply provides a Boolean based on percentile:
+        image2 = np.where(image&lt;np.percentile(image,25),1,0)
+        return image2
+    
+    def visualiseGrayScaleImageOverlay(self,analysis_result=None):
+        #Expected analysis_result is a boolean image.
+        #Create an image overlay from napari
+        self.napariOverlay.drawImageOverlay(im=analysis_result)
+    
+    def initGrayScaleImageOverlay(self):
+        self.napariOverlay.imageOverlay_init()
+        self.napariOverlay.changeName(&#39;Grayscale Image Overlay&#39;)
+        
+    &#34;&#34;&#34;
+    Testing cell segmentation
+    &#34;&#34;&#34;
+    
+    def calcCellSegmentOverlay(self,image):
+        coords = eval(HelperFunctions.createFunctionWithKwargs(&#34;StarDist.StarDistSegment_preloadedModel&#34;,image_data=&#34;image&#34;,model=&#34;self.stardistModel&#34;))
+        #Get image from this coords:
+        outimage = self.outlineCoordinatesToImage(coords)
+        return outimage
+        
+    def visualiseCellSegmentOverlay(self,analysis_result=None):
+        # self.napariOverlay.drawShapesOverlay(shapePosList=analysis_result,shapeCol=[&#39;red&#39;])
+        self.napariOverlay.drawImageOverlay(im=analysis_result)
+        
+    def initCellSegmentOverlay(self):
+        # self.napariOverlay.shapesOverlay_init()
+        self.napariOverlay.imageOverlay_init()
+        self.napariOverlay.changeName(&#39;Cell Segment Overlay&#39;)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>PyQt5.QtCore.QThread</li>
+<li>PyQt5.QtCore.QObject</li>
+<li>sip.wrapper</li>
+<li>sip.simplewrapper</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="AnalysisClass.AnalysisThread.analysis_done_signal"><code class="name flex">
+<span>def <span class="ident">analysis_done_signal</span></span>(<span>...)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>pyqtSignal(*types, name: str = &hellip;, revision: int = &hellip;, arguments: Sequence = &hellip;) -&gt; PYQT_SIGNAL</p>
+<p>types is normally a sequence of individual types.
+Each type is either a
+type object or a string that is the name of a C++ type.
+Alternatively
+each type could itself be a sequence of types each describing a different
+overloaded signal.
+name is the optional C++ name of the signal.
+If it is not specified then
+the name of the class attribute that is bound to the signal is used.
+revision is the optional revision of the signal that is exported to QML.
+If it is not specified then 0 is used.
+arguments is the optional sequence of the names of the signal's arguments.</p></div>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.calcAnalysisAvgGrayValue"><code class="name flex">
+<span>def <span class="ident">calcAnalysisAvgGrayValue</span></span>(<span>self, image)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calcAnalysisAvgGrayValue(self,image):
+    return np.mean(np.mean(image))</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.calcCellSegmentOverlay"><code class="name flex">
+<span>def <span class="ident">calcCellSegmentOverlay</span></span>(<span>self, image)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calcCellSegmentOverlay(self,image):
+    coords = eval(HelperFunctions.createFunctionWithKwargs(&#34;StarDist.StarDistSegment_preloadedModel&#34;,image_data=&#34;image&#34;,model=&#34;self.stardistModel&#34;))
+    #Get image from this coords:
+    outimage = self.outlineCoordinatesToImage(coords)
+    return outimage</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.calcGrayValueOverlay"><code class="name flex">
+<span>def <span class="ident">calcGrayValueOverlay</span></span>(<span>self, image)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calcGrayValueOverlay(self,image):
+    #Get an image that simply provides a Boolean based on percentile:
+    image2 = np.where(image&lt;np.percentile(image,25),1,0)
+    return image2</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.destroy"><code class="name flex">
+<span>def <span class="ident">destroy</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def destroy(self):
+    try:
+        print(&#39;Destroying &#39;+str(self.analysisInfo))
+    except:
+        print(&#39;Destroying some analysis thread&#39;)
+    self.stop()
+    # self.analysis_done_signal.disconnect(self.update_napariLayer)
+    # self.analysisInfo = None
+    #Wait for the thread to be finished
+    # self.napariOverlay.destroy()
+    self.quit()
+    self.wait()
+    self.deleteLater()</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.getLayer"><code class="name flex">
+<span>def <span class="ident">getLayer</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def getLayer(self):
+    return self.napariOverlay.getLayer()</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.initAvgGrayValueText"><code class="name flex">
+<span>def <span class="ident">initAvgGrayValueText</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def initAvgGrayValueText(self):
+    self.napariOverlay.changeName(&#39;Average Gray Value&#39;)
+    self.napariOverlay.drawTextOverlay_init()</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.initCellSegmentOverlay"><code class="name flex">
+<span>def <span class="ident">initCellSegmentOverlay</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def initCellSegmentOverlay(self):
+    # self.napariOverlay.shapesOverlay_init()
+    self.napariOverlay.imageOverlay_init()
+    self.napariOverlay.changeName(&#39;Cell Segment Overlay&#39;)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.initGrayScaleImageOverlay"><code class="name flex">
+<span>def <span class="ident">initGrayScaleImageOverlay</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def initGrayScaleImageOverlay(self):
+    self.napariOverlay.imageOverlay_init()
+    self.napariOverlay.changeName(&#39;Grayscale Image Overlay&#39;)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.initRandomOverlay"><code class="name flex">
+<span>def <span class="ident">initRandomOverlay</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def initRandomOverlay(self):
+    self.napariOverlay.changeName(&#39;RandomOverlay&#39;)
+    self.napariOverlay.shapesOverlay_init()    </code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.initialise_napariLayer"><code class="name flex">
+<span>def <span class="ident">initialise_napariLayer</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def initialise_napariLayer(self):
+    if self.visualisationInfo == &#39;AvgGrayValueText&#39;:
+        self.initAvgGrayValueText()
+    elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+        self.initGrayScaleImageOverlay()
+    elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+        self.initCellSegmentOverlay()
+    else:
+        self.initRandomOverlay()</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.outlineCoordinatesToImage"><code class="name flex">
+<span>def <span class="ident">outlineCoordinatesToImage</span></span>(<span>self, coords)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def outlineCoordinatesToImage(self,coords):
+# Create a blank grayscale image with a white background
+    image = Image.new(&#34;L&#34;, (self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height), &#34;black&#34;)
+    draw = ImageDraw.Draw(image)
+
+    # Iterate over each n in N
+    for n in range(coords.shape[0]):
+        # Get the x and y coordinates for the current n
+        x = coords[n, 0, :]
+        y = coords[n, 1, :]
+
+        # Create a list of (x, y) tuples for drawing the lines
+        points = [(x[i], y[i]) for i in range(len(x))]
+
+        # Draw the lines on the image
+        draw.line(points, fill=&#34;white&#34;,width=2)  # Use black for the lines
+
+    # Convert the image to grayscale mode (L)
+    grayscale_image = image.convert(&#34;L&#34;)
+    return np.fliplr(np.rot90(np.array(grayscale_image),k=3))</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.run"><code class="name flex">
+<span>def <span class="ident">run</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>run(self)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run(self):
+    while self.is_running:
+        #Run analysis on the image from the queue
+        self.analysis_result = self.runAnalysis(image_queue_analysis.get())
+        self.analysis_done_signal.emit(self.analysis_result)
+        self.finished.emit()</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.runAnalysis"><code class="name flex">
+<span>def <span class="ident">runAnalysis</span></span>(<span>self, image)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def runAnalysis(self,image): 
+    #Maybe add here that the layer should also be open?
+    if self.analysisInfo is not None:
+        print(&#39;layer running analysis&#39;)
+        #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
+        if self.analysisInfo == &#39;AvgGrayValueText&#39;:
+            analysisResult = self.calcAnalysisAvgGrayValue(image)
+        elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+            analysisResult = self.calcGrayValueOverlay(image)
+        elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+            analysisResult = self.calcCellSegmentOverlay(image)
+        else:
+            analysisResult = None
+        return analysisResult
+    else:
+        return None</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.stop"><code class="name flex">
+<span>def <span class="ident">stop</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def stop(self):
+    self.is_running = False</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.update_napariLayer"><code class="name flex">
+<span>def <span class="ident">update_napariLayer</span></span>(<span>self, analysis_result)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_napariLayer(self,analysis_result):
+    # print(analysis_result)
+    if self.analysisInfo is not None:
+        if self.visualisationInfo == &#39;AvgGrayValueText&#39;:
+            self.visualiseAvgGrayValueText(analysis_result)
+        elif self.analysisInfo == &#39;GrayValueOverlay&#39;:
+            self.visualiseGrayScaleImageOverlay(analysis_result)
+        elif self.analysisInfo == &#39;CellSegmentOverlay&#39;:
+            self.visualiseCellSegmentOverlay(analysis_result)
+        else:
+            self.visualiseRandomOverlay()</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.visualiseAvgGrayValueText"><code class="name flex">
+<span>def <span class="ident">visualiseAvgGrayValueText</span></span>(<span>self, analysis_result='Random')</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def visualiseAvgGrayValueText(self,analysis_result=&#39;Random&#39;):
+    self.napariOverlay.drawTextOverlay(text=&#39;Mean gray value: {:.0f}&#39;.format(analysis_result),pos=[0,0],textCol=&#39;white&#39;,textSize=12)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.visualiseCellSegmentOverlay"><code class="name flex">
+<span>def <span class="ident">visualiseCellSegmentOverlay</span></span>(<span>self, analysis_result=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def visualiseCellSegmentOverlay(self,analysis_result=None):
+    # self.napariOverlay.drawShapesOverlay(shapePosList=analysis_result,shapeCol=[&#39;red&#39;])
+    self.napariOverlay.drawImageOverlay(im=analysis_result)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.visualiseGrayScaleImageOverlay"><code class="name flex">
+<span>def <span class="ident">visualiseGrayScaleImageOverlay</span></span>(<span>self, analysis_result=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def visualiseGrayScaleImageOverlay(self,analysis_result=None):
+    #Expected analysis_result is a boolean image.
+    #Create an image overlay from napari
+    self.napariOverlay.drawImageOverlay(im=analysis_result)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.AnalysisThread.visualiseRandomOverlay"><code class="name flex">
+<span>def <span class="ident">visualiseRandomOverlay</span></span>(<span>self, analysis_result=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def visualiseRandomOverlay(self,analysis_result=None):
+    self.napariOverlay.drawSquaresOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="AnalysisClass.napariOverlay"><code class="flex name class">
+<span>class <span class="ident">napariOverlay</span></span>
+<span>(</span><span>napariViewer, layer_name: Optional[str] = 'new Layer')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Initializes an instance of the class with the specified <code>napariViewer</code> and <code>layer_name</code>.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>napariViewer</code></strong> :&ensp;<code>napari.Viewer</code></dt>
+<dd>The napari viewer object.</dd>
+<dt><strong><code>layer_name</code></strong> :&ensp;<code>Union[str, None]</code>, optional</dt>
+<dd>The name of the layer. Defaults to 'new Layer'.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class napariOverlay():
+    def __init__(self,napariViewer,layer_name:Union[str,None]=&#39;new Layer&#39;):
+        &#34;&#34;&#34;
+        Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
+
+        Args:
+            napariViewer (napari.Viewer): The napari viewer object.
+            layer_name (Union[str, None], optional): The name of the layer. Defaults to &#39;new Layer&#39;.
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        self.napariViewer = napariViewer
+        self.layer_name = layer_name
+        try:
+            self.layer_scale = napariViewer.layers[0].scale
+        except:
+            self.layer_scale = [1,1]
+        #Create the layer if layer_name is not none
+        #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
+        if layer_name is not None:
+            self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+        
+    #Update the name of the overlay
+    def changeName(self,new_name):
+        &#34;&#34;&#34;
+        Change the name of the napariOverlay
+
+        Args:
+            new_name (str): The new name for the napariOverlay.
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        self.layer_name = new_name
+        self.layer.name = self.layer_name
+        #Return the layer
+        
+    def getLayer(self):
+        &#34;&#34;&#34;
+        Returns the layer attribute of the object.
+
+        Args:
+            None
+
+        Returns:
+            layer (object or None): The layer attribute of the object if it exists, None otherwise.
+        &#34;&#34;&#34;
+        if hasattr(self, &#39;layer&#39;):
+            return self.layer
+        else:
+            return None
+        
+    #Initialise drawing a text overly (single string of text)
+    def drawTextOverlay_init(self):
+        &#34;&#34;&#34;
+        Initializes the text overlay for drawing text on the napari viewer.
+
+        Args:
+            None
+        
+        Returns:
+            None
+        &#34;&#34;&#34;
+        polygons = [np.array([[0, 0], [0, 1], [1, 1], [1, 0]])]
+        # create properties
+        properties = {&#39;value&#39;: [0]}
+        text_properties = {&#39;text&#39;: &#39;{value:0.1f}&#39;,&#39;anchor&#39;: &#39;upper_left&#39;,&#39;translation&#39;: [-5, 0],&#39;size&#39;: 8,&#39;color&#39;: &#39;green&#39;,}
+        #Remove old layer
+        napariViewer.layers.remove(self.layer)
+        # new layer with polygons and text
+        self.layer = napariViewer.add_shapes(polygons,properties=properties,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,text=text_properties,name=self.layer_name,scale=self.layer_scale,)
+        # change some properties of the layer
+        self.layer.opacity = 1
+    
+    #Update routine for drawing a text overly (single string of text)
+    def drawTextOverlay(self,text=&#39;&#39;,pos=[0,0],textCol=&#39;red&#39;,textSize=8):
+        &#34;&#34;&#34;
+        Running loop to draw/update the text overlay. Requires drawTextOverlay_init to be ran beforehand
+
+        Args:
+            text (str): The text to be displayed on the overlay. Defaults to an empty string.
+            pos ([int of size (2,1)]): The position of the overlay on the image. Defaults to [0, 0].
+            textCol (str): The color of the text. Defaults to &#39;red&#39;.
+            textSize (int): The size of the text. Defaults to 8.
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        # Update the properties - this contains the text
+        new_properties = {&#39;text&#39;: [text]}
+        self.layer.properties = new_properties
+        #update the polygon - this contains the position
+        pseudo_size = 0.1
+        polygons = [np.array([[pos[0], pos[1]], [pos[0]+pseudo_size, pos[1]], [pos[0]+pseudo_size, pos[1]+pseudo_size], [pos[0], pos[1]+pseudo_size]])]
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,)
+        #Update the text surrounding the invisible shape
+        text_properties = {&#39;text&#39;: &#39;{text}&#39;,&#39;anchor&#39;: &#39;upper_left&#39;,&#39;translation&#39;: [0, 0],&#39;size&#39;: textSize,&#39;color&#39;: textCol}
+        self.layer.text = text_properties
+        
+    #Initialise an overlay that only has shapes
+    def shapesOverlay_init(self):
+        &#34;&#34;&#34;
+        Initialise an overlay that only draws shapes.
+
+        Args:
+            None
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Initialise an overlay that only has shapes
+        #Create a single shape (polygon) and show it
+        polygons = [np.array([[225, 146], [283, 146], [283, 211], [225, 211]])]
+        #Remove old layer
+        self.napariViewer.layers.remove(self.layer)
+        # new layer with polygons and text
+        self.layer = self.napariViewer.add_shapes(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,name=self.layer_name,scale=self.layer_scale)
+    
+    #Update routine for an overlay that only has shapes
+    def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = [&#39;black&#39;]):
+        &#34;&#34;&#34;
+        Running loop to draw/update and overlay with one or multiple rectangles. Requires shapesOverlay_init to be ran beforehand
+
+        Args:
+            shapePosList (List[List[int]]): A list of shape positions in the format [[x, y, w, h], [x, y, w, h], ...].
+                Default is [[0, 0, 10, 10]].
+            shapeCol (List[Union[str, Tuple[float, float, float]]]): A single entry or an array with the same size as shapePosList.
+                Default is [&#39;black&#39;].
+
+        Returns:
+            None
+        &#34;&#34;&#34;        
+        #Update the shapes
+        polygons = []
+        for p in range(len(shapePosList)):
+            polygons.append(np.array([[shapePosList[p][0], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]+shapePosList[p][3]], [shapePosList[p][0], shapePosList[p][1]+shapePosList[p][3]]]))
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        if len(shapeCol) == 1:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol[0])
+        else:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol)
+    
+    
+    #Update routine for an overlay that only has shapes
+    def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = [&#39;black&#39;]):
+        &#34;&#34;&#34;
+        Running loop to draw arbitrary-shaped polygon shapes. Requires shapesOverlay_init to be ran beforehand
+
+        Args:
+            shapePosList (List[List[float]]): A list of shape positions. A [[x1-1,y1-1],[x1-2,y1-2],...],[[x2-1,y2-1],[x2-2,y2-2],...] array of size [n,2,m], drawing m shapes with n points each. Default is [[0,0],[0,10],[10,10],[10,0]].
+            shapeCol (List[Union[str, Tuple[float, float, float]]]): A list of shape colors. Default is [&#39;black&#39;].
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Update the shapes
+        polygons = []
+        for p in range((shapePosList.shape[2])):
+            polygons.append(shapePosList[:,:,p])
+        #Remove the old polygon
+        self.layer.data = []
+        # add the new polygon
+        if len(shapeCol) == 1:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol[0])
+        else:
+            self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol)
+    
+    #Initialise an overlay that only shows an image
+    def imageOverlay_init(self):
+        &#34;&#34;&#34;
+        Initialize a napari overlay that only draws an image
+
+        Args:
+            None
+        
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Initialise an overlay that only has shapes
+        #Load image
+        im = np.random.random((300, 300))
+        #Remove old layer
+        self.napariViewer.layers.remove(self.layer)
+        # new layer with polygons and text
+        self.layer = self.napariViewer.add_image(im,scale=self.layer_scale)
+        
+    #Update an overlay that shows an image
+    def drawImageOverlay(self,im=np.zeros((300,300))):
+        &#34;&#34;&#34;
+        Running loop to draw an image as napari overlay. Requires imageOverlay_init to be ran beforehand
+
+        Parameters:
+            im (numpy.ndarray): The image to be overlaid. Default is np.zeros((300, 300)).
+
+        Returns:
+            None
+        &#34;&#34;&#34;
+        #Remove the old image
+        self.layer.data = np.ones(np.shape(self.layer.data))
+        #Update the image
+        self.layer.data = im
+        
+    def destroy(self):
+        &#34;&#34;&#34;
+        Deletes the instance of the class.
+        &#34;&#34;&#34;
+        del self</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="AnalysisClass.napariOverlay.changeName"><code class="name flex">
+<span>def <span class="ident">changeName</span></span>(<span>self, new_name)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Change the name of the napariOverlay</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>new_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The new name for the napariOverlay.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def changeName(self,new_name):
+    &#34;&#34;&#34;
+    Change the name of the napariOverlay
+
+    Args:
+        new_name (str): The new name for the napariOverlay.
+
+    Returns:
+        None
+    &#34;&#34;&#34;
+    self.layer_name = new_name
+    self.layer.name = self.layer_name
+    #Return the layer</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.destroy"><code class="name flex">
+<span>def <span class="ident">destroy</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Deletes the instance of the class.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def destroy(self):
+    &#34;&#34;&#34;
+    Deletes the instance of the class.
+    &#34;&#34;&#34;
+    del self</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.drawImageOverlay"><code class="name flex">
+<span>def <span class="ident">drawImageOverlay</span></span>(<span>self, im=array([[0., 0., 0., ..., 0., 0., 0.],
+[0., 0., 0., ..., 0., 0., 0.],
+[0., 0., 0., ..., 0., 0., 0.],
+...,
+[0., 0., 0., ..., 0., 0., 0.],
+[0., 0., 0., ..., 0., 0., 0.],
+[0., 0., 0., ..., 0., 0., 0.]]))</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Running loop to draw an image as napari overlay. Requires imageOverlay_init to be ran beforehand</p>
+<h2 id="parameters">Parameters</h2>
+<p>im (numpy.ndarray): The image to be overlaid. Default is np.zeros((300, 300)).</p>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drawImageOverlay(self,im=np.zeros((300,300))):
+    &#34;&#34;&#34;
+    Running loop to draw an image as napari overlay. Requires imageOverlay_init to be ran beforehand
+
+    Parameters:
+        im (numpy.ndarray): The image to be overlaid. Default is np.zeros((300, 300)).
+
+    Returns:
+        None
+    &#34;&#34;&#34;
+    #Remove the old image
+    self.layer.data = np.ones(np.shape(self.layer.data))
+    #Update the image
+    self.layer.data = im</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.drawShapesOverlay"><code class="name flex">
+<span>def <span class="ident">drawShapesOverlay</span></span>(<span>self, shapePosList=[[0, 0], [0, 10], [10, 10], [10, 0]], shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black'])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Running loop to draw arbitrary-shaped polygon shapes. Requires shapesOverlay_init to be ran beforehand</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>shapePosList</code></strong> :&ensp;<code>List[List[float]]</code></dt>
+<dd>A list of shape positions. A [[x1-1,y1-1],[x1-2,y1-2],&hellip;],[[x2-1,y2-1],[x2-2,y2-2],&hellip;] array of size [n,2,m], drawing m shapes with n points each. Default is [[0,0],[0,10],[10,10],[10,0]].</dd>
+<dt><strong><code>shapeCol</code></strong> :&ensp;<code>List[Union[str, Tuple[float, float, float]]]</code></dt>
+<dd>A list of shape colors. Default is ['black'].</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = [&#39;black&#39;]):
+    &#34;&#34;&#34;
+    Running loop to draw arbitrary-shaped polygon shapes. Requires shapesOverlay_init to be ran beforehand
+
+    Args:
+        shapePosList (List[List[float]]): A list of shape positions. A [[x1-1,y1-1],[x1-2,y1-2],...],[[x2-1,y2-1],[x2-2,y2-2],...] array of size [n,2,m], drawing m shapes with n points each. Default is [[0,0],[0,10],[10,10],[10,0]].
+        shapeCol (List[Union[str, Tuple[float, float, float]]]): A list of shape colors. Default is [&#39;black&#39;].
+
+    Returns:
+        None
+    &#34;&#34;&#34;
+    #Update the shapes
+    polygons = []
+    for p in range((shapePosList.shape[2])):
+        polygons.append(shapePosList[:,:,p])
+    #Remove the old polygon
+    self.layer.data = []
+    # add the new polygon
+    if len(shapeCol) == 1:
+        self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol[0])
+    else:
+        self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.drawSquaresOverlay"><code class="name flex">
+<span>def <span class="ident">drawSquaresOverlay</span></span>(<span>self, shapePosList=[[0, 0, 10, 10]], shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black'])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Running loop to draw/update and overlay with one or multiple rectangles. Requires shapesOverlay_init to be ran beforehand</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>shapePosList</code></strong> :&ensp;<code>List[List[int]]</code></dt>
+<dd>A list of shape positions in the format [[x, y, w, h], [x, y, w, h], &hellip;].
+Default is [[0, 0, 10, 10]].</dd>
+<dt><strong><code>shapeCol</code></strong> :&ensp;<code>List[Union[str, Tuple[float, float, float]]]</code></dt>
+<dd>A single entry or an array with the same size as shapePosList.
+Default is ['black'].</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = [&#39;black&#39;]):
+    &#34;&#34;&#34;
+    Running loop to draw/update and overlay with one or multiple rectangles. Requires shapesOverlay_init to be ran beforehand
+
+    Args:
+        shapePosList (List[List[int]]): A list of shape positions in the format [[x, y, w, h], [x, y, w, h], ...].
+            Default is [[0, 0, 10, 10]].
+        shapeCol (List[Union[str, Tuple[float, float, float]]]): A single entry or an array with the same size as shapePosList.
+            Default is [&#39;black&#39;].
+
+    Returns:
+        None
+    &#34;&#34;&#34;        
+    #Update the shapes
+    polygons = []
+    for p in range(len(shapePosList)):
+        polygons.append(np.array([[shapePosList[p][0], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]], [shapePosList[p][0]+shapePosList[p][2], shapePosList[p][1]+shapePosList[p][3]], [shapePosList[p][0], shapePosList[p][1]+shapePosList[p][3]]]))
+    #Remove the old polygon
+    self.layer.data = []
+    # add the new polygon
+    if len(shapeCol) == 1:
+        self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol[0])
+    else:
+        self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=shapeCol)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.drawTextOverlay"><code class="name flex">
+<span>def <span class="ident">drawTextOverlay</span></span>(<span>self, text='', pos=[0, 0], textCol='red', textSize=8)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Running loop to draw/update the text overlay. Requires drawTextOverlay_init to be ran beforehand</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>text</code></strong> :&ensp;<code>str</code></dt>
+<dd>The text to be displayed on the overlay. Defaults to an empty string.</dd>
+<dt>pos ([int of size (2,1)]): The position of the overlay on the image. Defaults to [0, 0].</dt>
+<dt><strong><code>textCol</code></strong> :&ensp;<code>str</code></dt>
+<dd>The color of the text. Defaults to 'red'.</dd>
+<dt><strong><code>textSize</code></strong> :&ensp;<code>int</code></dt>
+<dd>The size of the text. Defaults to 8.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drawTextOverlay(self,text=&#39;&#39;,pos=[0,0],textCol=&#39;red&#39;,textSize=8):
+    &#34;&#34;&#34;
+    Running loop to draw/update the text overlay. Requires drawTextOverlay_init to be ran beforehand
+
+    Args:
+        text (str): The text to be displayed on the overlay. Defaults to an empty string.
+        pos ([int of size (2,1)]): The position of the overlay on the image. Defaults to [0, 0].
+        textCol (str): The color of the text. Defaults to &#39;red&#39;.
+        textSize (int): The size of the text. Defaults to 8.
+
+    Returns:
+        None
+    &#34;&#34;&#34;
+    # Update the properties - this contains the text
+    new_properties = {&#39;text&#39;: [text]}
+    self.layer.properties = new_properties
+    #update the polygon - this contains the position
+    pseudo_size = 0.1
+    polygons = [np.array([[pos[0], pos[1]], [pos[0]+pseudo_size, pos[1]], [pos[0]+pseudo_size, pos[1]+pseudo_size], [pos[0], pos[1]+pseudo_size]])]
+    #Remove the old polygon
+    self.layer.data = []
+    # add the new polygon
+    self.layer.add(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,)
+    #Update the text surrounding the invisible shape
+    text_properties = {&#39;text&#39;: &#39;{text}&#39;,&#39;anchor&#39;: &#39;upper_left&#39;,&#39;translation&#39;: [0, 0],&#39;size&#39;: textSize,&#39;color&#39;: textCol}
+    self.layer.text = text_properties</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.drawTextOverlay_init"><code class="name flex">
+<span>def <span class="ident">drawTextOverlay_init</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Initializes the text overlay for drawing text on the napari viewer.</p>
+<h2 id="args">Args</h2>
+<p>None</p>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drawTextOverlay_init(self):
+    &#34;&#34;&#34;
+    Initializes the text overlay for drawing text on the napari viewer.
+
+    Args:
+        None
+    
+    Returns:
+        None
+    &#34;&#34;&#34;
+    polygons = [np.array([[0, 0], [0, 1], [1, 1], [1, 0]])]
+    # create properties
+    properties = {&#39;value&#39;: [0]}
+    text_properties = {&#39;text&#39;: &#39;{value:0.1f}&#39;,&#39;anchor&#39;: &#39;upper_left&#39;,&#39;translation&#39;: [-5, 0],&#39;size&#39;: 8,&#39;color&#39;: &#39;green&#39;,}
+    #Remove old layer
+    napariViewer.layers.remove(self.layer)
+    # new layer with polygons and text
+    self.layer = napariViewer.add_shapes(polygons,properties=properties,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,text=text_properties,name=self.layer_name,scale=self.layer_scale,)
+    # change some properties of the layer
+    self.layer.opacity = 1</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.getLayer"><code class="name flex">
+<span>def <span class="ident">getLayer</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns the layer attribute of the object.</p>
+<h2 id="args">Args</h2>
+<p>None</p>
+<h2 id="returns">Returns</h2>
+<p>layer (object or None): The layer attribute of the object if it exists, None otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def getLayer(self):
+    &#34;&#34;&#34;
+    Returns the layer attribute of the object.
+
+    Args:
+        None
+
+    Returns:
+        layer (object or None): The layer attribute of the object if it exists, None otherwise.
+    &#34;&#34;&#34;
+    if hasattr(self, &#39;layer&#39;):
+        return self.layer
+    else:
+        return None</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.imageOverlay_init"><code class="name flex">
+<span>def <span class="ident">imageOverlay_init</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Initialize a napari overlay that only draws an image</p>
+<h2 id="args">Args</h2>
+<p>None</p>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def imageOverlay_init(self):
+    &#34;&#34;&#34;
+    Initialize a napari overlay that only draws an image
+
+    Args:
+        None
+    
+    Returns:
+        None
+    &#34;&#34;&#34;
+    #Initialise an overlay that only has shapes
+    #Load image
+    im = np.random.random((300, 300))
+    #Remove old layer
+    self.napariViewer.layers.remove(self.layer)
+    # new layer with polygons and text
+    self.layer = self.napariViewer.add_image(im,scale=self.layer_scale)</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.napariOverlay.shapesOverlay_init"><code class="name flex">
+<span>def <span class="ident">shapesOverlay_init</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Initialise an overlay that only draws shapes.</p>
+<h2 id="args">Args</h2>
+<p>None</p>
+<h2 id="returns">Returns</h2>
+<p>None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def shapesOverlay_init(self):
+    &#34;&#34;&#34;
+    Initialise an overlay that only draws shapes.
+
+    Args:
+        None
+
+    Returns:
+        None
+    &#34;&#34;&#34;
+    #Initialise an overlay that only has shapes
+    #Create a single shape (polygon) and show it
+    polygons = [np.array([[225, 146], [283, 146], [283, 211], [225, 211]])]
+    #Remove old layer
+    self.napariViewer.layers.remove(self.layer)
+    # new layer with polygons and text
+    self.layer = self.napariViewer.add_shapes(polygons,shape_type=&#39;polygon&#39;,edge_color=&#39;transparent&#39;,face_color=&#39;transparent&#39;,name=self.layer_name,scale=self.layer_scale)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="AnalysisClass.create_analysis_thread" href="#AnalysisClass.create_analysis_thread">create_analysis_thread</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="AnalysisClass.AnalysisThread" href="#AnalysisClass.AnalysisThread">AnalysisThread</a></code></h4>
+<ul class="">
+<li><code><a title="AnalysisClass.AnalysisThread.analysis_done_signal" href="#AnalysisClass.AnalysisThread.analysis_done_signal">analysis_done_signal</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.calcAnalysisAvgGrayValue" href="#AnalysisClass.AnalysisThread.calcAnalysisAvgGrayValue">calcAnalysisAvgGrayValue</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.calcCellSegmentOverlay" href="#AnalysisClass.AnalysisThread.calcCellSegmentOverlay">calcCellSegmentOverlay</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.calcGrayValueOverlay" href="#AnalysisClass.AnalysisThread.calcGrayValueOverlay">calcGrayValueOverlay</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.destroy" href="#AnalysisClass.AnalysisThread.destroy">destroy</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.getLayer" href="#AnalysisClass.AnalysisThread.getLayer">getLayer</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.initAvgGrayValueText" href="#AnalysisClass.AnalysisThread.initAvgGrayValueText">initAvgGrayValueText</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.initCellSegmentOverlay" href="#AnalysisClass.AnalysisThread.initCellSegmentOverlay">initCellSegmentOverlay</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.initGrayScaleImageOverlay" href="#AnalysisClass.AnalysisThread.initGrayScaleImageOverlay">initGrayScaleImageOverlay</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.initRandomOverlay" href="#AnalysisClass.AnalysisThread.initRandomOverlay">initRandomOverlay</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.initialise_napariLayer" href="#AnalysisClass.AnalysisThread.initialise_napariLayer">initialise_napariLayer</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.outlineCoordinatesToImage" href="#AnalysisClass.AnalysisThread.outlineCoordinatesToImage">outlineCoordinatesToImage</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.run" href="#AnalysisClass.AnalysisThread.run">run</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.runAnalysis" href="#AnalysisClass.AnalysisThread.runAnalysis">runAnalysis</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.stop" href="#AnalysisClass.AnalysisThread.stop">stop</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.update_napariLayer" href="#AnalysisClass.AnalysisThread.update_napariLayer">update_napariLayer</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.visualiseAvgGrayValueText" href="#AnalysisClass.AnalysisThread.visualiseAvgGrayValueText">visualiseAvgGrayValueText</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.visualiseCellSegmentOverlay" href="#AnalysisClass.AnalysisThread.visualiseCellSegmentOverlay">visualiseCellSegmentOverlay</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.visualiseGrayScaleImageOverlay" href="#AnalysisClass.AnalysisThread.visualiseGrayScaleImageOverlay">visualiseGrayScaleImageOverlay</a></code></li>
+<li><code><a title="AnalysisClass.AnalysisThread.visualiseRandomOverlay" href="#AnalysisClass.AnalysisThread.visualiseRandomOverlay">visualiseRandomOverlay</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="AnalysisClass.napariOverlay" href="#AnalysisClass.napariOverlay">napariOverlay</a></code></h4>
+<ul class="">
+<li><code><a title="AnalysisClass.napariOverlay.changeName" href="#AnalysisClass.napariOverlay.changeName">changeName</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.destroy" href="#AnalysisClass.napariOverlay.destroy">destroy</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.drawImageOverlay" href="#AnalysisClass.napariOverlay.drawImageOverlay">drawImageOverlay</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.drawShapesOverlay" href="#AnalysisClass.napariOverlay.drawShapesOverlay">drawShapesOverlay</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.drawSquaresOverlay" href="#AnalysisClass.napariOverlay.drawSquaresOverlay">drawSquaresOverlay</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.drawTextOverlay" href="#AnalysisClass.napariOverlay.drawTextOverlay">drawTextOverlay</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.drawTextOverlay_init" href="#AnalysisClass.napariOverlay.drawTextOverlay_init">drawTextOverlay_init</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.getLayer" href="#AnalysisClass.napariOverlay.getLayer">getLayer</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.imageOverlay_init" href="#AnalysisClass.napariOverlay.imageOverlay_init">imageOverlay_init</a></code></li>
+<li><code><a title="AnalysisClass.napariOverlay.shapesOverlay_init" href="#AnalysisClass.napariOverlay.shapesOverlay_init">shapesOverlay_init</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.10.0</a>.</p>
+</footer>
+</body>
+</html>

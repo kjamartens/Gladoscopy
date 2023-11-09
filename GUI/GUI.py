@@ -22,8 +22,6 @@ class Shared_data:
         liveModeChanged()
 
 
-
-
 if __name__ == "__main__":
     # Create an instance of the shared_data class
     shared_data = Shared_data()

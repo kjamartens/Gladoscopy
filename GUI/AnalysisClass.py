@@ -6,7 +6,7 @@ from napari.qt import thread_worker
 import time
 import queue
 from PyQt5.QtWidgets import QMainWindow
-from pycromanager import core
+from pycromanager import Core
 from magicgui import magicgui
 from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
@@ -17,6 +17,7 @@ from stardist.models import StarDist2D
 from PIL import Image, ImageDraw
 
 sys.path.append('AutonomousMicroscopy')
+sys.path.append('AutonomousMicroscopy/MainScripts')
 #Import all scripts in the custom script folders
 from CellSegmentScripts import * #type: ignore
 from CellScoringScripts import * #type: ignore
@@ -28,6 +29,16 @@ import HelperFunctions  #type: ignore
 #Class for overlays and their update and such
 class napariOverlay():
     def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer'):
+        """
+        Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
+
+        Args:
+            napariViewer (napari.Viewer): The napari viewer object.
+            layer_name (Union[str, None], optional): The name of the layer. Defaults to 'new Layer'.
+
+        Returns:
+            None
+        """
         self.napariViewer = napariViewer
         self.layer_name = layer_name
         try:
@@ -41,11 +52,45 @@ class napariOverlay():
         
     #Update the name of the overlay
     def changeName(self,new_name):
+        """
+        Change the name of the napariOverlay
+
+        Args:
+            new_name (str): The new name for the napariOverlay.
+
+        Returns:
+            None
+        """
         self.layer_name = new_name
         self.layer.name = self.layer_name
-    
+        #Return the layer
+        
+    def getLayer(self):
+        """
+        Returns the layer attribute of the object.
+
+        Args:
+            None
+
+        Returns:
+            layer (object or None): The layer attribute of the object if it exists, None otherwise.
+        """
+        if hasattr(self, 'layer'):
+            return self.layer
+        else:
+            return None
+        
     #Initialise drawing a text overly (single string of text)
     def drawTextOverlay_init(self):
+        """
+        Initializes the text overlay for drawing text on the napari viewer.
+
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         polygons = [np.array([[0, 0], [0, 1], [1, 1], [1, 0]])]
         # create properties
         properties = {'value': [0]}
@@ -59,6 +104,18 @@ class napariOverlay():
     
     #Update routine for drawing a text overly (single string of text)
     def drawTextOverlay(self,text='',pos=[0,0],textCol='red',textSize=8):
+        """
+        Running loop to draw/update the text overlay. Requires drawTextOverlay_init to be ran beforehand
+
+        Args:
+            text (str): The text to be displayed on the overlay. Defaults to an empty string.
+            pos ([int of size (2,1)]): The position of the overlay on the image. Defaults to [0, 0].
+            textCol (str): The color of the text. Defaults to 'red'.
+            textSize (int): The size of the text. Defaults to 8.
+
+        Returns:
+            None
+        """
         # Update the properties - this contains the text
         new_properties = {'text': [text]}
         self.layer.properties = new_properties
@@ -75,6 +132,15 @@ class napariOverlay():
         
     #Initialise an overlay that only has shapes
     def shapesOverlay_init(self):
+        """
+        Initialise an overlay that only draws shapes.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         #Initialise an overlay that only has shapes
         #Create a single shape (polygon) and show it
         polygons = [np.array([[225, 146], [283, 146], [283, 211], [225, 211]])]
@@ -85,9 +151,18 @@ class napariOverlay():
     
     #Update routine for an overlay that only has shapes
     def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
-        #ShapePosList should be a [[x,y,w,h],[x,y,w,h],...] array
-        #ShapeCol should be a single entry or an array with same size as shapeposlist
-        
+        """
+        Running loop to draw/update and overlay with one or multiple rectangles. Requires shapesOverlay_init to be ran beforehand
+
+        Args:
+            shapePosList (List[List[int]]): A list of shape positions in the format [[x, y, w, h], [x, y, w, h], ...].
+                Default is [[0, 0, 10, 10]].
+            shapeCol (List[Union[str, Tuple[float, float, float]]]): A single entry or an array with the same size as shapePosList.
+                Default is ['black'].
+
+        Returns:
+            None
+        """        
         #Update the shapes
         polygons = []
         for p in range(len(shapePosList)):
@@ -103,9 +178,16 @@ class napariOverlay():
     
     #Update routine for an overlay that only has shapes
     def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
-        #Draw true polygon shapes
-        #Expected input shapePosList: a [[x1-1,y1-1],[x1-2,y1-2],...],[[x2-1,y2-1],[x2-2,y2-2],...] array of size [n,2,m], drawing m shapes with n points each
-        
+        """
+        Running loop to draw arbitrary-shaped polygon shapes. Requires shapesOverlay_init to be ran beforehand
+
+        Args:
+            shapePosList (List[List[float]]): A list of shape positions. A [[x1-1,y1-1],[x1-2,y1-2],...],[[x2-1,y2-1],[x2-2,y2-2],...] array of size [n,2,m], drawing m shapes with n points each. Default is [[0,0],[0,10],[10,10],[10,0]].
+            shapeCol (List[Union[str, Tuple[float, float, float]]]): A list of shape colors. Default is ['black'].
+
+        Returns:
+            None
+        """
         #Update the shapes
         polygons = []
         for p in range((shapePosList.shape[2])):
@@ -118,15 +200,17 @@ class napariOverlay():
         else:
             self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
     
-    #Return the layer
-    def getLayer(self):
-        if hasattr(self, 'layer'):
-            return self.layer
-        else:
-            return None
-    
     #Initialise an overlay that only shows an image
     def imageOverlay_init(self):
+        """
+        Initialize a napari overlay that only draws an image
+
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         #Initialise an overlay that only has shapes
         #Load image
         im = np.random.random((300, 300))
@@ -136,13 +220,25 @@ class napariOverlay():
         self.layer = self.napariViewer.add_image(im,scale=self.layer_scale)
         
     #Update an overlay that shows an image
-    def drawImageOverlay(self,im):
+    def drawImageOverlay(self,im=np.zeros((300,300))):
+        """
+        Running loop to draw an image as napari overlay. Requires imageOverlay_init to be ran beforehand
+
+        Parameters:
+            im (numpy.ndarray): The image to be overlaid. Default is np.zeros((300, 300)).
+
+        Returns:
+            None
+        """
         #Remove the old image
         self.layer.data = np.ones(np.shape(self.layer.data))
         #Update the image
         self.layer.data = im
         
     def destroy(self):
+        """
+        Deletes the instance of the class.
+        """
         del self
         
 #This code gets some image and does some analysis on this
@@ -152,11 +248,22 @@ class AnalysisThread(QThread):
     analysis_done_signal = pyqtSignal(object)
     
     def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random'):
+        """
+        Initializes the AnalysisThread object.
+
+        Args:
+            shared_data: The shared data object. See Shared_data class for more information
+            analysisInfo (Union[str, None]): Optional. The analysis 'title/method'. Default is 'Random'.
+            visualisationInfo (Union[str, None]): Optional. The visualisation 'title/method'. Default is 'Random'.
+
+        Returns:
+        None
+        """
         super().__init__()	
         self.is_running = True
         self.analysis_ongoing = False
         self.shared_data = shared_data
-        self.analysisInfo=analysisInfo
+        self.analysisInfo = analysisInfo
         self.visualisationInfo = visualisationInfo
         self.napariViewer = shared_data.napariViewer
         if self.analysisInfo == 'CellSegmentOverlay':
@@ -174,6 +281,15 @@ class AnalysisThread(QThread):
                 self.initialise_napariLayer()
     
     def run(self):
+        """
+        Runs the function in a loop as long as `self.is_running` is True.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         while self.is_running:
             #Run analysis on the image from the queue
             self.analysis_result = self.runAnalysis(image_queue_analysis.get())
@@ -181,29 +297,64 @@ class AnalysisThread(QThread):
             self.finished.emit()
     
     def stop(self):
+        """
+        Stops the execution of the function
+        """
         self.is_running = False
     
     def destroy(self):
+        """
+        Destroy the object.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         try:
             print('Destroying '+str(self.analysisInfo))
         except:
             print('Destroying some analysis thread')
         self.stop()
-        # self.analysis_done_signal.disconnect(self.update_napariLayer)
-        # self.analysisInfo = None
         #Wait for the thread to be finished
-        # self.napariOverlay.destroy()
         self.quit()
         self.wait()
         self.deleteLater()
     
     #Get corresponding layer of napariOverlay
     def getLayer(self):
+        """
+        Obtain the napari overlay layer (napariOverlay class) associated with this analysisThread
+        
+        Args:
+            None
+
+        Returns:
+            napari.layers.Layer: The layer associated with the napari overlay.
+        """
         return self.napariOverlay.getLayer()
     
     #Analysis is split into two parts: obtaining the analysis result and displaying this.
     #Here, we calculate the analysis result based on the analysisInfo
     def runAnalysis(self,image): 
+        """
+        Runs the analysis on the given image based on the analysis information provided.
+
+        Args:
+            image (Image): The image on which the analysis needs to be performed.
+
+        Returns:
+            analysisResult (Any): The result of the analysis. The analysis result will be passed to Visualise_Analysis_results.
+
+        Notes:
+            - The layer should be open before running the analysis.
+            - The analysisInfo parameter should be set before calling this function.
+            - If analysisInfo is 'AvgGrayValueText', the analysisResult will be the result of calcAnalysisAvgGrayValue.
+            - If analysisInfo is 'GrayValueOverlay', the analysisResult will be the result of calcGrayValueOverlay.
+            - If analysisInfo is 'CellSegmentOverlay', the analysisResult will be the result of calcCellSegmentOverlay.
+            - If analysisInfo is not set or is invalid, the analysisResult will be None.
+        """
         #Maybe add here that the layer should also be open?
         if self.analysisInfo is not None:
             print('layer running analysis')
@@ -220,7 +371,7 @@ class AnalysisThread(QThread):
         else:
             return None
 
-    #And here we perform the visualisation - can be fully separate from performing tha analysis
+    #And here we perform the visualisation - can be fully separate from performing the analysis
     #Initialisation is called upon creation
     def initialise_napariLayer(self):
         if self.visualisationInfo == 'AvgGrayValueText':
