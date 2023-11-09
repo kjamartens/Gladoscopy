@@ -28,19 +28,27 @@ import HelperFunctions  #type: ignore
 
 #Class for overlays and their update and such
 class napariOverlay():
-    def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer'):
+    def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer',colormap='gray',opacity=1,visible=True,blending='opaque',):
         """
         Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
 
         Args:
             napariViewer (napari.Viewer): The napari viewer object.
             layer_name (Union[str, None], optional): The name of the layer. Defaults to 'new Layer'.
+            colormap (str, optional): The colormap to use. Defaults to 'gray'.
+            opacity (float, optional): The opacity of the layer. Defaults to 1.
+            visible (bool, optional): Whether the layer is visible. Defaults to True.
+            blending (str, optional): The blending mode. Defaults to 'opaque', options are {'opaque', 'translucent', and 'additive'}
 
         Returns:
             None
         """
         self.napariViewer = napariViewer
         self.layer_name = layer_name
+        self.colormap = colormap
+        self.opacity = opacity
+        self.visible = visible
+        self.blending = blending
         try:
             self.layer_scale = napariViewer.layers[0].scale
         except:
@@ -98,9 +106,7 @@ class napariOverlay():
         #Remove old layer
         napariViewer.layers.remove(self.layer)
         # new layer with polygons and text
-        self.layer = napariViewer.add_shapes(polygons,properties=properties,shape_type='polygon',edge_color='transparent',face_color='transparent',text=text_properties,name=self.layer_name,scale=self.layer_scale,)
-        # change some properties of the layer
-        self.layer.opacity = 1
+        self.layer = napariViewer.add_shapes(polygons,properties=properties,shape_type='polygon',edge_color='transparent',face_color='transparent',text=text_properties,name=self.layer_name,scale=self.layer_scale,opacity = self.opacity,visible=self.visible)
     
     #Update routine for drawing a text overly (single string of text)
     def drawTextOverlay(self,text='',pos=[0,0],textCol='red',textSize=8):
@@ -125,7 +131,7 @@ class napariOverlay():
         #Remove the old polygon
         self.layer.data = []
         # add the new polygon
-        self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',)
+        self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',opacity = self.opacity,visible=self.visible,blending=self.blending)
         #Update the text surrounding the invisible shape
         text_properties = {'text': '{text}','anchor': 'upper_left','translation': [0, 0],'size': textSize,'color': textCol}
         self.layer.text = text_properties
@@ -147,7 +153,7 @@ class napariOverlay():
         #Remove old layer
         self.napariViewer.layers.remove(self.layer)
         # new layer with polygons and text
-        self.layer = self.napariViewer.add_shapes(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',name=self.layer_name,scale=self.layer_scale)
+        self.layer = self.napariViewer.add_shapes(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',name=self.layer_name,scale=self.layer_scale,opacity = self.opacity,visible=self.visible)
     
     #Update routine for an overlay that only has shapes
     def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
@@ -201,23 +207,30 @@ class napariOverlay():
             self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
     
     #Initialise an overlay that only shows an image
-    def imageOverlay_init(self):
+    def imageOverlay_init(self,opacity=None,visible=None,blending=None,colormap=None):
         """
         Initialize a napari overlay that only draws an image
 
         Args:
-            None
+            opacity (float, optional): The opacity of the layer. If None, the value will be taken from self.opacity.
+            visible (bool, optional): Whether the layer is visible. If None, the value will be taken from self.visible.
+            blending (str, optional): The blending mode. If None, the value will be taken from self.blending.
+            colormap (str, optional): The colormap to use. If None, the value will be taken from self.colormap.
         
         Returns:
             None
         """
-        #Initialise an overlay that only has shapes
+        # Assign values from self if the corresponding argument is None
+        self.opacity = self.opacity if opacity is None else opacity
+        self.visible = self.visible if visible is None else visible
+        self.blending = self.blending if blending is None else blending
+        self.colormap = self.colormap if colormap is None else colormap
         #Load image
         im = np.random.random((300, 300))
         #Remove old layer
         self.napariViewer.layers.remove(self.layer)
         # new layer with polygons and text
-        self.layer = self.napariViewer.add_image(im,scale=self.layer_scale)
+        self.layer = self.napariViewer.add_image(im,scale=self.layer_scale,opacity = self.opacity,visible=self.visible,blending=self.blending,colormap=self.colormap)
         
     #Update an overlay that shows an image
     def drawImageOverlay(self,im=np.zeros((300,300))):
@@ -268,6 +281,7 @@ class AnalysisThread(QThread):
         self.napariViewer = shared_data.napariViewer
         if self.analysisInfo == 'CellSegmentOverlay':
             storageloc = './AutonomousMicroscopy/ExampleData/StarDistModel'
+            # storageloc = './AutonomousMicroscopy/ExampleData/StarDist_hfx_20220823'
             modelDirectory = storageloc.rsplit('/', 1)
             #Load the model - better to do this out of the loop for time reasons
             self.stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
@@ -474,7 +488,7 @@ class AnalysisThread(QThread):
         
     def initCellSegmentOverlay(self):
         # self.napariOverlay.shapesOverlay_init()
-        self.napariOverlay.imageOverlay_init()
+        self.napariOverlay.imageOverlay_init(blending='additive',opacity=0.5,colormap='red')
         self.napariOverlay.changeName('Cell Segment Overlay')
         
 def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = None,visualisationInfo = None):

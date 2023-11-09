@@ -45,13 +45,13 @@ if __name__ == "__main__":
         runAutonomousMicroscopyUI(core,MM_JSON,window)
 
         #Get a new basic UI in a new tab
-        tab_MMcontrol = window.findChild(QWidget, "tab_MMControls")
+        # tab_MMcontrol = window.findChild(QWidget, "tab_MMControls")
         #Create a layout in this
-        main_layout = QVBoxLayout(tab_MMcontrol) #type: ignore
-        microManagerControlsUI(core,MM_JSON,main_layout)
+        # main_layout = QVBoxLayout(tab_MMcontrol) #type: ignore
+        # microManagerControlsUI(core,MM_JSON,main_layout)
 
         #Create the napari UI
-        runNapariMicroManager(core,MM_JSON,shared_data)
+        # runNapariMicroManager(core,MM_JSON,shared_data)
 
         #Show window and start app
         #Breakpoint here for useful debugging
