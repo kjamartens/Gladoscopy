@@ -1,5 +1,6 @@
 from napariGlados import liveModeChanged
 from PyQt5.QtCore import QTimer
+import logging
 
 """_summary_
 
@@ -48,7 +49,7 @@ class Shared_data:
             self.on_analysisThreads_value_change()
     
     def on_analysisThreads_value_change(self):
-        print('Analysis Threads now: '+str(self._analysisThreads))
+        logging.debug('Analysis Threads now: '+str(self._analysisThreads))
         removed_entry = None
         if len(self._analysisThreads) < len(self.analysisThreads):
             removed_entry = [entry for entry in self.analysisThreads if entry not in self._analysisThreads][0]
@@ -74,12 +75,14 @@ class Shared_data:
             self._liveImageQueues = new_value
             self.on_liveImageQueues_value_change()
     def on_liveImageQueues_value_change(self):
-        print('liveImageQueues changed')
+        logging.debug('liveImageQueues changed')
 
 class periodicallyUpdate:
-    def __init__(self,updateFunction,timing = 5000):
+    def __init__(self,updateFunction,timing = 10000):
+        logging.debug('Initted periodically update with function %s', updateFunction)
         # Create a QTimer to periodically update MM info
         self.timer = QTimer()
         self.timer.setInterval(timing)
         self.timer.timeout.connect(updateFunction)
         self.timer.start()
+        

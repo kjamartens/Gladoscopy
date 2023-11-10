@@ -10,6 +10,7 @@ from magicgui import magicgui
 from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+import logging
 
 from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *
@@ -40,13 +41,12 @@ def napariUpdateLive(liveImage):
     global livestate
     if livestate == False:
         return
-    # print('NapariUpdateLive Ran at time {}'.format(time.time()))
+    logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
     liveImageLayer = getLayerIdFromName('liveImage')
 
     #If it's the first liveImageLayer
     if not liveImageLayer:
         nrLayersBefore = len(napariViewer.layers)
-        print(nrLayersBefore)
         layer = napariViewer.add_image(liveImage, rendering='attenuated_mip')
         #Set correct scale - in nm
         layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
@@ -91,14 +91,6 @@ def grab_image(image, metadata,event_queue):
         for queue in shared_data.liveImageQueues:
             if queue.qsize() < 2:
                 queue.put((image))
-    # else:
-    #     #Quite the event queue if livemode is stopped
-    #     # print(event_queue)
-    #     print(event_queue.qsize())
-    #     event_queue.put(None)
-        # print(event_queue)
-        # event_queue = None
-        # print(event_queue)
     return image, metadata
 
 @thread_worker
@@ -111,13 +103,12 @@ def append_img(img_queue):
     # acq = Acquisition(directory='', name=None, show_display=False, image_process_fn = grab_image) #type:ignore
     # events = multi_d_acquisition_events(num_time_points=2, time_interval_s=0)
     while livestate:
-        #JavaBackendAcquisition is an acquisition on a different thread to not block napari
+        #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
         with JavaBackendAcquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
         # with Acquisition(directory='TempAcq_removeFolder', name='', show_display=False, image_process_fn = grab_image) as acq: #type:ignore
             events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0)
             acq.acquire(events) #type:ignore
         # # time.sleep(sleep_time)
-        print(shared_data.liveImageQueues)
         
         #Other live mode, based on snapping images at all times
         # Works if no shutter has to be switched
@@ -132,7 +123,7 @@ def append_img(img_queue):
         
         #Better live mode
         # acq.acquire(events) #type:ignore
-        print('Acq done, to following')
+        # print('Acq done, to following')
 
 @thread_worker(connect={'yielded': napariUpdateLive})
 def yield_img(img_queue):
@@ -146,13 +137,12 @@ def yield_img(img_queue):
         # get elements from queue while there is more than one element
         # playing it safe: I'm always leaving one element in the queue
         while img_queue.qsize() > 1:
-            #print("reading from queue ", img_queue.qsize())
             yield img_queue.get(block = False)
 
     # read out last remaining elements after end of acquisition
     while img_queue.qsize() > 0:
         yield img_queue.get(block = False)
-    print("acquisition done")
+    logging.debug("acquisition done")
 
 
 def liveModeChanged():
@@ -163,12 +153,14 @@ def liveModeChanged():
         stop_continuous_task = True
         #Clear the image queue
         img_queue.queue.clear()
+        logging.debug("Live mode stopped")
     else:
         livestate = True
         stop_continuous_task = False
         worker1 = append_img(img_queue)
         worker2 = yield_img(img_queue) #type:ignore
         worker1.start() #type:ignore
+        logging.debug("Live mode started")
 
 
 """ 
@@ -180,6 +172,7 @@ def getLayerIdFromName(layer_name):
     return ImageLayer
 
 def InitateNapariUI(napariViewer):
+    logging.debug("Napari UI initiated")
     #Set title, icon
     napariViewer.title="GladOS - napari"
     # Set the window icon
@@ -197,6 +190,7 @@ Napari widgets
    
 class dockWidget_fullGladosUI(QMainWindow):
     def __init__(self): 
+        logging.debug("dockWidget_fullGladosUI started")
         super().__init__()
         self.ui = Ui_CustomDockWidget()
         self.ui.setupUi(self)
@@ -209,6 +203,7 @@ class dockWidget_fullGladosUI(QMainWindow):
         
 class dockWidget_MMcontrol(QMainWindow):
     def __init__(self): 
+        logging.debug("dockWidget_MMcontrol started")
         super().__init__()
         #Add a central widget in napari
         self.central_widget = QWidget(self)
@@ -224,6 +219,7 @@ class dockWidget_MMcontrol(QMainWindow):
     
 class dockWidget_analysisThreads(QMainWindow):
     def __init__(self): 
+        logging.debug("dockWidget_analysisThreads started")
         super().__init__()
         #Add a central widget in napari
         self.central_widget = QWidget(self)
@@ -263,6 +259,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     shared_data.napariViewer = napariViewer
     
     create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=image_queue_analysis)
+    logging.debug("Live mode pseudo-analysis thread created")
     
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)

@@ -22,6 +22,7 @@ from matplotlib.figure import Figure
 import tifffile
 import time
 from PyQt5.QtCore import QTimer,QDateTime
+import logging
 
 
 
@@ -230,12 +231,12 @@ class MMConfigUI:
         devices = [devices.get(i) for i in range(devices.size())]
         device_items = []
         for device in devices:
-            print('Device: '+device)
+            logging.debug('Device: '+device)
             names = core.get_device_property_names(device)
             props = [names.get(i) for i in range(names.size())]
             property_items = []
             for prop in props:
-                print('Property',prop)
+                logging.debug('Property',prop)
                 value = core.get_property(device, prop)
                 is_read_only = core.is_property_read_only(device, prop)
                 if core.has_property_limits(device, prop):
@@ -256,7 +257,7 @@ class MMConfigUI:
                     property_items.append(
                     {"device": device, "name": prop, "value": value, "allowed": allowed}
                     )
-                    print('===>', device, prop, value, allowed)
+                    logging.debug('===>', device, prop, value, allowed)
             if len(property_items) > 0:
                 device_items.append(
                 {
@@ -301,7 +302,7 @@ class MMConfigUI:
         #Get the current ROI info
         #[x,y,width,height]
         roiv = [self.core.get_roi().x,self.core.get_roi().y,self.core.get_roi().width,self.core.get_roi().height]
-        print('roiv'+str(roiv))
+        logging.debug('ROI zoom requested, current size: '+str(roiv))
         if option == 'ZoomIn':
             #zoom in twice
             try:
@@ -315,7 +316,7 @@ class MMConfigUI:
                 #Set the new ROI size
                 self.setROI([newX,newY,newTotWidth,newTotHeight])
             except:
-                print('ZOOMING IN DIDN\'T WORK!')
+                logging.error('ZOOMING IN DIDN\'T WORK!')
         elif option == 'ZoomOut':
             #zoom in twice
             try:
@@ -329,11 +330,11 @@ class MMConfigUI:
                 #Set the new ROI size
                 self.setROI([newX,newY,newTotWidth,newTotHeight])
             except:
-                print('ZOOMING IN DIDN\'T WORK!')
+                logging.error('ZOOMING IN DIDN\'T WORK!')
     
     def setROI(self,ROIpos):
         #ROIpos should be a list of [x,y,width,height]
-        print('Zooming ROI to ' + str(ROIpos))
+        logging.debug('Zooming ROI to ' + str(ROIpos))
         try:
             if shared_data.liveMode == False:
                 self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3])
@@ -344,7 +345,7 @@ class MMConfigUI:
                 time.sleep(0.5)
                 shared_data.liveMode = True
         except:
-            print('ZOOMING DIDN\'T WORK!')
+            logging.error('ZOOMING DIDN\'T WORK!')
     
     def stagesLayout(self):
         stageLayout = QHBoxLayout()
@@ -406,7 +407,7 @@ class MMConfigUI:
         #Loop over devices
         for device in devices:
             if self.core.get_device_type(device).to_string() == devicetype:
-                print(device)
+                logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
     
@@ -458,9 +459,7 @@ class MMConfigUI:
         self.moveoneDstagesmallAmount = 10
         self.moveoneDstagelargeAmount = 100
         
-        print(amount)
-        print(np.sign(amount))
-        print((np.sign(amount)*self.moveoneDstagesmallAmount).astype(float))
+        logging.debug("moving " + selectedStage + " by " + str(amount))
         
         #Move the stage relatively
         if abs(amount) == 2:
@@ -507,6 +506,8 @@ class MMConfigUI:
     def addDropDown(self,rowLayout,config_id):
         #Create a drop-down menu:
         self.dropDownBoxes[config_id] = QComboBox()
+        #Add an empty option:
+        self.dropDownBoxes[config_id].addItem('')
         #Populate with the options:
         for i in range(self.config_groups[config_id].nrConfigs()):
             self.dropDownBoxes[config_id].addItem(self.config_groups[config_id].configName(i))
@@ -519,14 +520,26 @@ class MMConfigUI:
         rowLayout.addWidget(self.dropDownBoxes[config_id])
     
     def on_dropDownChanged(self,config_id):
+        """
+        Changes a micromanager config when a dropdown has changed
+
+        Args:
+            config_id (int): The ID of the dropdown box that triggered the event.
+
+        Returns:
+            None
+        """
         #Get the new value from the dropdown:
         newValue = self.dropDownBoxes[config_id].currentText()
-        #Get the config group name:
-        configGroupName = self.config_groups[config_id].configGroupName()
-        #Set in MM:
-        self.config_groups[config_id].core.set_config(configGroupName,newValue)
+        #Change the value if it's a true value
+        if newValue != "" and newValue != " ":
+            #Get the config group name:
+            configGroupName = self.config_groups[config_id].configGroupName()
+            #Set in MM:
+            self.config_groups[config_id].core.set_config(configGroupName,newValue)
     
     def addSlider(self,rowLayout,config_id):
+        #TODO: Add a slider in pyqt
         pass
     
     def addInputField(self,rowLayout,config_id):
@@ -534,6 +547,7 @@ class MMConfigUI:
     
     #Update a single config based on current value in MM
     def updateValuefromMM(self,config_id):
+        logging.debug("Updating value from " + self.config_groups[config_id].configGroupName())
         #Get the value of the config_id from micromanager:
         currentValue = self.config_groups[config_id].getCurrentMMValue()
         #Set the value of the dropdown to the current MM value
@@ -550,7 +564,7 @@ class MMConfigUI:
     
     #Update everything there is update-able
     def updateAllMMinfo(self):
-        print('Updating all MM info')
+        logging.debug('Updating all MM info')
         self.updateConfigsFromMM()
         self.updateXYStageInfoWidget()
         self.updateOneDstageLayout()
