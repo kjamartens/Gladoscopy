@@ -35,7 +35,8 @@ class analysisDockWidget:
     
     def startThread(self,analysisInfo):
         print('Starting analysis ' + analysisInfo)
-        create_analysis_thread(napariGlados.obtain_imageQueueAnalysis(),shared_data,analysisInfo=analysisInfo)
+        # create_analysis_thread(napariGlados.obtain_imageQueueAnalysis(),shared_data,analysisInfo=analysisInfo)
+        create_analysis_thread(shared_data,analysisInfo=analysisInfo)
         
         #Append it to the list of analysisThreads
         # shared_data.analysisThreads.append(analysis_thread)

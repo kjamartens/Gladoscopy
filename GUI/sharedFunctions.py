@@ -12,6 +12,7 @@ class Shared_data:
         self._napariViewer = None
         self._analysisThreads = []
         self._core = []
+        self._liveImageQueues = []
         
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.
@@ -45,6 +46,7 @@ class Shared_data:
         if new_value != self._analysisThreads:
             self._analysisThreads = new_value
             self.on_analysisThreads_value_change()
+    
     def on_analysisThreads_value_change(self):
         print('Analysis Threads now: '+str(self._analysisThreads))
         removed_entry = None
@@ -62,6 +64,17 @@ class Shared_data:
     def core(self, new_value):
         if new_value != self._core:
             self._core = new_value
+
+    @property
+    def liveImageQueues(self):
+        return self._liveImageQueues
+    @liveImageQueues.setter
+    def liveImageQueues(self, new_value):
+        if new_value != self._liveImageQueues:
+            self._liveImageQueues = new_value
+            self.on_liveImageQueues_value_change()
+    def on_liveImageQueues_value_change(self):
+        print('liveImageQueues changed')
 
 class periodicallyUpdate:
     def __init__(self,updateFunction,timing = 5000):

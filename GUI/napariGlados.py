@@ -86,6 +86,11 @@ def grab_image(image, metadata,event_queue):
         # event_queue.put(multi_d_acquisition_events(num_time_points = 1))
         if img_queue.qsize() < 3:
             img_queue.put((image))
+        
+        #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+        for queue in shared_data.liveImageQueues:
+            if queue.qsize() < 2:
+                queue.put((image))
     # else:
     #     #Quite the event queue if livemode is stopped
     #     # print(event_queue)
@@ -107,12 +112,12 @@ def append_img(img_queue):
     # events = multi_d_acquisition_events(num_time_points=2, time_interval_s=0)
     while livestate:
         #JavaBackendAcquisition is an acquisition on a different thread to not block napari
-        # with JavaBackendAcquisition(directory='TempAcq_removeFolder', name='', show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-        with Acquisition(directory='TempAcq_removeFolder', name='', show_display=False, image_process_fn = grab_image) as acq: #type:ignore
+        with JavaBackendAcquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
+        # with Acquisition(directory='TempAcq_removeFolder', name='', show_display=False, image_process_fn = grab_image) as acq: #type:ignore
             events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0)
             acq.acquire(events) #type:ignore
         # # time.sleep(sleep_time)
-        
+        print(shared_data.liveImageQueues)
         
         #Other live mode, based on snapping images at all times
         # Works if no shutter has to be switched
@@ -257,12 +262,13 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
     
+    create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=image_queue_analysis)
+    
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
     
     # Start separate analysis threads
     # create_analysis_thread(image_queue_analysis,shared_data,analysisInfo='AvgGrayValueText')
-    create_analysis_thread(image_queue_analysis,shared_data,analysisInfo=None)
     
     #Add widgets as wanted
     custom_widget_analysisThreads = dockWidget_analysisThreads()
