@@ -3,9 +3,17 @@ import os
 import json
 import sys
 from PyQt5.QtWidgets import QApplication
+import shutil
 
 from napariGlados import runNapariPycroManager
 from sharedFunctions import Shared_data, periodicallyUpdate
+
+
+def perform_post_closing_actions():
+    #If it's closed, delete the folder for temp live images
+    folder_path = "TempAcq_removeFolder"
+    shutil.rmtree(folder_path) 
+
 
 if __name__ == "__main__":
     # Create an instance of the shared_data class
@@ -29,6 +37,7 @@ if __name__ == "__main__":
 
     #Ensure it stays open?
     app = QApplication([])
+    app.aboutToQuit.connect(perform_post_closing_actions)
     sys.exit(app.exec_())
 
     # except:

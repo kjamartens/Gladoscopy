@@ -260,6 +260,8 @@ class AnalysisThread(QThread):
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     
+    finished = pyqtSignal()# signal to indicate that the thread has finished
+    
     def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random'):
         """
         Initializes the AnalysisThread object.
@@ -304,11 +306,17 @@ class AnalysisThread(QThread):
         Returns:
             None
         """
-        while self.is_running:
+        while not self.isInterruptionRequested():
             #Run analysis on the image from the queue
             self.analysis_result = self.runAnalysis(image_queue_analysis.get())
             self.analysis_done_signal.emit(self.analysis_result)
-            self.finished.emit()
+            # self.finished.emit()
+            if self.is_running == False:
+                # self.finished.emit()
+                return
+        
+        # Thread has finished, emit the finished signal
+        self.finished.emit()
     
     def stop(self):
         """
@@ -330,11 +338,13 @@ class AnalysisThread(QThread):
             print('Destroying '+str(self.analysisInfo))
         except:
             print('Destroying some analysis thread')
-        self.stop()
         #Wait for the thread to be finished
+        self.stop()
+        self.requestInterruption()
         self.quit()
-        self.wait()
-        self.deleteLater()
+        #Officially we'd need to wait here, but that seems to start an infinite loop somewhere
+        # self.wait()
+        # self.deleteLater()
     
     #Get corresponding layer of napariOverlay
     def getLayer(self):
@@ -369,9 +379,7 @@ class AnalysisThread(QThread):
             - If analysisInfo is 'CellSegmentOverlay', the analysisResult will be the result of calcCellSegmentOverlay.
             - If analysisInfo is not set or is invalid, the analysisResult will be None.
         """
-        #Maybe add here that the layer should also be open?
         if self.analysisInfo is not None:
-            print('layer running analysis')
             #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
             if self.analysisInfo == 'AvgGrayValueText':
                 analysisResult = self.calcAnalysisAvgGrayValue(image)
@@ -498,6 +506,7 @@ def create_analysis_thread(image_queue_transfer,shared_data,analysisInfo = None,
     #Instantiate an analysis thread and add a signal
     analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo)
     analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
+    analysis_thread.finished.connect(analysis_thread.deleteLater)
     
     #Append it to the list of analysisThreads
     shared_data.analysisThreads.append(analysis_thread)

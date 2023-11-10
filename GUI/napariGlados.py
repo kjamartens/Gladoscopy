@@ -5,7 +5,7 @@ from napari.qt import thread_worker
 import time
 import queue
 from PyQt5.QtWidgets import QMainWindow
-from pycromanager import core
+from pycromanager import Core
 from magicgui import magicgui
 from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
@@ -27,7 +27,7 @@ image_queue_analysis = queue.Queue()
 analysis_done_signal = pyqtSignal(object)
 
 #Sleep time to keep responsiveness
-sleep_time = 0.1
+sleep_time = 0.05
 
 
 """
@@ -76,16 +76,24 @@ def napariUpdateLive(liveImage):
             
         
 def grab_image(image, metadata,event_queue):
-    """ image_process_fnc to grab image from uManager, clip it to central part
-        and call the fnc that will put it into the queue.
+    """ 
         Inputs: array image: image from micromanager
                 metadata from micromanager
         """
     global livestate
-    if img_queue.qsize() < 2:
-        img_queue.put((image))
-    if livestate == False:
-        event_queue.put(None)
+    if livestate:
+        # print(event_queue.qsize())
+        # event_queue.put(multi_d_acquisition_events(num_time_points = 1))
+        if img_queue.qsize() < 3:
+            img_queue.put((image))
+    # else:
+    #     #Quite the event queue if livemode is stopped
+    #     # print(event_queue)
+    #     print(event_queue.qsize())
+    #     event_queue.put(None)
+        # print(event_queue)
+        # event_queue = None
+        # print(event_queue)
     return image, metadata
 
 @thread_worker
@@ -95,12 +103,30 @@ def append_img(img_queue):
         Inputs: img_queue """
     # start microscope data acquisition
     global livestate
+    # acq = Acquisition(directory='', name=None, show_display=False, image_process_fn = grab_image) #type:ignore
+    # events = multi_d_acquisition_events(num_time_points=2, time_interval_s=0)
     while livestate:
         #JavaBackendAcquisition is an acquisition on a different thread to not block napari
-        with JavaBackendAcquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-            events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0.0)
+        # with JavaBackendAcquisition(directory='TempAcq_removeFolder', name='', show_display=False, image_process_fn = grab_image) as acq: #type:ignore
+        with Acquisition(directory='TempAcq_removeFolder', name='', show_display=False, image_process_fn = grab_image) as acq: #type:ignore
+            events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0)
             acq.acquire(events) #type:ignore
+        # # time.sleep(sleep_time)
+        
+        
+        #Other live mode, based on snapping images at all times
+        # Works if no shutter has to be switched
+        # core.snap_image()
+        # tagged_image = core.get_tagged_image()
+        # image_array = np.reshape(
+        #     tagged_image.pix,
+        #     newshape=[-1, tagged_image.tags["Height"], tagged_image.tags["Width"]],
+        # )
+        # grab_image(image_array,None,None)
         # time.sleep(sleep_time)
+        
+        #Better live mode
+        # acq.acquire(events) #type:ignore
         print('Acq done, to following')
 
 @thread_worker(connect={'yielded': napariUpdateLive})
@@ -227,7 +253,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
 
     #Napari start
     napariViewer = napari.Viewer()
-    #Add a connect event if a layer is removed - to potentially stop background processes
+    #Add a connect event if a layer is removed - to stop background processes
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
     

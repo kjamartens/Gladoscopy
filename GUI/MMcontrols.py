@@ -6,7 +6,7 @@ import sys
 import os
 # import PyQt5.QtWidgets
 import json
-from pycromanager import core
+from pycromanager import Core
 import numpy as np
 import time
 import asyncio
