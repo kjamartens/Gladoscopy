@@ -123,7 +123,7 @@ class napariOverlay():
             None
         """
         # Update the properties - this contains the text
-        new_properties = {'text': [text]}
+        new_properties = {'text': np.array([text]).astype(object)}
         self.layer.properties = new_properties
         #update the polygon - this contains the position
         pseudo_size = 0.1
@@ -131,7 +131,7 @@ class napariOverlay():
         #Remove the old polygon
         self.layer.data = []
         # add the new polygon
-        self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',opacity = self.opacity,visible=self.visible,blending=self.blending)
+        self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent')
         #Update the text surrounding the invisible shape
         text_properties = {'text': '{text}','anchor': 'upper_left','translation': [0, 0],'size': textSize,'color': textCol}
         self.layer.text = text_properties
@@ -259,7 +259,6 @@ class AnalysisThread(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
-    
     finished = pyqtSignal()# signal to indicate that the thread has finished
     def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=500):
         """
@@ -524,6 +523,7 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
     analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo,analysisQueue=image_queue_analysis)
     analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
     analysis_thread.finished.connect(analysis_thread.deleteLater)
+    analysis_thread.start()
     
     #Append it to the list of analysisThreads
     shared_data.analysisThreads.append(analysis_thread)
