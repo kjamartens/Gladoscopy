@@ -349,37 +349,11 @@ class Nodz(QtWidgets.QGraphicsView):
             itemsArea = self._getSelectionBoundingbox()
             self.fitInView(itemsArea, QtCore.Qt.KeepAspectRatio)
         else:
-            
-            # fxmin = 10000
-            # fymin = 10000
-            # fxmax = -10000
-            # fymax = -10000
-            # #Loop through all items:
-            # for item in self.scene().items():
-            #     #get the x,y,width,height:
-            #     xmin = item.scenePos().x()
-            #     ymin = item.scenePos().y()
-            #     xmax = xmin+item.boundingRect().width()
-            #     ymax = ymin+item.boundingRect().height()
-            #     if xmin < fxmin:
-            #         fxmin = xmin
-            #     if ymin < fymin:
-            #         fymin = ymin
-            #     if xmax > fxmax:
-            #         fxmax = xmax
-            #     if ymax > fymax:
-            #         fymax = ymax
-            # print((fxmin,fymin,fxmax,fymax))
-                
-            
             rect = self.scene().itemsBoundingRect() 
             center = rect.center()
             center.setX(center.x() + 400)  # Add 400 to the x-coordinate
-            itemsArea = rect.adjusted(-10, -10, 10, 10)  # Adjust the bounding rect for padding
+            itemsArea = rect.adjusted(-50, -50, 50, 50)  # Adjust the bounding rect for padding
             self.fitInView(itemsArea, QtCore.Qt.KeepAspectRatio)
-            # self.fitInView(QtCore.QRectF(fxmin,fymin,fxmax-fxmin,fymax-fymin), QtCore.Qt.KeepAspectRatio)
-            # self.setSceneRect(QtCore.QRectF(0,0,10000,10000))
-            # self.centerOn(center)
 
     def _getSelectionBoundingbox(self):
         """

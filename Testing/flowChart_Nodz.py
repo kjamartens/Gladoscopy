@@ -3,8 +3,8 @@ from PyQt5 import QtCore, QtWidgets
 import sys, os
 sys.path.append('Testing/Nodz-master')
 import nodz_main
-from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget
+from PyQt5.QtCore import Qt, QSize
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -26,8 +26,9 @@ class MainWindow(QMainWindow):
         self.graphics_view_layout = QVBoxLayout(self.graphics_view_tab)
 
         # Create a QGraphicsView
-        self.graphics_view = QGraphicsView()
-        self.graphics_view.setAlignment(Qt.AlignCenter)
+        scene = QGraphicsScene()
+        self.graphics_view = QtWidgets.QGraphicsView(scene)
+        # self.graphics_view.setAlignment(Qt.AlignCenter)
 
         # Add the QGraphicsView to the QVBoxLayout
         self.graphics_view_layout.addWidget(self.graphics_view)
@@ -52,7 +53,22 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.buttonLoad)
         # Connect the clicked signal of the button to your callback function
         self.buttonLoad.clicked.connect(self.loadInfo)
-        
+ 
+        self.last_size = QSize()
+        self.updateGraphicsViewAspectRatio()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if event.size() != self.last_size:
+            self.last_size = event.size()
+            self.updateGraphicsViewAspectRatio()
+
+    def updateGraphicsViewAspectRatio(self):
+        try:
+            nodz.setFixedSize(QSize(self.graphics_view.width(),self.graphics_view.height()))
+        except:
+            pass
+
     # Define your callback function
     def getConnections(self):
         print( nodz.evaluateGraph())
@@ -80,6 +96,8 @@ nodz = nodz_main.Nodz(window.graphics_view)
 # nodz.loadConfig(filePath='')
 nodz.initialize()
 nodz.show()
+#Needs this as init
+window.updateGraphicsViewAspectRatio()
 
 
 ######################################################################
@@ -184,7 +202,7 @@ nodz.signal_KeyPressed.connect(on_keyPressed)
 ######################################################################
 
 # Node A
-nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=QtCore.QPoint(5010,5010))
+nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=QtCore.QPoint(50010,50010))
 
 nodz.createAttribute(node=nodeA, name='Aattr1', index=-1, preset='attr_preset_1',
                      plug=True, socket=False, dataType=int)
@@ -207,7 +225,7 @@ nodz.createAttribute(node=nodeA, name='Aattr2', index=-1, preset='attr_preset_1'
 
 
 # # Node B
-nodeB = nodz.createNode(name='nodeB', preset='node_preset_1',position=QtCore.QPoint(5070,5010))
+nodeB = nodz.createNode(name='nodeB', preset='node_preset_1',position=QtCore.QPoint(50070,50010))
 
 nodz.createAttribute(node=nodeB, name='Battr1', index=-1, preset='attr_preset_1',
                      plug=True, socket=False, dataType=int)
@@ -224,7 +242,7 @@ nodz.createAttribute(node=nodeB, name='Battr\nNewline\nNewline4', index=-1, pres
 
 
 # Node C
-nodeC = nodz.createNode(name='nodeC', preset='node_preset_1',position=QtCore.QPoint(5015,5010))
+nodeC = nodz.createNode(name='nodeC', preset='node_preset_1',position=QtCore.QPoint(50015,50010))
 
 nodz.createAttribute(node=nodeC, name='Cattr1', index=-1, preset='attr_preset_1',
                      plug=False, socket=True, dataType=int)
@@ -251,7 +269,7 @@ nodz.createAttribute(node=nodeC, name='Cattr8', index=-1, preset='attr_preset_3'
                      plug=True, socket=False, dataType=int)
 
 
-nodeNew = nodz.createNode(name='New node!', preset='node_preset_1',position=QtCore.QPoint(5045,5010))
+nodeNew = nodz.createNode(name='New node!', preset='node_preset_1',position=QtCore.QPoint(50045,50010))
 
 nodz.createAttribute(node=nodeNew, name='New attribute', index=-1, preset='attr_preset_1',
                      plug=False, socket=True, dataType=int)
