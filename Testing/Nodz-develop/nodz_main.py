@@ -2951,7 +2951,7 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
         """
         super(ConnectionItem, self).__init__()
 
-        self.setZValue(1)
+        self.setZValue(99)
         self.lastSelected = False
 
         # Storage.

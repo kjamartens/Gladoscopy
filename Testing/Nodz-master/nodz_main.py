@@ -3,7 +3,9 @@ import re
 import json
 
 from PyQt5 import QtGui, QtCore, QtWidgets
-from PyQt5.QtWidgets import QLineEdit, QInputDialog
+from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox
+from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
+from PyQt5.QtCore import QRectF
 import nodz_utils as utils
 
 
@@ -398,7 +400,7 @@ class Nodz(QtWidgets.QGraphicsView):
         # end if
         bbw = bbx_max - bbx_min
         bbh = bby_max - bby_min
-        return QtCore.QRectF(QtCore.QRect(bbx_min, bby_min, bbw, bbh))
+        return QtCore.QRectF(QtCore.QRect(int(bbx_min), int(bby_min), int(bbw), int(bbh)))
 
     def _deleteSelectedNodes(self):
         """
@@ -596,7 +598,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
 
     # ATTRS
-    def createAttribute(self, node, name='default', index=-1, preset='attr_default', plug=True, socket=True, dataType=None, plugMaxConnections=-1, socketMaxConnections=1):
+    def createAttribute(self, node, name='default', index=-1, preset='attr_default', plug=True, socket=True, dataType=None, plugMaxConnections=-1, socketMaxConnections=-1):
         """
         Create a new attribute with a given name.
 
@@ -1069,7 +1071,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
     """
 
-    def __init__(self, name, alternate, preset, config):
+    def __init__(self, name, alternate, preset, config, textbox=True):
         """
         Initialize the class.
 
@@ -1107,6 +1109,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         # Methods.
         self._createStyle(config)
+        
+        self.textbox_exists = textbox
+        self.textboxheight = 200
 
     @property
     def height(self):
@@ -1115,11 +1120,23 @@ class NodeItem(QtWidgets.QGraphicsItem):
         is created.
 
         """
+        
+        nrSocketAttrs = 0
+        nrPlugAttrs = 0
+        #loop over all attrs and add to socket or plug:
+        for attr in self.attrs:
+            if self.attrsData[attr]['plug']:
+                nrPlugAttrs += 1
+            elif self.attrsData[attr]['socket']:
+                nrSocketAttrs += 1
+        
+        
         if self.attrCount > 0:
             return (self.baseHeight +
-                    self.attrHeight * self.attrCount +
+                    self.attrHeight * max(nrSocketAttrs, nrPlugAttrs) +
                     self.border +
-                    0.5 * self.radius)
+                    0.5 * self.radius + 
+                    self.textbox_exists * self.textboxheight)
         else:
             return self.baseHeight
 
@@ -1375,27 +1392,35 @@ class NodeItem(QtWidgets.QGraphicsItem):
                          QtCore.Qt.AlignCenter,
                          self.name)
 
-
-        # Attributes.
-        offset = 0
+        #Draw the textbox
+        self.drawTextbox(painter)
+        
+        # Draw the attributes.
+        offsetLeft = 0
+        offsetRight = 0
         for attr in self.attrs:
             nodzInst = self.scene().views()[0]
             config = nodzInst.config
-
-            # Attribute rect.
-            rect = QtCore.QRect(int(self.border / 2),
-                                int(self.baseHeight - self.radius + offset),
-                                int(self.baseWidth - self.border),
-                                int(self.attrHeight))
-
-
 
             attrData = self.attrsData[attr]
             name = attr
 
             preset = attrData['preset']
-
-
+            
+            xoffset = 0
+            offset = offsetLeft
+            width = (self.baseWidth - self.border)
+            if attrData['plug'] and not attrData['socket']:
+                xoffset = (self.baseWidth - self.border)/2
+                offset = offsetRight
+            if not (attrData['socket'] and attrData['plug']):
+                width /= 2
+            
+            # Attribute rect.
+            rect = QtCore.QRect(int(self.border / 2+xoffset),
+                                int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight),
+                                int(width),
+                                int(self.attrHeight))
             # Attribute base.
             self._attrBrush.setColor(utils._convertDataToColor(config[preset]['bg']))
             if self.alternate:
@@ -1426,14 +1451,40 @@ class NodeItem(QtWidgets.QGraphicsItem):
                                      rect.top(),
                                      rect.width() - 2*self.radius,
                                      rect.height())
-            painter.drawText(textRect, QtCore.Qt.AlignVCenter, name)
-            # textEdit = QLineEdit()
-            # textEdit.setText("Some text")
-            # textEdit.raise_()
-            # textEdit.setGeometry(textRect)
-            # textEdit.setAlignment(QtCore.Qt.AlignVCenter)
+            
+            halignment = QtCore.Qt.AlignLeft
+            if attrData['plug'] and not attrData['socket']:
+                halignment = QtCore.Qt.AlignRight
+            painter.drawText(textRect, halignment | QtCore.Qt.AlignVCenter, name)
+            
+            if attrData['plug'] and not attrData['socket']:
+                offsetRight += self.attrHeight
+            else:
+                offsetLeft += self.attrHeight
 
-            offset += self.attrHeight
+    def drawTextbox(self,painter):
+        # Draw rectangle
+        rectpos = [5,5,200,100]
+        painter.setBrush(QColor(200, 200, 200))
+        painter.drawRoundedRect(*rectpos,self.radius,self.radius)
+        
+        # # Draw text
+        font = QFont('Arial', 12)
+        painter.setFont(font)
+        painter.setPen(QColor(0, 0, 0))
+        
+        td = QTextDocument()
+        td.setHtml("This is a<br><span style='font-weight:bold; font-style:italic'>multiline</span> text")
+        ctx = QAbstractTextDocumentLayout.PaintContext()
+        ctx.clip = QRectF(0,0, 400, 100)
+        
+        #Move painter
+        painter.translate(rectpos[0],rectpos[1])
+        
+        td.documentLayout().draw(painter, ctx)
+        
+        #Move painter back
+        painter.translate(-rectpos[0],-rectpos[1])
 
     def mousePressEvent(self, event):
         """
@@ -1458,8 +1509,11 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         """
         
-        new_name, ok = QInputDialog.getText("Change Name", "Enter new name:")
-        print(new_name)
+        dialog = AdvancedInputDialog()
+        if dialog.exec_() == QDialog.Accepted:
+            text, combo_value = dialog.getInputs()
+            print("Text:", text)
+            print("Combo Value:", combo_value)
         
         super(NodeItem, self).mouseDoubleClickEvent(event)
         self.scene().parent().signal_NodeDoubleClicked.emit(self.name,event.pos())
@@ -1716,7 +1770,6 @@ class SlotItem(QtWidgets.QGraphicsItem):
 
         return self.mapToScene(center)
 
-
 class PlugItem(SlotItem):
 
     """
@@ -1774,10 +1827,18 @@ class PlugItem(SlotItem):
         nodzInst = self.scene().views()[0]
         config = nodzInst.config
 
+        #Find how many attributes the parentItem has that are plugs before this index:
+        nrPlugsParentBeforeThis = 0
+        for attr in self.parentItem().attrs:
+            if self.parentItem().attrs.index(attr)<self.parentItem().attrs.index(self.attribute):
+                if self.parentItem().attrsData[attr]['plug']:
+                    nrPlugsParentBeforeThis += 1
+
         x = self.parentItem().baseWidth - (width / 2.0)
         y = (self.parentItem().baseHeight - config['node_radius'] +
              self.parentItem().attrHeight / 4 +
-             self.parentItem().attrs.index(self.attribute) * self.parentItem().attrHeight)
+             nrPlugsParentBeforeThis * self.parentItem().attrHeight + 
+             self.parentItem().textbox_exists*self.parentItem().textboxheight)
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
@@ -1823,7 +1884,6 @@ class PlugItem(SlotItem):
             self.connected_slots.remove(connection.socketItem)
         # Remove connection
         self.connections.remove(connection)
-
 
 class SocketItem(SlotItem):
 
@@ -1881,11 +1941,20 @@ class SocketItem(SlotItem):
 
         nodzInst = self.scene().views()[0]
         config = nodzInst.config
+        
+        
+        #Find how many attributes the parentItem has that are sockets before this index:
+        nrSocketsParentBeforeThis = 0
+        for attr in self.parentItem().attrs:
+            if self.parentItem().attrs.index(attr)<self.parentItem().attrs.index(self.attribute):
+                if self.parentItem().attrsData[attr]['socket']:
+                    nrSocketsParentBeforeThis += 1
 
         x = - width / 2.0
         y = (self.parentItem().baseHeight - config['node_radius'] +
             (self.parentItem().attrHeight/4) +
-             self.parentItem().attrs.index(self.attribute) * self.parentItem().attrHeight )
+             nrSocketsParentBeforeThis * self.parentItem().attrHeight + 
+             self.parentItem().textbox_exists*self.parentItem().textboxheight)
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
@@ -1929,7 +1998,6 @@ class SocketItem(SlotItem):
             self.connected_slots.remove(connection.plugItem)
         # Remove connections
         self.connections.remove(connection)
-
 
 class ConnectionItem(QtWidgets.QGraphicsPathItem):
 
@@ -2136,3 +2204,32 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
         path.cubicTo(ctrl1, ctrl2, self.target_point)
 
         self.setPath(path)
+
+class AdvancedInputDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle("Advanced Input Dialog")
+        
+        # Create line edit
+        self.line_edit = QLineEdit()
+        
+        # Create combobox
+        self.combo_box = QComboBox()
+        self.combo_box.addItems(["Option 1", "Option 2", "Option 3"])
+        
+        # Create button box
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.line_edit)
+        layout.addWidget(self.combo_box)
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+        
+    def getInputs(self):
+        return self.line_edit.text(), self.combo_box.currentText()
