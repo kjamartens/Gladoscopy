@@ -1,10 +1,10 @@
 from PyQt5 import QtCore, QtWidgets
 #Add inclusion of this folder:
-import sys
+import sys, os
 sys.path.append('Testing/Nodz-master')
 import nodz_main
-from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget
-
+from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget
+from PyQt5.QtCore import Qt
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -15,15 +15,54 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout(self.central_widget)
         self.setCentralWidget(self.central_widget)
 
+        # Create a QTabWidget
+        self.tab_widget = QTabWidget()
+        self.layout.addWidget(self.tab_widget)
+
+        # Create a QWidget to hold the QGraphicsView
+        self.graphics_view_tab = QWidget()
+
+        # Create a QVBoxLayout to hold the QGraphicsView within the QWidget
+        self.graphics_view_layout = QVBoxLayout(self.graphics_view_tab)
+
         # Create a QGraphicsView
         self.graphics_view = QGraphicsView()
-        self.layout.addWidget(self.graphics_view)
+        self.graphics_view.setAlignment(Qt.AlignCenter)
+
+        # Add the QGraphicsView to the QVBoxLayout
+        self.graphics_view_layout.addWidget(self.graphics_view)
+
+        # Add the QWidget with the QGraphicsView to the QTabWidget
+        self.tab_widget.addTab(self.graphics_view_tab, 'Graphics View')
 
         # Create a QPushButton
-        self.button = QPushButton("Click Me!")
-        self.layout.addWidget(self.button)
+        self.buttonGetConnections = QPushButton("Connections")
+        self.layout.addWidget(self.buttonGetConnections)
+        # Connect the clicked signal of the button to your callback function
+        self.buttonGetConnections.clicked.connect(self.getConnections)
 
+        # Create a QPushButton
+        self.buttonSave = QPushButton("Save")
+        self.layout.addWidget(self.buttonSave)
+        # Connect the clicked signal of the button to your callback function
+        self.buttonSave.clicked.connect(self.storeInfo)
 
+        # Create a QPushButton
+        self.buttonLoad = QPushButton("Load")
+        self.layout.addWidget(self.buttonLoad)
+        # Connect the clicked signal of the button to your callback function
+        self.buttonLoad.clicked.connect(self.loadInfo)
+        
+    # Define your callback function
+    def getConnections(self):
+        print( nodz.evaluateGraph())
+
+    def storeInfo(self):
+        nodz.saveGraph(filePath='Testing'+os.sep+'GraphStore.json')
+        
+    def loadInfo(self):
+        nodz.clearGraph()
+        nodz.loadGraph(filePath='Testing'+os.sep+'GraphStore.json')
 
 app = QApplication(sys.argv)
 window = MainWindow()
@@ -31,12 +70,13 @@ window.show()
 # sys.exit(app.exec_())
 
 # try:
-#     app = QtWidgets.QApplication([])
+# app = QtWidgets.QApplication([])
 # except:
 #     # I guess we're running somewhere that already has a QApp created
 #     app = None
 global nodz
 nodz = nodz_main.Nodz(window.graphics_view)
+# nodz = nodz_main.Nodz(None)
 # nodz.loadConfig(filePath='')
 nodz.initialize()
 nodz.show()
