@@ -13,7 +13,7 @@ from sharedFunctions import Shared_data, periodicallyUpdate
 def perform_post_closing_actions():
     #If it's closed, delete the folder for temp live images
     folder_path = "TempAcq_removeFolder"
-    shutil.rmtree(folder_path) 
+    shutil.rmtree(folder_path)
 
 def main():
     #Create parser
