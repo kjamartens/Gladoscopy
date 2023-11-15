@@ -3,7 +3,7 @@ import re
 import json
 
 from PyQt5 import QtGui, QtCore, QtWidgets
-from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox
+from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
 from PyQt5.QtCore import QRectF
 import nodz_utils as utils
@@ -91,11 +91,46 @@ class Nodz(QtWidgets.QGraphicsView):
         self.scale(zoomFactor, zoomFactor)
         self.currentState = 'DEFAULT'
 
+    def contextMenuEvent(self, QMouseevent):
+        context_menu = QMenu(self)
+
+        new_acq_node_action = QAction("New Acquisition node", self)
+        new_analysis_node_action = QAction("New Analysis node", self)
+        new_scoring_node_action = QAction("New Scoring node", self)
+        new_decision_node_action = QAction("New Decision node", self)
+
+        context_menu.addAction(new_acq_node_action)
+        context_menu.addAction(new_analysis_node_action)
+        context_menu.addAction(new_scoring_node_action)
+        context_menu.addAction(new_decision_node_action)
+        
+        print(QMouseevent)
+        new_acq_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewAcqNode'))
+        new_analysis_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewAnalysisNode'))
+        new_scoring_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewScoringNode'))
+        new_decision_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewDecisionNode'))
+
+        # Show the context menu at the event's position
+        # context_menu.exec_(self.mapToScene(QMouseevent.pos()))
+        context_menu.exec_(QMouseevent.globalPos())
+        
+    def createNewNode(self,event,name):
+        print(event)
+        NodeZ = self.createNode(name=name, preset='node_preset_1', position=self.mapToScene(event.pos()))
+    
     def mousePressEvent(self, event):
         """
         Initialize tablet zoom, drag canvas and the selection.
 
         """
+        
+        #New node when pressing RightButton
+        if (event.button() == QtCore.Qt.RightButton and event.modifiers() == QtCore.Qt.NoModifier):
+            #Get a small context menu:
+            self.contextMenuEvent(event)
+            #Create a new node at mouse position
+            # nodeZ = self.createNode(name='nodeZ', preset='node_preset_1', position=self.mapToScene(event.pos()))
+        
         # Tablet zoom
         if (event.button() == QtCore.Qt.RightButton and
             event.modifiers() == QtCore.Qt.AltModifier):

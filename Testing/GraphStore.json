@@ -1,16 +1,16 @@
 {
     "CONNECTIONS": [
         [
-            "nodeC.Cattr3",
-            "nodeA.Aattr2"
+            "nodeB.Battr1",
+            "New node!.New attribute"
         ],
         [
             "New node!.Another new attribute",
             "nodeC.Cattr5"
         ],
         [
-            "nodeB.Battr1",
-            "New node!.New attribute"
+            "nodeC.Cattr3",
+            "nodeA.Aattr2"
         ]
     ],
     "NODES": {
@@ -37,7 +37,7 @@
                 }
             ],
             "position": [
-                49239.0,
+                49131.0,
                 50499.0
             ],
             "preset": "node_preset_1"
@@ -65,7 +65,7 @@
                 }
             ],
             "position": [
-                49815.0,
+                49707.0,
                 50499.0
             ],
             "preset": "node_preset_1"
@@ -111,7 +111,7 @@
                 }
             ],
             "position": [
-                48951.0,
+                48843.0,
                 50499.0
             ],
             "preset": "node_preset_1"
@@ -193,7 +193,7 @@
                 }
             ],
             "position": [
-                49527.0,
+                49419.0,
                 50499.0
             ],
             "preset": "node_preset_1"
