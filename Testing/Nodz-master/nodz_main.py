@@ -339,7 +339,12 @@ class Nodz(QtWidgets.QGraphicsView):
 
         if event.key() == QtCore.Qt.Key_S:
             self._nodeSnap = True
-
+            
+        if event.key() == QtCore.Qt.Key_T:
+            for node in self.scene().selectedItems():
+                import random
+                self.editNodeDisplayText(node, newDisplayText="NodeZZ"+str(random.randint(1, 10)))
+                
         # Emit signal.
         self.signal_KeyPressed.emit(event.key())
 
@@ -519,7 +524,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
 
     # NODES
-    def createNode(self, name='default', preset='node_default', position=None, alternate=True):
+    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None):
         """
         Create a new node with a given name, position and color.
 
@@ -549,7 +554,7 @@ class Nodz(QtWidgets.QGraphicsView):
             return
         else:
             nodeItem = NodeItem(name=name, alternate=alternate, preset=preset,
-                                config=self.config)
+                                config=self.config, displayText = displayText)
 
             # Store node in scene.
             self.scene().nodes[name] = nodeItem
@@ -634,6 +639,21 @@ class Nodz(QtWidgets.QGraphicsView):
         # Emit signal.
         self.signal_NodeEdited.emit(oldName, newName)
 
+
+    def editNodeDisplayText(self, node, newDisplayText=None):
+        """
+        Rename an existing node.
+
+        :type  node: class.
+        :param node: The node instance that you want to delete.
+
+        :type  newDisplayText: str.
+        :param newName: The new displayText for the node.
+
+        """
+        node.displayText = newDisplayText
+
+        node.update()
 
     # ATTRS
     def createAttribute(self, node, name='default', index=-1, preset='attr_default', plug=True, socket=True, dataType=None, plugMaxConnections=-1, socketMaxConnections=-1):
@@ -1111,7 +1131,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
     """
 
-    def __init__(self, name, alternate, preset, config, textbox=True):
+    def __init__(self, name, alternate, preset, config, displayText = None, textbox=True):
         """
         Initialize the class.
 
@@ -1137,6 +1157,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.alternate = alternate
         self.nodePreset = preset
         self.attrPreset = None
+        self.displayText = displayText
 
         # Attributes storage.
         self.attrs = list()
@@ -1405,6 +1426,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         Paint the node and attributes.
 
         """
+        self.painter = painter
         # Node base.
         painter.setBrush(self._brush)
         painter.setPen(self.pen)
@@ -1502,6 +1524,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
             else:
                 offsetLeft += self.attrHeight
 
+        
     def drawTextbox(self,painter):
         # Draw rectangle
         rectpos = [5,5,200,100]
@@ -1514,7 +1537,10 @@ class NodeItem(QtWidgets.QGraphicsItem):
         painter.setPen(QColor(0, 0, 0))
         
         td = QTextDocument()
-        td.setHtml("This is a<br><span style='font-weight:bold; font-style:italic'>multiline</span> text")
+        if self.displayText is not None:
+            td.setHtml("This is a<br><span style='font-weight:bold; font-style:italic'>multiline</span> text"+self.displayText)
+        else:
+            td.setHtml("No displayText defined")
         ctx = QAbstractTextDocumentLayout.PaintContext()
         ctx.clip = QRectF(0,0, 400, 100)
         
@@ -1522,6 +1548,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
         painter.translate(rectpos[0],rectpos[1])
         
         td.documentLayout().draw(painter, ctx)
+        
+        self.textbox = td
         
         #Move painter back
         painter.translate(-rectpos[0],-rectpos[1])
@@ -1549,11 +1577,18 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         """
         
+        #Open a Dialog on double click
         dialog = AdvancedInputDialog()
+        #Get the outputs from the dialog
         if dialog.exec_() == QDialog.Accepted:
             text, combo_value = dialog.getInputs()
             print("Text:", text)
             print("Combo Value:", combo_value)
+        
+        #Update the node text from this dialog output:
+        self.textbox.setHtml(text+"<br>"+combo_value) #self.textbox.toHtml()
+        #Update the drawing
+        self.update()
         
         super(NodeItem, self).mouseDoubleClickEvent(event)
         self.scene().parent().signal_NodeDoubleClicked.emit(self.name,event.pos())

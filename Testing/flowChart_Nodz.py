@@ -225,7 +225,7 @@ nodz.createAttribute(node=nodeA, name='Aattr2', index=-1, preset='attr_preset_1'
 
 
 # # Node B
-nodeB = nodz.createNode(name='nodeB', preset='node_preset_1',position=QtCore.QPoint(50070,50010))
+nodeB = nodz.createNode(name='nodeB', preset='node_imaging',position=QtCore.QPoint(50070,50010))
 
 nodz.createAttribute(node=nodeB, name='Battr1', index=-1, preset='attr_preset_1',
                      plug=True, socket=False, dataType=int)
@@ -236,13 +236,16 @@ nodz.createAttribute(node=nodeB, name='Battr2', index=-1, preset='attr_preset_1'
 nodz.createAttribute(node=nodeB, name='Battr3', index=-1, preset='attr_preset_2',
                      plug=True, socket=False, dataType=int)
 
-nodz.createAttribute(node=nodeB, name='Battr\nNewline\nNewline4', index=-1, preset='attr_preset_3',
+nodz.createAttribute(node=nodeB, name='BINattr\nNewline4', index=-1, preset='attr_imaging_input_1',
+                     plug=False, socket=True, dataType=int)
+
+nodz.createAttribute(node=nodeB, name='Battr\nNewline4', index=-1, preset='attr_imaging_output_1',
                      plug=True, socket=False, dataType=int)
 
 
 
 # Node C
-nodeC = nodz.createNode(name='nodeC', preset='node_preset_1',position=QtCore.QPoint(50015,50010))
+nodeC = nodz.createNode(name='nodeC', preset='node_preset_1',position=QtCore.QPoint(50015,50010), displayText = "Testing displayText")
 
 nodz.createAttribute(node=nodeC, name='Cattr1', index=-1, preset='attr_preset_1',
                      plug=False, socket=True, dataType=int)
