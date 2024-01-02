@@ -1537,10 +1537,17 @@ class NodeItem(QtWidgets.QGraphicsItem):
         painter.setPen(QColor(0, 0, 0))
         
         td = QTextDocument()
+        textToDisplay = ''
+        if self.nodePreset is not None:
+            textToDisplay = textToDisplay+self.nodePreset
+            if self.nodePreset == 'node_imaging':
+                textToDisplay = textToDisplay+"<br><img src=\"Testing\\Nodz-master\\nodz2.png\" width=\"50\" height = \"50\">"
         if self.displayText is not None:
-            td.setHtml("This is a<br><span style='font-weight:bold; font-style:italic'>multiline</span> text"+self.displayText)
-        else:
-            td.setHtml("No displayText defined")
+            textToDisplay = textToDisplay+" "+self.displayText
+        
+
+            
+        td.setHtml(textToDisplay)
         ctx = QAbstractTextDocumentLayout.PaintContext()
         ctx.clip = QRectF(0,0, 400, 100)
         

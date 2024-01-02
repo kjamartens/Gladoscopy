@@ -2,15 +2,19 @@
     "CONNECTIONS": [
         [
             "nodeB.Battr1",
+            "nodeA.Aattr2"
+        ],
+        [
+            "nodeB.Battr2",
+            "nodeC.Cattr4"
+        ],
+        [
+            "nodeA.Aattr1",
             "New node!.New attribute"
         ],
         [
-            "New node!.Another new attribute",
-            "nodeC.Cattr5"
-        ],
-        [
-            "nodeC.Cattr3",
-            "nodeA.Aattr2"
+            "nodeC.Cattr2",
+            "New node!.New attribute"
         ]
     ],
     "NODES": {
@@ -37,8 +41,8 @@
                 }
             ],
             "position": [
-                49131.0,
-                50499.0
+                5342.162590320102,
+                4910.924490258081
             ],
             "preset": "node_preset_1"
         },
@@ -65,8 +69,8 @@
                 }
             ],
             "position": [
-                49707.0,
-                50499.0
+                5012.274756788768,
+                4607.825711119525
             ],
             "preset": "node_preset_1"
         },
@@ -102,19 +106,28 @@
                 },
                 {
                     "dataType": "<class 'int'>",
-                    "name": "Battr\nNewline\nNewline4",
+                    "name": "BINattr\nNewline4",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_imaging_input_1",
+                    "socket": true,
+                    "socketMaxConnections": -1
+                },
+                {
+                    "dataType": "<class 'int'>",
+                    "name": "Battr\nNewline4",
                     "plug": true,
                     "plugMaxConnections": -1,
-                    "preset": "attr_preset_3",
+                    "preset": "attr_imaging_output_1",
                     "socket": false,
                     "socketMaxConnections": -1
                 }
             ],
             "position": [
-                48843.0,
-                50499.0
+                4599.269703294222,
+                4879.27354079152
             ],
-            "preset": "node_preset_1"
+            "preset": "node_imaging"
         },
         "nodeC": {
             "alternate": true,
@@ -193,8 +206,8 @@
                 }
             ],
             "position": [
-                49419.0,
-                50499.0
+                5004.858176260931,
+                5072.472852150652
             ],
             "preset": "node_preset_1"
         }

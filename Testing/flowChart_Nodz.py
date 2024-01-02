@@ -6,6 +6,10 @@ import nodz_main
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget
 from PyQt5.QtCore import Qt, QSize
 
+import warnings
+# Disable the libpng warning
+warnings.filterwarnings("ignore", category=UserWarning, module="PIL.PngImagePlugin")
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -202,7 +206,7 @@ nodz.signal_KeyPressed.connect(on_keyPressed)
 ######################################################################
 
 # Node A
-nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=QtCore.QPoint(50010,50010))
+nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=QtCore.QPoint(5010,5010))
 
 nodz.createAttribute(node=nodeA, name='Aattr1', index=-1, preset='attr_preset_1',
                      plug=True, socket=False, dataType=int)
@@ -225,7 +229,7 @@ nodz.createAttribute(node=nodeA, name='Aattr2', index=-1, preset='attr_preset_1'
 
 
 # # Node B
-nodeB = nodz.createNode(name='nodeB', preset='node_imaging',position=QtCore.QPoint(50070,50010))
+nodeB = nodz.createNode(name='nodeB', preset='node_imaging',position=QtCore.QPoint(5070,5010))
 
 nodz.createAttribute(node=nodeB, name='Battr1', index=-1, preset='attr_preset_1',
                      plug=True, socket=False, dataType=int)
@@ -245,7 +249,7 @@ nodz.createAttribute(node=nodeB, name='Battr\nNewline4', index=-1, preset='attr_
 
 
 # Node C
-nodeC = nodz.createNode(name='nodeC', preset='node_preset_1',position=QtCore.QPoint(50015,50010), displayText = "Testing displayText")
+nodeC = nodz.createNode(name='nodeC', preset='node_preset_1',position=QtCore.QPoint(5015,5010), displayText = "Testing displayText")
 
 nodz.createAttribute(node=nodeC, name='Cattr1', index=-1, preset='attr_preset_1',
                      plug=False, socket=True, dataType=int)
@@ -272,7 +276,7 @@ nodz.createAttribute(node=nodeC, name='Cattr8', index=-1, preset='attr_preset_3'
                      plug=True, socket=False, dataType=int)
 
 
-nodeNew = nodz.createNode(name='New node!', preset='node_preset_1',position=QtCore.QPoint(50045,50010))
+nodeNew = nodz.createNode(name='New node!', preset='node_preset_1',position=QtCore.QPoint(5045,5010))
 
 nodz.createAttribute(node=nodeNew, name='New attribute', index=-1, preset='attr_preset_1',
                      plug=False, socket=True, dataType=int)

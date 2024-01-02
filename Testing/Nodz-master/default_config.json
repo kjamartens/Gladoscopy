@@ -1,7 +1,7 @@
 {
     // General > Edit values BUT do not delete.
-    "scene_width": 100000,
-    "scene_height": 100000,
+    "scene_width": 10000,
+    "scene_height": 10000,
     "grid_size": 36,
     "antialiasing": true,
     "antialiasing_boost": true,
@@ -48,14 +48,14 @@
     // following part.
 
     "node_imaging": {
-        "bg": [250, 80, 80, 255],
-        "border": [150, 50, 50, 255],
+        "bg": [80, 80, 180, 255],
+        "border": [50, 50, 50, 255],
         "border_sel": [170, 80, 80, 255],
-        "text": [230, 180, 180, 255]
+        "text": [180, 180, 240, 255]
     },
 
     "attr_imaging_output_1": {
-        "bg": [150, 60, 60, 255],
+        "bg": [60, 60, 150, 255],
         "text": [220, 220, 220, 255],
         "plug": [255, 155, 0, 255],
         "socket": [255, 155, 0, 255]
