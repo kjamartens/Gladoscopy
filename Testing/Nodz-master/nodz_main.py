@@ -1600,7 +1600,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         #     print("Combo Value:", combo_value)
         
         # #Update the node text from this dialog output:
-        # self.scene().parent().editNodeDisplayText(self, newDisplayText="<br>"+text+"<br>"+combo_value) #type:ignore
+        self.scene().parent().editNodeDisplayText(self, newDisplayText=str(dialog.getInputs())) #type:ignore
         
         super(NodeItem, self).mouseDoubleClickEvent(event)
         self.scene().parent().signal_NodeDoubleClicked.emit(self.name,event.pos())#type:ignore

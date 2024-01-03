@@ -59,7 +59,7 @@ class FoVFindImaging_singleCh_configs(QDialog):
                 allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
             
             #Create the MM config via all config groups
-            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False)
+            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False, showCheckboxes=True)
             
             button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             button_box.accepted.connect(self.accept)
@@ -73,4 +73,4 @@ class FoVFindImaging_singleCh_configs(QDialog):
             self.setLayout(layout)
         
     def getInputs(self):
-        return self.MMconfig.getUIConfigInfo()
+        return self.MMconfig.getUIConfigInfo(onlyChecked=True)

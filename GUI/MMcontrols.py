@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont
 from PyQt5 import uic
@@ -132,7 +132,7 @@ class ConfigInfo:
 
 #Create a big MM config ui and add all config groups with options
 class MMConfigUI:
-    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True):
+    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False):
         """
         Initializes the class with the given configuration groups.
 
@@ -152,12 +152,14 @@ class MMConfigUI:
         self.showStages = showStages
         self.showROIoptions = showROIoptions
         self.showLiveMode = showLiveMode
+        self.showCheckboxes = showCheckboxes
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.changes_update_MM = changes_update_MM
         self.core = self.config_groups[0].core
         self.dropDownBoxes = {}
         self.sliders = {}
+        self.configCheckboxes = {}
         self.sliderPrecision = 100
         #Create a Vertical+horizontal layout:
         self.mainLayout = QGridLayout()
@@ -203,9 +205,11 @@ class MMConfigUI:
         self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
     
     #Get all config information as set by the UI:
-    def getUIConfigInfo(self):
+    def getUIConfigInfo(self,onlyChecked=False):
         configInfo = {}
         for config_id in range(len(self.config_groups)):
+            if onlyChecked and not self.configCheckboxes[config_id].isChecked():
+                continue
             configInfo[self.config_groups[config_id].configGroupName()] = self.currentConfigUISingleValue(config_id)
         return configInfo
     
@@ -533,6 +537,10 @@ class MMConfigUI:
         self.configLayout.addLayout(rowLayout,divmod(config_id,self.number_columns)[1],divmod(config_id,self.number_columns)[0])
     
     def addLabel(self,rowLayout,config_id):
+        if self.showCheckboxes:
+            #Add a checkbox
+            self.configCheckboxes[config_id] = QCheckBox()
+            rowLayout.addWidget(self.configCheckboxes[config_id])
         #add a label to the row:
         label = QLabel()
         label.setText(self.config_groups[config_id].configGroupName())
