@@ -43,7 +43,7 @@ def main():
 
     #Periodically update the MM info of the MMcontrolsWidget
     global MM_update_instance
-    MM_update_instance = periodicallyUpdate(updateFunction=nPM['MMcontrolWidget'].updateAllMMinfo)
+    # MM_update_instance = periodicallyUpdate(updateFunction=nPM['MMcontrolWidget'].updateAllMMinfo)
 
     #Ensure it stays open
     app = QApplication([])

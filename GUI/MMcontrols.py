@@ -132,30 +132,48 @@ class ConfigInfo:
 
 #Create a big MM config ui and add all config groups with options
 class MMConfigUI:
-    def __init__(self, config_groups,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5):
+    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True):
+        """
+        Initializes the class with the given configuration groups.
+
+        Parameters:
+            config_groups (list): A list of configuration groups.
+            showConfigs (bool): Whether to show the configurations in the UI.
+            showStages (bool): Whether to show the stages in the UI.
+            showROIoptions (bool): Whether to show the ROI options in the UI.
+            showLiveMode (bool): Whether to show the live mode in the UI.
+            number_config_columns (int): The number of columns for the configuration.
+            changes_update_MM (bool): Whether to update the MM changes when configs are changed.
+
+        Returns:
+            None
+        """
         self.config_groups = config_groups
         self.number_columns = number_config_columns
+        self.changes_update_MM = changes_update_MM
         self.core = self.config_groups[0].core
         self.dropDownBoxes = {}
         self.sliders = {}
+        self.sliderPrecision = 100
         #Create a Vertical+horizontal layout:
         self.mainLayout = QGridLayout()
-        #Create a layout for the configs:
-        self.configLayout = QGridLayout()
-        #Add this to the mainLayout:
-        self.mainLayout.addLayout(self.configLayout,0,0)
-        #Fill the configLayout
-        for config_id in range(len(config_groups)):
-            self.addRow(config_id)
-        pass
-    
-        #Add a button to refresh from MM:
-        self.refreshButton = QPushButton("Refresh configs from MM")
-        totalRowsAdded = int(np.ceil(len(config_groups)/self.number_columns))
-        #Add a button spanning the total columns at the bottom
-        self.configLayout.addWidget(self.refreshButton,totalRowsAdded+1,0,1,self.number_columns)
-        #Connect the button:
-        self.refreshButton.clicked.connect(lambda index: self.updateConfigsFromMM())
+        if showConfigs:
+            #Create a layout for the configs:
+            self.configLayout = QGridLayout()
+            #Add this to the mainLayout:
+            self.mainLayout.addLayout(self.configLayout,0,0)
+            #Fill the configLayout
+            for config_id in range(len(config_groups)):
+                self.addRow(config_id)
+            pass
+        
+            #Add a button to refresh from MM:
+            self.refreshButton = QPushButton("Refresh configs from MM")
+            totalRowsAdded = int(np.ceil(len(config_groups)/self.number_columns))
+            #Add a button spanning the total columns at the bottom
+            self.configLayout.addWidget(self.refreshButton,totalRowsAdded+1,0,1,self.number_columns)
+            #Connect the button:
+            self.refreshButton.clicked.connect(lambda index: self.updateConfigsFromMM())
         
         #Add the stages widget to the right of this if wanted
         if showStages:
@@ -179,7 +197,31 @@ class MMConfigUI:
         
         #Change the font of everything in the layout
         self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
+        
+        #Testing to get all config info as set by the UI:
+        print(self.getUIConfigInfo())
     
+    #Get all config information as set by the UI:
+    def getUIConfigInfo(self):
+        configInfo = {}
+        for config_id in range(len(self.config_groups)):
+            configInfo[self.config_groups[config_id].configGroupName()] = self.currentConfigUISingleValue(config_id)
+        return configInfo
+    
+    def currentConfigUISingleValue(self,config_id):
+        #Get the value of a single config as currently determined by the UI
+        if self.config_groups[config_id].isDropDown():
+            currentUIvalue = self.dropDownBoxes[config_id].currentText()
+        elif self.config_groups[config_id].isSlider():
+            #Get the value from the slider:
+            sliderValue = self.sliders[config_id].value()
+            #Get the true value from the conversion:
+            currentUIvalue = sliderValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
+        elif self.config_groups[config_id].isInputField():
+            currentUIvalue = None
+        else:
+            currentUIvalue = None
+        return currentUIvalue
     
     #Live mode UI
     def liveModeLayout(self):
@@ -530,14 +572,15 @@ class MMConfigUI:
         Returns:
             None
         """
-        #Get the new value from the dropdown:
-        newValue = self.dropDownBoxes[config_id].currentText()
-        #Change the value if it's a true value
-        if newValue != "" and newValue != " ":
-            #Get the config group name:
-            configGroupName = self.config_groups[config_id].configGroupName()
-            #Set in MM:
-            self.config_groups[config_id].core.set_config(configGroupName,newValue)
+        if self.changes_update_MM:
+            #Get the new value from the dropdown:
+            newValue = self.dropDownBoxes[config_id].currentText()
+            #Change the value if it's a true value
+            if newValue != "" and newValue != " ":
+                #Get the config group name:
+                configGroupName = self.config_groups[config_id].configGroupName()
+                #Set in MM:
+                self.config_groups[config_id].core.set_config(configGroupName,newValue)
     
     def addSlider(self,rowLayout,config_id):        
         #Get the config group name
@@ -557,19 +600,20 @@ class MMConfigUI:
         currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
         
         #Sliders only work in integers, so we need to set some artificial precision and translate to this precision
-        sliderPrecision = 1000
+        sliderPrecision = self.sliderPrecision
         sliderValInSliderPrecision = int(((currentSliderValue-lowerLimit)/(upperLimit-lowerLimit))*sliderPrecision)
         # #Create the slider:
-        self.sliders[config_id] = QSlider(Qt.Horizontal)
+        self.sliders[config_id] = QSlider(Qt.Horizontal) #type: ignore
         self.sliders[config_id].setRange(0,sliderPrecision)
         self.sliders[config_id].setValue(sliderValInSliderPrecision)
+        self.sliders[config_id].slider_conversion_array = [lowerLimit,upperLimit,sliderPrecision]
         #Add a callback when it is changed:
-        self.sliders[config_id].valueChanged.connect(lambda value, config_id = config_id, slider_conversion_array = [lowerLimit,upperLimit,sliderPrecision]: self.on_sliderChanged(config_id,slider_conversion_array))
+        self.sliders[config_id].valueChanged.connect(lambda value, config_id = config_id: self.on_sliderChanged(config_id))
         # #Add the slider to the rowLayout:
         rowLayout.addWidget(self.sliders[config_id])
         pass
     
-    def on_sliderChanged(self,config_id,slider_conversion_array):
+    def on_sliderChanged(self,config_id):
         """
         Changes a micromanager config when a slider has changed
 
@@ -580,23 +624,24 @@ class MMConfigUI:
         Returns:
             None
         """
-        #Get the new value from the slider:
-        newValue = self.sliders[config_id].value()
-        #Get the true value from the conversion:
-        trueValue = newValue/slider_conversion_array[2]*(slider_conversion_array[1]-slider_conversion_array[0])+slider_conversion_array[0]
-        #Change the value if it's a true value
-        if trueValue != "" and trueValue != " ":
-            #Get the config group name:
-            configGroupName = self.config_groups[config_id].configGroupName()
-            #Set in MM:
-            #A slider config by definition (?) only has a single property underneath, so get that:
-            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
-            configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-            device_label = configdata.get_setting(0).get_device_label()
-            property_name = configdata.get_setting(0).get_property_name()
+        if self.changes_update_MM:
+            #Get the new value from the slider:
+            newValue = self.sliders[config_id].value()
+            #Get the true value from the conversion:
+            trueValue = newValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
+            #Change the value if it's a true value
+            if trueValue != "" and trueValue != " ":
+                #Get the config group name:
+                configGroupName = self.config_groups[config_id].configGroupName()
+                #Set in MM:
+                #A slider config by definition (?) only has a single property underneath, so get that:
+                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+                configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+                device_label = configdata.get_setting(0).get_device_label()
+                property_name = configdata.get_setting(0).get_property_name()
 
-            #Set this property:
-            self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
+                #Set this property:
+                self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
     
     
     def addInputField(self,rowLayout,config_id):
@@ -622,7 +667,7 @@ class MMConfigUI:
             currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
                 
             #Sliders only work in integers, so we need to set some artificial precision and translate to this precision
-            sliderPrecision = 1000
+            sliderPrecision = self.sliderPrecision
             #Get the min and max value of the slider:
             lowerLimit = self.config_groups[config_id].lowerLimit()
             upperLimit = self.config_groups[config_id].upperLimit()

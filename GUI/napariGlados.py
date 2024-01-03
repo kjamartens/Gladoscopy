@@ -17,6 +17,7 @@ from AutonomousMicroscopyScripts import *
 from MMcontrols import *
 from AnalysisClass import *
 from Analysis_dockWidgets import *
+from FlowChart_dockWidgets import *
 
 # Define a flag to control the continuous task
 stop_continuous_task = False
@@ -233,6 +234,22 @@ class dockWidget_analysisThreads(QMainWindow):
     def getDockWidget(self):
         return self.dockWidget
 
+class dockWidget_flowChart(QMainWindow):
+    def __init__(self): 
+        logging.debug("dockWidget_flowchart started")
+        super().__init__()
+        #Add a central widget in napari
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
+        #add a layout in this central widget
+        self.layout = QVBoxLayout(self.central_widget) #type:ignore
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
+    
+    def getDockWidget(self):
+        return self.dockWidget
+
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
     layerRemoved = shared_data.napariViewer.layers[event.index].name
@@ -244,7 +261,7 @@ def layer_removed_event_callback(event, shared_data):
                 l.destroy()
                 shared_data.analysisThreads.remove(l)
 
-def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
+def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
     core = score
@@ -273,6 +290,10 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="MMcontrols",tabify=True)
+    
+    if include_flowChart_automatedMicroscopy:
+        custom_widget_flowChart = dockWidget_flowChart()
+        napariViewer.window.add_dock_widget(custom_widget_flowChart, area="top", name="flowChart",tabify=True)
     
     if includecustomUI:
         custom_widget_gladosUI = dockWidget_fullGladosUI()
