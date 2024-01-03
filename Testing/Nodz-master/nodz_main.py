@@ -1591,15 +1591,16 @@ class NodeItem(QtWidgets.QGraphicsItem):
         """
         
         #Open a Dialog on double click
-        dialog = AdvancedInputDialog(parentData=self.scene().views()[0])
+        dialog = FoVFindImaging_singleCh_configs(parentData=self.scene().views()[0])
         #Get the outputs from the dialog
         if dialog.exec_() == QDialog.Accepted:
-            text, combo_value = dialog.getInputs()
-            print("Text:", text)
-            print("Combo Value:", combo_value)
+            print(dialog.getInputs())
+        #     text, combo_value = dialog.getInputs()
+        #     print("Text:", text)
+        #     print("Combo Value:", combo_value)
         
-        #Update the node text from this dialog output:
-        self.scene().parent().editNodeDisplayText(self, newDisplayText="<br>"+text+"<br>"+combo_value) #type:ignore
+        # #Update the node text from this dialog output:
+        # self.scene().parent().editNodeDisplayText(self, newDisplayText="<br>"+text+"<br>"+combo_value) #type:ignore
         
         super(NodeItem, self).mouseDoubleClickEvent(event)
         self.scene().parent().signal_NodeDoubleClicked.emit(self.name,event.pos())#type:ignore

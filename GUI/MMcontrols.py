@@ -148,6 +148,10 @@ class MMConfigUI:
         Returns:
             None
         """
+        self.showConfigs = showConfigs
+        self.showStages = showStages
+        self.showROIoptions = showROIoptions
+        self.showLiveMode = showLiveMode
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.changes_update_MM = changes_update_MM
@@ -197,9 +201,6 @@ class MMConfigUI:
         
         #Change the font of everything in the layout
         self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
-        
-        #Testing to get all config info as set by the UI:
-        print(self.getUIConfigInfo())
     
     #Get all config information as set by the UI:
     def getUIConfigInfo(self):
@@ -690,9 +691,11 @@ class MMConfigUI:
     #Update everything there is update-able
     def updateAllMMinfo(self):
         logging.debug('Updating all MM info')
-        self.updateConfigsFromMM()
-        self.updateXYStageInfoWidget()
-        self.updateOneDstageLayout()
+        if self.showConfigs:
+            self.updateConfigsFromMM()
+        if self.showStages:
+            self.updateXYStageInfoWidget()
+            self.updateOneDstageLayout()
 
 def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     global shared_data

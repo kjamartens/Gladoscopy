@@ -1,4 +1,7 @@
 {
     "python.analysis.typeCheckingMode": "basic",
-    "editor.wordWrap": "on"
+    "editor.wordWrap": "on",
+    "python.analysis.extraPaths": [
+        "./GUI"
+    ]
 }
