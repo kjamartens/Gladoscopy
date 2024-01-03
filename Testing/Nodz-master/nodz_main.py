@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboB
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
 from PyQt5.QtCore import QRectF
 import nodz_utils as utils
-
+from nodz_custom import *
 
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
@@ -47,15 +47,21 @@ class Nodz(QtWidgets.QGraphicsView):
     signal_KeyPressed = QtCore.pyqtSignal(object)
     signal_Dropped = QtCore.pyqtSignal()
 
-    def __init__(self, parent, configPath=defaultConfigPath):
+    def __init__(self, parent, configPath=defaultConfigPath,core=None,shared_data=None,MM_JSON="TestStr"):
         """
         Initialize the graphics view.
 
         """
         super(Nodz, self).__init__(parent)
-
+        
         # Load nodz configuration.
         self.loadConfig(configPath)
+        
+        #Global variables for MM/napari
+        self.core = core
+        self.shared_data = shared_data
+        self.MM_JSON=MM_JSON
+
 
         # General data.
         self.gridVisToggle = True
@@ -1585,7 +1591,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         """
         
         #Open a Dialog on double click
-        dialog = AdvancedInputDialog()
+        dialog = AdvancedInputDialog(parentData=self.scene().views()[0])
         #Get the outputs from the dialog
         if dialog.exec_() == QDialog.Accepted:
             text, combo_value = dialog.getInputs()
@@ -2285,31 +2291,3 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
 
         self.setPath(path)
 
-class AdvancedInputDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        
-        self.setWindowTitle("Advanced Input Dialog")
-        
-        # Create line edit
-        self.line_edit = QLineEdit()
-        
-        # Create combobox
-        self.combo_box = QComboBox()
-        self.combo_box.addItems(["Option 1", "Option 2", "Option 3"])
-        
-        # Create button box
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        
-        # Create layout
-        layout = QVBoxLayout()
-        layout.addWidget(self.line_edit)
-        layout.addWidget(self.combo_box)
-        layout.addWidget(button_box)
-        
-        self.setLayout(layout)
-        
-    def getInputs(self):
-        return self.line_edit.text(), self.combo_box.currentText()

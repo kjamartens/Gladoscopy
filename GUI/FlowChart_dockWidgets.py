@@ -304,7 +304,7 @@ from PyQt5.QtWidgets import QGridLayout, QPushButton
 #     sys.exit(app.exec_())
     
 class flowChart_dockWidgetF():
-    def __init__(self):
+    def __init__(self,core=None,shared_data=None,MM_JSON=None):
         #Create a Vertical+horizontal layout:
         self.mainLayout = QGridLayout()
         
@@ -315,7 +315,7 @@ class flowChart_dockWidgetF():
         self.mainLayout.addWidget(self.graphics_view)
 
         global nodz
-        nodz = nodz_main.Nodz(self.graphics_view)
+        nodz = nodz_main.Nodz(self.graphics_view,core=core,shared_data=shared_data,MM_JSON=MM_JSON)
 
         nodz.initialize()
         nodz.show()
@@ -347,7 +347,7 @@ def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     napariViewer = shared_data.napariViewer
     
     #Create the a flowchart testing
-    flowChart_dockWidget = flowChart_dockWidgetF()
+    flowChart_dockWidget = flowChart_dockWidgetF(core=core,shared_data=shared_data,MM_JSON=MM_JSON)
     main_layout.addLayout(flowChart_dockWidget.mainLayout)
     
     return flowChart_dockWidget
