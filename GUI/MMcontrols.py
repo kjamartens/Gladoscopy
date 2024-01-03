@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont
 from PyQt5 import uic
@@ -137,6 +137,7 @@ class MMConfigUI:
         self.number_columns = number_config_columns
         self.core = self.config_groups[0].core
         self.dropDownBoxes = {}
+        self.sliders = {}
         #Create a Vertical+horizontal layout:
         self.mainLayout = QGridLayout()
         #Create a layout for the configs:
@@ -538,9 +539,65 @@ class MMConfigUI:
             #Set in MM:
             self.config_groups[config_id].core.set_config(configGroupName,newValue)
     
-    def addSlider(self,rowLayout,config_id):
-        #TODO: Add a slider in pyqt
+    def addSlider(self,rowLayout,config_id):        
+        #Get the config group name
+        configGroupName = self.config_groups[config_id].configGroupName()
+        
+        #Get the min and max value of the slider:
+        lowerLimit = self.config_groups[config_id].lowerLimit()
+        upperLimit = self.config_groups[config_id].upperLimit()
+        
+        #A slider config by definition (?) only has a single property underneath, so get that:
+        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+        configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+        device_label = configdata.get_setting(0).get_device_label()
+        property_name = configdata.get_setting(0).get_property_name()
+        
+        #Finally we get the current value of the slider
+        currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
+        
+        #Sliders only work in integers, so we need to set some artificial precision and translate to this precision
+        sliderPrecision = 1000
+        sliderValInSliderPrecision = int(((currentSliderValue-lowerLimit)/(upperLimit-lowerLimit))*sliderPrecision)
+        # #Create the slider:
+        self.sliders[config_id] = QSlider(Qt.Horizontal)
+        self.sliders[config_id].setRange(0,sliderPrecision)
+        self.sliders[config_id].setValue(sliderValInSliderPrecision)
+        #Add a callback when it is changed:
+        self.sliders[config_id].valueChanged.connect(lambda value, config_id = config_id, slider_conversion_array = [lowerLimit,upperLimit,sliderPrecision]: self.on_sliderChanged(config_id,slider_conversion_array))
+        # #Add the slider to the rowLayout:
+        rowLayout.addWidget(self.sliders[config_id])
         pass
+    
+    def on_sliderChanged(self,config_id,slider_conversion_array):
+        """
+        Changes a micromanager config when a slider has changed
+
+        Args:
+            config_id (int): The ID of the slider box that triggered the event.
+            slider_conversion_array (array): [lowerLimit,upperLimit,sliderPrecision]
+
+        Returns:
+            None
+        """
+        #Get the new value from the slider:
+        newValue = self.sliders[config_id].value()
+        #Get the true value from the conversion:
+        trueValue = newValue/slider_conversion_array[2]*(slider_conversion_array[1]-slider_conversion_array[0])+slider_conversion_array[0]
+        #Change the value if it's a true value
+        if trueValue != "" and trueValue != " ":
+            #Get the config group name:
+            configGroupName = self.config_groups[config_id].configGroupName()
+            #Set in MM:
+            #A slider config by definition (?) only has a single property underneath, so get that:
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+            configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+            device_label = configdata.get_setting(0).get_device_label()
+            property_name = configdata.get_setting(0).get_property_name()
+
+            #Set this property:
+            self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
+    
     
     def addInputField(self,rowLayout,config_id):
         pass
@@ -553,6 +610,29 @@ class MMConfigUI:
         #Set the value of the dropdown to the current MM value
         if self.config_groups[config_id].isDropDown():
             self.dropDownBoxes[config_id].setCurrentText(currentValue)
+        elif self.config_groups[config_id].isSlider():
+            #A slider config by definition (?) only has a single property underneath, so get that:
+            configGroupName = self.config_groups[config_id].configGroupName()
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+            configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+            device_label = configdata.get_setting(0).get_device_label()
+            property_name = configdata.get_setting(0).get_property_name()
+            
+            #Finally we get the current value of the slider
+            currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
+                
+            #Sliders only work in integers, so we need to set some artificial precision and translate to this precision
+            sliderPrecision = 1000
+            #Get the min and max value of the slider:
+            lowerLimit = self.config_groups[config_id].lowerLimit()
+            upperLimit = self.config_groups[config_id].upperLimit()
+            sliderValInSliderPrecision = int(((currentSliderValue-lowerLimit)/(upperLimit-lowerLimit))*sliderPrecision)
+            # #Update the slider:
+            self.sliders[config_id].setRange(0,sliderPrecision)
+            self.sliders[config_id].setValue(sliderValInSliderPrecision)
+            
+        elif self.config_groups[config_id].isInputField():
+            pass
         pass
     
     #Update all configs based on current value in MM
