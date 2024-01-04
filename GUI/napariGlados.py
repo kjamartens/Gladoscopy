@@ -250,6 +250,22 @@ class dockWidget_flowChart(QMainWindow):
     def getDockWidget(self):
         return self.dockWidget
 
+class dockWidget_MDA(QMainWindow):
+    def __init__(self): 
+        logging.debug("dockWidget_MDA started")
+        super().__init__()
+        #Add a central widget in napari
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
+        #add a layout in this central widget
+        self.layout = QVBoxLayout(self.central_widget) #type:ignore
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True).getGui()
+    
+    def getDockWidget(self):
+        return self.dockWidget
+
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
     layerRemoved = shared_data.napariViewer.layers[event.index].name
@@ -290,6 +306,9 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="MMcontrols",tabify=True)
+    
+    custom_widget_MDA = dockWidget_MDA()
+    napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="MDA",tabify=True)
     
     if include_flowChart_automatedMicroscopy:
         custom_widget_flowChart = dockWidget_flowChart()
