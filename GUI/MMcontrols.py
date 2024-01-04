@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont
 from PyQt5 import uic
@@ -165,9 +165,11 @@ class MMConfigUI:
         self.mainLayout = QGridLayout()
         if showConfigs:
             #Create a layout for the configs:
+            self.configGroupBox = QGroupBox("Configurations")
             self.configLayout = QGridLayout()
-            #Add this to the mainLayout:
-            self.mainLayout.addLayout(self.configLayout,0,0)
+            #Add this to the mainLayout via the groupbox:
+            self.configGroupBox.setLayout(self.configLayout)
+            self.mainLayout.addWidget(self.configGroupBox,0,0)
             #Fill the configLayout
             for config_id in range(len(config_groups)):
                 self.addRow(config_id)
@@ -183,20 +185,23 @@ class MMConfigUI:
         
         #Add the stages widget to the right of this if wanted
         if showStages:
-            self.mainLayout.addWidget(self.Vseparator_line(), 0, 1)
             #Now add the stages widget
             # self.stagesWidget()
-            self.mainLayout.addLayout(self.stagesLayout(), 0, 2)
+            self.stagesGroupBox = QGroupBox("Stages")
+            self.stagesGroupBox.setLayout(self.stagesLayout())
+            self.mainLayout.addWidget(self.stagesGroupBox, 0, 2)
         
         if showROIoptions:
-            self.mainLayout.addWidget(self.Vseparator_line(),0,3)
             #Now add the ROI options widget
-            self.mainLayout.addLayout(self.ROIoptionsLayout(),0,4)
+            self.roiOptionsGroupBox = QGroupBox("ROI Options")
+            self.roiOptionsGroupBox.setLayout(self.ROIoptionsLayout())
+            self.mainLayout.addWidget(self.roiOptionsGroupBox, 0, 4)
         
         if showLiveMode:
-            self.mainLayout.addWidget(self.Vseparator_line(),0,5)
             #Now add the live mode widget
-            self.mainLayout.addLayout(self.liveModeLayout(),0,6)
+            self.liveModeGroupBox = QGroupBox("Live Mode")
+            self.liveModeGroupBox.setLayout(self.liveModeLayout())
+            self.mainLayout.addWidget(self.liveModeGroupBox, 0, 6)
         
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
