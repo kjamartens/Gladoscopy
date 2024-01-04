@@ -11,6 +11,7 @@ class Shared_data:
     def __init__(self):
         self._liveMode = False
         self._napariViewer = None
+        self._headless = False
         self._analysisThreads = []
         self._core = []
         self._liveImageQueues = []
