@@ -581,6 +581,9 @@ class MMConfigUI:
         Returns:
             None
         """
+        if self.showCheckboxes:
+            #Check the corresponding checkbox
+            self.configCheckboxes[config_id].setChecked(True)
         if self.changes_update_MM:
             #Get the new value from the dropdown:
             newValue = self.dropDownBoxes[config_id].currentText()
@@ -633,6 +636,9 @@ class MMConfigUI:
         Returns:
             None
         """
+        if self.showCheckboxes:
+            #Check the corresponding checkbox:
+            self.configCheckboxes[config_id].setChecked(True)
         if self.changes_update_MM:
             #Get the new value from the slider:
             newValue = self.sliders[config_id].value()
