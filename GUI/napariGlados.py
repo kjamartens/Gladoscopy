@@ -294,6 +294,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     if include_flowChart_automatedMicroscopy:
         custom_widget_flowChart = dockWidget_flowChart()
         napariViewer.window.add_dock_widget(custom_widget_flowChart, area="top", name="flowChart",tabify=True)
+        custom_widget_flowChart.dockWidget.focus()
     
     if includecustomUI:
         custom_widget_gladosUI = dockWidget_fullGladosUI()
