@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplicatio
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
+from AnalysisClass import *
 import sys
 import os
 # import PyQt5.QtWidgets
@@ -25,6 +26,8 @@ from PyQt5.QtCore import QTimer,QDateTime
 import logging
 from typing import List, Iterable
 import itertools
+import queue
+from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 
 
 class ConfigInfo:
@@ -718,7 +721,7 @@ class MMConfigUI:
             self.updateOneDstageLayout()
 
 class MDAGlados():
-    def __init__(self,core,MM_JSON,layout,shared_data,hasGUI=False,num_time_points: int | None = None, time_interval_s: float | List[float] = 0, z_start: float | None = None, z_end: float | None = None, z_step: float | None = None, channel_group: str | None = None, channels: list | None = None, channel_exposures_ms: list | None = None, xy_positions: Iterable | None = None, xyz_positions: Iterable | None = None, position_labels: List[str] | None = None, order: str = 'tpcz', exposure_ms: float | None = 90, GUI_show_exposure = True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_acquire_button=True):
+    def __init__(self,core,MM_JSON,layout,shared_data,hasGUI=False,num_time_points: int | None = 10, time_interval_s: float | List[float] = 0, z_start: float | None = None, z_end: float | None = None, z_step: float | None = None, channel_group: str | None = None, channels: list | None = None, channel_exposures_ms: list | None = None, xy_positions: Iterable | None = None, xyz_positions: Iterable | None = None, position_labels: List[str] | None = None, order: str = 'tpcz', exposure_ms: float | None = 90, GUI_show_exposure = True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_acquire_button=True):
         self.num_time_points = num_time_points
         self.time_interval_s = time_interval_s
         self.z_start = z_start
@@ -743,6 +746,7 @@ class MDAGlados():
         self.GUI_show_storage = GUI_show_storage
         self.GUI_acquire_button = GUI_acquire_button
         self.core = core
+        self.mda_analysis_thread = None
         self.MM_JSON = MM_JSON
         self.layout = layout
         self.shared_data = shared_data
@@ -1008,16 +1012,64 @@ class MDAGlados():
         self.gui.update()
     
     def MDA_acq_from_GUI(self):
+        #ensure that live mode is stopped:
+        self.shared_data.core.stop_sequence_acquisition()
+        
+        if self.mda_analysis_thread == None:
+            #Create a thread to do some dummy real-time analysis:
+            self.mda_analysis_thread = create_analysis_thread(shared_data,analysisInfo='AvgGrayValueText')
+        
+        #Create a napari layer:
+        mdaImageLayer = getLayerIdFromName('pycromanager acquisition',self.shared_data.napariViewer)
+        #If it's the first mdaImageLayer
+        if not mdaImageLayer:
+            nrLayersBefore = len(self.shared_data.napariViewer.layers)
+            layer = self.shared_data.napariViewer.add_image(np.zeros((self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height)), rendering='attenuated_mip', name="pycromanager acquisition")
+            #Set correct scale - in nm
+            layer.scale = [self.shared_data.core.get_pixel_size_um(),self.shared_data.core.get_pixel_size_um()] #type:ignore
+            layer._keep_auto_contrast = True #type:ignore
+            self.shared_data.napariViewer.layers.move_multiple([nrLayersBefore,0])
+            self.shared_data.napariViewer.reset_view()
+        #Else if the layer already exists, replace it!
+        else:
+            # layer is present, replace its data
+            layer = self.shared_data.napariViewer.layers[mdaImageLayer[0]]
+            
+        layer.events.data.connect(lambda: self.update_mda_visualisation(layer, self.mda_analysis_thread ))
+
         #First, we get the events:
         self.get_MDA_events_from_GUI()
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
         
-        with Acquisition(directory=self.storageFolder, name=self.storageFileName) as acq:
-            acq.acquire(self.mda)
+        # connect napari viewer to Acquisition class and start data acquisition
+        acq = Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer)
+        acq.acquire(self.mda)
+        acq.mark_finished()
+        # acq.await_completion()
+
+        #old method that freezes napari:
+        # with Acquisition(directory=self.storageFolder, name=self.storageFileName, show_display=False) as acq:
+        #     acq.acquire(self.mda)
+        # with Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer) as acq:
+        #     acq.acquire(self.mda)
         pass
     
+    def update_mda_visualisation(self, layer, analysis_thread=None):
+        # Assuming your new data is added to the first layer
+        print('updateMDAvis')
+        current_slice = len(self.shared_data.napariViewer.layers[0].data) - 1
+        self.shared_data.napariViewer.dims.set_point(0, current_slice)
+        layer.reset_contrast_limits() #unsure why this is not working
+        
+        #Start accompanied analysis thread
+        if analysis_thread is not None:
+            analysis_thread.image_queue_analysis.put(layer.data[-1,:,:].compute())
+            if not analysis_thread.isRunning():
+                print('start')
+                analysis_thread.start()
+        
     def get_MDA_events_from_GUI(self):
         #This function will be run every time any option in the GUI is changed.
         

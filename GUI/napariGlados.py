@@ -14,10 +14,11 @@ import logging
 
 from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *
-from MMcontrols import *
+from MMcontrols import microManagerControlsUI, MDAGlados
 from AnalysisClass import *
 from Analysis_dockWidgets import *
 from FlowChart_dockWidgets import *
+from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 
 # Define a flag to control the continuous task
 stop_continuous_task = False
@@ -43,7 +44,7 @@ def napariUpdateLive(liveImage):
     if livestate == False:
         return
     logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
-    liveImageLayer = getLayerIdFromName('liveImage')
+    liveImageLayer = getLayerIdFromName('liveImage',napariViewer)
 
     #If it's the first liveImageLayer
     if not liveImageLayer:
@@ -73,7 +74,7 @@ def napariUpdateLive(liveImage):
         #     analysis_thread.start()
         # # Start the analysis thread if it's not already running
         # if not analysis_thread2.isRunning():
-        #     analysis_thread2.start()
+        #     analysis_thread2.start()  
             
         
 def grab_image(image, metadata,event_queue):
@@ -164,27 +165,6 @@ def liveModeChanged():
         logging.debug("Live mode started")
 
 
-""" 
-General napari functions
-"""
-
-def getLayerIdFromName(layer_name):
-    ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, '_name') and layer._name == layer_name]
-    return ImageLayer
-
-def InitateNapariUI(napariViewer):
-    logging.debug("Napari UI initiated")
-    #Set title, icon
-    napariViewer.title="GladOS - napari"
-    # Set the window icon
-    icon_path = './GUI/Icons/GladosIcon.ico'
-    icon = QIcon(icon_path)
-    napariViewer.window._qt_window.setWindowIcon(icon)
-    
-    #Turn on scalebar
-    napariViewer.scale_bar.visible = True
-    napariViewer.scale_bar.unit = "um"
-    
 """ 
 Napari widgets
 """

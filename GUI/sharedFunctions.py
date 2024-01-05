@@ -15,6 +15,7 @@ class Shared_data:
         self._analysisThreads = []
         self._core = []
         self._liveImageQueues = []
+        self._mdaImageQueues = []
         
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.
@@ -77,6 +78,18 @@ class Shared_data:
             self.on_liveImageQueues_value_change()
     def on_liveImageQueues_value_change(self):
         logging.debug('liveImageQueues changed')
+        
+    @property
+    def mdaImageQueues(self):
+        return self._mdaImageQueues
+    @mdaImageQueues.setter
+    def mdaImageQueues(self, new_value):
+        if new_value != self._mdaImageQueues:
+            self._mdaImageQueues = new_value
+            self.on_mdaImageQueues_value_change()
+    def on_mdaImageQueues_value_change(self):
+        logging.debug('mdaImageQueues changed')
+        
 
 class periodicallyUpdate:
     def __init__(self,updateFunction,timing = 10000):

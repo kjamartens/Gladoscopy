@@ -326,7 +326,10 @@ class AnalysisThread(QThread):
         """
         self.is_running = False
         #Also remove the image queue requestion from live mode
-        self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
+        if self.image_queue_analysis in self.shared_data.liveImageQueues:
+            self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
+        elif self.image_queue_analysis in self.shared_data.mdaImageQueues:
+            self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
     
     def destroy(self):
         """
@@ -507,7 +510,7 @@ class AnalysisThread(QThread):
         self.napariOverlay.imageOverlay_init(blending='additive',opacity=0.5,colormap='red')
         self.napariOverlay.changeName('Cell Segment Overlay')
         
-def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = None,createNewThread = True,throughputThread=None):
+def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = None,createNewThread = True,throughputThread=None,liveorMDA='live'):
     global image_queue_analysis, napariViewer
     napariViewer = shared_data.napariViewer
     if createNewThread == False:
@@ -516,7 +519,10 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
         #Create a new analysis thread
         print('starting new image queue analysis')
         image_queue_analysis = queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
-        shared_data.liveImageQueues.append(image_queue_analysis)
+        if liveorMDA == 'live':
+            shared_data.liveImageQueues.append(image_queue_analysis)
+        elif liveorMDA == 'MDA':
+            shared_data.mdaImageQueues.append(image_queue_analysis)
         
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal
