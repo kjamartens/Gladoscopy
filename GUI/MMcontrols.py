@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog
-from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread
+from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
 import sys
@@ -24,6 +24,7 @@ import time
 from PyQt5.QtCore import QTimer,QDateTime
 import logging
 from typing import List, Iterable
+import itertools
 
 
 class ConfigInfo:
@@ -825,6 +826,9 @@ class MDAGlados():
         storageLayout.addWidget(self.storageFileNameEntry,1,1)
         
         
+        #--------------- Order widget -----------------------------------------------
+        #order should be a dropdown that has all possible options of c,t,p,z (channel, time, position, z), but only if these are actually turned on in the settings:
+        orderLayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
         
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
@@ -883,6 +887,32 @@ class MDAGlados():
         #Add the layout to the main layout
         self.layout.addLayout(self.gui)
     
+    def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z):
+        orderLayout = QVBoxLayout()
+        letters_to_include = ''
+        if GUI_show_channel:
+            letters_to_include += 'c'
+        if GUI_show_time:
+            letters_to_include += 't'
+        if GUI_show_xy:
+            letters_to_include += 'p'
+        if GUI_show_z:
+            letters_to_include += 'z'
+        #Now we create an array with all possible combinations of these letters:
+        permuatations = [''.join(comb) for comb in itertools.permutations(letters_to_include, len(letters_to_include))]
+        self.orderDropdown = QComboBox()
+        #add the options to the dropdown:
+        for option in permuatations:
+            self.orderDropdown.addItem(option)
+        #Create a label:
+        self.orderLabel = QLabel("Order:")
+        
+        #Show the widgets.
+        orderLayout.addWidget(self.orderLabel)
+        orderLayout.addWidget(self.orderDropdown)
+        
+        return orderLayout
+        
     def showOptionChanged(self):
         #This function will be called when the checkboxes are clicked. It will update the GUI accordingly:
         self.updateGUIwidgets(GUI_show_exposure=self.GUI_show_exposure_chkbox.isChecked(), GUI_show_xy = self.GUI_show_xy_chkbox.isChecked(), GUI_show_z=self.GUI_show_z_chkbox.isChecked(), GUI_show_channel=self.GUI_show_channel_chkbox.isChecked(), GUI_show_time=self.GUI_show_time_chkbox.isChecked(), GUI_show_order=self.GUI_show_order_chkbox.isChecked(), GUI_show_storage=self.GUI_show_storage_chkbox.isChecked(),GUI_showOptions=True)
@@ -890,14 +920,14 @@ class MDAGlados():
     def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4):
         gridWidth = self.GUI_grid_width
         #remove all widgets from self.gui:
-        self.gui.removeWidget(self.exposureGroupBox)
-        self.gui.removeWidget(self.xyGroupBox)
-        self.gui.removeWidget(self.zGroupBox)
-        self.gui.removeWidget(self.channelGroupBox)
-        self.gui.removeWidget(self.timeGroupBox)
-        self.gui.removeWidget(self.orderGroupBox)
-        self.gui.removeWidget(self.storageGroupBox)
-        self.gui.removeWidget(self.showOptionsGroupBox)
+        # self.gui.removeWidget(self.exposureGroupBox)
+        # self.gui.removeWidget(self.xyGroupBox)
+        # self.gui.removeWidget(self.zGroupBox)
+        # self.gui.removeWidget(self.channelGroupBox)
+        # self.gui.removeWidget(self.timeGroupBox)
+        # self.gui.removeWidget(self.orderGroupBox)
+        # self.gui.removeWidget(self.storageGroupBox)
+        # self.gui.removeWidget(self.showOptionsGroupBox)
         
         # Remove the widgets from their parent
         self.exposureGroupBox.setParent(None)
@@ -917,36 +947,52 @@ class MDAGlados():
                 widget.deleteLater()
         #redraw the self.gui:
         self.gui.update()
+        QCoreApplication.processEvents()
         
         curindex = 0
         if GUI_show_exposure:
             self.gui.addWidget(self.exposureGroupBox, curindex//gridWidth, curindex%gridWidth)
             curindex+=1
+            QCoreApplication.processEvents()
         if GUI_show_xy:
             self.gui.addWidget(self.xyGroupBox, curindex//gridWidth, curindex%gridWidth)
             curindex+=1
+            QCoreApplication.processEvents()
         if GUI_show_z:
             self.gui.addWidget(self.zGroupBox, curindex//gridWidth, curindex%gridWidth)
             curindex+=1
+            QCoreApplication.processEvents()
         if GUI_show_channel:
             self.gui.addWidget(self.channelGroupBox, curindex//gridWidth, curindex%gridWidth)
             curindex+=1
+            QCoreApplication.processEvents()
         if GUI_show_time:
             self.gui.addWidget(self.timeGroupBox, curindex//gridWidth, curindex%gridWidth)
             curindex+=1
-        if GUI_show_order:
+            QCoreApplication.processEvents()
+        if GUI_show_order:    
+            #New groupbox
+            self.orderGroupBox = QGroupBox("Order")
+            QCoreApplication.processEvents()
+            orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
+            self.orderGroupBox.setLayout(orderlayout)
             self.gui.addWidget(self.orderGroupBox, curindex//gridWidth, curindex%gridWidth)
             curindex+=1
+            QCoreApplication.processEvents()
         if GUI_show_storage: 
             self.gui.addWidget(self.storageGroupBox, curindex//gridWidth, curindex%gridWidth)
             curindex+=1
+            QCoreApplication.processEvents()
         
         #To the full buttom:
         if GUI_showOptions:
             self.gui.addWidget(self.showOptionsGroupBox, 10,0)
+            QCoreApplication.processEvents()
         
         self.gui.setColumnStretch(99,gridWidth+1)
         self.gui.setRowStretch(99,gridWidth+1)
+        
+        QCoreApplication.processEvents()
         
         #redraw the self.gui:
         self.gui.update()
