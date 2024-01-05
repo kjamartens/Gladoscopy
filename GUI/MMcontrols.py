@@ -6,7 +6,7 @@ import sys
 import os
 # import PyQt5.QtWidgets
 import json
-from pycromanager import Core, multi_d_acquisition_events
+from pycromanager import Core, multi_d_acquisition_events, Acquisition
 import numpy as np
 import time
 import asyncio
@@ -718,7 +718,7 @@ class MMConfigUI:
             self.updateOneDstageLayout()
 
 class MDAGlados():
-    def __init__(self,core,MM_JSON,layout,shared_data,hasGUI=False,num_time_points: int | None = None, time_interval_s: float | List[float] = 0, z_start: float | None = None, z_end: float | None = None, z_step: float | None = None, channel_group: str | None = None, channels: list | None = None, channel_exposures_ms: list | None = None, xy_positions: Iterable | None = None, xyz_positions: Iterable | None = None, position_labels: List[str] | None = None, order: str = 'tpcz', exposure_ms: float | None = None, GUI_show_exposure = True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True):
+    def __init__(self,core,MM_JSON,layout,shared_data,hasGUI=False,num_time_points: int | None = None, time_interval_s: float | List[float] = 0, z_start: float | None = None, z_end: float | None = None, z_step: float | None = None, channel_group: str | None = None, channels: list | None = None, channel_exposures_ms: list | None = None, xy_positions: Iterable | None = None, xyz_positions: Iterable | None = None, position_labels: List[str] | None = None, order: str = 'tpcz', exposure_ms: float | None = 90, GUI_show_exposure = True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_acquire_button=True):
         self.num_time_points = num_time_points
         self.time_interval_s = time_interval_s
         self.z_start = z_start
@@ -732,6 +732,8 @@ class MDAGlados():
         self.position_labels = position_labels
         self.order = order
         self.exposure_ms = exposure_ms
+        self.storageFolder = None
+        self.storageFileName = None
         self.GUI_show_exposure = GUI_show_exposure
         self.GUI_show_xy = GUI_show_xy
         self.GUI_show_z = GUI_show_z
@@ -739,6 +741,7 @@ class MDAGlados():
         self.GUI_show_time = GUI_show_time
         self.GUI_show_order = GUI_show_order
         self.GUI_show_storage = GUI_show_storage
+        self.GUI_acquire_button = GUI_acquire_button
         self.core = core
         self.MM_JSON = MM_JSON
         self.layout = layout
@@ -750,9 +753,9 @@ class MDAGlados():
         
         #Initiate GUI if wanted
         if hasGUI:
-            self.initGUI(GUI_show_exposure=self.GUI_show_exposure,GUI_show_xy=self.GUI_show_xy, GUI_show_z=self.GUI_show_z, GUI_show_channel=self.GUI_show_channel, GUI_show_time=self.GUI_show_time, GUI_show_order=self.GUI_show_order, GUI_show_storage=self.GUI_show_storage)
+            self.initGUI(GUI_show_exposure=self.GUI_show_exposure,GUI_show_xy=self.GUI_show_xy, GUI_show_z=self.GUI_show_z, GUI_show_channel=self.GUI_show_channel, GUI_show_time=self.GUI_show_time, GUI_show_order=self.GUI_show_order, GUI_show_storage=self.GUI_show_storage, GUI_acquire_button=self.GUI_acquire_button)
         
-    def initGUI(self, GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_showOptions=True):
+    def initGUI(self, GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_showOptions=True,GUI_acquire_button=True):
         #initiate the GUI
         #Create a Vertical+horizontal layout:
         self.gui = QGridLayout()
@@ -783,6 +786,7 @@ class MDAGlados():
         #Exposure: add a label, an entry field, and a dropdown between 'ms' and 's':
         self.exposureLabel = QLabel("Exposure:")
         self.exposureEntry = QLineEdit()
+        self.exposureEntry.setText(str(self.exposure_ms))
         #ensure thatexposureEntry can only be a float:
         self.exposureEntry.setValidator(QDoubleValidator())
         self.exposureDropdown = QComboBox()
@@ -791,6 +795,9 @@ class MDAGlados():
         exposureLayout.addWidget(self.exposureLabel)
         exposureLayout.addWidget(self.exposureEntry)
         exposureLayout.addWidget(self.exposureDropdown)
+        #run get_MDA_events_from_GUI when the text or dropdown is changed:
+        self.exposureEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.exposureDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         #--------------- Time widget -----------------------------------------------
         #Time: add labels for time points and time intervals, and integer-based entry fields:
@@ -808,6 +815,10 @@ class MDAGlados():
         timeLayout.addWidget(self.timeIntervalLabel,1,0)
         timeLayout.addWidget(self.timeIntervalEntry,1,1)
         timeLayout.addWidget(self.timeIntervalDropdown,1,2)
+        #run get_MDA_events_from_GUI when the text or dropdown is changed:
+        self.timePointEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.timeIntervalEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.timeIntervalDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         #--------------- storage widget -----------------------------------------------
         #storage: first, add a label, entry field, and button with '...' to select a folder of choice:
@@ -824,6 +835,8 @@ class MDAGlados():
         self.storageFileNameEntry = QLineEdit()
         storageLayout.addWidget(self.storageFileNameLabel,1,0)
         storageLayout.addWidget(self.storageFileNameEntry,1,1)
+        self.storageFolderEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.storageFileNameEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         
         #--------------- Order widget -----------------------------------------------
@@ -882,7 +895,7 @@ class MDAGlados():
         self.showOptionsGroupBox.setLayout(showOptionsLayout)
 
         # Add groupboxes to the main layout, only if they should be shown. The position of the gridbox is based on whether the previous ones are added or not:
-        self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_order=GUI_show_order, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions)
+        self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_order=GUI_show_order, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions,GUI_acquire_button=GUI_acquire_button)
         
         #Add the layout to the main layout
         self.layout.addLayout(self.gui)
@@ -915,20 +928,11 @@ class MDAGlados():
         
     def showOptionChanged(self):
         #This function will be called when the checkboxes are clicked. It will update the GUI accordingly:
-        self.updateGUIwidgets(GUI_show_exposure=self.GUI_show_exposure_chkbox.isChecked(), GUI_show_xy = self.GUI_show_xy_chkbox.isChecked(), GUI_show_z=self.GUI_show_z_chkbox.isChecked(), GUI_show_channel=self.GUI_show_channel_chkbox.isChecked(), GUI_show_time=self.GUI_show_time_chkbox.isChecked(), GUI_show_order=self.GUI_show_order_chkbox.isChecked(), GUI_show_storage=self.GUI_show_storage_chkbox.isChecked(),GUI_showOptions=True)
+        self.updateGUIwidgets(GUI_show_exposure=self.GUI_show_exposure_chkbox.isChecked(), GUI_show_xy = self.GUI_show_xy_chkbox.isChecked(), GUI_show_z=self.GUI_show_z_chkbox.isChecked(), GUI_show_channel=self.GUI_show_channel_chkbox.isChecked(), GUI_show_time=self.GUI_show_time_chkbox.isChecked(), GUI_show_order=self.GUI_show_order_chkbox.isChecked(), GUI_show_storage=self.GUI_show_storage_chkbox.isChecked(),GUI_showOptions=True,GUI_acquire_button=self.GUI_acquire_button)
+        self.get_MDA_events_from_GUI()
     
-    def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4):
+    def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4,GUI_acquire_button=True):
         gridWidth = self.GUI_grid_width
-        #remove all widgets from self.gui:
-        # self.gui.removeWidget(self.exposureGroupBox)
-        # self.gui.removeWidget(self.xyGroupBox)
-        # self.gui.removeWidget(self.zGroupBox)
-        # self.gui.removeWidget(self.channelGroupBox)
-        # self.gui.removeWidget(self.timeGroupBox)
-        # self.gui.removeWidget(self.orderGroupBox)
-        # self.gui.removeWidget(self.storageGroupBox)
-        # self.gui.removeWidget(self.showOptionsGroupBox)
-        
         # Remove the widgets from their parent
         self.exposureGroupBox.setParent(None)
         self.xyGroupBox.setParent(None)
@@ -937,7 +941,7 @@ class MDAGlados():
         self.timeGroupBox.setParent(None)
         self.orderGroupBox.setParent(None)
         self.storageGroupBox.setParent(None)
-        self.showOptionsGroupBox.setParent(None)
+        self.showOptionsGroupBox.setParent(None) 
 
         # Clear the layout
         while self.gui.count():
@@ -989,6 +993,12 @@ class MDAGlados():
             self.gui.addWidget(self.showOptionsGroupBox, 10,0)
             QCoreApplication.processEvents()
         
+        if GUI_acquire_button:
+            self.GUI_acquire_button = QPushButton("Acquire")
+            self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI())
+            self.gui.addWidget(self.GUI_acquire_button, 11,0)
+            QCoreApplication.processEvents()
+        
         self.gui.setColumnStretch(99,gridWidth+1)
         self.gui.setRowStretch(99,gridWidth+1)
         
@@ -996,7 +1006,53 @@ class MDAGlados():
         
         #redraw the self.gui:
         self.gui.update()
+    
+    def MDA_acq_from_GUI(self):
+        #First, we get the events:
+        self.get_MDA_events_from_GUI()
         
+        #Set the exposure time:
+        self.core.set_exposure(self.exposure_ms)
+        
+        with Acquisition(directory=self.storageFolder, name=self.storageFileName) as acq:
+            acq.acquire(self.mda)
+        pass
+    
+    def get_MDA_events_from_GUI(self):
+        #This function will be run every time any option in the GUI is changed.
+        
+        #Make this somewhat readable:
+        if self.exposureGroupBox.isVisible():
+            try:
+                self.exposure_ms = float(self.exposureEntry.text())
+                if self.exposureDropdown.currentText() == 's':
+                    self.exposure_ms *= 1000
+            except:
+                self.exposure_ms = None
+        
+        if self.timeGroupBox.isVisible():
+            try:
+                self.num_time_points = int(self.timePointEntry.text())
+                self.time_interval_s = float(self.timeIntervalEntry.text())
+                if self.timeIntervalDropdown.currentText() == 'ms':
+                    self.time_interval_s /= 1000
+            except:
+                self.num_time_points = None
+                self.time_interval_s = None
+                
+        if self.orderGroupBox.isVisible():
+            self.order = self.orderDropdown.currentText()
+        
+        if self.storageGroupBox.isVisible():
+            self.storageFolder = self.storageFolderEntry.text()
+            self.storageFileName = self.storageFileNameEntry.text()
+        
+        #initiate with an empty mda:
+        self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
+        
+        print(self.mda)
+        
+        pass
     def printText(self):
         print(self.getEvents())
     
