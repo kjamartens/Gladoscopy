@@ -42,13 +42,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.shared_data = shared_data
         self.MM_JSON=MM_JSON
         
-        
-        
-        
-        
-        
-        
-        
         global nodz
         nodz = self
         self.initialize()
@@ -97,10 +90,10 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         context_menu.addAction(new_decision_node_action)
         
         print(QMouseevent)
-        new_acq_node_action.triggered.connect(lambda _, event=QMouseevent: self.nodz.createNewNode(event,'NewAcqNode'))
-        new_analysis_node_action.triggered.connect(lambda _, event=QMouseevent: self.nodz.createNewNode(event,'NewAnalysisNode'))
-        new_scoring_node_action.triggered.connect(lambda _, event=QMouseevent: self.nodz.createNewNode(event,'NewScoringNode'))
-        new_decision_node_action.triggered.connect(lambda _, event=QMouseevent: self.nodz.createNewNode(event,'NewDecisionNode'))
+        new_acq_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewAcqNode'))
+        new_analysis_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewAnalysisNode'))
+        new_scoring_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewScoringNode'))
+        new_decision_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewDecisionNode'))
 
         # Show the context menu at the event's position
         # context_menu.exec_(self.mapToScene(QMouseevent.pos()))
