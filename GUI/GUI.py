@@ -1,4 +1,7 @@
 from pycromanager import core
+import sys
+sys.path.append('GUI\\nodz')
+
 
 from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *

@@ -77,6 +77,8 @@ class Nodz(QtWidgets.QGraphicsView):
         # Display options.
         self.currentState = 'DEFAULT'
         self.pressedKeys = list()
+        
+        return self
 
     def wheelEvent(self, event):
         """
@@ -1460,6 +1462,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
                          QtCore.Qt.AlignCenter, #type:ignore
                          self.name)
 
+
         #Draw the textbox
         self.drawTextbox(painter)
         
@@ -1469,6 +1472,14 @@ class NodeItem(QtWidgets.QGraphicsItem):
         for attr in self.attrs:
             nodzInst = self.scene().views()[0]
             config = nodzInst.config
+
+							 
+												
+																	   
+															 
+												
+
+
 
             attrData = self.attrsData[attr]
             name = attr
@@ -1547,7 +1558,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         if self.nodePreset is not None:
             textToDisplay = textToDisplay+self.nodePreset
             if self.nodePreset == 'node_imaging':
-                textToDisplay = textToDisplay+"<br><img src=\"Testing\\Nodz-master\\nodz2.png\" width=\"50\" height = \"50\">"
+                textToDisplay = textToDisplay+"<br><img src=\"GUI\\nodz\\nodz2.png\" width=\"50\" height = \"50\">"
         if self.displayText is not None:
             textToDisplay = textToDisplay+" "+self.displayText
         
@@ -1857,6 +1868,7 @@ class SlotItem(QtWidgets.QGraphicsItem):
 
         return self.mapToScene(center)
 
+
 class PlugItem(SlotItem):
 
     """
@@ -1972,6 +1984,7 @@ class PlugItem(SlotItem):
         # Remove connection
         self.connections.remove(connection)
 
+
 class SocketItem(SlotItem):
 
     """
@@ -2085,6 +2098,7 @@ class SocketItem(SlotItem):
             self.connected_slots.remove(connection.plugItem)
         # Remove connections
         self.connections.remove(connection)
+
 
 class ConnectionItem(QtWidgets.QGraphicsPathItem):
 

@@ -302,8 +302,41 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
     returnInfo['MMcontrolWidget'] = custom_widget_MMcontrols.getDockWidget()
+    
+    # #Testing some code
+    # XYStageName = core.get_xy_stage_device()
+    # #Get the stage position
+    # XYStagePos = core.get_xy_stage_position(XYStageName)
+    # #XY speed set to '9'
+    # sleep_time = 0.0
+    # start_x = XYStagePos.x
+    # start_y = XYStagePos.y
+    # circle_rad = 10 #in um
+    # circle_points = 20
+    # spoints = get_points_on_circle((start_x,start_y), circle_rad, circle_points)
+    
+    # for i in range(0,2):
+    #     for point in spoints:
+    #         core.set_xy_position(point[0],point[1])
+    #         core.wait_for_device(XYStageName)
+    #         # time.sleep(sleep_time)
+    # core.set_xy_position(start_x,start_y)
+    
     # breakpoint
     return returnInfo
+
+import math
+def get_points_on_circle(center, radius, N):
+    points = []
+    angle = 0
+    
+    for _ in range(N):
+        x = center[0] + radius * math.cos(angle)
+        y = center[1] + radius * math.sin(angle)
+        points.append((x, y))
+        angle += 2 * math.pi / N
+        
+    return points
 
 def obtain_imageQueueAnalysis():
     global image_queue_analysis
