@@ -1027,18 +1027,18 @@ class MDAGlados():
     def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4,GUI_acquire_button=True):
         gridWidth = self.GUI_grid_width
         # Remove the widgets from their parent
-        self.exposureGroupBox.setParent(None)
-        self.xyGroupBox.setParent(None)
-        self.zGroupBox.setParent(None)
-        self.channelGroupBox.setParent(None)
-        self.timeGroupBox.setParent(None)
-        self.orderGroupBox.setParent(None)
-        self.storageGroupBox.setParent(None)
-        self.showOptionsGroupBox.setParent(None) 
+        self.exposureGroupBox.setParent(None) # type: ignore
+        self.xyGroupBox.setParent(None) # type: ignore
+        self.zGroupBox.setParent(None) # type: ignore
+        self.channelGroupBox.setParent(None) # type: ignore
+        self.timeGroupBox.setParent(None) # type: ignore
+        self.orderGroupBox.setParent(None) # type: ignore
+        self.storageGroupBox.setParent(None) # type: ignore
+        self.showOptionsGroupBox.setParent(None)  # type: ignore
 
         # Clear the layout
-        while self.gui.count():
-            item = self.gui.takeAt(0)
+        while self.gui.count(): # type: ignore
+            item = self.gui.takeAt(0) # type: ignore
             widget = item.widget()
             if widget:
                 widget.deleteLater()
@@ -1048,23 +1048,23 @@ class MDAGlados():
         
         curindex = 0
         if GUI_show_exposure:
-            self.gui.addWidget(self.exposureGroupBox, curindex//gridWidth, curindex%gridWidth)
+            self.gui.addWidget(self.exposureGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
             curindex+=1
             QCoreApplication.processEvents()
         if GUI_show_xy:
-            self.gui.addWidget(self.xyGroupBox, curindex//gridWidth, curindex%gridWidth)
+            self.gui.addWidget(self.xyGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
             curindex+=1
             QCoreApplication.processEvents()
         if GUI_show_z:
-            self.gui.addWidget(self.zGroupBox, curindex//gridWidth, curindex%gridWidth)
+            self.gui.addWidget(self.zGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
             curindex+=1
             QCoreApplication.processEvents()
         if GUI_show_channel:
-            self.gui.addWidget(self.channelGroupBox, curindex//gridWidth, curindex%gridWidth)
+            self.gui.addWidget(self.channelGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
             curindex+=1
             QCoreApplication.processEvents()
         if GUI_show_time:
-            self.gui.addWidget(self.timeGroupBox, curindex//gridWidth, curindex%gridWidth)
+            self.gui.addWidget(self.timeGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
             curindex+=1
             QCoreApplication.processEvents()
         if GUI_show_order:    
@@ -1073,27 +1073,27 @@ class MDAGlados():
             QCoreApplication.processEvents()
             orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
             self.orderGroupBox.setLayout(orderlayout)
-            self.gui.addWidget(self.orderGroupBox, curindex//gridWidth, curindex%gridWidth)
+            self.gui.addWidget(self.orderGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
             curindex+=1
             QCoreApplication.processEvents()
         if GUI_show_storage: 
-            self.gui.addWidget(self.storageGroupBox, curindex//gridWidth, curindex%gridWidth)
+            self.gui.addWidget(self.storageGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
             curindex+=1
             QCoreApplication.processEvents()
         
         #To the full buttom:
         if GUI_showOptions:
-            self.gui.addWidget(self.showOptionsGroupBox, 10,0)
+            self.gui.addWidget(self.showOptionsGroupBox, 10,0) # type: ignore
             QCoreApplication.processEvents()
         
         if GUI_acquire_button:
             self.GUI_acquire_button = QPushButton("Acquire")
             self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI())
-            self.gui.addWidget(self.GUI_acquire_button, 11,0)
+            self.gui.addWidget(self.GUI_acquire_button, 11,0) # type: ignore
             QCoreApplication.processEvents()
         
-        self.gui.setColumnStretch(99,gridWidth+1)
-        self.gui.setRowStretch(99,gridWidth+1)
+        self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
+        self.gui.setRowStretch(99,gridWidth+1) # type: ignore
         
         QCoreApplication.processEvents()
         
@@ -1133,7 +1133,7 @@ class MDAGlados():
         self.core.set_exposure(self.exposure_ms)
         
         # connect napari viewer to Acquisition class and start data acquisition
-        acq = Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer)
+        acq = Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer) # type: ignore
         acq.acquire(self.mda)
         acq.mark_finished()
         # acq.await_completion()
