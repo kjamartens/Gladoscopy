@@ -2,7 +2,7 @@ from napariGlados import liveModeChanged
 from PyQt5.QtCore import QTimer
 import logging
 
-"""_summary_
+"""Shared data summary
 
     Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
 """
@@ -29,7 +29,6 @@ class Shared_data:
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
         liveModeChanged()
-         
     
     #NapariViewer property   
     @property
@@ -99,4 +98,3 @@ class periodicallyUpdate:
         self.timer.setInterval(timing)
         self.timer.timeout.connect(updateFunction)
         self.timer.start()
-        

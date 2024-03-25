@@ -372,8 +372,12 @@ def armLaser(i):
         exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
         if k == 0:
             if length>0: #type:ignore
-                print('PAO'+str(i+1)+'-0-' + str(round(65535*0.01*GetIntensityLaser(MM_JSON,i))))
-                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-' + str(round(65535*0.01*GetIntensityLaser(MM_JSON,i))))
+                power_level = 65535*0.01*GetIntensityLaser(MM_JSON,i)
+                if i == 2: #Exception for the 561 laser:
+                    print('Power level exception for 561 laser succes')
+                    power_level = 65535*0.01*GetIntensityLaser(MM_JSON,i)*(8/100)
+                print('PAO'+str(i+1)+'-0-' + str(round(power_level)))
+                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-' + str(round(power_level)))
                 TS_Response_verbose();
             else:
                 print('PAO'+str(i+1)+'-0' + str(round(0)))

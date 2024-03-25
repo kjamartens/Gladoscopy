@@ -47,13 +47,52 @@
     // Don't forget to edit the end of the dictionary if editing the
     // following part.
 
-    "node_imaging": {
+    "start_node": {
+        "bg": [80, 180, 80, 255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
+    "stop_node": {
+        "bg": [180, 80, 80, 255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
+
+    "acquisition": {
+        "bg": [80, 80, 180, 255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
+    "analysis": {
+        "bg": [80, 80, 180, 255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
+    "scoring": {
+        "bg": [80, 80, 180, 255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
+    "decision": {
         "bg": [80, 80, 180, 255],
         "border": [50, 50, 50, 255],
         "border_sel": [170, 80, 80, 255],
         "text": [180, 180, 240, 255]
     },
 
+
+    
+    "node_imaging": {
+        "bg": [80, 80, 180, 255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
     "attr_imaging_output_1": {
         "bg": [60, 60, 150, 255],
         "text": [220, 220, 220, 255],

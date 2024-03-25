@@ -10,10 +10,21 @@ import argparse
 
 from napariGlados import runNapariPycroManager
 from sharedFunctions import Shared_data, periodicallyUpdate
+from utils import *
 
 def perform_post_closing_actions(shared_data):
+    """Performing closing actions
+
+    Args:
+        shared_data: shared_data class (Shared_data())
+    """
+    #Clean up temporary files
+    cleanUpTemporaryFiles()
+    
     if shared_data._headless:
         stop_headless()
+        
+    
     # #If it's closed, delete the folder for temp live images
     # folder_path = "TempAcq_removeFolder"
     # shutil.rmtree(folder_path)
@@ -23,6 +34,8 @@ def main():
     parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
     args=parser.parse_args()
+    
+    cleanUpTemporaryFiles()
     
     if args.debug:
         log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"

@@ -11,6 +11,7 @@ from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 import logging
+import os
 
 from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *
@@ -19,6 +20,7 @@ from AnalysisClass import *
 from Analysis_dockWidgets import *
 from FlowChart_dockWidgets import *
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+from utils import cleanUpTemporaryFiles
 
 # Define a flag to control the continuous task
 stop_continuous_task = False
@@ -38,6 +40,11 @@ Live update definitions for napari
 """
 
 def napariUpdateLive(liveImage):
+    """ 
+    Function that finally shows the live image in napari
+    
+    Inputs: liveImage: current live image (array)
+    """
     if liveImage is None:
         return
     global livestate
@@ -75,63 +82,70 @@ def napariUpdateLive(liveImage):
         # # Start the analysis thread if it's not already running
         # if not analysis_thread2.isRunning():
         #     analysis_thread2.start()  
-            
-        
-def grab_image(image, metadata,event_queue):
+
+def grab_image_livemode(image, metadata, event_queue):
     """ 
-        Inputs: array image: image from micromanager
-                metadata from micromanager
-        """
+    Function that runs on every frame obtained in live mode and putis in the image queue
+    
+    Inputs: array image: image from micromanager
+            metadata: metadata from micromanager
+    """
+    # print(event_queue.get())
     global livestate
     if livestate:
-        # print(event_queue.qsize())
-        # event_queue.put(multi_d_acquisition_events(num_time_points = 1))
+        logging.info('grab_image within livemode')
         if img_queue.qsize() < 3:
             img_queue.put((image))
+            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+            for queue in shared_data.liveImageQueues:
+                if queue.qsize() < 2:
+                    queue.put((image))
         
-        #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-        for queue in shared_data.liveImageQueues:
-            if queue.qsize() < 2:
-                queue.put((image))
+    else:
+        logging.info('Broke off live mode')
+        event_queue.put(None)
+        try:
+            acq.abort()
+            logging.info('aborted acquisition')
+        except:
+            logging.info('attemped to abort acq')
+    
     return image, metadata
 
 @thread_worker
-def append_img(img_queue):
-    """ Worker thread that adds images to a list.
-        Calls either micro-manager data acquisition or functions for simulating data.
-        Inputs: img_queue """
-    # start microscope data acquisition
+def run_live_mode_worker(img_queue):
+    """ 
+    Worker which handles live mode on/off turning etc
+    
+    Inputs: img_queue (unused, but required)
+    """
+    #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
+    #The abortion is handled in grab_image_livemode
     global livestate
-    # acq = Acquisition(directory='', name=None, show_display=False, image_process_fn = grab_image) #type:ignore
-    # events = multi_d_acquisition_events(num_time_points=2, time_interval_s=0)
+    global acq
     while livestate:
         #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-        with JavaBackendAcquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-        # with Acquisition(directory='TempAcq_removeFolder', name='', show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-            events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0)
-            acq.acquire(events) #type:ignore
-        # # time.sleep(sleep_time)
-        
-        #Other live mode, based on snapping images at all times
-        # Works if no shutter has to be switched
-        # core.snap_image()
-        # tagged_image = core.get_tagged_image()
-        # image_array = np.reshape(
-        #     tagged_image.pix,
-        #     newshape=[-1, tagged_image.tags["Height"], tagged_image.tags["Width"]],
-        # )
-        # grab_image(image_array,None,None)
-        # time.sleep(sleep_time)
-        
-        #Better live mode
-        # acq.acquire(events) #type:ignore
-        # print('Acq done, to following')
+        with JavaBackendAcquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = grab_image_livemode) as acq: #type:ignore
+            events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+            acq.acquire(events)
+
+    #Now we're after the livestate
+    #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+    cleanUpTemporaryFiles()
+    import shutil
+    for folder in os.listdir('./temp'):
+        if 'LiveAcqShouldBeRemoved' in folder:
+            try:
+                shutil.rmtree(os.path.join('./temp', folder))
+            except:
+                pass
 
 @thread_worker(connect={'yielded': napariUpdateLive})
-def yield_img(img_queue):
-    """ Worker thread that checks whether there are elements in the
-        queue, reads them out.
-        Connected to display_napari function to update display """
+def visualise_live_mode_worker(img_queue):
+    """
+    Worker which handles the visualisation of the live mode queue
+    Connected to display_napari function to update display 
+    """
     global livestate
 
     while livestate:
@@ -148,6 +162,11 @@ def yield_img(img_queue):
 
 
 def liveModeChanged():
+    """
+    General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered
+    
+    Is called, and shared_data.liveMode should be changed seperately from running this funciton
+    """
     global livestate, stop_continuous_task
     #Hook the live mode into the scripts here
     if shared_data.liveMode == False:
@@ -155,23 +174,24 @@ def liveModeChanged():
         stop_continuous_task = True
         #Clear the image queue
         img_queue.queue.clear()
-        logging.debug("Live mode stopped")
+        logging.info("Live mode stopped")
     else:
         livestate = True
         stop_continuous_task = False
-        worker1 = append_img(img_queue)
-        worker2 = yield_img(img_queue) #type:ignore
+        #Start the two workers, one to run it, one to visualise it.
+        worker1 = run_live_mode_worker(img_queue)
+        worker2 = visualise_live_mode_worker(img_queue) #type:ignore
         worker1.start() #type:ignore
-        logging.debug("Live mode started")
+        logging.info("Live mode started")
 
 
 """ 
 Napari widgets
 """
-   
+
 class dockWidget_fullGladosUI(QMainWindow):
     def __init__(self): 
-        logging.debug("dockWidget_fullGladosUI started")
+        logging.info("dockWidget_fullGladosUI started")
         super().__init__()
         self.ui = Ui_CustomDockWidget()
         self.ui.setupUi(self)

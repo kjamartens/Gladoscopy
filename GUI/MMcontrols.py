@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
@@ -758,7 +758,22 @@ class MDAGlados():
         #Initiate GUI if wanted
         if hasGUI:
             self.initGUI(GUI_show_exposure=self.GUI_show_exposure,GUI_show_xy=self.GUI_show_xy, GUI_show_z=self.GUI_show_z, GUI_show_channel=self.GUI_show_channel, GUI_show_time=self.GUI_show_time, GUI_show_order=self.GUI_show_order, GUI_show_storage=self.GUI_show_storage, GUI_acquire_button=self.GUI_acquire_button)
-        
+    
+    def getDevicesOfDeviceType(self,devicetype):
+        #Find all devices that have a specific devicetype
+        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+        #for all devicetypes
+        #Get devices
+        devices = self.core.get_loaded_devices()
+        devices = [devices.get(i) for i in range(devices.size())]
+        devicesOfType = []
+        #Loop over devices
+        for device in devices:
+            if self.core.get_device_type(device).to_string() == devicetype:
+                logging.debug("found " + device + " of type " + devicetype)
+                devicesOfType.append(device)
+        return devicesOfType
+    
     def initGUI(self, GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_showOptions=True,GUI_acquire_button=True):
         #initiate the GUI
         #Create a Vertical+horizontal layout:
@@ -778,7 +793,7 @@ class MDAGlados():
         # Create layouts for each groupbox
         exposureLayout=QHBoxLayout()
         xyLayout = QVBoxLayout()
-        zLayout = QVBoxLayout()
+        zLayout = QGridLayout()
         channelLayout = QVBoxLayout()
         timeLayout = QGridLayout()
         orderLayout = QVBoxLayout()
@@ -843,6 +858,68 @@ class MDAGlados():
         self.storageFileNameEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         
+        #--------------- Z widget widget -----------------------------------------------
+        #First a dropdown to select the 1d stage:
+        self.z_oneDstageDropdownLabel = QLabel("Z Stage:")
+        self.z_oneDstageDropdown = QComboBox()
+        oneDstages = self.getDevicesOfDeviceType('StageDevice')
+        #add the options to the dropdown:
+        for stage in oneDstages:
+            self.z_oneDstageDropdown.addItem(stage)
+        zLayout.addWidget(self.z_oneDstageDropdownLabel,0,0)
+        zLayout.addWidget(self.z_oneDstageDropdown,0,1)
+        
+        self.z_startLabel = QLabel("Start:")
+        self.z_startEntry = QLineEdit()
+        self.z_startEntry.setValidator(QDoubleValidator())
+        self.z_startSetButton = QPushButton('Set')
+        self.z_startSetButton.clicked.connect(lambda: self.setZStart())
+        self.z_endLabel = QLabel("End:")
+        self.z_endEntry = QLineEdit()
+        self.z_endEntry.setValidator(QDoubleValidator())
+        self.z_endSetButton = QPushButton('Set')
+        self.z_endSetButton.clicked.connect(lambda: self.setZEnd())
+        
+        zLayout.addWidget(self.z_startLabel,1,0)
+        zLayout.addWidget(self.z_startEntry,1,1)
+        zLayout.addWidget(self.z_startSetButton,1,2)
+        zLayout.addWidget(self.z_endLabel,2,0)
+        zLayout.addWidget(self.z_endEntry,2,1)
+        zLayout.addWidget(self.z_endSetButton,2,2)
+        
+        #add radio buttons:
+        self.z_nrsteps_radio= QRadioButton("Number of steps: ")
+        self.z_stepdistance_radio= QRadioButton("Step distance: ")
+        #preselect the nr of steps one:
+        self.z_nrsteps_radio.setChecked(True)
+        #add edit boxes for number of steps and step distance:
+        self.z_nrsteps_entry = QLineEdit()
+        self.z_nrsteps_entry.setValidator(QIntValidator())
+        self.z_stepdistance_entry = QLineEdit()
+        self.z_stepdistance_entry.setValidator(QDoubleValidator())
+        
+        zLayout.addWidget(self.z_nrsteps_radio,3,0)
+        zLayout.addWidget(self.z_nrsteps_entry,3,1)
+        zLayout.addWidget(self.z_stepdistance_radio,4,0)
+        zLayout.addWidget(self.z_stepdistance_entry,4,1)
+        
+        #run get_MDA_events_from_GUI when the text or dropdown is changed:
+        self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_startEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_endEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_nrsteps_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_stepdistance_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_nrsteps_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        
+        
+        #--------------- XY widget widget -----------------------------------------------
+        #First a dropdown to select the 1d stage:
+        self.xy_oneDstageDropdownLabel = QLabel("XY Stage:")
+        self.xy_oneDstageDropdown = QComboBox()
+        oneDstages = self.getDevicesOfDeviceType('StageDevice')
+        
+        
         #--------------- Order widget -----------------------------------------------
         #order should be a dropdown that has all possible options of c,t,p,z (channel, time, position, z), but only if these are actually turned on in the settings:
         orderLayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
@@ -903,6 +980,18 @@ class MDAGlados():
         
         #Add the layout to the main layout
         self.layout.addLayout(self.gui)
+    
+    def setZStart(self):
+        zstage = self.z_oneDstageDropdown.currentText()
+        #zstage value limited to 2 decimal places:
+        zstagePos = round(float(self.core.get_position(zstage)),2)
+        self.z_startEntry.setText(str(zstagePos))
+    
+    def setZEnd(self):
+        zstage = self.z_oneDstageDropdown.currentText()
+        #zstage value limited to 2 decimal places:
+        zstagePos = round(float(self.core.get_position(zstage)),2)
+        self.z_endEntry.setText(str(zstagePos))
     
     def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z):
         orderLayout = QVBoxLayout()
@@ -1098,6 +1187,25 @@ class MDAGlados():
         if self.storageGroupBox.isVisible():
             self.storageFolder = self.storageFolderEntry.text()
             self.storageFileName = self.storageFileNameEntry.text()
+        
+        if self.zGroupBox.isVisible():
+            try:
+                self.z_start = (float(self.z_startEntry.text()))
+                self.z_end = (float(self.z_endEntry.text()))
+                if self.z_nrsteps_radio.isChecked():
+                    self.z_step = float((self.z_end-self.z_start)/int(self.z_nrsteps_entry.text()))
+                elif self.z_stepdistance_radio.isChecked():
+                    self.z_step = float(self.z_stepdistance_entry.text())
+                    if self.z_start < self.z_end:
+                        if self.z_step > 0:
+                            self.z_step*=-1
+                    elif self.z_start > self.z_end:
+                        if self.z_step < 0:
+                            self.z_step*=-1
+            except:
+                self.z_start = None
+                self.z_end = None
+                self.z_step = None
         
         #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
