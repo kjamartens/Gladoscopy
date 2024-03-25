@@ -55,7 +55,7 @@ def main():
     except:
         #else, create a new headless instance:
         print('Starting headless MM')
-        start_headless(mm_app_path= "C:\\Program Files\\Micro-Manager-2.0gamma\\", config_file="C:\\Users\\SMIPC2\\Desktop\\MM-config\\MMconfig_20240103c.cfg", python_backend=False, buffer_size_mb=2048, max_memory_mb=10000)
+        start_headless(mm_app_path= "C:\\Program Files\\Micro-Manager-2.0gamma\\", config_file="C:\\Users\\SMIPC2\\Desktop\s\MM-config\\MMconfig_20240103c.cfg", python_backend=False, buffer_size_mb=2048, max_memory_mb=10000)
         shared_data._headless = True
         print('headless MM started')
         core = Core()

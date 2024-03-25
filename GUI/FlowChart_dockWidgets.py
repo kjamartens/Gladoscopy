@@ -19,7 +19,6 @@ class CustomGraphicsView(QtWidgets.QGraphicsView):
     def updateGraphicsViewSize(self):
         nodz.setFixedSize(self.viewport().size())
 
-
 class flowChart_dockWidgetF(nodz_main.Nodz):
     def __init__(self,core=None,shared_data=None,MM_JSON=None):
         #Create a Vertical+horizontal layout:
@@ -175,7 +174,7 @@ def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     
     #Create the a flowchart testing
     flowChart_dockWidget = flowChart_dockWidgetF(core=core,shared_data=shared_data,MM_JSON=MM_JSON)
-    main_layout.addLayout(flowChart_dockWidget.mainLayout)
+    main_layout.addLayout(flowChart_dockWidget.mainLayout,0,0)
     
     flowChart_dockWidget.getNodz()
     

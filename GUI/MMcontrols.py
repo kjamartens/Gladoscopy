@@ -979,7 +979,7 @@ class MDAGlados():
         self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_order=GUI_show_order, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions,GUI_acquire_button=GUI_acquire_button)
         
         #Add the layout to the main layout
-        self.layout.addLayout(self.gui)
+        self.layout.addLayout(self.gui,0,0)
     
     def setZStart(self):
         zstage = self.z_oneDstageDropdown.currentText()
@@ -1233,7 +1233,7 @@ def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     
     #Create the MM config via all config groups
     MMconfig = MMConfigUI(allConfigGroups)
-    main_layout.addLayout(MMconfig.mainLayout)
+    main_layout.addLayout(MMconfig.mainLayout,0,0)
     
     return MMconfig
     

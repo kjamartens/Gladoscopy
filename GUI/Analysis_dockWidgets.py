@@ -40,8 +40,6 @@ class analysisDockWidget:
         
         #Append it to the list of analysisThreads
         # shared_data.analysisThreads.append(analysis_thread)
-    
-
 
 def analysis_dockWidget(MM_JSON,main_layout,sshared_data):
     global shared_data, napariViewer
@@ -50,6 +48,6 @@ def analysis_dockWidget(MM_JSON,main_layout,sshared_data):
     
     #Create the MM config via all config groups
     MMconfig = analysisDockWidget(napariViewer)
-    main_layout.addLayout(MMconfig.mainLayout)
+    main_layout.addLayout(MMconfig.mainLayout,0,0)
     
     return MMconfig

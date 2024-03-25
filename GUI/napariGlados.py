@@ -7,7 +7,7 @@ import queue
 from PyQt5.QtWidgets import QMainWindow
 from pycromanager import Core
 from magicgui import magicgui
-from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QScrollArea
 import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 import logging
@@ -189,6 +189,31 @@ def liveModeChanged():
 Napari widgets
 """
 
+class dockWidgets(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        #Create all the widgets/layouts:
+        self.central_widget = QWidget(self)
+        self.central_layout = QVBoxLayout()
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.content_widget = QWidget()
+        self.layout = QGridLayout() #type:ignore
+        
+        #Order them logically:
+        self.content_widget.setLayout(self.layout)
+        self.scroll_area.setWidget(self.content_widget)
+        self.central_layout.addWidget(self.scroll_area)
+        self.central_widget.setLayout(self.central_layout)
+        self.setCentralWidget(self.central_widget)
+        
+        self.dockWidget = None
+
+        #we end up with self.layout() that's changed by every indiv dockwidget
+        
+    def getDockWidget(self):
+        return self.dockWidget
+        
 class dockWidget_fullGladosUI(QMainWindow):
     def __init__(self): 
         logging.info("dockWidget_fullGladosUI started")
@@ -202,69 +227,36 @@ class dockWidget_fullGladosUI(QMainWindow):
         runlaserControllerUI(core,MM_JSON,self.ui,shared_data)
         # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
         
-class dockWidget_MMcontrol(QMainWindow):
+class dockWidget_MMcontrol(dockWidgets):
     def __init__(self): 
         logging.debug("dockWidget_MMcontrol started")
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
-        
         #Add the full micro manager controls UI
         self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)
     
-    def getDockWidget(self):
-        return self.dockWidget
-    
-class dockWidget_analysisThreads(QMainWindow):
+class dockWidget_analysisThreads(dockWidgets):
     def __init__(self): 
         logging.debug("dockWidget_analysisThreads started")
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
         
         #Add the full micro manager controls UI
         self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
-    
-    def getDockWidget(self):
-        return self.dockWidget
 
-class dockWidget_flowChart(QMainWindow):
+class dockWidget_flowChart(dockWidgets):
     def __init__(self): 
         logging.debug("dockWidget_flowchart started")
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
         
         #Add the full micro manager controls UI
         self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
-    
-    def getDockWidget(self):
-        return self.dockWidget
 
-class dockWidget_MDA(QMainWindow):
+class dockWidget_MDA(dockWidgets):
     def __init__(self): 
         logging.debug("dockWidget_MDA started")
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
         
         #Add the full micro manager controls UI
         self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True).getGui()
-    
-    def getDockWidget(self):
-        return self.dockWidget
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
