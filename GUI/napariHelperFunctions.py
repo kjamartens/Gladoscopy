@@ -1,6 +1,7 @@
 
 from PyQt5.QtGui import QIcon
 import logging
+from napari.qt import thread_worker
 
 """ 
 General napari functions
@@ -10,6 +11,7 @@ def getLayerIdFromName(layer_name,napariViewer):
     ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, '_name') and layer._name == layer_name]
     return ImageLayer
 
+@thread_worker
 def InitateNapariUI(napariViewer):
     logging.debug("Napari UI initiated")
     #Set title, icon

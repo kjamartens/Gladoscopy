@@ -1,4 +1,4 @@
-from napariGlados import liveModeChanged
+from napariGlados import liveModeChanged, mdaModeChanged
 from PyQt5.QtCore import QTimer
 import logging
 
@@ -10,12 +10,17 @@ class Shared_data:
     #Initialises the info of shared data
     def __init__(self):
         self._liveMode = False
+        self._mdaMode = False
+        self._mdaModeParams = []
         self._napariViewer = None
         self._headless = False
         self._analysisThreads = []
         self._core = []
         self._liveImageQueues = []
         self._mdaImageQueues = []
+        self._defaultFocusDevice = ''
+        self._mdaModeSaveLoc = ['','']
+        self._mdaModeNapariViewer = None
         
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.
@@ -29,6 +34,19 @@ class Shared_data:
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
         liveModeChanged()
+        
+        
+    @property
+    def mdaMode(self):
+        return self._mdaMode
+    @mdaMode.setter
+    def mdaMode(self, new_value):
+        if new_value != self._mdaMode:
+            print('new mdamode value: '+str(new_value))
+            self._mdaMode = new_value
+            self.on_mdaMode_value_change()
+    def on_mdaMode_value_change(self):
+        mdaModeChanged()
     
     #NapariViewer property   
     @property

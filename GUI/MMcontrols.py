@@ -28,7 +28,7 @@ from typing import List, Iterable
 import itertools
 import queue
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-
+from PyQt5.QtWidgets import QListWidget, QWidget, QInputDialog
 
 class ConfigInfo:
     def __init__(self,core,config_group_id):
@@ -792,7 +792,7 @@ class MDAGlados():
 
         # Create layouts for each groupbox
         exposureLayout=QHBoxLayout()
-        xyLayout = QVBoxLayout()
+        xyLayout = QGridLayout()
         zLayout = QGridLayout()
         channelLayout = QVBoxLayout()
         timeLayout = QGridLayout()
@@ -857,6 +857,40 @@ class MDAGlados():
         self.storageFolderEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         self.storageFileNameEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
+        #--------------- XY widget widget -----------------------------------------------
+        #First a dropdown to select the 1d stage:
+        self.xy_stagesDropdownLabel = QLabel("XY Stage:")
+        self.xy_stagesDropdown = QComboBox()
+        XYstages = self.getDevicesOfDeviceType('XYStageDevice')
+        #add the options to the dropdown:
+        for stage in XYstages:
+            self.xy_stagesDropdown.addItem(stage)
+        xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
+        xyLayout.addWidget(self.xy_stagesDropdown,0,1)
+        
+        
+        self.xypositionListWidget = QListWidget()
+        self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
+        self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
+        self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
+        self.xypositionListWidget_addButton = QPushButton('Add New Entry')
+        
+        self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget_deleteSelected)
+        self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget_moveUp)
+        self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget_moveDown)
+        self.xypositionListWidget_addButton.clicked.connect(self.xypositionListWidget_addNewEntry)
+        
+        #Add dummy entries
+        dummyList = ["Item 1", "Item 2", "Item 3"]
+        for item in dummyList:
+            self.xypositionListWidget.addItem(item)
+        
+        
+        xyLayout.addWidget(self.xypositionListWidget)
+        xyLayout.addWidget(self.xypositionListWidget_deleteButton)
+        xyLayout.addWidget(self.xypositionListWidget_moveUpButton)
+        xyLayout.addWidget(self.xypositionListWidget_moveDownButton)
+        xyLayout.addWidget(self.xypositionListWidget_addButton)
         
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:
@@ -911,18 +945,12 @@ class MDAGlados():
         self.z_stepdistance_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
         self.z_nrsteps_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        
-        
-        #--------------- XY widget widget -----------------------------------------------
-        #First a dropdown to select the 1d stage:
-        self.xy_oneDstageDropdownLabel = QLabel("XY Stage:")
-        self.xy_oneDstageDropdown = QComboBox()
-        oneDstages = self.getDevicesOfDeviceType('StageDevice')
-        
+
         
         #--------------- Order widget -----------------------------------------------
         #order should be a dropdown that has all possible options of c,t,p,z (channel, time, position, z), but only if these are actually turned on in the settings:
         orderLayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
+        self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
@@ -981,6 +1009,31 @@ class MDAGlados():
         #Add the layout to the main layout
         self.layout.addLayout(self.gui,0,0)
     
+    
+    def xypositionListWidget_deleteSelected(self):
+        row = self.xypositionListWidget.currentRow()
+        if row != -1:
+            self.xypositionListWidget.takeItem(row)
+
+    def xypositionListWidget_moveUp(self):
+        row = self.xypositionListWidget.currentRow()
+        if row > 0:
+            item = self.xypositionListWidget.takeItem(row)
+            self.xypositionListWidget.insertItem(row - 1, item)
+            self.xypositionListWidget.setCurrentRow(row - 1)
+
+    def xypositionListWidget_moveDown(self):
+        row = self.xypositionListWidget.currentRow()
+        if row < self.xypositionListWidget.count() - 1 and row != -1:
+            item = self.xypositionListWidget.takeItem(row)
+            self.xypositionListWidget.insertItem(row + 1, item)
+            self.xypositionListWidget.setCurrentRow(row + 1)
+
+    def xypositionListWidget_addNewEntry(self):
+        text, okPressed = QInputDialog.getText(self, "Add New Entry", "New Entry:", QLineEdit.Normal, "")
+        if okPressed and text != '':
+            self.xypositionListWidget.addItem(text)
+    
     def setZStart(self):
         zstage = self.z_oneDstageDropdown.currentText()
         #zstage value limited to 2 decimal places:
@@ -1007,6 +1060,7 @@ class MDAGlados():
         #Now we create an array with all possible combinations of these letters:
         permuatations = [''.join(comb) for comb in itertools.permutations(letters_to_include, len(letters_to_include))]
         self.orderDropdown = QComboBox()
+        self.orderDropdown.currentTextChanged.connect(lambda: self.get_MDA_events_from_GUI())
         #add the options to the dropdown:
         for option in permuatations:
             self.orderDropdown.addItem(option)
@@ -1101,41 +1155,58 @@ class MDAGlados():
         self.gui.update()
     
     def MDA_acq_from_GUI(self):
+        print('At MDA_acq_from_GUI')
+        self.shared_data._mdaMode = False
         #ensure that live mode is stopped:
-        self.shared_data.core.stop_sequence_acquisition()
+        # self.shared_data.core.stop_sequence_acquisition()
         
-        if self.mda_analysis_thread == None:
-            #Create a thread to do some dummy real-time analysis:
-            self.mda_analysis_thread = create_analysis_thread(shared_data,analysisInfo='AvgGrayValueText')
+        # if self.mda_analysis_thread == None:
+        #     #Create a thread to do some dummy real-time analysis:
+        #     self.mda_analysis_thread = create_analysis_thread(shared_data,analysisInfo='AvgGrayValueText')
         
-        #Create a napari layer:
-        mdaImageLayer = getLayerIdFromName('pycromanager acquisition',self.shared_data.napariViewer)
-        #If it's the first mdaImageLayer
-        if not mdaImageLayer:
-            nrLayersBefore = len(self.shared_data.napariViewer.layers)
-            layer = self.shared_data.napariViewer.add_image(np.zeros((self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height)), rendering='attenuated_mip', name="pycromanager acquisition")
-            #Set correct scale - in nm
-            layer.scale = [self.shared_data.core.get_pixel_size_um(),self.shared_data.core.get_pixel_size_um()] #type:ignore
-            layer._keep_auto_contrast = True #type:ignore
-            self.shared_data.napariViewer.layers.move_multiple([nrLayersBefore,0])
-            self.shared_data.napariViewer.reset_view()
-        #Else if the layer already exists, replace it!
-        else:
-            # layer is present, replace its data
-            layer = self.shared_data.napariViewer.layers[mdaImageLayer[0]]
+        # #Create a napari layer:
+        # mdaImageLayer = getLayerIdFromName('pycromanager acquisition',self.shared_data.napariViewer)
+        # #If it's the first mdaImageLayer
+        # if not mdaImageLayer:
+        #     nrLayersBefore = len(self.shared_data.napariViewer.layers)
+        #     layer = self.shared_data.napariViewer.add_image(np.zeros((self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height)), rendering='attenuated_mip', name="pycromanager acquisition")
+        #     #Set correct scale - in nm
+        #     layer.scale = [self.shared_data.core.get_pixel_size_um(),self.shared_data.core.get_pixel_size_um()] #type:ignore
+        #     layer._keep_auto_contrast = True #type:ignore
+        #     self.shared_data.napariViewer.layers.move_multiple([nrLayersBefore,0])
+        #     self.shared_data.napariViewer.reset_view()
+        # #Else if the layer already exists, replace it!
+        # else:
+        #     # layer is present, replace its data
+        #     layer = self.shared_data.napariViewer.layers[mdaImageLayer[0]]
             
-        layer.events.data.connect(lambda: self.update_mda_visualisation(layer, self.mda_analysis_thread ))
+        # layer._keep_auto_contrast = False #type:ignore
+        # # layer.events.data.connect(lambda: self.update_mda_visualisation(layer, self.mda_analysis_thread ))
 
-        #First, we get the events:
-        self.get_MDA_events_from_GUI()
+        # #First, we get the events:
+        # self.get_MDA_events_from_GUI()
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
         
+        print('starting mda mode')
+        #Set the location where to save the mda
+        self.shared_data._mdaModeSaveLoc = [self.storageFolder,self.storageFileName]
+        #Set whether the napariviewer should (also) try to connect to the mda
+        # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
+        #Set the mda parameters
+        self.shared_data._mdaModeParams = self.mda
+        #And set the mdamode to be true
+        self.shared_data.mdaMode = True
+        print('ended setting mdamode params')
+        
         # connect napari viewer to Acquisition class and start data acquisition
-        acq = Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer) # type: ignore
-        acq.acquire(self.mda)
-        acq.mark_finished()
+        # acq = Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer,image_process_fn = grab_image_acqmode) # type: ignore
+        # acq.acquire(self.mda)
+        # acq.mark_finished()
+        
+        
+        
         # acq.await_completion()
 
         #old method that freezes napari:
@@ -1145,20 +1216,6 @@ class MDAGlados():
         #     acq.acquire(self.mda)
         pass
     
-    def update_mda_visualisation(self, layer, analysis_thread=None):
-        # Assuming your new data is added to the first layer
-        print('updateMDAvis')
-        current_slice = len(self.shared_data.napariViewer.layers[0].data) - 1
-        self.shared_data.napariViewer.dims.set_point(0, current_slice)
-        layer.reset_contrast_limits() #unsure why this is not working
-        
-        #Start accompanied analysis thread
-        if analysis_thread is not None:
-            analysis_thread.image_queue_analysis.put(layer.data[-1,:,:].compute())
-            if not analysis_thread.isRunning():
-                print('start')
-                analysis_thread.start()
-        
     def get_MDA_events_from_GUI(self):
         #This function will be run every time any option in the GUI is changed.
         
@@ -1190,6 +1247,9 @@ class MDAGlados():
         
         if self.zGroupBox.isVisible():
             try:
+                #We also need to set the shared_data focus device for proper z-functioning
+                self.shared_data.core.set_focus_device(self.z_oneDstageDropdown.currentText())
+                
                 self.z_start = (float(self.z_startEntry.text()))
                 self.z_end = (float(self.z_endEntry.text()))
                 if self.z_nrsteps_radio.isChecked():
@@ -1206,6 +1266,9 @@ class MDAGlados():
                 self.z_start = None
                 self.z_end = None
                 self.z_step = None
+                self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
+        else:
+            self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
         
         #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore

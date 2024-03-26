@@ -455,6 +455,7 @@ class AnalysisThread(QThread):
     """
     #Calculating average gray value of an image
     def calcAnalysisAvgGrayValue(self,image):
+        print('calcAnalysisAvgGrayValue')
         return np.mean(np.mean(image))
     
     def visualiseAvgGrayValueText(self,analysis_result='Random'):
