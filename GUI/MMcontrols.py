@@ -28,7 +28,90 @@ from typing import List, Iterable
 import itertools
 import queue
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-from PyQt5.QtWidgets import QListWidget, QWidget, QInputDialog
+from PyQt5.QtWidgets import QTableWidget, QWidget, QInputDialog, QTableWidgetItem
+
+class InteractiveListWidget(QTableWidget):
+    """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
+    """
+    def __init__(self,fontsize=10):
+        print('init InteractiveListWidget')
+        super().__init__()
+        self.horizontalHeader().setStretchLastSection(True)
+        self.addDummyEntries()
+        
+        font = QFont()
+        font.setPointSize(fontsize)
+        self.setFont(font)
+        
+    def addDummyEntries(self):
+        data = [("Entry 1", "1"), ("Entry 2", "2"), ("Entry 3", "3")]
+        for entry in data:
+            self.addNewEntry(entry[0])
+            
+    def setColumNames(self, names):
+        self.setColumnCount(len(names))
+        self.setHorizontalHeaderLabels(names)
+        
+    def deleteSelected(self):
+        selectedRows = sorted(set(index.row() for index in self.selectedIndexes()), reverse=True)
+        for row in selectedRows:
+            self.removeRow(row)
+
+    def moveUp(self):
+        row = self.currentRow()
+        if row > 0:
+            self.swapRows(row, row - 1)
+            
+    def moveDown(self):
+        row = self.currentRow()
+        if row < self.rowCount() - 1 and row != -1:
+            self.swapRows(row, row + 1)
+
+    def swapRows(self, row1, row2):
+        for col in range(self.columnCount()):
+            item1 = self.takeItem(row1, col)
+            item2 = self.takeItem(row2, col)
+            self.setItem(row1, col, item2)
+            self.setItem(row2, col, item1)
+        self.setCurrentCell(row2, 0)
+
+    def getIDValues(self):
+        id_values = []
+        for row in range(self.rowCount()):
+            item_id = self.takeItem(row, 1)
+            print(item_id)
+            if item_id:
+                id_values.append(float(item_id.text()))
+        return id_values
+    
+    def addNewEntry(self,textEntry="New Entry",id=None):
+        if id == None:
+            if self.rowCount() == 0:
+                id = 1
+            else:
+                try:
+                    id = max(self.rowCount() + 1,max(self.getIDValues())+1)
+                except:
+                    id = self.rowCount()+1
+        print('added new entry')
+        from PyQt5.QtCore import Qt
+        rowPosition = self.rowCount()
+        self.insertRow(rowPosition)
+        self.setItem(rowPosition, 0, QTableWidgetItem(textEntry))
+        idEntry = QTableWidgetItem(str(rowPosition + 1))
+        idEntry.setFlags(idEntry.flags() & ~Qt.ItemIsEnabled) #type:ignore
+        self.setItem(rowPosition, 1, idEntry)
+        
+
+class XYStageList(InteractiveListWidget):
+    """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
+    """
+    def __init__(self):
+        super().__init__()
+        self.XYstageName = ''
+        
+    def setXYStageName(self, XYstageName):
+        self.XYstageName = XYstageName
 
 class ConfigInfo:
     def __init__(self,core,config_group_id):
@@ -858,35 +941,38 @@ class MDAGlados():
         self.storageFileNameEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         #--------------- XY widget widget -----------------------------------------------
-        #First a dropdown to select the 1d stage:
+        #First a dropdown to select the xy stage:
+        
+        #Adding a list widget to add a list of xy positions
+        self.xypositionListWidget = XYStageList()
+        self.xypositionListWidget.setColumNames(["Name", "ID"])
+        
         self.xy_stagesDropdownLabel = QLabel("XY Stage:")
         self.xy_stagesDropdown = QComboBox()
         XYstages = self.getDevicesOfDeviceType('XYStageDevice')
         #add the options to the dropdown:
         for stage in XYstages:
             self.xy_stagesDropdown.addItem(stage)
+        #Add a callback if we change this dropdown:
+        self.xy_stagesDropdown.currentIndexChanged.connect(lambda: self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText()))
+        
+        #Add them to the layout
         xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
         xyLayout.addWidget(self.xy_stagesDropdown,0,1)
         
-        
-        self.xypositionListWidget = QListWidget()
+        self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText)
+
         self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
         self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
         self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
         self.xypositionListWidget_addButton = QPushButton('Add New Entry')
         
-        self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget_deleteSelected)
-        self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget_moveUp)
-        self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget_moveDown)
-        self.xypositionListWidget_addButton.clicked.connect(self.xypositionListWidget_addNewEntry)
+        self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
+        self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget.moveUp)
+        self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
+        self.xypositionListWidget_addButton.clicked.connect(self.xypositionListWidget.addNewEntry)
         
-        #Add dummy entries
-        dummyList = ["Item 1", "Item 2", "Item 3"]
-        for item in dummyList:
-            self.xypositionListWidget.addItem(item)
-        
-        
-        xyLayout.addWidget(self.xypositionListWidget)
+        xyLayout.addWidget(self.xypositionListWidget,1,0)
         xyLayout.addWidget(self.xypositionListWidget_deleteButton)
         xyLayout.addWidget(self.xypositionListWidget_moveUpButton)
         xyLayout.addWidget(self.xypositionListWidget_moveDownButton)
@@ -1009,30 +1095,6 @@ class MDAGlados():
         #Add the layout to the main layout
         self.layout.addLayout(self.gui,0,0)
     
-    
-    def xypositionListWidget_deleteSelected(self):
-        row = self.xypositionListWidget.currentRow()
-        if row != -1:
-            self.xypositionListWidget.takeItem(row)
-
-    def xypositionListWidget_moveUp(self):
-        row = self.xypositionListWidget.currentRow()
-        if row > 0:
-            item = self.xypositionListWidget.takeItem(row)
-            self.xypositionListWidget.insertItem(row - 1, item)
-            self.xypositionListWidget.setCurrentRow(row - 1)
-
-    def xypositionListWidget_moveDown(self):
-        row = self.xypositionListWidget.currentRow()
-        if row < self.xypositionListWidget.count() - 1 and row != -1:
-            item = self.xypositionListWidget.takeItem(row)
-            self.xypositionListWidget.insertItem(row + 1, item)
-            self.xypositionListWidget.setCurrentRow(row + 1)
-
-    def xypositionListWidget_addNewEntry(self):
-        text, okPressed = QInputDialog.getText(self, "Add New Entry", "New Entry:", QLineEdit.Normal, "")
-        if okPressed and text != '':
-            self.xypositionListWidget.addItem(text)
     
     def setZStart(self):
         zstage = self.z_oneDstageDropdown.currentText()
