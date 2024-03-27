@@ -359,7 +359,14 @@ Napari widgets
 """
 
 class dockWidgets(QMainWindow):
+    sizeChanged = pyqtSignal(QSize)
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.sizeChanged.emit(event.size())
+        
     def __init__(self):
+        print('dockwidget started')
         super().__init__()
         #Create all the widgets/layouts:
         self.central_widget = QWidget(self)
@@ -418,14 +425,16 @@ class dockWidget_flowChart(dockWidgets):
         
         #Add the full micro manager controls UI
         self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
-
+    
 class dockWidget_MDA(dockWidgets):
     def __init__(self): 
-        logging.debug("dockWidget_MDA started")
+        print("dockWidget_MDA started")
         super().__init__()
         
         #Add the full micro manager controls UI
         self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True).getGui()
+        self.sizeChanged.connect(self.dockWidget.handleSizeChange)
+        
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
