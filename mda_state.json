@@ -1,0 +1,289 @@
+{
+    "storingExceptions": [
+        "core",
+        "layout",
+        "shared_data",
+        "gui",
+        "mda"
+    ],
+    "num_time_points": 100,
+    "time_interval_s": 0.0,
+    "z_start": 3503.7,
+    "z_end": 3703.7,
+    "z_step": 66.66666666666667,
+    "channel_group": null,
+    "channels": null,
+    "channel_exposures_ms": null,
+    "xy_positions": null,
+    "xyz_positions": null,
+    "position_labels": null,
+    "order": "t",
+    "exposure_ms": 100.0,
+    "storageFolder": "C:/Users/SMIPC2/Documents/GitHub/ScopeGUI/Testing",
+    "storageFileName": "asdf",
+    "GUI_show_exposure": true,
+    "GUI_show_xy": true,
+    "GUI_show_z": true,
+    "GUI_show_channel": false,
+    "GUI_show_time": true,
+    "GUI_show_order": true,
+    "GUI_show_storage": true,
+    "GUI_acquire_button": {
+        "text": "Acquire",
+        "checked": false
+    },
+    "has_GUI": true,
+    "mda_analysis_thread": null,
+    "MM_JSON": {
+        "lasers": {
+            "MM_Property_OnOff_Name": "State",
+            "MM_Property_Intensity_Name": "Volts",
+            "MM_Property_OnOff_OnValue": "1",
+            "MM_Property_OnOff_OffValue": "0",
+            "Laser0": {
+                "Wavelength": 405,
+                "MM_Property_Name": "TS_DAC01_405Laser",
+                "Intensity_offset": 0,
+                "Intensity_slope": 0.05
+            },
+            "Laser1": {
+                "Wavelength": 488,
+                "MM_Property_Name": "TS_DAC02_488Laser",
+                "Intensity_offset": 0,
+                "Intensity_slope": 0.05
+            },
+            "Laser2": {
+                "Wavelength": 561,
+                "MM_Property_Name": "TS_DAC03_561Laser",
+                "Intensity_offset": 0,
+                "Intensity_slope": 0.00375,
+                "_COMMENT": "//75pct seems to be max, so corr for that --> 0.0034, otherwise would be 0.005"
+            },
+            "Laser3": {
+                "Wavelength": 638,
+                "MM_Property_Name": "TS_DAC04_638Laser",
+                "Intensity_offset": 0,
+                "Intensity_slope": 0.05
+            },
+            "Laser4": {
+                "Wavelength": 750,
+                "MM_Property_Name": "TS_DAC05_750Laser",
+                "Intensity_offset": 0,
+                "Intensity_slope": 0.05
+            }
+        },
+        "filter_wheel": {
+            "MM_Property_Name": "Thorlabs Filter Wheel",
+            "MM_Property_Label_Name": "Label",
+            "MM_Property_State_Name": "State",
+            "Label0": "510/80",
+            "Label1": "585/65",
+            "Label2": "610/75",
+            "Label3": "689/23",
+            "Label4": "LP655",
+            "Label5": "Empty",
+            "ChangeWaitTimeMs": "2000"
+        },
+        "BF_radioLabels": {
+            "Label0": "BF Off",
+            "Label1": "BF On",
+            "Label2": "BF High",
+            "ChangeWaitTimeMs": "2000"
+        }
+    },
+    "lastTimeUpdateSize": 1711557824.0143504,
+    "_GUI_grid_width": 10,
+    "exposureGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "xyGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "zGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "channelGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "timeGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "storageGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "showOptionsGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "exposureLabel": {
+        "text": "Exposure:",
+        "checked": null
+    },
+    "exposureEntry": {
+        "text": "100",
+        "checked": null
+    },
+    "exposureDropdown": {
+        "text": null,
+        "checked": null
+    },
+    "timePointLabel": {
+        "text": "Number time points:",
+        "checked": null
+    },
+    "timePointEntry": {
+        "text": "100",
+        "checked": null
+    },
+    "timeIntervalLabel": {
+        "text": "Time interval:",
+        "checked": null
+    },
+    "timeIntervalEntry": {
+        "text": "0",
+        "checked": null
+    },
+    "timeIntervalDropdown": {
+        "text": null,
+        "checked": null
+    },
+    "storageFolderLabel": {
+        "text": "Storage:",
+        "checked": null
+    },
+    "storageFolderEntry": {
+        "text": "C:/Users/SMIPC2/Documents/GitHub/ScopeGUI/Testing",
+        "checked": null
+    },
+    "storageFolderButton": {
+        "text": "...",
+        "checked": false
+    },
+    "storageFileNameLabel": {
+        "text": "File name:",
+        "checked": null
+    },
+    "storageFileNameEntry": {
+        "text": "asdf",
+        "checked": null
+    },
+    "xypositionListWidget": {
+        "text": null,
+        "checked": null
+    },
+    "xy_stagesDropdownLabel": {
+        "text": "XY Stage:",
+        "checked": null
+    },
+    "xy_stagesDropdown": {
+        "text": null,
+        "checked": null
+    },
+    "xypositionListWidget_deleteButton": {
+        "text": "Delete Selected",
+        "checked": false
+    },
+    "xypositionListWidget_moveUpButton": {
+        "text": "Move Up",
+        "checked": false
+    },
+    "xypositionListWidget_moveDownButton": {
+        "text": "Move Down",
+        "checked": false
+    },
+    "xypositionListWidget_addButton": {
+        "text": "Add New Entry",
+        "checked": false
+    },
+    "z_oneDstageDropdownLabel": {
+        "text": "Z Stage:",
+        "checked": null
+    },
+    "z_oneDstageDropdown": {
+        "text": null,
+        "checked": null
+    },
+    "z_startLabel": {
+        "text": "Start:",
+        "checked": null
+    },
+    "z_startEntry": {
+        "text": "3503.7",
+        "checked": null
+    },
+    "z_startSetButton": {
+        "text": "Set",
+        "checked": false
+    },
+    "z_endLabel": {
+        "text": "End:",
+        "checked": null
+    },
+    "z_endEntry": {
+        "text": "3703.7",
+        "checked": null
+    },
+    "z_endSetButton": {
+        "text": "Set",
+        "checked": false
+    },
+    "z_nrsteps_radio": {
+        "text": "Number of steps: ",
+        "checked": true
+    },
+    "z_stepdistance_radio": {
+        "text": "Step distance: ",
+        "checked": false
+    },
+    "z_nrsteps_entry": {
+        "text": "3",
+        "checked": null
+    },
+    "z_stepdistance_entry": {
+        "text": "",
+        "checked": null
+    },
+    "GUI_show_exposure_chkbox": {
+        "text": "Exposure",
+        "checked": true
+    },
+    "GUI_show_xy_chkbox": {
+        "text": "XY",
+        "checked": false
+    },
+    "GUI_show_z_chkbox": {
+        "text": "Z",
+        "checked": false
+    },
+    "GUI_show_channel_chkbox": {
+        "text": "Channel",
+        "checked": false
+    },
+    "GUI_show_time_chkbox": {
+        "text": "Time",
+        "checked": true
+    },
+    "GUI_show_storage_chkbox": {
+        "text": "Storage",
+        "checked": true
+    },
+    "orderGroupBox": {
+        "text": null,
+        "checked": false
+    },
+    "orderDropdown": {
+        "text": null,
+        "checked": null
+    },
+    "orderLabel": {
+        "text": "Order:",
+        "checked": null
+    },
+    "fully_started": true
+}

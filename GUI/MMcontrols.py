@@ -806,7 +806,69 @@ class MMConfigUI:
 
 from PyQt5.QtCore import QSize, pyqtSignal
 
-class MDAGlados(QMainWindow):
+import pickle
+
+class CustomMainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.storingExceptions = ['core','layout','shared_data','gui','mda']
+
+    def save_state(self, filename):
+        print('SAVING STATE')
+        state = {}
+        for key, value in vars(self).items():
+            if isinstance(value, QWidget):
+                state[key] = {
+                    'text': value.text() if hasattr(value, 'text') else None,
+                    'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
+                    # Add more properties as needed
+                }
+            else:
+                if key not in self.storingExceptions:
+                    state[key] = value
+
+        with open(filename, 'w') as file:
+            json.dump(state, file, indent=4)
+
+    def load_state(self, filename):
+        print('LOADING STATE')
+        with open(filename, 'r') as file:
+            state = json.load(file)
+            
+        for key, value in state.items():
+            try:
+                if eval('isinstance(self.'+key+',QWidget)'):
+                    isWidget = True
+                    isVar = False
+                elif eval('hasattr(self,\"'+key+'\")'):
+                    isVar = True
+                    isWidget = False
+                else:
+                    isVar = False
+                    isWidget = False
+                if isWidget:
+                    widget = eval('self.'+key)
+                    if value['text'] is not None:
+                        widget.setText(value['text'])
+                    if value['checked'] is not None:
+                        widget.setChecked(value['checked'])
+                elif isVar:
+                    setattr(self, key, value)
+            except:
+                pass
+            
+            # if isinstance(value, dict):
+            #     for widget_name, properties in value.items():
+            #         widget = getattr(self, widget_name, None)
+            #         if widget is not None:
+            #             if hasattr(widget, 'setText') and 'text' in properties:
+            #                 widget.setText(properties['text'])
+            #             if hasattr(widget, 'setChecked') and 'checked' in properties:
+            #                 widget.setChecked(properties['checked'])
+            #             # Add more properties as needed
+            # else:
+    
+class MDAGlados(CustomMainWindow):
     
     def handleSizeChange(self, size):
         newNrColumns = max(1,min(10, size.width() // 150))
@@ -856,6 +918,9 @@ class MDAGlados(QMainWindow):
             self.has_GUI = True
         
         self.fully_started = True
+        #check if mda_state.json exists:
+        if os.path.isfile('mda_state.json'):
+            self.load_state('mda_state.json')
     
     def getDevicesOfDeviceType(self,devicetype):
         #Find all devices that have a specific devicetype
@@ -871,7 +936,6 @@ class MDAGlados(QMainWindow):
                 logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
-    
     
     @property
     def GUI_grid_width(self):
@@ -900,7 +964,6 @@ class MDAGlados(QMainWindow):
         self.zGroupBox = QGroupBox("Z")
         self.channelGroupBox = QGroupBox("Channel")
         self.timeGroupBox = QGroupBox("Time")
-        self.orderGroupBox = QGroupBox("Order")
         self.storageGroupBox = QGroupBox("Storage")
         self.showOptionsGroupBox = QGroupBox("Options")
 
@@ -1064,12 +1127,6 @@ class MDAGlados(QMainWindow):
         self.z_nrsteps_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
 
-        
-        #--------------- Order widget -----------------------------------------------
-        #order should be a dropdown that has all possible options of c,t,p,z (channel, time, position, z), but only if these are actually turned on in the settings:
-        orderLayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
-        self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
         self.GUI_show_exposure_chkbox = QCheckBox("Exposure")
@@ -1112,7 +1169,6 @@ class MDAGlados(QMainWindow):
         self.zGroupBox.setLayout(zLayout)
         self.channelGroupBox.setLayout(channelLayout)
         self.timeGroupBox.setLayout(timeLayout)
-        self.orderGroupBox.setLayout(orderLayout)
         self.storageGroupBox.setLayout(storageLayout)
         self.showOptionsGroupBox.setLayout(showOptionsLayout)
 
@@ -1200,33 +1256,34 @@ class MDAGlados(QMainWindow):
         QCoreApplication.processEvents()
         
         #At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
-        optionsGroupBox = QGroupBox()
-        optionsLayout = QVBoxLayout()
-        optionsGroupBox.setLayout(optionsLayout)
-        optionsLayout.addWidget(self.showOptionsGroupBox) # type: ignore
+        optionsBGroupBox = QWidget()
+        optionsBLayout = QVBoxLayout()
+        optionsBGroupBox.setLayout(optionsBLayout)
+        optionsBLayout.addWidget(self.showOptionsGroupBox) # type: ignore
         self.showOptionsGroupBox.setEnabled(True)
-        optionsLayout.addWidget(self.storageGroupBox) # type: ignore
+        optionsBLayout.addWidget(self.storageGroupBox) # type: ignore
         if GUI_show_storage: 
             self.storageGroupBox.setEnabled(True)
         else:
             self.storageGroupBox.setEnabled(False)
         self.GUI_acquire_button = QPushButton("Acquire")
         self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI())
-        optionsLayout.addWidget(self.GUI_acquire_button) # type: ignore
+        optionsBLayout.addWidget(self.GUI_acquire_button) # type: ignore
         if GUI_acquire_button:
             self.GUI_acquire_button.setEnabled(True)
         else:
             self.GUI_acquire_button.setEnabled(False)
         
-        self.gui.addWidget(optionsGroupBox, 0, 0) # type: ignore
+        self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
         
         #Add order/exposure/time as single groupbox
-        orderexposuretimegroupbox = QGroupBox()
+        orderexposuretimegroupbox = QWidget()
         orderexposuretimelayout = QVBoxLayout()
         orderexposuretimegroupbox.setLayout(orderexposuretimelayout)
         
         self.orderGroupBox = QGroupBox("Order")
         orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
+        
         self.orderGroupBox.setLayout(orderlayout)
         orderexposuretimelayout.addWidget(self.orderGroupBox) # type: ignore
         orderexposuretimelayout.addWidget(self.exposureGroupBox) # type: ignore
@@ -1341,7 +1398,7 @@ class MDAGlados(QMainWindow):
         #This function will be run every time any option in the GUI is changed.
         print('starting get_MDA_events_from_GUI')
         #Make this somewhat readable:
-        if self.exposureGroupBox.isVisible():
+        if self.exposureGroupBox.isEnabled():
             try:
                 self.exposure_ms = float(self.exposureEntry.text())
                 if self.exposureDropdown.currentText() == 's':
@@ -1349,7 +1406,7 @@ class MDAGlados(QMainWindow):
             except:
                 self.exposure_ms = None
         
-        if self.timeGroupBox.isVisible():
+        if self.timeGroupBox.isEnabled():
             try:
                 self.num_time_points = int(self.timePointEntry.text())
                 self.time_interval_s = float(self.timeIntervalEntry.text())
@@ -1359,14 +1416,14 @@ class MDAGlados(QMainWindow):
                 self.num_time_points = None
                 self.time_interval_s = None
                 
-        if self.orderGroupBox.isVisible():
+        if self.orderGroupBox.isEnabled():
             self.order = self.orderDropdown.currentText()
         
-        if self.storageGroupBox.isVisible():
+        if self.storageGroupBox.isEnabled():
             self.storageFolder = self.storageFolderEntry.text()
             self.storageFileName = self.storageFileNameEntry.text()
         
-        if self.zGroupBox.isVisible():
+        if self.zGroupBox.isEnabled():
             try:
                 #We also need to set the shared_data focus device for proper z-functioning
                 self.shared_data.core.set_focus_device(self.z_oneDstageDropdown.currentText())
@@ -1395,6 +1452,8 @@ class MDAGlados(QMainWindow):
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
         
         print(self.mda)
+        if self.fully_started:
+            self.save_state('mda_state.json')
         print('ended get_MDA_events_from_GUI')
         
         pass

@@ -131,6 +131,7 @@ def run_live_mode_worker(img_queue):
             acq.acquire(events)
 
     #Now we're after the livestate
+    shared_data.core.stop_sequence_acquisition()
     #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
     cleanUpTemporaryFiles()
     import shutil
@@ -284,6 +285,7 @@ def run_mda_mode_worker(img_queue):
     global acq
     while mdastate:
         print("attempting to acquire")
+        shared_data.core.stop_sequence_acquisition()
         print(f"found mdaparams: {shared_data._mdaModeParams}")
         #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
         savefolder = './temp'
@@ -301,6 +303,10 @@ def run_mda_mode_worker(img_queue):
         with JavaBackendAcquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = grab_image_mdamode,napari_viewer=napariViewer) as acq: #type:ignore
             events = shared_data._mdaModeParams
             acq.acquire(events)
+            # acq.await_completion()
+            acq.mark_finished()
+        print('MDA Acq fully finished')
+        shared_data.core.stop_sequence_acquisition()
         mdastate = False
 
     #Now we're after the livestate
