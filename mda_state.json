@@ -6,7 +6,7 @@
         "gui",
         "mda"
     ],
-    "num_time_points": 100,
+    "num_time_points": 10,
     "time_interval_s": 0.0,
     "z_start": 3503.7,
     "z_end": 3703.7,
@@ -92,7 +92,7 @@
         }
     },
     "lastTimeUpdateSize": 1711557824.0143504,
-    "_GUI_grid_width": 10,
+    "_GUI_grid_width": 9,
     "exposureGroupBox": {
         "text": null,
         "checked": false
@@ -138,7 +138,7 @@
         "checked": null
     },
     "timePointEntry": {
-        "text": "100",
+        "text": "10",
         "checked": null
     },
     "timeIntervalLabel": {

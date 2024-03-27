@@ -123,15 +123,21 @@ def run_live_mode_worker(img_queue):
     #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
     #The abortion is handled in grab_image_livemode
     global livestate
+    global mdastate
     global acq
     while livestate:
-        #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-        with JavaBackendAcquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = grab_image_livemode) as acq: #type:ignore
-            events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
-            acq.acquire(events)
+        if mdastate:
+            print('LIVE NOT STARTED! MDA IS RUNNING')
+            shared_data.liveMode = False
+        else:
+            #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+            with JavaBackendAcquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = grab_image_livemode) as acq: #type:ignore
+                events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                acq.acquire(events)
 
     #Now we're after the livestate
     shared_data.core.stop_sequence_acquisition()
+    shared_data.liveMode = False
     #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
     cleanUpTemporaryFiles()
     import shutil
@@ -169,7 +175,8 @@ def liveModeChanged():
     
     Is called, and shared_data.liveMode should be changed seperately from running this funciton
     """
-    global livestate, stop_continuous_task
+    global livestate, stop_continuous_task, mdastate
+    mdastate = shared_data.mdaMode
     #Hook the live mode into the scripts here
     if shared_data.liveMode == False:
         livestate = False
@@ -281,10 +288,13 @@ def run_mda_mode_worker(img_queue):
     print('MDA mode worker run started')
     #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
     #The abortion is handled in grab_image_livemode
-    global mdastate
-    global acq
+    global mdastate, acq, livestate
     while mdastate:
         print("attempting to acquire")
+        if livestate:
+            print("Attempting to turn live mode off")
+            shared_data.liveMode = False
+            time.sleep(1)
         shared_data.core.stop_sequence_acquisition()
         print(f"found mdaparams: {shared_data._mdaModeParams}")
         #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
@@ -308,6 +318,7 @@ def run_mda_mode_worker(img_queue):
         print('MDA Acq fully finished')
         shared_data.core.stop_sequence_acquisition()
         mdastate = False
+        shared_data.mdaMode = False
 
     #Now we're after the livestate
     #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
@@ -341,8 +352,8 @@ def mdaModeChanged():
     
     Is called, and shared_data.mdaMode should be changed seperately from running this funciton
     """
-    print('mdamodechanged called')
-    global mdastate, stop_continuous_task
+    global mdastate, stop_continuous_task, livestate    
+    livestate = shared_data.liveMode
     #Hook the live mode into the scripts here
     if shared_data.mdaMode == False:
         mdastate = False
@@ -358,7 +369,6 @@ def mdaModeChanged():
         worker2 = visualise_mda_mode_worker(img_queue) #type:ignore
         worker1.start() #type:ignore
         logging.info("MDA display mode started")
-
 
 """ 
 Napari widgets
