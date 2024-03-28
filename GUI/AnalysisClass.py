@@ -181,7 +181,6 @@ class napariOverlay():
         else:
             self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
     
-    
     #Update routine for an overlay that only has shapes
     def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
         """
@@ -260,7 +259,7 @@ class AnalysisThread(QThread):
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=100):
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=500):
         """
         Initializes the AnalysisThread object.
 
@@ -427,7 +426,6 @@ class AnalysisThread(QThread):
     #Update ir called every time the analysis is done
     def update_napariLayer(self,analysis_data):
         if analysis_data is not None:
-            print(f"len of data in update_napariLayer: {len(analysis_data)}")
             analysis_result = analysis_data[0]
             metadata = analysis_data[1]
             # print(analysis_result)

@@ -8,6 +8,7 @@ General napari functions
 """
 
 def getLayerIdFromName(layer_name,napariViewer):
+    print(layer_name)
     ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, '_name') and layer._name == layer_name]
     return ImageLayer
 

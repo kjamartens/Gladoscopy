@@ -23,43 +23,44 @@ from FlowChart_dockWidgets import *
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 from utils import cleanUpTemporaryFiles
 
-# Define a flag to control the continuous task
-stop_continuous_task = False
-# empty queue for (live) image data
-img_queue = queue.Queue()
-# Create a queue to pass image data between threads
-image_queue_analysis = queue.Queue()
-# Create a signal to communicate between threads
-analysis_done_signal = pyqtSignal(object)
 
-#Sleep time to keep responsiveness
-sleep_time = 0.05
+# # Define a flag to control the continuous task
+# stop_continuous_task = False
+# # empty queue for (live) image data
+# img_queue = queue.Queue()
+# # Create a queue to pass image data between threads
+# image_queue_analysis = queue.Queue()
+# # Create a signal to communicate between threads
+# analysis_done_signal = pyqtSignal(object)
+
+# #Sleep time to keep responsiveness
+# sleep_time = 0.05
 
 
-"""
-Live update definitions for napari
-"""
-
-def napariUpdateLive(data):
-    liveImage = data[0]
-    metadata = data[1]
+#This needs to be a function outside of any class due to Yield-calling
+def napariUpdateLive(DataStructure):
     """ 
-    Function that finally shows the live image in napari
-    
-    Inputs: liveImage: current live image (array)
+    Function that finally shows the  image in napari
     """
+    napariViewer = DataStructure['napariViewer']
+    acqstate = DataStructure['acqState']
+    core = DataStructure['core']
+    image_queue_analysisA = DataStructure['image_queue_analysis']
+    analysisThreads = DataStructure['analysisThreads']
+    print('NapariUpdateLive Ran at time {}'.format(time.time()))
+    liveImage = DataStructure['data'][0]
+    metadata = DataStructure['data'][1]
+    layerName = DataStructure['layer_name']
     if liveImage is None:
         return
-    global livestate
-    if livestate == False:
+    if acqstate == False:
         return
-    logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
-    liveImageLayer = getLayerIdFromName('liveImage',napariViewer)
+    liveImageLayer = getLayerIdFromName(layerName,napariViewer)
 
     #If it's the first liveImageLayer
     if not liveImageLayer:
         nrLayersBefore = len(napariViewer.layers)
-        layer = napariViewer.add_image(liveImage, rendering='attenuated_mip')
+        layer = napariViewer.add_image(liveImage, rendering='attenuated_mip', name = layerName)
         #Set correct scale - in nm
         layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
         layer._keep_auto_contrast = True #type:ignore
@@ -73,307 +74,219 @@ def napariUpdateLive(data):
     
     # Do analysis on this live image
     # Check if the queue is empty
-    if image_queue_analysis.empty():
-        image_queue_analysis.put([liveImage,metadata])
+    if image_queue_analysisA.empty():
+        image_queue_analysisA.put([liveImage,metadata])
         #Start all analysisthreads
-        for analysisThread in shared_data.analysisThreads:
+        for analysisThread in analysisThreads:
             if not analysisThread.isRunning():
+                print(f'starting analysis thread: {analysisThread}')
                 analysisThread.start()
-        # # Start the analysis thread if it's not already running
-        # if not analysis_thread.isRunning():
-        #     analysis_thread.start()
-        # # Start the analysis thread if it's not already running
-        # if not analysis_thread2.isRunning():
-        #     analysis_thread2.start()  
 
-def grab_image_livemode(image, metadata, event_queue):
-    """ 
-    Function that runs on every frame obtained in live mode and putis in the image queue
-    
-    Inputs: array image: image from micromanager
-            metadata: metadata from micromanager
-    """
-    # print(event_queue.get())
-    # print(image)
-    # print(metadata)
-    global livestate
-    if livestate:
-        logging.info('grab_image within livemode')
-        if img_queue.qsize() < 3:
-            img_queue.put([image,metadata])
-            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-            for queue in shared_data.liveImageQueues:
-                if queue.qsize() < 2:
-                    queue.put([image,metadata])
+class napariHandler():
+    def __init__(self, shared_data,liveOrMda='live') -> None:
+        self.shared_data = shared_data
+        self.napariViewer = shared_data.napariViewer
+        if liveOrMda == 'live':
+            self.liveOrMda = 'live'
+            self.acqstate = shared_data.liveMode
+        elif liveOrMda == 'mda':
+            self.liveOrMda = 'mda'
+            self.acqstate = shared_data.mdaMode
+        # Define a flag to control the continuous task
+        self.stop_continuous_task = False
+        # empty queue for (live) image data
+        self.img_queue = queue.Queue()
+        # Create a queue to pass image data between threads
+        self.image_queue_analysis = queue.Queue()
+        # Create a signal to communicate between threads
+        self.analysis_done_signal = pyqtSignal(object)
+
+        #Sleep time to keep responsiveness
+        self.sleep_time = 0.1
+        self.layerName = 'newLayer'
+
+    def grab_image(self,image, metadata, event_queue):
+        """ 
+        Function that runs on every frame obtained in live mode and putis in the image queue
         
-    else:
-        logging.info('Broke off live mode')
-        event_queue.put(None)
-        try:
-            acq.abort()
-            logging.info('aborted acquisition')
-        except:
-            logging.info('attemped to abort acq')
-    
-    return image, metadata
-
-@thread_worker
-def run_live_mode_worker(img_queue):
-    """ 
-    Worker which handles live mode on/off turning etc
-    
-    Inputs: img_queue (unused, but required)
-    """
-    #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
-    #The abortion is handled in grab_image_livemode
-    global livestate
-    global mdastate
-    global acq
-    while livestate:
-        if mdastate:
-            print('LIVE NOT STARTED! MDA IS RUNNING')
-            shared_data.liveMode = False
+        Inputs: array image: image from micromanager
+                metadata: metadata from micromanager
+        """
+        # print(event_queue.get())
+        if self.acqstate:
+            if self.img_queue.qsize() < 3:
+                self.img_queue.put([image,metadata])
+                #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+                for queue in self.shared_data.liveImageQueues:
+                    if queue.qsize() < 2:
+                        queue.put([image,metadata])
+            
         else:
-            #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-            with JavaBackendAcquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = grab_image_livemode) as acq: #type:ignore
-                events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
-                acq.acquire(events)
-
-    #Now we're after the livestate
-    shared_data.core.stop_sequence_acquisition()
-    shared_data.liveMode = False
-    #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
-    cleanUpTemporaryFiles()
-    import shutil
-    for folder in os.listdir('./temp'):
-        if 'LiveAcqShouldBeRemoved' in folder:
+            logging.info('Broke off live mode')
+            event_queue.put(None)
             try:
-                shutil.rmtree(os.path.join('./temp', folder))
+                acq.abort()
+                logging.info('aborted acquisition')
             except:
-                pass
-
-@thread_worker(connect={'yielded': napariUpdateLive})
-def visualise_live_mode_worker(img_queue):
-    """
-    Worker which handles the visualisation of the live mode queue
-    Connected to display_napari function to update display 
-    """
-    global livestate
-
-    while livestate:
-        time.sleep(sleep_time)
-        # get elements from queue while there is more than one element
-        # playing it safe: I'm always leaving one element in the queue
-        while img_queue.qsize() > 1:
-            yield img_queue.get(block = False)
-
-    # read out last remaining elements after end of acquisition
-    while img_queue.qsize() > 0:
-        yield img_queue.get(block = False)
-    logging.debug("acquisition done")
-
-
-def liveModeChanged():
-    """
-    General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered
-    
-    Is called, and shared_data.liveMode should be changed seperately from running this funciton
-    """
-    global livestate, stop_continuous_task, mdastate
-    mdastate = shared_data.mdaMode
-    #Hook the live mode into the scripts here
-    if shared_data.liveMode == False:
-        livestate = False
-        stop_continuous_task = True
-        #Clear the image queue
-        img_queue.queue.clear()
-        logging.info("Live mode stopped")
-    else:
-        livestate = True
-        stop_continuous_task = False
-        #Start the two workers, one to run it, one to visualise it.
-        worker1 = run_live_mode_worker(img_queue)
-        worker2 = visualise_live_mode_worker(img_queue) #type:ignore
-        worker1.start() #type:ignore
-        logging.info("Live mode started")
-
-
-
-
-
-
-
-
-
-
-
-
-def napariUpdateMda(mdaImage):
-    """ 
-    Function that finally shows the live image in napari
-    
-    Inputs: liveImage: current live image (array)
-    """
-    if mdaImage is None:
-        return
-    global mdastate
-    if mdastate == False:
-        return
-    logging.debug('NapariUpdatemda Ran at time {}'.format(time.time()))
-    mdaImageLayer = getLayerIdFromName('mdaImage',napariViewer)
-
-    #If it's the first liveImageLayer
-    if not mdaImageLayer:
-        nrLayersBefore = len(napariViewer.layers)
-        layer = napariViewer.add_image(mdaImage, rendering='attenuated_mip')
-        #Set correct scale - in nm
-        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
-        layer._keep_auto_contrast = True #type:ignore
-        napariViewer.layers.move_multiple([nrLayersBefore,0])
-        napariViewer.reset_view()
-    #Else if the layer already exists, replace it!
-    else:
-        # layer is present, replace its data
-        layer = napariViewer.layers[mdaImageLayer[0]]
-        layer.data = mdaImage
-    
-    # Do analysis on this live image
-    # Check if the queue is empty
-    if image_queue_analysis.empty():
-        image_queue_analysis.put(mdaImage)
-        #Start all analysisthreads
-        for analysisThread in shared_data.analysisThreads:
-            if not analysisThread.isRunning():
-                analysisThread.start()
-        # # Start the analysis thread if it's not already running
-        # if not analysis_thread.isRunning():
-        #     analysis_thread.start()
-        # # Start the analysis thread if it's not already running
-        # if not analysis_thread2.isRunning():
-        #     analysis_thread2.start()  
-
-def grab_image_mdamode(image, metadata, event_queue):
-    """ 
-    Function that runs on every frame obtained in live mode and putis in the image queue
-    
-    Inputs: array image: image from micromanager
-            metadata: metadata from micromanager
-    """
-    # print(event_queue.get())
-    global mdastate
-    if mdastate:
-        logging.info('grab_image within mdamode')
-        if img_queue.qsize() < 3:
-            img_queue.put((image))
-            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-            for queue in shared_data.mdaImageQueues:
-                if queue.qsize() < 2:
-                    queue.put((image))
+                logging.info('attemped to abort acq')
         
-    else:
-        logging.info('Broke off mda mode')
-        event_queue.put(None)
-        try:
-            acq.abort()
-            logging.info('aborted acquisition')
-        except:
-            logging.info('attemped to abort acq')
+        return image, metadata
+
+    @thread_worker
+    def run_pycroManagerAcquisition_worker(self,img_queue):
+        """ 
+        Worker which handles live mode on/off turning etc
+        
+        Inputs: img_queue (unused, but required)
+        """
+        global acq
+        #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
+        #The abortion is handled in grab_image_livemode
+        if self.liveOrMda == 'live':
+            while self.acqstate:
+                if self.shared_data.mdaMode:
+                    print('LIVE NOT STARTED! MDA IS RUNNING')
+                    self.shared_data.liveMode = False
+                else:
+                    #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+                    print('starting acq')
+                    with JavaBackendAcquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
+                        events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                        acq.acquire(events)
+
+            #Now we're after the livestate
+            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.liveMode = False
+            #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+            cleanUpTemporaryFiles()
+        elif self.liveOrMda == 'mda':
+            while self.acqstate:
+                if self.shared_data.liveMode:
+                    self.shared_data.liveMode = False
+                    time.sleep(1)
+                    
+                #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+                print('starting MDA acq')
+                savefolder = './temp'
+                savename = 'MdaAcq'
+                if shared_data._mdaModeSaveLoc[0] != '':
+                    savefolder = shared_data._mdaModeSaveLoc[0]
+                if shared_data._mdaModeSaveLoc[1] != '':
+                    savename = shared_data._mdaModeSaveLoc[1]
+                if shared_data._mdaModeNapariViewer != None:
+                    napariViewer = shared_data._mdaModeNapariViewer
+                    showdisplay = True
+                else:
+                    napariViewer = None
+                    showdisplay = False
+                with JavaBackendAcquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
+                    events = shared_data._mdaModeParams
+                    acq.acquire(events)
+                self.acqstate = False #End the MDA acq state
+
+            #Now we're after the livestate
+            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.mdaMode = False
+            #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+            cleanUpTemporaryFiles()
     
-    return image, metadata
+    @thread_worker(connect={'yielded': napariUpdateLive})
+    def run_napariVisualisation_worker(self,img_queue):
+        """
+        Worker which handles the visualisation of the live mode queue
+        Connected to display_napari function to update display 
+        """
+        while self.acqstate:
+            time.sleep(self.sleep_time)
+            print('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
+            # get elements from queue while there is more than one element
+            # playing it safe: I'm always leaving one element in the queue
+            while img_queue.qsize() > 1:
+                DataStructure = {}
+                DataStructure['data'] = img_queue.get(block = False)
+                DataStructure['napariViewer'] = self.shared_data.napariViewer
+                DataStructure['acqState'] = self.acqstate
+                DataStructure['core'] = self.shared_data.core
+                DataStructure['image_queue_analysis'] = self.image_queue_analysis
+                DataStructure['analysisThreads'] = self.shared_data.analysisThreads
+                if self.liveOrMda == 'live':
+                    DataStructure['layer_name'] = 'Live'
+                else:
+                    DataStructure['layer_name'] = 'MDA'
+                yield DataStructure
+                # self.napariUpdateLive(img_queue.get(block=False))
+
+        # read out last remaining element(s) after end of acquisition
+        while img_queue.qsize() > 0:
+            DataStructure = {}
+            DataStructure['data'] = img_queue.get(block = False)
+            DataStructure['napariViewer'] = self.shared_data.napariViewer
+            DataStructure['acqState'] = self.acqstate
+            DataStructure['core'] = self.shared_data.core
+            DataStructure['image_queue_analysis'] = self.image_queue_analysis
+            DataStructure['analysisThreads'] = self.shared_data.analysisThreads
+            if self.liveOrMda == 'live':
+                DataStructure['layer_name'] = 'Live'
+            else:
+                DataStructure['layer_name'] = 'MDA'
+            yield DataStructure#img_queue.get(block = False)
+            # self.napariUpdateLive(img_queue.get(block=False))
+        logging.debug("acquisition done")
+
+    def acqModeChanged(self, newSharedData = None):
+        """
+        General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered
+        
+        Is called, and shared_data.liveMode should be changed seperately from running this funciton
+        """
+        if newSharedData is not None:
+            self.shared_data = newSharedData
+        if self.liveOrMda == 'live':
+            #Hook the live mode into the scripts here
+            if self.shared_data.liveMode == False:
+                self.acqstate = False
+                self.stop_continuous_task = True
+                #Clear the image queue
+                self.img_queue.queue.clear()
+                logging.info("Live mode stopped")
+            else:
+                print('liveMode changed to TRUE')
+                self.acqstate = True
+                self.stop_continuous_task = False
+                #Start the two workers, one to run it, one to visualise it.
+                worker1 = self.run_pycroManagerAcquisition_worker(self.img_queue) #type:ignore
+                worker2 = self.run_napariVisualisation_worker(self.img_queue) #type:ignore
+                worker1.start() #type:ignore
+                # worker2.start()
+                logging.info("Live mode started")
+        elif self.liveOrMda == 'mda':
+            #Hook the live mode into the scripts here
+            if self.shared_data.mdaMode == False:
+                self.acqstate = False
+                self.stop_continuous_task = True
+                #Clear the image queue
+                self.img_queue.queue.clear()
+                logging.info("MDA mode stopped")
+            else:
+                print('mdaMode changed to TRUE')
+                self.acqstate = True
+                self.stop_continuous_task = False
+                #Start the two workers, one to run it, one to visualise it.
+                worker1 = self.run_pycroManagerAcquisition_worker(self.img_queue) #type:ignore
+                worker2 = self.run_napariVisualisation_worker(self.img_queue) #type:ignore
+                worker1.start() #type:ignore
+                # worker2.start()
+                logging.info("MDA mode started")
 
 
-@thread_worker
-def run_mda_mode_worker(img_queue):
-    """ 
-    Worker which handles mda mode on/off turning etc
-    
-    Inputs: img_queue (unused, but required)
-    """
-    print('MDA mode worker run started')
-    #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
-    #The abortion is handled in grab_image_livemode
-    global mdastate, acq, livestate
-    while mdastate:
-        print("attempting to acquire")
-        if livestate:
-            print("Attempting to turn live mode off")
-            shared_data.liveMode = False
-            time.sleep(1)
-        shared_data.core.stop_sequence_acquisition()
-        print(f"found mdaparams: {shared_data._mdaModeParams}")
-        #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-        savefolder = './temp'
-        savename = 'MdaAcq'
-        if shared_data._mdaModeSaveLoc[0] != '':
-            savefolder = shared_data._mdaModeSaveLoc[0]
-        if shared_data._mdaModeSaveLoc[1] != '':
-            savename = shared_data._mdaModeSaveLoc[1]
-        if shared_data._mdaModeNapariViewer != None:
-            napariViewer = shared_data._mdaModeNapariViewer
-            showdisplay = True
-        else:
-            napariViewer = None
-            showdisplay = False
-        with JavaBackendAcquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = grab_image_mdamode,napari_viewer=napariViewer) as acq: #type:ignore
-            events = shared_data._mdaModeParams
-            acq.acquire(events)
-            # acq.await_completion()
-            acq.mark_finished()
-        print('MDA Acq fully finished')
-        shared_data.core.stop_sequence_acquisition()
-        mdastate = False
-        shared_data.mdaMode = False
+class napariHandler_liveMode(napariHandler):
+    def __init__(self, shared_data) -> None:
+        super().__init__(shared_data, liveOrMda='live')
+        
 
-    #Now we're after the livestate
-    #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
-    cleanUpTemporaryFiles()
-
-@thread_worker(connect={'yielded': napariUpdateMda})
-def visualise_mda_mode_worker(img_queue):
-    """
-    Worker which handles the visualisation of the live mode queue
-    Connected to display_napari function to update display 
-    """
-    global mdastate
-    print('MDA mode worker visualisation started')
-
-    while mdastate:
-        time.sleep(sleep_time)
-        # get elements from queue while there is more than one element
-        # playing it safe: I'm always leaving one element in the queue
-        while img_queue.qsize() > 1:
-            yield img_queue.get(block = False)
-
-    # read out last remaining elements after end of acquisition
-    while img_queue.qsize() > 0:
-        yield img_queue.get(block = False)
-    logging.debug("acquisition done")
-
-
-def mdaModeChanged():
-    """
-    General function which is called if mda mode is changed or not. Generally called from sharedFunction - when self._mdaMode is altered
-    
-    Is called, and shared_data.mdaMode should be changed seperately from running this funciton
-    """
-    global mdastate, stop_continuous_task, livestate    
-    livestate = shared_data.liveMode
-    #Hook the live mode into the scripts here
-    if shared_data.mdaMode == False:
-        mdastate = False
-        stop_continuous_task = True
-        #Clear the image queue
-        img_queue.queue.clear()
-        logging.info("MDA mode stopped")
-    else:
-        mdastate = True
-        stop_continuous_task = False
-        #Start the two workers, one to run it, one to visualise it.
-        worker1 = run_mda_mode_worker(img_queue)
-        worker2 = visualise_mda_mode_worker(img_queue) #type:ignore
-        worker1.start() #type:ignore
-        logging.info("MDA display mode started")
-
+class napariHandler_mdaMode(napariHandler):
+    def __init__(self, shared_data) -> None:
+        super().__init__(shared_data, liveOrMda='mda')
 """ 
 Napari widgets
 """
@@ -485,8 +398,8 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
     
-    create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=image_queue_analysis)
-    create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=image_queue_analysis)
+    create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    # create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=image_queue_analysis)
     logging.debug("Live mode pseudo-analysis thread created")
     
     #Set some common things for the UI (scale bar on and such)

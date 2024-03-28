@@ -6,18 +6,18 @@
         "gui",
         "mda"
     ],
-    "num_time_points": 10,
-    "time_interval_s": 0.002,
+    "num_time_points": 2,
+    "time_interval_s": 0.001,
     "z_start": 3503.7,
     "z_end": 3703.7,
-    "z_step": 66.66666666666667,
+    "z_step": 40.0,
     "channel_group": null,
     "channels": null,
     "channel_exposures_ms": null,
     "xy_positions": null,
     "xyz_positions": null,
     "position_labels": null,
-    "order": "t",
+    "order": "tz",
     "exposure_ms": 100.0,
     "storageFolder": "C:/Users/SMIPC2/Documents/GitHub/ScopeGUI/Testing",
     "storageFileName": "asdf",
@@ -138,7 +138,7 @@
         "checked": null
     },
     "timePointEntry": {
-        "text": "10",
+        "text": "2",
         "checked": null
     },
     "timeIntervalLabel": {
@@ -146,7 +146,7 @@
         "checked": null
     },
     "timeIntervalEntry": {
-        "text": "2",
+        "text": "1",
         "checked": null
     },
     "timeIntervalDropdown": {
@@ -242,7 +242,7 @@
         "checked": false
     },
     "z_nrsteps_entry": {
-        "text": "3",
+        "text": "5",
         "checked": null
     },
     "z_stepdistance_entry": {
@@ -259,7 +259,7 @@
     },
     "GUI_show_z_chkbox": {
         "text": "Z",
-        "checked": false
+        "checked": true
     },
     "GUI_show_channel_chkbox": {
         "text": "Channel",
