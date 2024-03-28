@@ -93,7 +93,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         sub_menu_startstop = QMenu("Start/stop", self)
 
-        new_acq_node_action = QAction("New Acquisition node", self)
+        new_acq_node_action = QAction("New MDA/Acquisition node", self)
         new_analysis_node_action = QAction("New Analysis node", self)
         new_scoring_node_action = QAction("New Scoring node", self)
         new_decision_node_action = QAction("New Decision node", self)

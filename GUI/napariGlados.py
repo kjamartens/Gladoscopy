@@ -19,6 +19,7 @@ from AutonomousMicroscopyScripts import *
 from MMcontrols import microManagerControlsUI, MDAGlados
 from AnalysisClass import *
 from Analysis_dockWidgets import *
+from mdaAnalysisScoringVisualisation import *
 from FlowChart_dockWidgets import *
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 from utils import cleanUpTemporaryFiles
@@ -47,7 +48,7 @@ def napariUpdateLive(DataStructure):
     core = DataStructure['core']
     image_queue_analysisA = DataStructure['image_queue_analysis']
     analysisThreads = DataStructure['analysisThreads']
-    print('NapariUpdateLive Ran at time {}'.format(time.time()))
+    # print('NapariUpdateLive Ran at time {}'.format(time.time()))
     liveImage = DataStructure['data'][0]
     metadata = DataStructure['data'][1]
     layerName = DataStructure['layer_name']
@@ -198,7 +199,7 @@ class napariHandler():
         """
         while self.acqstate:
             time.sleep(self.sleep_time)
-            print('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
+            # print('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
             # get elements from queue while there is more than one element
             # playing it safe: I'm always leaving one element in the queue
             while img_queue.qsize() > 1:
@@ -358,7 +359,16 @@ class dockWidget_flowChart(dockWidgets):
         
         #Add the full micro manager controls UI
         self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
+
+class dockWidget_mdaAnalysisScoringTest(dockWidgets):
+    def __init__(self): 
+        logging.debug("dockwidgetMDAANALYSISSCORINGTEST started")
+        super().__init__()
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = mdaAnalysisScoringTest_dockWidget(core,MM_JSON,self.layout,shared_data)
     
+
 class dockWidget_MDA(dockWidgets):
     def __init__(self): 
         print("dockWidget_MDA started")
@@ -367,7 +377,7 @@ class dockWidget_MDA(dockWidgets):
         #Add the full micro manager controls UI
         self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True).getGui()
         self.sizeChanged.connect(self.dockWidget.handleSizeChange)
-        
+
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
@@ -399,7 +409,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     shared_data.napariViewer = napariViewer
     
     create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
-    # create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=image_queue_analysis)
+    create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     logging.debug("Live mode pseudo-analysis thread created")
     
     #Set some common things for the UI (scale bar on and such)
@@ -417,6 +427,9 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     
     custom_widget_MDA = dockWidget_MDA()
     napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="MDA",tabify=True)
+    
+    custom_widget_MDAAST = dockWidget_mdaAnalysisScoringTest()
+    napariViewer.window.add_dock_widget(custom_widget_MDAAST, area="top", name="TESTER",tabify=True)
     
     if include_flowChart_automatedMicroscopy:
         custom_widget_flowChart = dockWidget_flowChart()

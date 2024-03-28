@@ -6,7 +6,7 @@
         "gui",
         "mda"
     ],
-    "num_time_points": 2,
+    "num_time_points": 5,
     "time_interval_s": 0.001,
     "z_start": 3503.7,
     "z_end": 3703.7,
@@ -17,7 +17,7 @@
     "xy_positions": null,
     "xyz_positions": null,
     "position_labels": null,
-    "order": "tz",
+    "order": "t",
     "exposure_ms": 100.0,
     "storageFolder": "C:/Users/SMIPC2/Documents/GitHub/ScopeGUI/Testing",
     "storageFileName": "asdf",
@@ -93,6 +93,7 @@
     },
     "lastTimeUpdateSize": 1711557824.0143504,
     "_GUI_grid_width": 10,
+    "fully_started": true,
     "exposureGroupBox": {
         "text": null,
         "checked": false
@@ -138,7 +139,7 @@
         "checked": null
     },
     "timePointEntry": {
-        "text": "2",
+        "text": "5",
         "checked": null
     },
     "timeIntervalLabel": {
@@ -259,7 +260,7 @@
     },
     "GUI_show_z_chkbox": {
         "text": "Z",
-        "checked": true
+        "checked": false
     },
     "GUI_show_channel_chkbox": {
         "text": "Channel",
@@ -271,7 +272,7 @@
     },
     "GUI_show_storage_chkbox": {
         "text": "Storage",
-        "checked": true
+        "checked": false
     },
     "orderGroupBox": {
         "text": null,
@@ -284,6 +285,5 @@
     "orderLabel": {
         "text": "Order:",
         "checked": null
-    },
-    "fully_started": true
+    }
 }

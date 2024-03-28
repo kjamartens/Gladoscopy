@@ -1,0 +1,46 @@
+from MainScripts import FunctionHandling
+from shapely import Polygon, affinity
+import math
+import numpy as np
+import inspect
+import dask.array as da
+
+# Required function __function_metadata__
+# Should have an entry for every function in this file
+def __function_metadata__():
+    return {
+        "AvgGrayValue": {
+            "required_kwargs": [
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Average gray value."
+        }
+    }
+
+
+#-------------------------------------------------------------------------------------------------------------------------------
+#Callable functions
+#-------------------------------------------------------------------------------------------------------------------------------
+def AvgGrayValue(NDTIFFStack,**kwargs):
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+
+    print(NDTIFFStack._summary_metadata)
+    print(NDTIFFStack.as_array())
+    
+    
+    # Compute the average intensity of each slice
+    slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2))
+
+    # Compute the overall average intensity
+    overall_avg_intensity = slice_avg_intensity.mean().compute()
+
+    # Print the average intensity of each slice
+    print("Average intensity of each slice:")
+    print(slice_avg_intensity.compute())
+
+    # Print the overall average intensity
+    print("Overall average intensity:", overall_avg_intensity)
+    
+    return overall_avg_intensity

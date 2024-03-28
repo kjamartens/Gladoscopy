@@ -1601,14 +1601,20 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         """
         
-        #Open a Dialog on double click
-        dialog = FoVFindImaging_singleCh_configs(parentData=self.scene().views()[0])
-        #Get the outputs from the dialog
-        if dialog.exec_() == QDialog.Accepted:
-            print(dialog.getInputs())
-        #     text, combo_value = dialog.getInputs()
-        #     print("Text:", text)
-        #     print("Combo Value:", combo_value)
+        if self.nodePreset == 'acquisition':
+            dialog = nodz_openMDADialog(parentData=self.scene().views()[0])
+            if dialog.exec_() == QDialog.Accepted:
+                print(dialog.getInputs())
+            print('hmm')
+        else:
+            #Open a Dialog on double click
+            dialog = FoVFindImaging_singleCh_configs(parentData=self.scene().views()[0])
+            #Get the outputs from the dialog
+            if dialog.exec_() == QDialog.Accepted:
+                print(dialog.getInputs())
+            #     text, combo_value = dialog.getInputs()
+            #     print("Text:", text)
+            #     print("Combo Value:", combo_value)
         
         # #Update the node text from this dialog output:
         self.scene().parent().editNodeDisplayText(self, newDisplayText=str(dialog.getInputs())) #type:ignore

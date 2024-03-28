@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
 
 #Import all scripts in the custom script folders
-from CellSegmentScripts import *
-from CellScoringScripts import *
+from AutonomousMicroscopy.Analysis_Shapes import *
+from AutonomousMicroscopy.Scoring_Shapes import *
 from ROICalcScripts import *
 from ScoringMetrics import *
 #Obtain the helperfunctions

@@ -8,7 +8,7 @@ from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayou
 from PyQt5.QtCore import QRectF
 import nodz_utils as utils
 
-from MMcontrols import MMConfigUI, ConfigInfo
+from MMcontrols import MMConfigUI, ConfigInfo, MDAGlados
 
 """ 
 Custom nodz attachments
@@ -42,6 +42,40 @@ class AdvancedInputDialog(QDialog):
         
     def getInputs(self):
         return self.line_edit.text(), self.combo_box.currentText()
+
+
+class nodz_openMDADialog(QDialog):
+    def __init__(self, parent=None, parentData=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle("MDA Dialog")
+        if parentData is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            testQWidget = QWidget()
+            
+            self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,hasGUI=True)
+            
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box.accepted.connect(self.accept)
+            button_box.rejected.connect(self.reject)
+            
+
+            # Create the QVBoxLayout
+            layout = QVBoxLayout()
+
+            # Create a QWidget to contain the QGridLayout
+            grid_widget = QWidget()
+            grid_widget.setLayout(self.mdaconfig.gui)
+            # Add the QMainWindow to the QVBoxLayout
+            layout.addWidget(grid_widget)
+
+            layout.addWidget(button_box)
+            
+            self.setLayout(layout)
+        
+    def getInputs(self):
+        return self.mdaconfig.mda
+
 
 class FoVFindImaging_singleCh_configs(QDialog):
     def __init__(self, parent=None, parentData=None):

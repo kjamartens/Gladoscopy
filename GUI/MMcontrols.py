@@ -808,7 +808,7 @@ from PyQt5.QtCore import QSize, pyqtSignal
 
 import pickle
 
-class CustomMainWindow(QMainWindow):
+class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.storingExceptions = ['core','layout','shared_data','gui','mda']
@@ -908,6 +908,8 @@ class MDAGlados(CustomMainWindow):
         self.gui = {}
         self.lastTimeUpdateSize = time.time()
         self._GUI_grid_width = None
+        
+        self.fully_started = False
         
         #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
@@ -1175,19 +1177,20 @@ class MDAGlados(CustomMainWindow):
         # Add groupboxes to the main layout, only if they should be shown. The position of the gridbox is based on whether the previous ones are added or not:
         self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions,GUI_acquire_button=GUI_acquire_button)
         
-        #Add the layout to the main layout
-        self.layout.addLayout(self.gui,0,0)
-        
-        # Changing font and padding of all widgets
-        font = QFont("Arial", 7)
-        for i in range(self.gui.count()):
-            try:
-                item = self.gui.itemAt(i)
-                if item.widget():
-                    item.widget().setFont(font)
-                    item.widget().setStyleSheet("padding: 2px; margin: 1px; spacing: 1px;")  # Change padding as needed
-            except:
-                pass
+        if self.layout is not None:
+            #Add the layout to the main layout
+            self.layout.addLayout(self.gui,0,0)
+            
+            # Changing font and padding of all widgets
+            font = QFont("Arial", 7)
+            for i in range(self.gui.count()):
+                try:
+                    item = self.gui.itemAt(i)
+                    if item.widget():
+                        item.widget().setFont(font)
+                        item.widget().setStyleSheet("padding: 2px; margin: 1px; spacing: 1px;")  # Change padding as needed
+                except:
+                    pass
         
     def setZStart(self):
         zstage = self.z_oneDstageDropdown.currentText()

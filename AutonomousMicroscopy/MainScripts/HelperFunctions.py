@@ -9,9 +9,9 @@ import re
 from stardist.models import StarDist2D
 
 #Import all scripts in the custom script folders
-from CellSegmentScripts import *
+from AutonomousMicroscopy.Analysis_Shapes import *
 from ROICalcScripts import *
-from CellScoringScripts import *
+from AutonomousMicroscopy.Scoring_Shapes import *
 from ScoringMetrics import *
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
