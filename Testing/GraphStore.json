@@ -1,20 +1,12 @@
 {
     "CONNECTIONS": [
         [
-            "nodeB.Battr1",
+            "nodeB.Battr\nNewline4",
             "nodeA.Aattr2"
         ],
         [
-            "nodeB.Battr2",
+            "nodeB.Battr1",
             "nodeC.Cattr4"
-        ],
-        [
-            "nodeA.Aattr1",
-            "New node!.New attribute"
-        ],
-        [
-            "nodeC.Cattr2",
-            "New node!.New attribute"
         ]
     ],
     "NODES": {
@@ -41,8 +33,8 @@
                 }
             ],
             "position": [
-                5342.162590320102,
-                4910.924490258081
+                5267.0,
+                4834.5
             ],
             "preset": "node_preset_1"
         },
@@ -69,8 +61,8 @@
                 }
             ],
             "position": [
-                5012.274756788768,
-                4607.825711119525
+                4885.0,
+                4997.5
             ],
             "preset": "node_preset_1"
         },
@@ -124,8 +116,8 @@
                 }
             ],
             "position": [
-                4599.269703294222,
-                4879.27354079152
+                4597.0,
+                4750.5
             ],
             "preset": "node_imaging"
         },
@@ -206,8 +198,8 @@
                 }
             ],
             "position": [
-                5004.858176260931,
-                5072.472852150652
+                4980.0,
+                4700.5
             ],
             "preset": "node_preset_1"
         }

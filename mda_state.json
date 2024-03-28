@@ -7,7 +7,7 @@
         "mda"
     ],
     "num_time_points": 10,
-    "time_interval_s": 0.0,
+    "time_interval_s": 0.002,
     "z_start": 3503.7,
     "z_end": 3703.7,
     "z_step": 66.66666666666667,
@@ -92,7 +92,7 @@
         }
     },
     "lastTimeUpdateSize": 1711557824.0143504,
-    "_GUI_grid_width": 9,
+    "_GUI_grid_width": 10,
     "exposureGroupBox": {
         "text": null,
         "checked": false
@@ -146,7 +146,7 @@
         "checked": null
     },
     "timeIntervalEntry": {
-        "text": "0",
+        "text": "2",
         "checked": null
     },
     "timeIntervalDropdown": {

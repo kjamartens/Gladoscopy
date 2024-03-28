@@ -40,7 +40,9 @@ sleep_time = 0.05
 Live update definitions for napari
 """
 
-def napariUpdateLive(liveImage):
+def napariUpdateLive(data):
+    liveImage = data[0]
+    metadata = data[1]
     """ 
     Function that finally shows the live image in napari
     
@@ -72,7 +74,7 @@ def napariUpdateLive(liveImage):
     # Do analysis on this live image
     # Check if the queue is empty
     if image_queue_analysis.empty():
-        image_queue_analysis.put(liveImage)
+        image_queue_analysis.put([liveImage,metadata])
         #Start all analysisthreads
         for analysisThread in shared_data.analysisThreads:
             if not analysisThread.isRunning():
@@ -92,15 +94,17 @@ def grab_image_livemode(image, metadata, event_queue):
             metadata: metadata from micromanager
     """
     # print(event_queue.get())
+    # print(image)
+    # print(metadata)
     global livestate
     if livestate:
         logging.info('grab_image within livemode')
         if img_queue.qsize() < 3:
-            img_queue.put((image))
+            img_queue.put([image,metadata])
             #Loop over all queues in shared_data.liveImageQueues and also append the image there:
             for queue in shared_data.liveImageQueues:
                 if queue.qsize() < 2:
-                    queue.put((image))
+                    queue.put([image,metadata])
         
     else:
         logging.info('Broke off live mode')

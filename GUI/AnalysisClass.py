@@ -260,7 +260,7 @@ class AnalysisThread(QThread):
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=500):
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=100):
         """
         Initializes the AnalysisThread object.
 
@@ -310,6 +310,7 @@ class AnalysisThread(QThread):
         """
         while not self.isInterruptionRequested():
             #Run analysis on the image from the queue
+            # print(self.image_queue_analysis.get())
             self.analysis_result = self.runAnalysis(self.image_queue_analysis.get()) #type:ignore
             self.analysis_done_signal.emit(self.analysis_result)
             # self.finished.emit()
@@ -368,12 +369,14 @@ class AnalysisThread(QThread):
     
     #Analysis is split into two parts: obtaining the analysis result and displaying this.
     #Here, we calculate the analysis result based on the analysisInfo
-    def runAnalysis(self,image): 
+    def runAnalysis(self,data): 
         """
         Runs the analysis on the given image based on the analysis information provided.
 
         Args:
+            data, containing:
             image (Image): The image on which the analysis needs to be performed.
+            metadata: corresponding metadata
 
         Returns:
             analysisResult (Any): The result of the analysis. The analysis result will be passed to Visualise_Analysis_results.
@@ -386,21 +389,26 @@ class AnalysisThread(QThread):
             - If analysisInfo is 'CellSegmentOverlay', the analysisResult will be the result of calcCellSegmentOverlay.
             - If analysisInfo is not set or is invalid, the analysisResult will be None.
         """
-        if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation':
-            self.msleep(self.sleepTimeMs)
-            #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
-            if self.analysisInfo == 'AvgGrayValueText':
-                analysisResult = self.calcAnalysisAvgGrayValue(image)
-            elif self.analysisInfo == 'GrayValueOverlay':
-                analysisResult = self.calcGrayValueOverlay(image)
-            elif self.analysisInfo == 'CellSegmentOverlay':
-                analysisResult = self.calcCellSegmentOverlay(image)
+        if data is not None:
+            image = data[0]
+            metadata = data[1]
+            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation':
+                self.msleep(self.sleepTimeMs)
+                #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
+                if self.analysisInfo == 'AvgGrayValueText':
+                    analysisResult = self.calcAnalysisAvgGrayValue(image,metadata=metadata)
+                elif self.analysisInfo == 'GrayValueOverlay':
+                    analysisResult = self.calcGrayValueOverlay(image,metadata=metadata)
+                elif self.analysisInfo == 'CellSegmentOverlay':
+                    analysisResult = self.calcCellSegmentOverlay(image,metadata=metadata)
+                else:
+                    analysisResult = None
+                return [analysisResult,metadata]
+            elif self.analysisInfo == 'LiveModeVisualisation':
+                self.setPriority(self.HighestPriority) #type:ignore
+                return None
             else:
-                analysisResult = None
-            return analysisResult
-        elif self.analysisInfo == 'LiveModeVisualisation':
-            self.setPriority(self.HighestPriority) #type:ignore
-            return None
+                return None
         else:
             return None
 
@@ -417,17 +425,21 @@ class AnalysisThread(QThread):
             self.initRandomOverlay()
             
     #Update ir called every time the analysis is done
-    def update_napariLayer(self,analysis_result):
-        # print(analysis_result)
-        if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation':
-            if self.visualisationInfo == 'AvgGrayValueText':
-                self.visualiseAvgGrayValueText(analysis_result)
-            elif self.analysisInfo == 'GrayValueOverlay':
-                self.visualiseGrayScaleImageOverlay(analysis_result)
-            elif self.analysisInfo == 'CellSegmentOverlay':
-                self.visualiseCellSegmentOverlay(analysis_result)
-            else:
-                self.visualiseRandomOverlay()
+    def update_napariLayer(self,analysis_data):
+        if analysis_data is not None:
+            print(f"len of data in update_napariLayer: {len(analysis_data)}")
+            analysis_result = analysis_data[0]
+            metadata = analysis_data[1]
+            # print(analysis_result)
+            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation':
+                if self.visualisationInfo == 'AvgGrayValueText':
+                    self.visualiseAvgGrayValueText(analysis_result=analysis_result,metadata=metadata)
+                elif self.analysisInfo == 'GrayValueOverlay':
+                    self.visualiseGrayScaleImageOverlay(analysis_result=analysis_result,metadata=metadata)
+                elif self.analysisInfo == 'CellSegmentOverlay':
+                    self.visualiseCellSegmentOverlay(analysis_result=analysis_result,metadata=metadata)
+                else:
+                    self.visualiseRandomOverlay()
     
     def outlineCoordinatesToImage(self,coords):
     # Create a blank grayscale image with a white background
@@ -454,12 +466,11 @@ class AnalysisThread(QThread):
     Average gray value calculation and display
     """
     #Calculating average gray value of an image
-    def calcAnalysisAvgGrayValue(self,image):
-        print('calcAnalysisAvgGrayValue')
+    def calcAnalysisAvgGrayValue(self,image,metadata=None):
         return np.mean(np.mean(image))
     
-    def visualiseAvgGrayValueText(self,analysis_result='Random'):
-        self.napariOverlay.drawTextOverlay(text='Mean gray value: {:.0f}'.format(analysis_result),pos=[0,0],textCol='white',textSize=12)
+    def visualiseAvgGrayValueText(self,analysis_result='Random',metadata={}):
+        self.napariOverlay.drawTextOverlay(text='Mean gray value: {:.0f}, at frame: {:.0f}'.format(analysis_result,float(metadata['ImageNumber'])),pos=[0,0],textCol='white',textSize=12)
         
     def initAvgGrayValueText(self):
         self.napariOverlay.changeName('Average Gray Value')
@@ -468,7 +479,7 @@ class AnalysisThread(QThread):
     """
     Random overlay display
     """   
-    def visualiseRandomOverlay(self,analysis_result=None):
+    def visualiseRandomOverlay(self,analysis_result=None,metadata={}):
         self.napariOverlay.drawSquaresOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
         
     def initRandomOverlay(self):
@@ -478,12 +489,12 @@ class AnalysisThread(QThread):
     """
     Testing overlay of image - based on grayscale value
     """
-    def calcGrayValueOverlay(self,image):
+    def calcGrayValueOverlay(self,image,metadata=None):
         #Get an image that simply provides a Boolean based on percentile:
         image2 = np.where(image<np.percentile(image,25),1,0)
         return image2
     
-    def visualiseGrayScaleImageOverlay(self,analysis_result=None):
+    def visualiseGrayScaleImageOverlay(self,analysis_result=None,metadata={}):
         #Expected analysis_result is a boolean image.
         #Create an image overlay from napari
         self.napariOverlay.drawImageOverlay(im=analysis_result) #type:ignore
@@ -495,14 +506,13 @@ class AnalysisThread(QThread):
     """
     Testing cell segmentation
     """
-    
-    def calcCellSegmentOverlay(self,image):
+    def calcCellSegmentOverlay(self,image,metadata=None):
         coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment_preloadedModel",image_data="image",model="self.stardistModel"))
         #Get image from this coords:
         outimage = self.outlineCoordinatesToImage(coords)
         return outimage
         
-    def visualiseCellSegmentOverlay(self,analysis_result=None):
+    def visualiseCellSegmentOverlay(self,analysis_result=None,metadata={}):
         # self.napariOverlay.drawShapesOverlay(shapePosList=analysis_result,shapeCol=['red'])
         self.napariOverlay.drawImageOverlay(im=analysis_result) #type:ignore
         
