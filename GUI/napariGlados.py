@@ -16,7 +16,8 @@ import os
 
 from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *
-from MMcontrols import microManagerControlsUI, MDAGlados
+from MMcontrols import microManagerControlsUI
+from MDAGlados import MDAGlados
 from AnalysisClass import *
 from Analysis_dockWidgets import *
 from mdaAnalysisScoringVisualisation import *
@@ -294,7 +295,6 @@ class napariHandler():
 class napariHandler_liveMode(napariHandler):
     def __init__(self, shared_data) -> None:
         super().__init__(shared_data, liveOrMda='live')
-        
 
 class napariHandler_mdaMode(napariHandler):
     def __init__(self, shared_data) -> None:
@@ -334,7 +334,48 @@ class dockWidgets(QMainWindow):
         
     def getDockWidget(self):
         return self.dockWidget
+
+class dockWidget_MMcontrol(dockWidgets):
+    def __init__(self): 
+        logging.debug("dockWidget_MMcontrol started")
+        super().__init__()
+        #Add the full micro manager controls UI
+        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)
+
+class dockWidget_MDA(dockWidgets):
+    def __init__(self): 
+        print("dockWidget_MDA started")
+        super().__init__()
         
+        #Add the full micro manager controls UI
+        self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True).getGui()
+        self.sizeChanged.connect(self.dockWidget.handleSizeChange)
+
+class dockWidget_flowChart(dockWidgets):
+    def __init__(self): 
+        logging.debug("dockWidget_flowchart started")
+        super().__init__()
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
+
+#--- below here not fully necessary---
+class dockWidget_mdaAnalysisScoringTest(dockWidgets):
+    def __init__(self): 
+        logging.debug("dockwidgetMDAANALYSISSCORINGTEST started")
+        super().__init__()
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = mdaAnalysisScoringTest_dockWidget(core,MM_JSON,self.layout,shared_data)
+
+class dockWidget_analysisThreads(dockWidgets):
+    def __init__(self): 
+        logging.debug("dockWidget_analysisThreads started")
+        super().__init__()
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
+
 class dockWidget_fullGladosUI(QMainWindow):
     def __init__(self): 
         logging.info("dockWidget_fullGladosUI started")
@@ -347,47 +388,6 @@ class dockWidget_fullGladosUI(QMainWindow):
         #Run the laserController UI
         runlaserControllerUI(core,MM_JSON,self.ui,shared_data)
         # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
-        
-class dockWidget_MMcontrol(dockWidgets):
-    def __init__(self): 
-        logging.debug("dockWidget_MMcontrol started")
-        super().__init__()
-        #Add the full micro manager controls UI
-        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)
-    
-class dockWidget_analysisThreads(dockWidgets):
-    def __init__(self): 
-        logging.debug("dockWidget_analysisThreads started")
-        super().__init__()
-        
-        #Add the full micro manager controls UI
-        self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
-
-class dockWidget_flowChart(dockWidgets):
-    def __init__(self): 
-        logging.debug("dockWidget_flowchart started")
-        super().__init__()
-        
-        #Add the full micro manager controls UI
-        self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
-
-class dockWidget_mdaAnalysisScoringTest(dockWidgets):
-    def __init__(self): 
-        logging.debug("dockwidgetMDAANALYSISSCORINGTEST started")
-        super().__init__()
-        
-        #Add the full micro manager controls UI
-        self.dockWidget = mdaAnalysisScoringTest_dockWidget(core,MM_JSON,self.layout,shared_data)
-    
-
-class dockWidget_MDA(dockWidgets):
-    def __init__(self): 
-        print("dockWidget_MDA started")
-        super().__init__()
-        
-        #Add the full micro manager controls UI
-        self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True).getGui()
-        self.sizeChanged.connect(self.dockWidget.handleSizeChange)
 
 
 def layer_removed_event_callback(event, shared_data):

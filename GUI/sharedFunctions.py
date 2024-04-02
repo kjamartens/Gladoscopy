@@ -25,6 +25,7 @@ class Shared_data(QObject):
         self._mdaModeSaveLoc = ['','']
         self._mdaModeNapariViewer = None
         self.mdaDatasets = []
+        self.activeMDAobject = None
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')

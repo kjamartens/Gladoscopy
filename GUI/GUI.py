@@ -7,7 +7,7 @@ from LaserControlScripts import *
 from AutonomousMicroscopyScripts import *
 from MMcontrols import *
 from napariGlados import *
-
+from MDAGlados import MDAGlados
 
 class Shared_data:
     def __init__(self):

@@ -1181,6 +1181,11 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         self.textbox_exists = textbox
         self.textboxheight = 200
+        self.mdaData = None
+
+    def finishedmda(self):
+        print('MDA finished within node')
+        print(self.name)
 
     @property
     def height(self):

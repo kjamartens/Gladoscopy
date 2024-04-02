@@ -3,6 +3,8 @@ from PyQt5 import QtCore, QtWidgets
 import sys, os
 sys.path.append('C:\\Users\\SMIPC2\\Documents\\GitHub\\ScopeGUI\\GUI\\nodz')
 import nodz_main #type: ignore
+from MMcontrols import MMConfigUI, ConfigInfo
+from MDAGlados import MDAGlados
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget, QMenu, QAction
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
@@ -21,20 +23,22 @@ class CustomGraphicsView(QtWidgets.QGraphicsView):
 
 class flowChart_dockWidgetF(nodz_main.Nodz):
     def __init__(self,core=None,shared_data=None,MM_JSON=None):
-        #Create a Vertical+horizontal layout:
+        #Create a QGridLayout:
         self.mainLayout = QGridLayout()
         
-        # Create a QGraphicsView
-        # scene = QGraphicsScene()
-        self.graphics_view = CustomGraphicsView()
+        #Add a few buttons to the left side:
+        self.buttonsArea = QVBoxLayout()
+        self.mainLayout.addLayout(self.buttonsArea,0,0)
+        self.debugScoringButton = QPushButton('Debug Scoring')
+        self.buttonsArea.addWidget(self.debugScoringButton)
+        self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
         
+        # Create a QGraphicsView 
+        self.graphics_view = CustomGraphicsView()
         super(flowChart_dockWidgetF, self).__init__(parent=self.graphics_view)
         
-        # self.graphics_view.setScene(scene)
         # Add the QGraphicsView to the mainLayout
-        self.mainLayout.addWidget(self.graphics_view)
-        
-        # self.nodz = super(flowChart_dockWidgetF, self).__init__(parent=self.graphics_view,core=core,shared_data=shared_data,MM_JSON=MM_JSON)
+        self.mainLayout.addWidget(self.graphics_view,0,1)
         
         #Global variables for MM/napari
         self.core = core
@@ -47,10 +51,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.show()
         #Needs these lines as init
         self.graphics_view.updateGraphicsViewSize()
-                
-        # Set the size policy for self.graphics_view
-        # self.graphics_view.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-
 
         self.nodes = []
         
@@ -60,7 +60,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeCounter['scoring'] = 0
         self.nodeCounter['decision'] = 0
         
-        #Initialise with a few dummy nodes
+        #Initialise with a few dummy nodes - later change this to restore a saved state
         # Node A
         self.nodes.append(self.createNode(name='nodeA', preset='node_preset_1', position=QtCore.QPoint(5010,5010)))
 
@@ -80,6 +80,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         #Focus on the nodes
         self._focus()
+    
+    def debugScoring(self):
+        """
+        Function to get some debug information from the scoring function(s)
+        """
+        print("Debug Scoring")
+        print(self)
     
     def findNodeByName(self, name):
         for node in self.nodes:
@@ -119,7 +126,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         new_stop_node_action.triggered.connect(lambda _, event=QMouseevent:  self.createStartStopNodeFromRightClick(event,nodeType='stop'))
 
         # Show the context menu at the event's position
-        # context_menu.exec_(self.mapToScene(QMouseevent.pos()))
         context_menu.exec_(QMouseevent.globalPos())
 
     def createStartStopNodeFromRightClick(self,event,nodeType='start'):
@@ -128,15 +134,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Create the node
             self.nodes.append(self.createNode(name=name, preset='start_node', position=self.mapToScene(event.pos())))
             #Only add a start attribute
-            self.createAttribute(node=self.findNodeByName(name), name='Start', index=-1, preset='attr_preset_1',
-                            plug=True, socket=False,dataType=bool)
+            self.createAttribute(node=self.findNodeByName(name), name='Start', index=-1, preset='attr_preset_1', plug=True, socket=False,dataType=bool)
         elif nodeType == 'stop':
             name="Stop"
             #Create the node
             self.nodes.append(self.createNode(name=name, preset='stop_node', position=self.mapToScene(event.pos())))
             #Only add a start attribute
-            self.createAttribute(node=self.findNodeByName(name), name='Stop', index=-1, preset='attr_preset_1',
-                            plug=False, socket=True,dataType=bool)
+            self.createAttribute(node=self.findNodeByName(name), name='Stop', index=-1, preset='attr_preset_1', plug=False, socket=True,dataType=bool)
 
     def createNodeFromRightClick(self,event,nodeType=None):
         #Find all nodes that have (partial) name with nodeType:
@@ -148,18 +152,20 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         #Add attribute, dummy for now:
         if nodeType == 'acquisition':
-            self.createAttribute(node=self.findNodeByName(name), name='Acq start', index=-1, preset='attr_preset_1',
-                            plug=False, socket=True,dataType=bool)
-            self.createAttribute(node=self.findNodeByName(name), name='Data', index=-1, preset='attr_preset_1',
-                            plug=True, socket=False)
-            self.createAttribute(node=self.findNodeByName(name), name='Finished', index=-1, preset='attr_preset_1',
-                            plug=True, socket=False,dataType=bool)
+            nodeInstance = self.findNodeByName(name)
+            self.createAttribute(node=nodeInstance, name='Acq start', index=-1, preset='attr_preset_1', plug=False, socket=True,dataType=bool)
+            self.createAttribute(node=nodeInstance, name='Data', index=-1, preset='attr_preset_1', plug=True, socket=False)
+            self.createAttribute(node=nodeInstance, name='Finished', index=-1, preset='attr_preset_1', plug=True, socket=False,dataType=bool)
+            #Attach a MDA data to this node
+            nodeInstance.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True) # type: ignore
+            
+            # customMDA.MDA_acq_from_GUI()
+            nodeInstance.mdaData.MDA_completed.connect(nodeInstance.finishedmda) #type:ignore
         else:
             self.createAttribute(node=self.findNodeByName(name), name='dummy1', index=-1, preset='attr_preset_1',
                             plug=True, socket=False, dataType=int)
             self.createAttribute(node=self.findNodeByName(name), name='dummy2', index=-1, preset='attr_preset_1',
                             plug=False, socket=True, dataType=int)
-            
 
     def getNodz(self):
         return self

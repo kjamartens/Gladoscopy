@@ -8,7 +8,8 @@ from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayou
 from PyQt5.QtCore import QRectF
 import nodz_utils as utils
 
-from MMcontrols import MMConfigUI, ConfigInfo, MDAGlados
+from MMcontrols import MMConfigUI, ConfigInfo
+from MDAGlados import MDAGlados
 
 """ 
 Custom nodz attachments
