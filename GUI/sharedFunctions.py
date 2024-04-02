@@ -1,14 +1,17 @@
 from napariGlados import napariHandler
 from PyQt5.QtCore import QTimer
 import logging
-
+from PyQt5.QtCore import QObject, pyqtSignal
 """Shared data summary
 
     Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
 """
-class Shared_data:
+class Shared_data(QObject):
+    mda_acq_done_signal = pyqtSignal(bool)
+    
     #Initialises the info of shared data
     def __init__(self):
+        super().__init__()
         self._liveMode = False
         self._mdaMode = False
         self._mdaModeParams = []
@@ -21,9 +24,16 @@ class Shared_data:
         self._defaultFocusDevice = ''
         self._mdaModeSaveLoc = ['','']
         self._mdaModeNapariViewer = None
+        self.mdaDatasets = []
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
+        
+        # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
+    
+    def mdaacqdonefunction(self):
+        print('mda acq done in shared_data')
+        self.mda_acq_done_signal.emit(True)
         
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.
@@ -109,7 +119,10 @@ class Shared_data:
             self.on_mdaImageQueues_value_change()
     def on_mdaImageQueues_value_change(self):
         logging.debug('mdaImageQueues changed')
-        
+    
+    def appendNewMDAdataset(self,mdadataset):
+        self.mdaDatasets.append(mdadataset)
+    
 
 class periodicallyUpdate:
     def __init__(self,updateFunction,timing = 10000):

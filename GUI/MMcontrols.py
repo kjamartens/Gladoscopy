@@ -81,7 +81,6 @@ class InteractiveListWidget(QTableWidget):
         id_values = []
         for row in range(self.rowCount()):
             item_id = self.takeItem(row, 1)
-            print(item_id)
             if item_id:
                 id_values.append(float(item_id.text()))
         return id_values
@@ -1338,34 +1337,6 @@ class MDAGlados(CustomMainWindow):
     def MDA_acq_from_GUI(self):
         print('At MDA_acq_from_GUI')
         self.shared_data._mdaMode = False
-        #ensure that live mode is stopped:
-        # self.shared_data.core.stop_sequence_acquisition()
-        
-        # if self.mda_analysis_thread == None:
-        #     #Create a thread to do some dummy real-time analysis:
-        #     self.mda_analysis_thread = create_analysis_thread(shared_data,analysisInfo='AvgGrayValueText')
-        
-        # #Create a napari layer:
-        # mdaImageLayer = getLayerIdFromName('pycromanager acquisition',self.shared_data.napariViewer)
-        # #If it's the first mdaImageLayer
-        # if not mdaImageLayer:
-        #     nrLayersBefore = len(self.shared_data.napariViewer.layers)
-        #     layer = self.shared_data.napariViewer.add_image(np.zeros((self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height)), rendering='attenuated_mip', name="pycromanager acquisition")
-        #     #Set correct scale - in nm
-        #     layer.scale = [self.shared_data.core.get_pixel_size_um(),self.shared_data.core.get_pixel_size_um()] #type:ignore
-        #     layer._keep_auto_contrast = True #type:ignore
-        #     self.shared_data.napariViewer.layers.move_multiple([nrLayersBefore,0])
-        #     self.shared_data.napariViewer.reset_view()
-        # #Else if the layer already exists, replace it!
-        # else:
-        #     # layer is present, replace its data
-        #     layer = self.shared_data.napariViewer.layers[mdaImageLayer[0]]
-            
-        # layer._keep_auto_contrast = False #type:ignore
-        # # layer.events.data.connect(lambda: self.update_mda_visualisation(layer, self.mda_analysis_thread ))
-
-        # #First, we get the events:
-        # self.get_MDA_events_from_GUI()
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
@@ -1381,20 +1352,6 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mdaMode = True
         print('ended setting mdamode params')
         
-        # connect napari viewer to Acquisition class and start data acquisition
-        # acq = Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer,image_process_fn = grab_image_acqmode) # type: ignore
-        # acq.acquire(self.mda)
-        # acq.mark_finished()
-        
-        
-        
-        # acq.await_completion()
-
-        #old method that freezes napari:
-        # with Acquisition(directory=self.storageFolder, name=self.storageFileName, show_display=False) as acq:
-        #     acq.acquire(self.mda)
-        # with Acquisition(directory=self.storageFolder, name=self.storageFileName, napari_viewer=self.shared_data.napariViewer) as acq:
-        #     acq.acquire(self.mda)
         pass
     
     def get_MDA_events_from_GUI(self):
@@ -1469,6 +1426,9 @@ class MDAGlados(CustomMainWindow):
     
     def getGui(self):
         return self
+    
+    def setMDAparams(self,mdaparams):
+        self.mda = mdaparams
 
 def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     global shared_data

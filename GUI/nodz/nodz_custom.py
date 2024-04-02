@@ -65,7 +65,7 @@ class nodz_openMDADialog(QDialog):
 
             # Create a QWidget to contain the QGridLayout
             grid_widget = QWidget()
-            grid_widget.setLayout(self.mdaconfig.gui)
+            grid_widget.setLayout(self.mdaconfig.gui) #type:ignore
             # Add the QMainWindow to the QVBoxLayout
             layout.addWidget(grid_widget)
 

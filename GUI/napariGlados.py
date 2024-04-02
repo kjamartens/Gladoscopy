@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QObject
 import napari
 import math
 from napari.qt import thread_worker
@@ -100,12 +100,15 @@ class napariHandler():
         # Create a queue to pass image data between threads
         self.image_queue_analysis = queue.Queue()
         # Create a signal to communicate between threads
-        self.analysis_done_signal = pyqtSignal(object)
+        self.mda_acq_done_signal = pyqtSignal(bool)
 
         #Sleep time to keep responsiveness
         self.sleep_time = 0.1
         self.layerName = 'newLayer'
 
+    def mdaacqdonefunction(self):
+        self.shared_data.mdaacqdonefunction()
+        
     def grab_image(self,image, metadata, event_queue):
         """ 
         Function that runs on every frame obtained in live mode and putis in the image queue
@@ -134,12 +137,13 @@ class napariHandler():
         return image, metadata
 
     @thread_worker
-    def run_pycroManagerAcquisition_worker(self,img_queue):
+    def run_pycroManagerAcquisition_worker(self,parent):
         """ 
         Worker which handles live mode on/off turning etc
         
         Inputs: img_queue (unused, but required)
         """
+        img_queue = parent.img_queue
         global acq
         #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
         #The abortion is handled in grab_image_livemode
@@ -183,20 +187,27 @@ class napariHandler():
                 with JavaBackendAcquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
                     events = shared_data._mdaModeParams
                     acq.acquire(events)
+                
                 self.acqstate = False #End the MDA acq state
+                self.shared_data.appendNewMDAdataset(acq.get_dataset())
 
-            #Now we're after the livestate
+            #Now we're after the acquisition
             self.shared_data.core.stop_sequence_acquisition()
             self.shared_data.mdaMode = False
+            
+            #Signal to all parents that the MDA acquisition is done - in the Nodz MDA, now we would trigger the MDA-based analysis for scoring or so
+            parent.mdaacqdonefunction()
+            
             #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
             cleanUpTemporaryFiles()
     
     @thread_worker(connect={'yielded': napariUpdateLive})
-    def run_napariVisualisation_worker(self,img_queue):
+    def run_napariVisualisation_worker(self,parent):
         """
         Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
         """
+        img_queue = parent.img_queue
         while self.acqstate:
             time.sleep(self.sleep_time)
             # print('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
@@ -255,8 +266,8 @@ class napariHandler():
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Start the two workers, one to run it, one to visualise it.
-                worker1 = self.run_pycroManagerAcquisition_worker(self.img_queue) #type:ignore
-                worker2 = self.run_napariVisualisation_worker(self.img_queue) #type:ignore
+                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore
                 # worker2.start()
                 logging.info("Live mode started")
@@ -267,17 +278,17 @@ class napariHandler():
                 self.stop_continuous_task = True
                 #Clear the image queue
                 self.img_queue.queue.clear()
-                logging.info("MDA mode stopped")
+                print("MDA mode stopped from acqModeChanged")
             else:
                 print('mdaMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Start the two workers, one to run it, one to visualise it.
-                worker1 = self.run_pycroManagerAcquisition_worker(self.img_queue) #type:ignore
-                worker2 = self.run_napariVisualisation_worker(self.img_queue) #type:ignore
+                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore
                 # worker2.start()
-                logging.info("MDA mode started")
+                print("MDA mode started from acqModeChanged")
 
 
 class napariHandler_liveMode(napariHandler):
