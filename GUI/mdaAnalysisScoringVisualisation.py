@@ -65,7 +65,7 @@ class mdaASTDockWidget():
         
         ImageData = self.shared_data.mdaDatasets[-1]
         #Throw this into the analysis:
-        avgGrayVal = eval(HelperFunctions.createFunctionWithKwargs("AverageIntensity.AvgGrayValue",NDTIFFStack="ImageData"))
+        avgGrayVal = eval(HelperFunctions.createFunctionWithKwargs("AverageIntensity.AvgGrayValue",NDTIFFStack="ImageData",core="self.shared_data.core"))
         print(f"found avg gray val: {avgGrayVal}")
         
 

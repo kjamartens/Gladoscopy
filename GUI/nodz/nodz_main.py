@@ -484,6 +484,9 @@ class Nodz(QtWidgets.QGraphicsView):
     # API
     ##################################################################
 
+    def addConfig(self, config):
+        self.config.update(config)
+
     def loadConfig(self, filePath):
         """
         Set a specific configuration for this instance of Nodz.
@@ -532,7 +535,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
 
     # NODES
-    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None):
+    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None, displayName=None):
         """
         Create a new node with a given name, position and color.
 
@@ -562,7 +565,7 @@ class Nodz(QtWidgets.QGraphicsView):
             return
         else:
             nodeItem = NodeItem(name=name, alternate=alternate, preset=preset,
-                                config=self.config, displayText = displayText)
+                                config=self.config, displayText = displayText, displayName=displayName)
 
             # Store node in scene.
             self.scene().nodes[name] = nodeItem #type:ignore
@@ -1139,7 +1142,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
     """
 
-    def __init__(self, name, alternate, preset, config, displayText = None, textbox=True):
+    def __init__(self, name, alternate, preset, config, displayName = None, displayText = None, textbox=True):
         """
         Initialize the class.
 
@@ -1165,7 +1168,14 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.alternate = alternate
         self.nodePreset = preset
         self.attrPreset = None
+        
+        #Added by KM
         self.displayText = displayText
+        self.displayName = displayName
+        self.callAction = None
+        self.callActionRelatedObject = None
+        self.n_connect_at_start = 0 #number of others connected at start (which should all be finished!)        
+        self.n_connect_at_start_finished = 0 #number of others connected at start which are finished already
 
         # Attributes storage.
         self.attrs = list()
@@ -1182,6 +1192,18 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.textbox_exists = textbox
         self.textboxheight = 200
         self.mdaData = None
+
+    def oneConnectionAtStartIsFinished(self):
+        self.n_connect_at_start_finished += 1
+        print('Called oneConnectionAtStartIsFinished')
+        print(f"n_connect_at_start_finished: {self.n_connect_at_start_finished}")
+        print(f"n_connect_at_start: {self.n_connect_at_start}")
+        if self.n_connect_at_start_finished == self.n_connect_at_start:
+            self.n_connect_at_start_finished = 0 #to allow for looping :)
+            print('All connections at start are finished')
+            print(f"Starting call action of node with name: {self.name}")
+            if self.callAction is not None:
+                self.callAction(self.callActionRelatedObject) #type:ignore
 
     def finishedmda(self):
         print('MDA finished within node')
@@ -1463,10 +1485,14 @@ class NodeItem(QtWidgets.QGraphicsItem):
                                 int(text_width),
                                 int(text_height))
 
-        painter.drawText(textRect,
-                         QtCore.Qt.AlignCenter, #type:ignore
-                         self.name)
-
+        if self.displayName == None:
+            painter.drawText(textRect,
+                            QtCore.Qt.AlignCenter, #type:ignore
+                            self.name)
+        else:
+            painter.drawText(textRect,
+                            QtCore.Qt.AlignCenter, #type:ignore
+                            self.displayName)
 
         #Draw the textbox
         self.drawTextbox(painter)
@@ -1603,26 +1629,25 @@ class NodeItem(QtWidgets.QGraphicsItem):
     def mouseDoubleClickEvent(self, event):
         """
         Emit a signal.
-
         """
         
-        if self.nodePreset == 'acquisition':
-            dialog = nodz_openMDADialog(parentData=self.scene().views()[0])
-            if dialog.exec_() == QDialog.Accepted:
-                print(dialog.getInputs())
-            print('hmm')
-        else:
-            #Open a Dialog on double click
-            dialog = FoVFindImaging_singleCh_configs(parentData=self.scene().views()[0])
-            #Get the outputs from the dialog
-            if dialog.exec_() == QDialog.Accepted:
-                print(dialog.getInputs())
-            #     text, combo_value = dialog.getInputs()
-            #     print("Text:", text)
-            #     print("Combo Value:", combo_value)
+        # if self.nodePreset == 'acquisition':
+        #     dialog = nodz_openMDADialog(parentData=self.scene().views()[0])
+        #     if dialog.exec_() == QDialog.Accepted:
+        #         print(dialog.getInputs())
+        #     print('hmm')
+        # else:
+        #     #Open a Dialog on double click
+        #     dialog = FoVFindImaging_singleCh_configs(parentData=self.scene().views()[0])
+        #     #Get the outputs from the dialog
+        #     if dialog.exec_() == QDialog.Accepted:
+        #         print(dialog.getInputs())
+        #     #     text, combo_value = dialog.getInputs()
+        #     #     print("Text:", text)
+        #     #     print("Combo Value:", combo_value)
         
-        # #Update the node text from this dialog output:
-        self.scene().parent().editNodeDisplayText(self, newDisplayText=str(dialog.getInputs())) #type:ignore
+        # # #Update the node text from this dialog output:
+        # self.scene().parent().editNodeDisplayText(self, newDisplayText=str(dialog.getInputs())) #type:ignore
         
         super(NodeItem, self).mouseDoubleClickEvent(event)
         self.scene().parent().signal_NodeDoubleClicked.emit(self.name,event.pos())#type:ignore

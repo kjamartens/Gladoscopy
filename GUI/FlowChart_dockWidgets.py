@@ -12,6 +12,104 @@ from PyQt5.QtWidgets import QGridLayout, QPushButton
 from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
 from PyQt5.QtCore import QRectF
+import numpy as np
+
+
+class AdvancedInputDialog(QDialog):
+    def __init__(self, parent=None, parentData=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle("Advanced Input Dialog")
+        
+        # Create line edit
+        self.line_edit = QLineEdit()
+        
+        # Create combobox
+        self.combo_box = QComboBox()
+        self.combo_box.addItems(["Option 1", "Option 2", "Option 3"])
+        
+        # Create button box
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.line_edit)
+        layout.addWidget(self.combo_box)
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+        
+    def getInputs(self):
+        return self.line_edit.text(), self.combo_box.currentText()
+
+
+class nodz_openMDADialog(QDialog):
+    def __init__(self, parent=None, parentData=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle("MDA Dialog")
+        if parentData is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            testQWidget = QWidget()
+            
+            self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,hasGUI=True)
+            
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box.accepted.connect(self.accept)
+            button_box.rejected.connect(self.reject)
+            
+
+            # Create the QVBoxLayout
+            layout = QVBoxLayout()
+
+            # Create a QWidget to contain the QGridLayout
+            grid_widget = QWidget()
+            grid_widget.setLayout(self.mdaconfig.gui) #type:ignore
+            # Add the QMainWindow to the QVBoxLayout
+            layout.addWidget(grid_widget)
+
+            layout.addWidget(button_box)
+            
+            self.setLayout(layout)
+        
+    def getInputs(self):
+        return self.mdaconfig.mda
+
+
+class FoVFindImaging_singleCh_configs(QDialog):
+    def __init__(self, parent=None, parentData=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle("Advanced Input Dialog")
+        if parentData is not None:
+            core = parentData.core
+            
+            
+            # Get all config groups
+            allConfigGroups={}
+            nrconfiggroups = core.get_available_config_groups().size()
+            for config_group_id in range(nrconfiggroups):
+                allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
+            
+            #Create the MM config via all config groups
+            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False, showCheckboxes=True)
+            
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box.accepted.connect(self.accept)
+            button_box.rejected.connect(self.reject)
+                
+            #Set the layout
+            layout = QVBoxLayout()
+            layout.addLayout(self.MMconfig.mainLayout)
+            layout.addWidget(button_box)
+            
+            self.setLayout(layout)
+        
+    def getInputs(self):
+        return self.MMconfig.getUIConfigInfo(onlyChecked=True)
+
 
 class CustomGraphicsView(QtWidgets.QGraphicsView):
     def resizeEvent(self, event):
@@ -21,10 +119,78 @@ class CustomGraphicsView(QtWidgets.QGraphicsView):
     def updateGraphicsViewSize(self):
         nodz.setFixedSize(self.viewport().size())
 
+class GladosGraph():
+    #Also adds these values correctly for each node:
+        # self.n_connect_at_start = 0 #number of others connected at start (which should all be finished!)
+        # self.connectedToFinish = []
+        # self.connectedToData = []
+        
+    def __init__(self,parent):
+        self.parent = parent
+        self.nodes = []
+        self.startNodeIndex = -1
+        # self.unstartedNodes = []
+        # self.ongoingNodes = []
+        # self.finishedNodes = []
+
+
+        
+    def addRawGraphEval(self,graphEval):
+        #We'll get a structure like this:
+        # [('scoreStart_0.Start', '1s timer_0.start'), ('1s timer_0.Finished', '2s timer_0.start'), ('2s timer_0.Finished', 'scoreEnd_0.End')]
+        
+        # for graphEvalPartFull in graphEval:
+        #     sendingNode = self.parent.findNodeByName(graphEvalPartFull[0].split('.')[0])
+            
+        #     receivingNode = self.parent.findNodeByName(graphEvalPartFull[1].split('.')[0])
+        #     if graphEvalPartFull[0].split('.')[1] == 'Finished': #Later determine based on defineNodeInfo
+        #         sendingNode.connectedToFinish.append(receivingNode)
+                
+        #     if graphEvalPartFull[1].split('.')[1] == 'Done': #Later determine based on defineNodeInfo
+        #         sendingNode.connectedToData.append(receivingNode)
+            
+        #     if graphEvalPartFull[1].split('.')[1] == 'Start': #Later determine based on defineNodeInfo
+        #         receivingNode.n_connect_at_start += 1
+            
+        #Also generate a list of all nodes in this graph
+        self.allNodeNames = []
+        for graphEvalPartFull in graphEval:
+            for graphEvalPartFull2 in graphEvalPartFull:
+                graphEvalPart = graphEvalPartFull2.split('.')[0]
+                if graphEvalPart not in self.allNodeNames:
+                    self.allNodeNames.append(graphEvalPart)
+        
+        for nodeName in self.allNodeNames:
+            self.nodes.append(self.parent.findNodeByName(nodeName))
+
+from PyQt5.QtCore import QObject, pyqtSignal
+class NodeSignalManager(QObject):
+    new_signal = pyqtSignal()
+    
+    def __init__(self):
+        QObject.__init__(self)
+        super().__init__()
+        self.signals = []
+
+    def add_signal(self, signal_name):
+        # Dynamically add a new signal to the object
+        setattr(self, signal_name, self.new_signal)
+        self.signals.append(self.new_signal)
+
+    def print_signals(self):
+        for signal in self.signals:
+            print(signal)
+
+    def emit_all_signals(self):
+        for signal in self.signals:
+            signal.emit()
+            print(f"emitting signal {signal}")
+
 class flowChart_dockWidgetF(nodz_main.Nodz):
     def __init__(self,core=None,shared_data=None,MM_JSON=None):
         #Create a QGridLayout:
         self.mainLayout = QGridLayout()
+        
         
         #Add a few buttons to the left side:
         self.buttonsArea = QVBoxLayout()
@@ -36,6 +202,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(flowChart_dockWidgetF, self).__init__(parent=self.graphics_view)
+        self.defineNodeInfo()
         
         # Add the QGraphicsView to the mainLayout
         self.mainLayout.addWidget(self.graphics_view,0,1)
@@ -51,121 +218,353 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.show()
         #Needs these lines as init
         self.graphics_view.updateGraphicsViewSize()
-
         self.nodes = []
-        
         self.nodeCounter={}
-        self.nodeCounter['acquisition'] = 0
-        self.nodeCounter['analysis'] = 0
-        self.nodeCounter['scoring'] = 0
-        self.nodeCounter['decision'] = 0
         
-        #Initialise with a few dummy nodes - later change this to restore a saved state
-        # Node A
-        self.nodes.append(self.createNode(name='nodeA', preset='node_preset_1', position=QtCore.QPoint(5010,5010)))
-
-        self.createAttribute(node=self.findNodeByName('nodeA'),name='Aattr1', index=-1, preset='attr_preset_1',
-                            plug=True, socket=False, dataType=int)
-        self.createAttribute(node=self.findNodeByName('nodeA'), name='Aattr2', index=-1, preset='attr_preset_1',
-                            plug=False, socket=True, dataType=int)
-
-        # Node B
-        self.nodes.append(self.createNode(name='nodeB', preset='node_imaging',position=QtCore.QPoint(5070,5010)))
-
-        self.createAttribute(node=self.findNodeByName('nodeB'), name='Battr1', index=-1, preset='attr_preset_1',
-                            plug=True, socket=False, dataType=int)
-
-        self.createAttribute(node=self.findNodeByName('nodeB'), name='Battr2', index=-1, preset='attr_preset_1',
-                            plug=True, socket=False, dataType=int)
+        
+        #Connect required deleted/double clicked signals
+        self.signal_NodeDeleted.connect(self.NodeRemoved)
+        self.signal_NodeDoubleClicked.connect(self.NodeDoubleClicked)
+        self.signal_PlugConnected.connect(self.PlugConnected)
+        self.signal_PlugDisconnected.connect(self.PlugOrSocketDisconnected)
+        self.signal_SocketConnected.connect(self.SocketConnected)
         
         #Focus on the nodes
         self._focus()
+        
+    def nodeLookupName_withoutCounter(self,nodeName):
+        
+        
+        #Find the last underscore ('_0, _1, etc')
+        index_last_underscore = nodeName.rfind('_')
+        nodeNameNC = nodeName[:index_last_underscore]
+        #Now get the correct lookup name by looking through all nodeInfo items
+        for node_name, node_data in self.nodeInfo.items():
+            # Check if the name matches the specific value
+            if 'name' in node_data and node_data['name'] == nodeNameNC:
+                finalNodeName = node_name
+        
+        return finalNodeName
+    
+    def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        print(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        sourceNode = self.findNodeByName(srcNodeName)
+        if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
+            destinationNode = self.findNodeByName(dstNodeName)
+            #The destination node needs one extra to be started...
+            destinationNode.n_connect_at_start += 1 #type: ignore
+            
+            #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
+            sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
+            # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
+            print('signal connected')
+        print(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        
+    def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        
+        sourceNode = self.findNodeByName(srcNodeName)
+        if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']:
+            signal = sourceNode.customFinishedEmits.signals[0] #type: ignore
+            try:
+                signal.disconnect()
+            except:
+                print('attempted to disconnect a disconnected signal')
+        
+        destinationNode = self.findNodeByName(dstNodeName)
+        destinationNode.n_connect_at_start -= 1
+                
+        print(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        
+    def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        #Check if all are non-Nones:
+        if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
+            return
+        else:
+            self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
+            
+    def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        #Check if all are non-Nones:
+        if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
+            return
+        else:
+            self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
+    
+    def NodeRemoved(self,nodeNames):
+        print('one or more nodes are removed!')
+        for nodeName in nodeNames:
+            for node_type, node_data in self.nodeInfo.items():
+                if node_data['name'] in nodeName:
+                    if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
+                        self.nodeInfo[node_type]['NodeCounter'] -= 1
+    
+    def NodeDoubleClicked(self,nodeName):
+        currentNode = self.findNodeByName(nodeName)
+        if 'acquisition' in nodeName:
+            dialog = nodz_openMDADialog(parentData=self)
+            if dialog.exec_() == QDialog.Accepted:
+                print(dialog.getInputs())
+            print('hmm')
+            
+            currentNode.displayText = str(dialog.getInputs())#type:ignore
+            currentNode.update() #type:ignore
+        
+        if 'timer' in nodeName:
+            currentNode.callAction(self) #type:ignore
+    
+        if 'scoringStart' in nodeName:
+            currentNode.callAction(self) #type:ignore
+    
+    def defineNodeInfo(self):
+        self.nodeInfo = {}
+        
+        #We define the node info for each type of node like this: (might be expanded in the future)
+        self.nodeInfo['acquisition'] = {}
+        self.nodeInfo['acquisition']['name'] = 'acquisition'
+        self.nodeInfo['acquisition']['displayName'] = 'Acquisition'
+        self.nodeInfo['acquisition']['startAttributes'] = ['Acquisition start']
+        self.nodeInfo['acquisition']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['acquisition']['dataAttributes'] = []
+        self.nodeInfo['acquisition']['NodeCounter'] = 0
+        self.nodeInfo['acquisition']['MaxNodeCounter'] = np.inf
+        
+        self.nodeInfo['analysisMeasurement'] = {}
+        self.nodeInfo['analysisMeasurement']['name'] = 'analysisMeasurement'
+        self.nodeInfo['analysisMeasurement']['displayName'] = 'Analysis [Measurement]'
+        self.nodeInfo['analysisMeasurement']['startAttributes'] = ['Analysis start']
+        self.nodeInfo['analysisMeasurement']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisMeasurement']['NodeCounter'] = 0
+        self.nodeInfo['analysisMeasurement']['MaxNodeCounter'] = np.inf
+        
+        self.nodeInfo['analysisShapes'] = {}
+        self.nodeInfo['analysisShapes']['name'] = 'analysisShapes'
+        self.nodeInfo['analysisShapes']['displayName'] = 'Analysis [Shapes]'
+        self.nodeInfo['analysisShapes']['startAttributes'] = ['Analysis start']
+        self.nodeInfo['analysisShapes']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['analysisShapes']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisShapes']['NodeCounter'] = 0
+        self.nodeInfo['analysisShapes']['MaxNodeCounter'] = np.inf
+        
+        self.nodeInfo['analysisImages'] = {}
+        self.nodeInfo['analysisImages']['name'] = 'analysisImages'
+        self.nodeInfo['analysisImages']['displayName'] = 'Analysis [Images]'
+        self.nodeInfo['analysisImages']['startAttributes'] = ['Analysis start']
+        self.nodeInfo['analysisImages']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['analysisImages']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisImages']['NodeCounter'] = 0
+        self.nodeInfo['analysisImages']['MaxNodeCounter'] = np.inf
+        
+        self.nodeInfo['scoringStart'] = {}
+        self.nodeInfo['scoringStart']['name'] = 'scoringStart'
+        self.nodeInfo['scoringStart']['displayName'] = 'Scoring start'
+        self.nodeInfo['scoringStart']['startAttributes'] = []
+        self.nodeInfo['scoringStart']['finishedAttributes'] = ['Start']
+        self.nodeInfo['scoringStart']['dataAttributes'] = []
+        self.nodeInfo['scoringStart']['NodeCounter'] = 0
+        self.nodeInfo['scoringStart']['MaxNodeCounter'] = 1
+        
+        self.nodeInfo['scoringEnd'] = {}
+        self.nodeInfo['scoringEnd']['name'] = 'scoringEnd'
+        self.nodeInfo['scoringEnd']['displayName'] = 'Scoring end'
+        self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
+        self.nodeInfo['scoringEnd']['finishedAttributes'] = []
+        self.nodeInfo['scoringEnd']['dataAttributes'] = []
+        self.nodeInfo['scoringEnd']['NodeCounter'] = 0
+        self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
+        
+        self.nodeInfo['onesectimer'] = {}
+        self.nodeInfo['onesectimer']['name'] = '1s timer'
+        self.nodeInfo['onesectimer']['displayName'] = '1s timer'
+        self.nodeInfo['onesectimer']['startAttributes'] = ['Start']
+        self.nodeInfo['onesectimer']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['onesectimer']['dataAttributes'] = []
+        self.nodeInfo['onesectimer']['NodeCounter'] = 0
+        self.nodeInfo['onesectimer']['MaxNodeCounter'] = np.inf
+        self.nodeInfo['twosectimer'] = {}
+        self.nodeInfo['twosectimer']['name'] = '2s timer'
+        self.nodeInfo['twosectimer']['displayName'] = '2s timer'
+        self.nodeInfo['twosectimer']['startAttributes'] = ['Start']
+        self.nodeInfo['twosectimer']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['twosectimer']['dataAttributes'] = []
+        self.nodeInfo['twosectimer']['NodeCounter'] = 0
+        self.nodeInfo['twosectimer']['MaxNodeCounter'] = np.inf
+        self.nodeInfo['threesectimer'] = {}
+        self.nodeInfo['threesectimer']['name'] = '3s timer'
+        self.nodeInfo['threesectimer']['displayName'] = '3s timer'
+        self.nodeInfo['threesectimer']['startAttributes'] = ['Start']
+        self.nodeInfo['threesectimer']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['threesectimer']['dataAttributes'] = []
+        self.nodeInfo['threesectimer']['NodeCounter'] = 0
+        self.nodeInfo['threesectimer']['MaxNodeCounter'] = np.inf
+        
+        
+        #We also add some custom JSON info about the node layout (colors and such)
+        import json
+        self.nodeLayout = json.loads('''{
+            
+            "scoringStart": {
+                "bg": [80, 180, 80, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "scoringEnd": {
+                "bg": [180, 80, 80, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "acquisition": {
+                "bg": [80, 80, 180, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            }
+            
+        }''')
+        self.addConfig(self.nodeLayout)
     
     def debugScoring(self):
         """
         Function to get some debug information from the scoring function(s)
         """
         print("Debug Scoring")
+        scoreGraph = self.prepareGraph(methodName = "Score")
+        
         print(self)
     
+    def prepareGraph(self, methodName='Score'):
+        graphEval = self.evaluateGraph()
+        if methodName == 'Score':
+            scoreGraph = GladosGraph(self)
+            scoreGraph.addRawGraphEval(graphEval)
+            for node in scoreGraph.nodes:
+                self.giveInfoOnNode(node)
+            return scoreGraph
+            
     def findNodeByName(self, name):
         for node in self.nodes:
-            if node.name == name:
-                return node
+            #check if the attribute 'name' is found:
+            if hasattr(node, 'name'):
+                if node.name == name:
+                    return node
         return None
     
     #replace the contextMenuEvent in nodz with this custom function:
     def contextMenuEvent(self, QMouseevent):
         context_menu = QMenu(self)
         
-        sub_menu_startstop = QMenu("Start/stop", self)
-
-        new_acq_node_action = QAction("New MDA/Acquisition node", self)
-        new_analysis_node_action = QAction("New Analysis node", self)
-        new_scoring_node_action = QAction("New Scoring node", self)
-        new_decision_node_action = QAction("New Decision node", self)
-        
-        new_start_node_action = QAction("Start node", self)
-        new_stop_node_action = QAction("Stop node", self)
-
-        context_menu.addMenu(sub_menu_startstop)
-        context_menu.addAction(new_acq_node_action)
-        context_menu.addAction(new_analysis_node_action)
-        context_menu.addAction(new_scoring_node_action)
-        context_menu.addAction(new_decision_node_action)
-        
-        sub_menu_startstop.addAction(new_start_node_action)
-        sub_menu_startstop.addAction(new_stop_node_action)
-        
-        new_acq_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNodeFromRightClick(event,nodeType='acquisition'))
-        new_analysis_node_action.triggered.connect(lambda _, event=QMouseevent:  self.createNodeFromRightClick(event,nodeType='analysis'))
-        new_scoring_node_action.triggered.connect(lambda _, event=QMouseevent:  self.createNodeFromRightClick(event,nodeType='scoring'))
-        new_decision_node_action.triggered.connect(lambda _, event=QMouseevent:  self.createNodeFromRightClick(event,nodeType='decision'))
-        
-        new_start_node_action.triggered.connect(lambda _, event=QMouseevent:  self.createStartStopNodeFromRightClick(event,nodeType='start'))
-        new_stop_node_action.triggered.connect(lambda _, event=QMouseevent:  self.createStartStopNodeFromRightClick(event,nodeType='stop'))
-
+        #Dynamically add all node types
+        for node_type, node_data in self.nodeInfo.items():
+            new_subAction = QAction(node_data['displayName'], self)
+            context_menu.addAction(new_subAction)
+            
+            # Define a closure to capture the current value of node_type
+            def create_lambda(node_type):
+                return lambda _, event=QMouseevent: self.createNodeFromRightClick(event, nodeType=node_type)
+            # Connect each action to its own lambda function
+            new_subAction.triggered.connect(create_lambda(node_type))
+            
         # Show the context menu at the event's position
         context_menu.exec_(QMouseevent.globalPos())
 
-    def createStartStopNodeFromRightClick(self,event,nodeType='start'):
-        if nodeType == 'start':
-            name="Start"
-            #Create the node
-            self.nodes.append(self.createNode(name=name, preset='start_node', position=self.mapToScene(event.pos())))
-            #Only add a start attribute
-            self.createAttribute(node=self.findNodeByName(name), name='Start', index=-1, preset='attr_preset_1', plug=True, socket=False,dataType=bool)
-        elif nodeType == 'stop':
-            name="Stop"
-            #Create the node
-            self.nodes.append(self.createNode(name=name, preset='stop_node', position=self.mapToScene(event.pos())))
-            #Only add a start attribute
-            self.createAttribute(node=self.findNodeByName(name), name='Stop', index=-1, preset='attr_preset_1', plug=False, socket=True,dataType=bool)
+    def createNewNode(self, nodeType, event):
+        if self.nodeInfo[nodeType]['NodeCounter'] < self.nodeInfo[nodeType]['MaxNodeCounter']:
+            #Find all nodes that have (partial) name with nodeType:
+            name = self.nodeInfo[nodeType]['name']+"_"+str(self.nodeInfo[nodeType]['NodeCounter'])
+            self.nodeInfo[nodeType]['NodeCounter']+=1
+        else:
+            print('Not allowed! Maximum number of nodes of this type reached')
+            return
+        
+        if nodeType in self.config:
+            configtype = nodeType
+        else:
+            configtype = 'node_preset_1'
+        
+        #Create the new node with correct name and preset
+        newNode = self.createNode(name=name, preset = configtype, position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'])
+        self.nodes.append(newNode)
+        
+        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
+            newNode.customStartEmits = NodeSignalManager()
+        else:
+            newNode.customStartEmits = None
+        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
+            newNode.customFinishedEmits = NodeSignalManager()
+        else:
+            newNode.customFinishedEmits = None
+        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
+            newNode.customDataEmits = NodeSignalManager()
+        else:
+            newNode.customDataEmits = None
+        
+        #Add custom attributes where necessary
+        for attr in self.nodeInfo[nodeType]['startAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=True)
+            newNode.customStartEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['finishedAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
+            newNode.customFinishedEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['dataAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
+            newNode.customDataEmits.add_signal(attr) #type: ignore
+        
+        
+        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
+            newNode.customStartEmits.print_signals() #type: ignore
+        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
+            newNode.customFinishedEmits.print_signals() #type: ignore
+        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
+            newNode.customDataEmits.print_signals()  #type: ignore
+            
+        #Custom functions that should be done
+        if nodeType == 'acquisition':
+            #Attach a MDA data to this node
+            newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True) # type: ignore
+            newNode.mdaData.MDA_completed.connect(newNode.finishedmda) #type:ignore
+            
+        if nodeType == 'onesectimer':
+            newNode.callAction = lambda self, node=newNode, timev = 1: self.timerCallAction(node,timev=timev)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'twosectimer':
+            newNode.callAction = lambda self, node=newNode, timev = 2: self.timerCallAction(node,timev=timev)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'threesectimer':
+            newNode.callAction = lambda self, node=newNode, timev = 3: self.timerCallAction(node,timev=timev)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'scoringStart':
+            newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        else:
+            newNode.callAction = None
+
+    def finishedEmits(self,node):
+        node.customFinishedEmits.emit_all_signals()
+
+    def scoringStart(self,node):
+        print('Starting the score routine!')
+        self.finishedEmits(node)
+
+    def timerCallAction(self,node,timev):
+        import time
+        print('start time sleeping')
+        time.sleep(timev)
+        print('end time sleeping')
+        self.finishedEmits(node)
 
     def createNodeFromRightClick(self,event,nodeType=None):
-        #Find all nodes that have (partial) name with nodeType:
-        name = str(nodeType)+"_"+str(self.nodeCounter[nodeType])
-        self.nodeCounter[nodeType]+=1
+        # if nodeType == 'acquisition':
+        self.createNewNode(nodeType,event)
+
+    def giveInfoOnNode(self,node):
+        print('--------')
+        print(node)
+        print(f"node name: {node.name}")
+        print(f"incoming connections: {node.n_connect_at_start}" )
+        # print(f"outgoing connections - finished: {node.connectedToFinish}")
+        # print(f"outgoing connections - data: {node.connectedToData}")
         
-        #Create the node
-        self.nodes.append(self.createNode(name=name, preset=nodeType, position=self.mapToScene(event.pos())))
-        
-        #Add attribute, dummy for now:
-        if nodeType == 'acquisition':
-            nodeInstance = self.findNodeByName(name)
-            self.createAttribute(node=nodeInstance, name='Acq start', index=-1, preset='attr_preset_1', plug=False, socket=True,dataType=bool)
-            self.createAttribute(node=nodeInstance, name='Data', index=-1, preset='attr_preset_1', plug=True, socket=False)
-            self.createAttribute(node=nodeInstance, name='Finished', index=-1, preset='attr_preset_1', plug=True, socket=False,dataType=bool)
-            #Attach a MDA data to this node
-            nodeInstance.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True) # type: ignore
-            
-            # customMDA.MDA_acq_from_GUI()
-            nodeInstance.mdaData.MDA_completed.connect(nodeInstance.finishedmda) #type:ignore
-        else:
-            self.createAttribute(node=self.findNodeByName(name), name='dummy1', index=-1, preset='attr_preset_1',
-                            plug=True, socket=False, dataType=int)
-            self.createAttribute(node=self.findNodeByName(name), name='dummy2', index=-1, preset='attr_preset_1',
-                            plug=False, socket=True, dataType=int)
 
     def getNodz(self):
         return self

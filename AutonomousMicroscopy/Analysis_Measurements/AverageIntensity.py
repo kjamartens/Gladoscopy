@@ -22,7 +22,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-def AvgGrayValue(NDTIFFStack,**kwargs):
+def AvgGrayValue(NDTIFFStack,core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -31,7 +31,7 @@ def AvgGrayValue(NDTIFFStack,**kwargs):
     
     
     # Compute the average intensity of each slice
-    slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2))
+    slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2)) #type:ignore
 
     # Compute the overall average intensity
     overall_avg_intensity = slice_avg_intensity.mean().compute()
