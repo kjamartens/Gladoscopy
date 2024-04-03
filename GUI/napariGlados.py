@@ -49,7 +49,7 @@ def napariUpdateLive(DataStructure):
     core = DataStructure['core']
     image_queue_analysisA = DataStructure['image_queue_analysis']
     analysisThreads = DataStructure['analysisThreads']
-    # print('NapariUpdateLive Ran at time {}'.format(time.time()))
+    logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
     liveImage = DataStructure['data'][0]
     metadata = DataStructure['data'][1]
     layerName = DataStructure['layer_name']
@@ -155,7 +155,7 @@ class napariHandler():
                     self.shared_data.liveMode = False
                 else:
                     #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-                    print('starting acq')
+                    logging.debug('starting acq')
                     with JavaBackendAcquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                         acq.acquire(events)
@@ -172,7 +172,7 @@ class napariHandler():
                     time.sleep(1)
                     
                 #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-                print('starting MDA acq')
+                logging.debug('starting MDA acq')
                 savefolder = './temp'
                 savename = 'MdaAcq'
                 if shared_data._mdaModeSaveLoc[0] != '':
@@ -211,7 +211,7 @@ class napariHandler():
         img_queue = parent.img_queue
         while self.acqstate:
             time.sleep(self.sleep_time)
-            # print('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
+            logging.debug('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
             # get elements from queue while there is more than one element
             # playing it safe: I'm always leaving one element in the queue
             while img_queue.qsize() > 1:
@@ -263,7 +263,7 @@ class napariHandler():
                 self.img_queue.queue.clear()
                 logging.info("Live mode stopped")
             else:
-                print('liveMode changed to TRUE')
+                logging.debug('liveMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Start the two workers, one to run it, one to visualise it.
@@ -279,9 +279,9 @@ class napariHandler():
                 self.stop_continuous_task = True
                 #Clear the image queue
                 self.img_queue.queue.clear()
-                print("MDA mode stopped from acqModeChanged")
+                logging.debug("MDA mode stopped from acqModeChanged")
             else:
-                print('mdaMode changed to TRUE')
+                logging.debug('mdaMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Start the two workers, one to run it, one to visualise it.
@@ -289,7 +289,7 @@ class napariHandler():
                 worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore
                 # worker2.start()
-                print("MDA mode started from acqModeChanged")
+                logging.debug("MDA mode started from acqModeChanged")
 
 
 class napariHandler_liveMode(napariHandler):
@@ -311,7 +311,7 @@ class dockWidgets(QMainWindow):
         self.sizeChanged.emit(event.size())
         
     def __init__(self):
-        print('dockwidget started')
+        logging.debug('dockwidget started')
         super().__init__()
         #Create all the widgets/layouts:
         self.central_widget = QWidget(self)
@@ -344,7 +344,7 @@ class dockWidget_MMcontrol(dockWidgets):
 
 class dockWidget_MDA(dockWidgets):
     def __init__(self): 
-        print("dockWidget_MDA started")
+        logging.debug("dockWidget_MDA started")
         super().__init__()
         
         #Add the full micro manager controls UI

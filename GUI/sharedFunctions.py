@@ -33,7 +33,7 @@ class Shared_data(QObject):
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
     
     def mdaacqdonefunction(self):
-        print('mda acq done in shared_data')
+        logging.debug('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)
         
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
@@ -56,7 +56,7 @@ class Shared_data(QObject):
     @mdaMode.setter
     def mdaMode(self, new_value):
         if new_value != self._mdaMode:
-            print('new mdamode value: '+str(new_value))
+            logging.debug('new mdamode value: '+str(new_value))
             self._mdaMode = new_value
             self.on_mdaMode_value_change()
     def on_mdaMode_value_change(self):
@@ -86,9 +86,9 @@ class Shared_data(QObject):
         removed_entry = None
         if len(self._analysisThreads) < len(self.analysisThreads):
             removed_entry = [entry for entry in self.analysisThreads if entry not in self._analysisThreads][0]
-        print('Analysis Threads now: ' + str(self._analysisThreads))
+        logging.debug('Analysis Threads now: ' + str(self._analysisThreads))
         if removed_entry is not None:
-            print('Removed entry: ' + str(removed_entry))
+            logging.info('Removed entry: ' + str(removed_entry))
         
     #core property        
     @property

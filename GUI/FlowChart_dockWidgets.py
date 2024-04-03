@@ -30,6 +30,7 @@ from Visualisation_Images import * #type: ignore
 from Visualisation_Measurements import * #type: ignore
 from Visualisation_Shapes import * #type: ignore
 import HelperFunctions #type: ignore
+import logging
 
 class AdvancedInputDialog(QDialog):
     def __init__(self, parent=None, parentData=None):
@@ -196,7 +197,7 @@ class NodeSignalManager(QObject):
     def emit_all_signals(self):
         for signal in self.signals:
             signal.emit()
-            print(f"emitting signal {signal}")
+            logging.debug(f"emitting signal {signal}")
 
 class flowChart_dockWidgetF(nodz_main.Nodz):
     def __init__(self,core=None,shared_data=None,MM_JSON=None):
@@ -259,7 +260,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         return finalNodeName
     
     def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        print(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        logging.debug(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         sourceNode = self.findNodeByName(srcNodeName)
         if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
             destinationNode = self.findNodeByName(dstNodeName)
@@ -269,8 +270,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
             sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
             # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
-            print('signal connected')
-        print(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        logging.debug(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         
@@ -285,7 +285,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         destinationNode = self.findNodeByName(dstNodeName)
         destinationNode.n_connect_at_start -= 1 #type:ignore
                 
-        print(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        logging.debug(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         
     def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         #Check if all are non-Nones:
@@ -302,7 +302,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
     
     def NodeRemoved(self,nodeNames):
-        print('one or more nodes are removed!')
+        logging.info('one or more nodes are removed!')
         for nodeName in nodeNames:
             for node_type, node_data in self.nodeInfo.items():
                 if node_data['name'] in nodeName:
@@ -314,10 +314,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         if 'acquisition' in nodeName:
             dialog = nodz_openMDADialog(parentData=self)
             if dialog.exec_() == QDialog.Accepted:
-                print(dialog.getInputs())
-            print('hmm')
+                logging.debug(f"MDA dialog input: {dialog.getInputs()}")
             
-            currentNode.mdaData.mda = dialog.getInputs()
+            currentNode.mdaData.mda = dialog.getInputs()#type:ignore
             currentNode.displayText = str(dialog.getInputs())#type:ignore
             currentNode.update() #type:ignore
         
@@ -573,7 +572,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.callAction = None
 
     def GrayScaleTest(self,node):
-        print('Hi!')
         #Find the node that is connected to this
         connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
         #First assess that it's a MDA node:

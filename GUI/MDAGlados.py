@@ -35,7 +35,7 @@ class InteractiveListWidget(QTableWidget):
     """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
     """
     def __init__(self,fontsize=6):
-        print('init InteractiveListWidget')
+        logging.debug('init InteractiveListWidget')
         super().__init__(rowCount=0, columnCount=2) #type: ignore
         self.horizontalHeader().setStretchLastSection(True)
         self.addDummyEntries()
@@ -96,7 +96,6 @@ class InteractiveListWidget(QTableWidget):
                     id = max(existing_ids) + 1
                 except:
                     id = self.rowCount() + 1
-        print('added new entry')
         rowPosition = self.rowCount()
         self.insertRow(rowPosition)
         self.setItem(rowPosition, 0, QTableWidgetItem(textEntry))
@@ -256,7 +255,7 @@ class MDAGlados(CustomMainWindow):
             self._GUI_grid_width = value
             if self.has_GUI and self.fully_started:
                 try:
-                    print(f"updating gui with nr of columns: {self._GUI_grid_width}")
+                    logging.debug(f"updating gui with nr of columns: {self._GUI_grid_width}")
                     self.showOptionChanged()
                 except:
                     pass
@@ -650,13 +649,12 @@ class MDAGlados(CustomMainWindow):
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_GUI(self):
-        print('At MDA_acq_from_GUI')
+        logging.debug('At MDA_acq_from_GUI')
         self.shared_data._mdaMode = False
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
         
-        print('starting mda mode')
         #Set the location where to save the mda
         self.shared_data._mdaModeSaveLoc = [self.storageFolder,self.storageFileName]
         #Set whether the napariviewer should (also) try to connect to the mda
@@ -668,13 +666,13 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mda_acq_done_signal.connect(self.MDA_acq_finished)
         #And set the mdamode to be true
         self.shared_data.mdaMode = True
-        print('ended setting mdamode params')
+        logging.debug('ended setting mdamode params')
         
         pass
     
     def get_MDA_events_from_GUI(self):
         #This function will be run every time any option in the GUI is changed.
-        print('starting get_MDA_events_from_GUI')
+        logging.debug('starting get_MDA_events_from_GUI')
         #Make this somewhat readable:
         if self.exposureGroupBox.isEnabled():
             try:
@@ -729,10 +727,10 @@ class MDAGlados(CustomMainWindow):
         #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
         
-        print(self.mda)
+        logging.debug(f"mda: {self.mda}")
         if self.fully_started:
             self.save_state('mda_state.json')
-        print('ended get_MDA_events_from_GUI')
+        logging.debug('ended get_MDA_events_from_GUI')
         
         pass
     
