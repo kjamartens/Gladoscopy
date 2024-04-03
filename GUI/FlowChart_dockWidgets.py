@@ -1,8 +1,9 @@
-from PyQt5 import QtCore, QtWidgets
 #Add inclusion of this folder:
 import sys, os
 sys.path.append('C:\\Users\\SMIPC2\\Documents\\GitHub\\ScopeGUI\\GUI\\nodz')
+from PyQt5 import QtCore, QtWidgets
 import nodz_main #type: ignore
+from PyQt5.QtCore import QObject, pyqtSignal
 from MMcontrols import MMConfigUI, ConfigInfo
 from MDAGlados import MDAGlados
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget, QMenu, QAction
@@ -13,7 +14,22 @@ from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboB
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
 from PyQt5.QtCore import QRectF
 import numpy as np
-
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+#Import all scripts in the custom script folders
+from Analysis_Images import * #type: ignore
+from Analysis_Measurements import * #type: ignore
+from Analysis_Shapes import * #type: ignore
+from Scoring_Images import * #type: ignore
+from Scoring_Measurements import * #type: ignore
+from Scoring_Shapes import * #type: ignore
+from Scoring_Images_Measurements import * #type: ignore
+from Scoring_Measurements_Shapes import * #type: ignore
+from Scoring_Images_Measurements_Shapes import * #type: ignore
+from Visualisation_Images import * #type: ignore
+from Visualisation_Measurements import * #type: ignore
+from Visualisation_Shapes import * #type: ignore
+import HelperFunctions #type: ignore
 
 class AdvancedInputDialog(QDialog):
     def __init__(self, parent=None, parentData=None):
@@ -43,7 +59,6 @@ class AdvancedInputDialog(QDialog):
         
     def getInputs(self):
         return self.line_edit.text(), self.combo_box.currentText()
-
 
 class nodz_openMDADialog(QDialog):
     def __init__(self, parent=None, parentData=None):
@@ -77,7 +92,6 @@ class nodz_openMDADialog(QDialog):
     def getInputs(self):
         return self.mdaconfig.mda
 
-
 class FoVFindImaging_singleCh_configs(QDialog):
     def __init__(self, parent=None, parentData=None):
         super().__init__(parent)
@@ -109,7 +123,6 @@ class FoVFindImaging_singleCh_configs(QDialog):
         
     def getInputs(self):
         return self.MMconfig.getUIConfigInfo(onlyChecked=True)
-
 
 class CustomGraphicsView(QtWidgets.QGraphicsView):
     def resizeEvent(self, event):
@@ -163,7 +176,6 @@ class GladosGraph():
         for nodeName in self.allNodeNames:
             self.nodes.append(self.parent.findNodeByName(nodeName))
 
-from PyQt5.QtCore import QObject, pyqtSignal
 class NodeSignalManager(QObject):
     new_signal = pyqtSignal()
     
@@ -305,6 +317,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 print(dialog.getInputs())
             print('hmm')
             
+            currentNode.mdaData.mda = dialog.getInputs()
             currentNode.displayText = str(dialog.getInputs())#type:ignore
             currentNode.update() #type:ignore
         
@@ -326,6 +339,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['acquisition']['dataAttributes'] = []
         self.nodeInfo['acquisition']['NodeCounter'] = 0
         self.nodeInfo['acquisition']['MaxNodeCounter'] = np.inf
+        
+        self.nodeInfo['analysisGrayScaleTest'] = {}
+        self.nodeInfo['analysisGrayScaleTest']['name'] = 'analysisGrayScaleTest'
+        self.nodeInfo['analysisGrayScaleTest']['displayName'] = 'Analysis Grayscale Test [Measurement]'
+        self.nodeInfo['analysisGrayScaleTest']['startAttributes'] = ['Analysis start']
+        self.nodeInfo['analysisGrayScaleTest']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['analysisGrayScaleTest']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisGrayScaleTest']['NodeCounter'] = 0
+        self.nodeInfo['analysisGrayScaleTest']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['analysisMeasurement'] = {}
         self.nodeInfo['analysisMeasurement']['name'] = 'analysisMeasurement'
@@ -441,7 +463,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             for node in scoreGraph.nodes:
                 self.giveInfoOnNode(node)
             return scoreGraph
-            
+
     def findNodeByName(self, name):
         for node in self.nodes:
             #check if the attribute 'name' is found:
@@ -510,7 +532,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
             newNode.customDataEmits.add_signal(attr) #type: ignore
         
-        
         if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
             newNode.customStartEmits.print_signals() #type: ignore
         if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
@@ -522,9 +543,21 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         if nodeType == 'acquisition':
             #Attach a MDA data to this node
             newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True) # type: ignore
-            newNode.mdaData.MDA_completed.connect(newNode.finishedmda) #type:ignore
             
-        if nodeType == 'onesectimer':
+            #Do the acquisition upon callAction
+            newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_GUI()
+            
+            #Add the node emits of 'finishing' upon MDA completion.
+            newNode.mdaData.MDA_completed.connect(lambda self, node = newNode: node.customFinishedEmits.emit_all_signals())
+            #Note: the recorded MDA data is stored in node.mdaData.data - any analysis method should find/read this.
+            #The core is at node.mdaData.core
+            
+            #Also connect the node's finishedMDA
+            newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
+        elif nodeType == 'analysisGrayScaleTest':
+            newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'onesectimer':
             newNode.callAction = lambda self, node=newNode, timev = 1: self.timerCallAction(node,timev=timev)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'twosectimer':
@@ -538,6 +571,23 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         else:
             newNode.callAction = None
+
+    def GrayScaleTest(self,node):
+        print('Hi!')
+        #Find the node that is connected to this
+        connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
+        #First assess that it's a MDA node:
+        if 'acquisition' not in connectedNode.name:
+            print('Error! Acquisition not connected to Grayscale test!')
+        else:
+            #And then find the mdaData object
+            mdaDataobject = connectedNode.mdaData
+            #Thow this into the analysis:
+            
+            avgGrayVal = eval(HelperFunctions.createFunctionWithKwargs("AverageIntensity.AvgGrayValue",NDTIFFStack="mdaDataobject.data",core="mdaDataobject.core"))
+            print(f"found avg gray val: {avgGrayVal}")
+            
+        self.finishedEmits(node)
 
     def finishedEmits(self,node):
         node.customFinishedEmits.emit_all_signals()

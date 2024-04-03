@@ -4,23 +4,24 @@
         "layout",
         "shared_data",
         "gui",
-        "mda"
+        "mda",
+        "data"
     ],
-    "num_time_points": 5,
-    "time_interval_s": 0.001,
-    "z_start": 3503.7,
-    "z_end": 3703.7,
-    "z_step": 40.0,
+    "num_time_points": 20,
+    "time_interval_s": 0.0,
+    "z_start": null,
+    "z_end": null,
+    "z_step": null,
     "channel_group": null,
     "channels": null,
     "channel_exposures_ms": null,
     "xy_positions": null,
     "xyz_positions": null,
     "position_labels": null,
-    "order": "t",
+    "order": "tpz",
     "exposure_ms": 100.0,
-    "storageFolder": "C:/Users/SMIPC2/Documents/GitHub/ScopeGUI/Testing",
-    "storageFileName": "asdf",
+    "storageFolder": "",
+    "storageFileName": "",
     "GUI_show_exposure": true,
     "GUI_show_xy": true,
     "GUI_show_z": true,
@@ -91,7 +92,7 @@
             "ChangeWaitTimeMs": "2000"
         }
     },
-    "lastTimeUpdateSize": 1711557824.0143504,
+    "lastTimeUpdateSize": 1712137258.95893,
     "_GUI_grid_width": 10,
     "fully_started": true,
     "exposureGroupBox": {
@@ -139,7 +140,7 @@
         "checked": null
     },
     "timePointEntry": {
-        "text": "5",
+        "text": "20",
         "checked": null
     },
     "timeIntervalLabel": {
@@ -147,7 +148,7 @@
         "checked": null
     },
     "timeIntervalEntry": {
-        "text": "1",
+        "text": "0",
         "checked": null
     },
     "timeIntervalDropdown": {
@@ -159,7 +160,7 @@
         "checked": null
     },
     "storageFolderEntry": {
-        "text": "C:/Users/SMIPC2/Documents/GitHub/ScopeGUI/Testing",
+        "text": "",
         "checked": null
     },
     "storageFolderButton": {
@@ -171,7 +172,7 @@
         "checked": null
     },
     "storageFileNameEntry": {
-        "text": "asdf",
+        "text": "",
         "checked": null
     },
     "xypositionListWidget": {
@@ -215,7 +216,7 @@
         "checked": null
     },
     "z_startEntry": {
-        "text": "3503.7",
+        "text": "",
         "checked": null
     },
     "z_startSetButton": {
@@ -227,7 +228,7 @@
         "checked": null
     },
     "z_endEntry": {
-        "text": "3703.7",
+        "text": "",
         "checked": null
     },
     "z_endSetButton": {
@@ -243,7 +244,7 @@
         "checked": false
     },
     "z_nrsteps_entry": {
-        "text": "5",
+        "text": "",
         "checked": null
     },
     "z_stepdistance_entry": {
@@ -256,11 +257,11 @@
     },
     "GUI_show_xy_chkbox": {
         "text": "XY",
-        "checked": false
+        "checked": true
     },
     "GUI_show_z_chkbox": {
         "text": "Z",
-        "checked": false
+        "checked": true
     },
     "GUI_show_channel_chkbox": {
         "text": "Channel",
@@ -272,7 +273,7 @@
     },
     "GUI_show_storage_chkbox": {
         "text": "Storage",
-        "checked": false
+        "checked": true
     },
     "orderGroupBox": {
         "text": null,

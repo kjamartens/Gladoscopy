@@ -116,7 +116,7 @@ class XYStageList(InteractiveListWidget):
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','data']
 
     def save_state(self, filename):
         print('SAVING STATE')

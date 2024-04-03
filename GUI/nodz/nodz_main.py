@@ -1190,7 +1190,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self._createStyle(config)
         
         self.textbox_exists = textbox
-        self.textboxheight = 200
+        self.textboxheight = 50
         self.mdaData = None
 
     def oneConnectionAtStartIsFinished(self):
@@ -1203,10 +1203,14 @@ class NodeItem(QtWidgets.QGraphicsItem):
             print('All connections at start are finished')
             print(f"Starting call action of node with name: {self.name}")
             if self.callAction is not None:
-                self.callAction(self.callActionRelatedObject) #type:ignore
+                if self.callActionRelatedObject is not None:
+                    self.callAction(self.callActionRelatedObject) #type:ignore
+                else:
+                    self.callAction(self)
 
     def finishedmda(self):
         print('MDA finished within node')
+        #MDA data is stored as self.mdaData.data
         print(self.name)
 
     @property
@@ -1575,7 +1579,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
     def drawTextbox(self,painter):
         # Draw rectangle
-        rectpos = [5,5,200,100]
+        w = (self.baseWidth - self.border)-5*2
+        h = self.textboxheight
+        rectpos = [5,5,w,h]
         painter.setBrush(QColor(200, 200, 200))
         painter.drawRoundedRect(*rectpos,self.radius,self.radius)
         
@@ -1597,7 +1603,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
             
         td.setHtml(textToDisplay)
         ctx = QAbstractTextDocumentLayout.PaintContext()
-        ctx.clip = QRectF(0,0, 400, 100)
+        ctx.clip = QRectF(0,0, w, h)
         
         #Move painter
         painter.translate(rectpos[0],rectpos[1])
