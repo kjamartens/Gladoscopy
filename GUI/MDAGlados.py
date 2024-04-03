@@ -287,7 +287,7 @@ class MDAGlados(CustomMainWindow):
         showOptionsLayout = QGridLayout()
 
         # Add widgets to each layout
-        #--------------- Exposure widget -----------------------------------------------
+        # --------------- Exposure widget -----------------------------------------------
         #Exposure: add a label, an entry field, and a dropdown between 'ms' and 's':
         self.exposureLabel = QLabel("Exposure:")
         self.exposureEntry = QLineEdit()
@@ -309,14 +309,15 @@ class MDAGlados(CustomMainWindow):
         self.timePointLabel = QLabel("Number time points:")
         self.timePointEntry = QLineEdit()
         self.timePointEntry.setValidator(QIntValidator())
-        timeLayout.addWidget(self.timePointLabel,0,0)
-        timeLayout.addWidget(self.timePointEntry,0,1)
         self.timeIntervalLabel = QLabel("Time interval:")
         self.timeIntervalEntry = QLineEdit()
         self.timeIntervalEntry.setValidator(QDoubleValidator())
         self.timeIntervalDropdown = QComboBox()
         self.timeIntervalDropdown.addItem("ms")
         self.timeIntervalDropdown.addItem("s")
+        #Adding widgets to layout
+        timeLayout.addWidget(self.timePointLabel,0,0)
+        timeLayout.addWidget(self.timePointEntry,0,1)
         timeLayout.addWidget(self.timeIntervalLabel,1,0)
         timeLayout.addWidget(self.timeIntervalEntry,1,1)
         timeLayout.addWidget(self.timeIntervalDropdown,1,2)
@@ -329,15 +330,16 @@ class MDAGlados(CustomMainWindow):
         #storage: first, add a label, entry field, and button with '...' to select a folder of choice:
         self.storageFolderLabel = QLabel("Storage:")
         self.storageFolderEntry = QLineEdit()
-        storageLayout.addWidget(self.storageFolderLabel,0,0)
-        storageLayout.addWidget(self.storageFolderEntry,0,1)
         self.storageFolderButton = QPushButton('...')
         #add a lambda function when this is pressed to search for a folder:
         self.storageFolderButton.clicked.connect(lambda: self.storageFolderEntry.setText(QFileDialog.getExistingDirectory()))
-        storageLayout.addWidget(self.storageFolderButton,0,2)
         #Then add a label and entry field for the file name:
         self.storageFileNameLabel = QLabel("File name:")
         self.storageFileNameEntry = QLineEdit()
+        #Adding widgets to layout
+        storageLayout.addWidget(self.storageFolderLabel,0,0)
+        storageLayout.addWidget(self.storageFolderEntry,0,1)
+        storageLayout.addWidget(self.storageFolderButton,0,2)
         storageLayout.addWidget(self.storageFileNameLabel,1,0)
         storageLayout.addWidget(self.storageFileNameEntry,1,1)
         self.storageFolderEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
@@ -359,23 +361,22 @@ class MDAGlados(CustomMainWindow):
         #Add a callback if we change this dropdown:
         self.xy_stagesDropdown.currentIndexChanged.connect(lambda: self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText()))
         
-        #Add them to the layout
-        xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
-        xyLayout.addWidget(self.xy_stagesDropdown,0,1)
-        
+        #Initisalise the XY position list
         self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText)
-
+        #Buttons for the xy position list
         self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
         self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
         self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
         self.xypositionListWidget_addButton = QPushButton('Add New Entry')
-        
+        #Adding callbacks to the xy position list buttons
         self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
         self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget.moveUp)
         self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
         self.xypositionListWidget_addButton.clicked.connect(lambda: self.xypositionListWidget.addNewEntry(textEntry="Your Text Entry"))
 
-        
+        #Adding widgets to layout
+        xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
+        xyLayout.addWidget(self.xy_stagesDropdown,0,1)
         xyLayout.addWidget(self.xypositionListWidget,1,0,6,1)
         xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
         xyLayout.addWidget(self.xypositionListWidget_moveUpButton,3,1)
@@ -390,9 +391,7 @@ class MDAGlados(CustomMainWindow):
         #add the options to the dropdown:
         for stage in oneDstages:
             self.z_oneDstageDropdown.addItem(stage)
-        zLayout.addWidget(self.z_oneDstageDropdownLabel,0,0)
-        zLayout.addWidget(self.z_oneDstageDropdown,0,1)
-        
+        #Create all other buttons/lineedits
         self.z_startLabel = QLabel("Start:")
         self.z_startEntry = QLineEdit()
         self.z_startEntry.setValidator(QDoubleValidator())
@@ -403,13 +402,6 @@ class MDAGlados(CustomMainWindow):
         self.z_endEntry.setValidator(QDoubleValidator())
         self.z_endSetButton = QPushButton('Set')
         self.z_endSetButton.clicked.connect(lambda: self.setZEnd())
-        
-        zLayout.addWidget(self.z_startLabel,1,0)
-        zLayout.addWidget(self.z_startEntry,1,1)
-        zLayout.addWidget(self.z_startSetButton,1,2)
-        zLayout.addWidget(self.z_endLabel,2,0)
-        zLayout.addWidget(self.z_endEntry,2,1)
-        zLayout.addWidget(self.z_endSetButton,2,2)
         
         #add radio buttons:
         self.z_nrsteps_radio= QRadioButton("Number of steps: ")
@@ -422,6 +414,15 @@ class MDAGlados(CustomMainWindow):
         self.z_stepdistance_entry = QLineEdit()
         self.z_stepdistance_entry.setValidator(QDoubleValidator())
         
+        #Add all widgets to layout
+        zLayout.addWidget(self.z_oneDstageDropdownLabel,0,0)
+        zLayout.addWidget(self.z_oneDstageDropdown,0,1)
+        zLayout.addWidget(self.z_startLabel,1,0)
+        zLayout.addWidget(self.z_startEntry,1,1)
+        zLayout.addWidget(self.z_startSetButton,1,2)
+        zLayout.addWidget(self.z_endLabel,2,0)
+        zLayout.addWidget(self.z_endEntry,2,1)
+        zLayout.addWidget(self.z_endSetButton,2,2)
         zLayout.addWidget(self.z_nrsteps_radio,3,0)
         zLayout.addWidget(self.z_nrsteps_entry,3,1)
         zLayout.addWidget(self.z_stepdistance_radio,4,0)
@@ -459,12 +460,12 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_time_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_storage_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         
-        
         font = QFont()
         font.setPointSize(7)  # Set the desired font size
 
         [checkbox.setFont(font) for checkbox in [self.GUI_show_exposure_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox, self.GUI_show_channel_chkbox, self.GUI_show_time_chkbox, self.GUI_show_storage_chkbox]]
 
+        #Add all checkboxes to the options-layout
         showOptionsLayout.addWidget(self.GUI_show_exposure_chkbox,0,0)
         showOptionsLayout.addWidget(self.GUI_show_xy_chkbox,0,1)
         showOptionsLayout.addWidget(self.GUI_show_z_chkbox,0,2)
@@ -472,6 +473,7 @@ class MDAGlados(CustomMainWindow):
         showOptionsLayout.addWidget(self.GUI_show_time_chkbox,1,1)
         showOptionsLayout.addWidget(self.GUI_show_storage_chkbox,1,2)
         
+        # ---------- Combining all to the main layout -----------------------------------------
         # Set layouts for each groupbox
         self.exposureGroupBox.setLayout(exposureLayout)
         self.xyGroupBox.setLayout(xyLayout)
@@ -555,17 +557,17 @@ class MDAGlados(CustomMainWindow):
         # self.storageGroupBox.setParent(None) # type: ignore
         # self.showOptionsGroupBox.setParent(None)  # type: ignore
 
-        # # Clear the layout
-        # while self.gui.count(): # type: ignore
-        #     item = self.gui.takeAt(0) # type: ignore
-        #     widget = item.widget()
-        #     if widget:
-        #         widget.deleteLater()
+        # Clear the layout - this is required
+        while self.gui.count(): # type: ignore
+            item = self.gui.takeAt(0) # type: ignore
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
         #redraw the self.gui:
         self.gui.update()
         QCoreApplication.processEvents()
         
-        #At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
+        # At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
         optionsBGroupBox = QWidget()
         optionsBLayout = QVBoxLayout()
         optionsBGroupBox.setLayout(optionsBLayout)
@@ -593,20 +595,19 @@ class MDAGlados(CustomMainWindow):
         
         self.orderGroupBox = QGroupBox("Order")
         orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
-        
         self.orderGroupBox.setLayout(orderlayout)
-        orderexposuretimelayout.addWidget(self.orderGroupBox) # type: ignore
-        orderexposuretimelayout.addWidget(self.exposureGroupBox) # type: ignore
         if GUI_show_exposure:
             self.exposureGroupBox.setEnabled(True)
         else:
             self.exposureGroupBox.setEnabled(False)
+        orderexposuretimelayout.addWidget(self.orderGroupBox) # type: ignore
+        orderexposuretimelayout.addWidget(self.exposureGroupBox) # type: ignore
         orderexposuretimelayout.addWidget(self.timeGroupBox) # type: ignore
         if GUI_show_time:
             self.timeGroupBox.setEnabled(True)
         else:
             self.timeGroupBox.setEnabled(False)
-            # QCoreApplication.processEvents()
+        #     # QCoreApplication.processEvents()
         self.gui.addWidget(orderexposuretimegroupbox, 1//gridWidth, 1%gridWidth) # type: ignore
         
         #Add XY, Z, Channel, groupboxes as individual groupboxes

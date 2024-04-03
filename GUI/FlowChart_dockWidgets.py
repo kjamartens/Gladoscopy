@@ -271,7 +271,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 print('attempted to disconnect a disconnected signal')
         
         destinationNode = self.findNodeByName(dstNodeName)
-        destinationNode.n_connect_at_start -= 1
+        destinationNode.n_connect_at_start -= 1 #type:ignore
                 
         print(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         
