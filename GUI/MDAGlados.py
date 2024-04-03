@@ -548,14 +548,14 @@ class MDAGlados(CustomMainWindow):
     def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4,GUI_acquire_button=True):
         gridWidth = self.GUI_grid_width
         # Remove the widgets from their parent
-        # self.exposureGroupBox.setParent(None) # type: ignore
-        # self.xyGroupBox.setParent(None) # type: ignore
-        # self.zGroupBox.setParent(None) # type: ignore
-        # self.channelGroupBox.setParent(None) # type: ignore
-        # self.timeGroupBox.setParent(None) # type: ignore
-        # self.orderGroupBox.setParent(None) # type: ignore
-        # self.storageGroupBox.setParent(None) # type: ignore
-        # self.showOptionsGroupBox.setParent(None)  # type: ignore
+        self.exposureGroupBox.setParent(None) # type: ignore
+        self.xyGroupBox.setParent(None) # type: ignore
+        self.zGroupBox.setParent(None) # type: ignore
+        self.channelGroupBox.setParent(None) # type: ignore
+        self.timeGroupBox.setParent(None) # type: ignore
+        # # self.orderGroupBox.setParent(None) # type: ignore
+        self.storageGroupBox.setParent(None) # type: ignore
+        self.showOptionsGroupBox.setParent(None)  # type: ignore
 
         # Clear the layout - this is required
         while self.gui.count(): # type: ignore
