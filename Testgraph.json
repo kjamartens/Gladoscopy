@@ -33,8 +33,8 @@
                 }
             ],
             "position": [
-                2314.6000000000004,
-                311.39189189189193
+                1050.6568947379849,
+                78.44392294035043
             ],
             "preset": "acquisition"
         },
@@ -70,8 +70,8 @@
                 }
             ],
             "position": [
-                2631.5513513513506,
-                311.3918918918919
+                1465.691888520311,
+                94.9791816567778
             ],
             "preset": "node_preset_1"
         },
@@ -89,10 +89,78 @@
                 }
             ],
             "position": [
-                1982.610810810811,
-                294.0405405405405
+                686.8812029765829,
+                119.7820697314188
             ],
             "preset": "scoringStart"
         }
+    },
+    "NODES_MDA": {
+        "acquisition_0": {
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "True",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "True",
+            "GUI_show_z": "True",
+            "_GUI_grid_width": "10",
+            "channel_exposures_ms": null,
+            "channel_group": null,
+            "channels": null,
+            "exposure_ms": "100.0",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1712137258.95893",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    }
+                }
+            ],
+            "mda_analysis_thread": null,
+            "num_time_points": "5",
+            "order": "t",
+            "position_labels": null,
+            "storageFileName": "",
+            "storageFolder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "data"
+            ],
+            "time_interval_s": "0.0",
+            "xy_positions": null,
+            "xyz_positions": null,
+            "z_end": null,
+            "z_start": null,
+            "z_step": null
+        },
+        "analysisGrayScaleTest_0": {},
+        "scoringStart_0": {}
     }
 }

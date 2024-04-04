@@ -855,6 +855,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
         # Store nodes data.
         data['NODES'] = dict()
+        data['NODES_MDA'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -866,6 +867,32 @@ class Nodz(QtWidgets.QGraphicsView):
                                    'position': [nodeInst.pos().x(), nodeInst.pos().y()],
                                    'alternate': nodeAlternate,
                                    'attributes': []}
+
+
+            import numpy
+            def convert_to_string(obj):
+                if isinstance(obj, (int, float, numpy.int32)):
+                    return str(obj)
+                elif isinstance(obj, dict):
+                    return {key: convert_to_string(value) for key, value in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_to_string(item) for item in obj]
+                else:
+                    return obj
+                    
+            data['NODES_MDA'][node] = {}
+            if nodeInst.mdaData is not None:
+                #Only store mda if its properly initialised as MDAGLados
+                if isinstance(nodeInst.mdaData,MDAGlados):
+                    #Skip some attributes in nodes_mda:
+                    mdaattr_skip = ['MDA_completed','MM_JSON','core','data','shared_data','gui','layout']
+                    for attr in vars(nodeInst.mdaData):
+                        if attr not in mdaattr_skip:
+                            #Also check if it's a Qtpy object:
+                            if not isinstance(getattr(nodeInst.mdaData, attr), QtCore.QObject):
+                                data['NODES_MDA'][node][attr] = getattr(nodeInst.mdaData, attr)
+
+                    data['NODES_MDA'][node] = convert_to_string(data['NODES_MDA'][node])
 
             attrs = nodeInst.attrs
             for attr in attrs:
@@ -914,6 +941,29 @@ class Nodz(QtWidgets.QGraphicsView):
         nodesData = data['NODES']
         nodesName = nodesData.keys()
         allNodes = []
+        
+        def convert_to_correct_type(obj):
+            if isinstance(obj, str):
+                try:
+                    # Try converting to integer
+                    return int(obj)
+                except ValueError:
+                    try:
+                        # Try converting to float
+                        return float(obj)
+                    except ValueError:
+                        if obj.lower() == 'true':
+                            return True
+                        elif obj.lower() == 'false':
+                            return False
+                        else:
+                            return obj
+            elif isinstance(obj, dict):
+                return {key: convert_to_correct_type(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_correct_type(item) for item in obj]
+            else:
+                return obj
 
         for name in nodesName:
             preset = nodesData[name]['preset']
@@ -924,16 +974,23 @@ class Nodz(QtWidgets.QGraphicsView):
             node = self.createNode(name=name,
                                    preset=preset,
                                    position=position,
-                                   alternate=alternate, skipCreateNodeSignal=True)
+                                   alternate=alternate, skipCreateNodeSignal=False)
             
+            #Restore MDA data
+            if name in data['NODES_MDA']:
+                if data['NODES_MDA'] is not None:
+                    correctedmdadata = convert_to_correct_type(data['NODES_MDA'][name])
+                    for attr in data['NODES_MDA'][name]:
+                        setattr(node.mdaData,attr,correctedmdadata[attr])
+
             allNodes.append(node)
             
         self.scene().update()
         self._focus()
-        #Only now emit the node-created for all nodes
-        for node in allNodes:
-            self.signal_NodeCreated.emit(node.name)
-            self.signal_NodeCreatedNodeItself.emit(node)
+        # #Only now emit the node-created for all nodes
+        # for node in allNodes:
+        #     self.signal_NodeCreated.emit(node.name)
+        #     self.signal_NodeCreatedNodeItself.emit(node)
         
         # Apply connections data.
         connectionsData = data['CONNECTIONS']
