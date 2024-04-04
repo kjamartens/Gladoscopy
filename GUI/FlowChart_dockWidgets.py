@@ -250,6 +250,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         #Connect required deleted/double clicked signals
         self.signal_NodeDeleted.connect(self.NodeRemoved)
+        self.signal_NodeCreatedNodeItself.connect(self.NodeAdded)
         self.signal_NodeDoubleClicked.connect(self.NodeDoubleClicked)
         self.signal_PlugConnected.connect(self.PlugConnected)
         self.signal_PlugDisconnected.connect(self.PlugOrSocketDisconnected)
@@ -274,66 +275,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 #     pass
     
     def storePickle(self):
-        import copy
-        import pickle
-        
-        def explore_attributes(obj, indent=0):
-            attributes = vars(obj)
-            for attr_name in attributes:
-                if not attr_name.startswith('_'):
-                    attr = getattr(obj, attr_name)
-                    if not callable(attr):
-                        print(" " * indent + attr_name)
-                    else:
-                        print(" " * indent + attr_name + '()')
-                    for attr2 in vars(attr):
-                        print(f"at2: {attr2}")	
-                        # self.explore_attributes(attr, indent + 2)
-                
-        
-        explore_attributes(self.nodes[0])
-        
-        valsToStore = dir(self.nodes[0])
-        for val in valsToStore:
-            print(val)
-        
-        toodumpdata = {}
-        for val in valsToStore:
-            try:
-                toodumpdata[val] = copy.deepcopy(getattr(self.nodes[0],val))
-            except TypeError:
-                print(f"could not deepcopy {val}")
-        
-        
-        with open('pickledata.pickle','wb') as f:
-            pickle.dump(toodumpdata,f)
-            
-        import dill
-        from dill import dumps, loads
-        with open('pickleDilldata.pickle','wb') as f:
-            pickle.dump_module(f)
-            
-        with dill.detect.trace():
-            dill.dumps(self.nodes)
-            
-        x = iter([1,2,3,4])
-        d = {'x':x}
-        # we check for unpicklable items in d (i.e. the iterator x)
-        print(dill.detect.baditems(self))
-        # [<listiterator object at 0x10b0e48d0>]
-        # note that nothing inside of the iterator is unpicklable!
-        print(dill.detect.baditems(x))
+        self.saveGraph('Testgraph.json')
     
     def loadPickle(self):
         import pickle, copy
-        with open('pickledata.pickle','rb') as f:   
-            valsFound = pickle.load(f)
-        
-        for val in (valsFound):
-            print(val)
-            setattr(self,val,valsFound[val])
-            
-        self.graphics_view.updateGraphicsViewSize()
+        self.loadGraph_KM('Testgraph.json')
     
     def nodeLookupName_withoutCounter(self,nodeName):
         
@@ -350,7 +296,20 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         return finalNodeName
     
     def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        logging.debug(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        print(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        
+        #First of all, abort if this exact connection is already made - this is called when loading the graph:
+        # srcNode = self.findNodeByName(srcNodeName)
+        # for plug in srcNode.plugs: #type:ignore
+        #     if plug == plugAttribute:
+        #         plugitem = srcNode.plugs[plug] #type:ignore
+        #         #Look at all connections
+        #         for connection in plugitem.connections:
+        #             #Check if the connection is already made
+        #             if connection.plugAttr == plugAttribute and connection.socketAttr == socketAttribute and connection.plugNode == srcNodeName and connection.socketNode == dstNodeName:
+        #                 print('skipping this!')
+        #                 return
+        
         sourceNode = self.findNodeByName(srcNodeName)
         if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
             destinationNode = self.findNodeByName(dstNodeName)
@@ -396,8 +355,20 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         for nodeName in nodeNames:
             for node_type, node_data in self.nodeInfo.items():
                 if node_data['name'] in nodeName:
-                    if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
-                        self.nodeInfo[node_type]['NodeCounter'] -= 1
+                    # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
+                    self.nodeInfo[node_type]['NodeCounter'] -= 1
+            
+            #Also remove from self.nodes:
+            node = self.findNodeByName(nodeName)
+            try:
+                self.nodes.remove(node)
+            except:
+                print(f"failed to remove node: {nodeName}")
+    
+    def NodeAdded(self,node):
+        logging.info('one or more nodes are created!')
+        nodeType = self.nodeLookupName_withoutCounter(node.name)
+        self.performPostNodeCreation_Start(node,nodeType)
     
     def NodeDoubleClicked(self,nodeName):
         currentNode = self.findNodeByName(nodeName)
@@ -588,21 +559,31 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         context_menu.exec_(QMouseevent.globalPos())
 
     def createNewNode(self, nodeType, event):
-        if self.nodeInfo[nodeType]['NodeCounter'] < self.nodeInfo[nodeType]['MaxNodeCounter']:
-            #Find all nodes that have (partial) name with nodeType:
-            name = self.nodeInfo[nodeType]['name']+"_"+str(self.nodeInfo[nodeType]['NodeCounter'])
-            self.nodeInfo[nodeType]['NodeCounter']+=1
-        else:
+        if self.nodeInfo[nodeType]['NodeCounter'] >= self.nodeInfo[nodeType]['MaxNodeCounter']:
             print('Not allowed! Maximum number of nodes of this type reached')
             return
+        
+        #Create the new node with correct name and preset
+        newNode = self.createNode(name=nodeType+"_", preset = 'node_preset_1', position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'])
+        
+        #Do post-node-creation functions - does this via the pyqtsignal!
+    
+    def performPostNodeCreation_Start(self,newNode,nodeType):
+        newNodeName = self.nodeInfo[nodeType]['name']+"_"+str(self.nodeInfo[nodeType]['NodeCounter'])
+        #Increase the nodeCounter
+        self.nodeInfo[nodeType]['NodeCounter']+=1
         
         if nodeType in self.config:
             configtype = nodeType
         else:
             configtype = 'node_preset_1'
+            
         
-        #Create the new node with correct name and preset
-        newNode = self.createNode(name=name, preset = configtype, position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'])
+        #Change name, change sdisplayName, change preset:
+        newNode.changeName(newNodeName)
+        newNode.changeDisplayName(self.nodeInfo[nodeType]['displayName'])
+        newNode.changePreset(configtype)
+        
         self.nodes.append(newNode)
         
         if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
@@ -669,6 +650,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         else:
             newNode.callAction = None
 
+        newNode.update()
+    
     def GrayScaleTest(self,node):
         #Find the node that is connected to this
         connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()

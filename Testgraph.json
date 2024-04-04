@@ -1,0 +1,98 @@
+{
+    "CONNECTIONS": [
+        [
+            "acquisition_0.Finished",
+            "analysisGrayScaleTest_0.Analysis start"
+        ],
+        [
+            "scoringStart_0.Start",
+            "acquisition_0.Acquisition start"
+        ]
+    ],
+    "NODES": {
+        "acquisition_0": {
+            "alternate": true,
+            "attributes": [
+                {
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1
+                },
+                {
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1
+                }
+            ],
+            "position": [
+                2314.6000000000004,
+                311.39189189189193
+            ],
+            "preset": "acquisition"
+        },
+        "analysisGrayScaleTest_0": {
+            "alternate": true,
+            "attributes": [
+                {
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1
+                },
+                {
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1
+                },
+                {
+                    "dataType": null,
+                    "name": "Output",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1
+                }
+            ],
+            "position": [
+                2631.5513513513506,
+                311.3918918918919
+            ],
+            "preset": "node_preset_1"
+        },
+        "scoringStart_0": {
+            "alternate": true,
+            "attributes": [
+                {
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1
+                }
+            ],
+            "position": [
+                1982.610810810811,
+                294.0405405405405
+            ],
+            "preset": "scoringStart"
+        }
+    }
+}

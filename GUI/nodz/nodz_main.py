@@ -24,6 +24,7 @@ class Nodz(QtWidgets.QGraphicsView):
     """
 
     signal_NodeCreated = QtCore.pyqtSignal(object)
+    signal_NodeCreatedNodeItself = QtCore.pyqtSignal(object)
     signal_NodeDeleted = QtCore.pyqtSignal(object)
     signal_NodeEdited = QtCore.pyqtSignal(object, object)
     signal_NodeSelected = QtCore.pyqtSignal(object)
@@ -34,9 +35,11 @@ class Nodz(QtWidgets.QGraphicsView):
     signal_AttrDeleted = QtCore.pyqtSignal(object, object)
     signal_AttrEdited = QtCore.pyqtSignal(object, object, object)
 
-    signal_PlugConnected = QtCore.pyqtSignal(object, object, object, object)
+    signal_PlugConnectedStartConnection = QtCore.pyqtSignal(object, object, object, object) #Runs at the start of connection
+    signal_PlugConnected = QtCore.pyqtSignal(object, object, object, object) #Runs at the end of connection
     signal_PlugDisconnected = QtCore.pyqtSignal(object, object, object, object)
-    signal_SocketConnected = QtCore.pyqtSignal(object, object, object, object)
+    signal_SocketConnectedStartConnection = QtCore.pyqtSignal(object, object, object, object) #Runs at the start of connection
+    signal_SocketConnected = QtCore.pyqtSignal(object, object, object, object) #Runs at the end of connection
     signal_SocketDisconnected = QtCore.pyqtSignal(object, object, object, object)
 
     signal_GraphSaved = QtCore.pyqtSignal()
@@ -535,7 +538,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
 
     # NODES
-    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None, displayName=None):
+    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None, displayName=None,skipCreateNodeSignal=False):
         """
         Create a new node with a given name, position and color.
 
@@ -578,8 +581,10 @@ class Nodz(QtWidgets.QGraphicsView):
             self.scene().addItem(nodeItem)
             nodeItem.setPos(position - nodeItem.nodeCenter)
 
-            # Emit signal.
-            self.signal_NodeCreated.emit(name)
+            if not skipCreateNodeSignal:
+                # Emit signal.
+                self.signal_NodeCreated.emit(name)
+                self.signal_NodeCreatedNodeItself.emit(nodeItem)
 
             return nodeItem
 
@@ -888,6 +893,70 @@ class Nodz(QtWidgets.QGraphicsView):
         # Emit signal.
         self.signal_GraphSaved.emit()
 
+    def loadGraph_KM(self, filePath='path'):
+        """
+        Get all the stored info from the .json file at the given location
+        and recreate the graph as saved.
+
+        :type  filePath: str.
+        :param filePath: The path where you want to load your graph from.
+
+        """
+        # Load data.
+        if os.path.exists(filePath):
+            data = utils._loadData(filePath=filePath)
+        else:
+            print('Invalid path : {0}'.format(filePath))
+            print('Load aborted !')
+            return False
+
+        # Apply nodes data.
+        nodesData = data['NODES']
+        nodesName = nodesData.keys()
+        allNodes = []
+
+        for name in nodesName:
+            preset = nodesData[name]['preset']
+            position = nodesData[name]['position']
+            position = QtCore.QPointF(position[0], position[1])
+            alternate = nodesData[name]['alternate']
+
+            node = self.createNode(name=name,
+                                   preset=preset,
+                                   position=position,
+                                   alternate=alternate, skipCreateNodeSignal=True)
+            
+            allNodes.append(node)
+            
+        self.scene().update()
+        self._focus()
+        #Only now emit the node-created for all nodes
+        for node in allNodes:
+            self.signal_NodeCreated.emit(node.name)
+            self.signal_NodeCreatedNodeItself.emit(node)
+        
+        # Apply connections data.
+        connectionsData = data['CONNECTIONS']
+
+        for connection in connectionsData:
+            source = connection[0]
+            sourceNode = source.split('.')[0]
+            sourceAttr = source.split('.')[1]
+
+            target = connection[1]
+            targetNode = target.split('.')[0]
+            targetAttr = target.split('.')[1]
+
+            self.createConnection(sourceNode, sourceAttr,
+                                  targetNode, targetAttr, plugSkipSignalEmit=True, socketSkipSignalEmit=False)
+
+        self.scene().update()
+        
+        self._focus()
+
+        # Emit signal.
+        self.signal_GraphLoaded.emit()
+
     def loadGraph(self, filePath='path'):
         """
         Get all the stored info from the .json file at the given location
@@ -948,6 +1017,8 @@ class Nodz(QtWidgets.QGraphicsView):
                                      socketMaxConnections=socketMaxConnections
                                      )
 
+        self.scene().update()
+        
         # Apply connections data.
         connectionsData = data['CONNECTIONS']
 
@@ -970,7 +1041,7 @@ class Nodz(QtWidgets.QGraphicsView):
         # Emit signal.
         self.signal_GraphLoaded.emit()
 
-    def createConnection(self, sourceNode, sourceAttr, targetNode, targetAttr):
+    def createConnection(self, sourceNode, sourceAttr, targetNode, targetAttr,plugSkipSignalEmit=False,socketSkipSignalEmit=False):
         """
         Create a manual connection.
 
@@ -997,8 +1068,8 @@ class Nodz(QtWidgets.QGraphicsView):
         connection.socketNode = socket.parentItem().name
         connection.socketAttr = socket.attribute
 
-        plug.connect(socket, connection)
-        socket.connect(plug, connection)
+        plug.connect(socket, connection,skipSignalEmit = plugSkipSignalEmit)
+        socket.connect(plug, connection,skipSignalEmit = socketSkipSignalEmit)
 
         connection.updatePath()
 
@@ -1187,11 +1258,27 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.sockets = dict()
 
         # Methods.
+        self.config = config
         self._createStyle(config)
         
         self.textbox_exists = textbox
         self.textboxheight = 50
         self.mdaData = None
+
+    def changeName(self,new_name):
+        if new_name != self.name:
+            #Also update in self.scene(): (adding both new one and removing old one)
+            self.scene().nodes[new_name] = self.scene().nodes[self.name] #type:ignore
+            self.scene().nodes.pop(self.name) #type:ignore
+            #And update the node name:
+            self.name = new_name
+    
+    def changePreset(self,new_preset):
+        self.nodePreset = new_preset
+        self._createStyle(self.config)
+    
+    def changeDisplayName(self,new_Displayname):
+        self.displayName = new_Displayname
 
     def oneConnectionAtStartIsFinished(self):
         self.n_connect_at_start_finished += 1
@@ -1576,7 +1663,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
             else:
                 offsetLeft += self.attrHeight
 
-        
     def drawTextbox(self,painter):
         # Draw rectangle
         w = (self.baseWidth - self.border)-5*2
@@ -1984,7 +2070,7 @@ class PlugItem(SlotItem):
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
 
-    def connect(self, socket_item, connection):
+    def connect(self, socket_item, connection,skipSignalEmit=False):
         """
         Connect to the given socket_item.
 
@@ -1992,6 +2078,11 @@ class PlugItem(SlotItem):
         if self.maxConnections>0 and len(self.connected_slots) >= self.maxConnections:
             # Already connected.
             self.connections[self.maxConnections-1]._remove()
+
+
+        nodzInst = self.scene().views()[0]
+        if not skipSignalEmit:
+            nodzInst.signal_PlugConnectedStartConnection.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
         # Populate connection.
         connection.socketItem = socket_item
@@ -2008,8 +2099,8 @@ class PlugItem(SlotItem):
             self.connections.append(connection)
 
         # Emit signal.
-        nodzInst = self.scene().views()[0]
-        nodzInst.signal_PlugConnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
+        if not skipSignalEmit:
+            nodzInst.signal_PlugConnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
     def disconnect(self, connection):
         """
@@ -2101,7 +2192,7 @@ class SocketItem(SlotItem):
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
 
-    def connect(self, plug_item, connection):
+    def connect(self, plug_item, connection, skipSignalEmit=False):
         """
         Connect to the given plug item.
 
@@ -2109,6 +2200,10 @@ class SocketItem(SlotItem):
         if self.maxConnections>0 and len(self.connected_slots) >= self.maxConnections:
             # Already connected.
             self.connections[self.maxConnections-1]._remove()
+
+        nodzInst = self.scene().views()[0]
+        if not skipSignalEmit:
+            nodzInst.signal_SocketConnectedStartConnection.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
         # Populate connection.
         connection.plugItem = plug_item
@@ -2123,8 +2218,8 @@ class SocketItem(SlotItem):
             self.connections.append(connection)
 
         # Emit signal.
-        nodzInst = self.scene().views()[0]
-        nodzInst.signal_SocketConnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
+        if not skipSignalEmit:
+            nodzInst.signal_SocketConnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
     def disconnect(self, connection):
         """
