@@ -93,6 +93,12 @@ class nodz_openMDADialog(QDialog):
     def getInputs(self):
         return self.mdaconfig.mda
 
+    def getExposureTime(self):
+        return self.mdaconfig.exposure_ms
+
+    def getmdaData(self):
+        return self.mdaconfig
+
 class FoVFindImaging_singleCh_configs(QDialog):
     def __init__(self, parent=None, parentData=None):
         super().__init__(parent)
@@ -211,6 +217,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.debugScoringButton = QPushButton('Debug Scoring')
         self.buttonsArea.addWidget(self.debugScoringButton)
         self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
+        self.storePickleButton = QPushButton('Store Pickle')
+        self.buttonsArea.addWidget(self.storePickleButton)
+        self.storePickleButton.clicked.connect(lambda index: self.storePickle())
+        self.loadPickleButton = QPushButton('Load Pickle')
+        self.buttonsArea.addWidget(self.loadPickleButton)
+        self.loadPickleButton.clicked.connect(lambda index: self.loadPickle())
+        
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
@@ -244,7 +257,84 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         #Focus on the nodes
         self._focus()
+    
+    def explore_attributes(self, obj, indent=0):
+        if indent < 20:
+            attributes = vars(obj)
+            for attr_name in attributes:
+                if not attr_name.startswith('_'):
+                    attr = getattr(obj, attr_name)
+                    if not callable(attr):
+                        print(" " * indent + attr_name)
+                    else:
+                        print(" " * indent + attr_name + '()')
+                    if hasattr(attr, '__dict__'):
+                        self.explore_attributes(attr, indent + 2)
+                # except:
+                #     pass
+    
+    def storePickle(self):
+        import copy
+        import pickle
         
+        def explore_attributes(obj, indent=0):
+            attributes = vars(obj)
+            for attr_name in attributes:
+                if not attr_name.startswith('_'):
+                    attr = getattr(obj, attr_name)
+                    if not callable(attr):
+                        print(" " * indent + attr_name)
+                    else:
+                        print(" " * indent + attr_name + '()')
+                    for attr2 in vars(attr):
+                        print(f"at2: {attr2}")	
+                        # self.explore_attributes(attr, indent + 2)
+                
+        
+        explore_attributes(self.nodes[0])
+        
+        valsToStore = dir(self.nodes[0])
+        for val in valsToStore:
+            print(val)
+        
+        toodumpdata = {}
+        for val in valsToStore:
+            try:
+                toodumpdata[val] = copy.deepcopy(getattr(self.nodes[0],val))
+            except TypeError:
+                print(f"could not deepcopy {val}")
+        
+        
+        with open('pickledata.pickle','wb') as f:
+            pickle.dump(toodumpdata,f)
+            
+        import dill
+        from dill import dumps, loads
+        with open('pickleDilldata.pickle','wb') as f:
+            pickle.dump_module(f)
+            
+        with dill.detect.trace():
+            dill.dumps(self.nodes)
+            
+        x = iter([1,2,3,4])
+        d = {'x':x}
+        # we check for unpicklable items in d (i.e. the iterator x)
+        print(dill.detect.baditems(self))
+        # [<listiterator object at 0x10b0e48d0>]
+        # note that nothing inside of the iterator is unpicklable!
+        print(dill.detect.baditems(x))
+    
+    def loadPickle(self):
+        import pickle, copy
+        with open('pickledata.pickle','rb') as f:   
+            valsFound = pickle.load(f)
+        
+        for val in (valsFound):
+            print(val)
+            setattr(self,val,valsFound[val])
+            
+        self.graphics_view.updateGraphicsViewSize()
+    
     def nodeLookupName_withoutCounter(self,nodeName):
         
         
@@ -316,7 +406,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 logging.debug(f"MDA dialog input: {dialog.getInputs()}")
             
-            currentNode.mdaData.mda = dialog.getInputs()#type:ignore
+            # currentNode.mdaData.exposure_ms = dialog.getExposureTime()
+            # currentNode.mdaData.mda = dialog.getInputs()#type:ignore
+            dialogmdaData = dialog.getmdaData()
+            attrs_to_not_copy = ['gui','core','shared_data','has_GUI','data','staticMetaObject','MDA_completed','MM_JSON']
+            #Loop over all attributes in dialogmdaData:
+            for attrs in vars(dialogmdaData):
+                if attrs not in attrs_to_not_copy:
+                    setattr(currentNode.mdaData,attrs,getattr(dialogmdaData,attrs))
+            
             currentNode.displayText = str(dialog.getInputs())#type:ignore
             currentNode.update() #type:ignore
         
