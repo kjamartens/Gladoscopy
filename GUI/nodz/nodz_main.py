@@ -857,6 +857,7 @@ class Nodz(QtWidgets.QGraphicsView):
         # Store nodes data.
         data['NODES'] = dict()
         data['NODES_MDA'] = dict()
+        data['NODES_MMCONFIGCHANGE'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -880,7 +881,8 @@ class Nodz(QtWidgets.QGraphicsView):
                     return [convert_to_string(item) for item in obj]
                 else:
                     return obj
-                    
+            
+            #Storing required MDA info
             data['NODES_MDA'][node] = {}
             if nodeInst.mdaData is not None:
                 #Only store mda if its properly initialised as MDAGLados
@@ -894,6 +896,12 @@ class Nodz(QtWidgets.QGraphicsView):
                                 data['NODES_MDA'][node][attr] = getattr(nodeInst.mdaData, attr)
 
                     data['NODES_MDA'][node] = convert_to_string(data['NODES_MDA'][node])
+
+            #Storing required MM-config-changing info:
+            data['NODES_MMCONFIGCHANGE'][node] = {}
+            if 'MMconfigInfo' in vars(nodeInst): 
+                if nodeInst.MMconfigInfo is not None:
+                    data['NODES_MMCONFIGCHANGE'][node] = nodeInst.MMconfigInfo.config_string_storage
 
             attrs = nodeInst.attrs
             for attr in attrs:
@@ -984,6 +992,14 @@ class Nodz(QtWidgets.QGraphicsView):
                     for attr in data['NODES_MDA'][name]:
                         setattr(node.mdaData,attr,correctedmdadata[attr]) #type:ignore
 
+            #Restore MM-config-changing data
+            if name in data['NODES_MMCONFIGCHANGE']:
+                if 'MMconfigInfo' in vars(node):
+                    if data['NODES_MMCONFIGCHANGE'] is not None:
+                        mmconfigchangedata = data['NODES_MMCONFIGCHANGE'][name]
+                        node.MMconfigInfo.config_string_storage = mmconfigchangedata #type:ignore
+                
+                
             allNodes.append(node)
             
         self.scene().update()

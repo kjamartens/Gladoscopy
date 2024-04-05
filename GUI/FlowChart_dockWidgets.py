@@ -742,7 +742,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             
             # Get all config groups
             allConfigGroups={}
-            nrconfiggroups = self.core.get_available_config_groups().size()
+            nrconfiggroups = self.core.get_available_config_groups().size() #type:ignore
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
