@@ -136,7 +136,7 @@ class ConfigInfo:
 
 #Create a big MM config ui and add all config groups with options
 class MMConfigUI:
-    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False):
+    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True):
         """
         Initializes the class with the given configuration groups.
 
@@ -160,13 +160,18 @@ class MMConfigUI:
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.changes_update_MM = changes_update_MM
-        self.core = self.config_groups[0].core
+        if self.config_groups is not None:
+            self.core = self.config_groups[0].core
+        else:
+            self.core = None
         self.dropDownBoxes = {}
         self.sliders = {}
         self.configCheckboxes = {}
         self.sliderPrecision = 100
+        self.config_string_storage = []
         #Create a Vertical+horizontal layout:
         self.mainLayout = QGridLayout()
+        self.configEntries = {}
         if showConfigs:
             #Create a layout for the configs:
             self.configGroupBox = QGroupBox("Configurations")
@@ -176,7 +181,7 @@ class MMConfigUI:
             self.mainLayout.addWidget(self.configGroupBox,0,0)
             #Fill the configLayout
             for config_id in range(len(config_groups)):
-                self.addRow(config_id)
+                self.configEntries[config_id] = self.addRow(config_id)
             pass
         
             #Add a button to refresh from MM:
@@ -186,6 +191,7 @@ class MMConfigUI:
             self.configLayout.addWidget(self.refreshButton,totalRowsAdded+1,0,1,self.number_columns)
             #Connect the button:
             self.refreshButton.clicked.connect(lambda index: self.updateConfigsFromMM())
+            
         
         #Add the stages widget to the right of this if wanted
         if showStages:
@@ -207,9 +213,15 @@ class MMConfigUI:
             self.liveModeGroupBox.setLayout(self.liveModeLayout())
             self.mainLayout.addWidget(self.liveModeGroupBox, 0, 6)
         
+        
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
         
+        #Inactivate all configs if this is wanted
+        if checkboxStartInactive and showCheckboxes:
+            for config_id in range(len(config_groups)):
+                self.configCheckboxes[config_id].setChecked(False)
+                    
         #Change the font of everything in the layout
         self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
     
@@ -544,11 +556,16 @@ class MMConfigUI:
         self.addLabel(rowLayout,config_id)
         #Add the widget to the QVBoxlayout
         self.configLayout.addLayout(rowLayout,divmod(config_id,self.number_columns)[1],divmod(config_id,self.number_columns)[0])
+        
+        return rowLayout
     
     def addLabel(self,rowLayout,config_id):
         if self.showCheckboxes:
             #Add a checkbox
             self.configCheckboxes[config_id] = QCheckBox()
+            self.configCheckboxes[config_id].setChecked(False)
+            #Add callback:
+            self.configCheckboxes[config_id].stateChanged.connect(lambda _, self=self, config_id = config_id: self.configLayoutEnableChange(config_id))
             rowLayout.addWidget(self.configCheckboxes[config_id])
         #add a label to the row:
         label = QLabel()
@@ -573,7 +590,7 @@ class MMConfigUI:
         for i in range(self.config_groups[config_id].nrConfigs()):
             self.dropDownBoxes[config_id].addItem(self.config_groups[config_id].configName(i))
         #Update the value to the current MM value:
-        self.updateValuefromMM(config_id)
+        # self.updateValuefromMM(config_id)
         #Add a callback when it is changed:
         self.dropDownBoxes[config_id].currentIndexChanged.connect(lambda index, config_id = config_id: self.on_dropDownChanged(config_id))
         
@@ -676,6 +693,7 @@ class MMConfigUI:
         logging.debug("Updating value from " + self.config_groups[config_id].configGroupName())
         #Get the value of the config_id from micromanager:
         currentValue = self.config_groups[config_id].getCurrentMMValue()
+        
         #Set the value of the dropdown to the current MM value
         if self.config_groups[config_id].isDropDown():
             self.dropDownBoxes[config_id].setCurrentText(currentValue)
@@ -702,7 +720,51 @@ class MMConfigUI:
             
         elif self.config_groups[config_id].isInputField():
             pass
+        
+        #Make inactive if the checkbox is inactive
+        self.configLayoutEnableChange(config_id)
         pass
+    
+    
+    def updateValueInGUI(self,config_id, newValue):
+        #Set the value of the dropdown to the current MM value
+        if self.config_groups[config_id].isDropDown():
+            self.dropDownBoxes[config_id].setCurrentText(newValue)
+        elif self.config_groups[config_id].isSlider():
+            #Finally we get the current value of the slider
+            currentSliderValue = float(newValue)
+                
+            #Sliders only work in integers, so we need to set some artificial precision and translate to this precision
+            sliderPrecision = self.sliderPrecision
+            #Get the min and max value of the slider:
+            lowerLimit = self.config_groups[config_id].lowerLimit()
+            upperLimit = self.config_groups[config_id].upperLimit()
+            sliderValInSliderPrecision = int(((currentSliderValue-lowerLimit)/(upperLimit-lowerLimit))*sliderPrecision)
+            
+            self.sliders[config_id].setValue(sliderValInSliderPrecision)
+            
+        elif self.config_groups[config_id].isInputField():
+            pass
+        
+    def configLayoutEnableChange(self,config_id):
+        if self.showCheckboxes:
+            #Disable all children recursively
+            def enableDisableLayout(self, layout,config_id,trueFalse):
+                for i in range(layout.count()):
+                    item = layout.itemAt(i)
+
+                    if item.widget():
+                        #Don't disable if it's the checkbox itself
+                        if not item.widget() == self.configCheckboxes[config_id]:
+                            item.widget().setEnabled(trueFalse)
+                    elif item.layout():
+                        self.disableLayout(item.layout())
+                        
+            if self.configCheckboxes[config_id].isChecked():
+                enableDisableLayout(self, self.configEntries[config_id],config_id,True)
+            else:
+                enableDisableLayout(self, self.configEntries[config_id],config_id,False)
+        return
     
     #Update all configs based on current value in MM
     def updateConfigsFromMM(self):

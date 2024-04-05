@@ -61,6 +61,75 @@ class AdvancedInputDialog(QDialog):
     def getInputs(self):
         return self.line_edit.text(), self.combo_box.currentText()
 
+class nodz_openMMConfigDialog(QDialog):
+    def __init__(self, parentNode=None, storedConfigsStrings=None):
+        super().__init__(None)
+        self.newConfigUI = type(MMConfigUI)
+        
+        self.setWindowTitle("MM config Dialog")
+        if parentNode is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            
+            self.MMlayout = parentNode.MMconfigInfo.mainLayout
+            
+            #Create a new MMconfigUI with the same components as parentNode.MMconfigInfo:
+            self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs, showLiveMode=parentNode.MMconfigInfo.showLiveMode, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM)
+            if parentNode.MMconfigInfo.changes_update_MM:
+                print('WARNING! Nodz is actually changing the configs real-time rather than only when they are ran!')
+            
+            #Change some configs that are stored from last time this node was openend:
+            if storedConfigsStrings is not None and len(storedConfigsStrings)>0:
+                for storedConfigString in storedConfigsStrings:
+                    #Find the config that has this name:
+                    for config_id in self.newConfigUI.config_groups:
+                        thisConfig = self.newConfigUI.config_groups[config_id]
+                        if thisConfig.configGroupName() == storedConfigString[0]:
+                            foundConfigId = config_id
+                            #Set the checkbox to true:
+                            self.newConfigUI.configCheckboxes[foundConfigId].setChecked(True)
+                            #Set the value correctly in the GUI:
+                            self.newConfigUI.updateValueInGUI(foundConfigId,storedConfigString[1])
+                            break
+            
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box.accepted.connect(self.accept)
+            button_box.rejected.connect(self.reject)
+            
+            # Create the QVBoxLayout
+            layout = QVBoxLayout()
+
+            # Create a QWidget to contain the QGridLayout
+            grid_widget = QWidget()
+            grid_widget.setLayout(self.newConfigUI.mainLayout) #type:ignore
+            # Add the QMainWindow to the QVBoxLayout
+            layout.addWidget(grid_widget)
+
+            layout.addWidget(button_box)
+            
+            self.setLayout(layout)
+        
+    def ConfigsToBeChanged(self):
+        
+        #Get the new value of all configs that are/should/want to be changed:
+        ConfigsToBeChanged = []
+        for config_id in range(len(self.newConfigUI.config_groups)):
+            if self.newConfigUI.configCheckboxes[config_id].isChecked():
+                #Add config name and new value
+                ConfigsToBeChanged.append([self.newConfigUI.config_groups[config_id].configGroupName(),self.newConfigUI.currentConfigUISingleValue(config_id)])
+        
+        #Not adding ,self.newConfigUI.config_groups[config_id] (all info) for pickling reasons
+        
+        return ConfigsToBeChanged
+        
+        return self.newConfigUI
+
+    # def getExposureTime(self):
+    #     return self.mdaconfig.exposure_ms
+
+    # def getmdaData(self):
+    #     return self.mdaconfig
+    
+
 class nodz_openMDADialog(QDialog):
     def __init__(self, parent=None, parentData=None):
         super().__init__(parent)
@@ -384,15 +453,23 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Loop over all attributes in dialogmdaData:
             for attrs in vars(dialogmdaData):
                 if attrs not in attrs_to_not_copy:
-                    setattr(currentNode.mdaData,attrs,getattr(dialogmdaData,attrs))
+                    setattr(currentNode.mdaData,attrs,getattr(dialogmdaData,attrs)) #type:ignore
             
             currentNode.displayText = str(dialog.getInputs())#type:ignore
             currentNode.update() #type:ignore
         
-        if 'timer' in nodeName:
+        elif 'changeProperties' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #Show dialog:
+            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
+        
+        elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
     
-        if 'scoringStart' in nodeName:
+        elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
     
     def defineNodeInfo(self):
@@ -407,6 +484,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['acquisition']['dataAttributes'] = []
         self.nodeInfo['acquisition']['NodeCounter'] = 0
         self.nodeInfo['acquisition']['MaxNodeCounter'] = np.inf
+        
+        self.nodeInfo['changeProperties'] = {}
+        self.nodeInfo['changeProperties']['name'] = 'changeProperties'
+        self.nodeInfo['changeProperties']['displayName'] = 'Change Properties'
+        self.nodeInfo['changeProperties']['startAttributes'] = ['Start']
+        self.nodeInfo['changeProperties']['finishedAttributes'] = ['Properties changed']
+        self.nodeInfo['changeProperties']['dataAttributes'] = []
+        self.nodeInfo['changeProperties']['NodeCounter'] = 0
+        self.nodeInfo['changeProperties']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['analysisGrayScaleTest'] = {}
         self.nodeInfo['analysisGrayScaleTest']['name'] = 'analysisGrayScaleTest'
@@ -509,7 +595,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
+            },
+            "changeProperties": {
+                "bg": [180, 80, 180, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
             }
+            
+            
             
         }''')
         self.addConfig(self.nodeLayout)
@@ -539,6 +633,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 if node.name == name:
                     return node
         return None
+    
+    def changeConfigStorageInNodz(self,currentNode,configNameSet):
+        #Changes a config from a double-click config popup to the MMconfig stored inside the nodz node itself (i.e. storing/loading of configs)
+        
+        #Add all of them to the MMconfigInfo.config_string_storage:
+        currentNode.MMconfigInfo.config_string_storage=[]
+        for singleConfig in configNameSet:
+            currentNode.MMconfigInfo.config_string_storage.append([singleConfig[0],singleConfig[1]])
+        return
     
     #replace the contextMenuEvent in nodz with this custom function:
     def contextMenuEvent(self, QMouseevent):
@@ -632,6 +735,24 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             
             #Also connect the node's finishedMDA
             newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
+        elif nodeType == 'changeProperties':
+            #attach MMconfigUI to this:
+            
+            
+            
+            # Get all config groups
+            allConfigGroups={}
+            nrconfiggroups = self.core.get_available_config_groups().size()
+            for config_group_id in range(nrconfiggroups):
+                allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
+        
+            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True) # type: ignore
+            
+            
+            #Add the callaction
+            newNode.callAction = lambda self, node=newNode: self.MMconfigChangeRan(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
         elif nodeType == 'analysisGrayScaleTest':
             newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -651,6 +772,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.callAction = None
 
         newNode.update()
+    
+    def MMconfigChangeRan(self,node):
+        print('MMconfigChangeRan')
+        #We need to change some configs (probably):
+        for config_to_change in node.MMconfigInfo.config_string_storage:
+            #Change the config, and wait for the config to be changed
+            self.core.set_config(config_to_change[0],config_to_change[1]) #type:ignore
+            self.core.wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
+        self.finishedEmits(node)
     
     def GrayScaleTest(self,node):
         #Find the node that is connected to this

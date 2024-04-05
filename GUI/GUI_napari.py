@@ -68,6 +68,10 @@ def main():
     else:
         logging.basicConfig(level=logging.INFO)
 
+    #Just for now:
+    log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
+    logging.basicConfig(format=log_format, level=logging.DEBUG)
+    
     # Create an instance of the shared_data class
     shared_data = Shared_data()
         

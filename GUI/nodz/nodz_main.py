@@ -8,6 +8,7 @@ from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayou
 from PyQt5.QtCore import QRectF
 import nodz_utils as utils
 from nodz_custom import *
+import logging
 
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
@@ -871,7 +872,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
             import numpy
             def convert_to_string(obj):
-                if isinstance(obj, (int, float, numpy.int32)):
+                if isinstance(obj, (int, float, numpy.int32)): #type:ignore
                     return str(obj)
                 elif isinstance(obj, dict):
                     return {key: convert_to_string(value) for key, value in obj.items()}
@@ -981,16 +982,12 @@ class Nodz(QtWidgets.QGraphicsView):
                 if data['NODES_MDA'] is not None:
                     correctedmdadata = convert_to_correct_type(data['NODES_MDA'][name])
                     for attr in data['NODES_MDA'][name]:
-                        setattr(node.mdaData,attr,correctedmdadata[attr])
+                        setattr(node.mdaData,attr,correctedmdadata[attr]) #type:ignore
 
             allNodes.append(node)
             
         self.scene().update()
         self._focus()
-        # #Only now emit the node-created for all nodes
-        # for node in allNodes:
-        #     self.signal_NodeCreated.emit(node.name)
-        #     self.signal_NodeCreatedNodeItself.emit(node)
         
         # Apply connections data.
         connectionsData = data['CONNECTIONS']
@@ -1339,12 +1336,12 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
     def oneConnectionAtStartIsFinished(self):
         self.n_connect_at_start_finished += 1
-        print('Called oneConnectionAtStartIsFinished')
-        print(f"n_connect_at_start_finished: {self.n_connect_at_start_finished}")
-        print(f"n_connect_at_start: {self.n_connect_at_start}")
+        logging.debug('Called oneConnectionAtStartIsFinished')
+        logging.debug(f"n_connect_at_start_finished: {self.n_connect_at_start_finished}")
+        logging.debug(f"n_connect_at_start: {self.n_connect_at_start}")
         if self.n_connect_at_start_finished == self.n_connect_at_start:
             self.n_connect_at_start_finished = 0 #to allow for looping :)
-            print('All connections at start are finished')
+            logging.debug('All connections at start are finished')
             print(f"Starting call action of node with name: {self.name}")
             if self.callAction is not None:
                 if self.callActionRelatedObject is not None:
