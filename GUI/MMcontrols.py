@@ -255,17 +255,17 @@ class MMConfigUI:
         liveModeLayout = QGridLayout()
         #Add a 'exposure time' label:
         exposureTimeLabel = QLabel("Exposure time (ms):")
-        liveModeLayout.addWidget(exposureTimeLabel,0,1)
+        liveModeLayout.addWidget(exposureTimeLabel,1,0)
         #Add a 'exposure time' input field:
         self.exposureTimeInputField = QLineEdit()
         self.exposureTimeInputField.setText(str(100))
-        liveModeLayout.addWidget(self.exposureTimeInputField,0,2)
+        liveModeLayout.addWidget(self.exposureTimeInputField,1,1)
         
         self.LiveModeButton = QPushButton("Start Live Mode")
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
+        liveModeLayout.addWidget(self.LiveModeButton,0,0,1,2)
         #Return the layout
         return liveModeLayout
     
