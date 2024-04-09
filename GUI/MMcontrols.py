@@ -188,7 +188,7 @@ class MMConfigUI:
             self.refreshButton = QPushButton("Refresh configs from MM")
             totalRowsAdded = int(np.ceil(len(config_groups)/self.number_columns))
             #Add a button spanning the total columns at the bottom
-            self.configLayout.addWidget(self.refreshButton,totalRowsAdded+1,0,1,self.number_columns)
+            self.configLayout.addWidget(self.refreshButton,totalRowsAdded+99,0,1,self.number_columns)
             #Connect the button:
             self.refreshButton.clicked.connect(lambda index: self.updateConfigsFromMM())
             
