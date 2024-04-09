@@ -18,7 +18,7 @@
     "xy_positions": null,
     "xyz_positions": null,
     "position_labels": null,
-    "order": "tpz",
+    "order": "t",
     "exposure_ms": 100.0,
     "storageFolder": "",
     "storageFileName": "",
@@ -257,11 +257,11 @@
     },
     "GUI_show_xy_chkbox": {
         "text": "XY",
-        "checked": true
+        "checked": false
     },
     "GUI_show_z_chkbox": {
         "text": "Z",
-        "checked": true
+        "checked": false
     },
     "GUI_show_channel_chkbox": {
         "text": "Channel",
@@ -273,7 +273,7 @@
     },
     "GUI_show_storage_chkbox": {
         "text": "Storage",
-        "checked": true
+        "checked": false
     },
     "orderGroupBox": {
         "text": null,

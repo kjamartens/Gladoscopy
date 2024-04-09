@@ -253,19 +253,35 @@ class MMConfigUI:
     def liveModeLayout(self):
         #Create a Grid layout:
         liveModeLayout = QGridLayout()
-        self.LiveModeButton = QPushButton("Start/Stop Live Mode")
+        #Add a 'exposure time' label:
+        exposureTimeLabel = QLabel("Exposure time (ms):")
+        liveModeLayout.addWidget(exposureTimeLabel,0,1)
+        #Add a 'exposure time' input field:
+        self.exposureTimeInputField = QLineEdit()
+        self.exposureTimeInputField.setText(str(100))
+        liveModeLayout.addWidget(self.exposureTimeInputField,0,2)
+        
+        self.LiveModeButton = QPushButton("Start Live Mode")
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.LiveModeButton,0,0)
+        liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
         #Return the layout
         return liveModeLayout
     
     #Changes live mode
     def changeLiveMode(self):
         if shared_data.liveMode == False:
+            #update the button text of the live mode:
+            self.LiveModeButton.setText("Stop Live Mode")
+            #set exposure time first:
+            shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
+            #Then start live mode:
             shared_data.liveMode = True
         else:
+            #update the button text of the live mode:
+            self.LiveModeButton.setText("Start Live Mode")
+            #update live mode:
             shared_data.liveMode = False
                 
     #Set the font of all buttons/labels in the layout recursively

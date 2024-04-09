@@ -153,7 +153,7 @@ class napariHandler():
                 if self.shared_data.mdaMode:
                     print('LIVE NOT STARTED! MDA IS RUNNING')
                     self.shared_data.liveMode = False
-                else:
+                else:        
                     #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                     logging.debug('starting acq')
                     with JavaBackendAcquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore

@@ -1,6 +1,6 @@
 #Add inclusion of this folder:
 import sys, os
-sys.path.append('C:\\Users\\SMIPC2\\Documents\\GitHub\\ScopeGUI\\GUI\\nodz')
+sys.path.append('.\\GUI\\nodz')
 from PyQt5 import QtCore, QtWidgets
 import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
