@@ -34,9 +34,9 @@ from PyQt5.QtWidgets import QTableWidget, QWidget, QInputDialog, QTableWidgetIte
 class InteractiveListWidget(QTableWidget):
     """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
     """
-    def __init__(self,fontsize=6):
+    def __init__(self,fontsize=6,columnCount=2):
         logging.debug('init InteractiveListWidget')
-        super().__init__(rowCount=0, columnCount=2) #type: ignore
+        super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
         self.horizontalHeader().setStretchLastSection(True)
         self.addDummyEntries()
         
@@ -86,20 +86,33 @@ class InteractiveListWidget(QTableWidget):
                 id_values.append(float(item_id.text()))
         return id_values
     
+
+class ChannelList(InteractiveListWidget):
+    """Creation of an interactive list widget, initially created for a nice channel list (similar to POS list in micromanager)
+    """
+    def __init__(self):
+        super().__init__(columnCount=3)
+        self.channelName = ''
+        
+    def setChannelName(self, channelName):
+        self.channelName = channelName
+        
     def addNewEntry(self,textEntry="New Entry",id=None):
         if id is None:
             if self.rowCount() == 0:
                 id = 1
             else:
                 try:
+                    #add the new ID to be the max existing ID + 1
                     existing_ids = [int(self.item(row, 1).text()) for row in range(self.rowCount())]
                     id = max(existing_ids) + 1
                 except:
                     id = self.rowCount() + 1
         rowPosition = self.rowCount()
         self.insertRow(rowPosition)
-        self.setItem(rowPosition, 0, QTableWidgetItem(textEntry))
-        self.setItem(rowPosition, 1, QTableWidgetItem(str(id)))
+        self.setItem(rowPosition, 0, QTableWidgetItem(str(id)))
+        self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
+        self.setItem(rowPosition, 2, QTableWidgetItem(textEntry))
 
 class XYStageList(InteractiveListWidget):
     """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
@@ -110,6 +123,22 @@ class XYStageList(InteractiveListWidget):
         
     def setXYStageName(self, XYstageName):
         self.XYstageName = XYstageName
+        
+    def addNewEntry(self,textEntry="New Entry",id=None):
+        if id is None:
+            if self.rowCount() == 0:
+                id = 1
+            else:
+                try:
+                    #add the new ID to be the max existing ID + 1
+                    existing_ids = [int(self.item(row, 1).text()) for row in range(self.rowCount())]
+                    id = max(existing_ids) + 1
+                except:
+                    id = self.rowCount() + 1
+        rowPosition = self.rowCount()
+        self.insertRow(rowPosition)
+        self.setItem(rowPosition, 0, QTableWidgetItem(textEntry))
+        self.setItem(rowPosition, 1, QTableWidgetItem(str(id)))
 
 
 class CustomMainWindow(QWidget):
@@ -279,7 +308,7 @@ class MDAGlados(CustomMainWindow):
         exposureLayout=QHBoxLayout()
         xyLayout = QGridLayout()
         zLayout = QGridLayout()
-        channelLayout = QVBoxLayout()
+        channelLayout = QGridLayout()
         timeLayout = QGridLayout()
         orderLayout = QVBoxLayout()
         storageLayout = QGridLayout()
@@ -435,6 +464,43 @@ class MDAGlados(CustomMainWindow):
         self.z_stepdistance_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
         self.z_nrsteps_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+
+        #--------------- Channel widget -----------------------------------------------
+        #Adding a list widget to add a list of channels
+        self.channelListWidget = ChannelList()
+        self.channelListWidget.setColumNames(["ID", "Channel Setting", "Exposure"])
+        
+        #Add possible channels
+        self.channelDropdownLabel = QLabel("Channel:")
+        self.channelDropdown = QComboBox()
+        XYstages = self.getDevicesOfDeviceType('XYStageDevice')
+        #add the options to the dropdown:
+        for stage in XYstages:
+            self.channelDropdown.addItem(stage)
+        #Add a callback if we change this dropdown:
+        self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.setChannelName(self.channelDropdown.currentText()))
+        
+        #Initisalise the XY position list
+        self.channelListWidget.setChannelName(self.channelDropdown.currentText)
+        #Buttons for the xy position list
+        self.channelListWidget_deleteButton = QPushButton('Delete Selected')
+        self.channelListWidget_moveUpButton = QPushButton('Move Up')
+        self.channelListWidget_moveDownButton = QPushButton('Move Down')
+        self.channelListWidget_addButton = QPushButton('Add New Entry')
+        #Adding callbacks to the xy position list buttons
+        self.channelListWidget_deleteButton.clicked.connect(self.channelListWidget.deleteSelected)
+        self.channelListWidget_moveUpButton.clicked.connect(self.channelListWidget.moveUp)
+        self.channelListWidget_moveDownButton.clicked.connect(self.channelListWidget.moveDown)
+        self.channelListWidget_addButton.clicked.connect(lambda: self.channelListWidget.addNewEntry(textEntry="Your Text Entry"))
+
+        #Adding widgets to layout
+        channelLayout.addWidget(self.channelDropdownLabel,0,0)
+        channelLayout.addWidget(self.channelDropdown,0,1)
+        channelLayout.addWidget(self.channelListWidget,1,0,6,1)
+        channelLayout.addWidget(self.channelListWidget_deleteButton,2,1)
+        channelLayout.addWidget(self.channelListWidget_moveUpButton,3,1)
+        channelLayout.addWidget(self.channelListWidget_moveDownButton,4,1)
+        channelLayout.addWidget(self.channelListWidget_addButton,5,1)
 
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:

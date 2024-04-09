@@ -18,7 +18,7 @@
     "xy_positions": null,
     "xyz_positions": null,
     "position_labels": null,
-    "order": "t",
+    "order": "ctp",
     "exposure_ms": 100.0,
     "storageFolder": "",
     "storageFileName": "",
@@ -251,13 +251,41 @@
         "text": "",
         "checked": null
     },
+    "channelListWidget": {
+        "text": null,
+        "checked": null
+    },
+    "channelDropdownLabel": {
+        "text": "Channel:",
+        "checked": null
+    },
+    "channelDropdown": {
+        "text": null,
+        "checked": null
+    },
+    "channelListWidget_deleteButton": {
+        "text": "Delete Selected",
+        "checked": false
+    },
+    "channelListWidget_moveUpButton": {
+        "text": "Move Up",
+        "checked": false
+    },
+    "channelListWidget_moveDownButton": {
+        "text": "Move Down",
+        "checked": false
+    },
+    "channelListWidget_addButton": {
+        "text": "Add New Entry",
+        "checked": false
+    },
     "GUI_show_exposure_chkbox": {
         "text": "Exposure",
         "checked": true
     },
     "GUI_show_xy_chkbox": {
         "text": "XY",
-        "checked": false
+        "checked": true
     },
     "GUI_show_z_chkbox": {
         "text": "Z",
@@ -265,7 +293,7 @@
     },
     "GUI_show_channel_chkbox": {
         "text": "Channel",
-        "checked": false
+        "checked": true
     },
     "GUI_show_time_chkbox": {
         "text": "Time",
