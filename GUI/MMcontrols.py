@@ -136,7 +136,7 @@ class ConfigInfo:
 
 #Create a big MM config ui and add all config groups with options
 class MMConfigUI:
-    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True):
+    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False):
         """
         Initializes the class with the given configuration groups.
 
@@ -146,6 +146,7 @@ class MMConfigUI:
             showStages (bool): Whether to show the stages in the UI.
             showROIoptions (bool): Whether to show the ROI options in the UI.
             showLiveMode (bool): Whether to show the live mode in the UI.
+            showRelativeStages (bool): Whether to show stages with relative change (i.e. up by 10 um)
             number_config_columns (int): The number of columns for the configuration.
             changes_update_MM (bool): Whether to update the MM changes when configs are changed.
 
@@ -157,6 +158,7 @@ class MMConfigUI:
         self.showROIoptions = showROIoptions
         self.showLiveMode = showLiveMode
         self.showCheckboxes = showCheckboxes
+        self.showRelativeStages = showRelativeStages
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.changes_update_MM = changes_update_MM
@@ -213,12 +215,16 @@ class MMConfigUI:
             self.liveModeGroupBox.setLayout(self.liveModeLayout())
             self.mainLayout.addWidget(self.liveModeGroupBox, 0, 6)
         
+        if showRelativeStages:
+            self.relativeStagesGroupBox = QGroupBox("RelativeStages")
+            self.relativeStagesGroupBox.setLayout(self.relativeStagesLayout())
+            self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 7)
         
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
         
         #Inactivate all configs if this is wanted
-        if checkboxStartInactive and showCheckboxes:
+        if checkboxStartInactive and showCheckboxes and showConfigs:
             for config_id in range(len(config_groups)):
                 self.configCheckboxes[config_id].setChecked(False)
                     
@@ -433,6 +439,12 @@ class MMConfigUI:
             logging.error('ZOOMING DIDN\'T WORK!')
     
     def stagesLayout(self):
+        stageLayout = QHBoxLayout()
+        stageLayout.addLayout(self.XYstageLayout())
+        stageLayout.addLayout(self.oneDstageLayout())
+        return stageLayout
+    
+    def relativeStagesLayout(self):
         stageLayout = QHBoxLayout()
         stageLayout.addLayout(self.XYstageLayout())
         stageLayout.addLayout(self.oneDstageLayout())

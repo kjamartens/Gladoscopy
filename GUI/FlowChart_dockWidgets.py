@@ -466,6 +466,14 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 #Update the results of this dialog into the nodz node
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
         
+        elif 'changeStagePos' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #Show dialog:
+            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
+        
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
     
@@ -489,10 +497,19 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['changeProperties']['name'] = 'changeProperties'
         self.nodeInfo['changeProperties']['displayName'] = 'Change Properties'
         self.nodeInfo['changeProperties']['startAttributes'] = ['Start']
-        self.nodeInfo['changeProperties']['finishedAttributes'] = ['Properties changed']
+        self.nodeInfo['changeProperties']['finishedAttributes'] = ['Done']
         self.nodeInfo['changeProperties']['dataAttributes'] = []
         self.nodeInfo['changeProperties']['NodeCounter'] = 0
         self.nodeInfo['changeProperties']['MaxNodeCounter'] = np.inf
+        
+        self.nodeInfo['changeStagePos'] = {}
+        self.nodeInfo['changeStagePos']['name'] = 'changeStagePos'
+        self.nodeInfo['changeStagePos']['displayName'] = 'Change Stage Position'
+        self.nodeInfo['changeStagePos']['startAttributes'] = ['Start']
+        self.nodeInfo['changeStagePos']['finishedAttributes'] = ['Done']
+        self.nodeInfo['changeStagePos']['dataAttributes'] = []
+        self.nodeInfo['changeStagePos']['NodeCounter'] = 0
+        self.nodeInfo['changeStagePos']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['analysisGrayScaleTest'] = {}
         self.nodeInfo['analysisGrayScaleTest']['name'] = 'analysisGrayScaleTest'
@@ -598,6 +615,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             },
             "changeProperties": {
                 "bg": [180, 80, 180, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "changeStagePos": {
+                "bg": [120, 20, 180, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
@@ -752,7 +775,18 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMconfigChangeRan(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'changeStagePos':
+            # Get all config groups
+            allConfigGroups={}
+            nrconfiggroups = self.core.get_available_config_groups().size() #type:ignore
+            for config_group_id in range(nrconfiggroups):
+                allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
+        
+            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=True,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True) # type: ignore
             
+            #Add the callaction
+            newNode.callAction = lambda self, node=newNode: self.MMstageChangeRan(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within 
         elif nodeType == 'analysisGrayScaleTest':
             newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -768,11 +802,18 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'scoringEnd':
+            newNode.callAction = lambda self, node=newNode: self.scoringEnd(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         else:
             newNode.callAction = None
 
         newNode.update()
     
+    def MMstageChangeRan(self,node):
+        print('MMstageChange')
+        self.finishedEmits(node)
+        
     def MMconfigChangeRan(self,node):
         print('MMconfigChangeRan')
         #We need to change some configs (probably):
@@ -804,6 +845,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
     def scoringStart(self,node):
         print('Starting the score routine!')
         self.finishedEmits(node)
+        
+    def scoringEnd(self,node):
+        print('Scoring finished fully!')
+        print('----------------------')
+        # self.finishedEmits(node)
 
     def timerCallAction(self,node,timev):
         import time
