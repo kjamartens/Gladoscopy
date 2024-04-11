@@ -70,13 +70,6 @@ class InteractiveListWidget(QTableWidget):
         if row < self.rowCount() - 1 and row != -1:
             self.swapRows(row, row + 1)
 
-    def swapRows(self, row1, row2):
-        for col in range(self.columnCount()):
-            item1 = self.takeItem(row1, col)
-            item2 = self.takeItem(row2, col)
-            self.setItem(row1, col, item2)
-            self.setItem(row2, col, item1)
-        self.setCurrentCell(row2, 0)
 
     def getIDValues(self):
         id_values = []
@@ -97,22 +90,56 @@ class ChannelList(InteractiveListWidget):
     def setChannelName(self, channelName):
         self.channelName = channelName
         
-    def addNewEntry(self,textEntry="New Entry",id=None):
-        if id is None:
-            if self.rowCount() == 0:
-                id = 1
+        
+    def swapRows(self, row1, row2):
+        for col in range(self.columnCount()):
+            if col == 0:
+                combobox1 = self.cellWidget(row1, col)
+                combobox2 = self.cellWidget(row2, col)
+                
+                chosenEntry1 = combobox1.currentText()
+                chosenEntry2 = combobox2.currentText()
+                
+                combobox1.setCurrentText(chosenEntry2)
+                combobox2.setCurrentText(chosenEntry1)
+                # newdropbox = QComboBox()
+                # newdropbox.addItem('0')
+                # newdropbox.addItem('1')
+        
+                # self.removeCellWidget(row1, col)
+                # self.removeCellWidget(row2, col)
+                # time.sleep(0.5)
+                # self.setCellWidget(row1, col, combobox2)
+                # time.sleep(0.5)
+                # self.setCellWidget(row2, col, combobox1)
+                # time.sleep(0.5)
             else:
-                try:
-                    #add the new ID to be the max existing ID + 1
-                    existing_ids = [int(self.item(row, 1).text()) for row in range(self.rowCount())]
-                    id = max(existing_ids) + 1
-                except:
-                    id = self.rowCount() + 1
+                item1 = self.takeItem(row1, col)
+                item2 = self.takeItem(row2, col)
+                self.setItem(row1, col, item2)
+                self.setItem(row2, col, item1)
+        self.setCurrentCell(row2, 1)
+        
+    def addNewEntry(self,textEntry="New Entry",id=None):
+        # if id is None:
+        #     if self.rowCount() == 0:
+        #         id = 1
+        #     else:
+        #         try:
+        #             #add the new ID to be the max existing ID + 1
+        #             existing_ids = [int(self.item(row, 1).text()) for row in range(self.rowCount())]
+        #             id = max(existing_ids) + 1
+        #         except:
+        #             id = self.rowCount() + 1
         rowPosition = self.rowCount()
         self.insertRow(rowPosition)
-        self.setItem(rowPosition, 0, QTableWidgetItem(str(id)))
+        #Create a dropbox with two options:
+        newdropbox = QComboBox()
+        newdropbox.addItem('0')
+        newdropbox.addItem('1')
+        self.setCellWidget(rowPosition, 0, newdropbox)
+        # self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
         self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
-        self.setItem(rowPosition, 2, QTableWidgetItem(textEntry))
 
 class XYStageList(InteractiveListWidget):
     """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
@@ -123,6 +150,14 @@ class XYStageList(InteractiveListWidget):
         
     def setXYStageName(self, XYstageName):
         self.XYstageName = XYstageName
+    
+    def swapRows(self, row1, row2):
+        for col in range(self.columnCount()):
+            item1 = self.takeItem(row1, col)
+            item2 = self.takeItem(row2, col)
+            self.setItem(row1, col, item2)
+            self.setItem(row2, col, item1)
+        self.setCurrentCell(row2, 0)
         
     def addNewEntry(self,textEntry="New Entry",id=None):
         if id is None:
@@ -473,10 +508,22 @@ class MDAGlados(CustomMainWindow):
         #Add possible channels
         self.channelDropdownLabel = QLabel("Channel:")
         self.channelDropdown = QComboBox()
-        XYstages = self.getDevicesOfDeviceType('XYStageDevice')
+        
+        #Figure out from all config groups which ones are "dropdown"
+        nrconfiggroups = self.core.get_available_config_groups().size()
+        allConfigGroups={}
+        from MMcontrols import ConfigInfo
+        for config_group_id in range(nrconfiggroups):
+            allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
+        comboboxindexes = []
+        for config_group_id in range(nrconfiggroups):
+            if allConfigGroups[config_group_id].isDropDown():
+                comboboxindexes.append(config_group_id)
+        ComboBoxes = {key: allConfigGroups[key] for key in comboboxindexes}
+        
         #add the options to the dropdown:
-        for stage in XYstages:
-            self.channelDropdown.addItem(stage)
+        for combobox in ComboBoxes:
+            self.channelDropdown.addItem(allConfigGroups[combobox].configGroupName())
         #Add a callback if we change this dropdown:
         self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.setChannelName(self.channelDropdown.currentText()))
         
