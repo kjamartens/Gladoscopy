@@ -782,7 +782,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
-            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=True,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True) # type: ignore
+            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=True,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,showRelativeStages = True) # type: ignore
             
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMstageChangeRan(node)

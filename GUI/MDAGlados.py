@@ -46,6 +46,8 @@ class InteractiveListWidget(QTableWidget):
         # Reduce padding within cells
         self.setStyleSheet("QTableWidget::item { padding: 1px; }")
         
+        self.parentWidget=None #type:ignore
+        
     def addDummyEntries(self):
         data = ["Entry 1","Entry 2","Entry 3"]
         for entry in data:
@@ -58,6 +60,10 @@ class InteractiveListWidget(QTableWidget):
     def deleteSelected(self):
         selectedRows = sorted(set(index.row() for index in self.selectedIndexes()), reverse=True)
         for row in selectedRows:
+            self.removeRow(row)
+
+    def deleteAll(self):
+        for row in range(self.rowCount() - 1, -1, -1):
             self.removeRow(row)
 
     def moveUp(self):
@@ -83,9 +89,10 @@ class InteractiveListWidget(QTableWidget):
 class ChannelList(InteractiveListWidget):
     """Creation of an interactive list widget, initially created for a nice channel list (similar to POS list in micromanager)
     """
-    def __init__(self):
+    def __init__(self,parent=None):
         super().__init__(columnCount=3)
         self.channelName = ''
+        self.parentWidget=parent#type:ignore
         
     def setChannelName(self, channelName):
         self.channelName = channelName
@@ -102,17 +109,6 @@ class ChannelList(InteractiveListWidget):
                 
                 combobox1.setCurrentText(chosenEntry2)
                 combobox2.setCurrentText(chosenEntry1)
-                # newdropbox = QComboBox()
-                # newdropbox.addItem('0')
-                # newdropbox.addItem('1')
-        
-                # self.removeCellWidget(row1, col)
-                # self.removeCellWidget(row2, col)
-                # time.sleep(0.5)
-                # self.setCellWidget(row1, col, combobox2)
-                # time.sleep(0.5)
-                # self.setCellWidget(row2, col, combobox1)
-                # time.sleep(0.5)
             else:
                 item1 = self.takeItem(row1, col)
                 item2 = self.takeItem(row2, col)
@@ -120,7 +116,7 @@ class ChannelList(InteractiveListWidget):
                 self.setItem(row2, col, item1)
         self.setCurrentCell(row2, 1)
         
-    def addNewEntry(self,textEntry="New Entry",id=None):
+    def addNewEntry(self,textEntry=None,id=None):
         # if id is None:
         #     if self.rowCount() == 0:
         #         id = 1
@@ -131,15 +127,25 @@ class ChannelList(InteractiveListWidget):
         #             id = max(existing_ids) + 1
         #         except:
         #             id = self.rowCount() + 1
-        rowPosition = self.rowCount()
-        self.insertRow(rowPosition)
-        #Create a dropbox with two options:
-        newdropbox = QComboBox()
-        newdropbox.addItem('0')
-        newdropbox.addItem('1')
-        self.setCellWidget(rowPosition, 0, newdropbox)
-        # self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
-        self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
+        #Add the current exposure time as text as textentry:
+        if 'channelDropdown' in dir(self.parentWidget):
+            rowPosition = self.rowCount()
+            self.insertRow(rowPosition)
+            #Create a dropbox with two options:
+            newdropbox = QComboBox()
+            #Currently selected channel: self.parentWidget.channelDropdown.currentText()
+            #Find the corresponding options:
+            currentChannel = self.parentWidget.channelDropdown.currentText()
+            nrConfigs = self.parentWidget.core.get_available_configs(currentChannel).size()
+            for i in range(nrConfigs):
+                newdropbox.addItem(self.parentWidget.core.get_available_configs(currentChannel).get(i))
+            self.setCellWidget(rowPosition, 0, newdropbox)
+            # self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
+            if textEntry == None:
+                currentexposure = self.parentWidget.core.get_exposure()
+                self.setItem(rowPosition, 1, QTableWidgetItem(str(currentexposure)))
+            else:
+                self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
 
 class XYStageList(InteractiveListWidget):
     """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
@@ -502,8 +508,8 @@ class MDAGlados(CustomMainWindow):
 
         #--------------- Channel widget -----------------------------------------------
         #Adding a list widget to add a list of channels
-        self.channelListWidget = ChannelList()
-        self.channelListWidget.setColumNames(["ID", "Channel Setting", "Exposure"])
+        self.channelListWidget = ChannelList(parent=self)
+        self.channelListWidget.setColumNames(["Channel Setting", "Exposure"])
         
         #Add possible channels
         self.channelDropdownLabel = QLabel("Channel:")
@@ -526,6 +532,8 @@ class MDAGlados(CustomMainWindow):
             self.channelDropdown.addItem(allConfigGroups[combobox].configGroupName())
         #Add a callback if we change this dropdown:
         self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.setChannelName(self.channelDropdown.currentText()))
+        #Also delete all the current entries
+        self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.deleteAll())
         
         #Initisalise the XY position list
         self.channelListWidget.setChannelName(self.channelDropdown.currentText)
@@ -534,11 +542,13 @@ class MDAGlados(CustomMainWindow):
         self.channelListWidget_moveUpButton = QPushButton('Move Up')
         self.channelListWidget_moveDownButton = QPushButton('Move Down')
         self.channelListWidget_addButton = QPushButton('Add New Entry')
+        self.channelListWidget_deleteAllButton = QPushButton('Delete All')
         #Adding callbacks to the xy position list buttons
         self.channelListWidget_deleteButton.clicked.connect(self.channelListWidget.deleteSelected)
+        self.channelListWidget_deleteAllButton.clicked.connect(self.channelListWidget.deleteAll)
         self.channelListWidget_moveUpButton.clicked.connect(self.channelListWidget.moveUp)
         self.channelListWidget_moveDownButton.clicked.connect(self.channelListWidget.moveDown)
-        self.channelListWidget_addButton.clicked.connect(lambda: self.channelListWidget.addNewEntry(textEntry="Your Text Entry"))
+        self.channelListWidget_addButton.clicked.connect(lambda: self.channelListWidget.addNewEntry())
 
         #Adding widgets to layout
         channelLayout.addWidget(self.channelDropdownLabel,0,0)
@@ -548,6 +558,7 @@ class MDAGlados(CustomMainWindow):
         channelLayout.addWidget(self.channelListWidget_moveUpButton,3,1)
         channelLayout.addWidget(self.channelListWidget_moveDownButton,4,1)
         channelLayout.addWidget(self.channelListWidget_addButton,5,1)
+        channelLayout.addWidget(self.channelListWidget_deleteAllButton,6,1)
 
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
