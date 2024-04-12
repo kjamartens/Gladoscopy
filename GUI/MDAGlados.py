@@ -848,6 +848,32 @@ class MDAGlados(CustomMainWindow):
         else:
             self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
         
+        if self.channelGroupBox.isEnabled():
+            try:
+                
+                self.channel_group = self.channelDropdown.currentText()
+                
+                self.channels = []
+                self.channel_exposures_ms = []
+                for row in range(self.channelListWidget.rowCount()):
+                    for column in range(self.channelListWidget.columnCount()):
+                        if column == 0:
+                            self.channels.append(self.channelListWidget.cellWidget(row,0).currentText())
+                        elif column == 1:
+                            item = self.channelListWidget.item(row, column)
+                            try: #Check if it will be float-value:
+                                if item is not None:
+                                    self.channel_exposures_ms.append(float(item.text()))
+                                else:
+                                    self.channel_exposures_ms.append("")  # Add an empty string for empty cells
+                            except ValueError:  # Add an empty string for non-float
+                                self.channel_exposures_ms.append("")
+
+            except:
+                self.channel_group = None
+                self.channels = None
+                self.channel_exposures_ms = None
+        
         #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
         
