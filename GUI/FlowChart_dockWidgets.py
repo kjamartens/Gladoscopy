@@ -133,6 +133,9 @@ class nodz_openMMConfigDialog(QDialog):
 class nodz_openMDADialog(QDialog):
     def __init__(self, parent=None, parentData=None, currentNode = None):
         super().__init__(parent)
+        self.parent = parent
+        self.parentData = parentData
+        self.currentNode=  currentNode
         
         self.setWindowTitle("MDA Dialog")
         if parentData is not None:
@@ -175,6 +178,7 @@ class nodz_openMDADialog(QDialog):
                 self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,hasGUI=True)
             
             button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box.accepted.connect(self.mdaconfig.showOptionChanged)
             button_box.accepted.connect(self.accept)
             button_box.rejected.connect(self.reject)
             

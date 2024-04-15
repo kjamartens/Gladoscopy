@@ -984,10 +984,10 @@ class Nodz(QtWidgets.QGraphicsView):
             
 
             node = self.createNode(name=name,
-                                   preset=preset,
-                                   position=position,
-                                   alternate=alternate, skipCreateNodeSignal=False,
-                                   displayText=nodesData[name]['textbox_text'])
+                                preset=preset,
+                                position=position,
+                                alternate=alternate, skipCreateNodeSignal=False,
+                                displayText=nodesData[name]['textbox_text'])
             
             #Restore MDA data
             if name in data['NODES_MDA']:

@@ -38,7 +38,6 @@ class InteractiveListWidget(QTableWidget):
         logging.debug('init InteractiveListWidget')
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
         self.horizontalHeader().setStretchLastSection(True)
-        self.addDummyEntries()
         
         font = QFont()
         font.setPointSize(fontsize)
@@ -47,11 +46,6 @@ class InteractiveListWidget(QTableWidget):
         self.setStyleSheet("QTableWidget::item { padding: 1px; }")
         
         self.parentWidget=None #type:ignore
-        
-    def addDummyEntries(self):
-        data = ["Entry 1","Entry 2","Entry 3"]
-        for entry in data:
-            self.addNewEntry(textEntry=entry)
             
     def setColumNames(self, names):
         self.setColumnCount(len(names))
@@ -76,7 +70,6 @@ class InteractiveListWidget(QTableWidget):
         if row < self.rowCount() - 1 and row != -1:
             self.swapRows(row, row + 1)
 
-
     def getIDValues(self):
         id_values = []
         for row in range(self.rowCount()):
@@ -97,7 +90,6 @@ class ChannelList(InteractiveListWidget):
     def setChannelName(self, channelName):
         self.channelName = channelName
         
-        
     def swapRows(self, row1, row2):
         for col in range(self.columnCount()):
             if col == 0:
@@ -116,17 +108,7 @@ class ChannelList(InteractiveListWidget):
                 self.setItem(row2, col, item1)
         self.setCurrentCell(row2, 1)
         
-    def addNewEntry(self,textEntry=None,id=None):
-        # if id is None:
-        #     if self.rowCount() == 0:
-        #         id = 1
-        #     else:
-        #         try:
-        #             #add the new ID to be the max existing ID + 1
-        #             existing_ids = [int(self.item(row, 1).text()) for row in range(self.rowCount())]
-        #             id = max(existing_ids) + 1
-        #         except:
-        #             id = self.rowCount() + 1
+    def addNewEntry(self,channelEntry=None,exposureEntry=None):
         #Add the current exposure time as text as textentry:
         if 'channelDropdown' in dir(self.parentWidget):
             rowPosition = self.rowCount()
@@ -139,13 +121,19 @@ class ChannelList(InteractiveListWidget):
             nrConfigs = self.parentWidget.core.get_available_configs(currentChannel).size()
             for i in range(nrConfigs):
                 newdropbox.addItem(self.parentWidget.core.get_available_configs(currentChannel).get(i))
+            if channelEntry is not None:
+                try:
+                    newdropbox.setCurrentText(channelEntry)
+                except:
+                    logging.warning('Wrong mix of channel and entries')
+                    pass
             self.setCellWidget(rowPosition, 0, newdropbox)
             # self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
-            if textEntry == None:
+            if exposureEntry == None:
                 currentexposure = self.parentWidget.core.get_exposure()
                 self.setItem(rowPosition, 1, QTableWidgetItem(str(currentexposure)))
             else:
-                self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
+                self.setItem(rowPosition, 1, QTableWidgetItem(exposureEntry))
 
 class XYStageList(InteractiveListWidget):
     """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
@@ -601,6 +589,7 @@ class MDAGlados(CustomMainWindow):
             if allConfigGroups[config_group_id].isDropDown():
                 comboboxindexes.append(config_group_id)
         ComboBoxes = {key: allConfigGroups[key] for key in comboboxindexes}
+        ComboBoxNames = {allConfigGroups[key].configGroupName() for key in comboboxindexes}
         
         #add the options to the dropdown:
         for combobox in ComboBoxes:
@@ -610,15 +599,17 @@ class MDAGlados(CustomMainWindow):
         #Also delete all the current entries
         self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.deleteAll())
         
-        #Initisalise the XY position list
+        #Initisalise the channel  list
         self.channelListWidget.setChannelName(self.channelDropdown.currentText)
-        #Buttons for the xy position list
+        
+        
+        #Buttons for the channel position list
         self.channelListWidget_deleteButton = QPushButton('Delete Selected')
         self.channelListWidget_moveUpButton = QPushButton('Move Up')
         self.channelListWidget_moveDownButton = QPushButton('Move Down')
         self.channelListWidget_addButton = QPushButton('Add New Entry')
         self.channelListWidget_deleteAllButton = QPushButton('Delete All')
-        #Adding callbacks to the xy position list buttons
+        #Adding callbacks to the channel list buttons
         self.channelListWidget_deleteButton.clicked.connect(self.channelListWidget.deleteSelected)
         self.channelListWidget_deleteAllButton.clicked.connect(self.channelListWidget.deleteAll)
         self.channelListWidget_moveUpButton.clicked.connect(self.channelListWidget.moveUp)
@@ -635,6 +626,13 @@ class MDAGlados(CustomMainWindow):
         channelLayout.addWidget(self.channelListWidget_addButton,5,1)
         channelLayout.addWidget(self.channelListWidget_deleteAllButton,6,1)
 
+        #Add the pre-set channels:
+        if self.channel_group in ComboBoxNames:
+            if self.channel_group is not None:
+                self.channelDropdown.setCurrentText(self.channel_group)
+        if self.channels is not None and self.channel_exposures_ms is not None:
+            for entry in range(len(self.channels)):
+                self.channelListWidget.addNewEntry(channelEntry=self.channels[entry],exposureEntry=str(self.channel_exposures_ms[entry]))
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
         self.GUI_show_exposure_chkbox = QCheckBox("Exposure")
