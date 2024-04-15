@@ -348,7 +348,7 @@ class dockWidget_MDA(dockWidgets):
         super().__init__()
         
         #Add the full micro manager controls UI
-        self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True).getGui()
+        self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True,autoSaveLoad=True).getGui()
         self.sizeChanged.connect(self.dockWidget.handleSizeChange)
 
 class dockWidget_flowChart(dockWidgets):

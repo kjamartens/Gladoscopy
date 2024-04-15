@@ -249,23 +249,59 @@ class MDAGlados(CustomMainWindow):
         newNrColumns = max(1,min(10, size.width() // 150))
         self.GUI_grid_width = newNrColumns
         
-    def __init__(self,core,MM_JSON,layout,shared_data,hasGUI=False,num_time_points: int | None = 10, time_interval_s: float | List[float] = 0, z_start: float | None = None, z_end: float | None = None, z_step: float | None = None, channel_group: str | None = None, channels: list | None = None, channel_exposures_ms: list | None = None, xy_positions: Iterable | None = None, xyz_positions: Iterable | None = None, position_labels: List[str] | None = None, order: str = 'tpcz', exposure_ms: float | None = 90, GUI_show_exposure = True, GUI_show_xy = True, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_acquire_button=True):
+    def __init__(self,core,MM_JSON,layout,
+                shared_data,
+                hasGUI=False,
+                num_time_points: int | None = 10, 
+                time_interval_s: float | List[float] = 0, 
+                z_start: float | None = None, 
+                z_end: float | None = None, 
+                z_step: float | None = None, 
+                z_stage_sel : str | None = None,
+                z_nr_steps: float | None = None,
+                z_step_distance: float | None = None,
+                z_nrsteps_radio_sel: bool | None = None,
+                z_stepdistance_radio_sel: bool | None = None,
+                channel_group: str | None = None, 
+                channels: list | None = None, 
+                channel_exposures_ms: list | None = None, 
+                xy_positions: Iterable | None = None, 
+                xyz_positions: Iterable | None = None, 
+                position_labels: List[str] | None = None, 
+                order: str = 'tpcz', 
+                exposure_ms: float | None = 90, 
+                storage_folder: str | None = None,
+                storage_file_name: str | None = None,
+                GUI_show_exposure = True, 
+                GUI_show_xy = True, 
+                GUI_show_z = True, 
+                GUI_show_channel = True, 
+                GUI_show_time = True, 
+                GUI_show_order = True, 
+                GUI_show_storage = True, 
+                GUI_acquire_button = True,
+                autoSaveLoad = False):
         super().__init__()
         self.num_time_points = num_time_points
         self.time_interval_s = time_interval_s
         self.z_start = z_start
         self.z_end = z_end
         self.z_step = z_step
+        self.z_stage_sel = z_stage_sel
+        self.z_nr_steps = z_nr_steps
+        self.z_step_distance = z_step_distance
+        self.z_nrsteps_radio_sel = z_nrsteps_radio_sel
+        self.z_stepdistance_radio_sel = z_stepdistance_radio_sel
         self.channel_group = channel_group
         self.channels = channels
         self.channel_exposures_ms = channel_exposures_ms
+        self.storage_folder = storage_folder
+        self.storage_file_name = storage_file_name
         self.xy_positions = xy_positions
         self.xyz_positions = xyz_positions
         self.position_labels = position_labels
         self.order = order
         self.exposure_ms = exposure_ms
-        self.storageFolder = None
-        self.storageFileName = None
         self.GUI_show_exposure = GUI_show_exposure
         self.GUI_show_xy = GUI_show_xy
         self.GUI_show_z = GUI_show_z
@@ -273,6 +309,17 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_time = GUI_show_time
         self.GUI_show_order = GUI_show_order
         self.GUI_show_storage = GUI_show_storage
+        self.autoSaveLoad = autoSaveLoad
+
+        
+        self.GUI_exposure_enabled = GUI_show_exposure
+        self.GUI_xy_enabled = GUI_show_xy
+        self.GUI_z_enabled = GUI_show_z
+        self.GUI_channel_enabled = GUI_show_channel
+        self.GUI_time_enabled = GUI_show_time
+        self.GUI_order_enabled = GUI_show_order
+        self.GUI_storage_enabled = GUI_show_storage
+        
         self.GUI_acquire_button = GUI_acquire_button
         self.has_GUI = False
         self.core = core
@@ -287,18 +334,19 @@ class MDAGlados(CustomMainWindow):
         
         self.fully_started = False
         
-        #initiate with an empty mda:
-        self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
-        
         #Initiate GUI if wanted
         if hasGUI:
             self.initGUI(GUI_show_exposure=self.GUI_show_exposure,GUI_show_xy=self.GUI_show_xy, GUI_show_z=self.GUI_show_z, GUI_show_channel=self.GUI_show_channel, GUI_show_time=self.GUI_show_time, GUI_show_order=self.GUI_show_order, GUI_show_storage=self.GUI_show_storage, GUI_acquire_button=self.GUI_acquire_button)
             self.has_GUI = True
         
+        #initiate with an empty mda, or mda based on GUI:
+        self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
+        
         self.fully_started = True
         #check if mda_state.json exists:
         if os.path.isfile('mda_state.json'):
-            self.load_state('mda_state.json')
+            if self.autoSaveLoad:
+                self.load_state('mda_state.json')
     
     def getDevicesOfDeviceType(self,devicetype):
         #Find all devices that have a specific devicetype
@@ -377,9 +425,13 @@ class MDAGlados(CustomMainWindow):
         #Time: add labels for time points and time intervals, and integer-based entry fields:
         self.timePointLabel = QLabel("Number time points:")
         self.timePointEntry = QLineEdit()
+        if self.num_time_points is not None:
+            self.timePointEntry.setText(str(self.num_time_points))
         self.timePointEntry.setValidator(QIntValidator())
         self.timeIntervalLabel = QLabel("Time interval:")
         self.timeIntervalEntry = QLineEdit()
+        if self.time_interval_s is not None:
+            self.timeIntervalEntry.setText(str(self.time_interval_s))
         self.timeIntervalEntry.setValidator(QDoubleValidator())
         self.timeIntervalDropdown = QComboBox()
         self.timeIntervalDropdown.addItem("ms")
@@ -399,12 +451,16 @@ class MDAGlados(CustomMainWindow):
         #storage: first, add a label, entry field, and button with '...' to select a folder of choice:
         self.storageFolderLabel = QLabel("Storage:")
         self.storageFolderEntry = QLineEdit()
+        if self.storage_folder is not None:
+            self.storageFolderEntry.setText(self.storage_folder)
         self.storageFolderButton = QPushButton('...')
         #add a lambda function when this is pressed to search for a folder:
         self.storageFolderButton.clicked.connect(lambda: self.storageFolderEntry.setText(QFileDialog.getExistingDirectory()))
         #Then add a label and entry field for the file name:
         self.storageFileNameLabel = QLabel("File name:")
         self.storageFileNameEntry = QLineEdit()
+        if self.storage_file_name is not None:
+            self.storageFileNameEntry.setText(self.storage_file_name)
         #Adding widgets to layout
         storageLayout.addWidget(self.storageFolderLabel,0,0)
         storageLayout.addWidget(self.storageFolderEntry,0,1)
@@ -460,14 +516,21 @@ class MDAGlados(CustomMainWindow):
         #add the options to the dropdown:
         for stage in oneDstages:
             self.z_oneDstageDropdown.addItem(stage)
+        if self.z_stage_sel is not None:
+            if self.z_stage_sel in oneDstages:
+                self.z_oneDstageDropdown.setCurrentText(self.z_stage_sel)
         #Create all other buttons/lineedits
         self.z_startLabel = QLabel("Start:")
         self.z_startEntry = QLineEdit()
+        if self.z_start is not None:
+            self.z_startEntry.setText(str(self.z_start))
         self.z_startEntry.setValidator(QDoubleValidator())
         self.z_startSetButton = QPushButton('Set')
         self.z_startSetButton.clicked.connect(lambda: self.setZStart())
         self.z_endLabel = QLabel("End:")
         self.z_endEntry = QLineEdit()
+        if self.z_end is not None:
+            self.z_endEntry.setText(str(self.z_end))
         self.z_endEntry.setValidator(QDoubleValidator())
         self.z_endSetButton = QPushButton('Set')
         self.z_endSetButton.clicked.connect(lambda: self.setZEnd())
@@ -476,11 +539,20 @@ class MDAGlados(CustomMainWindow):
         self.z_nrsteps_radio= QRadioButton("Number of steps: ")
         self.z_stepdistance_radio= QRadioButton("Step distance: ")
         #preselect the nr of steps one:
-        self.z_nrsteps_radio.setChecked(True)
+        if self.z_nrsteps_radio_sel == True:
+            self.z_nrsteps_radio.setChecked(True)
+        elif self.z_stepdistance_radio_sel == True:
+            self.z_stepdistance_radio.setChecked(True)
+        else:
+            self.z_nrsteps_radio.setChecked(True)
         #add edit boxes for number of steps and step distance:
         self.z_nrsteps_entry = QLineEdit()
+        if self.z_nr_steps is not None:
+            self.z_nrsteps_entry.setText(str(self.z_nr_steps))
         self.z_nrsteps_entry.setValidator(QIntValidator())
         self.z_stepdistance_entry = QLineEdit()
+        if self.z_step_distance is not None:
+            self.z_stepdistance_entry.setText(str(self.z_step_distance))
         self.z_stepdistance_entry.setValidator(QDoubleValidator())
         
         #Add all widgets to layout
@@ -506,6 +578,9 @@ class MDAGlados(CustomMainWindow):
         self.z_nrsteps_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
         self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
 
+        # --- Ordering widget ---
+        #Note: only used in updateGUIwidgets
+        
         #--------------- Channel widget -----------------------------------------------
         #Adding a list widget to add a list of channels
         self.channelListWidget = ChannelList(parent=self)
@@ -569,12 +644,12 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_time_chkbox = QCheckBox("Time")
         self.GUI_show_storage_chkbox = QCheckBox("Storage")
         #initialise the checkboxes based on the values in this GUI:
-        self.GUI_show_exposure_chkbox.setChecked(GUI_show_exposure)
-        self.GUI_show_xy_chkbox.setChecked(GUI_show_xy)
-        self.GUI_show_z_chkbox.setChecked(GUI_show_z)
-        self.GUI_show_channel_chkbox.setChecked(GUI_show_channel)
-        self.GUI_show_time_chkbox.setChecked(GUI_show_time)
-        self.GUI_show_storage_chkbox.setChecked(GUI_show_storage)
+        self.GUI_show_exposure_chkbox.setChecked(self.GUI_show_exposure)
+        self.GUI_show_xy_chkbox.setChecked(self.GUI_show_xy)
+        self.GUI_show_z_chkbox.setChecked(self.GUI_show_z)
+        self.GUI_show_channel_chkbox.setChecked(self.GUI_show_channel)
+        self.GUI_show_time_chkbox.setChecked(self.GUI_show_time)
+        self.GUI_show_storage_chkbox.setChecked(self.GUI_show_storage)
         #Add lambda functions to all of them that all run the same function: showOptionChanged():
         self.GUI_show_exposure_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_xy_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
@@ -636,7 +711,7 @@ class MDAGlados(CustomMainWindow):
         zstagePos = round(float(self.core.get_position(zstage)),2)
         self.z_endEntry.setText(str(zstagePos))
     
-    def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z):
+    def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice = None):
         orderLayout = QVBoxLayout()
         letters_to_include = ''
         if GUI_show_channel:
@@ -661,12 +736,31 @@ class MDAGlados(CustomMainWindow):
         orderLayout.addWidget(self.orderLabel)
         orderLayout.addWidget(self.orderDropdown)
         
+        if orderChoice in permuatations:
+            if orderChoice is not None:
+                self.orderDropdown.setCurrentText(orderChoice)
+        
         return orderLayout
         
     def showOptionChanged(self):
+        self.setAllCheckBoxEnableValues()
         #This function will be called when the checkboxes are clicked. It will update the GUI accordingly:
         self.updateGUIwidgets(GUI_show_exposure=self.GUI_show_exposure_chkbox.isChecked(), GUI_show_xy = self.GUI_show_xy_chkbox.isChecked(), GUI_show_z=self.GUI_show_z_chkbox.isChecked(), GUI_show_channel=self.GUI_show_channel_chkbox.isChecked(), GUI_show_time=self.GUI_show_time_chkbox.isChecked(), GUI_show_storage=self.GUI_show_storage_chkbox.isChecked(),GUI_showOptions=True,GUI_acquire_button=self.GUI_acquire_button)
         self.get_MDA_events_from_GUI()
+    
+    def setAllCheckBoxEnableValues(self):
+        self.GUI_exposure_enabled = self.GUI_show_exposure_chkbox.isChecked()
+        self.GUI_xy_enabled = self.GUI_show_xy_chkbox.isChecked()
+        self.GUI_z_enabled = self.GUI_show_z_chkbox.isChecked()
+        self.GUI_channel_enabled = self.GUI_show_channel_chkbox.isChecked()
+        self.GUI_time_enabled = self.GUI_show_time_chkbox.isChecked()
+        self.GUI_storage_enabled = self.GUI_show_storage_chkbox.isChecked()
+        self.GUI_show_exposure = self.GUI_show_exposure_chkbox.isChecked()
+        self.GUI_show_xy = self.GUI_show_xy_chkbox.isChecked()
+        self.GUI_show_z = self.GUI_show_z_chkbox.isChecked()
+        self.GUI_show_channel = self.GUI_show_channel_chkbox.isChecked()
+        self.GUI_show_time = self.GUI_show_time_chkbox.isChecked()
+        self.GUI_show_storage = self.GUI_show_storage_chkbox.isChecked()
     
     def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4,GUI_acquire_button=True):
         gridWidth = self.GUI_grid_width
@@ -679,6 +773,7 @@ class MDAGlados(CustomMainWindow):
         # # self.orderGroupBox.setParent(None) # type: ignore
         self.storageGroupBox.setParent(None) # type: ignore
         self.showOptionsGroupBox.setParent(None)  # type: ignore
+
 
         # Clear the layout - this is required
         while self.gui.count(): # type: ignore
@@ -716,13 +811,15 @@ class MDAGlados(CustomMainWindow):
         orderexposuretimelayout = QVBoxLayout()
         orderexposuretimegroupbox.setLayout(orderexposuretimelayout)
         
-        self.orderGroupBox = QGroupBox("Order")
-        orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
-        self.orderGroupBox.setLayout(orderlayout)
         if GUI_show_exposure:
             self.exposureGroupBox.setEnabled(True)
         else:
             self.exposureGroupBox.setEnabled(False)
+            
+        self.orderGroupBox = QGroupBox("Order")
+        orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice=self.order)
+        self.orderGroupBox.setLayout(orderlayout)
+        
         orderexposuretimelayout.addWidget(self.orderGroupBox) # type: ignore
         orderexposuretimelayout.addWidget(self.exposureGroupBox) # type: ignore
         orderexposuretimelayout.addWidget(self.timeGroupBox) # type: ignore
@@ -827,24 +924,47 @@ class MDAGlados(CustomMainWindow):
             try:
                 #We also need to set the shared_data focus device for proper z-functioning
                 self.shared_data.core.set_focus_device(self.z_oneDstageDropdown.currentText())
+            except:
+                self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
                 
+            self.z_stage_sel = self.z_oneDstageDropdown.currentText()
+            
+            if self.z_startEntry.text() != '':
                 self.z_start = (float(self.z_startEntry.text()))
+            else:
+                self.z_start = None
+                
+            if self.z_endEntry.text() != '':
                 self.z_end = (float(self.z_endEntry.text()))
-                if self.z_nrsteps_radio.isChecked():
+            else:
+                self.z_end = None
+                
+            if self.z_nrsteps_radio.isChecked():
+                if (self.z_nrsteps_entry.text() != '') and self.z_start is not None and self.z_end is not None:
                     self.z_step = float((self.z_end-self.z_start)/int(self.z_nrsteps_entry.text()))
-                elif self.z_stepdistance_radio.isChecked():
+                    self.z_step_distance = None
+                    self.z_nr_steps = int(self.z_nrsteps_entry.text())
+                else:
+                    self.z_step = None
+                    self.z_step_distance = None
+                    self.z_nr_steps = None
+            elif self.z_stepdistance_radio.isChecked():
+                if self.z_stepdistance_entry.text() != '' and self.z_start is not None and self.z_end is not None:
                     self.z_step = float(self.z_stepdistance_entry.text())
+                    self.z_step_distance = float(self.z_stepdistance_entry.text())
+                    self.z_nr_steps = None
                     if self.z_start < self.z_end:
                         if self.z_step > 0:
                             self.z_step*=-1
                     elif self.z_start > self.z_end:
                         if self.z_step < 0:
                             self.z_step*=-1
-            except:
-                self.z_start = None
-                self.z_end = None
-                self.z_step = None
-                self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
+                else:
+                    self.z_step = None
+                    self.z_step_distance = None
+                    self.z_nr_steps = None
+            self.z_nrsteps_radio_sel = self.z_nrsteps_radio.isChecked()
+            self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
         else:
             self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
         
@@ -874,12 +994,20 @@ class MDAGlados(CustomMainWindow):
                 self.channels = None
                 self.channel_exposures_ms = None
         
+        #Do a small catch in case z_start, z_step or z_end is None:
+        if self.z_start is None or self.z_step is None or self.z_end is None:
+            logging.warning("z_start, z_step or z_end is None. MDA will not be created.")
+            self.z_start = 0
+            self.z_step = 1
+            self.z_end = 1
+        
         #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
         
         logging.debug(f"mda: {self.mda}")
         if self.fully_started:
-            self.save_state('mda_state.json')
+            if self.autoSaveLoad:
+                self.save_state('mda_state.json')
         logging.debug('ended get_MDA_events_from_GUI')
         
         pass

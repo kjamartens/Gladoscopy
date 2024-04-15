@@ -131,7 +131,7 @@ class nodz_openMMConfigDialog(QDialog):
     
 
 class nodz_openMDADialog(QDialog):
-    def __init__(self, parent=None, parentData=None):
+    def __init__(self, parent=None, parentData=None, currentNode = None):
         super().__init__(parent)
         
         self.setWindowTitle("MDA Dialog")
@@ -139,7 +139,40 @@ class nodz_openMDADialog(QDialog):
             from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
             testQWidget = QWidget()
             
-            self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,hasGUI=True)
+            if currentNode is not None:
+                #Create a new MDAGlados with all the same components as currentNode.mdaData:
+                self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,
+                    hasGUI=True,
+                    GUI_show_channel=currentNode.mdaData.GUI_show_channel,
+                    GUI_show_exposure=currentNode.mdaData.GUI_show_exposure,
+                    GUI_show_order=currentNode.mdaData.GUI_show_order,
+                    GUI_show_storage=currentNode.mdaData.GUI_show_storage,
+                    GUI_show_time=currentNode.mdaData.GUI_show_time,
+                    GUI_show_xy=currentNode.mdaData.GUI_show_xy,
+                    GUI_show_z=currentNode.mdaData.GUI_show_z,
+                    GUI_acquire_button=False,
+                    order = currentNode.mdaData.order,
+                    num_time_points=currentNode.mdaData.num_time_points,
+                    time_interval_s=currentNode.mdaData.time_interval_s,
+                    z_start=currentNode.mdaData.z_start,
+                    z_end=currentNode.mdaData.z_end,
+                    z_step=currentNode.mdaData.z_step,
+                    z_stage_sel = currentNode.mdaData.z_stage_sel,
+                    z_nr_steps = currentNode.mdaData.z_nr_steps,
+                    z_step_distance = currentNode.mdaData.z_step_distance,
+                    z_nrsteps_radio_sel = currentNode.mdaData.z_nrsteps_radio_sel,
+                    z_stepdistance_radio_sel= currentNode.mdaData.z_stepdistance_radio_sel,
+                    channel_group=currentNode.mdaData.channel_group,
+                    channels=currentNode.mdaData.channels,
+                    channel_exposures_ms=currentNode.mdaData.channel_exposures_ms,
+                    xy_positions=currentNode.mdaData.xy_positions,
+                    xyz_positions=currentNode.mdaData.xyz_positions,
+                    position_labels=currentNode.mdaData.position_labels,
+                    exposure_ms=currentNode.mdaData.exposure_ms,
+                    storage_folder=currentNode.mdaData.storageFolder,
+                    storage_file_name=currentNode.mdaData.storageFileName)
+            else: #This should never happen, but otherwise just open a new mdaglados instance
+                self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,hasGUI=True)
             
             button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             button_box.accepted.connect(self.accept)
@@ -442,7 +475,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
     def NodeDoubleClicked(self,nodeName):
         currentNode = self.findNodeByName(nodeName)
         if 'acquisition' in nodeName:
-            dialog = nodz_openMDADialog(parentData=self)
+            dialog = nodz_openMDADialog(parentData=self,currentNode = currentNode)
             if dialog.exec_() == QDialog.Accepted:
                 logging.debug(f"MDA dialog input: {dialog.getInputs()}")
             

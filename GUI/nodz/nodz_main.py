@@ -868,8 +868,8 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES'][node] = {'preset': preset,
                                    'position': [nodeInst.pos().x(), nodeInst.pos().y()],
                                    'alternate': nodeAlternate,
-                                   'attributes': []}
-
+                                   'attributes': [],
+                                   'textbox_text': nodeInst.textbox.toPlainText()}
 
             import numpy
             def convert_to_string(obj):
@@ -951,6 +951,8 @@ class Nodz(QtWidgets.QGraphicsView):
         nodesName = nodesData.keys()
         allNodes = []
         
+        
+        
         def convert_to_correct_type(obj):
             if isinstance(obj, str):
                 try:
@@ -979,11 +981,13 @@ class Nodz(QtWidgets.QGraphicsView):
             position = nodesData[name]['position']
             position = QtCore.QPointF(position[0], position[1])
             alternate = nodesData[name]['alternate']
+            
 
             node = self.createNode(name=name,
                                    preset=preset,
                                    position=position,
-                                   alternate=alternate, skipCreateNodeSignal=False)
+                                   alternate=alternate, skipCreateNodeSignal=False,
+                                   displayText=nodesData[name]['textbox_text'])
             
             #Restore MDA data
             if name in data['NODES_MDA']:
@@ -992,6 +996,21 @@ class Nodz(QtWidgets.QGraphicsView):
                     for attr in data['NODES_MDA'][name]:
                         setattr(node.mdaData,attr,correctedmdadata[attr]) #type:ignore
 
+                    #Restore the settings of the '_enabled' options
+                    # node.mdaData.GUI_show_channel_chkbox.setChecked(node.mdaData.GUI_channel_enabled) #type:ignore
+                    # node.mdaData.GUI_show_channel = node.mdaData.GUI_channel_enabled #type:ignore
+                    # node.mdaData.GUI_show_exposure_chkbox.setChecked(node.mdaData.GUI_exposure_enabled) #type:ignore
+                    # node.mdaData.GUI_show_exposure = node.mdaData.GUI_exposure_enabled #type:ignore
+                    # node.mdaData.GUI_show_storage_chkbox.setChecked(node.mdaData.GUI_storage_enabled) #type:ignore
+                    # node.mdaData.GUI_show_storage = node.mdaData.GUI_storage_enabled #type:ignore
+                    # node.mdaData.GUI_show_time_chkbox.setChecked(node.mdaData.GUI_time_enabled) #type:ignore
+                    # node.mdaData.GUI_show_time = node.mdaData.GUI_time_enabled #type:ignore
+                    # node.mdaData.GUI_show_xy_chkbox.setChecked(node.mdaData.GUI_xy_enabled) #type:ignore
+                    # node.mdaData.GUI_show_xy = node.mdaData.GUI_xy_enabled #type:ignore
+                    # node.mdaData.GUI_show_z_chkbox.setChecked(node.mdaData.GUI_z_enabled) #type:ignore
+                    # node.mdaData.GUI_show_z = node.mdaData.GUI_z_enabled #type:ignore
+                    
+                
             #Restore MM-config-changing data
             if name in data['NODES_MMCONFIGCHANGE']:
                 if 'MMconfigInfo' in vars(node):
