@@ -11,8 +11,11 @@ def __function_metadata__():
     return {
         "AvgGrayValue": {
             "required_kwargs": [
+                {"name": "ReqKwarg1", "description": "First required kwarg"},
+                {"name": "ReqKwarg2", "description": "Second required kwarg", "default": 0, "type": int}
             ],
             "optional_kwargs": [
+                {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
             ],
             "help_string": "Average gray value."
         }

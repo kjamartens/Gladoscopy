@@ -31,45 +31,87 @@ from Visualisation_Measurements import * #type: ignore
 from Visualisation_Shapes import * #type: ignore
 import HelperFunctions #type: ignore
 import logging
+import utils
 
-class AdvancedInputDialog(QDialog):
-    def __init__(self, parent=None, parentData=None):
+from PyQt5.QtWidgets import QApplication, QComboBox
+
+class AnalysisScoringVisualisationDialog(QDialog):
+    def __init__(self, parent=None, currentNode=None):
         """
         Advanced input dialog.
 
         Args:
             parent (QWidget): Parent widget.
-            parentData (dict): Parent data.
+            currentNode (Nodz): Node data.
 
         Returns:
             tuple: A tuple containing the line edit and combo box input from the user.
         """
-        super().__init__(parent)
-        
-        self.setWindowTitle("Advanced Input Dialog")
-        
-        # Create line edit
-        self.line_edit = QLineEdit()
-        
-        # Create combobox
-        self.combo_box = QComboBox()
-        self.combo_box.addItems(["Option 1", "Option 2", "Option 3"])
-        
-        # Create button box
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
+        super().__init__()
         
         # Create layout
         layout = QVBoxLayout()
-        layout.addWidget(self.line_edit)
-        layout.addWidget(self.combo_box)
+        
+        self.mainLayout = QGridLayout()
+        layout.addLayout(self.mainLayout)
+        
+        #Add a OK/cancel button set:
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        #Add this to the bottom of the layout, stretching horizontally but centering in the center:
         layout.addWidget(button_box)
         
         self.setLayout(layout)
+
+class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
+    def __init__(self, parent=None, currentNode=None):
+        super().__init__(parent, currentNode)
+        self.setWindowTitle("Analysis Options")
         
-    def getInputs(self):
-        return self.line_edit.text(), self.combo_box.currentText()
+        #Let's try to get all possible analysis options
+        analysisFunctions_Images = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Images')
+        analysisFunctions_Measurements = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Measurements')
+        analysisFunctions_Shapes = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Shapes')
+        
+        all_analysisFunctions = analysisFunctions_Images + analysisFunctions_Measurements + analysisFunctions_Shapes
+        
+        
+        #Add a dropbox with all the options
+        self.comboBox_analysisFunctions = QComboBox(self)
+        if len(analysisFunctions_Images) > 0:
+            for item in analysisFunctions_Images:
+                self.comboBox_analysisFunctions.addItem(item)
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images))  
+        if len(analysisFunctions_Measurements) > 0:
+            for item in analysisFunctions_Measurements:
+                self.comboBox_analysisFunctions.addItem(item)
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Measurements))
+        if len(analysisFunctions_Shapes) > 0:
+            for item in analysisFunctions_Shapes:
+                self.comboBox_analysisFunctions.addItem(item)
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Shapes))          
+
+        self.mainLayout.addWidget(self.comboBox_analysisFunctions, 0, 1)
+        
+        #TODO: pre-load all args/kwargs and their edit values - then hide all of them
+        
+        displaynames, Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
+        textGrid = utils.changeLayout_choice(self.mainLayout,'',Finding_functionNameToDisplayNameMapping,current_dropdown = self.comboBox_analysisFunctions)
+        # textGrid = utils.createGridFromFunction(all_analysisFunctions[0])
+        #TODO: read from some json file and pre-load all options in the dropdown
+        
+        
+        
+        
+
+        
+        print('hi!')
+
+class nodz_analysisMeasurementDialog(nodz_analysisDialog):
+    def __init__(self, parent=None, currentNode=None):
+        super().__init__(parent, currentNode)
+        self.setWindowTitle("Analysis Measurement Options")
 
 class nodz_openMMConfigDialog(QDialog):
     def __init__(self, parentNode=None, storedConfigsStrings=None):
@@ -613,7 +655,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
             # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
         logging.debug(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
-        
+    
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
         Handle when a plug or socket is disconnected.
@@ -633,7 +675,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         destinationNode.n_connect_at_start -= 1 #type:ignore
                 
         logging.debug(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
-        
+    
     def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
         Handle when a plug is connected.
@@ -731,6 +773,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
+        elif 'analysisMeasurement' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                logging.info('Pressed OK on analysisMeasurementDialog')
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringStart' in nodeName:
