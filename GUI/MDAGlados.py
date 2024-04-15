@@ -332,9 +332,9 @@ class MDAGlados(CustomMainWindow):
         
         self.fully_started = True
         #check if mda_state.json exists:
-        if os.path.isfile('mda_state.json'):
-            if self.autoSaveLoad:
-                self.load_state('mda_state.json')
+        # if os.path.isfile('mda_state.json'):
+        #     if self.autoSaveLoad:
+        #         self.load_state('mda_state.json')
     
     def getDevicesOfDeviceType(self,devicetype):
         #Find all devices that have a specific devicetype

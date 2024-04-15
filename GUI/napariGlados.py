@@ -373,6 +373,15 @@ class dockWidget_MDA(dockWidgets):
                     exposure_ms = mdaInfo['exposure_ms'],
                     storage_folder = mdaInfo['storage_folder'],
                     storage_file_name = mdaInfo['storage_file_name'],
+                    order = mdaInfo['order'],
+                    GUI_show_exposure = mdaInfo['GUI_show_exposure'], 
+                    GUI_show_xy = mdaInfo['GUI_show_xy'], 
+                    GUI_show_z = mdaInfo['GUI_show_z'], 
+                    GUI_show_channel = mdaInfo['GUI_show_channel'], 
+                    GUI_show_time = mdaInfo['GUI_show_time'], 
+                    GUI_show_order = mdaInfo['GUI_show_order'], 
+                    GUI_show_storage = mdaInfo['GUI_show_storage'], 
+                    GUI_acquire_button = True,
                     autoSaveLoad=True).getGui()
         self.sizeChanged.connect(self.dockWidget.handleSizeChange)
 

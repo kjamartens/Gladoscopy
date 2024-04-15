@@ -34,6 +34,16 @@ import logging
 
 class AdvancedInputDialog(QDialog):
     def __init__(self, parent=None, parentData=None):
+        """
+        Advanced input dialog.
+
+        Args:
+            parent (QWidget): Parent widget.
+            parentData (dict): Parent data.
+
+        Returns:
+            tuple: A tuple containing the line edit and combo box input from the user.
+        """
         super().__init__(parent)
         
         self.setWindowTitle("Advanced Input Dialog")
@@ -63,6 +73,16 @@ class AdvancedInputDialog(QDialog):
 
 class nodz_openMMConfigDialog(QDialog):
     def __init__(self, parentNode=None, storedConfigsStrings=None):
+        """
+        Opens a dialog to modify the OpenMM configs of a node
+        
+        Args:
+            parentNode (Node): The node to modify the configs of.
+            storedConfigsStrings (list of tuples): A list of tuples with the name of the config and the value of the config.
+            
+        Returns:
+            A tuple with the configs as a dictionary and the list of configs as strings.
+        """
         super().__init__(None)
         self.newConfigUI = type(MMConfigUI)
         
@@ -109,7 +129,12 @@ class nodz_openMMConfigDialog(QDialog):
             self.setLayout(layout)
         
     def ConfigsToBeChanged(self):
+        """
+        Returns the configs that have been changed in the MM config Dialog.
         
+        Returns:
+            A list of tuples with the name of the config and the value of the config that has been changed.
+        """
         #Get the new value of all configs that are/should/want to be changed:
         ConfigsToBeChanged = []
         for config_id in range(len(self.newConfigUI.config_groups)):
@@ -128,10 +153,20 @@ class nodz_openMMConfigDialog(QDialog):
 
     # def getmdaData(self):
     #     return self.mdaconfig
-    
 
 class nodz_openMDADialog(QDialog):
     def __init__(self, parent=None, parentData=None, currentNode = None):
+        """
+        Dialog for the MDA options.
+        
+        Args:
+            parent (QtWidgets.QWidget): Parent widget of the dialog.
+            parentData (FlowChartCore): Instance of the FlowChartCore class.
+            currentNode (FlowChartNode): Instance of the FlowChartNode class.
+            
+        Returns:
+            List: List of tuples, each containing the configuration name and its new value.
+        """
         super().__init__(parent)
         self.parent = parent
         self.parentData = parentData
@@ -207,6 +242,16 @@ class nodz_openMDADialog(QDialog):
 
 class FoVFindImaging_singleCh_configs(QDialog):
     def __init__(self, parent=None, parentData=None):
+        """
+        Advanced dialog for user to input the configuration for a single channel single FOV imaging experiment.
+
+        Args:
+            parent (QWidget): The parent widget for this dialog. Defaults to None.
+            parentData: The data object for this app. Defaults to None.
+
+        Returns:
+            mdaData: The mdaData object with all the user input.
+        """
         super().__init__(parent)
         
         self.setWindowTitle("Advanced Input Dialog")
@@ -239,10 +284,27 @@ class FoVFindImaging_singleCh_configs(QDialog):
 
 class CustomGraphicsView(QtWidgets.QGraphicsView):
     def resizeEvent(self, event):
+        """
+        Handles resizing of the graphics view.
+        
+        Args:
+            event (QResizeEvent): The resize event.
+        """
         super().resizeEvent(event)
         self.updateGraphicsViewSize()
     
     def updateGraphicsViewSize(self):
+        """
+        Updates the size of the GraphicsView to match its viewport size.
+
+        This function is called automatically when the viewport is resized.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         nodz.setFixedSize(self.viewport().size())
 
 class GladosGraph():
@@ -252,6 +314,18 @@ class GladosGraph():
         # self.connectedToData = []
         
     def __init__(self,parent):
+        """
+        Initialize a GladosGraph object
+
+        This function initializes a GladosGraph object.
+
+        Args:
+            parent (nodz_mda.GladosFlowchart): The nodz_mda flowchart object.
+
+        Returns:
+            None
+
+        """ 
         self.parent = parent
         self.nodes = []
         self.startNodeIndex = -1
@@ -259,9 +333,23 @@ class GladosGraph():
         # self.ongoingNodes = []
         # self.finishedNodes = []
 
-
-        
     def addRawGraphEval(self,graphEval):
+        """
+        Adds information about connections to the nodes in a graphEval
+
+        This function adds information about connections to the nodes in a graphEval.
+        In particular, it adds to each node the nodes it is connected to
+        based on the connections in graphEval.
+
+        Args:
+            graphEval (list): A list of tuples that describe the connections in the graph.
+                Each tuple has the form (sending_node_name, receiving_node_name)
+
+        Returns:
+            None
+
+        """
+        
         #We'll get a structure like this:
         # [('scoreStart_0.Start', '1s timer_0.start'), ('1s timer_0.Finished', '2s timer_0.start'), ('2s timer_0.Finished', 'scoreEnd_0.End')]
         
@@ -293,26 +381,81 @@ class NodeSignalManager(QObject):
     new_signal = pyqtSignal()
     
     def __init__(self):
+        """
+        Constructor for the NodeSignalManager class.
+
+        This class is used to manage the signals emitted by nodes in the graph.
+        This is a generic class to handle the signals of any number of nodes.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         QObject.__init__(self)
         super().__init__()
         self.signals = []
 
     def add_signal(self, signal_name):
+        """
+        Adds a new signal to the NodeSignalManager class.
+
+        This function is used to dynamically add a new signal to the object.
+
+        Args:
+            signal_name (str): The name of the signal to be added.
+
+        Returns:
+            None
+        """
         # Dynamically add a new signal to the object
         setattr(self, signal_name, self.new_signal)
         self.signals.append(self.new_signal)
 
     def print_signals(self):
+        """
+        Prints all the signals managed by this class.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         for signal in self.signals:
             print(signal)
 
     def emit_all_signals(self):
+        """
+        Emits all the signals managed by this class.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         for signal in self.signals:
             signal.emit()
             logging.debug(f"emitting signal {signal}")
 
 class flowChart_dockWidgetF(nodz_main.Nodz):
+    """
+    Class that represents a Flowchart dock widget in napari-Glados. 
+    Inherits from Nodz, which is a graph drawing tool.
+    
+    """
     def __init__(self,core=None,shared_data=None,MM_JSON=None):
+        """
+        Class that represents a Flowchart dock widget in napari-Glados. 
+        Inherits from Nodz, which is a graph drawing tool.
+
+        This functions initializes a flowchart dock widget in napari-Glados.
+        It takes the napari viewer, the core Micro-Manager object, a
+        shared_data object, and a JSON file containing the Micro-Manager
+        settings.
+        """
         #Create a QGridLayout:
         self.mainLayout = QGridLayout()
         
@@ -366,6 +509,20 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self._focus()
     
     def explore_attributes(self, obj, indent=0):
+        """
+        Recursively print the attributes of an object.
+
+        This function is used for debugging purposes to explore the attributes of an object.
+        It will print the attributes of `obj` and all of its sub-attributes, up to a maximum
+        depth of 20.
+
+        Parameters
+        ----------
+        obj : object
+            The object to explore
+        indent : int, optional
+            The indentation level, by default 0
+        """
         if indent < 20:
             attributes = vars(obj)
             for attr_name in attributes:
@@ -381,15 +538,38 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 #     pass
     
     def storePickle(self):
+        """
+        Save the current graph to a pickle file.
+
+        This function saves the current graph to a pickle file, which can be loaded later using `loadPickle()`.
+        """
         self.saveGraph('Testgraph.json')
     
     def loadPickle(self):
+        """
+        Load the graph from a pickle file.
+
+        This function loads the graph from a pickle file created using `storePickle()`.
+        """
         import pickle, copy
         self.loadGraph_KM('Testgraph.json')
     
     def nodeLookupName_withoutCounter(self,nodeName):
-        
-        
+        """
+        Returns the node name without the counter suffix.
+
+        Given a node name like "MyNode_0" this function returns "MyNode".
+
+        Parameters
+        ----------
+        nodeName : str
+            The node name to strip the counter from.
+
+        Returns
+        -------
+        str
+            The node name without the counter suffix.
+        """
         #Find the last underscore ('_0, _1, etc')
         index_last_underscore = nodeName.rfind('_')
         nodeNameNC = nodeName[:index_last_underscore]
@@ -402,6 +582,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         return finalNodeName
     
     def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        """
+        Handle when a plug or socket is connected.
+
+        When a plug or socket is connected, this function is called. It will check if the destination
+        node should be marked as 'started' or 'finished' based on the attributes connected.
+        """
+        
         print(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         
         #First of all, abort if this exact connection is already made - this is called when loading the graph:
@@ -428,7 +615,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         logging.debug(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        
+        """
+        Handle when a plug or socket is disconnected.
+
+        When a plug or socket is disconnected, this function is called. It will disconnect
+        the finished event of the source node from the 'we finished one of the prerequisites' at the destination node.
+        """
         sourceNode = self.findNodeByName(srcNodeName)
         if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']:
             signal = sourceNode.customFinishedEmits.signals[0] #type: ignore
@@ -443,13 +635,26 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         logging.debug(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         
     def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        """
+        Handle when a plug is connected.
+
+        When a plug is connected, this function is called. It will check if the destination
+        node should be marked as 'started' based on the attributes connected.
+        """
         #Check if all are non-Nones:
         if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
             return
         else:
             self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
-            
+
     def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        """
+        Handle when a socket is connected.
+
+        When a socket is connected, this function is called. It does not do anything
+        special, it only exists to keep the Node class happy by having a method that
+        corresponds to the 'SocketConnected' signal from the FlowChart.
+        """
         #Check if all are non-Nones:
         if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
             return
@@ -457,6 +662,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
     
     def NodeRemoved(self,nodeNames):
+        """
+        Handle when one or more nodes are removed from the flowchart.
+
+        When one or more nodes are removed from the flowchart, this function is called.
+        It will update the node counters of the corresponding node types.
+        """
         logging.info('one or more nodes are removed!')
         for nodeName in nodeNames:
             for node_type, node_data in self.nodeInfo.items():
@@ -472,11 +683,23 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 print(f"failed to remove node: {nodeName}")
     
     def NodeAdded(self,node):
+        """
+        Handle when one or more nodes are created in the flowchart.
+
+        When one or more nodes are created in the flowchart, this function is called.
+        It does some pre-processing of the node and then calls performPostNodeCreation_Start.
+        """
         logging.info('one or more nodes are created!')
         nodeType = self.nodeLookupName_withoutCounter(node.name)
         self.performPostNodeCreation_Start(node,nodeType)
     
     def NodeDoubleClicked(self,nodeName):
+        """
+        Handle double-clicking on a node in the flowchart.
+
+        When a node is double-clicked, this function is called. Depending on the node, this 
+        function will open a dialog to modify the node's data.
+        """
         currentNode = self.findNodeByName(nodeName)
         if 'acquisition' in nodeName:
             dialog = nodz_openMDADialog(parentData=self,currentNode = currentNode)
@@ -494,7 +717,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             
             currentNode.displayText = str(dialog.getInputs())#type:ignore
             currentNode.update() #type:ignore
-        
         elif 'changeProperties' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #Show dialog:
@@ -502,7 +724,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
-        
         elif 'changeStagePos' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #Show dialog:
@@ -510,14 +731,21 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
-        
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
-    
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
     
     def defineNodeInfo(self):
+        """
+        Define the node information for all nodes in the flowchart.
+
+        This function is called once at the initialization of the flowchart.
+        It returns a dictionary containing all nodes and their info.
+        The info is used by the flowchart to create the nodes and their connections.
+        
+        It also contains layout information (colors and such)
+        """
         self.nodeInfo = {}
         
         #We define the node info for each type of node like this: (might be expanded in the future)
@@ -678,6 +906,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         print(self)
     
     def prepareGraph(self, methodName='Score'):
+        """
+        Function to prepare a graph based on the flowchart's connections.
+        The resulting graph will have all nodes connected by edges based on the connections
+        in the flowchart
+        """
         graphEval = self.evaluateGraph()
         if methodName == 'Score':
             scoreGraph = GladosGraph(self)
@@ -687,6 +920,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             return scoreGraph
 
     def findNodeByName(self, name):
+        """
+        Function to find a node based on its name attribute
+
+        Args:
+            name (str): The name of the node to find
+
+        Returns:
+            nodz.node: The node with the given name or None if not found
+        """
         for node in self.nodes:
             #check if the attribute 'name' is found:
             if hasattr(node, 'name'):
@@ -695,6 +937,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         return None
     
     def changeConfigStorageInNodz(self,currentNode,configNameSet):
+        """
+        Function to change the config storage of a nodz node from the double-click popup to the MMconfigInfo class stored inside the node.
+
+        This is useful when storing and loading configurations for a node, as the MMconfigInfo class can be serialized and deserialized.
+
+        Args:
+            currentNode (nodz.Node): The node to change the config storage of.
+            configNameSet (set of tuples): A set of tuples in the form (configName, selectedValue)
+        """
         #Changes a config from a double-click config popup to the MMconfig stored inside the nodz node itself (i.e. storing/loading of configs)
         
         #Add all of them to the MMconfigInfo.config_string_storage:
@@ -705,6 +956,14 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
     
     #replace the contextMenuEvent in nodz with this custom function:
     def contextMenuEvent(self, QMouseevent):
+        """
+        Function to create a context menu when right-clicking on the nodz canvas
+
+        This function creates a context menu with all available node types that the user can select from, and adds the node to the nodz canvas at the position of the mouse click.
+
+        Args:
+            QMouseevent (PyQt5.QtGui.QMouseEvent): The mouse event that triggered this context menu
+        """
         context_menu = QMenu(self)
         
         #Dynamically add all node types
@@ -722,6 +981,19 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         context_menu.exec_(QMouseevent.globalPos())
 
     def createNewNode(self, nodeType, event):
+        """
+        Creates a new node on the nodz canvas, with name and preset specified.
+
+        This function creates a new node on the nodz canvas at the position of the mouse event.
+        The name of the node is specified by appending a number to the nodeType parameter.
+        The preset of the node is set to 'node_preset_1'.
+
+        Args:
+            nodeType (str): The type of node to create.
+            event (PyQt5.QtGui.QMouseEvent): The mouse event that triggered this node creation.
+        Returns:
+            nodz.Node: The created nodz node.
+        """
         if self.nodeInfo[nodeType]['NodeCounter'] >= self.nodeInfo[nodeType]['MaxNodeCounter']:
             print('Not allowed! Maximum number of nodes of this type reached')
             return
@@ -732,6 +1004,16 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Do post-node-creation functions - does this via the pyqtsignal!
     
     def performPostNodeCreation_Start(self,newNode,nodeType):
+        """
+        Handles post-node-creation functions for nodes.
+
+        This function handles post-node-creation functions for nodes, such as
+        setting the node name and preset, and adding custom attributes.
+
+        Args:
+            newNode (nodz.Node): The newly created node.
+            nodeType (str): The type of node that was created.
+        """
         newNodeName = self.nodeInfo[nodeType]['name']+"_"+str(self.nodeInfo[nodeType]['NodeCounter'])
         #Increase the nodeCounter
         self.nodeInfo[nodeType]['NodeCounter']+=1
@@ -852,6 +1134,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.finishedEmits(node)
         
     def MMconfigChangeRan(self,node):
+        """
+        Handle the configuration change event for a node.
+
+        This function handles the configuration change event for a node, by
+        changing the desired configs in the Core.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+        """
         print('MMconfigChangeRan')
         #We need to change some configs (probably):
         for config_to_change in node.MMconfigInfo.config_string_storage:
@@ -861,6 +1152,16 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.finishedEmits(node)
     
     def GrayScaleTest(self,node):
+        """
+        This function is the action function for the Grayscale Test node in the Flowchart.
+
+        This function takes the data from the MDA node, which should be connected
+        to the Grayscale Test node, and performs a grayscale analysis on the data.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+
+        """
         #Find the node that is connected to this
         connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
         #First assess that it's a MDA node:
@@ -877,18 +1178,62 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.finishedEmits(node)
 
     def finishedEmits(self,node):
+        """
+        This function emits the customFinishedEmits signal of a node.
+
+        Args:
+            node (nodz.Node): The node that needs to finish.
+
+        Returns:
+            None
+        """
         node.customFinishedEmits.emit_all_signals()
 
     def scoringStart(self,node):
+        """
+        This function is the action function for the Scoring Start node in the Flowchart.
+
+        This function signals to the rest of the flowchart that it's time to start
+        the scoring routine.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+
+        Returns:
+            None
+        """
         print('Starting the score routine!')
         self.finishedEmits(node)
         
     def scoringEnd(self,node):
+        """
+        This function is the action function for the Scoring End node in the Flowchart.
+
+        This function signals to the rest of the flowchart that the scoring routine is finished.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+
+        Returns:
+            None
+        """
         print('Scoring finished fully!')
         print('----------------------')
         # self.finishedEmits(node)
 
     def timerCallAction(self,node,timev):
+        """
+        This function is the action function for the Timer Call node in the Flowchart.
+
+        This function waits for a specified amount of time before triggering the next node in the flowchart.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+            timev (float): The time to wait in seconds.
+
+        Returns:
+            None
+        """
         import time
         print('start time sleeping')
         time.sleep(timev)
@@ -896,25 +1241,59 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.finishedEmits(node)
 
     def createNodeFromRightClick(self,event,nodeType=None):
-        # if nodeType == 'acquisition':
+        """
+        This function creates a new node in the flowchart when the user right-clicks in the flowchart area. Mostly a wrapper function
+
+        Args:
+            event (QMouseEvent): The mouse event that triggered this function.
+            nodeType (str): The type of node to create. Defaults to None.
+
+        Returns:
+            None
+        """
         self.createNewNode(nodeType,event)
 
     def giveInfoOnNode(self,node):
+        """
+        Prints information about a node in the flowchart
+
+        This function prints some basic information about a node in the flowchart.
+
+        Args:
+            node (nodz.Node): The node to get information about.
+
+        Returns:
+            None
+        """
         print('--------')
         print(node)
         print(f"node name: {node.name}")
         print(f"incoming connections: {node.n_connect_at_start}" )
         # print(f"outgoing connections - finished: {node.connectedToFinish}")
         # print(f"outgoing connections - data: {node.connectedToData}")
-        
 
     def getNodz(self):
         return self
     
     def focus(self):
         self._focus()
-    
+
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
+    """
+    Creates a dock widget with a flowchart for running analysis workflows
+
+    This function creates a dock widget with a flowchart for running analysis workflows.
+
+    Args:
+        core (pycro-manager.Core): A connection to the micro-manager API.
+        MM_JSON (dict): A dictionary containing the settings from the Micro-Manager settings file.
+        main_layout (PyQt5.QtWidgets.QVBoxLayout): The main layout of the dock widget.
+        sshared_data (Shared_data): A shared data class instance containing shared data between widgets.
+
+    Returns:
+        flowChart_dockWidgetF: The flowchart dock widget.
+    """
+
     global shared_data, napariViewer
     shared_data = sshared_data
     napariViewer = shared_data.napariViewer
