@@ -19,10 +19,18 @@ from PIL import Image, ImageDraw
 sys.path.append('AutonomousMicroscopy')
 sys.path.append('AutonomousMicroscopy/MainScripts')
 #Import all scripts in the custom script folders
-from CellSegmentScripts import * #type: ignore
-from CellScoringScripts import * #type: ignore
-from ROICalcScripts import * #type: ignore
-from ScoringMetrics import * #type: ignore
+from Analysis_Images import * #type: ignore
+from Analysis_Measurements import * #type: ignore
+from Analysis_Shapes import * #type: ignore
+from Scoring_Images import * #type: ignore
+from Scoring_Measurements import * #type: ignore
+from Scoring_Shapes import * #type: ignore
+from Scoring_Images_Measurements import * #type: ignore
+from Scoring_Measurements_Shapes import * #type: ignore
+from Scoring_Images_Measurements_Shapes import * #type: ignore
+from Visualisation_Images import * #type: ignore
+from Visualisation_Measurements import * #type: ignore
+from Visualisation_Shapes import * #type: ignore
 #Obtain the helperfunctions
 import HelperFunctions  #type: ignore
 
