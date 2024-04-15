@@ -347,8 +347,33 @@ class dockWidget_MDA(dockWidgets):
         logging.debug("dockWidget_MDA started")
         super().__init__()
         
+        #Load the mda state
+        with open('mda_state.json', 'r') as file:
+            mdaInfo = json.load(file)
+        
         #Add the full micro manager controls UI
-        self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,hasGUI=True,autoSaveLoad=True).getGui()
+        self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                    hasGUI=True,
+                    num_time_points = mdaInfo['num_time_points'], 
+                    time_interval_s = mdaInfo['time_interval_s'], 
+                    z_start = mdaInfo['z_start'],
+                    z_end = mdaInfo['z_end'],
+                    z_step = mdaInfo['z_step'],
+                    z_stage_sel = mdaInfo['z_stage_sel'],
+                    z_nr_steps = mdaInfo['z_nr_steps'],
+                    z_step_distance = mdaInfo['z_step_distance'],
+                    z_nrsteps_radio_sel = mdaInfo['z_nrsteps_radio_sel'],
+                    z_stepdistance_radio_sel = mdaInfo['z_stepdistance_radio_sel'],
+                    channel_group = mdaInfo['channel_group'],
+                    channels = mdaInfo['channels'],
+                    channel_exposures_ms = mdaInfo['channel_exposures_ms'],
+                    xy_positions = mdaInfo['xy_positions'],
+                    xyz_positions = mdaInfo['xyz_positions'],
+                    position_labels = mdaInfo['position_labels'],
+                    exposure_ms = mdaInfo['exposure_ms'],
+                    storage_folder = mdaInfo['storage_folder'],
+                    storage_file_name = mdaInfo['storage_file_name'],
+                    autoSaveLoad=True).getGui()
         self.sizeChanged.connect(self.dockWidget.handleSizeChange)
 
 class dockWidget_flowChart(dockWidgets):
