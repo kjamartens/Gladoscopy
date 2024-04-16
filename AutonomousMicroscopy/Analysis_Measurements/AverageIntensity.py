@@ -17,7 +17,8 @@ def __function_metadata__():
             "optional_kwargs": [
                 {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
             ],
-            "help_string": "Average gray value."
+            "help_string": "Average gray value.",
+            "display_name": "Average gray value"
         }
     }
 

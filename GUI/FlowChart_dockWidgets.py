@@ -75,44 +75,44 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         analysisFunctions_Images = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Images')
         analysisFunctions_Measurements = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Measurements')
         analysisFunctions_Shapes = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Shapes')
-        
+        #Also add them back to back
         all_analysisFunctions = analysisFunctions_Images + analysisFunctions_Measurements + analysisFunctions_Shapes
         
+        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
         
         #Add a dropbox with all the options
         self.comboBox_analysisFunctions = QComboBox(self)
         if len(analysisFunctions_Images) > 0:
             for item in analysisFunctions_Images:
-                self.comboBox_analysisFunctions.addItem(item)
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images))  
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)-1)  
         if len(analysisFunctions_Measurements) > 0:
             for item in analysisFunctions_Measurements:
-                self.comboBox_analysisFunctions.addItem(item)
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Measurements))
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_Measurements)-1)
         if len(analysisFunctions_Shapes) > 0:
             for item in analysisFunctions_Shapes:
-                self.comboBox_analysisFunctions.addItem(item)
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Shapes))          
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_Measurements)+len(analysisFunctions_Shapes)-1)          
 
         self.mainLayout.addWidget(self.comboBox_analysisFunctions, 0, 1)
         #give it an objectName:
         self.comboBox_analysisFunctions.setObjectName('comboBox_analysisFunctions_KEEP')
         #Give it a connect-callback if it's changed (then the layout should be changed)
-        self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, layout=self.mainLayout, dropdown=self.comboBox_analysisFunctions: utils.layout_changedDropdown(layout,current_dropdown=dropdown))
+        self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, layout=self.mainLayout, dropdown=self.comboBox_analysisFunctions,displaynameMapping=displaynameMapping: utils.layout_changedDropdown(layout,dropdown,displaynameMapping))
 
         
         # pre-load all args/kwargs and their edit values - then hide all of them
-        displaynames, Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
-        textGrid = utils.layout_init(self.mainLayout,'',Finding_functionNameToDisplayNameMapping,current_dropdown = self.comboBox_analysisFunctions)
+        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_analysisFunctions)
         
-        #TODO: read from some json file and pre-load all options in the dropdown
+        #Pre-load the options if they're in the current node info
         utils.preLoadOptions(self.mainLayout,currentNode.scoring_analysis_currentData)
         
         
         
-
-        
-        print('hi!')
 
 class nodz_analysisMeasurementDialog(nodz_analysisDialog):
     def __init__(self, parent=None, currentNode=None):

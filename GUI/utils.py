@@ -504,22 +504,18 @@ def typeFromKwarg(functionname,kwargname):
     
     return typing
 
-def layout_changedDropdown(curr_layout,current_dropdown,parent=None):
+def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap,parent=None):
     #Called whenever the dropdown is changed, hides everything and shows selectively only the chosen dropdown
     if current_dropdown == None:
         return
     item_text = current_dropdown.currentText()
     if item_text is not None and item_text != '':
         #Get the kw-arguments from the current dropdown.
-        current_selected_function = item_text #functionNameFromDisplayName(item_text,displayNameToFunctionNameMap)
-        print('current selected function: '+current_selected_function)
-        #Hides everything
-        # resetLayout(curr_layout,'')
+        current_selected_function = functionNameFromDisplayName(item_text,displayNameToFunctionNameMap)
         #Hides everything except current dropdown selected
         resetLayout(curr_layout,current_selected_function)
         #Update the layout
         curr_layout.update()
-    
 
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
@@ -532,7 +528,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
         item_text = current_dropdown.itemText(index)
         if item_text is not None and item_text != '':
             #Get the kw-arguments from the current dropdown.
-            current_selected_function = item_text #functionNameFromDisplayName(item_text,displayNameToFunctionNameMap)
+            current_selected_function = functionNameFromDisplayName(item_text,displayNameToFunctionNameMap)
             logging.debug('current selected function: '+current_selected_function)
 
             #Unhide everything
@@ -663,7 +659,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         changeDataVarUponKwargChange(line_edit)
                         
     #Hides everything except the current layout
-    layout_changedDropdown(curr_layout,current_dropdown)
+    layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
 
 def preLoadOptions(curr_layout,currentData):
     """
