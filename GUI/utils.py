@@ -682,7 +682,11 @@ def changeDataVarUponKwargChange(line_edit):
     parentObject = line_edit.parent()
     newValue = line_edit.text()
     parentObject.currentData[line_edit.objectName()] = newValue
-    
+    #To be sure, also do this routine:
+    updateCurrentDataUponDropdownChange(parentObject)
+
+
+def updateCurrentDataUponDropdownChange(parentObject):
     #Figure out the current selected dropdown entry:
     #loop over all children:
     for child in parentObject.children():

@@ -11,7 +11,7 @@ def __function_metadata__():
     return {
         "AvgGrayValue": {
             "required_kwargs": [
-                {"name": "ReqKwarg1", "description": "First required kwarg"},
+                {"name": "ReqKwarg1", "description": "First required kwarg", "default": 'DefaultKwarg', "type": str},
                 {"name": "ReqKwarg2", "description": "Second required kwarg", "default": 0, "type": int}
             ],
             "optional_kwargs": [
@@ -30,6 +30,7 @@ def AvgGrayValue(NDTIFFStack,core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
+    print(kwargs['ReqKwarg1'])
     # print(NDTIFFStack._summary_metadata)
     # print(NDTIFFStack.as_array())
     

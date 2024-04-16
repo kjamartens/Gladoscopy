@@ -32,11 +32,7 @@ def __function_metadata__():
     }
 
 #Normal stardist segmentation, requires image_data and modelStorageLoc as required kwargs
-def StarDistSegment(**kwargs):
-    # print('Running stardistsegment')
-    # print(kwargs["image_data"])
-    
-    
+def StarDistSegment(NDTIFFStack,core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -63,7 +59,7 @@ def StarDistSegment(**kwargs):
     #Return the coordinates of the ROIs (could also return the labeled inage via 'labels')
     return coord
 
-def StarDistSegment_preloadedModel(**kwargs):
+def StarDistSegment_preloadedModel(NDTIFFStack,core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 

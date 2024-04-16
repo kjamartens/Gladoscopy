@@ -105,6 +105,8 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         self.comboBox_analysisFunctions.setObjectName('comboBox_analysisFunctions_KEEP')
         #Give it a connect-callback if it's changed (then the layout should be changed)
         self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, layout=self.mainLayout, dropdown=self.comboBox_analysisFunctions,displaynameMapping=displaynameMapping: utils.layout_changedDropdown(layout,dropdown,displaynameMapping))
+        #Also give it a connect-callback to store the currentinfo:
+        self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
 
         
         # pre-load all args/kwargs and their edit values - then hide all of them
@@ -1202,12 +1204,14 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #And then find the mdaData object
             mdaDataobject = connectedNode.mdaData
             
+            #Figure out which function is selected in the scoring_analysis node
             selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-            
+            #Figure out the belonging evaluation-text
             evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
             #And evaluate the custom function with custom parameters
-            output = eval(evalText)
+            output = eval(evalText) #type:ignore
             
+            #Display final output to the user for now
             print(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
             
             #Finish up
