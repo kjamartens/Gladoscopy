@@ -490,7 +490,7 @@ class NodeSignalManager(QObject):
         """
         for signal in self.signals:
             signal.emit()
-            logging.debug(f"emitting signal {signal}")
+            print(f"emitting signal {signal}")
 
 class flowChart_dockWidgetF(nodz_main.Nodz):
     """
@@ -604,6 +604,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         This function loads the graph from a pickle file created using `storePickle()`.
         """
         import pickle, copy
+        #Fully clear graph:
+        self.clearGraph()
+        #Set all counters to 0:
+        for nodeType in self.nodeInfo:
+            self.nodeInfo[nodeType]['NodeCounter'] = 0
+            self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
         self.loadGraph_KM('Testgraph.json')
     
     def nodeLookupName_withoutCounter(self,nodeName):
@@ -655,16 +661,16 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #                 print('skipping this!')
         #                 return
         
-        sourceNode = self.findNodeByName(srcNodeName)
-        if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
-            destinationNode = self.findNodeByName(dstNodeName)
-            #The destination node needs one extra to be started...
-            destinationNode.n_connect_at_start += 1 #type: ignore
+        # sourceNode = self.findNodeByName(srcNodeName)
+        # if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
+        #     destinationNode = self.findNodeByName(dstNodeName)
+        #     #The destination node needs one extra to be started...
+        #     destinationNode.n_connect_at_start += 1 #type: ignore
             
-            #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
-            sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
-            # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
-        logging.debug(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        #     #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
+        #     sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
+        #     # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
+        # logging.debug(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
     
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -673,18 +679,19 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         When a plug or socket is disconnected, this function is called. It will disconnect
         the finished event of the source node from the 'we finished one of the prerequisites' at the destination node.
         """
-        sourceNode = self.findNodeByName(srcNodeName)
-        if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']:
-            signal = sourceNode.customFinishedEmits.signals[0] #type: ignore
-            try:
-                signal.disconnect()
-            except:
-                print('attempted to disconnect a disconnected signal')
+        print('plugorsocketdisconnected')
+        # sourceNode = self.findNodeByName(srcNodeName)
+        # if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']:
+        #     signal = sourceNode.customFinishedEmits.signals[0] #type: ignore
+        #     try:
+        #         signal.disconnect()
+        #     except:
+        #         print('attempted to disconnect a disconnected signal')
         
-        destinationNode = self.findNodeByName(dstNodeName)
-        destinationNode.n_connect_at_start -= 1 #type:ignore
+        # destinationNode = self.findNodeByName(dstNodeName)
+        # destinationNode.n_connect_at_start -= 1 #type:ignore
                 
-        logging.debug(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        # logging.debug(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
     
     def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -694,10 +701,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         node should be marked as 'started' based on the attributes connected.
         """
         #Check if all are non-Nones:
-        if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
-            return
-        else:
-            self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
+        print('plug connected')
+        # if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
+        #     return
+        # else:
+        #     self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
 
     def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -708,10 +716,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         corresponds to the 'SocketConnected' signal from the FlowChart.
         """
         #Check if all are non-Nones:
-        if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
-            return
-        else:
-            self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
+        print('socket connected')
+        # if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
+        #     return
+        # else:
+            # self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
     
     def NodeRemoved(self,nodeNames):
         """
@@ -816,6 +825,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['acquisition']['finishedAttributes'] = ['Finished']
         self.nodeInfo['acquisition']['dataAttributes'] = []
         self.nodeInfo['acquisition']['NodeCounter'] = 0
+        self.nodeInfo['acquisition']['NodeCounterNeverReset'] = 0
         self.nodeInfo['acquisition']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['changeProperties'] = {}
@@ -825,6 +835,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['changeProperties']['finishedAttributes'] = ['Done']
         self.nodeInfo['changeProperties']['dataAttributes'] = []
         self.nodeInfo['changeProperties']['NodeCounter'] = 0
+        self.nodeInfo['changeProperties']['NodeCounterNeverReset'] = 0
         self.nodeInfo['changeProperties']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['changeStagePos'] = {}
@@ -834,6 +845,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['changeStagePos']['finishedAttributes'] = ['Done']
         self.nodeInfo['changeStagePos']['dataAttributes'] = []
         self.nodeInfo['changeStagePos']['NodeCounter'] = 0
+        self.nodeInfo['changeStagePos']['NodeCounterNeverReset'] = 0
         self.nodeInfo['changeStagePos']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['analysisGrayScaleTest'] = {}
@@ -843,6 +855,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisGrayScaleTest']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisGrayScaleTest']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisGrayScaleTest']['NodeCounter'] = 0
+        self.nodeInfo['analysisGrayScaleTest']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisGrayScaleTest']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['analysisMeasurement'] = {}
@@ -852,6 +865,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisMeasurement']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisMeasurement']['NodeCounter'] = 0
+        self.nodeInfo['analysisMeasurement']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisMeasurement']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['analysisShapes'] = {}
@@ -861,6 +875,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisShapes']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisShapes']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisShapes']['NodeCounter'] = 0
+        self.nodeInfo['analysisShapes']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisShapes']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['analysisImages'] = {}
@@ -870,6 +885,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisImages']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisImages']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisImages']['NodeCounter'] = 0
+        self.nodeInfo['analysisImages']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisImages']['MaxNodeCounter'] = np.inf
         
         self.nodeInfo['scoringStart'] = {}
@@ -879,6 +895,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['scoringStart']['finishedAttributes'] = ['Start']
         self.nodeInfo['scoringStart']['dataAttributes'] = []
         self.nodeInfo['scoringStart']['NodeCounter'] = 0
+        self.nodeInfo['scoringStart']['NodeCounterNeverReset'] = 0
         self.nodeInfo['scoringStart']['MaxNodeCounter'] = 1
         
         self.nodeInfo['scoringEnd'] = {}
@@ -888,6 +905,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['scoringEnd']['finishedAttributes'] = []
         self.nodeInfo['scoringEnd']['dataAttributes'] = []
         self.nodeInfo['scoringEnd']['NodeCounter'] = 0
+        self.nodeInfo['scoringEnd']['NodeCounterNeverReset'] = 0
         self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
         
         self.nodeInfo['onesectimer'] = {}
@@ -897,6 +915,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['onesectimer']['finishedAttributes'] = ['Finished']
         self.nodeInfo['onesectimer']['dataAttributes'] = []
         self.nodeInfo['onesectimer']['NodeCounter'] = 0
+        self.nodeInfo['onesectimer']['NodeCounterNeverReset'] = 0
         self.nodeInfo['onesectimer']['MaxNodeCounter'] = np.inf
         self.nodeInfo['twosectimer'] = {}
         self.nodeInfo['twosectimer']['name'] = '2s timer'
@@ -905,6 +924,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['twosectimer']['finishedAttributes'] = ['Finished']
         self.nodeInfo['twosectimer']['dataAttributes'] = []
         self.nodeInfo['twosectimer']['NodeCounter'] = 0
+        self.nodeInfo['twosectimer']['NodeCounterNeverReset'] = 0
         self.nodeInfo['twosectimer']['MaxNodeCounter'] = np.inf
         self.nodeInfo['threesectimer'] = {}
         self.nodeInfo['threesectimer']['name'] = '3s timer'
@@ -913,6 +933,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['threesectimer']['finishedAttributes'] = ['Finished']
         self.nodeInfo['threesectimer']['dataAttributes'] = []
         self.nodeInfo['threesectimer']['NodeCounter'] = 0
+        self.nodeInfo['threesectimer']['NodeCounterNeverReset'] = 0
         self.nodeInfo['threesectimer']['MaxNodeCounter'] = np.inf
         
         
@@ -963,7 +984,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         print("Debug Scoring")
         scoreGraph = self.prepareGraph(methodName = "Score")
         
+        
         print(self)
+        print(self.evaluateGraph())
     
     def prepareGraph(self, methodName='Score'):
         """
@@ -1074,10 +1097,21 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode (nodz.Node): The newly created node.
             nodeType (str): The type of node that was created.
         """
-        newNodeName = self.nodeInfo[nodeType]['name']+"_"+str(self.nodeInfo[nodeType]['NodeCounter'])
-        #Increase the nodeCounter
-        self.nodeInfo[nodeType]['NodeCounter']+=1
-        
+        if not newNode.createdFromLoading: #Normal case when it's simply created from the nodz canvas
+            newNodeName = self.nodeInfo[nodeType]['name']+"_"+str(self.nodeInfo[nodeType]['NodeCounterNeverReset'])
+            #Increase the nodeCounter - use the neverReset one to completely eliminate options of same-named nodes ever
+            self.nodeInfo[nodeType]['NodeCounter']+=1
+            self.nodeInfo[nodeType]['NodeCounterNeverReset']+=1
+        elif newNode.createdFromLoading: #Special case in case it's created from loading the whole graph
+            newNodeName = newNode.name #Don't change the name
+            self.nodeInfo[nodeType]['NodeCounter']+=1
+            #Get the node name:
+            lastUnderscore = newNode.name.rfind('_')
+            newNodeNumber = int(newNode.name[lastUnderscore+1:])
+            #And set the nodecounterneverreset to be this value +1 or higher
+            if self.nodeInfo[nodeType]['NodeCounterNeverReset'] < newNodeNumber+1:
+                self.nodeInfo[nodeType]['NodeCounterNeverReset'] = newNodeNumber+1
+            
         if nodeType in self.config:
             configtype = nodeType
         else:
@@ -1277,6 +1311,53 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         """
         node.customFinishedEmits.emit_all_signals()
 
+    def GraphToSignals(self):
+        """Idea: we evaluate the graph at this time point, connect all signals/emits:
+        
+        """
+        print('graphicing to signals')
+        #Loop over all nodes:
+        for node in self.nodes:
+            node.n_connect_at_start = 0
+            signal = node.customFinishedEmits.signals[0] #type: ignore
+            try:
+                #This disconnects all signals
+                signal.disconnect()
+            except:
+                print('attempted to disconnect a disconnected signal')
+            
+        #Create all required signal connections
+        currentgraph = self.evaluateGraph()
+        for connection in currentgraph:
+            plugAttribute = connection[0][connection[0].rfind('.')+1:]
+            socketAttribute = connection[1][connection[1].rfind('.')+1:]
+            srcNodeName = connection[0][:connection[0].rfind('.')]
+            dstNodeName = connection[1][:connection[1].rfind('.')]
+            
+            typeOfFinishedAttributes_of_srcNode = self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']
+            typeOfStartAttributes_of_dstNode = self.nodeInfo[self.nodeLookupName_withoutCounter(dstNodeName)]['startAttributes']
+            
+            if plugAttribute in typeOfFinishedAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
+                srcNode = self.findNodeByName(srcNodeName)#self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]
+                dstNode = self.findNodeByName(dstNodeName)
+                #The destination node needs one extra to be started...
+                dstNode.n_connect_at_start += 1 #type: ignore
+                
+                #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
+                srcNode.customFinishedEmits.signals[0].connect(dstNode.oneConnectionAtStartIsFinished) #type: ignore
+                print(f"connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+            else:
+                print(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+            
+        
+        # if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
+        #     destinationNode = self.findNodeByName(dstNodeName)
+        #     #The destination node needs one extra to be started...
+        #     destinationNode.n_connect_at_start += 1 #type: ignore
+            
+        #     #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
+        #     sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
+        #     # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
     def scoringStart(self,node):
         """
         This function is the action function for the Scoring Start node in the Flowchart.
@@ -1291,6 +1372,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             None
         """
         print('Starting the score routine!')
+        
+        self.GraphToSignals()
+        
         self.finishedEmits(node)
         
     def scoringEnd(self,node):

@@ -539,7 +539,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
 
     # NODES
-    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None, displayName=None,skipCreateNodeSignal=False):
+    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None, displayName=None,skipCreateNodeSignal=False,createdFromNodzLoading=False):
         """
         Create a new node with a given name, position and color.
 
@@ -581,6 +581,12 @@ class Nodz(QtWidgets.QGraphicsView):
             # Set node position.
             self.scene().addItem(nodeItem)
             nodeItem.setPos(position - nodeItem.nodeCenter)
+            
+            #Add some info about whether it's loaded or not - if it's just created, the numbering should go up, ifi t's loaded, the numbering should stay without change
+            if createdFromNodzLoading:
+                nodeItem.createdFromLoading = True #type:ignore
+            else:
+                nodeItem.createdFromLoading = False #type:ignore
 
             if not skipCreateNodeSignal:
                 # Emit signal.
@@ -1007,7 +1013,7 @@ class Nodz(QtWidgets.QGraphicsView):
                                 preset=preset,
                                 position=position,
                                 alternate=alternate, skipCreateNodeSignal=False,
-                                displayText=nodesData[name]['textbox_text'])
+                                displayText=nodesData[name]['textbox_text'],createdFromNodzLoading=True)
             
             #Restore MDA data
             if name in data['NODES_MDA']:
