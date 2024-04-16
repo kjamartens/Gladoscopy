@@ -106,7 +106,7 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         textGrid = utils.layout_init(self.mainLayout,'',Finding_functionNameToDisplayNameMapping,current_dropdown = self.comboBox_analysisFunctions)
         
         #TODO: read from some json file and pre-load all options in the dropdown
-        utils.preLoadOptions(self.mainLayout,currentNode.analysis_currentData)
+        utils.preLoadOptions(self.mainLayout,currentNode.scoring_analysis_currentData)
         
         
         
@@ -785,7 +785,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
-                currentNode.analysis_currentData = dialog.currentData
+                currentNode.scoring_analysis_currentData = dialog.currentData
                 logging.info('Pressed OK on analysisMeasurementDialog')
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore

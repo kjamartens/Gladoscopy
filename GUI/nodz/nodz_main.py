@@ -858,6 +858,9 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES'] = dict()
         data['NODES_MDA'] = dict()
         data['NODES_MMCONFIGCHANGE'] = dict()
+        data['NODES_SCORING_ANALYSIS'] = dict()
+        data['NODES_SCORING_VISUALISATION'] = dict()
+        data['NODES_SCORING_SCORING'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -902,6 +905,23 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'MMconfigInfo' in vars(nodeInst): 
                 if nodeInst.MMconfigInfo is not None:
                     data['NODES_MMCONFIGCHANGE'][node] = nodeInst.MMconfigInfo.config_string_storage
+
+            
+            data['NODES_SCORING_ANALYSIS'][node] = {}
+            if 'scoring_analysis_currentData' in vars(nodeInst):
+                if nodeInst.scoring_analysis_currentData is not None:
+                    data['NODES_SCORING_ANALYSIS'][node] = nodeInst.scoring_analysis_currentData
+                    
+            data['NODES_SCORING_VISUALISATION'][node] = {}
+            if 'scoring_visualisation_currentData' in vars(nodeInst):
+                if nodeInst.scoring_visualisation_currentData is not None:
+                    data['NODES_SCORING_VISUALISATION'][node] = nodeInst.scoring_visualisation_currentData
+                    
+            data['NODES_SCORING_SCORING'][node] = {}
+            if 'scoring_scoring_currentData' in vars(nodeInst):
+                if nodeInst.scoring_scoring_currentData is not None:
+                    data['NODES_SCORING_SCORING'][node] = nodeInst.scoring_scoring_currentData
+                    
 
             attrs = nodeInst.attrs
             for attr in attrs:
@@ -1018,7 +1038,20 @@ class Nodz(QtWidgets.QGraphicsView):
                         mmconfigchangedata = data['NODES_MMCONFIGCHANGE'][name]
                         node.MMconfigInfo.config_string_storage = mmconfigchangedata #type:ignore
                 
-                
+            #Restore scoring-data:
+            if name in data['NODES_SCORING_ANALYSIS']:
+                if 'scoring_analysis_currentData' in vars(node):
+                    if data['NODES_SCORING_ANALYSIS'] is not None:
+                        node.scoring_analysis_currentData = data['NODES_SCORING_ANALYSIS'][name] #type:ignore
+            if name in data['NODES_SCORING_VISUALISATION']:
+                if 'scoring_visualisation_currentData' in vars(node):
+                    if data['NODES_SCORING_VISUALISATION'] is not None:
+                        node.scoring_visualisation_currentData = data['NODES_SCORING_VISUALISATION'][name] #type:ignore
+            if name in data['NODES_SCORING_SCORING']:
+                if 'scoring_scoring_currentData' in vars(node):
+                    if data['NODES_SCORING_SCORING'] is not None:
+                        node.scoring_scoring_currentData = data['NODES_SCORING_SCORING'][name] #type:ignore
+                        
             allNodes.append(node)
             
         self.scene().update()
@@ -1336,9 +1369,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.callActionRelatedObject = None
         self.n_connect_at_start = 0 #number of others connected at start (which should all be finished!)        
         self.n_connect_at_start_finished = 0 #number of others connected at start which are finished already
-        self.analysis_currentData = {}
-        self.scoring_currentData = {}
-        self.visualisation_currentData = {}
+        self.scoring_analysis_currentData = {}
+        self.scoring_scoring_currentData = {}
+        self.scoring_visualisation_currentData = {}
 
         # Attributes storage.
         self.attrs = list()
