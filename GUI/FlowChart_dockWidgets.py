@@ -604,8 +604,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         This function loads the graph from a pickle file created using `storePickle()`.
         """
         import pickle, copy
-        #Fully clear graph:
+        #Fully clear graph and delete all nodes from memory:
         self.clearGraph()
+        self.nodes = []
         #Set all counters to 0:
         for nodeType in self.nodeInfo:
             self.nodeInfo[nodeType]['NodeCounter'] = 0
