@@ -813,6 +813,103 @@ def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',
     file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
     return file_path
 
+
+def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
+    
+    methodKwargNames_method=[]
+    methodKwargValues_method=[]
+    #Loop over all entries of currentData:
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("LineEdit" in key):
+                # The objectName will be along the lines of foo#bar#str
+                #Check if the objectname is part of a method or part of a scoring
+                split_list = key.split('#')
+                methodName_method = split_list[1]
+                methodKwargNames_method.append(split_list[2])
+
+                #value could contain a file location. Thus, we need to swap out all \ for /:
+                methodKwargValues_method.append(value.replace('\\','/'))
+            print(key)
+            print(value)
+    
+    #Now we create evaluation-texts:
+    moduleMethodEvalTexts = []
+    if methodName_method != '':
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+        #append this to moduleEvalTexts
+        moduleMethodEvalTexts.append(EvalTextMethod)
+
+    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+        return moduleMethodEvalTexts[0]
+
+def getFunctionEvalText(layout,p1,p2):
+    #Get the dropdown info
+    moduleMethodEvalTexts = []
+
+    methodKwargNames_method = []
+    methodKwargValues_method = []
+    methodName_method = ''
+    # Iterate over the items in the layout
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        widget = item.widget()
+        if widget is not None:#Catching layouts rather than widgets....
+            if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(layout):
+                # The objectName will be along the lines of foo#bar#str
+                #Check if the objectname is part of a method or part of a scoring
+                split_list = widget.objectName().split('#')
+                methodName_method = split_list[1]
+                methodKwargNames_method.append(split_list[2])
+
+                #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                methodKwargValues_method.append(widget.text().replace('\\','/'))
+        else:
+            #If the item is a layout instead...
+            if isinstance(item, QLayout):
+                for index2 in range(item.count()):
+                    item_sub = item.itemAt(index2)
+                    widget_sub = item_sub.widget()
+                    if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(layout):
+                        # The objectName will be along the lines of foo#bar#str
+                        #Check if the objectname is part of a method or part of a scoring
+                        split_list = widget_sub.objectName().split('#')
+                        methodName_method = split_list[1]
+                        methodKwargNames_method.append(split_list[2])
+
+                        #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
+                        methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
+
+                    # add distKwarg choice to Kwargs if given
+                    if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(layout) and 'dist_kwarg' in widget_sub.objectName():
+                        methodKwargNames_method.append('dist_kwarg')
+                        methodKwargValues_method.append(widget_sub.currentText())
+                    # add timeKwarg choice to Kwargs if given
+                    if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(layout) and 'time_kwarg' in widget_sub.objectName():
+                        methodKwargNames_method.append('time_kwarg')
+                        methodKwargValues_method.append(widget_sub.currentText())
+
+    # #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
+    # if methodName_method == '':
+    #     for index in range(all_layouts.count()):
+    #         item = all_layouts.itemAt(index)
+    #         widget = item.widget()
+    #         if isinstance(widget,QComboBox) and widget.isVisibleTo(self.tab_processing) and className in widget.objectName():
+    #             if className == 'Finding':
+    #                 methodName_method = functionNameFromDisplayName(widget.currentText(),getattr(self,f"Finding_functionNameToDisplayNameMapping{polarity}"))
+    #             elif className == 'Fitting':
+    #                 methodName_method = functionNameFromDisplayName(widget.currentText(),getattr(self,f"Fitting_functionNameToDisplayNameMapping{polarity}"))
+
+    #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
+    if methodName_method != '':
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+        #append this to moduleEvalTexts
+        moduleMethodEvalTexts.append(EvalTextMethod)
+
+    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+        return moduleMethodEvalTexts[0]
+    else:
+        return None
     
 def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------

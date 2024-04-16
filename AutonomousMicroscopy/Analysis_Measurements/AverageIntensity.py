@@ -30,8 +30,8 @@ def AvgGrayValue(NDTIFFStack,core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
-    print(NDTIFFStack._summary_metadata)
-    print(NDTIFFStack.as_array())
+    # print(NDTIFFStack._summary_metadata)
+    # print(NDTIFFStack.as_array())
     
     
     # Compute the average intensity of each slice

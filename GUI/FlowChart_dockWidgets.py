@@ -79,6 +79,8 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         all_analysisFunctions = analysisFunctions_Images + analysisFunctions_Measurements + analysisFunctions_Shapes
         
         allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
+        #Store this mapping also in the node
+        self.currentData['__displayNameFunctionNameMap__'] = displaynameMapping
         
         #Add a dropbox with all the options
         self.comboBox_analysisFunctions = QComboBox(self)
@@ -1165,6 +1167,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         elif nodeType == 'analysisGrayScaleTest':
             newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'analysisMeasurement':
+            newNode.callAction = lambda self, node=newNode: self.scoring_analysis_ran(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'onesectimer':
             newNode.callAction = lambda self, node=newNode, timev = 1: self.timerCallAction(node,timev=timev)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1184,6 +1189,29 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.callAction = None
 
         newNode.update()
+    
+    def scoring_analysis_ran(self,node):
+        
+        
+        #Find the node that is connected (i.e. downstream) to this
+        connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
+        #First assess that it's a MDA node:
+        if 'acquisition' not in connectedNode.name:
+            print('Error! Acquisition not connected to Grayscale test!')
+        else:
+            #And then find the mdaData object
+            mdaDataobject = connectedNode.mdaData
+            
+            selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+            
+            evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
+            #And evaluate the custom function with custom parameters
+            output = eval(evalText)
+            
+            print(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
+            
+            #Finish up
+            self.finishedEmits(node)
     
     def MMstageChangeRan(self,node):
         print('MMstageChange')
