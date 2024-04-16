@@ -1228,9 +1228,17 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
     
     def scoring_analysis_ran(self,node):
         
-        
         #Find the node that is connected (i.e. downstream) to this
-        connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
+        connectedNode = None
+        for connection in self.evaluateGraph():
+            if connection[1][connection[1].rfind('.')+1:] == 'Analysis start':
+                if connection[1][:connection[1].rfind('.')] == node.name:
+                    connectedNodeName = connection[0][:connection[0].rfind('.')]
+                    connectedNode = self.findNodeByName(connectedNodeName)
+        if connectedNode is None:
+            print('Error! No connected node found for scoring analysis')
+            return
+        
         #First assess that it's a MDA node:
         if 'acquisition' not in connectedNode.name:
             print('Error! Acquisition not connected to Grayscale test!')
