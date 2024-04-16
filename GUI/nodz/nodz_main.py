@@ -1336,6 +1336,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.callActionRelatedObject = None
         self.n_connect_at_start = 0 #number of others connected at start (which should all be finished!)        
         self.n_connect_at_start_finished = 0 #number of others connected at start which are finished already
+        self.analysis_currentData = {}
+        self.scoring_currentData = {}
+        self.visualisation_currentData = {}
 
         # Attributes storage.
         self.attrs = list()

@@ -504,17 +504,36 @@ def typeFromKwarg(functionname,kwargname):
     
     return typing
 
-def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4):
+def layout_changedDropdown(curr_layout,current_dropdown,parent=None):
+    #Called whenever the dropdown is changed, hides everything and shows selectively only the chosen dropdown
+    if current_dropdown == None:
+        return
+    item_text = current_dropdown.currentText()
+    if item_text is not None and item_text != '':
+        #Get the kw-arguments from the current dropdown.
+        current_selected_function = item_text #functionNameFromDisplayName(item_text,displayNameToFunctionNameMap)
+        print('current selected function: '+current_selected_function)
+        #Hides everything
+        # resetLayout(curr_layout,'')
+        #Hides everything except current dropdown selected
+        resetLayout(curr_layout,current_selected_function)
+        #Update the layout
+        curr_layout.update()
+    
+
+def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
     #Get the dropdown info
+    if current_dropdown == None:
+        return
     for index in range(current_dropdown.count()):
         item_text = current_dropdown.itemText(index)
         if item_text is not None and item_text != '':
             #Get the kw-arguments from the current dropdown.
             current_selected_function = item_text #functionNameFromDisplayName(item_text,displayNameToFunctionNameMap)
-            print('current selected function: '+current_selected_function)
+            logging.debug('current selected function: '+current_selected_function)
 
             #Unhide everything
             model = current_dropdown.model()
@@ -568,6 +587,8 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,curre
                             
                             #Add an listener when the pushButton is pressed
                             line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
+                            #Init the parent currentData storage:
+                            changeDataVarUponKwargChange(line_edit)
                             
                     else: #'normal' type - int, float, string, whatever
                         #Creating a line-edit...
@@ -582,6 +603,8 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,curre
                             curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                             #Add a on-change listener:
                             line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                            #Init the parent currentData storage:
+                            changeDataVarUponKwargChange(line_edit)
                 else:
                     labelposoffset -= 1
                 
@@ -619,6 +642,8 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,curre
                         curr_layout.addLayout(hor_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                         #Add a on-change listener:
                         line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                        #Init the parent currentData storage:
+                        changeDataVarUponKwargChange(line_edit)
                         
                         #Add an listener when the pushButton is pressed
                         line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
@@ -634,8 +659,43 @@ def changeLayout_choice(curr_layout,className,displayNameToFunctionNameMap,curre
                         curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
                         #Add a on-change listener:
                         line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                        #Init the parent currentData storage:
+                        changeDataVarUponKwargChange(line_edit)
+                        
+    #Hides everything except the current layout
+    layout_changedDropdown(curr_layout,current_dropdown)
+
+def preLoadOptions(curr_layout,currentData):
+    """
+    Preloads the kwarg values from the currentData dict into their respective widgets
+    """
+    for i in range(curr_layout.count()):
+        item = curr_layout.itemAt(i)
+        if item.widget() is not None:
+            child = item.widget()
+            if child.objectName() in currentData:
+                child.setText(str(currentData[child.objectName()]))
+                
+            #Also set the dropdown to the correct value:
+            if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
+                child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
+    
+
+def changeDataVarUponKwargChange(line_edit):
+    #Idea: update the parent.currentData{} structure whenever a kwarg is changed, and this can be (re-)loaded when needed
+    parentObject = line_edit.parent()
+    newValue = line_edit.text()
+    parentObject.currentData[line_edit.objectName()] = newValue
+    
+    #Figure out the current selected dropdown entry:
+    #loop over all children:
+    for child in parentObject.children():
+        if 'comboBox_analysisFunctions' in child.objectName():
+            parentObject.currentData['__selectedDropdownEntryAnalysis__'] = child.currentText()
 
 def kwargValueInputChanged(line_edit):
+    #Change the storage structure
+    changeDataVarUponKwargChange(line_edit)
     #Get the function name
     function = line_edit.objectName().split("#")[1]
     #Get the kwarg
@@ -712,9 +772,11 @@ def resetLayout(curr_layout,className):
         if widget_item.widget() is not None:
             widget = widget_item.widget()
             #If it's the dropdown segment, label it as such
-            if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+            if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
                 logging.debug(f"Hiding {widget.objectName()}")
                 widget.hide()
+            else:
+                widget.show()
         else:
             for index2 in range(widget_item.count()):
                 widget_sub_item = widget_item.itemAt(index2)
@@ -722,9 +784,11 @@ def resetLayout(curr_layout,className):
                 if widget_sub_item.widget() is not None:
                     widget = widget_sub_item.widget()
                     #If it's the dropdown segment, label it as such
-                    if not ("CandidateFindingDropdown" in widget.objectName()) and not ("CandidateFittingDropdown" in widget.objectName()) and widget.objectName() != f"titleLabel_{className}" and not ("KEEP" in widget.objectName()):
+                    if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
                         logging.debug(f"Hiding {widget.objectName()}")
                         widget.hide()
+                else:
+                    widget.show()
 
 def getMethodDropdownInfo(curr_layout,className):
     curr_dropdown = []

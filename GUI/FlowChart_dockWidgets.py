@@ -49,6 +49,8 @@ class AnalysisScoringVisualisationDialog(QDialog):
         """
         super().__init__()
         
+        self.currentData = {}
+        
         # Create layout
         layout = QVBoxLayout()
         
@@ -93,14 +95,18 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
             self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Shapes))          
 
         self.mainLayout.addWidget(self.comboBox_analysisFunctions, 0, 1)
+        #give it an objectName:
+        self.comboBox_analysisFunctions.setObjectName('comboBox_analysisFunctions_KEEP')
+        #Give it a connect-callback if it's changed (then the layout should be changed)
+        self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, layout=self.mainLayout, dropdown=self.comboBox_analysisFunctions: utils.layout_changedDropdown(layout,current_dropdown=dropdown))
+
         
-        #TODO: pre-load all args/kwargs and their edit values - then hide all of them
-        
+        # pre-load all args/kwargs and their edit values - then hide all of them
         displaynames, Finding_functionNameToDisplayNameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
-        textGrid = utils.changeLayout_choice(self.mainLayout,'',Finding_functionNameToDisplayNameMapping,current_dropdown = self.comboBox_analysisFunctions)
-        # textGrid = utils.createGridFromFunction(all_analysisFunctions[0])
-        #TODO: read from some json file and pre-load all options in the dropdown
+        textGrid = utils.layout_init(self.mainLayout,'',Finding_functionNameToDisplayNameMapping,current_dropdown = self.comboBox_analysisFunctions)
         
+        #TODO: read from some json file and pre-load all options in the dropdown
+        utils.preLoadOptions(self.mainLayout,currentNode.analysis_currentData)
         
         
         
@@ -775,9 +781,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
         elif 'analysisMeasurement' in nodeName:
             currentNode = self.findNodeByName(nodeName)
+            #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
+                currentNode.analysis_currentData = dialog.currentData
                 logging.info('Pressed OK on analysisMeasurementDialog')
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
