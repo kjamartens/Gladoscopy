@@ -292,6 +292,77 @@ class nodz_openMDADialog(QDialog):
     def getmdaData(self):
         return self.mdaconfig
 
+from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
+class nodz_openScoringEndDialog(QDialog):
+    def __init__(self, parent=None, parentData=None):
+        super().__init__(parent)
+        self.setWindowTitle("Scoring End")
+        #Add an OK/Cancel box
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        # Create a QWidget to contain the QGridLayout
+        self.grid_widget = QGridLayout()
+            
+        self.nrVarsSpinbox = QSpinBox()
+        self.nrVarsSpinbox.setMinimum(1)
+        self.nrVarsSpinbox.valueChanged.connect(self.updateLayout)
+        self.grid_widget.addWidget(self.nrVarsSpinbox,0,0)
+
+        self.variableContainer = QGridLayout()
+        # self.grid_widget.addLayout(self.variableContainer,1,0)
+        
+        self.variableContainerscrollArea = QScrollArea(self)
+        self.variableContainerscrollArea.setWidgetResizable(True)
+        self.variableContainerscrollAreaWidgetContents = QWidget()
+        self.variableContainerscrollAreaWidgetContents.setLayout(self.variableContainer)
+        self.variableContainerscrollArea.setWidget(self.variableContainerscrollAreaWidgetContents)
+        self.grid_widget.addWidget(self.variableContainerscrollArea,1,0)
+        
+        # Set a fixed size for the QScrollArea
+        self.variableContainerscrollArea.setFixedSize(QSize(300, 300))  # Adjust the size as needed
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addLayout(self.grid_widget)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+        
+        #Add a spacer item at the bottom of the variableContainer so it's pushing it down down down
+        spacerItem = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.variableContainer.addItem(spacerItem, 999, 0)
+
+
+        self.labels = []
+        self.lineEdits = []
+        
+        #And update the layout at the start:
+        self.updateLayout()
+        
+    def updateLayout(self):
+        nrVars = self.nrVarsSpinbox.value()
+        for label in self.labels:
+            self.layout().removeWidget(label)
+            label.deleteLater()
+        for lineEdit in self.lineEdits:
+            self.layout().removeWidget(lineEdit)
+            lineEdit.deleteLater()
+
+        self.labels = []
+        self.lineEdits = []
+
+        for i in range(nrVars):
+            label = QLabel(f"Variable {i+1}:")
+            lineEdit = QLineEdit()
+            self.variableContainer.addWidget(label,i,0)
+            self.labels.append(label)
+            self.variableContainer.addWidget(lineEdit,i,1)
+            self.lineEdits.append(lineEdit)
+
 class FoVFindImaging_singleCh_configs(QDialog):
     def __init__(self, parent=None, parentData=None):
         """
@@ -805,6 +876,53 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             currentNode.callAction(self) #type:ignore
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
+        elif 'scoringEnd' in nodeName:
+            dialog = nodz_openScoringEndDialog(parentData=self,parent=self)
+            if dialog.exec_() == QDialog.Accepted:
+                dialogLineEdits = []
+                for lineEdit in dialog.lineEdits:
+                    dialogLineEdits.append(lineEdit.text())
+                currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
+                #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
+                
+                import time
+                #We loop over the sockets:
+                for socket_id in reversed(range(len(currentNode.sockets))):
+                    socketFull = list(currentNode.sockets.items())[socket_id]
+                    socket = socketFull[0]
+                    #We check if the socket is in dialogLineEdits:
+                    if socket not in dialogLineEdits:
+                        # pos_in_dialogLineEdits = dialogLineEdits.index(socket)
+                        # #If it is, we move it to its new location
+                        # self.editAttribute(currentNode,socket_id,newName = None,newIndex=attr_offset)
+                        # print(f"moving socket {socket} to {attr_offset}")
+                        # attr_offset+=1
+                    # else:
+                        #If it isn't, we just delete it:
+                        self.deleteAttribute(currentNode,socket_id)
+                        self.update()
+                        time.sleep(0.05)
+                
+                #Then we create new sockets or move existing sockets:
+                for socket_new in dialogLineEdits:
+                    pos_in_dialogLineEdits = dialogLineEdits.index(socket_new)
+                    if socket_new not in currentNode.sockets:
+                        self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
+                        self.update()
+                        time.sleep(0.05)
+                    else: #Else we move it from some other location to where we want it
+                        #Find this socket in currentNode.sockets.items():
+                        socketFull = list(currentNode.sockets.items())
+                        pos_in_node_info = [socket_id for socket_id in range(len(socketFull)) if socketFull[socket_id][0] == socket_new][0]
+                        old_pos = socketFull[pos_in_node_info][1].index
+                        #Physically move it
+                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=socket_id)
+                        self.update()
+                        time.sleep(0.05)
+                
+                self.update()
+                print(dialogLineEdits)
+                print('Pressed OK on scoringEnd')
     
     def defineNodeInfo(self):
         """

@@ -1378,6 +1378,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.scoring_analysis_currentData = {}
         self.scoring_scoring_currentData = {}
         self.scoring_visualisation_currentData = {}
+        
+        self.scoring_end_currentData = {}
+        self.scoring_end_currentData['Variables'] = {}
 
         # Attributes storage.
         self.attrs = list()
