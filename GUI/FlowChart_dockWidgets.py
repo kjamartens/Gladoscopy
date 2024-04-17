@@ -294,7 +294,7 @@ class nodz_openMDADialog(QDialog):
 
 from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
 class nodz_openScoringEndDialog(QDialog):
-    def __init__(self, parent=None, parentData=None):
+    def __init__(self, parent=None, currentNode=None):
         super().__init__(parent)
         self.setWindowTitle("Scoring End")
         #Add an OK/Cancel box
@@ -336,32 +336,62 @@ class nodz_openScoringEndDialog(QDialog):
         spacerItem = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         self.variableContainer.addItem(spacerItem, 999, 0)
 
-
+        #Pre-load labels/line-Edits with the current sockets:
         self.labels = []
         self.lineEdits = []
+        if currentNode is not None:
+            currentSockets = list(currentNode.sockets.items())
+            for socket in currentSockets:
+                label = QLabel(f"Score {len(self.labels)+1}:")
+                lineEdit = QLineEdit()
+                lineEdit.setText(socket[0])
+                self.variableContainer.addWidget(label,len(self.labels),0)
+                self.variableContainer.addWidget(lineEdit,len(self.labels),1)
+                self.labels.append(label)
+                self.lineEdits.append(lineEdit)
         
+        self.nrVarsSpinbox.setValue(len(self.labels)) 
         #And update the layout at the start:
-        self.updateLayout()
+        # self.updateLayout()
         
     def updateLayout(self):
         nrVars = self.nrVarsSpinbox.value()
-        for label in self.labels:
-            self.layout().removeWidget(label)
-            label.deleteLater()
-        for lineEdit in self.lineEdits:
-            self.layout().removeWidget(lineEdit)
-            lineEdit.deleteLater()
-
-        self.labels = []
-        self.lineEdits = []
-
-        for i in range(nrVars):
-            label = QLabel(f"Variable {i+1}:")
+        if nrVars == len(self.labels)-1: #If we want to remove the last one
+            tobeRemovedLabel = self.labels[-1]
+            tobeRemovedLineEdit = self.lineEdits[-1]
+            self.layout().removeWidget(tobeRemovedLabel)
+            tobeRemovedLabel.deleteLater()
+            self.layout().removeWidget(tobeRemovedLineEdit)
+            tobeRemovedLineEdit.deleteLater()
+            self.labels.pop()
+            self.lineEdits.pop()
+        elif nrVars == len(self.labels)+1: #if we want to add one...
+            label = QLabel(f"Score {len(self.labels)+1}:")
             lineEdit = QLineEdit()
-            self.variableContainer.addWidget(label,i,0)
+            self.variableContainer.addWidget(label,len(self.labels),0)
+            self.variableContainer.addWidget(lineEdit,len(self.labels),1)
             self.labels.append(label)
-            self.variableContainer.addWidget(lineEdit,i,1)
             self.lineEdits.append(lineEdit)
+        elif nrVars == len(self.labels): 
+            pass
+        else: #Else, we added a fully new number, so we reset everything
+            for label in self.labels:
+                self.layout().removeWidget(label)
+                label.deleteLater()
+            for lineEdit in self.lineEdits:
+                self.layout().removeWidget(lineEdit)
+                lineEdit.deleteLater()
+
+            self.labels = []
+            self.lineEdits = []
+
+            for i in range(nrVars):
+                label = QLabel(f"Score {i+1}:")
+                lineEdit = QLineEdit()
+                self.variableContainer.addWidget(label,i,0)
+                self.labels.append(label)
+                self.variableContainer.addWidget(lineEdit,i,1)
+                self.lineEdits.append(lineEdit)
 
 class FoVFindImaging_singleCh_configs(QDialog):
     def __init__(self, parent=None, parentData=None):
@@ -877,35 +907,30 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringEnd' in nodeName:
-            dialog = nodz_openScoringEndDialog(parentData=self,parent=self)
+            dialog = nodz_openScoringEndDialog(parent=self,currentNode=currentNode)
             if dialog.exec_() == QDialog.Accepted:
                 dialogLineEdits = []
                 for lineEdit in dialog.lineEdits:
                     dialogLineEdits.append(lineEdit.text())
                 currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
-                #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
                 
+                #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
                 import time
                 #We loop over the sockets:
                 for socket_id in reversed(range(len(currentNode.sockets))):
                     socketFull = list(currentNode.sockets.items())[socket_id]
-                    socket = socketFull[0]
+                    socket_new = socketFull[0]
                     #We check if the socket is in dialogLineEdits:
-                    if socket not in dialogLineEdits:
-                        # pos_in_dialogLineEdits = dialogLineEdits.index(socket)
-                        # #If it is, we move it to its new location
-                        # self.editAttribute(currentNode,socket_id,newName = None,newIndex=attr_offset)
-                        # print(f"moving socket {socket} to {attr_offset}")
-                        # attr_offset+=1
-                    # else:
+                    if socket_new not in dialogLineEdits:
                         #If it isn't, we just delete it:
                         self.deleteAttribute(currentNode,socket_id)
                         self.update()
                         time.sleep(0.05)
                 
-                #Then we create new sockets or move existing sockets:
-                for socket_new in dialogLineEdits:
-                    pos_in_dialogLineEdits = dialogLineEdits.index(socket_new)
+                # #Then we create new sockets or move existing sockets:
+                # for socket_new in list(reversed(dialogLineEdits)):
+                
+                    pos_in_dialogLineEdits = socket_id
                     if socket_new not in currentNode.sockets:
                         self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
                         self.update()
@@ -916,7 +941,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                         pos_in_node_info = [socket_id for socket_id in range(len(socketFull)) if socketFull[socket_id][0] == socket_new][0]
                         old_pos = socketFull[pos_in_node_info][1].index
                         #Physically move it
-                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=socket_id)
+                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits)
                         self.update()
                         time.sleep(0.05)
                 
