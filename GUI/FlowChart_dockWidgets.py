@@ -847,6 +847,19 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 print(f"failed to remove node: {nodeName}")
     
     def NodeFullyInitialised(self,node):
+        """
+        Handle when a node is fully initialised.
+        
+        Specifically, when all e.g. data['NODES_SCORING_SCORING'] from loading is added to the node, only after that, this will run.
+
+        This function is called when a node is fully initialised. It does some
+        post-initialisation processing for nodes based on their type.
+
+        Parameters
+        ----------
+        node : Node
+            The node that has been fully initialised.
+        """
         nodeType = self.nodeLookupName_withoutCounter(node.name)
         if nodeType == 'scoringEnd':
             self.update_scoring_end(node,node.scoring_end_currentData['Variables'])

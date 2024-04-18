@@ -2075,7 +2075,25 @@ class SlotItem(QtWidgets.QGraphicsItem):
             nodzInst.drawingConnection = False
             nodzInst.currentDataType = None
 
-            target = self.scene().itemAt(event.scenePos().toPoint(), QtGui.QTransform())
+
+            #KM: Added a small square around cursor when selecting a slot, makes it easier to select it
+            pos = event.scenePos().toPoint()
+            # Define the error radius
+            error_radius = 10
+            # Create a QRectF with a slightly larger area around the scene position
+            search_rect = QRectF(pos.x() - error_radius, pos.y() - error_radius,
+                                    2 * error_radius, 2 * error_radius)
+            # Get the items within the search rectangle
+            items_in_rect = self.scene().items(search_rect)
+
+            #Select a slotItem in this target - assuming only one.
+            target = None
+            for item in items_in_rect:
+                if isinstance(item, SlotItem):
+                    target = item
+                    pass
+
+            # target = self.scene().itemAt(event.scenePos().toPoint(), QtGui.QTransform())
 
             if not isinstance(target, SlotItem):
                 self.newConnection._remove() #type:ignore
