@@ -176,7 +176,7 @@ class CustomMainWindow(QWidget):
         self.storingExceptions = ['core','layout','shared_data','gui','mda','data']
 
     def save_state(self, filename):
-        print('SAVING STATE')
+        logging.debug('SAVING STATE')
         state = {}
         for key, value in vars(self).items():
             if isinstance(value, QWidget):
@@ -193,7 +193,7 @@ class CustomMainWindow(QWidget):
             json.dump(state, file, indent=4)
 
     def load_state(self, filename):
-        print('LOADING STATE')
+        logging.debug('LOADING STATE')
         with open(filename, 'r') as file:
             state = json.load(file)
             
@@ -864,7 +864,7 @@ class MDAGlados(CustomMainWindow):
     def MDA_acq_finished(self):
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         self.data = self.shared_data.mdaDatasets[-1]
-        print('MDA acq data finished and data stored!')
+        logging.info('MDA acq data finished and data stored!')
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_GUI(self):

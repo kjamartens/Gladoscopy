@@ -62,15 +62,21 @@ def main():
     
     cleanUpTemporaryFiles()
     
-    if args.debug:
-        log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
-        logging.basicConfig(format=log_format, level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
+    #Set up logging at correct level
+    log_file_path = 'logpath.txt'
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-    #Just for now:
-    log_format = "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
-    logging.basicConfig(format=log_format, level=logging.DEBUG,stream=sys.stdout)
+    # Create the file handler to log to the file
+    file_handler = logging.FileHandler(log_file_path)
+    file_handler.setLevel(logging.INFO)
+
+    # Create the stream handler to log to the debug terminal
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(logging.DEBUG if args.debug else logging.INFO)
+
+    # Add the handlers to the logger
+    logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.DEBUG if args.debug else logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
     
     # Create an instance of the shared_data class
     shared_data = Shared_data()

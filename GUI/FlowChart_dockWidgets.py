@@ -6,7 +6,7 @@ import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
 from MMcontrols import MMConfigUI, ConfigInfo
 from MDAGlados import MDAGlados
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget, QMenu, QAction
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget, QMenu, QAction, QColorDialog
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QGridLayout, QPushButton
@@ -1290,14 +1290,33 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             
             changeColor_subAction.triggered.connect(create_lambda_changeColor(item_at_mouse))
             context_menu.exec_(QMouseevent.globalPos())
-            
-            # item_at_mouse.contextMenuEvent(QMouseevent)
 
     def changeNodeName(self, node, event):
-        print('x')
+        #Create a quick popup window with a line edit and an ok/cancel:
+        dialog = QDialog()
+        dialog.setWindowTitle('Change node name')
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+
+        lineEdit = QLineEdit()
+        lineEdit.setText(node.displayName)
+        layout.addWidget(lineEdit)
+
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, dialog)
+        buttonBox.accepted.connect(dialog.accept)
+        buttonBox.rejected.connect(dialog.reject)
+        layout.addWidget(buttonBox)
+
+        if dialog.exec_() == QDialog.Accepted:
+            node.displayName = lineEdit.text()
         
     def changeNodeColor(self, node, event):
-        print('x')
+        color = QColorDialog.getColor()
+        node.alternateFillColor = color.getRgb()
+        #Force the change in the node:
+        node.BGcolChanged()
+        node.update()
+        logging.debug(f"Node color changed to {node.alternateFillColor}")
 
     def createNewNode(self, nodeType, event):
         """

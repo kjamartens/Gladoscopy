@@ -834,8 +834,6 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
 
                 #value could contain a file location. Thus, we need to swap out all \ for /:
                 methodKwargValues_method.append(value.replace('\\','/'))
-            print(key)
-            print(value)
     
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []

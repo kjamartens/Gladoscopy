@@ -117,7 +117,7 @@ class Nodz(QtWidgets.QGraphicsView):
         context_menu.addAction(new_scoring_node_action)
         context_menu.addAction(new_decision_node_action)
         
-        print(QMouseevent)
+        logging.debug(QMouseevent)
         new_acq_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewAcqNode'))
         new_analysis_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewAnalysisNode'))
         new_scoring_node_action.triggered.connect(lambda _, event=QMouseevent: self.createNewNode(event,'NewScoringNode'))
@@ -881,7 +881,9 @@ class Nodz(QtWidgets.QGraphicsView):
                                 'alternate': nodeAlternate,
                                 'attributes': [],
                                 'textbox_text': nodeInst.textbox.toHtml(),
-                                'textboxheight': nodeInst.textboxheight}
+                                'textboxheight': nodeInst.textboxheight,
+                                'displayName': nodeInst.displayName,
+                                'alternateFillColor': nodeInst.alternateFillColor}
 
             import numpy
             def convert_to_string(obj):
@@ -1021,8 +1023,15 @@ class Nodz(QtWidgets.QGraphicsView):
                                 position=position,
                                 alternate=alternate, skipCreateNodeSignal=False,
                                 displayText=nodesData[name]['textbox_text'],createdFromNodzLoading=True)
-            node.textboxheight = nodesData[name]['textboxheight']
-            
+            if 'textboxheight' in nodesData[name]:
+                node.textboxheight = nodesData[name]['textboxheight']
+            if 'displayName' in nodesData[name]:
+                node.displayName = nodesData[name]['displayName']
+            if 'alternateFillColor' in nodesData[name]:
+                node.alternateFillColor = nodesData[name]['alternateFillColor']
+                #Force the change in the node:
+                node.BGcolChanged()
+                node.update()
             #Restore MDA data
             if name in data['NODES_MDA']:
                 if data['NODES_MDA'] is not None:
@@ -1358,7 +1367,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
     """
 
-    def __init__(self, name, alternate, preset, config, displayName = None, displayText = None, textbox=True):
+    def __init__(self, name, alternate, preset, config, displayName = None, displayText = None, textbox=True, alternateFillColor = None):
         """
         Initialize the class.
 
@@ -1395,6 +1404,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.scoring_analysis_currentData = {}
         self.scoring_scoring_currentData = {}
         self.scoring_visualisation_currentData = {}
+        self.alternateFillColor = alternateFillColor
         
         self.scoring_end_currentData = {}
         self.scoring_end_currentData['Variables'] = {}
@@ -1448,6 +1458,10 @@ class NodeItem(QtWidgets.QGraphicsItem):
     def changeDisplayName(self,new_Displayname):
         self.displayName = new_Displayname
 
+    def oneConnectionAtStartProvidesData(self):
+        #At the moment, does the same as oneConnectionAtStartIsFinished, but might be changedl ater:
+        self.oneConnectionAtStartIsFinished()
+
     def oneConnectionAtStartIsFinished(self):
         self.n_connect_at_start_finished += 1
         logging.debug('Called oneConnectionAtStartIsFinished')
@@ -1456,7 +1470,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         if self.n_connect_at_start_finished == self.n_connect_at_start:
             self.n_connect_at_start_finished = 0 #to allow for looping :)
             logging.debug('All connections at start are finished')
-            print(f"Starting call action of node with name: {self.name}")
+            logging.info(f"Starting call action of node with name: {self.name}")
             if self.callAction is not None:
                 if self.callActionRelatedObject is not None:
                     self.callAction(self.callActionRelatedObject) #type:ignore
@@ -1464,9 +1478,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
                     self.callAction(self)
 
     def finishedmda(self):
-        print('MDA finished within node')
+        logging.info('MDA finished within node')
         #MDA data is stored as self.mdaData.data
-        print(self.name)
+        logging.info(self.name)
 
     @property
     def height(self):
@@ -1528,7 +1542,10 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         self._brush = QtGui.QBrush()
         self._brush.setStyle(QtCore.Qt.SolidPattern) #type:ignore
-        self._brush.setColor(utils._convertDataToColor(config[self.nodePreset]['bg']))
+        if self.alternateFillColor == None:
+            self._brush.setColor(utils._convertDataToColor(config[self.nodePreset]['bg']))
+        else:
+            self._brush.setColor(utils._convertDataToColor(self.alternateFillColor))
 
         self._pen = QtGui.QPen()
         self._pen.setStyle(QtCore.Qt.SolidLine) #type:ignore
@@ -1555,6 +1572,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         self._attrPen = QtGui.QPen()
         self._attrPen.setStyle(QtCore.Qt.SolidLine) #type:ignore
+
+    def BGcolChanged(self):
+        self._createStyle(self.config)
 
     def _createAttribute(self, name, index, preset, plug, socket, dataType, plugMaxConnections, socketMaxConnections):
         """
