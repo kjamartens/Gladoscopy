@@ -680,7 +680,7 @@ class Nodz(QtWidgets.QGraphicsView):
         node.update()
 
     # ATTRS
-    def createAttribute(self, node, name='default', index=-1, preset='attr_default', plug=True, socket=True, dataType=None, plugMaxConnections=-1, socketMaxConnections=-1):
+    def createAttribute(self, node, name='default', index=-1, preset='attr_default', plug=True, socket=True, bottomAttr=False, topAttr=False, dataType=None, plugMaxConnections=-1, socketMaxConnections=-1):
         """
         Create a new attribute with a given name.
 
@@ -727,7 +727,7 @@ class Nodz(QtWidgets.QGraphicsView):
             print('Attribute creation aborted !')
             return
 
-        node._createAttribute(name=name, index=index, preset=preset, plug=plug, socket=socket, dataType=dataType, plugMaxConnections=plugMaxConnections, socketMaxConnections=socketMaxConnections)
+        node._createAttribute(name=name, index=index, preset=preset, plug=plug, socket=socket, bottomAttr=bottomAttr, topAttr=topAttr, dataType=dataType, plugMaxConnections=plugMaxConnections, socketMaxConnections=socketMaxConnections)
 
         # Emit signal.
         self.signal_AttrCreated.emit(node.name, index)
@@ -1152,6 +1152,8 @@ class Nodz(QtWidgets.QGraphicsView):
                 plug = attrData['plug']
                 socket = attrData['socket']
                 preset = attrData['preset']
+                bottomAttr = attrData['bottomAttr']
+                topAttr = attrData['topAttr']
                 dataType = attrData['dataType']
                 plugMaxConnections = attrData['plugMaxConnections']
                 socketMaxConnections = attrData['socketMaxConnections']
@@ -1417,6 +1419,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         self.plugs = dict()
         self.sockets = dict()
+        self.bottomAttrs = dict()
+        self.topAttrs = dict()
 
         # Methods.
         self.config = config
@@ -1492,14 +1496,20 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         nrSocketAttrs = 0
         nrPlugAttrs = 0
+        nrBottomAttrs = 0
+        nrTopAttrs = 0
         #loop over all attrs and add to socket or plug:
         for attr in self.attrs:
             if self.attrsData[attr]['plug']:
                 nrPlugAttrs += 1
             elif self.attrsData[attr]['socket']:
                 nrSocketAttrs += 1
+            elif self.attrsData[attr]['bottomAttr']:
+                nrBottomAttrs += 1
+            elif self.attrsData[attr]['topAttr']:
+                nrTopAttrs += 1
         
-        
+        #TODO: Change height if bottom attr is present
         if self.attrCount > 0:
             return (self.baseHeight +
                     self.attrHeight * max(nrSocketAttrs, nrPlugAttrs) +
@@ -1576,7 +1586,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
     def BGcolChanged(self):
         self._createStyle(self.config)
 
-    def _createAttribute(self, name, index, preset, plug, socket, dataType, plugMaxConnections, socketMaxConnections):
+    def _createAttribute(self, name, index, preset, plug, socket, bottomAttr, topAttr, dataType, plugMaxConnections, socketMaxConnections):
         """
         Create an attribute by expanding the node, adding a label and
         connection items.
@@ -1634,6 +1644,17 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
             self.sockets[name] = socketInst
 
+        #Create a bottom attribution item
+        if bottomAttr:
+            bottomAttrInst = BottomAttrItem(parent=self,
+                                            attribute=name,
+                                            index=self.attrCount,
+                                            preset=preset,
+                                            dataType=dataType,
+                                            maxConnections=socketMaxConnections)
+
+            self.bottomAttrs[name] = bottomAttrInst
+
         self.attrCount += 1
 
         # Add the attribute based on its index.
@@ -1646,6 +1667,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.attrsData[name] = {'name': name,
                                 'socket': socket,
                                 'plug': plug,
+                                'bottomAttr': bottomAttr,
+                                'topAttr': topAttr,
                                 'preset': preset,
                                 'dataType': dataType,
                                 'plugMaxConnections': plugMaxConnections,
@@ -1779,17 +1802,10 @@ class NodeItem(QtWidgets.QGraphicsItem):
         # Draw the attributes.
         offsetLeft = 0
         offsetRight = 0
+        nrBottomAttrs = 0
         for attr in self.attrs:
             nodzInst = self.scene().views()[0]
             config = nodzInst.config
-
-							 
-												
-																	   
-															 
-												
-
-
 
             attrData = self.attrsData[attr]
             name = attr
@@ -1799,17 +1815,32 @@ class NodeItem(QtWidgets.QGraphicsItem):
             xoffset = 0
             offset = offsetLeft
             width = (self.baseWidth - self.border)
+            height = self.attrHeight
             if attrData['plug'] and not attrData['socket']:
                 xoffset = (self.baseWidth - self.border)/2
                 offset = offsetRight
             if not (attrData['socket'] and attrData['plug']):
                 width /= 2
+                
+            if attrData['bottomAttr']:
+                #Determine width,height, xoffset, yoffset:
+                totalNrBottomAttrs = len(self.bottomAttrs)
+                width = self.baseWidth/totalNrBottomAttrs
+                height = self.attrHeight
+                xoffset = nrBottomAttrs*width
+                offset = max(offsetLeft,offsetRight)+5
+                #Increment counter
+                nrBottomAttrs += 1
+                print('Bottom attr!')
+            if attrData['topAttr']:
+                print('Top attr!')
+            
             
             # Attribute rect.
             rect = QtCore.QRect(int(self.border / 2+xoffset),
                                 int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight),
                                 int(width),
-                                int(self.attrHeight))
+                                int(height))
             # Attribute base.
             self._attrBrush.setColor(utils._convertDataToColor(config[preset]['bg']))
             if self.alternate:
@@ -1842,14 +1873,17 @@ class NodeItem(QtWidgets.QGraphicsItem):
                                      rect.height())
             
             halignment = QtCore.Qt.AlignLeft #type:ignore
-            if attrData['plug'] and not attrData['socket']:
+            if attrData['bottomAttr'] or attrData['topAttr']:
+                halignment = QtCore.Qt.AlignCenter #type:ignore
+            elif attrData['plug'] and not attrData['socket']:
                 halignment = QtCore.Qt.AlignRight #type:ignore
             painter.drawText(textRect, halignment | QtCore.Qt.AlignVCenter, name) #type:ignore
             
-            if attrData['plug'] and not attrData['socket']:
-                offsetRight += self.attrHeight
-            else:
-                offsetLeft += self.attrHeight
+            if not attrData['bottomAttr'] and not attrData['topAttr']:
+                if attrData['plug'] and not attrData['socket']:
+                    offsetRight += self.attrHeight
+                else:
+                    offsetLeft += self.attrHeight
 
     def drawTextbox(self,painter):
         # Draw rectangle
@@ -2321,7 +2355,6 @@ class PlugItem(SlotItem):
         # Remove connection
         self.connections.remove(connection)
 
-
 class SocketItem(SlotItem):
 
     """
@@ -2440,7 +2473,46 @@ class SocketItem(SlotItem):
         # Remove connections
         self.connections.remove(connection)
 
+class BottomAttrItem(PlugItem):
+    def __init__(self, parent, attribute, index, preset, dataType, maxConnections):
+        super(BottomAttrItem, self).__init__(parent, attribute, index, preset, dataType, maxConnections)
+        print('bottom attr created')
+        self.attributte = attribute
+        self.preset = preset
+        self.slotType = 'bottomAttr'
+    
+    def boundingRect(self):
+        """
+        The bounding rect based on the width and height variables.
 
+        """
+        width = height = self.parentItem().attrHeight / 2.0 #type:ignore
+
+        nodzInst = self.scene().views()[0]
+        config = nodzInst.config
+
+        #Find how many attributes the parentItem has that are BottomAttr before this index:
+        nrBottomAttrParentBeforeThis = 0
+        for attr in self.parentItem().attrs: #type:ignore
+            if self.parentItem().attrs.index(attr)<self.parentItem().attrs.index(self.attribute): #type:ignore
+                if self.parentItem().attrsData[attr]['bottomAttr']: #type:ignore
+                    nrBottomAttrParentBeforeThis += 1
+
+        totalnrBottomAttrs = len(self.parentItem().bottomAttrs)
+        distanceFromLeft = 1/(1+totalnrBottomAttrs)
+
+        x = (nrBottomAttrParentBeforeThis+1)*distanceFromLeft*self.parentItem().baseWidth
+        y = (self.parentItem().boundingRect().height()) #type:ignore
+
+        rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
+        return rect
+
+class TopAttrItem(SocketItem):
+    def __init__(self, parent, attribute, index, preset, dataType, maxConnections):
+        super().__init__(parent, attribute, index, preset, dataType, maxConnections)
+        print('top attr created')
+        self.slotType = 'topAttr'
+        
 class ConnectionItem(QtWidgets.QGraphicsPathItem):
 
     """

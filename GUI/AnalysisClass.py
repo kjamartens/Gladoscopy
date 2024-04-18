@@ -477,14 +477,12 @@ class AnalysisThread(QThread):
     """
     
     def changeStageAtFrame(self,image,metadata=None,core=None,frame=100):
-        
+        print(float(metadata['ImageNumber']))
         
         if float(metadata['ImageNumber'])>frame and self.notyetchanged == True:
             core.set_relative_position('Z',100.0)
             self.notyetchanged = False
             print('Z position changed!')
-        
-        return 0
         
     def initChangeStageAtFrame(self):
         print('Initted changestageatframe')

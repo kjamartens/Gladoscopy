@@ -1032,6 +1032,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['acquisition']['startAttributes'] = ['Acquisition start']
         self.nodeInfo['acquisition']['finishedAttributes'] = ['Finished']
         self.nodeInfo['acquisition']['dataAttributes'] = []
+        self.nodeInfo['acquisition']['bottomAttributes'] = ['A1','A2']
+        self.nodeInfo['acquisition']['topAttributes'] = []
         self.nodeInfo['acquisition']['NodeCounter'] = 0
         self.nodeInfo['acquisition']['NodeCounterNeverReset'] = 0
         self.nodeInfo['acquisition']['MaxNodeCounter'] = np.inf
@@ -1042,6 +1044,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['changeProperties']['startAttributes'] = ['Start']
         self.nodeInfo['changeProperties']['finishedAttributes'] = ['Done']
         self.nodeInfo['changeProperties']['dataAttributes'] = []
+        self.nodeInfo['changeProperties']['bottomAttributes'] = []
+        self.nodeInfo['changeProperties']['topAttributes'] = []
         self.nodeInfo['changeProperties']['NodeCounter'] = 0
         self.nodeInfo['changeProperties']['NodeCounterNeverReset'] = 0
         self.nodeInfo['changeProperties']['MaxNodeCounter'] = np.inf
@@ -1052,6 +1056,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['changeStagePos']['startAttributes'] = ['Start']
         self.nodeInfo['changeStagePos']['finishedAttributes'] = ['Done']
         self.nodeInfo['changeStagePos']['dataAttributes'] = []
+        self.nodeInfo['changeStagePos']['bottomAttributes'] = []
+        self.nodeInfo['changeStagePos']['topAttributes'] = []
         self.nodeInfo['changeStagePos']['NodeCounter'] = 0
         self.nodeInfo['changeStagePos']['NodeCounterNeverReset'] = 0
         self.nodeInfo['changeStagePos']['MaxNodeCounter'] = np.inf
@@ -1062,6 +1068,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisGrayScaleTest']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisGrayScaleTest']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisGrayScaleTest']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisGrayScaleTest']['bottomAttributes'] = []
+        self.nodeInfo['analysisGrayScaleTest']['topAttributes'] = []
         self.nodeInfo['analysisGrayScaleTest']['NodeCounter'] = 0
         self.nodeInfo['analysisGrayScaleTest']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisGrayScaleTest']['MaxNodeCounter'] = np.inf
@@ -1072,6 +1080,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisMeasurement']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisMeasurement']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisMeasurement']['bottomAttributes'] = []
+        self.nodeInfo['analysisMeasurement']['topAttributes'] = []
         self.nodeInfo['analysisMeasurement']['NodeCounter'] = 0
         self.nodeInfo['analysisMeasurement']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisMeasurement']['MaxNodeCounter'] = np.inf
@@ -1082,6 +1092,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisShapes']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisShapes']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisShapes']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisShapes']['bottomAttributes'] = []
+        self.nodeInfo['analysisShapes']['topAttributes'] = []
         self.nodeInfo['analysisShapes']['NodeCounter'] = 0
         self.nodeInfo['analysisShapes']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisShapes']['MaxNodeCounter'] = np.inf
@@ -1092,6 +1104,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['analysisImages']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisImages']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisImages']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisImages']['bottomAttributes'] = []
+        self.nodeInfo['analysisImages']['topAttributes'] = []
         self.nodeInfo['analysisImages']['NodeCounter'] = 0
         self.nodeInfo['analysisImages']['NodeCounterNeverReset'] = 0
         self.nodeInfo['analysisImages']['MaxNodeCounter'] = np.inf
@@ -1102,6 +1116,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['scoringStart']['startAttributes'] = []
         self.nodeInfo['scoringStart']['finishedAttributes'] = ['Start']
         self.nodeInfo['scoringStart']['dataAttributes'] = []
+        self.nodeInfo['scoringStart']['bottomAttributes'] = []
+        self.nodeInfo['scoringStart']['topAttributes'] = []
         self.nodeInfo['scoringStart']['NodeCounter'] = 0
         self.nodeInfo['scoringStart']['NodeCounterNeverReset'] = 0
         self.nodeInfo['scoringStart']['MaxNodeCounter'] = 1
@@ -1112,6 +1128,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
         self.nodeInfo['scoringEnd']['finishedAttributes'] = []
         self.nodeInfo['scoringEnd']['dataAttributes'] = []
+        self.nodeInfo['scoringEnd']['bottomAttributes'] = []
+        self.nodeInfo['scoringEnd']['topAttributes'] = []
         self.nodeInfo['scoringEnd']['NodeCounter'] = 0
         self.nodeInfo['scoringEnd']['NodeCounterNeverReset'] = 0
         self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
@@ -1122,6 +1140,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['onesectimer']['startAttributes'] = ['Start']
         self.nodeInfo['onesectimer']['finishedAttributes'] = ['Finished']
         self.nodeInfo['onesectimer']['dataAttributes'] = []
+        self.nodeInfo['onesectimer']['bottomAttributes'] = []
+        self.nodeInfo['onesectimer']['topAttributes'] = []
         self.nodeInfo['onesectimer']['NodeCounter'] = 0
         self.nodeInfo['onesectimer']['NodeCounterNeverReset'] = 0
         self.nodeInfo['onesectimer']['MaxNodeCounter'] = np.inf
@@ -1131,6 +1151,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['twosectimer']['startAttributes'] = ['Start']
         self.nodeInfo['twosectimer']['finishedAttributes'] = ['Finished']
         self.nodeInfo['twosectimer']['dataAttributes'] = []
+        self.nodeInfo['twosectimer']['bottomAttributes'] = []
+        self.nodeInfo['twosectimer']['topAttributes'] = []
         self.nodeInfo['twosectimer']['NodeCounter'] = 0
         self.nodeInfo['twosectimer']['NodeCounterNeverReset'] = 0
         self.nodeInfo['twosectimer']['MaxNodeCounter'] = np.inf
@@ -1140,6 +1162,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['threesectimer']['startAttributes'] = ['Start']
         self.nodeInfo['threesectimer']['finishedAttributes'] = ['Finished']
         self.nodeInfo['threesectimer']['dataAttributes'] = []
+        self.nodeInfo['threesectimer']['bottomAttributes'] = []
+        self.nodeInfo['threesectimer']['topAttributes'] = []
         self.nodeInfo['threesectimer']['NodeCounter'] = 0
         self.nodeInfo['threesectimer']['NodeCounterNeverReset'] = 0
         self.nodeInfo['threesectimer']['MaxNodeCounter'] = np.inf
@@ -1400,7 +1424,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.customDataEmits = NodeSignalManager()
         else:
             newNode.customDataEmits = None
-        
+        if len(self.nodeInfo[nodeType]['bottomAttributes']) > 0:
+            newNode.customBottomEmits = NodeSignalManager()
+        else:
+            newNode.customBottomEmits = None
+        if len(self.nodeInfo[nodeType]['topAttributes']) > 0:
+            newNode.customTopEmits = NodeSignalManager()
+        else:
+            newNode.customTopEmits = None
+            
         #Add custom attributes where necessary
         for attr in self.nodeInfo[nodeType]['startAttributes']:
             self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=True)
@@ -1411,6 +1443,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         for attr in self.nodeInfo[nodeType]['dataAttributes']:
             self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
             newNode.customDataEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['bottomAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=False, bottomAttr=True)
+            newNode.customBottomEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['topAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=False, topAttr=True)
+            newNode.customTopEmits.add_signal(attr) #type: ignore
         
         if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
             newNode.customStartEmits.print_signals() #type: ignore
