@@ -591,7 +591,7 @@ class NodeSignalManager(QObject):
         """
         for signal in self.signals:
             signal.emit()
-            print(f"emitting signal {signal}")
+            logging.debug(f"emitting signal {signal}")
 
 class flowChart_dockWidgetF(nodz_main.Nodz):
     """
@@ -749,31 +749,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         When a plug or socket is connected, this function is called. It will check if the destination
         node should be marked as 'started' or 'finished' based on the attributes connected.
         """
+        logging.info(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
         
-        print(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
-        
-        #First of all, abort if this exact connection is already made - this is called when loading the graph:
-        # srcNode = self.findNodeByName(srcNodeName)
-        # for plug in srcNode.plugs: #type:ignore
-        #     if plug == plugAttribute:
-        #         plugitem = srcNode.plugs[plug] #type:ignore
-        #         #Look at all connections
-        #         for connection in plugitem.connections:
-        #             #Check if the connection is already made
-        #             if connection.plugAttr == plugAttribute and connection.socketAttr == socketAttribute and connection.plugNode == srcNodeName and connection.socketNode == dstNodeName:
-        #                 print('skipping this!')
-        #                 return
-        
-        # sourceNode = self.findNodeByName(srcNodeName)
-        # if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
-        #     destinationNode = self.findNodeByName(dstNodeName)
-        #     #The destination node needs one extra to be started...
-        #     destinationNode.n_connect_at_start += 1 #type: ignore
-            
-        #     #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
-        #     sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
-        #     # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
-        # logging.debug(f"plug/socket connected end: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
     
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -782,19 +759,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         When a plug or socket is disconnected, this function is called. It will disconnect
         the finished event of the source node from the 'we finished one of the prerequisites' at the destination node.
         """
-        print('plugorsocketdisconnected')
-        # sourceNode = self.findNodeByName(srcNodeName)
-        # if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']:
-        #     signal = sourceNode.customFinishedEmits.signals[0] #type: ignore
-        #     try:
-        #         signal.disconnect()
-        #     except:
-        #         print('attempted to disconnect a disconnected signal')
-        
-        # destinationNode = self.findNodeByName(dstNodeName)
-        # destinationNode.n_connect_at_start -= 1 #type:ignore
-                
-        # logging.debug(f"plug/socket disconnected: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        logging.info('plugorsocketdisconnected')
     
     def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -804,11 +769,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         node should be marked as 'started' based on the attributes connected.
         """
         #Check if all are non-Nones:
-        print('plug connected')
-        # if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
-        #     return
-        # else:
-        #     self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
+        logging.info('plug connected')
 
     def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -819,12 +780,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         corresponds to the 'SocketConnected' signal from the FlowChart.
         """
         #Check if all are non-Nones:
-        print('socket connected')
-        # if any([srcNodeName is None, plugAttribute is None, dstNodeName is None, socketAttribute is None]):
-        #     return
-        # else:
-            # self.PlugOrSocketConnected(srcNodeName, plugAttribute, dstNodeName, socketAttribute)
-    
+        logging.info('socket connected')
+        
     def NodeRemoved(self,nodeNames):
         """
         Handle when one or more nodes are removed from the flowchart.
@@ -990,8 +947,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 self.update_scoring_end(currentNode,dialogLineEdits)
                 
                 self.update()
-                print(dialogLineEdits)
-                print('Pressed OK on scoringEnd')
+                logging.info(dialogLineEdits)
+                logging.info('Pressed OK on scoringEnd')
     
     def update_scoring_end(self,currentNode,dialogLineEdits):
             currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
@@ -1296,21 +1253,51 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         Args:
             QMouseevent (PyQt5.QtGui.QMouseEvent): The mouse event that triggered this context menu
         """
-        context_menu = QMenu(self)
+        #Check if we are right-clicking on a node:
+        item_at_mouse = self.scene().itemAt(self.mapToScene(QMouseevent.pos()), QtGui.QTransform())
         
-        #Dynamically add all node types
-        for node_type, node_data in self.nodeInfo.items():
-            new_subAction = QAction(node_data['displayName'], self)
-            context_menu.addAction(new_subAction)
+        if item_at_mouse == None:
+            context_menu = QMenu(self)
             
-            # Define a closure to capture the current value of node_type
-            def create_lambda(node_type):
-                return lambda _, event=QMouseevent: self.createNodeFromRightClick(event, nodeType=node_type)
-            # Connect each action to its own lambda function
-            new_subAction.triggered.connect(create_lambda(node_type))
+            #Dynamically add all node types
+            for node_type, node_data in self.nodeInfo.items():
+                new_subAction = QAction(node_data['displayName'], self)
+                context_menu.addAction(new_subAction)
+                # Define a closure to capture the current value of node_type
+                def create_lambda(node_type):
+                    return lambda _, event=QMouseevent: self.createNodeFromRightClick(event, nodeType=node_type)
+                # Connect each action to its own lambda function
+                new_subAction.triggered.connect(create_lambda(node_type))
+                
+            # Show the context menu at the event's position
+            context_menu.exec_(QMouseevent.globalPos())
+        elif item_at_mouse in self.nodes:
             
-        # Show the context menu at the event's position
-        context_menu.exec_(QMouseevent.globalPos())
+            context_menu = QMenu(self)
+            
+            #Add a change-name option
+            changeName_subAction = QAction('Change name', self)
+            context_menu.addAction(changeName_subAction)
+            def create_lambda_changeName(item_at_mouse):
+                return lambda _, event=QMouseevent: self.changeNodeName(item_at_mouse, event)
+            changeName_subAction.triggered.connect(create_lambda_changeName(item_at_mouse))
+            
+            #Add a change-color option
+            changeColor_subAction = QAction('Change color', self)
+            context_menu.addAction(changeColor_subAction)
+            def create_lambda_changeColor(item_at_mouse):
+                return lambda _, event=QMouseevent: self.changeNodeColor(item_at_mouse, event)
+            
+            changeColor_subAction.triggered.connect(create_lambda_changeColor(item_at_mouse))
+            context_menu.exec_(QMouseevent.globalPos())
+            
+            # item_at_mouse.contextMenuEvent(QMouseevent)
+
+    def changeNodeName(self, node, event):
+        print('x')
+        
+    def changeNodeColor(self, node, event):
+        print('x')
 
     def createNewNode(self, nodeType, event):
         """
@@ -1503,7 +1490,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             output = eval(evalText) #type:ignore
             
             #Display final output to the user for now
-            print(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
+            logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
             
             node.scoring_analysis_currentData['__output__'] = output
             
@@ -1511,7 +1498,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             self.finishedEmits(node)
     
     def MMstageChangeRan(self,node):
-        print('MMstageChange')
+        logging.info('MMstageChange')
         self.finishedEmits(node)
         
     def MMconfigChangeRan(self,node):
@@ -1524,7 +1511,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         Args:
             node (nodz.Node): The node that has triggered the event.
         """
-        print('MMconfigChangeRan')
+        logging.info('MMconfigChangeRan')
         #We need to change some configs (probably):
         for config_to_change in node.MMconfigInfo.config_string_storage:
             #Change the config, and wait for the config to be changed
@@ -1554,13 +1541,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Thow this into the analysis:
             
             avgGrayVal = eval(HelperFunctions.createFunctionWithKwargs("AverageIntensity.AvgGrayValue",NDTIFFStack="mdaDataobject.data",core="mdaDataobject.core"))
-            print(f"found avg gray val: {avgGrayVal}")
+            logging.info(f"found avg gray val: {avgGrayVal}")
             
         self.finishedEmits(node)
 
     def finishedEmits(self,node):
         """
-        This function emits the customFinishedEmits signal of a node.
+        This function emits the customFinishedEmits signal of a node, and allt he customDataEmits
 
         Args:
             node (nodz.Node): The node that needs to finish.
@@ -1568,13 +1555,16 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         Returns:
             None
         """
-        node.customFinishedEmits.emit_all_signals()
+        if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
+            node.customFinishedEmits.emit_all_signals()
+        if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
+            node.customDataEmits.emit_all_signals()
 
     def GraphToSignals(self):
         """Idea: we evaluate the graph at this time point, connect all signals/emits:
         
         """
-        print('graphicing to signals')
+        logging.debug('graphicing to signals')
         #Loop over all nodes:
         for node in self.nodes:
             node.n_connect_at_start = 0
@@ -1585,7 +1575,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                     #This disconnects all signals
                     signal.disconnect()
                 except:
-                    print('attempted to disconnect a disconnected signal')
+                    logging.warning('attempted to disconnect a disconnected signal')
             
         #Create all required signal connections
         currentgraph = self.evaluateGraph()
@@ -1596,30 +1586,32 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             dstNodeName = connection[1][:connection[1].rfind('.')]
             
             typeOfFinishedAttributes_of_srcNode = self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']
+            typeOfDataAttributes_of_srcNode = self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['dataAttributes']
             typeOfStartAttributes_of_dstNode = self.nodeInfo[self.nodeLookupName_withoutCounter(dstNodeName)]['startAttributes']
             
+            #Connect the finished event of the source node to the 'we finished one of the prerequisites' at the destination node
             if plugAttribute in typeOfFinishedAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
-                srcNode = self.findNodeByName(srcNodeName)#self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]
+                srcNode = self.findNodeByName(srcNodeName)
                 dstNode = self.findNodeByName(dstNodeName)
                 #The destination node needs one extra to be started...
                 dstNode.n_connect_at_start += 1 #type: ignore
                 
                 #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
                 srcNode.customFinishedEmits.signals[0].connect(dstNode.oneConnectionAtStartIsFinished) #type: ignore
-                print(f"connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+                
+                logging.info(f"connected Finish {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+            #Same for data
+            elif plugAttribute in typeOfDataAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
+                srcNode = self.findNodeByName(srcNodeName)
+                dstNode = self.findNodeByName(dstNodeName)
+                #The destination node needs one extra to be started...
+                dstNode.n_connect_at_start += 1 #type: ignore
+                
+                #And the finished event of the source node is connected to the 'we gave data' at the destination node
+                srcNode.customDataEmits.signals[0].connect(dstNode.oneConnectionAtStartProvidesData) #type: ignore
+                logging.info(f"connected Data {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
             else:
-                print(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
-        
-        scoringEndNode = self.findNodeByName('scoringEnd_0')
-        
-        # if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
-        #     destinationNode = self.findNodeByName(dstNodeName)
-        #     #The destination node needs one extra to be started...
-        #     destinationNode.n_connect_at_start += 1 #type: ignore
-            
-        #     #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
-        #     sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
-        #     # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
+                logging.warning(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
     
     def scoringStart(self,node):
         """
