@@ -875,7 +875,7 @@ class MDAGlados(CustomMainWindow):
         self.core.set_exposure(self.exposure_ms)
         
         #Set the location where to save the mda
-        self.shared_data._mdaModeSaveLoc = [self.storageFolder,self.storageFileName]
+        self.shared_data._mdaModeSaveLoc = [self.storage_folder,self.storage_file_name]
         #Set whether the napariviewer should (also) try to connect to the mda
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
@@ -915,8 +915,8 @@ class MDAGlados(CustomMainWindow):
             self.order = self.orderDropdown.currentText()
         
         if self.storageGroupBox.isEnabled():
-            self.storageFolder = self.storageFolderEntry.text()
-            self.storageFileName = self.storageFileNameEntry.text()
+            self.storage_folder = self.storageFolderEntry.text()
+            self.storage_file_name = self.storageFileNameEntry.text()
         
         if self.zGroupBox.isEnabled():
             try:
