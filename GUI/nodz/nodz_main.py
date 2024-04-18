@@ -26,6 +26,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
     signal_NodeCreated = QtCore.pyqtSignal(object)
     signal_NodeCreatedNodeItself = QtCore.pyqtSignal(object)
+    signal_NodeFullyInitialisedNodeItself = QtCore.pyqtSignal(object)
     signal_NodeDeleted = QtCore.pyqtSignal(object)
     signal_NodeEdited = QtCore.pyqtSignal(object, object)
     signal_NodeSelected = QtCore.pyqtSignal(object)
@@ -867,6 +868,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_SCORING_ANALYSIS'] = dict()
         data['NODES_SCORING_VISUALISATION'] = dict()
         data['NODES_SCORING_SCORING'] = dict()
+        data['NODES_SCORING_END'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -927,7 +929,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'scoring_scoring_currentData' in vars(nodeInst):
                 if nodeInst.scoring_scoring_currentData is not None:
                     data['NODES_SCORING_SCORING'][node] = nodeInst.scoring_scoring_currentData
-                    
+
+            data['NODES_SCORING_END'][node] = {}
+            if 'scoring_end_currentData' in vars(nodeInst):
+                if nodeInst.scoring_end_currentData['Variables'] is not None:
+                    data['NODES_SCORING_END'][node] = nodeInst.scoring_end_currentData
 
             attrs = nodeInst.attrs
             for attr in attrs:
@@ -1058,6 +1064,15 @@ class Nodz(QtWidgets.QGraphicsView):
                     if data['NODES_SCORING_SCORING'] is not None:
                         node.scoring_scoring_currentData = data['NODES_SCORING_SCORING'][name] #type:ignore
                         
+            
+            if name in data['NODES_SCORING_END']:
+                if 'scoring_end_currentData' in vars(node):
+                    if len(data['NODES_SCORING_END'][name]['Variables']) > 0:
+                        node.scoring_end_currentData = data['NODES_SCORING_END'][name] #type:ignore
+            
+            
+            #Do an emit after full loading:
+            self.signal_NodeFullyInitialisedNodeItself.emit(node)
             allNodes.append(node)
             
         self.scene().update()

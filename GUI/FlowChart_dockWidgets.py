@@ -653,6 +653,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Connect required deleted/double clicked signals
         self.signal_NodeDeleted.connect(self.NodeRemoved)
         self.signal_NodeCreatedNodeItself.connect(self.NodeAdded)
+        self.signal_NodeFullyInitialisedNodeItself.connect(self.NodeFullyInitialised)
         self.signal_NodeDoubleClicked.connect(self.NodeDoubleClicked)
         self.signal_PlugConnected.connect(self.PlugConnected)
         self.signal_PlugDisconnected.connect(self.PlugOrSocketDisconnected)
@@ -845,6 +846,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             except:
                 print(f"failed to remove node: {nodeName}")
     
+    def NodeFullyInitialised(self,node):
+        nodeType = self.nodeLookupName_withoutCounter(node.name)
+        if nodeType == 'scoringEnd':
+            self.update_scoring_end(node,node.scoring_end_currentData['Variables'])
+    
     def NodeAdded(self,node):
         """
         Handle when one or more nodes are created in the flowchart.
@@ -912,27 +918,52 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 dialogLineEdits = []
                 for lineEdit in dialog.lineEdits:
                     dialogLineEdits.append(lineEdit.text())
-                currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
+                self.update_scoring_end(currentNode,dialogLineEdits)
                 
-                #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
-                import time
+                self.update()
+                print(dialogLineEdits)
+                print('Pressed OK on scoringEnd')
+    
+    def update_scoring_end(self,currentNode,dialogLineEdits):
+            currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
+            
+            #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
+            import time
+            
+            current_sockets = [item[0] for item in list(currentNode.sockets.items())]
+            if dialogLineEdits != current_sockets:
+                
                 #We loop over the sockets:
                 for socket_id in reversed(range(len(currentNode.sockets))):
                     socketFull = list(currentNode.sockets.items())[socket_id]
-                    socket_new = socketFull[0]
+                    socket = socketFull[0]
                     #We check if the socket is in dialogLineEdits:
-                    if socket_new not in dialogLineEdits:
+                    if socket not in dialogLineEdits:
                         #If it isn't, we just delete it:
                         self.deleteAttribute(currentNode,socket_id)
                         self.update()
                         time.sleep(0.05)
                 
-                # #Then we create new sockets or move existing sockets:
-                # for socket_new in list(reversed(dialogLineEdits)):
                 
-                    pos_in_dialogLineEdits = socket_id
+                #Check which are different (index-wise) between dialogLineEdits and current_sockets:
+                diff_indexes = []
+                same_indexes = []
+                for i in range(min(len(dialogLineEdits),len(current_sockets))):
+                    if dialogLineEdits[i] != current_sockets[i]:
+                        diff_indexes.append(i)
+                    else:
+                        same_indexes.append(i)
+                #Also append indexes if dialogLineEdits is longer than current_sockets:
+                if len(dialogLineEdits) > len(current_sockets):
+                    for i in range(len(current_sockets),len(dialogLineEdits)):
+                        diff_indexes.append(i)
+                
+                offset = 100
+                #Then we create new sockets or move existing sockets, only for those that have a different pos
+                for socket_new in ([dialogLineEdits[i] for i in diff_indexes]):
+                    pos_in_dialogLineEdits = dialogLineEdits.index(socket_new)
                     if socket_new not in currentNode.sockets:
-                        self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
+                        self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits+offset, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
                         self.update()
                         time.sleep(0.05)
                     else: #Else we move it from some other location to where we want it
@@ -941,13 +972,18 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                         pos_in_node_info = [socket_id for socket_id in range(len(socketFull)) if socketFull[socket_id][0] == socket_new][0]
                         old_pos = socketFull[pos_in_node_info][1].index
                         #Physically move it
-                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits)
+                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits+offset)
                         self.update()
                         time.sleep(0.05)
-                
-                self.update()
-                print(dialogLineEdits)
-                print('Pressed OK on scoringEnd')
+            
+            #We loop over the sockets:
+            # for socket_id in (range(len(currentNode.sockets))):
+            #     socketFull = list(currentNode.sockets.items())[socket_id]
+            #     socket = socketFull[0]
+            #     self.editAttribute(currentNode,socket_id,newName = None, newIndex=socket_id-offset)
+            
+            #We also need to add these attributes to the nodes startAttributes in self.nodeInfo:
+            self.nodeInfo[self.nodeLookupName_withoutCounter(currentNode.name)]['startAttributes'] = dialogLineEdits
     
     def defineNodeInfo(self):
         """
@@ -1400,6 +1436,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Display final output to the user for now
             print(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
             
+            node.scoring_analysis_currentData['__output__'] = output
+            
             #Finish up
             self.finishedEmits(node)
     
@@ -1471,12 +1509,14 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Loop over all nodes:
         for node in self.nodes:
             node.n_connect_at_start = 0
-            signal = node.customFinishedEmits.signals[0] #type: ignore
-            try:
-                #This disconnects all signals
-                signal.disconnect()
-            except:
-                print('attempted to disconnect a disconnected signal')
+            #Disconnect all signals, but only if there are any
+            if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
+                signal = node.customFinishedEmits.signals[0] #type: ignore
+                try:
+                    #This disconnects all signals
+                    signal.disconnect()
+                except:
+                    print('attempted to disconnect a disconnected signal')
             
         #Create all required signal connections
         currentgraph = self.evaluateGraph()
@@ -1500,7 +1540,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 print(f"connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
             else:
                 print(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
-            
+        
+        scoringEndNode = self.findNodeByName('scoringEnd_0')
         
         # if plugAttribute in self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']: 
         #     destinationNode = self.findNodeByName(dstNodeName)
@@ -1510,6 +1551,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #     #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
         #     sourceNode.customFinishedEmits.signals[0].connect(destinationNode.oneConnectionAtStartIsFinished) #type: ignore
         #     # sourceNode.customFinishedEmits.signals[0].connect(lambda: destinationNode.oneConnectionAtStartIsFinished) #type: ignore
+    
     def scoringStart(self,node):
         """
         This function is the action function for the Scoring Start node in the Flowchart.
@@ -1541,6 +1583,22 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         Returns:
             None
         """
+        
+        
+        #Find the nodes that are connected downstream of this:
+        data = {}
+        for attr in node.attrs:
+            connectedNode = None
+            for connection in self.evaluateGraph():
+                if connection[1][connection[1].rfind('.')+1:] == attr:
+                    if connection[1][:connection[1].rfind('.')] == node.name:
+                        connectedNodeName = connection[0][:connection[0].rfind('.')]
+                        connectedNode = self.findNodeByName(connectedNodeName)
+        
+            data[attr] = connectedNode.scoring_analysis_currentData['__output__']
+            print(f"Data found for {attr}: {data[attr]}")
+        
+        
         print('Scoring finished fully!')
         print('----------------------')
         # self.finishedEmits(node)
@@ -1593,6 +1651,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         print(node)
         print(f"node name: {node.name}")
         print(f"incoming connections: {node.n_connect_at_start}" )
+        if 'scoringEnd' in node.name:
+            print('hi')
         # print(f"outgoing connections - finished: {node.connectedToFinish}")
         # print(f"outgoing connections - data: {node.connectedToData}")
 
