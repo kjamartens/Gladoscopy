@@ -8,7 +8,7 @@ def cleanUpTemporaryFiles(mainFolder='./'):
     for folder in os.listdir(os.path.join(mainFolder,'temp')):
         if 'LiveAcqShouldBeRemoved' in folder:
             try:
-                shutil.rmtree(os.path.join(os.path.join(folder,'temp'), folder))
+                shutil.rmtree(os.path.join(mainFolder,os.path.join('temp',folder)))
             except:
                 pass
 
