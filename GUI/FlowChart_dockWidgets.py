@@ -6,7 +6,7 @@ import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
 from MMcontrols import MMConfigUI, ConfigInfo
 from MDAGlados import MDAGlados
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QWidget, QTabWidget, QMenu, QAction, QColorDialog
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QGridLayout, QPushButton
@@ -1287,9 +1287,52 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             context_menu.addAction(changeColor_subAction)
             def create_lambda_changeColor(item_at_mouse):
                 return lambda _, event=QMouseevent: self.changeNodeColor(item_at_mouse, event)
-            
             changeColor_subAction.triggered.connect(create_lambda_changeColor(item_at_mouse))
+            
+            #Add a advanced-info option
+            advNodeInfo_subAction = QAction('Advanced Node info', self)
+            context_menu.addAction(advNodeInfo_subAction)
+            def create_lambda_advNodeInfo(item_at_mouse):
+                return lambda _, event=QMouseevent: self.advNodeInfo(item_at_mouse, event)
+            advNodeInfo_subAction.triggered.connect(create_lambda_advNodeInfo(item_at_mouse))
+            
             context_menu.exec_(QMouseevent.globalPos())
+
+    def advNodeInfo(self,node,event):
+        #Create a quick popup window with a line edit and an ok/cancel:
+        dialog = QDialog()
+        dialog.setWindowTitle('Node info')
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+
+        
+        textEdit = QTextEdit()
+        
+        attrs_to_show = ['name','displayName','nodePreset','plugs','sockets','scoring_analysis_currentData','scoring_end_currentData','scoring_scoring_currentData','scoring_visualisation_currentData']
+        text_to_show = ''
+        for attr in attrs_to_show:
+            if hasattr(node,attr):
+                text_to_show += f'{attr}: {str(getattr(node,attr))}\n'
+        
+        #Custom add these ones:
+        if hasattr(node,'mdaData'):
+            if hasattr(node.mdaData,'mda'):
+                text_to_show += f'mda: {str(node.mdaData.mda)}\n'
+        if hasattr(node,'MMconfigInfo'):
+            if hasattr(node.MMconfigInfo,'config_string_storage'):
+                text_to_show += f'config_string_storage: {str(node.MMconfigInfo.config_string_storage)}\n'
+        
+        textEdit.setText(text_to_show)
+        layout.addWidget(textEdit)
+
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok, dialog)
+        layout.addWidget(buttonBox)
+
+        buttonBox.accepted.connect(dialog.accept)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            logging.debug('advanced node info closed')
+
 
     def changeNodeName(self, node, event):
         #Create a quick popup window with a line edit and an ok/cancel:
