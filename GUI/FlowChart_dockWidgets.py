@@ -906,7 +906,27 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
             for i in range(len(optKwValues)):
                 displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
-            
+        elif nodeType == 'acquisition':
+            displayHTMLtext = f"<b>{len(dialog.getInputs())} frames with order {dialog.mdaconfig.order}</b>"
+            if dialog.mdaconfig.GUI_exposure_enabled:
+                displayHTMLtext += f"<br>{dialog.getExposureTime()} ms exposure time"
+            if dialog.mdaconfig.GUI_show_time:
+                displayHTMLtext += f"<br>{dialog.mdaconfig.num_time_points} time points"
+            if dialog.mdaconfig.GUI_show_channel:
+                displayHTMLtext += f"<br>{len(dialog.mdaconfig.channel_exposures_ms)} channels in group {dialog.mdaconfig.channel_group}"
+            if dialog.mdaconfig.GUI_show_xy:
+                displayHTMLtext += f"<br>{len(dialog.mdaconfig.xy_positions)} XY positions"
+            if dialog.mdaconfig.GUI_show_z:
+                if dialog.mdaconfig.z_nr_steps is not None:
+                    displayHTMLtext += f"<br>{dialog.mdaconfig.z_nr_steps} Z positions"
+                else:
+                    nrZsteps = (dialog.mdaconfig.z_end-dialog.mdaconfig.z_start)//dialog.mdaconfig.z_step_distance
+                    displayHTMLtext += f"<br>{nrZsteps} Z positions"
+        elif nodeType == 'changeProperties':
+            displayHTMLtext = f"Changing {len(dialog.ConfigsToBeChanged())} config(s):"
+            for config in dialog.ConfigsToBeChanged():
+                displayHTMLtext += f"<br>{config[0]} to {config[1]}"
+        #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
     
     def NodeDoubleClicked(self,nodeName):
@@ -920,6 +940,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         if 'acquisition' in nodeName:
             dialog = nodz_openMDADialog(parentData=self,currentNode = currentNode)
             if dialog.exec_() == QDialog.Accepted:
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'acquisition')
                 logging.debug(f"MDA dialog input: {dialog.getInputs()}")
             
             # currentNode.mdaData.exposure_ms = dialog.getExposureTime()
@@ -931,13 +952,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 if attrs not in attrs_to_not_copy:
                     setattr(currentNode.mdaData,attrs,getattr(dialogmdaData,attrs)) #type:ignore
             
-            currentNode.displayText = str(dialog.getInputs())#type:ignore
             currentNode.update() #type:ignore
         elif 'changeProperties' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #Show dialog:
             dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
                 #Update the results of this dialog into the nodz node
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
         elif 'changeStagePos' in nodeName:

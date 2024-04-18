@@ -952,10 +952,10 @@ class MDAGlados(CustomMainWindow):
                     self.z_step_distance = float(self.z_stepdistance_entry.text())
                     self.z_nr_steps = None
                     if self.z_start < self.z_end:
-                        if self.z_step > 0:
+                        if self.z_step < 0:
                             self.z_step*=-1
                     elif self.z_start > self.z_end:
-                        if self.z_step < 0:
+                        if self.z_step > 0:
                             self.z_step*=-1
                 else:
                     self.z_step = None
