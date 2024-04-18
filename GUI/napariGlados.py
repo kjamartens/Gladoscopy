@@ -174,7 +174,7 @@ class napariHandler():
                 #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                 logging.debug('starting MDA acq')
                 savefolder = './temp'
-                savename = 'MdaAcq'
+                savename = 'MdaAcqShouldBeRemoved'
                 if shared_data._mdaModeSaveLoc[0] != '':
                     savefolder = shared_data._mdaModeSaveLoc[0]
                 if shared_data._mdaModeSaveLoc[1] != '':
