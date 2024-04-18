@@ -947,6 +947,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 self.update_scoring_end(currentNode,dialogLineEdits)
                 
                 self.update()
+                nodeType = self.nodeLookupName_withoutCounter(nodeName)
+                self.updateNumberStartFinishedDataAttributes(currentNode,nodeType)
                 logging.info(dialogLineEdits)
                 logging.info('Pressed OK on scoringEnd')
     
@@ -1384,6 +1386,41 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         #Do post-node-creation functions - does this via the pyqtsignal!
     
+    def updateNumberStartFinishedDataAttributes(self,newNode,nodeType):
+        
+        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
+            newNode.customStartEmits = NodeSignalManager()
+        else:
+            newNode.customStartEmits = None
+        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
+            newNode.customFinishedEmits = NodeSignalManager()
+        else:
+            newNode.customFinishedEmits = None
+        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
+            newNode.customDataEmits = NodeSignalManager()
+        else:
+            newNode.customDataEmits = None
+        
+        #Add custom attributes where necessary
+        for attr in self.nodeInfo[nodeType]['startAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=True)
+            newNode.customStartEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['finishedAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
+            newNode.customFinishedEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['dataAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
+            newNode.customDataEmits.add_signal(attr) #type: ignore
+        
+        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
+            newNode.customStartEmits.print_signals() #type: ignore
+        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
+            newNode.customFinishedEmits.print_signals() #type: ignore
+        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
+            newNode.customDataEmits.print_signals()  #type: ignore
+        
+        logging.debug("updated custom attributes")
+    
     def performPostNodeCreation_Start(self,newNode,nodeType):
         """
         Handles post-node-creation functions for nodes.
@@ -1423,37 +1460,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         self.nodes.append(newNode)
         
-        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
-            newNode.customStartEmits = NodeSignalManager()
-        else:
-            newNode.customStartEmits = None
-        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
-            newNode.customFinishedEmits = NodeSignalManager()
-        else:
-            newNode.customFinishedEmits = None
-        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
-            newNode.customDataEmits = NodeSignalManager()
-        else:
-            newNode.customDataEmits = None
+        self.updateNumberStartFinishedDataAttributes(newNode,nodeType)
         
-        #Add custom attributes where necessary
-        for attr in self.nodeInfo[nodeType]['startAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=True)
-            newNode.customStartEmits.add_signal(attr) #type: ignore
-        for attr in self.nodeInfo[nodeType]['finishedAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
-            newNode.customFinishedEmits.add_signal(attr) #type: ignore
-        for attr in self.nodeInfo[nodeType]['dataAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
-            newNode.customDataEmits.add_signal(attr) #type: ignore
-        
-        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
-            newNode.customStartEmits.print_signals() #type: ignore
-        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
-            newNode.customFinishedEmits.print_signals() #type: ignore
-        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
-            newNode.customDataEmits.print_signals()  #type: ignore
-            
         #Custom functions that should be done
         if nodeType == 'acquisition':
             #Attach a MDA data to this node
@@ -1630,9 +1638,17 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Loop over all nodes:
         for node in self.nodes:
             node.n_connect_at_start = 0
+            node.n_connect_at_start_finished = 0
             #Disconnect all signals, but only if there are any
             if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
                 signal = node.customFinishedEmits.signals[0] #type: ignore
+                try:
+                    #This disconnects all signals
+                    signal.disconnect()
+                except:
+                    logging.warning('attempted to disconnect a disconnected signal')
+            if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
+                signal = node.customDataEmits.signals[0] #type: ignore
                 try:
                     #This disconnects all signals
                     signal.disconnect()
@@ -1718,8 +1734,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                         connectedNodeName = connection[0][:connection[0].rfind('.')]
                         connectedNode = self.findNodeByName(connectedNodeName)
         
-            data[attr] = connectedNode.scoring_analysis_currentData['__output__']
-            print(f"Data found for {attr}: {data[attr]}")
+                    data[attr] = connectedNode.scoring_analysis_currentData['__output__']
+                    print(f"Data found for {attr}: {data[attr]}")
         
         
         print('Scoring finished fully!')
