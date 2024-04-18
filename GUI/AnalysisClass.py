@@ -448,8 +448,8 @@ class AnalysisThread(QThread):
                     self.visualiseGrayScaleImageOverlay(analysis_result=analysis_result,metadata=metadata)
                 elif self.analysisInfo == 'CellSegmentOverlay':
                     self.visualiseCellSegmentOverlay(analysis_result=analysis_result,metadata=metadata)
-                else:
-                    self.visualiseRandomOverlay()
+                # else:
+                #     self.visualiseRandomOverlay()
     
     def outlineCoordinatesToImage(self,coords):
     # Create a blank grayscale image with a white background
@@ -565,12 +565,16 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
         
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal
-    analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo,analysisQueue=image_queue_analysis)
+    if analysisInfo == 'ChangeStageAtFrame':
+        delay = 0
+    else:
+        delay = 500
+    analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo,analysisQueue=image_queue_analysis,sleepTimeMs = delay)
     analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
     analysis_thread.finished.connect(analysis_thread.deleteLater)
     analysis_thread.start()
     
     #Append it to the list of analysisThreads
     shared_data.analysisThreads.append(analysis_thread)
-     
+    
     return analysis_thread 
