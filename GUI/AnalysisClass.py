@@ -404,6 +404,8 @@ class AnalysisThread(QThread):
                 #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
                 if self.analysisInfo == 'AvgGrayValueText':
                     analysisResult = self.calcAnalysisAvgGrayValue(image,metadata=metadata)
+                elif self.analysisInfo == 'ChangeStageAtFrame':
+                    analysisResult = self.changeStageAtFrame(image,metadata=metadata,core=self.shared_data.core,frame=500)
                 elif self.analysisInfo == 'GrayValueOverlay':
                     analysisResult = self.calcGrayValueOverlay(image,metadata=metadata)
                 elif self.analysisInfo == 'CellSegmentOverlay':
@@ -428,6 +430,8 @@ class AnalysisThread(QThread):
             self.initGrayScaleImageOverlay()
         elif self.analysisInfo == 'CellSegmentOverlay':
             self.initCellSegmentOverlay()
+        elif self.analysisInfo == 'ChangeStageAtFrame':
+            self.initChangeStageAtFrame()
         else:
             self.initRandomOverlay()
             
@@ -467,6 +471,24 @@ class AnalysisThread(QThread):
         # Convert the image to grayscale mode (L)
         grayscale_image = image.convert("L")
         return np.fliplr(np.rot90(np.array(grayscale_image),k=3))
+    
+    """
+    Testing updating a stage during acq
+    """
+    
+    def changeStageAtFrame(self,image,metadata=None,core=None,frame=100):
+        
+        
+        if float(metadata['ImageNumber'])>frame and self.notyetchanged == True:
+            core.set_relative_position('Z',100.0)
+            self.notyetchanged = False
+            print('Z position changed!')
+        
+        return 0
+        
+    def initChangeStageAtFrame(self):
+        print('Initted changestageatframe')
+        self.notyetchanged = True
     
     """
     Average gray value calculation and display
