@@ -877,10 +877,11 @@ class Nodz(QtWidgets.QGraphicsView):
             nodeAlternate = nodeInst.alternate
 
             data['NODES'][node] = {'preset': preset,
-                                   'position': [nodeInst.pos().x(), nodeInst.pos().y()],
-                                   'alternate': nodeAlternate,
-                                   'attributes': [],
-                                   'textbox_text': nodeInst.textbox.toPlainText()}
+                                'position': [nodeInst.pos().x(), nodeInst.pos().y()],
+                                'alternate': nodeAlternate,
+                                'attributes': [],
+                                'textbox_text': nodeInst.textbox.toHtml(),
+                                'textboxheight': nodeInst.textboxheight}
 
             import numpy
             def convert_to_string(obj):
@@ -1020,6 +1021,7 @@ class Nodz(QtWidgets.QGraphicsView):
                                 position=position,
                                 alternate=alternate, skipCreateNodeSignal=False,
                                 displayText=nodesData[name]['textbox_text'],createdFromNodzLoading=True)
+            node.textboxheight = nodesData[name]['textboxheight']
             
             #Restore MDA data
             if name in data['NODES_MDA']:
@@ -1413,6 +1415,23 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.textbox_exists = textbox
         self.textboxheight = 50
         self.mdaData = None
+
+    def updateDisplayText(self,new_display_text):
+        
+        
+        h = self.textboxheight
+        
+        td = QTextDocument()
+        textToDisplay = ''
+        if new_display_text is not None:
+            textToDisplay = new_display_text
+        td.setHtml(textToDisplay)
+                
+        #Change the textbox height so the text fits, capped at 300 px
+        self.textboxheight = int(min(300,max(50,td.size().height())))
+        self.update()
+        
+        self.scene().parent().editNodeDisplayText(self, newDisplayText=new_display_text)
 
     def changeName(self,new_name):
         if new_name != self.name:
@@ -1827,15 +1846,13 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         td = QTextDocument()
         textToDisplay = ''
-        if self.nodePreset is not None:
-            textToDisplay = textToDisplay+self.nodePreset
-            if self.nodePreset == 'node_imaging':
-                textToDisplay = textToDisplay+"<br><img src=\"GUI\\nodz\\nodz2.png\" width=\"50\" height = \"50\">"
+        # if self.nodePreset is not None:
+        #     textToDisplay = textToDisplay+self.nodePreset
+        #     if self.nodePreset == 'node_imaging':
+        #         textToDisplay = textToDisplay+"<br><img src=\"GUI\\nodz\\nodz2.png\" width=\"50\" height = \"50\">"
         if self.displayText is not None:
-            textToDisplay = textToDisplay+" "+self.displayText
+            textToDisplay = self.displayText
         
-
-            
         td.setHtml(textToDisplay)
         ctx = QAbstractTextDocumentLayout.PaintContext()
         ctx.clip = QRectF(0,0, w, h)

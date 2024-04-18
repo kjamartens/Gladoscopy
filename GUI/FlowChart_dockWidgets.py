@@ -875,6 +875,40 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         nodeType = self.nodeLookupName_withoutCounter(node.name)
         self.performPostNodeCreation_Start(node,nodeType)
     
+    def set_readable_text_after_dialogChange(self,currentNode,dialog,nodeType):
+        """Script which sets a readable text inside the textfield of the currentNode after a dialog is closed (i.e. a popup window is closed).
+
+        Args:
+            currentNode (Nodz Node): Current Nodz Node
+            dialog (QDialog): Dialog output
+            nodeType (str): Type of node
+        """
+        displayHTMLtext = ''
+        if nodeType == 'analysisMeasurement':
+            methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
+            methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
+            reqKwValues = []
+            optKwValues = []
+            
+            reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
+            optKwargs = utils.optKwargsFromFunction(methodFunctionName)
+            
+            for key in dialog.currentData:
+                for rkw in reqKwargs:
+                    if rkw in key and '#'+methodFunctionName+'#' in key:
+                        reqKwValues.append(dialog.currentData[key])
+                for okw in optKwargs:
+                    if okw in key and '#'+methodFunctionName+'#' in key:
+                        optKwValues.append(dialog.currentData[key])
+            
+            displayHTMLtext = f"<b>{methodName}</b>"
+            for i in range(len(reqKwValues)):
+                displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
+            for i in range(len(optKwValues)):
+                displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+            
+        currentNode.updateDisplayText(displayHTMLtext)
+    
     def NodeDoubleClicked(self,nodeName):
         """
         Handle double-clicking on a node in the flowchart.
@@ -920,6 +954,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 currentNode.scoring_analysis_currentData = dialog.currentData
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
                 logging.info('Pressed OK on analysisMeasurementDialog')
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
