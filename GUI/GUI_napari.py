@@ -1,5 +1,5 @@
 from pycromanager import Core
-from pycromanager import start_headless, stop_headless
+from pycromanager import start_headless
 import os
 import json
 import sys
