@@ -1513,9 +1513,11 @@ class NodeItem(QtWidgets.QGraphicsItem):
         if self.attrCount > 0:
             return (self.baseHeight +
                     self.attrHeight * max(nrSocketAttrs, nrPlugAttrs) +
+                    (1 if nrBottomAttrs >= 1 else 0) * self.bottomAttrHeight +
                     self.border +
                     0.5 * self.radius + 
-                    self.textbox_exists * self.textboxheight)
+                    self.textbox_exists * self.textboxheight +
+                    -10)
         else:
             return self.baseHeight
 
@@ -1543,6 +1545,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.baseWidth  = config['node_width']
         self.baseHeight = config['node_height']
         self.attrHeight = config['node_attr_height']
+        self.bottomAttrHeight = self.attrHeight*.8
         self.border = config['node_border']
         self.radius = config['node_radius']
 
@@ -1823,36 +1826,69 @@ class NodeItem(QtWidgets.QGraphicsItem):
                 width /= 2
                 
             if attrData['bottomAttr']:
+                bottomAttrOffset = 17
                 #Determine width,height, xoffset, yoffset:
                 totalNrBottomAttrs = len(self.bottomAttrs)
-                width = self.baseWidth/totalNrBottomAttrs
-                height = self.attrHeight
-                xoffset = nrBottomAttrs*width
+                width = (self.baseWidth - 2*self.border)/totalNrBottomAttrs-bottomAttrOffset
+                height = self.bottomAttrHeight
+                xmidpoint = (nrBottomAttrs/totalNrBottomAttrs+(1/totalNrBottomAttrs)/2)*self.baseWidth
+                xoffset = xmidpoint - width/2
+                # xoffset = nrBottomAttrs*(self.baseWidth/totalNrBottomAttrs)+bottomAttrOffset/2
                 offset = max(offsetLeft,offsetRight)+5
                 #Increment counter
                 nrBottomAttrs += 1
-                print('Bottom attr!')
             if attrData['topAttr']:
                 print('Top attr!')
             
+            if not attrData['bottomAttr']:
+                # Attribute rect.
+                rect = QtCore.QRect(int(self.border / 2+xoffset),
+                                    int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight),
+                                    int(width),
+                                    int(height))
+                # Attribute base.
+                
+                self._attrBrush.setColor(utils._convertDataToColor(self.config[self.nodePreset]['bg']).darker(175))
+                if self.alternate:
+                    self._attrBrushAlt.setColor(utils._convertDataToColor(self.config[self.nodePreset]['bg']).darker(225))
+                # self._attrBrush.setColor(utils._convertDataToColor(config[preset]['bg']))
+                # if self.alternate:
+                #     self._attrBrushAlt.setColor(utils._convertDataToColor(config[preset]['bg'], True, config['alternate_value']))
+
+                self._attrPen.setColor(utils._convertDataToColor([0, 0, 0, 0]))
+                painter.setPen(self._attrPen)
+                if attrData['socket']:
+                    painter.setBrush(self._attrBrush)
+                    if (offset / self.attrHeight) % 2:
+                        painter.setBrush(self._attrBrushAlt)
+                elif attrData['plug']:
+                    painter.setBrush(self._attrBrushAlt)
+                    if (offset / self.attrHeight) % 2:
+                        painter.setBrush(self._attrBrush)
+                else:
+                    painter.setBrush(self._attrBrush)
+                painter.drawRect(rect)
             
-            # Attribute rect.
-            rect = QtCore.QRect(int(self.border / 2+xoffset),
-                                int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight),
-                                int(width),
-                                int(height))
-            # Attribute base.
-            self._attrBrush.setColor(utils._convertDataToColor(config[preset]['bg']))
-            if self.alternate:
-                self._attrBrushAlt.setColor(utils._convertDataToColor(config[preset]['bg'], True, config['alternate_value']))
-
-            self._attrPen.setColor(utils._convertDataToColor([0, 0, 0, 0]))
-            painter.setPen(self._attrPen)
-            painter.setBrush(self._attrBrush)
-            if (offset / self.attrHeight) % 2:
-                painter.setBrush(self._attrBrushAlt)
-
-            painter.drawRect(rect)
+            elif attrData['bottomAttr']:
+                self._attrBrush.setColor(utils._convertDataToColor(self.config[self.nodePreset]['bg']).darker(175))
+                painter.setBrush(self._attrBrush)
+                
+                self._attrPen.setColor(utils._convertDataToColor([0, 0, 0, 0]))
+                painter.setPen(self._attrPen)
+                    
+                painter.drawRoundedRect(
+                                    int(self.border / 2+xoffset),
+                                    int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight)+10,
+                                    int(width),
+                                    int(height),
+                                    int(0),
+                                    int(0))
+                
+                #Create a rect to later draw the text, but we don't draw this rect...
+                rect = QtCore.QRect(int(self.border / 2+xoffset),
+                                    int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight)+10,
+                                    int(width),
+                                    int(height))
 
             # Attribute label.
             painter.setPen(utils._convertDataToColor(config[preset]['text']))
@@ -1868,22 +1904,46 @@ class NodeItem(QtWidgets.QGraphicsItem):
                         painter.setPen(utils._convertDataToColor(config['non_connectable_color']))
 
             textRect = QtCore.QRect(rect.left() + self.radius,
-                                     rect.top(),
-                                     rect.width() - 2*self.radius,
-                                     rect.height())
+                                    rect.top(),
+                                    rect.width() - 2*self.radius,
+                                    rect.height())
             
             halignment = QtCore.Qt.AlignLeft #type:ignore
-            if attrData['bottomAttr'] or attrData['topAttr']:
+            valignment = QtCore.Qt.AlignVCenter #type:ignore
+            if attrData['bottomAttr']:
                 halignment = QtCore.Qt.AlignCenter #type:ignore
+                valignment = QtCore.Qt.AlignTop #type:ignore
+                textRect = QtCore.QRect(rect.left() + self.radius,
+                                    rect.top()-3,
+                                    rect.width() - 2*self.radius,
+                                    rect.height())
             elif attrData['plug'] and not attrData['socket']:
                 halignment = QtCore.Qt.AlignRight #type:ignore
-            painter.drawText(textRect, halignment | QtCore.Qt.AlignVCenter, name) #type:ignore
+                valignment = QtCore.Qt.AlignVCenter #type:ignore
+            painter.drawText(textRect, halignment | valignment, name) #type:ignore
             
             if not attrData['bottomAttr'] and not attrData['topAttr']:
                 if attrData['plug'] and not attrData['socket']:
                     offsetRight += self.attrHeight
                 else:
                     offsetLeft += self.attrHeight
+                    
+                    
+        #At the end: draw the nodz again, but only the border:
+        
+        self.painter = painter
+        # Node base.
+        brush2 = QtGui.QBrush()
+        brush2.setColor(utils._convertDataToColor([0, 0, 0, 0]))
+        painter.setBrush(brush2)
+        painter.setPen(self.pen)
+
+        painter.drawRoundedRect(0, 0,
+                                int(self.baseWidth),
+                                int(self.height),
+                                int(self.radius),
+                                int(self.radius))
+        
 
     def drawTextbox(self,painter):
         # Draw rectangle
@@ -2499,10 +2559,10 @@ class BottomAttrItem(PlugItem):
                     nrBottomAttrParentBeforeThis += 1
 
         totalnrBottomAttrs = len(self.parentItem().bottomAttrs)
-        distanceFromLeft = 1/(1+totalnrBottomAttrs)
+        distanceFromLeft = nrBottomAttrParentBeforeThis/totalnrBottomAttrs+(1/totalnrBottomAttrs)/2
 
-        x = (nrBottomAttrParentBeforeThis+1)*distanceFromLeft*self.parentItem().baseWidth
-        y = (self.parentItem().boundingRect().height()) #type:ignore
+        x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border
+        y = (self.parentItem().boundingRect().height()-self.parentItem().radius/2) #type:ignore
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
