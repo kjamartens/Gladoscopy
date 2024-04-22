@@ -5,12 +5,13 @@ import logging
 
 def cleanUpTemporaryFiles(mainFolder='./'):
     logging.info('Cleaning up temporary files')
-    for folder in os.listdir(os.path.join(mainFolder,'temp')):
-        if 'LiveAcqShouldBeRemoved' in folder or 'MdaAcqShouldBeRemoved' in folder:
-            try:
-                shutil.rmtree(os.path.join(mainFolder,os.path.join('temp',folder)))
-            except:
-                pass
+    if os.path.exists(os.path.join(mainFolder,'temp')):
+        for folder in os.listdir(os.path.join(mainFolder,'temp')):
+            if 'LiveAcqShouldBeRemoved' in folder or 'MdaAcqShouldBeRemoved' in folder:
+                try:
+                    shutil.rmtree(os.path.join(mainFolder,os.path.join('temp',folder)))
+                except:
+                    pass
 
 #Below here, copy from Eve's util functions:
 import os
