@@ -35,6 +35,7 @@ import utils
 
 from PyQt5.QtWidgets import QApplication, QComboBox
 
+from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
 class AnalysisScoringVisualisationDialog(QDialog):
     def __init__(self, parent=None, currentNode=None):
         """
@@ -114,9 +115,6 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         
         #Pre-load the options if they're in the current node info
         utils.preLoadOptions(self.mainLayout,currentNode.scoring_analysis_currentData)
-        
-        
-        
 
 class nodz_analysisMeasurementDialog(nodz_analysisDialog):
     def __init__(self, parent=None, currentNode=None):
@@ -292,7 +290,6 @@ class nodz_openMDADialog(QDialog):
     def getmdaData(self):
         return self.mdaconfig
 
-from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
 class nodz_openScoringEndDialog(QDialog):
     def __init__(self, parent=None, currentNode=None):
         super().__init__(parent)
@@ -626,6 +623,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.buttonsArea.addWidget(self.loadPickleButton)
         self.loadPickleButton.clicked.connect(lambda index: self.loadPickle())
         
+        #import qgroupbox:
+        from qtpy.QtWidgets import QGroupBox    
+    
+        newgroupbox = QGroupBox("Decision Widget")
+        self.buttonsArea.addWidget(newgroupbox)
+        self.decisionWidget = DecisionWidget(nodzinstance=self)
+        newgroupbox.setLayout(self.decisionWidget.layout())
+        # self.buttonsArea.addLayout(self.decisionWidget.layout())
+        
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
@@ -750,7 +756,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         node should be marked as 'started' or 'finished' based on the attributes connected.
         """
         logging.info(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
-        
     
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -1104,6 +1109,18 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
         self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
         
+        self.nodeInfo['acqStart'] = self.singleNodeTypeInit()
+        self.nodeInfo['acqStart']['name'] = 'acqStart'
+        self.nodeInfo['acqStart']['displayName'] = 'Acquiring start'
+        self.nodeInfo['acqStart']['finishedAttributes'] = ['Start']
+        self.nodeInfo['acqStart']['MaxNodeCounter'] = 1
+        
+        self.nodeInfo['acqEnd'] = self.singleNodeTypeInit()
+        self.nodeInfo['acqEnd']['name'] = 'acqEnd'
+        self.nodeInfo['acqEnd']['displayName'] = 'Acquiring end'
+        self.nodeInfo['acqEnd']['startAttributes'] = ['End']
+        self.nodeInfo['acqEnd']['MaxNodeCounter'] = 1
+        
         self.nodeInfo['onesectimer'] = self.singleNodeTypeInit()
         self.nodeInfo['onesectimer']['name'] = '1s timer'
         self.nodeInfo['onesectimer']['displayName'] = '1s timer'
@@ -1310,7 +1327,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         if dialog.exec_() == QDialog.Accepted:
             logging.debug('advanced node info closed')
-
 
     def changeNodeName(self, node, event):
         #Create a quick popup window with a line edit and an ok/cancel:
@@ -1790,6 +1806,224 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
     
     def focus(self):
         self._focus()
+
+class ScanningWidget():
+    pass
+
+class DecisionWidget(QWidget):
+    def __init__(self, nodzinstance=None,parent=None):
+        super().__init__(parent)
+        # super().__init__()
+        self.nodzinstance=nodzinstance
+        self.decisionMode = 'DirectDecision'
+        self.decisionArray_modes = [
+                            ['DirectDecision','Direct Decision'],
+                            ['FullScan','Full Scan, then acquire'],
+                            ['RandomScan','Randomly scan Nth percentile, then acquire'],
+                            ['StayOnFOV','Conditionally stay on a FoV']]
+        
+        self.decisionArray_decisionTypes = {}
+        self.decisionArray_decisionTypes['DirectDecision'] = [
+                            ['OR_Score','Any scoring condition met'],
+                            ['AND_Score','All scoring conditions met'],
+                            ['Advanced','Advanced scoring condition']]
+        self.decisionArray_decisionTypes['FullScan'] = [
+                            ]
+        self.decisionArray_decisionTypes['RandomScan'] = [
+                            ]
+        self.decisionArray_decisionTypes['StayOnFOV'] = [
+                            ]
+        
+        self.finalDecisionLayout = QVBoxLayout()
+        
+        self.decisionLayouts = {}
+        self.currentMode = None
+        self.currentDecision = None
+        
+        self.create_GUI()
+    
+    def create_GUI(self):
+        # self.setWindowTitle('Decision')
+        self.mode_dropdown = QComboBox()
+        self.mode_dropdown.addItems([option[1] for option in self.decisionArray_modes])
+        self.mode_layout = QGridLayout()
+        self.mode_layout.addWidget(QLabel('Mode: '),0,0)
+        self.mode_layout.addWidget(self.mode_dropdown,0,1)
+
+        from PyQt5.QtWidgets import QHBoxLayout
+        for mode_option in self.decisionArray_modes:
+            self.decisionLayouts[mode_option[0]] = QWidget()
+            #Add a layout to this widget:
+            self.decisionLayouts[mode_option[0]].layout = QHBoxLayout()
+            self.decisionLayouts[mode_option[0]].setLayout(self.decisionLayouts[mode_option[0]].layout)
+            self.decisionLayouts[mode_option[0]].setVisible(False) #False
+            
+            self.decisionLayouts[mode_option[0]].mode_dropdown = QComboBox()
+            self.decisionLayouts[mode_option[0]].mode_dropdown.addItems([option[1] for option in self.decisionArray_decisionTypes[mode_option[0]]])
+            
+            self.decisionLayouts[mode_option[0]].mode_layout = QGridLayout()
+            self.decisionLayouts[mode_option[0]].mode_layout.addWidget(QLabel('Decision mode: '),0,0)
+            self.decisionLayouts[mode_option[0]].mode_layout.addWidget(self.decisionLayouts[mode_option[0]].mode_dropdown,0,1)
+            self.decisionLayouts[mode_option[0]].decisiontypes={}
+            
+            counter2 = 1
+            for option in self.decisionArray_decisionTypes[mode_option[0]]:
+                self.decisionLayouts[mode_option[0]].decisiontypes[option[0]] = advDecisionGridLayout(mode=mode_option[0],decision=option[0],parent=self)
+                self.decisionLayouts[mode_option[0]].decisiontypes[option[0]].setVisible(False)
+                self.decisionLayouts[mode_option[0]].mode_layout.addWidget(self.decisionLayouts[mode_option[0]].decisiontypes[option[0]],counter2,0,1,2)
+                counter2+=1
+            
+            # if self.decisionLayouts[mode_option[0]] is not None:
+                # self.decisionLayouts[mode_option[0]].addLayout(self.decisionLayouts[mode_option[0]].mode_layout)
+            self.decisionLayouts[mode_option[0]].layout.addLayout(self.decisionLayouts[mode_option[0]].mode_layout)
+            
+        self.layoutV = QVBoxLayout()
+        self.layoutV.addLayout(self.mode_layout)
+        counter = 2
+        for mode_option in self.decisionArray_modes:
+            self.mode_layout.addWidget(self.decisionLayouts[mode_option[0]],counter,0,1,2)
+            counter+=1
+        self.setLayout(self.layoutV)
+        
+        for mode_option in self.decisionArray_modes:
+            self.decisionLayouts[mode_option[0]].mode_dropdown.currentIndexChanged.connect(self.changeDecisionMode)
+        
+        self.mode_dropdown.currentIndexChanged.connect(self.changeMode)
+        self.changeMode()
+        self.changeDecisionMode()
+
+    def changeMode(self):
+        for groupbox in self.decisionLayouts.values():
+            groupbox.setVisible(False) #False
+        try:
+            self.decisionLayouts[self.decisionArray_modes[self.mode_dropdown.currentIndex()][0]].setVisible(True)
+        except:
+            pass
+
+    def changeDecisionMode(self):
+        #We should be working in self.finalDecisionLayout:
+        #remove everything from self.finalDecisionLayout:
+        # while self.finalDecisionLayout.count():
+        #     child = self.finalDecisionLayout.takeAt(0)
+        #     if child.widget() is not None:
+        #         child.widget().deleteLater()
+        
+        #Set all of these: self.decisionLayouts[currentMode][currentDecision].setVisible(True) to invis:
+        for mode in self.decisionLayouts:
+            for option in self.decisionLayouts[mode].decisiontypes:
+                if isinstance(self.decisionLayouts[mode].decisiontypes[option],advDecisionGridLayout):
+                    self.decisionLayouts[mode].decisiontypes[option].setVisible(False)
+        
+        # #Then, we do something specific based on this decision:
+        currentMode = self.decisionArray_modes[self.mode_dropdown.currentIndex()][0]
+        currentDecisionLong = self.decisionLayouts[currentMode].mode_dropdown.currentText()
+        currentDecision = ''
+        for option in self.decisionArray_decisionTypes[currentMode]:
+            if currentDecisionLong == option[1]:
+                currentDecision = option[0]
+        
+        self.decisionLayouts[currentMode].decisiontypes[currentDecision].setVisible(True)
+        self.currentMode = currentMode
+        self.currentDecision = currentDecision
+        
+        # # if currentMode = = 'DirectDecision':
+        # #     if currentDecision == 'OR_Score':
+                
+        print('hi')
+
+from PyQt5.QtWidgets import QGroupBox
+class advDecisionGridLayout(QGroupBox):
+    def __init__(self, mode=None,decision=None,parent=None):
+        self.parent = parent
+        super().__init__(parent)
+        #Create a QGridLayout to place in this groupbox:
+        self.setLayout(QGridLayout())
+        #Create a quick label that we place in 1,1:
+        self.layout().addWidget(QLabel(f"{mode} and {decision}",self),1,1)
+        if mode == 'DirectDecision':
+            if decision == 'AND_Score':
+                self.directDecision_AND_Score()
+    
+    def directDecision_AND_Score(self):
+        from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
+        
+        #Remove every child from the current layout():
+        while self.layout().count():
+            child = self.layout().takeAt(0)
+            if child.widget() is not None:
+                child.widget().deleteLater()
+
+        self.innerLayouts = []
+        plusbutton = QPushButton('+')
+        self.layout().addWidget(plusbutton)
+        minusbutton = QPushButton('-')
+        self.layout().addWidget(minusbutton)
+        #Add a callback:
+        
+        self.outerLayout = QVBoxLayout()
+        self.layout().addLayout(self.outerLayout,0,0,1,3)
+
+        def remove_widgets_in_layout(layout):
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
+                elif item.layout() is not None:
+                    self.remove_widgets_in_layout(item.layout())
+                    
+        def remove_last_line():
+            if self.innerLayouts:
+                innerLayout = self.innerLayouts.pop()
+                while innerLayout.count():
+                    item = innerLayout.takeAt(0)
+                    widget = item.widget()
+                    if widget is not None:
+                        widget.deleteLater()
+                    elif item.layout() is not None:
+                        self.remove_widgets_in_layout(item.layout())
+                innerLayout.deleteLater()
+    
+            self.outerLayout.update()
+            self.update()
+
+        def add_new_line():
+            #This can probably be cleaned up later, but eh
+            flowChart = self.parent.nodzinstance
+            
+            if len(flowChart.nodes) > 0:
+                #Find the scoringEnd node in flowChart:
+                for node in flowChart.nodes:
+                    if 'scoringEnd_' in node.name:
+                        break
+                
+                #Now get the scores from here:
+                scoreMetrics = []
+                for socket in node.sockets:
+                    scoreMetrics.append(socket)
+                
+                
+                innerLayout = QHBoxLayout()
+                scoreMetricComboBox = QComboBox()
+                scoreMetricComboBox.addItems(scoreMetrics)
+                innerLayout.addWidget(scoreMetricComboBox)
+                operatorComboBox = QComboBox()
+                operatorComboBox.addItems(['>','>=','<','<=','==','!='])
+                innerLayout.addWidget(operatorComboBox)
+                valueLineEdit = QLineEdit()
+                innerLayout.addWidget(valueLineEdit)
+                self.innerLayouts.append(innerLayout)
+                self.outerLayout.addLayout(self.innerLayouts[-1])
+                self.update()
+            else:
+                logging.warning('EMPTY FLOWCHART!')
+            
+        plusbutton.clicked.connect(add_new_line)
+        minusbutton.clicked.connect(remove_last_line)
+
+        
+        
+        print('hi')
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     """

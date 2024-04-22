@@ -1722,6 +1722,10 @@ class NodeItem(QtWidgets.QGraphicsItem):
         if name in self.plugs.keys():
             for connection in self.plugs[name].connections:
                 connection._remove()
+            for connection in self.bottomAttrs[name].connections:
+                connection._remove()
+            for connection in self.topAttrs[name].connections:
+                connection._remove()
 
             self.scene().removeItem(self.plugs[name])
             self.plugs.pop(name)
@@ -1755,6 +1759,15 @@ class NodeItem(QtWidgets.QGraphicsItem):
         for plug in self.plugs.values():
             while len(plug.connections)>0:
                 plug.connections[0]._remove()
+
+
+        for bottomAttr in self.bottomAttrs.values():
+            while len(bottomAttr.connections)>0:
+                bottomAttr.connections[0]._remove()
+        for topAttr in self.topAttrs.values():
+            while len(topAttr.connections)>0:
+                topAttr.connections[0]._remove()
+
 
         # Remove node.
         scene = self.scene()
