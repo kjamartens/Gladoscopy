@@ -1013,6 +1013,20 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #We also need to add these attributes to the nodes startAttributes in self.nodeInfo:
             self.nodeInfo[self.nodeLookupName_withoutCounter(currentNode.name)]['startAttributes'] = dialogLineEdits
     
+    def singleNodeTypeInit(self):
+        init = {}
+        init['name'] = 'name'
+        init['displayName'] = 'DisplayName'
+        init['startAttributes'] = []
+        init['finishedAttributes'] = []
+        init['dataAttributes'] = []
+        init['bottomAttributes'] = []
+        init['topAttributes'] = []
+        init['NodeCounter'] = 0
+        init['NodeCounterNeverReset'] = 0
+        init['MaxNodeCounter'] = np.inf
+        return init
+    
     def defineNodeInfo(self):
         """
         Define the node information for all nodes in the flowchart.
@@ -1026,147 +1040,85 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo = {}
         
         #We define the node info for each type of node like this: (might be expanded in the future)
-        self.nodeInfo['acquisition'] = {}
+        self.nodeInfo['acquisition'] = self.singleNodeTypeInit()
         self.nodeInfo['acquisition']['name'] = 'acquisition'
         self.nodeInfo['acquisition']['displayName'] = 'Acquisition'
         self.nodeInfo['acquisition']['startAttributes'] = ['Acquisition start']
         self.nodeInfo['acquisition']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['acquisition']['dataAttributes'] = []
-        self.nodeInfo['acquisition']['bottomAttributes'] = ['A1','A2']
-        self.nodeInfo['acquisition']['topAttributes'] = []
-        self.nodeInfo['acquisition']['NodeCounter'] = 0
-        self.nodeInfo['acquisition']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['acquisition']['MaxNodeCounter'] = np.inf
+        self.nodeInfo['acquisition']['bottomAttributes'] = ['Visual','Real-time']
         
-        self.nodeInfo['changeProperties'] = {}
+        self.nodeInfo['changeProperties'] = self.singleNodeTypeInit()
         self.nodeInfo['changeProperties']['name'] = 'changeProperties'
         self.nodeInfo['changeProperties']['displayName'] = 'Change Properties'
         self.nodeInfo['changeProperties']['startAttributes'] = ['Start']
         self.nodeInfo['changeProperties']['finishedAttributes'] = ['Done']
-        self.nodeInfo['changeProperties']['dataAttributes'] = []
-        self.nodeInfo['changeProperties']['bottomAttributes'] = []
-        self.nodeInfo['changeProperties']['topAttributes'] = []
-        self.nodeInfo['changeProperties']['NodeCounter'] = 0
-        self.nodeInfo['changeProperties']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['changeProperties']['MaxNodeCounter'] = np.inf
         
-        self.nodeInfo['changeStagePos'] = {}
+        self.nodeInfo['visualisation'] = self.singleNodeTypeInit()
+        self.nodeInfo['visualisation']['name'] = 'visualisation'
+        self.nodeInfo['visualisation']['displayName'] = 'Visualisation'
+        self.nodeInfo['visualisation']['topAttributes'] = ['Start']
+        
+        self.nodeInfo['changeStagePos'] = self.singleNodeTypeInit()
         self.nodeInfo['changeStagePos']['name'] = 'changeStagePos'
         self.nodeInfo['changeStagePos']['displayName'] = 'Change Stage Position'
         self.nodeInfo['changeStagePos']['startAttributes'] = ['Start']
         self.nodeInfo['changeStagePos']['finishedAttributes'] = ['Done']
-        self.nodeInfo['changeStagePos']['dataAttributes'] = []
-        self.nodeInfo['changeStagePos']['bottomAttributes'] = []
-        self.nodeInfo['changeStagePos']['topAttributes'] = []
-        self.nodeInfo['changeStagePos']['NodeCounter'] = 0
-        self.nodeInfo['changeStagePos']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['changeStagePos']['MaxNodeCounter'] = np.inf
         
-        self.nodeInfo['analysisGrayScaleTest'] = {}
+        self.nodeInfo['analysisGrayScaleTest'] = self.singleNodeTypeInit()
         self.nodeInfo['analysisGrayScaleTest']['name'] = 'analysisGrayScaleTest'
         self.nodeInfo['analysisGrayScaleTest']['displayName'] = 'Analysis Grayscale Test [Measurement]'
         self.nodeInfo['analysisGrayScaleTest']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisGrayScaleTest']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisGrayScaleTest']['dataAttributes'] = ['Output']
-        self.nodeInfo['analysisGrayScaleTest']['bottomAttributes'] = []
-        self.nodeInfo['analysisGrayScaleTest']['topAttributes'] = []
-        self.nodeInfo['analysisGrayScaleTest']['NodeCounter'] = 0
-        self.nodeInfo['analysisGrayScaleTest']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['analysisGrayScaleTest']['MaxNodeCounter'] = np.inf
         
-        self.nodeInfo['analysisMeasurement'] = {}
+        self.nodeInfo['analysisMeasurement'] = self.singleNodeTypeInit()
         self.nodeInfo['analysisMeasurement']['name'] = 'analysisMeasurement'
         self.nodeInfo['analysisMeasurement']['displayName'] = 'Analysis [Measurement]'
         self.nodeInfo['analysisMeasurement']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisMeasurement']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
-        self.nodeInfo['analysisMeasurement']['bottomAttributes'] = []
-        self.nodeInfo['analysisMeasurement']['topAttributes'] = []
-        self.nodeInfo['analysisMeasurement']['NodeCounter'] = 0
-        self.nodeInfo['analysisMeasurement']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['analysisMeasurement']['MaxNodeCounter'] = np.inf
         
-        self.nodeInfo['analysisShapes'] = {}
+        self.nodeInfo['analysisShapes'] = self.singleNodeTypeInit()
         self.nodeInfo['analysisShapes']['name'] = 'analysisShapes'
         self.nodeInfo['analysisShapes']['displayName'] = 'Analysis [Shapes]'
         self.nodeInfo['analysisShapes']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisShapes']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisShapes']['dataAttributes'] = ['Output']
-        self.nodeInfo['analysisShapes']['bottomAttributes'] = []
-        self.nodeInfo['analysisShapes']['topAttributes'] = []
-        self.nodeInfo['analysisShapes']['NodeCounter'] = 0
-        self.nodeInfo['analysisShapes']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['analysisShapes']['MaxNodeCounter'] = np.inf
         
-        self.nodeInfo['analysisImages'] = {}
+        self.nodeInfo['analysisImages'] = self.singleNodeTypeInit()
         self.nodeInfo['analysisImages']['name'] = 'analysisImages'
         self.nodeInfo['analysisImages']['displayName'] = 'Analysis [Images]'
         self.nodeInfo['analysisImages']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisImages']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisImages']['dataAttributes'] = ['Output']
-        self.nodeInfo['analysisImages']['bottomAttributes'] = []
-        self.nodeInfo['analysisImages']['topAttributes'] = []
-        self.nodeInfo['analysisImages']['NodeCounter'] = 0
-        self.nodeInfo['analysisImages']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['analysisImages']['MaxNodeCounter'] = np.inf
         
-        self.nodeInfo['scoringStart'] = {}
+        self.nodeInfo['scoringStart'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringStart']['name'] = 'scoringStart'
         self.nodeInfo['scoringStart']['displayName'] = 'Scoring start'
-        self.nodeInfo['scoringStart']['startAttributes'] = []
         self.nodeInfo['scoringStart']['finishedAttributes'] = ['Start']
-        self.nodeInfo['scoringStart']['dataAttributes'] = []
-        self.nodeInfo['scoringStart']['bottomAttributes'] = []
-        self.nodeInfo['scoringStart']['topAttributes'] = []
-        self.nodeInfo['scoringStart']['NodeCounter'] = 0
-        self.nodeInfo['scoringStart']['NodeCounterNeverReset'] = 0
         self.nodeInfo['scoringStart']['MaxNodeCounter'] = 1
         
-        self.nodeInfo['scoringEnd'] = {}
+        self.nodeInfo['scoringEnd'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringEnd']['name'] = 'scoringEnd'
         self.nodeInfo['scoringEnd']['displayName'] = 'Scoring end'
         self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
-        self.nodeInfo['scoringEnd']['finishedAttributes'] = []
-        self.nodeInfo['scoringEnd']['dataAttributes'] = []
-        self.nodeInfo['scoringEnd']['bottomAttributes'] = []
-        self.nodeInfo['scoringEnd']['topAttributes'] = []
-        self.nodeInfo['scoringEnd']['NodeCounter'] = 0
-        self.nodeInfo['scoringEnd']['NodeCounterNeverReset'] = 0
         self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
         
-        self.nodeInfo['onesectimer'] = {}
+        self.nodeInfo['onesectimer'] = self.singleNodeTypeInit()
         self.nodeInfo['onesectimer']['name'] = '1s timer'
         self.nodeInfo['onesectimer']['displayName'] = '1s timer'
         self.nodeInfo['onesectimer']['startAttributes'] = ['Start']
         self.nodeInfo['onesectimer']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['onesectimer']['dataAttributes'] = []
-        self.nodeInfo['onesectimer']['bottomAttributes'] = []
-        self.nodeInfo['onesectimer']['topAttributes'] = []
-        self.nodeInfo['onesectimer']['NodeCounter'] = 0
-        self.nodeInfo['onesectimer']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['onesectimer']['MaxNodeCounter'] = np.inf
-        self.nodeInfo['twosectimer'] = {}
+        self.nodeInfo['twosectimer'] = self.singleNodeTypeInit()
         self.nodeInfo['twosectimer']['name'] = '2s timer'
         self.nodeInfo['twosectimer']['displayName'] = '2s timer'
         self.nodeInfo['twosectimer']['startAttributes'] = ['Start']
         self.nodeInfo['twosectimer']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['twosectimer']['dataAttributes'] = []
-        self.nodeInfo['twosectimer']['bottomAttributes'] = []
-        self.nodeInfo['twosectimer']['topAttributes'] = []
-        self.nodeInfo['twosectimer']['NodeCounter'] = 0
-        self.nodeInfo['twosectimer']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['twosectimer']['MaxNodeCounter'] = np.inf
-        self.nodeInfo['threesectimer'] = {}
+        self.nodeInfo['threesectimer'] = self.singleNodeTypeInit()
         self.nodeInfo['threesectimer']['name'] = '3s timer'
         self.nodeInfo['threesectimer']['displayName'] = '3s timer'
         self.nodeInfo['threesectimer']['startAttributes'] = ['Start']
         self.nodeInfo['threesectimer']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['threesectimer']['dataAttributes'] = []
-        self.nodeInfo['threesectimer']['bottomAttributes'] = []
-        self.nodeInfo['threesectimer']['topAttributes'] = []
-        self.nodeInfo['threesectimer']['NodeCounter'] = 0
-        self.nodeInfo['threesectimer']['NodeCounterNeverReset'] = 0
-        self.nodeInfo['threesectimer']['MaxNodeCounter'] = np.inf
         
         
         #We also add some custom JSON info about the node layout (colors and such)

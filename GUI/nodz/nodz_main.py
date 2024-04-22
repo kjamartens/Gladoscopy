@@ -1214,8 +1214,15 @@ class Nodz(QtWidgets.QGraphicsView):
         :param targetAttr: Attribute that receives the connection.
 
         """
-        plug = self.scene().nodes[sourceNode].plugs[sourceAttr] #type:ignore
-        socket = self.scene().nodes[targetNode].sockets[targetAttr] #type:ignore
+        if sourceAttr in self.scene().nodes[sourceNode].plugs:
+            plug = self.scene().nodes[sourceNode].plugs[sourceAttr] #type:ignore
+        elif sourceAttr in self.scene().nodes[sourceNode].bottomAttrs:
+            plug = self.scene().nodes[sourceNode].bottomAttrs[sourceAttr] #type:ignore
+        
+        if targetAttr in self.scene().nodes[targetNode].sockets:
+            socket = self.scene().nodes[targetNode].sockets[targetAttr] #type:ignore
+        elif targetAttr in self.scene().nodes[targetNode].topAttrs:
+            socket = self.scene().nodes[targetNode].topAttrs[targetAttr] #type:ignore
 
         connection = ConnectionItem(plug.center(), socket.center(), plug, socket)
 
@@ -1658,6 +1665,17 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
             self.bottomAttrs[name] = bottomAttrInst
 
+        #Create a bottom attribution item
+        if topAttr:
+            topAttrInst = TopAttrItem(parent=self,
+                                            attribute=name,
+                                            index=self.attrCount,
+                                            preset=preset,
+                                            dataType=dataType,
+                                            maxConnections=socketMaxConnections)
+
+            self.topAttrs[name] = topAttrInst
+
         self.attrCount += 1
 
         # Add the attribute based on its index.
@@ -1806,6 +1824,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         offsetLeft = 0
         offsetRight = 0
         nrBottomAttrs = 0
+        nrTopAttrs = 0
         for attr in self.attrs:
             nodzInst = self.scene().views()[0]
             config = nodzInst.config
@@ -1838,9 +1857,18 @@ class NodeItem(QtWidgets.QGraphicsItem):
                 #Increment counter
                 nrBottomAttrs += 1
             if attrData['topAttr']:
-                print('Top attr!')
+                #Determine width,height, xoffset, yoffset:
+                totalNrTopAttrs = len(self.topAttrs)
+                width = 0#(self.baseWidth - 2*self.border)/totalNrTopAttrs-topAttrs
+                height = 0#self.bottomAttrHeight
+                xmidpoint = 0#(nrBottomAttrs/totalNrBottomAttrs+(1/totalNrBottomAttrs)/2)*self.baseWidth
+                xoffset = 0#xmidpoint - width/2
+                # xoffset = nrBottomAttrs*(self.baseWidth/totalNrBottomAttrs)+bottomAttrOffset/2
+                offset = 0#max(offsetLeft,offsetRight)+5
+                #Increment counter
+                nrTopAttrs += 1
             
-            if not attrData['bottomAttr']:
+            if not attrData['bottomAttr'] and not attrData['topAttr']:
                 # Attribute rect.
                 rect = QtCore.QRect(int(self.border / 2+xoffset),
                                     int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight),
@@ -1902,31 +1930,32 @@ class NodeItem(QtWidgets.QGraphicsItem):
                          nodzInst.sourceSlot.slotType == 'socket' and attrData['plug'] == False)):
                         # Set non-connectable attributes color.
                         painter.setPen(utils._convertDataToColor(config['non_connectable_color']))
-
-            textRect = QtCore.QRect(rect.left() + self.radius,
-                                    rect.top(),
-                                    rect.width() - 2*self.radius,
-                                    rect.height())
-            
-            halignment = QtCore.Qt.AlignLeft #type:ignore
-            valignment = QtCore.Qt.AlignVCenter #type:ignore
-            if attrData['bottomAttr']:
-                halignment = QtCore.Qt.AlignCenter #type:ignore
-                valignment = QtCore.Qt.AlignTop #type:ignore
+            if not attrData['topAttr']:
                 textRect = QtCore.QRect(rect.left() + self.radius,
-                                    rect.top()-3,
-                                    rect.width() - 2*self.radius,
-                                    rect.height())
-            elif attrData['plug'] and not attrData['socket']:
-                halignment = QtCore.Qt.AlignRight #type:ignore
+                                        rect.top(),
+                                        rect.width() - 2*self.radius,
+                                        rect.height())
+                
+                halignment = QtCore.Qt.AlignLeft #type:ignore
                 valignment = QtCore.Qt.AlignVCenter #type:ignore
-            painter.drawText(textRect, halignment | valignment, name) #type:ignore
-            
-            if not attrData['bottomAttr'] and not attrData['topAttr']:
-                if attrData['plug'] and not attrData['socket']:
-                    offsetRight += self.attrHeight
-                else:
-                    offsetLeft += self.attrHeight
+                if attrData['bottomAttr']:
+                    halignment = QtCore.Qt.AlignCenter #type:ignore
+                    valignment = QtCore.Qt.AlignTop #type:ignore
+                    textRect = QtCore.QRect(rect.left() + self.radius,
+                                        rect.top()-3,
+                                        rect.width() - 2*self.radius,
+                                        rect.height())
+                elif attrData['plug'] and not attrData['socket']:
+                    halignment = QtCore.Qt.AlignRight #type:ignore
+                    valignment = QtCore.Qt.AlignVCenter #type:ignore
+                
+                painter.drawText(textRect, halignment | valignment, name) #type:ignore
+                
+                if not attrData['bottomAttr'] and not attrData['topAttr']:
+                    if attrData['plug'] and not attrData['socket']:
+                        offsetRight += self.attrHeight
+                    else:
+                        offsetLeft += self.attrHeight
                     
                     
         #At the end: draw the nodz again, but only the border:
@@ -2573,6 +2602,32 @@ class TopAttrItem(SocketItem):
         print('top attr created')
         self.slotType = 'topAttr'
         
+    def boundingRect(self):
+        """
+        The bounding rect based on the width and height variables.
+
+        """
+        width = height = self.parentItem().attrHeight / 2.0 #type:ignore
+
+        nodzInst = self.scene().views()[0]
+        config = nodzInst.config
+
+        #Find how many attributes the parentItem has that are TopAttr before this index:
+        nrTopAttrParentBeforeThis = 0
+        for attr in self.parentItem().attrs: #type:ignore
+            if self.parentItem().attrs.index(attr)<self.parentItem().attrs.index(self.attribute): #type:ignore
+                if self.parentItem().attrsData[attr]['topAttr']: #type:ignore
+                    nrTopAttrParentBeforeThis += 1
+
+        totalnrTopAttrs = len(self.parentItem().topAttrs)
+        distanceFromLeft = nrTopAttrParentBeforeThis/totalnrTopAttrs+(1/totalnrTopAttrs)/2
+
+        x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border
+        y = 0#(self.parentItem().boundingRect().height()-self.parentItem().radius/2) #type:ignore
+
+        rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
+        return rect
+        
 class ConnectionItem(QtWidgets.QGraphicsPathItem):
 
     """
@@ -2771,10 +2826,16 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
 
         path = QtGui.QPainterPath()
         path.moveTo(self.source_point)
-        dx = (self.target_point.x() - self.source_point.x()) * 0.5
-        dy = self.target_point.y() - self.source_point.y()
-        ctrl1 = QtCore.QPointF(self.source_point.x() + dx, self.source_point.y() + dy * 0)
-        ctrl2 = QtCore.QPointF(self.source_point.x() + dx, self.source_point.y() + dy * 1)
+        if self.source.slotType != 'bottomAttr' and self.source.slotType != 'topAttr':
+            dx = (self.target_point.x() - self.source_point.x()) * 0.5
+            dy = self.target_point.y() - self.source_point.y()
+            ctrl1 = QtCore.QPointF(self.source_point.x() + dx, self.source_point.y() + dy * 0)
+            ctrl2 = QtCore.QPointF(self.source_point.x() + dx, self.source_point.y() + dy * 1)
+        else:
+            dx = (self.target_point.x() - self.source_point.x())
+            dy = (self.target_point.y() - self.source_point.y()) * 0.5
+            ctrl1 = QtCore.QPointF(self.source_point.x() + dx * 0, self.source_point.y() + dy)
+            ctrl2 = QtCore.QPointF(self.source_point.x() + dx * 1, self.source_point.y() + dy)
         path.cubicTo(ctrl1, ctrl2, self.target_point)
 
         self.setPath(path)
