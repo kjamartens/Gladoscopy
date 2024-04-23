@@ -1469,6 +1469,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         self.scoring_end_currentData = {}
         self.scoring_end_currentData['Variables'] = {}
+        
+        self.status = 'idle' #status should be 'idle','running','finished'
 
         # Attributes storage.
         self.attrs = list()
@@ -1534,6 +1536,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
             self.n_connect_at_start_finished = 0 #to allow for looping :)
             logging.debug('All connections at start are finished')
             logging.info(f"Starting call action of node with name: {self.name}")
+            self.status = 'running'
+            self.update()
             if self.callAction is not None:
                 if self.callActionRelatedObject is not None:
                     self.callAction(self.callActionRelatedObject) #type:ignore
@@ -1541,6 +1545,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
                     self.callAction(self)
 
     def finishedmda(self):
+        self.status = 'finished'
+        self.update()
         logging.info('MDA finished within node')
         #MDA data is stored as self.mdaData.data
         logging.info(self.name)
@@ -1881,6 +1887,15 @@ class NodeItem(QtWidgets.QGraphicsItem):
             painter.drawText(textRect,
                             QtCore.Qt.AlignCenter, #type:ignore
                             self.displayName)
+
+
+        statusRect = QtCore.QRect(int(-margin),
+                                int(-text_height-text_height/2),
+                                int(text_width),
+                                int(text_height))
+        painter.drawText(statusRect,
+                        QtCore.Qt.AlignCenter, #type:ignore
+                        self.status)
 
         #Draw the textbox
         self.drawTextbox(painter)

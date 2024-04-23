@@ -32,10 +32,13 @@ from Visualisation_Shapes import * #type: ignore
 import HelperFunctions #type: ignore
 import logging
 import utils
+from nodz import nodz_utils
 
 from PyQt5.QtWidgets import QApplication, QComboBox
 
 from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
+
+
 class AnalysisScoringVisualisationDialog(QDialog):
     def __init__(self, parent=None, currentNode=None):
         """
@@ -1220,7 +1223,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         }''')
         self.addConfig(self.nodeLayout)
     
-    
     def getDevicesOfDeviceType(self,devicetype):
         #Find all devices that have a specific devicetype
         #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
@@ -1280,6 +1282,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 if 'scoringStart_' in node.name:
                     scoreStartNode = node
         
+        
+        
         #Run the scoring_start routine:
         if scoreStartNode is not None:
             self.scoringStart(scoreStartNode)
@@ -1303,7 +1307,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             self.acquiringStart(acqStartNode)
         else:
             logging.error('Could not find acqStart node in flowchart')
-    
     
     def debugScoring(self):
         """
@@ -1761,6 +1764,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         Returns:
             None
         """
+        node.status='finished'
+        self.update()
         if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
             node.customFinishedEmits.emit_all_signals()
         if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
@@ -1857,7 +1862,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             else:
                 self.singleRunOngoing = False
                 print('All done!')
-        # self.finishedEmits(node)
+        self.finishedEmits(node)
         
     def scoringStart(self,node):
         """
@@ -1873,6 +1878,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             None
         """
         print('Starting the score routine!')
+        
+        #Set all connected nodes to idle
+        connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
+        for connectedNode in connectedNodes:
+            for node in self.nodes:
+                if node.name == connectedNode:
+                    node.status='idle'
         
         self.GraphToSignals()
         
@@ -1938,7 +1950,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                     self.singleRunOngoing = False
                     print('All done!')
         print('----------------------')
-        # self.finishedEmits(node)
+        self.finishedEmits(node)
 
     def timerCallAction(self,node,timev):
         """
@@ -2043,7 +2055,6 @@ class ScanningWidget(QWidget):
 
     def changeScanMode(self):
         for groupbox in self.scanLayouts.values():
-            print(groupbox)
             groupbox.setVisible(False) #False
             
         try:
@@ -2286,7 +2297,6 @@ class advDecisionGridLayout(QGroupBox):
 
         self.outerLayout = QVBoxLayout()
         self.layout().addLayout(self.outerLayout,0,0)
-        print('updating directDecision_AND_Score_update')
         
         #Get out of this function if flowChart isn't initialised yet (i.e. first start-up):
         try:
@@ -2409,7 +2419,6 @@ class advScanGridLayout(QGroupBox):
                     positions[pos_id]['STAGES'].append(xypositionsRaw['map']['StagePositions']['array'][pos_id]['DefaultZStage']['scalar'])
                 
                 for stage in positions[pos_id]['STAGES']:
-                    print(stage)
                     devicePositions = xypositionsRaw['map']['StagePositions']['array'][pos_id]['DevicePositions']['array']
                     for devicePosition in devicePositions:
                         if stage == devicePosition['Device']['scalar']:
