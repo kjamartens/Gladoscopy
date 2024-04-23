@@ -609,6 +609,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Create a QGridLayout:
         self.mainLayout = QGridLayout()
         
+        self.fullRunOngoing = False
         
         #Add a few buttons to the left side:
         self.buttonsArea = QVBoxLayout()
