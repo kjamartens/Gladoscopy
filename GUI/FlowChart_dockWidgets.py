@@ -613,6 +613,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Add a few buttons to the left side:
         self.buttonsArea = QVBoxLayout()
         self.mainLayout.addLayout(self.buttonsArea,0,0)
+        self.runScoringButton = QPushButton('Start run!')
+        self.buttonsArea.addWidget(self.runScoringButton)
+        self.runScoringButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
         self.runScoringButton = QPushButton('Run Scoring')
         self.buttonsArea.addWidget(self.runScoringButton)
         self.runScoringButton.clicked.connect(lambda index: self.runScoring())
@@ -637,6 +640,14 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.buttonsArea.addWidget(newgroupbox)
         self.decisionWidget = DecisionWidget(nodzinstance=self)
         newgroupbox.setLayout(self.decisionWidget.layout())
+        
+        
+        newgroupbox = QGroupBox("Scan Widget")
+        newgridlayout = QGridLayout()
+        newgroupbox.setLayout(newgridlayout)
+        self.buttonsArea.addWidget(newgroupbox)
+        self.scanningWidget = ScanningWidget(nodzinstance=self)
+        newgridlayout.addWidget(self.scanningWidget)
         # self.buttonsArea.addLayout(self.decisionWidget.layout())
         
         
@@ -1208,6 +1219,56 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         }''')
         self.addConfig(self.nodeLayout)
     
+    
+    def getDevicesOfDeviceType(self,devicetype):
+        #Find all devices that have a specific devicetype
+        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+        #for all devicetypes
+        #Get devices
+        devices = self.shared_data.core.get_loaded_devices()
+        devices = [devices.get(i) for i in range(devices.size())]
+        devicesOfType = []
+        #Loop over devices
+        for device in devices:
+            if self.shared_data.core.get_device_type(device).to_string() == devicetype:
+                logging.debug("found " + device + " of type " + devicetype)
+                devicesOfType.append(device)
+        return devicesOfType
+    
+    def fullAutonomousRunStart(self):
+        print('Starting a full run')
+        
+        #General idea: first check if there are no glaring errors (scoring, position)
+        #then go to whatever start position based on the xy positions
+        #then run scoring+acquisition there
+        
+        self.fullRunOngoing = True
+        self.fullRunCurrentPos = 0
+        self.fullRunPositions = self.scanningWidget.getPositionInfo()
+        self.startNewScoreAcqAtPos()
+
+    def startNewScoreAcqAtPos(self):
+        
+        import time
+        positions = self.fullRunPositions
+        pos = self.fullRunCurrentPos
+        
+        #Set all stages correct
+        for stage in positions[pos]['STAGES']:
+            stagepos = positions[pos][stage]
+            #Check if this stage is an XY stage device...
+            #Since then we need to do something 2-dimensional
+            if stage in self.getDevicesOfDeviceType('XYStageDevice'):
+                logging.info(f'Moving stage {stage} to position {stagepos}')
+                self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1])
+                self.shared_data.core.wait_for_system()
+            else:#else we can move a 1d stage:
+                logging.info(f'Moving stage {stage} to position {stagepos}')
+                self.shared_data.core.set_position(stage,stagepos[0])
+                self.shared_data.core.wait_for_system()
+        
+        self.runScoring()
+    
     def runScoring(self):
         #Find the scoring_start node:
         scoreStartNode = None
@@ -1241,6 +1302,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             self.acquiringStart(acqStartNode)
         else:
             logging.error('Could not find acqStart node in flowchart')
+    
     
     def debugScoring(self):
         """
@@ -1597,6 +1659,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         elif nodeType == 'scoringEnd':
             newNode.callAction = lambda self, node=newNode: self.scoringEnd(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'acqEnd':
+            newNode.callAction = lambda self, node=newNode: self.acquiringEnd(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         else:
             newNode.callAction = None
 
@@ -1780,6 +1845,19 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         self.finishedEmits(node)
     
+    def acquiringEnd(self,node):
+        print("End Acquiring")
+        if self.fullRunOngoing:
+            #if there are more positions to look at...
+            if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
+                self.fullRunCurrentPos +=1
+                #And start a new score/acq at a new pos:
+                self.startNewScoreAcqAtPos()
+            else:
+                self.singleRunOngoing = False
+                print('All done!')
+        # self.finishedEmits(node)
+        
     def scoringStart(self,node):
         """
         This function is the action function for the Scoring Start node in the Flowchart.
@@ -1911,8 +1989,63 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
     def focus(self):
         self._focus()
 
-class ScanningWidget():
-    pass
+
+class ScanningWidget(QWidget):
+    def __init__(self, nodzinstance=None,parent=None):
+        super().__init__(parent)
+        # super().__init__()
+        self.nodzinstance=nodzinstance
+        self.scanMode = 'LoadPos'
+        self.scanArray_modes = [
+                            ['LoadPos','Load a POS list']]
+                
+        self.scanLayouts = {}
+        self.currentMode = None
+        
+        self.create_GUI()
+    
+    def create_GUI(self):
+        # self.setWindowTitle('Scan')
+        self.mode_dropdown = QComboBox()
+        self.mode_dropdown.addItems([option[1] for option in self.scanArray_modes])
+        self.mode_layout = QGridLayout()
+        self.mode_layout.addWidget(QLabel('Mode: '),0,0)
+        self.mode_layout.addWidget(self.mode_dropdown,0,1)
+
+
+        from PyQt5.QtWidgets import QHBoxLayout
+        for mode_option in self.scanArray_modes:
+            self.scanLayouts[mode_option[0]] = advScanGridLayout(mode=mode_option[0],parent=self)
+            
+            self.scanLayouts[mode_option[0]].setVisible(True) #False
+        
+        
+        self.layoutV = QVBoxLayout()
+        self.layoutV.addLayout(self.mode_layout)
+        counter = 2
+        for mode_option in self.scanArray_modes:
+            self.mode_layout.addWidget(self.scanLayouts[mode_option[0]],counter,0,1,2)
+            counter+=1
+        self.setLayout(self.layoutV)
+        
+        self.mode_dropdown.currentIndexChanged.connect(self.changeScanMode)
+        self.changeScanMode()
+
+    def changeScanMode(self):
+        for groupbox in self.scanLayouts.values():
+            print(groupbox)
+            groupbox.setVisible(False) #False
+            
+        try:
+            self.scanLayouts[self.scanArray_modes[self.mode_dropdown.currentIndex()][0]].setVisible(True)
+            
+            self.currentMode = self.scanArray_modes[self.mode_dropdown.currentIndex()][0]
+        except:
+            pass
+
+    def getPositionInfo(self):
+        return self.scanLayouts[self.scanArray_modes[self.mode_dropdown.currentIndex()][0]].getPositionInfo()
+            
 
 class DecisionWidget(QWidget):
     def __init__(self, nodzinstance=None,parent=None):
@@ -2083,8 +2216,6 @@ class advDecisionGridLayout(QGroupBox):
                 scoreMetrics.append(socket)
         return scoreMetrics
     
-    
-    
     def directDecision_AND_Score_test(self):
         """
         Code to test whether the current score passes the decision matrix or not. Should always output a boolean
@@ -2230,6 +2361,72 @@ class advDecisionGridLayout(QGroupBox):
         
         
         # print('hi')
+
+class advScanGridLayout(QGroupBox):
+    def __init__(self, mode=None,parent=None):
+        self.parent = parent
+        super().__init__(parent)
+        self.mode = mode
+        self.scanningInfoGUI = {}
+        #Create a QGridLayout to place in this groupbox:
+        try:
+            self.setLayout(QGridLayout())
+        except:
+            pass
+        #Create a quick label that we place in 1,1:
+        self.layout().addWidget(QLabel(f"{mode}",self))
+        if mode == 'LoadPos':
+            self.loadPos_update()
+    
+    def update(self):
+        print('update')
+    
+    def getPositionInfo(self):        
+        if self.mode == 'LoadPos':
+            positions = {}
+            #Read a JSON:
+            import json
+            with open(self.scanningInfoGUI['LoadPos']['fileName'], 'r') as f:
+                xypositionsRaw = json.load(f)
+
+            positions['nrPositions'] = len(xypositionsRaw['map']['StagePositions']['array'])
+            for pos_id in range(positions['nrPositions']):
+                positions[pos_id] = {}
+                positions[pos_id]['STAGES'] = []
+                if 'DefaultXYStage' in xypositionsRaw['map']['StagePositions']['array'][pos_id]:
+                    positions[pos_id]['STAGES'].append(xypositionsRaw['map']['StagePositions']['array'][pos_id]['DefaultXYStage']['scalar'])
+                if 'DefaultZStage' in xypositionsRaw['map']['StagePositions']['array'][pos_id]:
+                    positions[pos_id]['STAGES'].append(xypositionsRaw['map']['StagePositions']['array'][pos_id]['DefaultZStage']['scalar'])
+                
+                for stage in positions[pos_id]['STAGES']:
+                    print(stage)
+                    devicePositions = xypositionsRaw['map']['StagePositions']['array'][pos_id]['DevicePositions']['array']
+                    for devicePosition in devicePositions:
+                        if stage == devicePosition['Device']['scalar']:
+                            positions[pos_id][stage] = devicePosition['Position_um']['array']
+                
+            return positions
+    
+    def loadPos_update(self):
+        self.scanningInfoGUI['LoadPos'] = {}
+        
+        def load_pos_file():
+            from qtpy.QtWidgets import QFileDialog
+            filename, _ = QFileDialog.getOpenFileName(self,'Open file', '', '*.POS Files (*.pos)')
+            if filename:
+                self.lineEdit_posFilename.setText(filename)
+                self.scanningInfoGUI['LoadPos']['fileName'] = filename
+
+        def update_file_name(new_file_name):
+            self.scanningInfoGUI['LoadPos']['fileName'] = new_file_name
+    
+        self.lineEdit_posFilename = QLineEdit()
+        self.layout().addWidget(self.lineEdit_posFilename,1,0)
+        self.lineEdit_posFilename.textChanged.connect(lambda x: update_file_name(x))
+
+        button_browsePosFile = QPushButton('...')
+        self.layout().addWidget(button_browsePosFile,1,1)
+        button_browsePosFile.clicked.connect(load_pos_file)
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     """
