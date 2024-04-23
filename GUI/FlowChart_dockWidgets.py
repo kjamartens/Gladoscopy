@@ -950,10 +950,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 for lineEdit in dialog.lineEdits:
                     dialogLineEdits.append(lineEdit.text())
                 self.update_scoring_end(currentNode,dialogLineEdits)
-                
+                #Update the noce itself
                 self.update()
                 nodeType = self.nodeLookupName_withoutCounter(nodeName)
                 self.updateNumberStartFinishedDataAttributes(currentNode,nodeType)
+                
+                #Update the decisionwidget:
+                self.decisionWidget.updateAllDecisions()
                 logging.info(dialogLineEdits)
                 logging.info('Pressed OK on scoringEnd')
     
@@ -1743,8 +1746,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                     data[attr] = connectedNode.scoring_analysis_currentData['__output__']
                     print(f"Data found for {attr}: {data[attr]}")
         
-        
+        testPassed = self.decisionWidget.testCurrentDecision()
         print('Scoring finished fully!')
+        if testPassed:
+            print("Test is... Passed!")
+        elif not testPassed:
+            print("Test is... Not Passed!")
         print('----------------------')
         # self.finishedEmits(node)
 
@@ -1928,23 +1935,109 @@ class DecisionWidget(QWidget):
         
         # # if currentMode = = 'DirectDecision':
         # #     if currentDecision == 'OR_Score':
-                
-        print('hi')
+    
+    def updateAllDecisions(self):
+        for mode in self.decisionLayouts:
+            for option in self.decisionLayouts[mode].decisiontypes:
+                self.decisionLayouts[mode].decisiontypes[option].update()
+
+    def testCurrentDecision(self):
+        testPassed = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision].test_decision()
+        return testPassed
 
 from PyQt5.QtWidgets import QGroupBox
 class advDecisionGridLayout(QGroupBox):
     def __init__(self, mode=None,decision=None,parent=None):
         self.parent = parent
         super().__init__(parent)
+        self.mode = mode
+        self.decision = decision
+        self.decisionInfoGUI = {} #Will finally contain all decision info in GUI form!
         #Create a QGridLayout to place in this groupbox:
         self.setLayout(QGridLayout())
         #Create a quick label that we place in 1,1:
         self.layout().addWidget(QLabel(f"{mode} and {decision}",self),1,1)
         if mode == 'DirectDecision':
             if decision == 'AND_Score':
-                self.directDecision_AND_Score()
+                self.directDecision_AND_Score_update()
     
-    def directDecision_AND_Score(self):
+    def update(self):
+        if self.mode == 'DirectDecision':
+            if self.decision == 'AND_Score':
+                self.directDecision_AND_Score_update()
+    
+    def test_decision(self):
+        if self.mode == 'DirectDecision':
+            if self.decision == 'AND_Score':
+                return self.directDecision_AND_Score_test()
+    
+    def getScoreMetrics(self):
+        scoreMetrics = []
+        #Get all score metrics (i.e. sockets of score node)
+        flowChart = self.parent.nodzinstance
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'scoringEnd_' in node.name:
+                    break
+            
+            #Now get the scores from here:
+            for socket in node.sockets:
+                scoreMetrics.append(socket)
+        return scoreMetrics
+    
+    
+    
+    def directDecision_AND_Score_test(self):
+        """
+        Code to test whether the current score passes the decision matrix or not. Should always output a boolean
+        """
+        finalTest = False
+        scoreMetrics = self.getScoreMetrics()
+        
+        #Get all score metrics (i.e. sockets of score node)
+        flowChart = self.parent.nodzinstance
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'scoringEnd_' in node.name:
+                    break
+        
+        #Find the nodes that are connected downstream of this:
+        data = {}
+        for attr in node.attrs:
+            connectedNode = None
+            for connection in flowChart.evaluateGraph():
+                if connection[1][connection[1].rfind('.')+1:] == attr:
+                    if connection[1][:connection[1].rfind('.')] == node.name:
+                        connectedNodeName = connection[0][:connection[0].rfind('.')]
+                        connectedNode = flowChart.findNodeByName(connectedNodeName)
+        
+                    data[attr] = connectedNode.scoring_analysis_currentData['__output__']
+        
+        #Data now contains the values of the scores
+        self.decisionInfoGUI
+        scoreMetric = 'ScoreA'
+        indivBooleans = {}
+        for scoreMetric in scoreMetrics:
+            hbox = self.decisionInfoGUI[scoreMetric]
+            operator = hbox['dropdown'].currentText()
+            value = hbox['lineedit'].text()
+            
+            if eval(f"{data[scoreMetric]} {operator} {value}"):
+                indivBooleans[scoreMetric] = True
+            else:
+                indivBooleans[scoreMetric] = False
+        
+        if all(indivBooleans.values()):
+            finalTest = True
+        
+        return finalTest
+    
+    def directDecision_AND_Score_update(self):
+        """
+        Code to update the GUI of the DirectDecision_AND_Score groupbox
+        """
         from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
         
         #Remove every child from the current layout():
@@ -1953,77 +2046,93 @@ class advDecisionGridLayout(QGroupBox):
             if child.widget() is not None:
                 child.widget().deleteLater()
 
-        self.innerLayouts = []
-        plusbutton = QPushButton('+')
-        self.layout().addWidget(plusbutton)
-        minusbutton = QPushButton('-')
-        self.layout().addWidget(minusbutton)
-        #Add a callback:
-        
         self.outerLayout = QVBoxLayout()
-        self.layout().addLayout(self.outerLayout,0,0,1,3)
+        self.layout().addLayout(self.outerLayout,0,0)
+        print('updating directDecision_AND_Score_update')
+        
+        #Get out of this function if flowChart isn't initialised yet (i.e. first start-up):
+        try:
+            self.parent.nodzinstance.nodes
+        except RuntimeError:
+            return
+        
+        scoreMetrics = self.getScoreMetrics()
+        
+        for scoreMetric in scoreMetrics:
+            hbox = QHBoxLayout()
+            label = QLabel(scoreMetric)
+            hbox.addWidget(label)
+            dropdown = QComboBox()
+            dropdown.addItems(['>','>=','==','<=','<','!='])
+            hbox.addWidget(dropdown)
+            lineedit = QLineEdit()
+            hbox.addWidget(lineedit)
+            self.decisionInfoGUI[scoreMetric] = {}
+            self.decisionInfoGUI[scoreMetric]['dropdown'] = dropdown
+            self.decisionInfoGUI[scoreMetric]['lineedit'] = lineedit
+            self.outerLayout.addLayout(hbox)
 
-        def remove_widgets_in_layout(layout):
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
-                elif item.layout() is not None:
-                    self.remove_widgets_in_layout(item.layout())
+        # def remove_widgets_in_layout(layout):
+        #     while layout.count():
+        #         item = layout.takeAt(0)
+        #         widget = item.widget()
+        #         if widget is not None:
+        #             widget.deleteLater()
+        #         elif item.layout() is not None:
+        #             self.remove_widgets_in_layout(item.layout())
                     
-        def remove_last_line():
-            if self.innerLayouts:
-                innerLayout = self.innerLayouts.pop()
-                while innerLayout.count():
-                    item = innerLayout.takeAt(0)
-                    widget = item.widget()
-                    if widget is not None:
-                        widget.deleteLater()
-                    elif item.layout() is not None:
-                        self.remove_widgets_in_layout(item.layout())
-                innerLayout.deleteLater()
+        # def remove_last_line():
+        #     if self.innerLayouts:
+        #         innerLayout = self.innerLayouts.pop()
+        #         while innerLayout.count():
+        #             item = innerLayout.takeAt(0)
+        #             widget = item.widget()
+        #             if widget is not None:
+        #                 widget.deleteLater()
+        #             elif item.layout() is not None:
+        #                 self.remove_widgets_in_layout(item.layout())
+        #         innerLayout.deleteLater()
     
-            self.outerLayout.update()
-            self.update()
+        #     self.outerLayout.update()
+        #     self.update()
 
-        def add_new_line():
-            #This can probably be cleaned up later, but eh
-            flowChart = self.parent.nodzinstance
+        # def add_new_line():
+        #     #This can probably be cleaned up later, but eh
+        #     flowChart = self.parent.nodzinstance
             
-            if len(flowChart.nodes) > 0:
-                #Find the scoringEnd node in flowChart:
-                for node in flowChart.nodes:
-                    if 'scoringEnd_' in node.name:
-                        break
+        #     if len(flowChart.nodes) > 0:
+        #         #Find the scoringEnd node in flowChart:
+        #         for node in flowChart.nodes:
+        #             if 'scoringEnd_' in node.name:
+        #                 break
                 
-                #Now get the scores from here:
-                scoreMetrics = []
-                for socket in node.sockets:
-                    scoreMetrics.append(socket)
+        #         #Now get the scores from here:
+        #         scoreMetrics = []
+        #         for socket in node.sockets:
+        #             scoreMetrics.append(socket)
                 
                 
-                innerLayout = QHBoxLayout()
-                scoreMetricComboBox = QComboBox()
-                scoreMetricComboBox.addItems(scoreMetrics)
-                innerLayout.addWidget(scoreMetricComboBox)
-                operatorComboBox = QComboBox()
-                operatorComboBox.addItems(['>','>=','<','<=','==','!='])
-                innerLayout.addWidget(operatorComboBox)
-                valueLineEdit = QLineEdit()
-                innerLayout.addWidget(valueLineEdit)
-                self.innerLayouts.append(innerLayout)
-                self.outerLayout.addLayout(self.innerLayouts[-1])
-                self.update()
-            else:
-                logging.warning('EMPTY FLOWCHART!')
+        #         innerLayout = QHBoxLayout()
+        #         scoreMetricComboBox = QComboBox()
+        #         scoreMetricComboBox.addItems(scoreMetrics)
+        #         innerLayout.addWidget(scoreMetricComboBox)
+        #         operatorComboBox = QComboBox()
+        #         operatorComboBox.addItems(['>','>=','<','<=','==','!='])
+        #         innerLayout.addWidget(operatorComboBox)
+        #         valueLineEdit = QLineEdit()
+        #         innerLayout.addWidget(valueLineEdit)
+        #         self.innerLayouts.append(innerLayout)
+        #         self.outerLayout.addLayout(self.innerLayouts[-1])
+        #         self.update()
+        #     else:
+        #         logging.warning('EMPTY FLOWCHART!')
             
-        plusbutton.clicked.connect(add_new_line)
-        minusbutton.clicked.connect(remove_last_line)
+        # plusbutton.clicked.connect(add_new_line)
+        # minusbutton.clicked.connect(remove_last_line)
 
         
         
-        print('hi')
+        # print('hi')
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     """
