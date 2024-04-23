@@ -613,6 +613,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Add a few buttons to the left side:
         self.buttonsArea = QVBoxLayout()
         self.mainLayout.addLayout(self.buttonsArea,0,0)
+        self.runScoringButton = QPushButton('Run Scoring')
+        self.buttonsArea.addWidget(self.runScoringButton)
+        self.runScoringButton.clicked.connect(lambda index: self.runScoring())
+        self.runAcquiringButton = QPushButton('Run Acquiring')
+        self.buttonsArea.addWidget(self.runAcquiringButton)
+        self.runAcquiringButton.clicked.connect(lambda index: self.runAcquiring())
+        
         self.debugScoringButton = QPushButton('Debug Scoring')
         self.buttonsArea.addWidget(self.debugScoringButton)
         self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
@@ -1181,6 +1188,40 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         }''')
         self.addConfig(self.nodeLayout)
     
+    def runScoring(self):
+        #Find the scoring_start node:
+        scoreStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'scoringStart_' in node.name:
+                    scoreStartNode = node
+        
+        #Run the scoring_start routine:
+        if scoreStartNode is not None:
+            self.scoringStart(scoreStartNode)
+        else:
+            logging.error('Could not find scoringStart node in flowchart')
+    
+    def runAcquiring(self):
+        print("Run Acquiring")
+        
+        #Find the acqStart node:
+        acqStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'acqStart_' in node.name:
+                    acqStartNode = node
+        
+        #Run the scoring_start routine:
+        if acqStartNode is not None:
+            self.acquiringStart(acqStartNode)
+        else:
+            logging.error('Could not find acqStart node in flowchart')
+    
     def debugScoring(self):
         """
         Function to get some debug information from the scoring function(s)
@@ -1700,6 +1741,25 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             else:
                 logging.warning(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
     
+    def acquiringStart(self,node):
+        """
+        This function is the action function for the Acquiring Start node in the Flowchart.
+
+        This function signals to the rest of the flowchart that it's time to start
+        the Acquiring routine.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+
+        Returns:
+            None
+        """
+        print('Starting the acquiring routine!')
+        
+        self.GraphToSignals()
+        
+        self.finishedEmits(node)
+    
     def scoringStart(self,node):
         """
         This function is the action function for the Scoring Start node in the Flowchart.
@@ -1750,6 +1810,23 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         print('Scoring finished fully!')
         if testPassed:
             print("Test is... Passed!")
+            
+            #Find the acqStart node:
+            acqStartNode = None
+            flowChart = self
+            if len(flowChart.nodes) > 0:
+                #Find the scoringEnd node in flowChart:
+                for nodeF in flowChart.nodes:
+                    if 'acqStart_' in nodeF.name:
+                        acqStartNode = nodeF
+            
+            #Run the scoring_start routine:
+            if acqStartNode is not None:
+                logging.info('Starting acquisition routine!')
+                self.acquiringStart(acqStartNode)
+            else:
+                logging.error('Could not find acqStart node in flowchart')
+            
         elif not testPassed:
             print("Test is... Not Passed!")
         print('----------------------')
@@ -1831,8 +1908,8 @@ class DecisionWidget(QWidget):
         
         self.decisionArray_decisionTypes = {}
         self.decisionArray_decisionTypes['DirectDecision'] = [
-                            ['OR_Score','Any scoring condition met'],
                             ['AND_Score','All scoring conditions met'],
+                            ['OR_Score','Any scoring condition met'],
                             ['Advanced','Advanced scoring condition']]
         self.decisionArray_decisionTypes['FullScan'] = [
                             ]
