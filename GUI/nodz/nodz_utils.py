@@ -168,3 +168,36 @@ def _loadData(filePath):
     print("Data successfully loaded !")
     return j_data
 
+
+
+def findConnectedToNode(graphInfo,nodeName,fullNodeList):
+    """
+    Recursively search the connections of a node in a graph
+    Example: NodeListConnections = findConnectedToNode(self.parent().evaluateGraph(),'scoringStart',[])
+
+    :param graphInfo: List of connection info (.evaluateGraph()). Each connection is a tuple with
+        the format (origin node name, destination node name)
+    :type  graphInfo: List of tuples.
+
+    :param nodeName: Name of the node to find the connected nodes from.
+    :type  nodeName: Str.
+
+    :param fullNodeList: List of nodes already found and their connected nodes.
+    :type  fullNodeList: List of Str.
+
+    :return: List of nodes connected to the given nodeName.
+    :rtype:  List of Str.
+    """
+
+    for connection in graphInfo:
+        if nodeName in connection[0]:
+            if connection[1].split('.')[0] not in fullNodeList:
+                fullNodeList.append(connection[1].split('.')[0])
+                fullNodeList = findConnectedToNode(graphInfo,connection[1].split('.')[0],fullNodeList)
+        if nodeName in connection[1]:
+            if connection[0].split('.')[0] not in fullNodeList:
+                fullNodeList.append(connection[0].split('.')[0])
+                fullNodeList = findConnectedToNode(graphInfo,connection[0].split('.')[0],fullNodeList)
+    
+    return fullNodeList
+        

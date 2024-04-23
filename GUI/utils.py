@@ -1103,3 +1103,6 @@ class SmallWindow(QMainWindow):
         #Add the layout to the central widget:
         self.centralWidget().layout().addLayout(layout)
         return self.fileLocationLineEdit
+
+
+# Utils to do with NODZ:

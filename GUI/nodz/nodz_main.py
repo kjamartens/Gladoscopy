@@ -1357,6 +1357,58 @@ class NodeScene(QtWidgets.QGraphicsScene):
             self.pen.setWidth(0)
             painter.setPen(self.pen)
             painter.drawLines(lines) #type:ignore
+        
+        self.drawBoundingBoxes(painter)
+
+    def drawBoundingBoxes(self,painter):
+        """
+        Draw colorful bounding boxes around the scoring nodes and around the acquiring nodes
+        """
+        
+        NodeListConnectionsScore = utils.findConnectedToNode(self.parent().evaluateGraph(),'scoringStart',[])
+        
+        if len(NodeListConnectionsScore) > 0:
+            self.drawBoundingBox(painter,NodeListConnectionsScore,boundingBorder=35,solidPaint=[50,150,50,75],linePaint=[0,200,0,200])
+            
+        NodeListConnectionsAcq = utils.findConnectedToNode(self.parent().evaluateGraph(),'acqStart',[])
+        
+        if len(NodeListConnectionsAcq) > 0:
+            self.drawBoundingBox(painter,NodeListConnectionsAcq,boundingBorder=35,solidPaint=[150,150,30,75],linePaint=[150,150,0,200])
+        
+    def drawBoundingBox(self,painter,NodeListConnections,boundingBorder=25,solidPaint=[50,150,50,75],linePaint=[0,200,0,200]):
+        
+        #We then look at all these nodes and find their top-left and bottom-right points:
+        minleft = 1e8
+        mintop = 1e8
+        minright = -1e8
+        minbottom = -1e8
+        boundingBorder = boundingBorder
+        for wantedNode in NodeListConnections:
+            for node in self.parent().nodes:
+                if node.name == wantedNode:
+                    left = node.scenePos().x()
+                    top = node.scenePos().y()
+                    right = node.scenePos().x()+node.boundingRect().width()
+                    bottom = node.scenePos().y()+node.boundingRect().height()
+                    if left < minleft:
+                        minleft = left
+                    if top < mintop:
+                        mintop = top
+                    if right > minright:
+                        minright = right
+                    if bottom > minbottom:
+                        minbottom = bottom
+        
+        #We draw a bounding box around the scoring nodes:
+        painter.setBrush(utils._convertDataToColor(solidPaint))
+        painter.setPen(utils._convertDataToColor(linePaint))
+
+        painter.drawRoundedRect(int(minleft-boundingBorder), 
+                                int(mintop-boundingBorder-25),
+                                int(minright-minleft+boundingBorder*2),
+                                int(minbottom-mintop+boundingBorder*2),
+                                int(boundingBorder),
+                                int(boundingBorder))
 
     def updateScene(self):
         """
