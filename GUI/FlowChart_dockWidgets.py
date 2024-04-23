@@ -623,10 +623,10 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.debugScoringButton = QPushButton('Debug Scoring')
         self.buttonsArea.addWidget(self.debugScoringButton)
         self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
-        self.storePickleButton = QPushButton('Store Pickle')
+        self.storePickleButton = QPushButton('Store Graph')
         self.buttonsArea.addWidget(self.storePickleButton)
         self.storePickleButton.clicked.connect(lambda index: self.storePickle())
-        self.loadPickleButton = QPushButton('Load Pickle')
+        self.loadPickleButton = QPushButton('Load Graph')
         self.buttonsArea.addWidget(self.loadPickleButton)
         self.loadPickleButton.clicked.connect(lambda index: self.loadPickle())
         
@@ -710,7 +710,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
 
         This function saves the current graph to a pickle file, which can be loaded later using `loadPickle()`.
         """
-        self.saveGraph('Testgraph.json')
+        from qtpy.QtWidgets import QFileDialog
+        filename, _ = QFileDialog.getSaveFileName(self, 'Save file', '', 'JSON files (*.json)')
+        if filename:
+            if not filename.endswith('.json'):
+                filename += '.json'
+            with open(filename, 'wb') as f:
+                self.saveGraph(filename)
     
     def loadPickle(self):
         """
@@ -719,14 +725,28 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         This function loads the graph from a pickle file created using `storePickle()`.
         """
         import pickle, copy
-        #Fully clear graph and delete all nodes from memory:
-        self.clearGraph()
-        self.nodes = []
-        #Set all counters to 0:
-        for nodeType in self.nodeInfo:
-            self.nodeInfo[nodeType]['NodeCounter'] = 0
-            self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
-        self.loadGraph_KM('Testgraph.json')
+        
+        from qtpy.QtWidgets import QFileDialog, QMessageBox
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open file', '', 'JSON files (*.json)')
+        if filename:
+            try:
+                #Fully clear graph and delete all nodes from memory:
+                self.clearGraph()
+                self.nodes = []
+                #Set all counters to 0:
+                for nodeType in self.nodeInfo:
+                    self.nodeInfo[nodeType]['NodeCounter'] = 0
+                    self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
+                #Load the graph
+                with open(filename, 'rb') as f:
+                    self.loadGraph_KM(filename)
+            except:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Warning)
+                msg.setText("Could not load file: " + filename)
+                msg.setWindowTitle("Warning")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
     
     def nodeLookupName_withoutCounter(self,nodeName):
         """
