@@ -1927,6 +1927,15 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             
         elif not testPassed:
             print("Test is... Not Passed!")
+            #Go to next XY position
+            if self.fullRunOngoing:
+                if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
+                    self.fullRunCurrentPos +=1
+                    #And start a new score/acq at a new pos:
+                    self.startNewScoreAcqAtPos()
+                else:
+                    self.singleRunOngoing = False
+                    print('All done!')
         print('----------------------')
         # self.finishedEmits(node)
 
