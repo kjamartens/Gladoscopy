@@ -74,6 +74,15 @@ def napariUpdateLive(DataStructure):
         layer = napariViewer.layers[liveImageLayer[0]]
         layer.data = liveImage
     
+    # # Check if the queue is empty
+    # if image_queue_analysisA.empty():
+    #     image_queue_analysisA.put([liveImage,metadata])
+    #     #Start all analysisthreads
+    #     for analysisThread in analysisThreads:
+    #         if not analysisThread.isRunning():
+    #             print(f'starting analysis thread: {analysisThread}')
+    #             analysisThread.start()
+    
 def napariUpdateAnalysisThreads(DataStructure):
     """ 
     Function that finally shows the  image in napari
@@ -139,10 +148,14 @@ class napariHandler():
         if self.acqstate:
             if self.img_queue.qsize() < 3:
                 self.img_queue.put([image,metadata])
-                #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-                for queue in self.shared_data.liveImageQueues:
-                    if queue.qsize() < 2:
-                        queue.put([image,metadata])
+                
+            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() < 2:
+                    queue.put([image,metadata])
+                        
+            if self.image_queue_analysis.qsize() < 3:
+                self.image_queue_analysis.put([image,metadata])
             
         else:
             logging.info('Broke off live mode')
@@ -227,7 +240,7 @@ class napariHandler():
         Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
         """
-        img_queue = parent.img_queue
+        img_queue = parent.image_queue_analysis
         while self.acqstate:
             time.sleep(0)
             # get elements from queue while there is more than one element
@@ -312,7 +325,7 @@ class napariHandler():
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Always start live-mode visualisation:
-                # napariGlados.startLiveModeVisualisation(self.shared_data)
+                napariGlados.startLiveModeVisualisation(self.shared_data)
                 
                 #Start the worker to run the pycromanager acquisition
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
