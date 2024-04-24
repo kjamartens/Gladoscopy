@@ -1870,32 +1870,53 @@ class NodeItem(QtWidgets.QGraphicsItem):
         painter.setPen(self._textPen)
         painter.setFont(self._nodeTextFont)
 
-        metrics = QtGui.QFontMetrics(painter.font())
-        text_width = metrics.boundingRect(self.name).width() + 14
-        text_height = metrics.boundingRect(self.name).height() + 14
-        margin = (text_width - self.baseWidth) * 0.5
-        textRect = QtCore.QRect(int(-margin),
-                                int(-text_height),
-                                int(text_width),
-                                int(text_height))
 
         if self.displayName == None:
+            metrics = QtGui.QFontMetrics(painter.font())
+            text_width = metrics.boundingRect(self.name).width() + 14
+            text_height = metrics.boundingRect(self.name).height() + 14
+            margin = (text_width - self.baseWidth) * 0.5
+            textRect = QtCore.QRect(int(-margin),
+                                    int(-text_height),
+                                    int(text_width),
+                                    int(text_height))
             painter.drawText(textRect,
                             QtCore.Qt.AlignCenter, #type:ignore
                             self.name)
         else:
+            metrics = QtGui.QFontMetrics(painter.font())
+            text_width = metrics.boundingRect(self.displayName).width() + 14
+            text_height = metrics.boundingRect(self.displayName).height() + 14
+            margin = (text_width - self.baseWidth) * 0.5
+            textRect = QtCore.QRect(int(-margin),
+                                    int(-text_height),
+                                    int(text_width),
+                                    int(text_height))
             painter.drawText(textRect,
                             QtCore.Qt.AlignCenter, #type:ignore
                             self.displayName)
 
-
-        statusRect = QtCore.QRect(int(-margin),
-                                int(-text_height-text_height/2),
-                                int(text_width),
-                                int(text_height))
-        painter.drawText(statusRect,
-                        QtCore.Qt.AlignCenter, #type:ignore
-                        self.status)
+        #Draw the icon
+        from PyQt5.QtGui import QPixmap
+        if self.status == 'idle':
+            self.icon = QPixmap('GUI/Icons/node_pending.png')
+        elif self.status == 'running':
+            self.icon = QPixmap('GUI/Icons/node_inProgress.png')
+        elif self.status == 'finished':
+            self.icon = QPixmap('GUI/Icons/node_completed.png')
+        else:
+            self.icon = QPixmap('GUI/Icons/node_error.png')
+            
+        iconSize = 15
+        painter.drawPixmap(int(-margin-iconSize+14-5-iconSize/2), int(-text_height+iconSize*.66), int(iconSize), int(iconSize), self.icon)
+        
+        # statusRect = QtCore.QRect(int(-margin),
+        #                         int(-text_height-text_height/2),
+        #                         int(text_width),
+        #                         int(text_height))
+        # painter.drawText(statusRect,
+        #                 QtCore.Qt.AlignCenter, #type:ignore
+        #                 self.status)
 
         #Draw the textbox
         self.drawTextbox(painter)
