@@ -298,6 +298,8 @@ class AnalysisThread(QThread):
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
         elif analysisInfo == 'LiveModeVisualisation':
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+        elif analysisInfo == 'mdaVisualisation':
+            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
         else:
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
             #Create an empty overlay
@@ -399,7 +401,7 @@ class AnalysisThread(QThread):
         if data is not None:
             image = data[0]
             metadata = data[1]
-            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation':
+            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
                 self.msleep(self.sleepTimeMs)
                 #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
                 if self.analysisInfo == 'AvgGrayValueText':
@@ -413,7 +415,7 @@ class AnalysisThread(QThread):
                 else:
                     analysisResult = None
                 return [analysisResult,metadata]
-            elif self.analysisInfo == 'LiveModeVisualisation':
+            elif self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
                 self.setPriority(self.HighestPriority) #type:ignore
                 return None
             else:
@@ -441,7 +443,7 @@ class AnalysisThread(QThread):
             analysis_result = analysis_data[0]
             metadata = analysis_data[1]
             # print(analysis_result)
-            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation':
+            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
                 if self.visualisationInfo == 'AvgGrayValueText':
                     self.visualiseAvgGrayValueText(analysis_result=analysis_result,metadata=metadata)
                 elif self.analysisInfo == 'GrayValueOverlay':

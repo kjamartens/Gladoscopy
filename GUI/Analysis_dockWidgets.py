@@ -44,6 +44,11 @@ class analysisDockWidget:
         #add a connection to the button:
         self.Button1.clicked.connect(lambda index, s=shared_data: napariGlados.startLiveModeVisualisation(s))
         
+        self.Button1 = QPushButton('Start mda vis')
+        self.analysisLayout.addWidget(self.Button1,7,0)
+        #add a connection to the button:
+        self.Button1.clicked.connect(lambda index, s=shared_data: napariGlados.startMDAVisualisation(s))
+        
     
     def startThread(self,analysisInfo):
         print('Starting analysis ' + analysisInfo)

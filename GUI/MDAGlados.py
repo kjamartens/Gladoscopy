@@ -14,6 +14,7 @@ import asyncio
 import pyqtgraph as pg
 import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
+import napariGlados
 #For drawing
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -795,7 +796,7 @@ class MDAGlados(CustomMainWindow):
         else:
             self.storageGroupBox.setEnabled(False)
         self.GUI_acquire_button = QPushButton("Acquire")
-        self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI())
+        self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
         optionsBLayout.addWidget(self.GUI_acquire_button) # type: ignore
         if GUI_acquire_button:
             self.GUI_acquire_button.setEnabled(True)
@@ -867,7 +868,7 @@ class MDAGlados(CustomMainWindow):
         logging.info('MDA acq data finished and data stored!')
         self.MDA_completed.emit(True)
     
-    def MDA_acq_from_GUI(self):
+    def MDA_acq_from_GUI(self, mdaLayerName=None):
         logging.debug('At MDA_acq_from_GUI')
         self.shared_data._mdaMode = False
         
@@ -885,6 +886,9 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mda_acq_done_signal.connect(self.MDA_acq_finished)
         #And set the mdamode to be true
         self.shared_data.mdaMode = True
+        #And start visualization
+        if mdaLayerName is not None:
+            napariGlados.startMDAVisualisation(self.shared_data,layerName=mdaLayerName)
         logging.debug('ended setting mdamode params')
         
         pass

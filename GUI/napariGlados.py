@@ -235,7 +235,7 @@ class napariHandler():
     
     
     @thread_worker(connect={'yielded': napariUpdateAnalysisThreads})
-    def run_analysis_worker(self,parent):
+    def run_analysis_worker(self,parent,layerName='Layer'):
         """
         Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
@@ -253,15 +253,12 @@ class napariHandler():
                 DataStructure['core'] = self.shared_data.core
                 DataStructure['image_queue_analysis'] = self.image_queue_analysis
                 DataStructure['analysisThreads'] = self.shared_data.analysisThreads
-                if self.liveOrMda == 'live':
-                    DataStructure['layer_name'] = 'Live'
-                else:
-                    DataStructure['layer_name'] = 'MDA'
+                DataStructure['layer_name'] = layerName
                 yield DataStructure
 
     
     @thread_worker(connect={'yielded': napariUpdateLive})
-    def run_napariVisualisation_worker(self,parent):
+    def run_napariVisualisation_worker(self,parent,layerName='Layer'):
         """
         Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
@@ -280,10 +277,7 @@ class napariHandler():
                 DataStructure['core'] = self.shared_data.core
                 DataStructure['image_queue_analysis'] = self.image_queue_analysis
                 DataStructure['analysisThreads'] = self.shared_data.analysisThreads
-                if self.liveOrMda == 'live':
-                    DataStructure['layer_name'] = 'Live'
-                else:
-                    DataStructure['layer_name'] = 'MDA'
+                DataStructure['layer_name'] = layerName
                 yield DataStructure
                 # self.napariUpdateLive(img_queue.get(block=False))
 
@@ -296,10 +290,7 @@ class napariHandler():
             DataStructure['core'] = self.shared_data.core
             DataStructure['image_queue_analysis'] = self.image_queue_analysis
             DataStructure['analysisThreads'] = self.shared_data.analysisThreads
-            if self.liveOrMda == 'live':
-                DataStructure['layer_name'] = 'Live'
-            else:
-                DataStructure['layer_name'] = 'MDA'
+            DataStructure['layer_name'] = layerName
             yield DataStructure#img_queue.get(block = False)
             # self.napariUpdateLive(img_queue.get(block=False))
         logging.debug("acquisition done")
@@ -347,7 +338,7 @@ class napariHandler():
                 self.stop_continuous_task = False
                 #Start the two workers, one to run it, one to visualise it.
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
-                worker2 = self.run_napariVisualisation_worker(self) #type:ignore
+                # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore
                 # worker2.start()
                 logging.debug("MDA mode started from acqModeChanged")
@@ -494,7 +485,11 @@ class dockWidget_fullGladosUI(QMainWindow):
 
 def startLiveModeVisualisation(shared_data):
     create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
-    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler)
+    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = 'Live-')
+
+def startMDAVisualisation(shared_data,layerName='MDA-'):
+    create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
+    shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName)
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
@@ -526,7 +521,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     shared_data.napariViewer = napariViewer
     
     # create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
-    create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
+    # create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     logging.debug("Live mode pseudo-analysis thread created")
     
     #Set some common things for the UI (scale bar on and such)
