@@ -62,26 +62,21 @@ def napariUpdateLive(DataStructure):
     #If it's the first liveImageLayer
     if not liveImageLayer:
         nrLayersBefore = len(napariViewer.layers)
-        layer = napariViewer.add_image(liveImage, rendering='attenuated_mip', name = layerName)
+        layer = napariViewer.add_image(liveImage, rendering='attenuated_mip', colormap=DataStructure['layer_color_map'],name = layerName)
         #Set correct scale - in nm
         layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
         layer._keep_auto_contrast = True #type:ignore
-        napariViewer.layers.move_multiple([nrLayersBefore,0])
+        #Move to the front of the layers
+        napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
         napariViewer.reset_view()
     #Else if the layer already exists, replace it!
     else:
         # layer is present, replace its data
         layer = napariViewer.layers[liveImageLayer[0]]
+        #Also move to top
+        napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
         layer.data = liveImage
     
-    # # Check if the queue is empty
-    # if image_queue_analysisA.empty():
-    #     image_queue_analysisA.put([liveImage,metadata])
-    #     #Start all analysisthreads
-    #     for analysisThread in analysisThreads:
-    #         if not analysisThread.isRunning():
-    #             print(f'starting analysis thread: {analysisThread}')
-    #             analysisThread.start()
     
 def napariUpdateAnalysisThreads(DataStructure):
     """ 
@@ -235,7 +230,7 @@ class napariHandler():
     
     
     @thread_worker(connect={'yielded': napariUpdateAnalysisThreads})
-    def run_analysis_worker(self,parent,layerName='Layer'):
+    def run_analysis_worker(self,parent,layerName='Layer',layerColorMap='gray'):
         """
         Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
@@ -254,11 +249,12 @@ class napariHandler():
                 DataStructure['image_queue_analysis'] = self.image_queue_analysis
                 DataStructure['analysisThreads'] = self.shared_data.analysisThreads
                 DataStructure['layer_name'] = layerName
+                DataStructure['layer_color_map'] = layerColorMap
                 yield DataStructure
 
     
     @thread_worker(connect={'yielded': napariUpdateLive})
-    def run_napariVisualisation_worker(self,parent,layerName='Layer'):
+    def run_napariVisualisation_worker(self,parent,layerName='Layer',layerColorMap='gray'):
         """
         Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
@@ -278,6 +274,7 @@ class napariHandler():
                 DataStructure['image_queue_analysis'] = self.image_queue_analysis
                 DataStructure['analysisThreads'] = self.shared_data.analysisThreads
                 DataStructure['layer_name'] = layerName
+                DataStructure['layer_color_map'] = layerColorMap
                 yield DataStructure
                 # self.napariUpdateLive(img_queue.get(block=False))
 
@@ -291,6 +288,7 @@ class napariHandler():
             DataStructure['image_queue_analysis'] = self.image_queue_analysis
             DataStructure['analysisThreads'] = self.shared_data.analysisThreads
             DataStructure['layer_name'] = layerName
+            DataStructure['layer_color_map'] = layerColorMap
             yield DataStructure#img_queue.get(block = False)
             # self.napariUpdateLive(img_queue.get(block=False))
         logging.debug("acquisition done")
@@ -483,13 +481,13 @@ class dockWidget_fullGladosUI(QMainWindow):
         runlaserControllerUI(core,MM_JSON,self.ui,shared_data)
         # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
 
-def startLiveModeVisualisation(shared_data):
+def startLiveModeVisualisation(shared_data,layerName='Live'):
     create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
-    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = 'Live-')
+    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
 
-def startMDAVisualisation(shared_data,layerName='MDA-'):
+def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
     create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
-    shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName)
+    shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:

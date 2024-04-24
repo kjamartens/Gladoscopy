@@ -869,6 +869,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_SCORING_VISUALISATION'] = dict()
         data['NODES_SCORING_SCORING'] = dict()
         data['NODES_SCORING_END'] = dict()
+        data['NODES_VISUALISATION'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -937,6 +938,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'scoring_end_currentData' in vars(nodeInst):
                 if nodeInst.scoring_end_currentData['Variables'] is not None:
                     data['NODES_SCORING_END'][node] = nodeInst.scoring_end_currentData
+
+            data['NODES_VISUALISATION'][node] = {}
+            if 'visualisation_currentData' in vars(nodeInst):
+                if nodeInst.visualisation_currentData is not None:
+                    data['NODES_VISUALISATION'][node] = nodeInst.visualisation_currentData
 
             attrs = nodeInst.attrs
             for attr in attrs:
@@ -1039,20 +1045,6 @@ class Nodz(QtWidgets.QGraphicsView):
                     for attr in data['NODES_MDA'][name]:
                         setattr(node.mdaData,attr,correctedmdadata[attr]) #type:ignore
 
-                    #Restore the settings of the '_enabled' options
-                    # node.mdaData.GUI_show_channel_chkbox.setChecked(node.mdaData.GUI_channel_enabled) #type:ignore
-                    # node.mdaData.GUI_show_channel = node.mdaData.GUI_channel_enabled #type:ignore
-                    # node.mdaData.GUI_show_exposure_chkbox.setChecked(node.mdaData.GUI_exposure_enabled) #type:ignore
-                    # node.mdaData.GUI_show_exposure = node.mdaData.GUI_exposure_enabled #type:ignore
-                    # node.mdaData.GUI_show_storage_chkbox.setChecked(node.mdaData.GUI_storage_enabled) #type:ignore
-                    # node.mdaData.GUI_show_storage = node.mdaData.GUI_storage_enabled #type:ignore
-                    # node.mdaData.GUI_show_time_chkbox.setChecked(node.mdaData.GUI_time_enabled) #type:ignore
-                    # node.mdaData.GUI_show_time = node.mdaData.GUI_time_enabled #type:ignore
-                    # node.mdaData.GUI_show_xy_chkbox.setChecked(node.mdaData.GUI_xy_enabled) #type:ignore
-                    # node.mdaData.GUI_show_xy = node.mdaData.GUI_xy_enabled #type:ignore
-                    # node.mdaData.GUI_show_z_chkbox.setChecked(node.mdaData.GUI_z_enabled) #type:ignore
-                    # node.mdaData.GUI_show_z = node.mdaData.GUI_z_enabled #type:ignore
-                    
                 
             #Restore MM-config-changing data
             if name in data['NODES_MMCONFIGCHANGE']:
@@ -1080,7 +1072,10 @@ class Nodz(QtWidgets.QGraphicsView):
                 if 'scoring_end_currentData' in vars(node):
                     if len(data['NODES_SCORING_END'][name]['Variables']) > 0:
                         node.scoring_end_currentData = data['NODES_SCORING_END'][name] #type:ignore
-            
+            if name in data['NODES_VISUALISATION']:
+                if 'visualisation_currentData' in vars(node):
+                    if data['NODES_VISUALISATION'] is not None:
+                        node.visualisation_currentData = data['NODES_VISUALISATION'][name] #type:ignore
             
             #Do an emit after full loading:
             self.signal_NodeFullyInitialisedNodeItself.emit(node)
@@ -1469,6 +1464,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         self.scoring_end_currentData = {}
         self.scoring_end_currentData['Variables'] = {}
+        
+        self.visualisation_currentData = {}
         
         self.status = 'idle' #status should be 'idle','running','finished'
 

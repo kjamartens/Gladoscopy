@@ -868,6 +868,53 @@ class MDAGlados(CustomMainWindow):
         logging.info('MDA acq data finished and data stored!')
         self.MDA_completed.emit(True)
     
+    def MDA_acq_from_Node(self, nodeInfo):
+        #Basically the same as MDA_from_GUI, but with the NodeInfo
+        logging.debug('At MDA_acq_from_node')
+        nodeName = nodeInfo.name
+        
+        #Look at the 'Visual' bottom attribute:
+        visualAttr = nodeInfo.bottomAttrs['Visual']
+        if len(visualAttr.connections) > 0:
+            visual_connected_node_name = visualAttr.connections[0].socketNode
+            for node in nodeInfo.flowChart.nodes:
+                if node.name == visual_connected_node_name:
+                    visual_connected_node = node
+                    if 'layerName' in visual_connected_node.visualisation_currentData and visual_connected_node.visualisation_currentData['layerName'] is not None:
+                        layerName = visual_connected_node.visualisation_currentData['layerName']
+                    else:
+                        visual_connected_node.visualisation_currentData['layerName'] = nodeName
+                        layerName = nodeName
+                        
+                    if 'colormap' in visual_connected_node.visualisation_currentData and visual_connected_node.visualisation_currentData['colormap'] is not None:
+                        colormap = visual_connected_node.visualisation_currentData['colormap']
+                    else:
+                        visual_connected_node.visualisation_currentData['colormap'] = 'gray'
+                        colormap = 'gray'
+                    break
+        
+            napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
+        
+        self.shared_data._mdaMode = False
+        
+        #Set the exposure time:
+        self.core.set_exposure(self.exposure_ms)
+        
+        #Set the location where to save the mda
+        self.shared_data._mdaModeSaveLoc = [self.storage_folder,self.storage_file_name]
+        #Set whether the napariviewer should (also) try to connect to the mda
+        # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
+        #Set the mda parameters
+        self.shared_data._mdaModeParams = self.mda
+        #Set this MDA object as the active MDA object in the shared_data
+        self.shared_data.activeMDAobject = self
+        self.shared_data.mda_acq_done_signal.connect(self.MDA_acq_finished)
+        #And set the mdamode to be true
+        self.shared_data.mdaMode = True
+        logging.debug('ended setting mdamode params')
+        
+        pass
+    
     def MDA_acq_from_GUI(self, mdaLayerName=None):
         logging.debug('At MDA_acq_from_GUI')
         self.shared_data._mdaMode = False

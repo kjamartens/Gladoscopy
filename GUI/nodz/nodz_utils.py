@@ -200,4 +200,20 @@ def findConnectedToNode(graphInfo,nodeName,fullNodeList):
                 fullNodeList = findConnectedToNode(graphInfo,connection[0].split('.')[0],fullNodeList)
     
     return fullNodeList
-        
+
+def findNodeByName(flowchart,nodeName):
+    for nodes in flowchart.nodes:
+        if nodes.name == nodeName:
+            return nodes
+
+def getConnectedNodes(node, connectiontype):
+    connectedNodes = []
+    if connectiontype == 'topAttr':
+        for attr in node.topAttrs:
+            if len(node.topAttrs[attr].connections)>0:
+                for connection in node.topAttrs[attr].connections:
+                    connectedNodeName = connection.plugNode
+                    connectedNode = findNodeByName(node.flowChart,connectedNodeName)
+                    connectedNodes.append(connectedNode)
+    return connectedNodes
+                    

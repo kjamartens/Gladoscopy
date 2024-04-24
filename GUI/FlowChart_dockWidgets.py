@@ -70,6 +70,7 @@ class AnalysisScoringVisualisationDialog(QDialog):
         
         self.setLayout(layout)
 
+
 class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
     def __init__(self, parent=None, currentNode=None):
         super().__init__(parent, currentNode)
@@ -206,6 +207,66 @@ class nodz_openMMConfigDialog(QDialog):
 
     # def getmdaData(self):
     #     return self.mdaconfig
+
+class nodz_visualisationDialog(QDialog):
+    def __init__(self, parentNode=None):
+        """
+        Opens a dialog to modify the visualisation settings
+        
+        Args:
+            parentNode (Node): The node to modify the configs of.
+            
+        Returns:
+            A tuple with the configs as a dictionary and the list of configs as strings.
+        """
+        super().__init__(None)
+        
+        self.setWindowTitle("Visualisation Dialog")
+        if parentNode is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget, QFormLayout
+            layout_sub = QFormLayout()
+            if 'layerName' not in parentNode.visualisation_currentData or parentNode.visualisation_currentData['layerName'] is not None:
+                connectedNodes = nodz_utils.getConnectedNodes(parentNode, 'topAttr')
+                if len(connectedNodes)>0:
+                    connectedNode = connectedNodes[0]
+                    defaultText = connectedNode.name
+                else:
+                    defaultText = 'newLayer'
+            else:
+                defaultText = parentNode.visualisation_currentData['layerName']
+            self.layerNameEdit = QLineEdit()
+            self.layerNameEdit.setText(defaultText)
+            layout_sub.addRow("Layer name:", self.layerNameEdit)
+            
+            import napari
+            
+            self.colormapComboBox = QComboBox()
+            colormaps = napari.utils.colormaps.AVAILABLE_COLORMAPS
+            for colormap in colormaps:
+                self.colormapComboBox.addItem(colormap)
+            
+            if 'colormap' not in parentNode.visualisation_currentData or parentNode.visualisation_currentData['colormap'] is None:
+                self.colormapComboBox.setCurrentText('gray')
+            else:
+                self.colormapComboBox.setCurrentText(parentNode.visualisation_currentData['colormap'])
+            
+            self.colormapComboBox.addItem("Use new config")
+            layout_sub.addRow("Colormap:", self.colormapComboBox)
+            
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box.accepted.connect(self.accept)
+            button_box.rejected.connect(self.reject)
+            
+            # Create the QVBoxLayout
+            layout = QVBoxLayout()
+
+            # Add the QMainWindow to the QVBoxLayout
+            layout.addLayout(layout_sub)
+
+            layout.addWidget(button_box)
+            
+            self.setLayout(layout)
+        
 
 class nodz_openMDADialog(QDialog):
     def __init__(self, parent=None, parentData=None, currentNode = None):
@@ -965,6 +1026,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
                 #Update the results of this dialog into the nodz node
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
+        elif 'visualisation_' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #Show dialog:
+            dialog = nodz_visualisationDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.visualisation_currentData['layerName'] = dialog.layerNameEdit.text()
+                currentNode.visualisation_currentData['colormap'] = dialog.colormapComboBox.currentText()
         elif 'changeStagePos' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #Show dialog:
@@ -1582,7 +1650,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #And set the nodecounterneverreset to be this value +1 or higher
             if self.nodeInfo[nodeType]['NodeCounterNeverReset'] < newNodeNumber+1:
                 self.nodeInfo[nodeType]['NodeCounterNeverReset'] = newNodeNumber+1
-            
+        newNode.flowChart = self
         if nodeType in self.config:
             configtype = nodeType
         else:
@@ -1604,7 +1672,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True) # type: ignore
             
             #Do the acquisition upon callAction
-            newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_GUI()
+            newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_Node(node)
             
             #Add the node emits of 'finishing' upon MDA completion.
             newNode.mdaData.MDA_completed.connect(lambda self, node = newNode: node.customFinishedEmits.emit_all_signals())
@@ -1787,7 +1855,16 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                     #This disconnects all signals
                     signal.disconnect()
                 except:
+                    #Otherwise we FULLY reset the signal?
                     logging.warning('attempted to disconnect a disconnected signal')
+                    # nodeType = self.nodeLookupName_withoutCounter(node.name)
+                    # if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
+                    #     node.customFinishedEmits = NodeSignalManager()
+                    #     for attr in self.nodeInfo[nodeType]['finishedAttributes']:
+                    #         node.customFinishedEmits.add_signal(attr) #type: ignore
+                    # else:
+                    #     node.customFinishedEmits = None
+            
             if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
                 signal = node.customDataEmits.signals[0] #type: ignore
                 try:
@@ -1795,6 +1872,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                     signal.disconnect()
                 except:
                     logging.warning('attempted to disconnect a disconnected signal')
+                    # nodeType = self.nodeLookupName_withoutCounter(node.name)
+                    # if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
+                    #     node.customDataEmits = NodeSignalManager()
+                    #     for attr in self.nodeInfo[nodeType]['dataAttributes']:
+                    #         node.customDataEmits.add_signal(attr) #type: ignore
+                    # else:
+                    #     node.customDataEmits = None
             
         #Create all required signal connections
         currentgraph = self.evaluateGraph()
@@ -1882,9 +1966,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Set all connected nodes to idle
         connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
         for connectedNode in connectedNodes:
-            for node in self.nodes:
-                if node.name == connectedNode:
-                    node.status='idle'
+            for nodeC in self.nodes:
+                if nodeC.name == connectedNode:
+                    nodeC.status='idle'
         
         self.GraphToSignals()
         
