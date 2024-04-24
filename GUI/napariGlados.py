@@ -268,7 +268,7 @@ class napariHandler():
                 self.stop_continuous_task = False
                 #Start the two workers, one to run it, one to visualise it.
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
-                worker2 = self.run_napariVisualisation_worker(self) #type:ignore
+                # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore
                 # worker2.start()
                 logging.info("Live mode started")
@@ -431,6 +431,9 @@ class dockWidget_fullGladosUI(QMainWindow):
         runlaserControllerUI(core,MM_JSON,self.ui,shared_data)
         # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
 
+def startLiveModeVisualisation(shared_data):
+    create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler)
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
@@ -461,7 +464,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
     
-    create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    # create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
     create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     logging.debug("Live mode pseudo-analysis thread created")
     

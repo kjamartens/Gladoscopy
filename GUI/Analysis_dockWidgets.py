@@ -39,6 +39,11 @@ class analysisDockWidget:
         #add a connection to the button:
         self.Button1.clicked.connect(lambda index: self.startThread('ChangeStageAtFrame'))
         
+        self.Button1 = QPushButton('Start live vis')
+        self.analysisLayout.addWidget(self.Button1,6,0)
+        #add a connection to the button:
+        self.Button1.clicked.connect(lambda index, s=shared_data: napariGlados.startLiveModeVisualisation(s))
+        
     
     def startThread(self,analysisInfo):
         print('Starting analysis ' + analysisInfo)
