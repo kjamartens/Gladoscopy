@@ -74,7 +74,25 @@ def napariUpdateLive(DataStructure):
         layer = napariViewer.layers[liveImageLayer[0]]
         layer.data = liveImage
     
-    # Do analysis on this live image
+def napariUpdateAnalysisThreads(DataStructure):
+    """ 
+    Function that finally shows the  image in napari
+    """
+    napariViewer = DataStructure['napariViewer']
+    acqstate = DataStructure['acqState']
+    core = DataStructure['core']
+    image_queue_analysisA = DataStructure['image_queue_analysis']
+    analysisThreads = DataStructure['analysisThreads']
+    logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
+    liveImage = DataStructure['data'][0]
+    metadata = DataStructure['data'][1]
+    layerName = DataStructure['layer_name']
+    if liveImage is None:
+        return
+    if acqstate == False:
+        return
+    liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+
     # Check if the queue is empty
     if image_queue_analysisA.empty():
         image_queue_analysisA.put([liveImage,metadata])
@@ -202,6 +220,33 @@ class napariHandler():
             #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
             cleanUpTemporaryFiles()
     
+    
+    @thread_worker(connect={'yielded': napariUpdateAnalysisThreads})
+    def run_analysis_worker(self,parent):
+        """
+        Worker which handles the visualisation of the live mode queue
+        Connected to display_napari function to update display 
+        """
+        img_queue = parent.img_queue
+        while self.acqstate:
+            time.sleep(0)
+            # get elements from queue while there is more than one element
+            # playing it safe: I'm always leaving one element in the queue
+            while img_queue.qsize() > 1:
+                DataStructure = {}
+                DataStructure['data'] = img_queue.get(block = False)
+                DataStructure['napariViewer'] = self.shared_data.napariViewer
+                DataStructure['acqState'] = self.acqstate
+                DataStructure['core'] = self.shared_data.core
+                DataStructure['image_queue_analysis'] = self.image_queue_analysis
+                DataStructure['analysisThreads'] = self.shared_data.analysisThreads
+                if self.liveOrMda == 'live':
+                    DataStructure['layer_name'] = 'Live'
+                else:
+                    DataStructure['layer_name'] = 'MDA'
+                yield DataStructure
+
+    
     @thread_worker(connect={'yielded': napariUpdateLive})
     def run_napariVisualisation_worker(self,parent):
         """
@@ -266,11 +311,14 @@ class napariHandler():
                 logging.debug('liveMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
-                #Start the two workers, one to run it, one to visualise it.
+                #Always start live-mode visualisation:
+                # napariGlados.startLiveModeVisualisation(self.shared_data)
+                
+                #Start the worker to run the pycromanager acquisition
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
-                # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore
-                # worker2.start()
+                worker2 = self.run_analysis_worker(self)
+                
                 logging.info("Live mode started")
         elif self.liveOrMda == 'mda':
             #Hook the live mode into the scripts here
