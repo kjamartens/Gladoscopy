@@ -729,8 +729,9 @@ class AnalysisThread_customFunction(QThread):
         print('Called once to init the analysis!')
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):
-        utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
-        return 0
+        self.msleep(self.sleepTimeMs)
+        result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
+        return result
 
 
 
@@ -766,7 +767,7 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
     return analysis_thread
 
 #Use this function from now on
-def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewThread = True,throughputThread=None,delay=100):
+def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewThread = True,throughputThread=None,delay: float|None = None):
     
     #Created/tested via nodz
     
@@ -780,8 +781,8 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
         shared_data.liveImageQueues.append(image_queue_analysis)
             
     if delay==None:
-        #TODO: check for delay in the function
-        delay=100
+        #Get the delay of the function from the realTimeAnalysis module
+        delay = utils.realTimeAnalysis_getDelay(analysisInfo,runOrVis='run')
     
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal

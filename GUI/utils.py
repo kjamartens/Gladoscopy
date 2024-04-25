@@ -1109,6 +1109,23 @@ def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3)
 
     return result
 
+def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
+    wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][0][1].split(".")[0]
+    functionMetadata = eval(wrapperName+".__function_metadata__()")
+    functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][0][1].split(".")[1]]
+    if runOrVis == 'run':
+        if 'run_delay' not in functionMetadata2:
+            delay = 100 #Default value for run
+        else:
+            delay = functionMetadata2['run_delay']
+    elif runOrVis == 'visualise':
+        if 'visualise_delay' not in functionMetadata2:
+            delay = 500 #Default value for vis
+        else:
+            delay = functionMetadata2['visualise_delay']
+    
+    return delay
+
 class SmallWindow(QMainWindow):
     """ 
     General class that creates a small popup window to have some data. Mostly used for utility functions.

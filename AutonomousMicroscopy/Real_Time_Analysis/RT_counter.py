@@ -18,7 +18,9 @@ def __function_metadata__():
                 {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
             ],
             "help_string": "RT counter.",
-            "display_name": "RT counter"
+            "display_name": "RT counter",
+            "run_delay": 0,
+            "visualise_delay": 500
         }
     }
 
@@ -36,11 +38,7 @@ class RT_counterV():
         return None
 
     def run(self,image,metadata,core,**kwargs):
-        print('running every time this is called! now at time '+str(time.time()))
-        print(image)
-        print(metadata)
-        print(core)
-        print(kwargs)
+        print("At frame: "+metadata['ImageNumber'])
     
     def visualise(self,image,metadata,core,**kwargs):
         print('optional visualising every time this is called!')

@@ -907,7 +907,7 @@ class MDAGlados(CustomMainWindow):
                     rt_analysis_connected_node = node
                     rt_analysis_info = rt_analysis_connected_node.real_time_analysis_currentData
                     
-                    create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=0)
+                    create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None)
                     
                     
         self.shared_data._mdaMode = False
