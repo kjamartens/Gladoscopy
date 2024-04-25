@@ -712,9 +712,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         self.fullRunOngoing = False
         
-        #Add a few buttons to the left side:
+        #Add a few buttons:
         self.buttonsArea = QVBoxLayout()
-        self.mainLayout.addLayout(self.buttonsArea,0,0)
         self.runScoringButton = QPushButton('Start run!')
         self.buttonsArea.addWidget(self.runScoringButton)
         self.runScoringButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
@@ -735,31 +734,33 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.buttonsArea.addWidget(self.loadPickleButton)
         self.loadPickleButton.clicked.connect(lambda index: self.loadPickle())
         
+        
         #import qgroupbox:
         from qtpy.QtWidgets import QGroupBox    
     
-        newgroupbox = QGroupBox("Decision Widget")
-        self.buttonsArea.addWidget(newgroupbox)
+        self.decision_groupbox = QGroupBox("Decision Widget")
+        # self.buttonsArea.addWidget(self.decision_groupbox)
         self.decisionWidget = DecisionWidget(nodzinstance=self)
-        newgroupbox.setLayout(self.decisionWidget.layout())
+        self.decision_groupbox.setLayout(self.decisionWidget.layout())
         
         
-        newgroupbox = QGroupBox("Scan Widget")
+        self.scanwidget_groupbox = QGroupBox("Scan Widget")
         newgridlayout = QGridLayout()
-        newgroupbox.setLayout(newgridlayout)
-        self.buttonsArea.addWidget(newgroupbox)
+        self.scanwidget_groupbox.setLayout(newgridlayout)
         self.scanningWidget = ScanningWidget(nodzinstance=self)
         newgridlayout.addWidget(self.scanningWidget)
         # self.buttonsArea.addLayout(self.decisionWidget.layout())
-        
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(flowChart_dockWidgetF, self).__init__(parent=self.graphics_view)
         self.defineNodeInfo()
         
-        # Add the QGraphicsView to the mainLayout
-        self.mainLayout.addWidget(self.graphics_view,0,1)
+        # Add the QGraphicsView to the mainLayout and allt he other layouts
+        self.mainLayout.addWidget(self.graphics_view,0,0)
+        self.mainLayout.addLayout(self.buttonsArea,0,1)
+        self.mainLayout.addWidget(self.decision_groupbox,0,2)
+        self.mainLayout.addWidget(self.scanwidget_groupbox,0,3)
         
         #Global variables for MM/napari
         self.core = core
@@ -1781,6 +1782,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         elif nodeType == 'scoringEnd':
             newNode.callAction = lambda self, node=newNode: self.scoringEnd(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            #Update the decisionwidget after loading the scoringEnd node:
+            self.decisionWidget.updateAllDecisions()
         elif nodeType == 'acqEnd':
             newNode.callAction = lambda self, node=newNode: self.acquiringEnd(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -2371,6 +2374,15 @@ class advDecisionGridLayout(QGroupBox):
                 scoreMetrics.append(socket)
         return scoreMetrics
     
+    def remove_widgets_in_layout(self,layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            elif item.layout() is not None:
+                self.remove_widgets_in_layout(item.layout())
+    
     def directDecision_AND_Score_test(self):
         """
         Code to test whether the current score passes the decision matrix or not. Should always output a boolean
@@ -2424,11 +2436,14 @@ class advDecisionGridLayout(QGroupBox):
         from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
         
         #Remove every child from the current layout():
-        while self.layout().count():
-            child = self.layout().takeAt(0)
-            if child.widget() is not None:
-                child.widget().deleteLater()
+        # while self.layout().count():
+        #     child = self.layout().takeAt(0)
+        #     if child.widget() is not None:
+        #         child.widget().deleteLater()
 
+        
+        self.remove_widgets_in_layout(self.layout())
+        
         self.outerLayout = QVBoxLayout()
         self.layout().addLayout(self.outerLayout,0,0)
         

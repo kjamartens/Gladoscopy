@@ -1072,6 +1072,7 @@ class Nodz(QtWidgets.QGraphicsView):
                 if 'scoring_end_currentData' in vars(node):
                     if len(data['NODES_SCORING_END'][name]['Variables']) > 0:
                         node.scoring_end_currentData = data['NODES_SCORING_END'][name] #type:ignore
+                        
             if name in data['NODES_VISUALISATION']:
                 if 'visualisation_currentData' in vars(node):
                     if data['NODES_VISUALISATION'] is not None:
@@ -1102,6 +1103,9 @@ class Nodz(QtWidgets.QGraphicsView):
         self.scene().update()
         
         self._focus()
+        
+        #Update the decisionwidget after loading the scoringEnd node:
+        node.flowChart.decisionWidget.updateAllDecisions() #type:ignore
 
         # Emit signal.
         self.signal_GraphLoaded.emit()
