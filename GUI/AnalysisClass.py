@@ -725,7 +725,7 @@ class AnalysisThread_customFunction(QThread):
     
     
     def initAnalysis(self):
-        self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo)
+        self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core)
         print('Called once to init the analysis!')
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):

@@ -870,6 +870,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
     moduleMethodEvalTexts = []
     if methodName_method != '':
         EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=None)
+        EvalTextMethod = EvalTextMethod+"(core=core)"
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
 
@@ -1082,7 +1083,7 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
             return None
         
 
-def realTimeAnalysis_init(rt_analysis_info):
+def realTimeAnalysis_init(rt_analysis_info,core=None):
     #Get the classname from rt_analysis_info
     className = rt_analysis_info['__displayNameFunctionNameMap__'][0][1]
     

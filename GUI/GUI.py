@@ -45,7 +45,7 @@ if __name__ == "__main__":
         runlaserControllerUI(core,MM_JSON,window,shared_data)
 
         #Run autonomousMicroscopy UI
-        runAutonomousMicroscopyUI(core,MM_JSON,window)
+        # runAutonomousMicroscopyUI(core,MM_JSON,window)
 
         #Get a new basic UI in a new tab
         # tab_MMcontrol = window.findChild(QWidget, "tab_MMControls")
