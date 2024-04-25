@@ -873,12 +873,36 @@ class MDAGlados(CustomMainWindow):
             for analysis_thread in self.nodz_analysis_threads:
                 analysis_thread.stop()
         
+        #Set the status of the nodz-coupled vis and real-time to finished:
+        if 'nodeInfo' in vars(self):
+            
+        #Look at the 'Visual' bottom attribute:
+            visualAttr = self.nodeInfo.bottomAttrs['Visual']
+            if len(visualAttr.connections) > 0:
+                visual_connected_node_name = visualAttr.connections[0].socketNode
+                for node in self.nodeInfo.flowChart.nodes:
+                    if node.name == visual_connected_node_name:
+                        visual_connected_node = node
+                        visual_connected_node.status = 'finished'
+            
+            #Look at the 'Real-time' bottom attribute:
+            RealTimeAttr = self.nodeInfo.bottomAttrs['Real-time']
+            if len(RealTimeAttr.connections) > 0:
+                self.nodz_analysis_threads = []
+                rt_analysis_connected_node_name = RealTimeAttr.connections[0].socketNode
+                for node in self.nodeInfo.flowChart.nodes:
+                    if node.name == rt_analysis_connected_node_name:
+                        rt_analysis_connected_node = node
+                        rt_analysis_connected_node.status = 'finished'
+        
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_Node(self, nodeInfo):
         #Basically the same as MDA_from_GUI, but with the NodeInfo
         logging.debug('At MDA_acq_from_node')
         nodeName = nodeInfo.name
+        
+        self.nodeInfo = nodeInfo
         
         #Look at the 'Visual' bottom attribute:
         visualAttr = nodeInfo.bottomAttrs['Visual']
@@ -898,6 +922,8 @@ class MDAGlados(CustomMainWindow):
                     else:
                         visual_connected_node.visualisation_currentData['colormap'] = 'gray'
                         colormap = 'gray'
+                    
+                    visual_connected_node.status = 'running'
                     break
         
             napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
@@ -916,6 +942,7 @@ class MDAGlados(CustomMainWindow):
                     
                     new_analysis_thread = create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None)
                     self.nodz_analysis_threads.append(new_analysis_thread)
+                    rt_analysis_connected_node.status = 'running'
                     
                     
         self.shared_data._mdaMode = False
