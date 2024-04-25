@@ -867,6 +867,12 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         self.data = self.shared_data.mdaDatasets[-1]
         logging.info('MDA acq data finished and data stored!')
+        
+        #Remove any existing nodz-coupled real-time analyses:
+        if 'nodz_analysis_threads' in vars(self):
+            for analysis_thread in self.nodz_analysis_threads:
+                analysis_thread.stop()
+        
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_Node(self, nodeInfo):
@@ -898,16 +904,18 @@ class MDAGlados(CustomMainWindow):
         
         #And try to get real-time analysis attributes at bottom:
         
-        #Look at the 'Visual' bottom attribute:
+        #Look at the 'Real-time' bottom attribute:
         RealTimeAttr = nodeInfo.bottomAttrs['Real-time']
         if len(RealTimeAttr.connections) > 0:
+            self.nodz_analysis_threads = []
             rt_analysis_connected_node_name = RealTimeAttr.connections[0].socketNode
             for node in nodeInfo.flowChart.nodes:
                 if node.name == rt_analysis_connected_node_name:
                     rt_analysis_connected_node = node
                     rt_analysis_info = rt_analysis_connected_node.real_time_analysis_currentData
                     
-                    create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None)
+                    new_analysis_thread = create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None)
+                    self.nodz_analysis_threads.append(new_analysis_thread)
                     
                     
         self.shared_data._mdaMode = False
