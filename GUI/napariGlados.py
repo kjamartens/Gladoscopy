@@ -319,7 +319,7 @@ class napariHandler():
                 #Start the worker to run the pycromanager acquisition
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
                 worker1.start() #type:ignore
-                worker2 = self.run_analysis_worker(self)
+                worker2 = self.run_analysis_worker(self) #type:ignore
                 
                 logging.info("Live mode started")
         elif self.liveOrMda == 'mda':

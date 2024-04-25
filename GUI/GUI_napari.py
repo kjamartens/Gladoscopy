@@ -43,8 +43,8 @@ def perform_post_closing_actions(shared_data):
     #Clean up temporary files
     cleanUpTemporaryFiles()
     
-    if shared_data._headless:
-        stop_headless()
+    # if shared_data._headless:
+    #     stop_headless()
 
 class Worker(QObject):
     finished = pyqtSignal()

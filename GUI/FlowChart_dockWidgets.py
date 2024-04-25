@@ -119,7 +119,7 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_analysisFunctions)
         
         #Pre-load the options if they're in the current node info
-        utils.preLoadOptions(self.mainLayout,currentNode.scoring_analysis_currentData)
+        utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
 
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
@@ -154,7 +154,8 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions)
         
         #Pre-load the options if they're in the current node info
-        # utils.preLoadOptions(self.mainLayout,currentNode.real_time_analysis_currentData)
+        if 'real_time_analysis_currentData' in vars(currentNode):
+            utils.preLoadOptions_realtime(self.mainLayout,currentNode.real_time_analysis_currentData) #type:ignore
 
 
 class nodz_analysisMeasurementDialog(nodz_analysisDialog):
@@ -228,10 +229,10 @@ class nodz_openMMConfigDialog(QDialog):
         """
         #Get the new value of all configs that are/should/want to be changed:
         ConfigsToBeChanged = []
-        for config_id in range(len(self.newConfigUI.config_groups)):
-            if self.newConfigUI.configCheckboxes[config_id].isChecked():
+        for config_id in range(len(self.newConfigUI.config_groups)): #type:ignore
+            if self.newConfigUI.configCheckboxes[config_id].isChecked(): #type:ignore
                 #Add config name and new value
-                ConfigsToBeChanged.append([self.newConfigUI.config_groups[config_id].configGroupName(),self.newConfigUI.currentConfigUISingleValue(config_id)])
+                ConfigsToBeChanged.append([self.newConfigUI.config_groups[config_id].configGroupName(),self.newConfigUI.currentConfigUISingleValue(config_id)]) #type:ignore
         
         #Not adding ,self.newConfigUI.config_groups[config_id] (all info) for pickling reasons
         
@@ -278,7 +279,7 @@ class nodz_visualisationDialog(QDialog):
             import napari
             
             self.colormapComboBox = QComboBox()
-            colormaps = napari.utils.colormaps.AVAILABLE_COLORMAPS
+            colormaps = napari.utils.colormaps.AVAILABLE_COLORMAPS #type:ignore
             for colormap in colormaps:
                 self.colormapComboBox.addItem(colormap)
             
@@ -319,7 +320,7 @@ class nodz_openMDADialog(QDialog):
             List: List of tuples, each containing the configuration name and its new value.
         """
         super().__init__(parent)
-        self.parent = parent
+        self.parent = parent #type:ignore
         self.parentData = parentData
         self.currentNode=  currentNode
         
@@ -1009,6 +1010,30 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
             for i in range(len(optKwValues)):
                 displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+        
+        elif nodeType == 'RTanalysisMeasurement':
+            methodName = dialog.currentData['__selectedDropdownEntryRTAnalysis__']
+            methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
+            reqKwValues = []
+            optKwValues = []
+            
+            reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
+            optKwargs = utils.optKwargsFromFunction(methodFunctionName)
+            
+            for key in dialog.currentData:
+                for rkw in reqKwargs:
+                    if rkw in key and '#'+methodFunctionName+'#' in key:
+                        reqKwValues.append(dialog.currentData[key])
+                for okw in optKwargs:
+                    if okw in key and '#'+methodFunctionName+'#' in key:
+                        optKwValues.append(dialog.currentData[key])
+            
+            displayHTMLtext = f"<b>{methodName}</b>"
+            for i in range(len(reqKwValues)):
+                displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
+            for i in range(len(optKwValues)):
+                displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+        
         elif nodeType == 'acquisition':
             displayHTMLtext = f"<b>{len(dialog.getInputs())} frames with order {dialog.mdaconfig.order}</b>"
             if dialog.mdaconfig.GUI_exposure_enabled:
@@ -1069,8 +1094,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Show dialog:
             dialog = nodz_visualisationDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
-                currentNode.visualisation_currentData['layerName'] = dialog.layerNameEdit.text()
-                currentNode.visualisation_currentData['colormap'] = dialog.colormapComboBox.currentText()
+                currentNode.visualisation_currentData['layerName'] = dialog.layerNameEdit.text() #type:ignore
+                currentNode.visualisation_currentData['colormap'] = dialog.colormapComboBox.currentText() #type:ignore
         elif 'changeStagePos' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #Show dialog:
@@ -1084,7 +1109,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
-                currentNode.scoring_analysis_currentData = dialog.currentData
+                currentNode.scoring_analysis_currentData = dialog.currentData #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
                 logging.info('Pressed OK on analysisMeasurementDialog')
         elif 'realTimeAnalysis' in nodeName:
@@ -1093,8 +1118,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             dialog = nodz_realTimeAnalysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
-                currentNode.real_time_analysis_currentData = dialog.currentData
-                currentNode.real_time_analysis_currentData['chosenFunction'] = dialog.comboBox_RTanalysisFunctions.currentText()
+                currentNode.real_time_analysis_currentData = dialog.currentData #type:ignore
+                currentNode.real_time_analysis_currentData['__selectedDropdownEntryRTAnalysis__'] = dialog.comboBox_RTanalysisFunctions.currentText() #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
                 logging.info('Pressed OK on RTanalysis')
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
@@ -1348,12 +1374,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
         #for all devicetypes
         #Get devices
-        devices = self.shared_data.core.get_loaded_devices()
+        devices = self.shared_data.core.get_loaded_devices() #type:ignore
         devices = [devices.get(i) for i in range(devices.size())]
         devicesOfType = []
         #Loop over devices
         for device in devices:
-            if self.shared_data.core.get_device_type(device).to_string() == devicetype:
+            if self.shared_data.core.get_device_type(device).to_string() == devicetype: #type:ignore
                 logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
@@ -1383,12 +1409,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Since then we need to do something 2-dimensional
             if stage in self.getDevicesOfDeviceType('XYStageDevice'):
                 logging.info(f'Moving stage {stage} to position {stagepos}')
-                self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1])
-                self.shared_data.core.wait_for_system()
+                self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
+                self.shared_data.core.wait_for_system() #type:ignore
             else:#else we can move a 1d stage:
                 logging.info(f'Moving stage {stage} to position {stagepos}')
-                self.shared_data.core.set_position(stage,stagepos[0])
-                self.shared_data.core.wait_for_system()
+                self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
+                self.shared_data.core.wait_for_system() #type:ignore
         
         self.runScoring()
     
@@ -1553,7 +1579,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         textEdit = QTextEdit()
         
-        attrs_to_show = ['name','displayName','nodePreset','plugs','sockets','scoring_analysis_currentData','scoring_end_currentData','scoring_scoring_currentData','scoring_visualisation_currentData']
+        attrs_to_show = ['name','displayName','nodePreset','plugs','sockets','scoring_analysis_currentData','scoring_end_currentData','scoring_scoring_currentData','scoring_visualisation_currentData','visualisation_currentData','real_time_analysis_currentData']
+        
         text_to_show = ''
         for attr in attrs_to_show:
             if hasattr(node,attr):
@@ -1589,7 +1616,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         lineEdit.setText(node.displayName)
         layout.addWidget(lineEdit)
 
-        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, dialog)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, dialog) #type:ignore
         buttonBox.accepted.connect(dialog.accept)
         buttonBox.rejected.connect(dialog.reject)
         layout.addWidget(buttonBox)
@@ -2052,7 +2079,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                         connectedNodeName = connection[0][:connection[0].rfind('.')]
                         connectedNode = self.findNodeByName(connectedNodeName)
         
-                    data[attr] = connectedNode.scoring_analysis_currentData['__output__']
+                    data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
                     print(f"Data found for {attr}: {data[attr]}")
         
         testPassed = self.decisionWidget.testCurrentDecision()
@@ -2165,7 +2192,6 @@ class ScanningWidget(QWidget):
         self.create_GUI()
     
     def create_GUI(self):
-        # self.setWindowTitle('Scan')
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems([option[1] for option in self.scanArray_modes])
         self.mode_layout = QGridLayout()
@@ -2269,8 +2295,6 @@ class DecisionWidget(QWidget):
                 self.decisionLayouts[mode_option[0]].mode_layout.addWidget(self.decisionLayouts[mode_option[0]].decisiontypes[option[0]],counter2,0,1,2)
                 counter2+=1
             
-            # if self.decisionLayouts[mode_option[0]] is not None:
-                # self.decisionLayouts[mode_option[0]].addLayout(self.decisionLayouts[mode_option[0]].mode_layout)
             self.decisionLayouts[mode_option[0]].layout.addLayout(self.decisionLayouts[mode_option[0]].mode_layout)
             
         self.layoutV = QVBoxLayout()
@@ -2296,14 +2320,7 @@ class DecisionWidget(QWidget):
         except:
             pass
 
-    def changeDecisionMode(self):
-        #We should be working in self.finalDecisionLayout:
-        #remove everything from self.finalDecisionLayout:
-        # while self.finalDecisionLayout.count():
-        #     child = self.finalDecisionLayout.takeAt(0)
-        #     if child.widget() is not None:
-        #         child.widget().deleteLater()
-        
+    def changeDecisionMode(self):        
         #Set all of these: self.decisionLayouts[currentMode][currentDecision].setVisible(True) to invis:
         for mode in self.decisionLayouts:
             for option in self.decisionLayouts[mode].decisiontypes:
@@ -2321,9 +2338,6 @@ class DecisionWidget(QWidget):
         self.decisionLayouts[currentMode].decisiontypes[currentDecision].setVisible(True)
         self.currentMode = currentMode
         self.currentDecision = currentDecision
-        
-        # # if currentMode = = 'DirectDecision':
-        # #     if currentDecision == 'OR_Score':
     
     def updateAllDecisions(self):
         for mode in self.decisionLayouts:
@@ -2337,7 +2351,7 @@ class DecisionWidget(QWidget):
 from PyQt5.QtWidgets import QGroupBox
 class advDecisionGridLayout(QGroupBox):
     def __init__(self, mode=None,decision=None,parent=None):
-        self.parent = parent
+        self.parent = parent #type:ignore
         super().__init__(parent)
         self.mode = mode
         self.decision = decision
@@ -2345,7 +2359,7 @@ class advDecisionGridLayout(QGroupBox):
         #Create a QGridLayout to place in this groupbox:
         self.setLayout(QGridLayout())
         #Create a quick label that we place in 1,1:
-        self.layout().addWidget(QLabel(f"{mode} and {decision}",self),1,1)
+        self.layout().addWidget(QLabel(f"{mode} and {decision}",self),1,1) #type:ignore
         if mode == 'DirectDecision':
             if decision == 'AND_Score':
                 self.directDecision_AND_Score_update()
@@ -2409,7 +2423,7 @@ class advDecisionGridLayout(QGroupBox):
                         connectedNodeName = connection[0][:connection[0].rfind('.')]
                         connectedNode = flowChart.findNodeByName(connectedNodeName)
         
-                    data[attr] = connectedNode.scoring_analysis_currentData['__output__']
+                    data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
         
         #Data now contains the values of the scores
         self.decisionInfoGUI
@@ -2435,18 +2449,10 @@ class advDecisionGridLayout(QGroupBox):
         Code to update the GUI of the DirectDecision_AND_Score groupbox
         """
         from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
-        
-        #Remove every child from the current layout():
-        # while self.layout().count():
-        #     child = self.layout().takeAt(0)
-        #     if child.widget() is not None:
-        #         child.widget().deleteLater()
-
-        
         self.remove_widgets_in_layout(self.layout())
         
         self.outerLayout = QVBoxLayout()
-        self.layout().addLayout(self.outerLayout,0,0)
+        self.layout().addLayout(self.outerLayout,0,0) #type:ignore
         
         #Get out of this function if flowChart isn't initialised yet (i.e. first start-up):
         try:
@@ -2470,71 +2476,9 @@ class advDecisionGridLayout(QGroupBox):
             self.decisionInfoGUI[scoreMetric]['lineedit'] = lineedit
             self.outerLayout.addLayout(hbox)
 
-        # def remove_widgets_in_layout(layout):
-        #     while layout.count():
-        #         item = layout.takeAt(0)
-        #         widget = item.widget()
-        #         if widget is not None:
-        #             widget.deleteLater()
-        #         elif item.layout() is not None:
-        #             self.remove_widgets_in_layout(item.layout())
-                    
-        # def remove_last_line():
-        #     if self.innerLayouts:
-        #         innerLayout = self.innerLayouts.pop()
-        #         while innerLayout.count():
-        #             item = innerLayout.takeAt(0)
-        #             widget = item.widget()
-        #             if widget is not None:
-        #                 widget.deleteLater()
-        #             elif item.layout() is not None:
-        #                 self.remove_widgets_in_layout(item.layout())
-        #         innerLayout.deleteLater()
-    
-        #     self.outerLayout.update()
-        #     self.update()
-
-        # def add_new_line():
-        #     #This can probably be cleaned up later, but eh
-        #     flowChart = self.parent.nodzinstance
-            
-        #     if len(flowChart.nodes) > 0:
-        #         #Find the scoringEnd node in flowChart:
-        #         for node in flowChart.nodes:
-        #             if 'scoringEnd_' in node.name:
-        #                 break
-                
-        #         #Now get the scores from here:
-        #         scoreMetrics = []
-        #         for socket in node.sockets:
-        #             scoreMetrics.append(socket)
-                
-                
-        #         innerLayout = QHBoxLayout()
-        #         scoreMetricComboBox = QComboBox()
-        #         scoreMetricComboBox.addItems(scoreMetrics)
-        #         innerLayout.addWidget(scoreMetricComboBox)
-        #         operatorComboBox = QComboBox()
-        #         operatorComboBox.addItems(['>','>=','<','<=','==','!='])
-        #         innerLayout.addWidget(operatorComboBox)
-        #         valueLineEdit = QLineEdit()
-        #         innerLayout.addWidget(valueLineEdit)
-        #         self.innerLayouts.append(innerLayout)
-        #         self.outerLayout.addLayout(self.innerLayouts[-1])
-        #         self.update()
-        #     else:
-        #         logging.warning('EMPTY FLOWCHART!')
-            
-        # plusbutton.clicked.connect(add_new_line)
-        # minusbutton.clicked.connect(remove_last_line)
-
-        
-        
-        # print('hi')
-
 class advScanGridLayout(QGroupBox):
     def __init__(self, mode=None,parent=None):
-        self.parent = parent
+        self.parent = parent #type:ignore
         super().__init__(parent)
         self.mode = mode
         self.scanningInfoGUI = {}
@@ -2590,11 +2534,11 @@ class advScanGridLayout(QGroupBox):
             self.scanningInfoGUI['LoadPos']['fileName'] = new_file_name
     
         self.lineEdit_posFilename = QLineEdit()
-        self.layout().addWidget(self.lineEdit_posFilename,1,0)
+        self.layout().addWidget(self.lineEdit_posFilename,1,0) #type:ignore
         self.lineEdit_posFilename.textChanged.connect(lambda x: update_file_name(x))
 
         button_browsePosFile = QPushButton('...')
-        self.layout().addWidget(button_browsePosFile,1,1)
+        self.layout().addWidget(button_browsePosFile,1,1) #type:ignore
         button_browsePosFile.clicked.connect(load_pos_file)
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):

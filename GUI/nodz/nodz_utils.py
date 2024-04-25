@@ -20,21 +20,21 @@ def _convertDataToColor(data=None, alternate=False, av=20):
 
     """
     # rgb
-    if len(data) == 3:
-        color = QtGui.QColor(data[0], data[1], data[2])
+    if len(data) == 3: #type:ignore
+        color = QtGui.QColor(data[0], data[1], data[2]) #type:ignore
         if alternate:
             mult = _generateAlternateColorMultiplier(color, av)
 
 
-            color = QtGui.QColor(max(0, data[0]-(av*mult)), max(0, data[1]-(av*mult)), max(0, data[2]-(av*mult)))
+            color = QtGui.QColor(max(0, data[0]-(av*mult)), max(0, data[1]-(av*mult)), max(0, data[2]-(av*mult))) #type:ignore
         return color
 
     # rgba
-    elif len(data) == 4:
-        color = QtGui.QColor(data[0], data[1], data[2], data[3])
+    elif len(data) == 4: #type:ignore
+        color = QtGui.QColor(data[0], data[1], data[2], data[3]) #type:ignore
         if alternate:
             mult = _generateAlternateColorMultiplier(color, av)
-            color = QtGui.QColor(int(max(0, data[0]-(av*mult))), int(max(0, data[1]-(av*mult))), int(max(0, data[2]-(av*mult))), int(data[3]))
+            color = QtGui.QColor(int(max(0, data[0]-(av*mult))), int(max(0, data[1]-(av*mult))), int(max(0, data[2]-(av*mult))), int(data[3])) #type:ignore
         return color
 
     # wrong

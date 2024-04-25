@@ -870,6 +870,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_SCORING_SCORING'] = dict()
         data['NODES_SCORING_END'] = dict()
         data['NODES_VISUALISATION'] = dict()
+        data['NODES_RT_ANALYSIS'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -944,6 +945,11 @@ class Nodz(QtWidgets.QGraphicsView):
                 if nodeInst.visualisation_currentData is not None:
                     data['NODES_VISUALISATION'][node] = nodeInst.visualisation_currentData
 
+            data['NODES_RT_ANALYSIS'][node] = {}
+            if 'real_time_analysis_currentData' in vars(nodeInst):
+                if nodeInst.real_time_analysis_currentData is not None:
+                    data['NODES_RT_ANALYSIS'][node] = nodeInst.real_time_analysis_currentData
+                    
             attrs = nodeInst.attrs
             for attr in attrs:
                 attrData = nodeInst.attrsData[attr]
@@ -1023,21 +1029,20 @@ class Nodz(QtWidgets.QGraphicsView):
             position = QtCore.QPointF(position[0], position[1])
             alternate = nodesData[name]['alternate']
             
-
             node = self.createNode(name=name,
                                 preset=preset,
                                 position=position,
                                 alternate=alternate, skipCreateNodeSignal=False,
                                 displayText=nodesData[name]['textbox_text'],createdFromNodzLoading=True)
             if 'textboxheight' in nodesData[name]:
-                node.textboxheight = nodesData[name]['textboxheight']
+                node.textboxheight = nodesData[name]['textboxheight'] #type:ignore
             if 'displayName' in nodesData[name]:
-                node.displayName = nodesData[name]['displayName']
+                node.displayName = nodesData[name]['displayName'] #type:ignore
             if 'alternateFillColor' in nodesData[name]:
-                node.alternateFillColor = nodesData[name]['alternateFillColor']
+                node.alternateFillColor = nodesData[name]['alternateFillColor'] #type:ignore
                 #Force the change in the node:
-                node.BGcolChanged()
-                node.update()
+                node.BGcolChanged() #type:ignore
+                node.update() #type:ignore
             #Restore MDA data
             if name in data['NODES_MDA']:
                 if data['NODES_MDA'] is not None:
@@ -1078,6 +1083,10 @@ class Nodz(QtWidgets.QGraphicsView):
                     if data['NODES_VISUALISATION'] is not None:
                         node.visualisation_currentData = data['NODES_VISUALISATION'][name] #type:ignore
             
+            if name in data['NODES_RT_ANALYSIS']:
+                if 'real_time_analysis_currentData' in vars(node):
+                    if data['NODES_RT_ANALYSIS'] is not None:
+                        node.real_time_analysis_currentData = data['NODES_RT_ANALYSIS'][name] #type:ignore
             #Do an emit after full loading:
             self.signal_NodeFullyInitialisedNodeItself.emit(node)
             allNodes.append(node)
@@ -1162,15 +1171,15 @@ class Nodz(QtWidgets.QGraphicsView):
                     dataType = eval(str(dataType.split('\'')[1]))
 
                 self.createAttribute(node=node,
-                                     name=name,
-                                     index=index,
-                                     preset=preset,
-                                     plug=plug,
-                                     socket=socket,
-                                     dataType=dataType,
-                                     plugMaxConnections=plugMaxConnections,
-                                     socketMaxConnections=socketMaxConnections
-                                     )
+                                    name=name,
+                                    index=index,
+                                    preset=preset,
+                                    plug=plug,
+                                    socket=socket,
+                                    dataType=dataType,
+                                    plugMaxConnections=plugMaxConnections,
+                                    socketMaxConnections=socketMaxConnections
+                                    )
 
         self.scene().update()
         
@@ -1187,7 +1196,7 @@ class Nodz(QtWidgets.QGraphicsView):
             targetAttr = target.split('.')[1]
 
             self.createConnection(sourceNode, sourceAttr,
-                                  targetNode, targetAttr)
+                                targetNode, targetAttr)
 
         self.scene().update()
         
@@ -1213,14 +1222,14 @@ class Nodz(QtWidgets.QGraphicsView):
         :param targetAttr: Attribute that receives the connection.
 
         """
-        if sourceAttr in self.scene().nodes[sourceNode].plugs:
+        if sourceAttr in self.scene().nodes[sourceNode].plugs: #type:ignore
             plug = self.scene().nodes[sourceNode].plugs[sourceAttr] #type:ignore
-        elif sourceAttr in self.scene().nodes[sourceNode].bottomAttrs:
+        elif sourceAttr in self.scene().nodes[sourceNode].bottomAttrs: #type:ignore
             plug = self.scene().nodes[sourceNode].bottomAttrs[sourceAttr] #type:ignore
         
-        if targetAttr in self.scene().nodes[targetNode].sockets:
+        if targetAttr in self.scene().nodes[targetNode].sockets: #type:ignore
             socket = self.scene().nodes[targetNode].sockets[targetAttr] #type:ignore
-        elif targetAttr in self.scene().nodes[targetNode].topAttrs:
+        elif targetAttr in self.scene().nodes[targetNode].topAttrs: #type:ignore
             socket = self.scene().nodes[targetNode].topAttrs[targetAttr] #type:ignore
 
         connection = ConnectionItem(plug.center(), socket.center(), plug, socket)
@@ -1364,12 +1373,12 @@ class NodeScene(QtWidgets.QGraphicsScene):
         Draw colorful bounding boxes around the scoring nodes and around the acquiring nodes
         """
         
-        NodeListConnectionsScore = utils.findConnectedToNode(self.parent().evaluateGraph(),'scoringStart',[])
+        NodeListConnectionsScore = utils.findConnectedToNode(self.parent().evaluateGraph(),'scoringStart',[]) #type:ignore
         
         if len(NodeListConnectionsScore) > 0:
             self.drawBoundingBox(painter,NodeListConnectionsScore,boundingBorder=35,solidPaint=[50,150,50,75],linePaint=[0,200,0,200])
             
-        NodeListConnectionsAcq = utils.findConnectedToNode(self.parent().evaluateGraph(),'acqStart',[])
+        NodeListConnectionsAcq = utils.findConnectedToNode(self.parent().evaluateGraph(),'acqStart',[]) #type:ignore
         
         if len(NodeListConnectionsAcq) > 0:
             self.drawBoundingBox(painter,NodeListConnectionsAcq,boundingBorder=35,solidPaint=[150,150,30,75],linePaint=[150,150,0,200])
@@ -1383,7 +1392,7 @@ class NodeScene(QtWidgets.QGraphicsScene):
         minbottom = -1e8
         boundingBorder = boundingBorder
         for wantedNode in NodeListConnections:
-            for node in self.parent().nodes:
+            for node in self.parent().nodes: #type:ignore
                 if node.name == wantedNode:
                     left = node.scenePos().x()
                     top = node.scenePos().y()
@@ -1433,12 +1442,12 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         :type  name: str.
         :param name: The name of the node. The name has to be unique
-                     as it is used as a key to store the node object.
+                    as it is used as a key to store the node object.
 
         :type  alternate: bool.
         :param alternate: The attribute color alternate state, if True,
-                          every 2 attribute the color will be slightly
-                          darker.
+                        every 2 attribute the color will be slightly
+                        darker.
 
         :type  preset: str.
         :param preset: The name of graphical preset in the config file.
@@ -1470,6 +1479,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.scoring_end_currentData['Variables'] = {}
         
         self.visualisation_currentData = {}
+        self.real_time_analysis_currentData = {}
         
         self.status = 'idle' #status should be 'idle','running','finished'
 
@@ -1507,7 +1517,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.textboxheight = int(min(300,max(50,td.size().height())))
         self.update()
         
-        self.scene().parent().editNodeDisplayText(self, newDisplayText=new_display_text)
+        self.scene().parent().editNodeDisplayText(self, newDisplayText=new_display_text) #type:ignore
 
     def changeName(self,new_name):
         if new_name != self.name:
@@ -1662,8 +1672,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         :type  name: str.
         :param name: The name of the attribute. The name has to be
-                     unique as it is used as a key to store the node
-                     object.
+                    unique as it is used as a key to store the node
+                    object.
 
         :type  index: int.
         :param index: The index of the attribute in the node.
@@ -1676,12 +1686,12 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         :type  socket: bool.
         :param socket: Whether or not this attribute can receive
-                       connections.
+                    connections.
 
         :type  dataType: type.
         :param dataType: Type of the data represented by this attribute
-                         in order to highlight attributes of the same
-                         type while performing a connection.
+                        in order to highlight attributes of the same
+                        type while performing a connection.
 
         """
         if name in self.attrs:
@@ -2689,10 +2699,10 @@ class BottomAttrItem(PlugItem):
                 if self.parentItem().attrsData[attr]['bottomAttr']: #type:ignore
                     nrBottomAttrParentBeforeThis += 1
 
-        totalnrBottomAttrs = len(self.parentItem().bottomAttrs)
+        totalnrBottomAttrs = len(self.parentItem().bottomAttrs) #type:ignore
         distanceFromLeft = nrBottomAttrParentBeforeThis/totalnrBottomAttrs+(1/totalnrBottomAttrs)/2
 
-        x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border
+        x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border #type:ignore
         y = (self.parentItem().boundingRect().height()-self.parentItem().radius/2) #type:ignore
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
@@ -2721,10 +2731,10 @@ class TopAttrItem(SocketItem):
                 if self.parentItem().attrsData[attr]['topAttr']: #type:ignore
                     nrTopAttrParentBeforeThis += 1
 
-        totalnrTopAttrs = len(self.parentItem().topAttrs)
+        totalnrTopAttrs = len(self.parentItem().topAttrs) #type:ignore
         distanceFromLeft = nrTopAttrParentBeforeThis/totalnrTopAttrs+(1/totalnrTopAttrs)/2
 
-        x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border
+        x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border #type:ignore
         y = 0#(self.parentItem().boundingRect().height()-self.parentItem().radius/2) #type:ignore
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
@@ -2838,7 +2848,7 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
         config = nodzInst.config
 
         mbb = utils._createPointerBoundingBox(pointerPos=event.scenePos().toPoint(),
-                                              bbSize=config['mouse_bounding_box'])
+                                            bbSize=config['mouse_bounding_box'])
 
         # Get nodes in pointer's bounding box.
         targets = self.scene().items(mbb)
@@ -2928,7 +2938,7 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
 
         path = QtGui.QPainterPath()
         path.moveTo(self.source_point)
-        if self.source.slotType != 'bottomAttr' and self.source.slotType != 'topAttr':
+        if self.source.slotType != 'bottomAttr' and self.source.slotType != 'topAttr': #type:ignore
             dx = (self.target_point.x() - self.source_point.x()) * 0.5
             dy = self.target_point.y() - self.source_point.y()
             ctrl1 = QtCore.QPointF(self.source_point.x() + dx, self.source_point.y() + dy * 0)

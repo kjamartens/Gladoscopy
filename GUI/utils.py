@@ -531,7 +531,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
         if item_text is not None and item_text != '':
             #Get the kw-arguments from the current dropdown.
             current_selected_function = functionNameFromDisplayName(item_text,displayNameToFunctionNameMap)
-            logging.debug('current selected function: '+current_selected_function)
+            logging.debug('current selected function: '+current_selected_function) #type:ignore
 
             #Unhide everything
             model = current_dropdown.model()
@@ -540,7 +540,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                 #First show all rows:
                 current_dropdown.view().setRowHidden(rowId, False)
                 item = model.item(rowId)
-                item.setFlags(item.flags() | Qt.ItemIsEnabled)
+                item.setFlags(item.flags() | Qt.ItemIsEnabled) #type:ignore
         
             #Visual max number of rows before a 2nd column is started.
             labelposoffset = 0
@@ -663,7 +663,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
     #Hides everything except the current layout
     layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
 
-def preLoadOptions(curr_layout,currentData):
+def preLoadOptions_analysis(curr_layout,currentData):
     """
     Preloads the kwarg values from the currentData dict into their respective widgets
     """
@@ -677,6 +677,21 @@ def preLoadOptions(curr_layout,currentData):
             #Also set the dropdown to the correct value:
             if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
                 child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
+    
+def preLoadOptions_realtime(curr_layout,currentData):
+    """
+    Preloads the kwarg values from the currentData dict into their respective widgets
+    """
+    for i in range(curr_layout.count()):
+        item = curr_layout.itemAt(i)
+        if item.widget() is not None:
+            child = item.widget()
+            if child.objectName() in currentData:
+                child.setText(str(currentData[child.objectName()]))
+                
+            #Also set the dropdown to the correct value:
+            if 'comboBox_RTanalysisFunctions' in child.objectName() and '__selectedDropdownEntryRTAnalysis__' in currentData:
+                child.setCurrentText(currentData['__selectedDropdownEntryRTAnalysis__'])
     
 
 def changeDataVarUponKwargChange(line_edit):
@@ -898,7 +913,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
     moduleMethodEvalTexts = []
     if methodName_method != '':
         EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3))
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run')
+        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
 
@@ -926,7 +941,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,current
     moduleMethodEvalTexts = []
     if methodName_method != '':
         EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3))
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.visualise')
+        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.visualise') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
 
@@ -1084,7 +1099,7 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
 
 def realTimeAnalysis_init(rt_analysis_info,core=None):
     #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['chosenFunction']
+    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
@@ -1096,25 +1111,25 @@ def realTimeAnalysis_init(rt_analysis_info,core=None):
 
 def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3):
     #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['chosenFunction']
+    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','v3')
     #And run the .run function:
-    result = eval("RT_analysis_object" + evalText)
+    result = eval("RT_analysis_object" + evalText) #type:ignore
 
     return result
 
 def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3):
     #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['chosenFunction']
+    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3')
     #And run the .run function:
-    result = eval("RT_analysis_object" + evalText)
+    result = eval("RT_analysis_object" + evalText) #type:ignore
 
     return result
 
@@ -1195,7 +1210,7 @@ class SmallWindow(QMainWindow):
         #Add the label to the layout:
         layout.addWidget(self.descriptionLabel)
         #Add the layout to the central widget:
-        self.centralWidget().layout().addLayout(layout)
+        self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.descriptionLabel
     
     def addButton(self,buttonText="Button"):
@@ -1206,7 +1221,7 @@ class SmallWindow(QMainWindow):
         #Add the button to the layout:
         layout.addWidget(self.button)
         #Add the layout to the central widget:
-        self.centralWidget().layout().addLayout(layout)
+        self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.button
     
     def addTextEdit(self,labelText = "Text edit:", preFilledText = ""):
@@ -1219,7 +1234,7 @@ class SmallWindow(QMainWindow):
         layout.addWidget(QLabel(labelText))
         layout.addWidget(self.textEdit)
         #Add the layout to the central widget:
-        self.centralWidget().layout().addLayout(layout)
+        self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.textEdit
     
     #Add a file information label/text/button:
@@ -1234,14 +1249,14 @@ class SmallWindow(QMainWindow):
         self.addTextPrePriod(self.fileLocationLineEdit,LineEditText,textAddPrePeriod)
         
         self.fileLocationButton = QPushButton("...")
-        self.fileLocationButton.clicked.connect(lambda: self.openFileDialog(fileArgs = "All Files (*)"))
+        self.fileLocationButton.clicked.connect(lambda: self.openFileDialog(fileArgs = "All Files (*)")) #type:ignore
         
         #Add the label, line edit and button to the layout:
         layout.addWidget(self.fileLocationLabel)
         layout.addWidget(self.fileLocationLineEdit)
         layout.addWidget(self.fileLocationButton)
         #Add the layout to the central widget:
-        self.centralWidget().layout().addLayout(layout)
+        self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.fileLocationLineEdit
 
 
