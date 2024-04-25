@@ -1033,7 +1033,10 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
             for i in range(len(optKwValues)):
                 displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
-        
+        elif nodeType == 'visualisation':
+            displayHTMLtext = f"<b>Layer name: {dialog.layerNameEdit.text()}</b>"
+            if dialog.colormapComboBox.currentText() != 'None':
+                displayHTMLtext += f"<br>Colormap: {dialog.colormapComboBox.currentText()}"
         elif nodeType == 'acquisition':
             displayHTMLtext = f"<b>{len(dialog.getInputs())} frames with order {dialog.mdaconfig.order}</b>"
             if dialog.mdaconfig.GUI_exposure_enabled:
@@ -1094,6 +1097,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             #Show dialog:
             dialog = nodz_visualisationDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'visualisation')
                 currentNode.visualisation_currentData['layerName'] = dialog.layerNameEdit.text() #type:ignore
                 currentNode.visualisation_currentData['colormap'] = dialog.colormapComboBox.currentText() #type:ignore
         elif 'changeStagePos' in nodeName:
@@ -2230,7 +2234,6 @@ class ScanningWidget(QWidget):
 
     def getPositionInfo(self):
         return self.scanLayouts[self.scanArray_modes[self.mode_dropdown.currentIndex()][0]].getPositionInfo()
-            
 
 class DecisionWidget(QWidget):
     def __init__(self, nodzinstance=None,parent=None):
