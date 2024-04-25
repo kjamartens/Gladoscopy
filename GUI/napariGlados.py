@@ -497,8 +497,15 @@ def layer_removed_event_callback(event, shared_data):
         if l.getLayer() is not None:
             if l.getLayer().name == layerRemoved:
                 #Destroy the analysis thread
-                l.destroy()
                 shared_data.analysisThreads.remove(l)
+                
+                if 'skipAnalysisThreadDeletion' in vars(shared_data):
+                    if not shared_data.skipAnalysisThreadDeletion:
+                        l.destroy()
+                    else:
+                        shared_data.skipAnalysisThreadDeletion = False
+                else:
+                    l.destroy()
 
 def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):
     #Go from self to global variables

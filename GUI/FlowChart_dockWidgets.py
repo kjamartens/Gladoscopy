@@ -2168,7 +2168,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                         self.singleRunOngoing = False
                         print('All done!')
             print('----------------------')
-            self.preventAcq = False
             self.finishedEmits(node)
 
         except:
@@ -2176,6 +2175,9 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             node.status = 'error'
             testPassedText = 'Error when assessing test'
             self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
+            
+        self.preventAcq = False
+            
     def timerCallAction(self,node,timev):
         """
         This function is the action function for the Timer Call node in the Flowchart.

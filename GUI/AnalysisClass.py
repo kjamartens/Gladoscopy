@@ -634,6 +634,15 @@ class AnalysisThread_customFunction(QThread):
         elif self.image_queue_analysis in self.shared_data.mdaImageQueues:
             self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
     
+        try:
+            #check if there's a layer associated with this...
+            layer = self.getLayer()
+            #and remove it
+            self.shared_data.skipAnalysisThreadDeletion = True
+            self.shared_data.napariViewer.layers.remove(layer)
+        except:
+            pass
+        
     def destroy(self):
         """
         Destroy the object.
