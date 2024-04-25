@@ -29,7 +29,8 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 class RT_counterV():
-    def __init__(self,**kwargs):
+    def __init__(self,core,**kwargs):
+        print(core)
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore

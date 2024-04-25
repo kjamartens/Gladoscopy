@@ -869,8 +869,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=None)
-        EvalTextMethod = EvalTextMethod+"(core=core)"
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart='core=core')
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
 
@@ -1085,7 +1084,10 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
 
 def realTimeAnalysis_init(rt_analysis_info,core=None):
     #Get the classname from rt_analysis_info
-    className = rt_analysis_info['__displayNameFunctionNameMap__'][0][1]
+    functionDispName = rt_analysis_info['chosenFunction']
+    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
+        if function[0] == functionDispName:
+            className = function[1]
     
     #Get the object
     RT_analysis_object = eval(getFunctionEvalTextFromCurrentData_RTAnalysis_init(className,rt_analysis_info)) #type:ignore
@@ -1094,7 +1096,10 @@ def realTimeAnalysis_init(rt_analysis_info,core=None):
 
 def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3):
     #Get the classname from rt_analysis_info
-    className = rt_analysis_info['__displayNameFunctionNameMap__'][0][1]
+    functionDispName = rt_analysis_info['chosenFunction']
+    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
+        if function[0] == functionDispName:
+            className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','v3')
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText)
@@ -1103,7 +1108,10 @@ def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3):
 
 def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3):
     #Get the classname from rt_analysis_info
-    className = rt_analysis_info['__displayNameFunctionNameMap__'][0][1]
+    functionDispName = rt_analysis_info['chosenFunction']
+    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
+        if function[0] == functionDispName:
+            className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3')
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText)

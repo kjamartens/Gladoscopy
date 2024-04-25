@@ -1094,6 +1094,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 currentNode.real_time_analysis_currentData = dialog.currentData
+                currentNode.real_time_analysis_currentData['chosenFunction'] = dialog.comboBox_RTanalysisFunctions.currentText()
                 logging.info('Pressed OK on RTanalysis')
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
