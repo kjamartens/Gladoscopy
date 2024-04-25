@@ -45,6 +45,7 @@ from Scoring_Images_Measurements_Shapes import * #type: ignore
 from Visualisation_Images import * #type: ignore
 from Visualisation_Measurements import * #type: ignore
 from Visualisation_Shapes import * #type: ignore
+from Real_Time_Analysis import * #type: ignore
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -819,6 +820,7 @@ def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',
     return file_path
 
 
+
 def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
     
     methodKwargNames_method=[]
@@ -840,6 +842,91 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
     moduleMethodEvalTexts = []
     if methodName_method != '':
         EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+        #append this to moduleEvalTexts
+        moduleMethodEvalTexts.append(EvalTextMethod)
+
+    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+        return moduleMethodEvalTexts[0]
+
+
+def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
+    
+    methodKwargNames_method=[]
+    methodKwargValues_method=[]
+    #Loop over all entries of currentData:
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("LineEdit" in key):
+                # The objectName will be along the lines of foo#bar#str
+                #Check if the objectname is part of a method or part of a scoring
+                split_list = key.split('#')
+                methodName_method = split_list[1]
+                methodKwargNames_method.append(split_list[2])
+
+                #value could contain a file location. Thus, we need to swap out all \ for /:
+                methodKwargValues_method.append(value.replace('\\','/'))
+    
+    #Now we create evaluation-texts:
+    moduleMethodEvalTexts = []
+    if methodName_method != '':
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=None)
+        #append this to moduleEvalTexts
+        moduleMethodEvalTexts.append(EvalTextMethod)
+
+    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+        return moduleMethodEvalTexts[0]
+
+
+def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2,p3):
+    
+    methodKwargNames_method=[]
+    methodKwargValues_method=[]
+    #Loop over all entries of currentData:
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("LineEdit" in key):
+                # The objectName will be along the lines of foo#bar#str
+                #Check if the objectname is part of a method or part of a scoring
+                split_list = key.split('#')
+                methodName_method = split_list[1]
+                methodKwargNames_method.append(split_list[2])
+
+                #value could contain a file location. Thus, we need to swap out all \ for /:
+                methodKwargValues_method.append(value.replace('\\','/'))
+    
+    #Now we create evaluation-texts:
+    moduleMethodEvalTexts = []
+    if methodName_method != '':
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3))
+        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run')
+        #append this to moduleEvalTexts
+        moduleMethodEvalTexts.append(EvalTextMethod)
+
+    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+        return moduleMethodEvalTexts[0]
+
+def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,currentData,p1,p2,p3):
+    
+    methodKwargNames_method=[]
+    methodKwargValues_method=[]
+    #Loop over all entries of currentData:
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("LineEdit" in key):
+                # The objectName will be along the lines of foo#bar#str
+                #Check if the objectname is part of a method or part of a scoring
+                split_list = key.split('#')
+                methodName_method = split_list[1]
+                methodKwargNames_method.append(split_list[2])
+
+                #value could contain a file location. Thus, we need to swap out all \ for /:
+                methodKwargValues_method.append(value.replace('\\','/'))
+    
+    #Now we create evaluation-texts:
+    moduleMethodEvalTexts = []
+    if methodName_method != '':
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3))
+        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.visualise')
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
 
@@ -994,6 +1081,33 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
             logging.error('SOMETHING VERY STUPID HAPPENED')
             return None
         
+
+def realTimeAnalysis_init(rt_analysis_info):
+    #Get the classname from rt_analysis_info
+    className = rt_analysis_info['__displayNameFunctionNameMap__'][0][1]
+    
+    #Get the object
+    RT_analysis_object = eval(getFunctionEvalTextFromCurrentData_RTAnalysis_init(className,rt_analysis_info)) #type:ignore
+    
+    return RT_analysis_object
+
+def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3):
+    #Get the classname from rt_analysis_info
+    className = rt_analysis_info['__displayNameFunctionNameMap__'][0][1]
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','v3')
+    #And run the .run function:
+    result = eval("RT_analysis_object" + evalText)
+
+    return result
+
+def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3):
+    #Get the classname from rt_analysis_info
+    className = rt_analysis_info['__displayNameFunctionNameMap__'][0][1]
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3')
+    #And run the .run function:
+    result = eval("RT_analysis_object" + evalText)
+
+    return result
 
 class SmallWindow(QMainWindow):
     """ 

@@ -15,7 +15,7 @@ from napari.layers import Shapes
 from typing import Union, Tuple, List
 from stardist.models import StarDist2D
 from PIL import Image, ImageDraw
-
+import utils
 sys.path.append('AutonomousMicroscopy')
 sys.path.append('AutonomousMicroscopy/MainScripts')
 #Import all scripts in the custom script folders
@@ -548,7 +548,193 @@ class AnalysisThread(QThread):
         # self.napariOverlay.shapesOverlay_init()
         self.napariOverlay.imageOverlay_init(blending='additive',opacity=0.5,colormap='red')
         self.napariOverlay.changeName('Cell Segment Overlay')
+
+
+
+#This code gets some image and does some analysis on this
+class AnalysisThread_customFunction(QThread):
+    # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
+    # Create a signal to communicate between threads
+    analysis_done_signal = pyqtSignal(object)
+    finished = pyqtSignal()# signal to indicate that the thread has finished
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=100):
+        """
+        Initializes the AnalysisThread object.
+
+        Args:
+            shared_data: The shared data object. See Shared_data class for more information
+            analysisInfo (Union[str, None]): Optional. The analysis 'title/method'. Default is 'Random'.
+            visualisationInfo (Union[str, None]): Optional. The visualisation 'title/method'. Default is 'Random'.
+
+        Returns:
+        None
+        """
+        super().__init__()
+        #Initiate some variables
+        self.is_running = True
+        self.analysis_ongoing = False
+        self.shared_data = shared_data
+        self.analysisInfo = analysisInfo
+        self.napariViewer = shared_data.napariViewer
+        self.image_queue_analysis = analysisQueue
+        self.sleepTimeMs = sleepTimeMs
+        self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
         
+        self.initAnalysis()
+        # if self.analysisInfo == 'CellSegmentOverlay':
+        #     storageloc = './AutonomousMicroscopy/ExampleData/StarDistModel'
+        #     # storageloc = './AutonomousMicroscopy/ExampleData/StarDist_hfx_20220823'
+        #     modelDirectory = storageloc.rsplit('/', 1)
+        #     #Load the model - better to do this out of the loop for time reasons
+        #     self.stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
+        # if analysisInfo == None:
+        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+        # elif analysisInfo == 'LiveModeVisualisation':
+        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+        # elif analysisInfo == 'mdaVisualisation':
+        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+        # else:
+        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
+            #Create an empty overlay
+            # if visualisationInfo != None:
+            #     #Activate layer
+            #     self.initialise_napariLayer()
+    
+    def run(self):
+        """
+        Runs the function in a loop as long as `self.is_running` is True.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        while not self.isInterruptionRequested():
+            #Run analysis on the image from the queue
+            # print(self.image_queue_analysis.get())
+            self.analysis_result = self.runAnalysis(self.image_queue_analysis.get()) #type:ignore
+            self.analysis_done_signal.emit(self.analysis_result)
+            # self.finished.emit()
+            if self.is_running == False:
+                # self.finished.emit()
+                return
+        
+        # Thread has finished, emit the finished signal
+        self.finished.emit()
+    
+    def stop(self):
+        """
+        Stops the execution of the function
+        """
+        self.is_running = False
+        #Also remove the image queue requestion from live mode
+        if self.image_queue_analysis in self.shared_data.liveImageQueues:
+            self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
+        elif self.image_queue_analysis in self.shared_data.mdaImageQueues:
+            self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
+    
+    def destroy(self):
+        """
+        Destroy the object.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        try:
+            print('Destroying '+str(self.analysisInfo))
+        except:
+            print('Destroying some analysis thread')
+        #Wait for the thread to be finished
+        self.stop()
+        self.requestInterruption()
+        self.quit()
+        #Officially we'd need to wait here, but that seems to start an infinite loop somewhere
+        # self.wait()
+        # self.deleteLater()
+    
+    #Get corresponding layer of napariOverlay
+    def getLayer(self):
+        """
+        Obtain the napari overlay layer (napariOverlay class) associated with this analysisThread
+        
+        Args:
+            None
+
+        Returns:
+            napari.layers.Layer: The layer associated with the napari overlay.
+        """
+        return self.napariOverlay.getLayer()
+    
+    #Analysis is split into two parts: obtaining the analysis result and displaying this.
+    #Here, we calculate the analysis result based on the analysisInfo
+    def runAnalysis(self,data): 
+        """
+        Runs the analysis on the given image based on the analysis information provided.
+
+        Args:
+            data, containing:
+            image (Image): The image on which the analysis needs to be performed.
+            metadata: corresponding metadata
+
+        Returns:
+            analysisResult (Any): The result of the analysis. The analysis result will be passed to Visualise_Analysis_results.
+
+        Notes:
+            - The layer should be open before running the analysis.
+            - The analysisInfo parameter should be set before calling this function.
+            - If analysisInfo is 'AvgGrayValueText', the analysisResult will be the result of calcAnalysisAvgGrayValue.
+            - If analysisInfo is 'GrayValueOverlay', the analysisResult will be the result of calcGrayValueOverlay.
+            - If analysisInfo is 'CellSegmentOverlay', the analysisResult will be the result of calcCellSegmentOverlay.
+            - If analysisInfo is not set or is invalid, the analysisResult will be None.
+        """
+        if data is not None:
+            image = data[0]
+            metadata = data[1]
+            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
+                self.msleep(self.sleepTimeMs)
+                #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
+                analysisResult = self.runAnalysisThisImage(self.analysisInfo,image,metadata=metadata,core=self.shared_data.core)
+                # if self.analysisInfo == 'ChangeStageAtFrame':
+                #     analysisResult = self.changeStageAtFrame(image,metadata=metadata,core=self.shared_data.core,frame=500)
+                    
+                return [analysisResult,metadata]
+            elif self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
+                self.setPriority(self.HighestPriority) #type:ignore
+                return None
+            else:
+                return None
+        else:
+            return None
+
+
+
+    #And here we perform the visualisation - can be fully separate from performing the analysis
+    #Initialisation is called upon creation
+    def initialise_napariLayer(self):
+        print('init_napariLayer')
+            
+    #Update ir called every time the analysis is done
+    def update_napariLayer(self,analysis_data):
+        print('napari Layer should be updated here :)')
+    
+    
+    
+    
+    def initAnalysis(self):
+        self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo)
+        print('Called once to init the analysis!')
+    
+    def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):
+        utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
+        return 0
+
+
+
+#This function probably gets deprecated soon
 def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = None,createNewThread = True,throughputThread=None,liveorMDA='live'):
     global image_queue_analysis, napariViewer
     napariViewer = shared_data.napariViewer
@@ -577,4 +763,38 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
     #Append it to the list of analysisThreads
     shared_data.analysisThreads.append(analysis_thread)
     
-    return analysis_thread 
+    return analysis_thread
+
+#Use this function from now on
+def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewThread = True,throughputThread=None,delay=100):
+    
+    #Created/tested via nodz
+    
+    global image_queue_analysis, napariViewer
+    napariViewer = shared_data.napariViewer
+    if createNewThread == False:
+        image_queue_analysis = throughputThread
+    else:
+        #Create a new analysis thread
+        image_queue_analysis = queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
+        shared_data.liveImageQueues.append(image_queue_analysis)
+            
+    if delay==None:
+        #TODO: check for delay in the function
+        delay=100
+    
+    # image_queue_analysis = image_queue_transfer
+    #Instantiate an analysis thread and add a signal
+    analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay)
+    
+    #TODO: make this depending on whether or not we want to do visualisation of the RT analysis
+    # analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
+    
+    
+    analysis_thread.finished.connect(analysis_thread.deleteLater)
+    analysis_thread.start()
+    
+    #Append it to the list of analysisThreads
+    shared_data.analysisThreads.append(analysis_thread)
+    
+    return analysis_thread

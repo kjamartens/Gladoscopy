@@ -17,6 +17,7 @@ from matplotlib import colormaps # type: ignore
 import napariGlados
 #For drawing
 import matplotlib
+import utils
 matplotlib.use('Qt5Agg')
 # from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -895,6 +896,20 @@ class MDAGlados(CustomMainWindow):
         
             napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
+        #And try to get real-time analysis attributes at bottom:
+        
+        #Look at the 'Visual' bottom attribute:
+        RealTimeAttr = nodeInfo.bottomAttrs['Real-time']
+        if len(RealTimeAttr.connections) > 0:
+            rt_analysis_connected_node_name = RealTimeAttr.connections[0].socketNode
+            for node in nodeInfo.flowChart.nodes:
+                if node.name == rt_analysis_connected_node_name:
+                    rt_analysis_connected_node = node
+                    rt_analysis_info = rt_analysis_connected_node.real_time_analysis_currentData
+                    
+                    create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=0)
+                    
+                    
         self.shared_data._mdaMode = False
         
         #Set the exposure time:

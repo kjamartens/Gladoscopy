@@ -29,6 +29,7 @@ from Scoring_Images_Measurements_Shapes import * #type: ignore
 from Visualisation_Images import * #type: ignore
 from Visualisation_Measurements import * #type: ignore
 from Visualisation_Shapes import * #type: ignore
+from Real_Time_Analysis import * #type: ignore
 import HelperFunctions #type: ignore
 import logging
 import utils
@@ -119,6 +120,42 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         
         #Pre-load the options if they're in the current node info
         utils.preLoadOptions(self.mainLayout,currentNode.scoring_analysis_currentData)
+
+
+class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
+    def __init__(self, parent=None, currentNode=None):
+        super().__init__(parent, currentNode)
+        self.setWindowTitle("Real-Time Analysis Options")
+        
+        #Let's try to get all possible RT analysis options
+        realTimeAnalysisFunctions = utils.functionNamesFromDir('AutonomousMicroscopy\\Real_Time_Analysis')
+        
+        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(realTimeAnalysisFunctions,'')
+        #Store this mapping also in the node
+        self.currentData['__displayNameFunctionNameMap__'] = displaynameMapping
+        
+        #Add a dropbox with all the options
+        self.comboBox_RTanalysisFunctions = QComboBox(self)
+        if len(realTimeAnalysisFunctions) > 0:
+            for item in realTimeAnalysisFunctions:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
+        
+        self.mainLayout.addWidget(self.comboBox_RTanalysisFunctions, 0, 1)
+        #give it an objectName:
+        self.comboBox_RTanalysisFunctions.setObjectName('comboBox_RTanalysisFunctions_KEEP')
+        #Give it a connect-callback if it's changed (then the layout should be changed)
+        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, layout=self.mainLayout, dropdown=self.comboBox_RTanalysisFunctions,displaynameMapping=displaynameMapping: utils.layout_changedDropdown(layout,dropdown,displaynameMapping))
+        #Also give it a connect-callback to store the currentinfo:
+        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
+
+        
+        # pre-load all args/kwargs and their edit values - then hide all of them
+        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions)
+        
+        #Pre-load the options if they're in the current node info
+        # utils.preLoadOptions(self.mainLayout,currentNode.real_time_analysis_currentData)
+
 
 class nodz_analysisMeasurementDialog(nodz_analysisDialog):
     def __init__(self, parent=None, currentNode=None):
@@ -1049,6 +1086,14 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 currentNode.scoring_analysis_currentData = dialog.currentData
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
                 logging.info('Pressed OK on analysisMeasurementDialog')
+        elif 'realTimeAnalysis' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
+            dialog = nodz_realTimeAnalysisDialog(currentNode = currentNode, parent = self)
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                currentNode.real_time_analysis_currentData = dialog.currentData
+                logging.info('Pressed OK on RTanalysis')
         elif 'timer' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringStart' in nodeName:
@@ -1175,6 +1220,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['visualisation']['name'] = 'visualisation'
         self.nodeInfo['visualisation']['displayName'] = 'Visualisation'
         self.nodeInfo['visualisation']['topAttributes'] = ['Start']
+        
+        self.nodeInfo['realTimeAnalysis'] = self.singleNodeTypeInit()
+        self.nodeInfo['realTimeAnalysis']['name'] = 'realTimeAnalysis'
+        self.nodeInfo['realTimeAnalysis']['displayName'] = 'Real-Time analysis'
+        self.nodeInfo['realTimeAnalysis']['topAttributes'] = ['Start']
         
         self.nodeInfo['changeStagePos'] = self.singleNodeTypeInit()
         self.nodeInfo['changeStagePos']['name'] = 'changeStagePos'
