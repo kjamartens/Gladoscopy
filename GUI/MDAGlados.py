@@ -875,7 +875,6 @@ class MDAGlados(CustomMainWindow):
         
         #Set the status of the nodz-coupled vis and real-time to finished:
         if 'nodeInfo' in vars(self):
-            
         #Look at the 'Visual' bottom attribute:
             visualAttr = self.nodeInfo.bottomAttrs['Visual']
             if len(visualAttr.connections) > 0:

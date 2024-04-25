@@ -715,12 +715,21 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         #Add a few buttons:
         self.buttonsArea = QVBoxLayout()
+        self.loadPickleButton = QPushButton('Load Graph')
+        self.buttonsArea.addWidget(self.loadPickleButton)
+        self.loadPickleButton.clicked.connect(lambda index: self.loadPickle())
         self.runScoringButton = QPushButton('Start run!')
         self.buttonsArea.addWidget(self.runScoringButton)
         self.runScoringButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
-        self.runScoringButton = QPushButton('Run Scoring')
+        self.runScoringButton = QPushButton('Run Scoring Only')
+        self.buttonsArea.addWidget(self.runScoringButton)
+        self.runScoringButton.clicked.connect(lambda index: self.runScoringOnly())
+        self.runScoringButton = QPushButton('Run Scoring + Acq')
         self.buttonsArea.addWidget(self.runScoringButton)
         self.runScoringButton.clicked.connect(lambda index: self.runScoring())
+        self.storePickleButton = QPushButton('Store Graph')
+        self.buttonsArea.addWidget(self.storePickleButton)
+        self.storePickleButton.clicked.connect(lambda index: self.storePickle())
         self.runAcquiringButton = QPushButton('Run Acquiring')
         self.buttonsArea.addWidget(self.runAcquiringButton)
         self.runAcquiringButton.clicked.connect(lambda index: self.runAcquiring())
@@ -728,12 +737,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.debugScoringButton = QPushButton('Debug Scoring')
         self.buttonsArea.addWidget(self.debugScoringButton)
         self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
-        self.storePickleButton = QPushButton('Store Graph')
-        self.buttonsArea.addWidget(self.storePickleButton)
-        self.storePickleButton.clicked.connect(lambda index: self.storePickle())
-        self.loadPickleButton = QPushButton('Load Graph')
-        self.buttonsArea.addWidget(self.loadPickleButton)
-        self.loadPickleButton.clicked.connect(lambda index: self.loadPickle())
         
         
         #import qgroupbox:
@@ -776,6 +779,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.graphics_view.updateGraphicsViewSize()
         self.nodes = []
         self.nodeCounter={}
+        self.preventAcq=False #Set to true if you want to prevent smart acquisition (i.e. scoring-only, never passing to acq)
         
         
         #Connect required deleted/double clicked signals
@@ -1057,6 +1061,19 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             displayHTMLtext = f"Changing {len(dialog.ConfigsToBeChanged())} config(s):"
             for config in dialog.ConfigsToBeChanged():
                 displayHTMLtext += f"<br>{config[0]} to {config[1]}"
+        elif nodeType == 'scoreEnd':
+            import time
+            from datetime import datetime
+            displayHTMLtext = f"<i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
+            for score_entry in dialog[0]:
+                displayHTMLtext += f"<br><b>{score_entry}:</b> {format(dialog[1][score_entry],'.2f')}"
+            if len(dialog) > 2:
+                displayHTMLtext += f"<br><b>{dialog[2]}</b>"
+        elif nodeType == 'scoreStart':
+            import time
+            from datetime import datetime
+            displayHTMLtext = "<b>Scoring started at:</b>"
+            displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
     
@@ -1391,6 +1408,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
     
     def fullAutonomousRunStart(self):
         print('Starting a full run')
+        self.preventAcq = True
         
         #General idea: first check if there are no glaring errors (scoring, position)
         #then go to whatever start position based on the xy positions
@@ -1423,7 +1441,26 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         self.runScoring()
     
+    def runScoringOnly(self):
+        self.preventAcq = True
+        
+        #Find the scoring_start node:
+        scoreStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'scoringStart_' in node.name:
+                    scoreStartNode = node
+        
+        #Run the scoring_start routine:
+        if scoreStartNode is not None:
+            self.scoringStart(scoreStartNode)
+        else:
+            logging.error('Could not find scoringStart node in flowchart')
+    
     def runScoring(self):
+        self.preventAcq = False
         #Find the scoring_start node:
         scoreStartNode = None
         flowChart = self
@@ -2015,11 +2052,14 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         Returns:
             None
         """
-        print('Starting the acquiring routine!')
-        
-        self.GraphToSignals()
-        
-        self.finishedEmits(node)
+        if self.preventAcq == False:
+            print('Starting the acquiring routine!')
+            
+            self.GraphToSignals()
+            
+            self.finishedEmits(node)
+        else:
+            logging.warning('Would have started acquiring, but was prevented!')
     
     def acquiringEnd(self,node):
         print("End Acquiring")
@@ -2056,6 +2096,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 if nodeC.name == connectedNode:
                     nodeC.status='idle'
         
+        self.set_readable_text_after_dialogChange(node,'','scoreStart')
+        
         self.GraphToSignals()
         
         self.finishedEmits(node)
@@ -2076,6 +2118,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         #Find the nodes that are connected downstream of this:
         data = {}
+        attrs = []
         for attr in node.attrs:
             connectedNode = None
             for connection in self.evaluateGraph():
@@ -2085,43 +2128,54 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                         connectedNode = self.findNodeByName(connectedNodeName)
         
                     data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
+                    attrs.append(attr)
                     print(f"Data found for {attr}: {data[attr]}")
         
-        testPassed = self.decisionWidget.testCurrentDecision()
-        print('Scoring finished fully!')
-        if testPassed:
-            print("Test is... Passed!")
+        try:
+            testPassed = self.decisionWidget.testCurrentDecision()
+            testPassedText = 'Test is Passed' if testPassed else 'Test is Not Passed'
+            self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
             
-            #Find the acqStart node:
-            acqStartNode = None
-            flowChart = self
-            if len(flowChart.nodes) > 0:
-                #Find the scoringEnd node in flowChart:
-                for nodeF in flowChart.nodes:
-                    if 'acqStart_' in nodeF.name:
-                        acqStartNode = nodeF
-            
-            #Run the scoring_start routine:
-            if acqStartNode is not None:
-                logging.info('Starting acquisition routine!')
-                self.acquiringStart(acqStartNode)
-            else:
-                logging.error('Could not find acqStart node in flowchart')
-            
-        elif not testPassed:
-            print("Test is... Not Passed!")
-            #Go to next XY position
-            if self.fullRunOngoing:
-                if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                    self.fullRunCurrentPos +=1
-                    #And start a new score/acq at a new pos:
-                    self.startNewScoreAcqAtPos()
+            print('Scoring finished fully!')
+            if testPassed:
+                print("Test is... Passed!")
+                
+                #Find the acqStart node:
+                acqStartNode = None
+                flowChart = self
+                if len(flowChart.nodes) > 0:
+                    #Find the scoringEnd node in flowChart:
+                    for nodeF in flowChart.nodes:
+                        if 'acqStart_' in nodeF.name:
+                            acqStartNode = nodeF
+                
+                #Run the scoring_start routine:
+                if acqStartNode is not None:
+                    logging.info('Starting acquisition routine!')
+                    self.acquiringStart(acqStartNode)
                 else:
-                    self.singleRunOngoing = False
-                    print('All done!')
-        print('----------------------')
-        self.finishedEmits(node)
+                    logging.error('Could not find acqStart node in flowchart')
+                
+            elif not testPassed:
+                print("Test is... Not Passed!")
+                #Go to next XY position
+                if self.fullRunOngoing:
+                    if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
+                        self.fullRunCurrentPos +=1
+                        #And start a new score/acq at a new pos:
+                        self.startNewScoreAcqAtPos()
+                    else:
+                        self.singleRunOngoing = False
+                        print('All done!')
+            print('----------------------')
+            self.preventAcq = False
+            self.finishedEmits(node)
 
+        except:
+            testPassed = False
+            node.status = 'error'
+            testPassedText = 'Error when assessing test'
+            self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
     def timerCallAction(self,node,timev):
         """
         This function is the action function for the Timer Call node in the Flowchart.

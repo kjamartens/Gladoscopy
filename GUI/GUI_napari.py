@@ -49,9 +49,9 @@ def perform_post_closing_actions(shared_data):
 class Worker(QObject):
     finished = pyqtSignal()
 
-    def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data):
+    def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data,includeCustomUI=False):
         # Your code for running the NapariPycroManager function goes here
-        runNapariPycroManager(core, MM_JSON, shared_data)
+        runNapariPycroManager(core, MM_JSON, shared_data,includecustomUI=includeCustomUI)
         self.finished.emit()
 
 def main():

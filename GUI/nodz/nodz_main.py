@@ -1936,6 +1936,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
             self.icon = QPixmap('GUI/Icons/node_inProgress.png')
         elif self.status == 'finished':
             self.icon = QPixmap('GUI/Icons/node_completed.png')
+        elif self.status == 'error':
+            self.icon = QPixmap('GUI/Icons/node_error.png')
         else:
             self.icon = QPixmap('GUI/Icons/node_error.png')
             

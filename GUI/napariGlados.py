@@ -525,25 +525,19 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
     
-    # Start separate analysis threads
-    # create_analysis_thread(image_queue_analysis,shared_data,analysisInfo='AvgGrayValueText')
-    
     #Add widgets as wanted
     custom_widget_analysisThreads = dockWidget_analysisThreads()
-    napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="analysisThreads",tabify=True)
+    napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
-    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="MMcontrols",tabify=True)
+    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
     
     custom_widget_MDA = dockWidget_MDA()
-    napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="MDA",tabify=True)
-    
-    custom_widget_MDAAST = dockWidget_mdaAnalysisScoringTest()
-    napariViewer.window.add_dock_widget(custom_widget_MDAAST, area="top", name="TESTER",tabify=True)
+    napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)
     
     if include_flowChart_automatedMicroscopy:
         custom_widget_flowChart = dockWidget_flowChart()
-        napariViewer.window.add_dock_widget(custom_widget_flowChart, area="top", name="flowChart",tabify=True)
+        napariViewer.window.add_dock_widget(custom_widget_flowChart, area="top", name="Autonomous microscopy",tabify=True)
         custom_widget_flowChart.dockWidget.focus()
     
     if includecustomUI:
