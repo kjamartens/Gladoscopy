@@ -540,7 +540,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
 
     # NODES
-    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None, displayName=None,skipCreateNodeSignal=False,createdFromNodzLoading=False):
+    def createNode(self, name='default', preset='node_default', position=None, alternate=True, displayText=None, displayName=None,skipCreateNodeSignal=False,createdFromNodzLoading=False,nodeInfo=None):
         """
         Create a new node with a given name, position and color.
 
@@ -570,7 +570,7 @@ class Nodz(QtWidgets.QGraphicsView):
             return
         else:
             nodeItem = NodeItem(name=name, alternate=alternate, preset=preset,
-                                config=self.config, displayText = displayText, displayName=displayName)
+                                config=self.config, displayText = displayText, displayName=displayName,nodeInfo=nodeInfo)
 
             # Store node in scene.
             self.scene().nodes[name] = nodeItem #type:ignore
@@ -879,7 +879,7 @@ class Nodz(QtWidgets.QGraphicsView):
             nodeAlternate = nodeInst.alternate
 
             data['NODES'][node] = {'preset': preset,
-                                'position': [nodeInst.pos().x(), nodeInst.pos().y()],
+                                'position': [nodeInst.pos().x()+nodeInst.baseWidth/2, nodeInst.pos().y()+nodeInst.height/2],
                                 'alternate': nodeAlternate,
                                 'attributes': [],
                                 'textbox_text': nodeInst.textbox.toHtml(),
@@ -1029,11 +1029,14 @@ class Nodz(QtWidgets.QGraphicsView):
             position = QtCore.QPointF(position[0], position[1])
             alternate = nodesData[name]['alternate']
             
+            nodeType = ''.join(name.split('_')[:-1])
+            
             node = self.createNode(name=name,
                                 preset=preset,
                                 position=position,
                                 alternate=alternate, skipCreateNodeSignal=False,
-                                displayText=nodesData[name]['textbox_text'],createdFromNodzLoading=True)
+                                displayText=nodesData[name]['textbox_text'],createdFromNodzLoading=True,
+                                nodeInfo = self.nodeInfo[nodeType])
             if 'textboxheight' in nodesData[name]:
                 node.textboxheight = nodesData[name]['textboxheight'] #type:ignore
             if 'displayName' in nodesData[name]:
@@ -1043,6 +1046,11 @@ class Nodz(QtWidgets.QGraphicsView):
                 #Force the change in the node:
                 node.BGcolChanged() #type:ignore
                 node.update() #type:ignore
+            
+            #move to exact position
+            node.setX(nodesData[name]['position'][0]-node.baseWidth/2)
+            node.setY(nodesData[name]['position'][1]-node.height/2)
+            
             #Restore MDA data
             if name in data['NODES_MDA']:
                 if data['NODES_MDA'] is not None:
@@ -1412,7 +1420,7 @@ class NodeScene(QtWidgets.QGraphicsScene):
         painter.setPen(utils._convertDataToColor(linePaint))
 
         painter.drawRoundedRect(int(minleft-boundingBorder), 
-                                int(mintop-boundingBorder-25),
+                                int(mintop-boundingBorder-10),
                                 int(minright-minleft+boundingBorder*2),
                                 int(minbottom-mintop+boundingBorder*2),
                                 int(boundingBorder),
@@ -1436,7 +1444,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
     """
 
-    def __init__(self, name, alternate, preset, config, displayName = None, displayText = None, textbox=True, alternateFillColor = None):
+    def __init__(self, name, alternate, preset, config, displayName = None, displayText = None, textbox=True, alternateFillColor = None, nodeInfo=None):
         """
         Initialize the class.
 
@@ -1495,11 +1503,16 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.topAttrs = dict()
 
         # Methods.
-        self.config = config
-        self._createStyle(config)
+        import copy
+        self.config = config.copy()
+        if nodeInfo is not None:
+            #Adjust the width
+            self.config['node_width'] *= float(nodeInfo['NodeSize'])/100
+        self._createStyle(self.config)
         
         self.textbox_exists = textbox
         self.textboxheight = 50
+        self.textboxborder = 5
         self.mdaData = None
 
     def updateDisplayText(self,new_display_text):
@@ -1585,17 +1598,23 @@ class NodeItem(QtWidgets.QGraphicsItem):
             elif self.attrsData[attr]['topAttr']:
                 nrTopAttrs += 1
         
-        #TODO: Change height if bottom attr is present
-        if self.attrCount > 0:
+        if (nrPlugAttrs+nrSocketAttrs) > 0:
             return (self.baseHeight +
                     self.attrHeight * max(nrSocketAttrs, nrPlugAttrs) +
                     (1 if nrBottomAttrs >= 1 else 0) * self.bottomAttrHeight +
-                    self.border +
-                    0.5 * self.radius + 
-                    self.textbox_exists * self.textboxheight +
-                    -10)
+                    2*self.border +
+                    #self.radius + 
+                    self.textbox_exists * (self.textboxheight +
+                    self.textboxborder * 2))
         else:
-            return self.baseHeight
+            try:
+                return (self.baseHeight +
+                        # self.border +
+                        # 2 * self.radius + 
+                        self.textbox_exists * (self.textboxheight +
+                        self.textboxborder * 2))
+            except:
+                return 20
 
     @property
     def pen(self):
@@ -1883,6 +1902,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
 
         if self.displayName == None:
+            painter.setPen(QColor(255,255,255))
             metrics = QtGui.QFontMetrics(painter.font())
             text_width = metrics.boundingRect(self.name).width() + 14
             text_height = metrics.boundingRect(self.name).height() + 14
@@ -1895,6 +1915,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
                             QtCore.Qt.AlignCenter, #type:ignore
                             self.name)
         else:
+            painter.setPen(QColor(255,255,255))
             metrics = QtGui.QFontMetrics(painter.font())
             text_width = metrics.boundingRect(self.displayName).width() + 14
             text_height = metrics.boundingRect(self.displayName).height() + 14
@@ -1983,7 +2004,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
             if not attrData['bottomAttr'] and not attrData['topAttr']:
                 # Attribute rect.
                 rect = QtCore.QRect(int(self.border / 2+xoffset),
-                                    int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight),
+                                    int(self.baseHeight + offset + self.textbox_exists*(self.textboxheight+self.textboxborder*2)),
                                     int(width),
                                     int(height))
                 # Attribute base.
@@ -2018,7 +2039,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
                     
                 painter.drawRoundedRect(
                                     int(self.border / 2+xoffset),
-                                    int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight)+10,
+                                    int(self.baseHeight + offset + self.textbox_exists*(self.textboxheight+self.textboxborder*2)),
                                     int(width),
                                     int(height),
                                     int(0),
@@ -2026,7 +2047,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
                 
                 #Create a rect to later draw the text, but we don't draw this rect...
                 rect = QtCore.QRect(int(self.border / 2+xoffset),
-                                    int(self.baseHeight - self.radius + offset + self.textbox_exists*self.textboxheight)+10,
+                                    int(self.baseHeight + offset + self.textbox_exists*(self.textboxheight+self.textboxborder*2)),
                                     int(width),
                                     int(height))
 
@@ -2090,9 +2111,11 @@ class NodeItem(QtWidgets.QGraphicsItem):
         # Draw rectangle
         w = (self.baseWidth - self.border)-5*2
         h = self.textboxheight
-        rectpos = [5,5,w,h]
-        painter.setBrush(QColor(200, 200, 200))
-        painter.drawRoundedRect(*rectpos,self.radius,self.radius)
+        rectpos = [self.textboxborder,self.textboxborder,int(w),int(h)]
+        textboxColor = self._brush.color().lighter(200)
+        painter.setBrush(textboxColor)
+        painter.setPen(QColor(0, 0, 0, 0))
+        painter.drawRoundedRect(*rectpos,self.radius/2,self.radius/2)
         
         # # Draw text
         font = QFont('Arial', 12)
@@ -2500,11 +2523,12 @@ class PlugItem(SlotItem):
                 if self.parentItem().attrsData[attr]['plug']: #type:ignore
                     nrPlugsParentBeforeThis += 1
 
+
         x = self.parentItem().baseWidth - (width / 2.0) #type:ignore
         y = (self.parentItem().baseHeight - config['node_radius'] + #type:ignore
-             self.parentItem().attrHeight / 4 + #type:ignore
-             nrPlugsParentBeforeThis * self.parentItem().attrHeight +  #type:ignore
-             self.parentItem().textbox_exists*self.parentItem().textboxheight) #type:ignore
+            #self.parentItem().attrHeight / 4 + #type:ignore
+            (nrPlugsParentBeforeThis+0.5) * self.parentItem().attrHeight +  #type:ignore
+            self.parentItem().textbox_exists*(self.parentItem().textboxheight+self.parentItem().textboxborder*2)) #type:ignore
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
@@ -2623,9 +2647,9 @@ class SocketItem(SlotItem):
 
         x = - width / 2.0
         y = (self.parentItem().baseHeight - config['node_radius'] + #type:ignore
-            (self.parentItem().attrHeight/4) + #type:ignore
-             nrSocketsParentBeforeThis * self.parentItem().attrHeight +  #type:ignore
-             self.parentItem().textbox_exists*self.parentItem().textboxheight) #type:ignore
+            #(self.parentItem().attrHeight/4) + #type:ignore
+            (nrSocketsParentBeforeThis+0.5) * self.parentItem().attrHeight +  #type:ignore
+            self.parentItem().textbox_exists*(self.parentItem().textboxheight+self.parentItem().textboxborder*2)) #type:ignore
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
@@ -2703,7 +2727,7 @@ class BottomAttrItem(PlugItem):
         distanceFromLeft = nrBottomAttrParentBeforeThis/totalnrBottomAttrs+(1/totalnrBottomAttrs)/2
 
         x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border #type:ignore
-        y = (self.parentItem().boundingRect().height()-self.parentItem().radius/2) #type:ignore
+        y = (self.parentItem().boundingRect().height()-config['node_radius']) #type:ignore
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect
@@ -2735,7 +2759,7 @@ class TopAttrItem(SocketItem):
         distanceFromLeft = nrTopAttrParentBeforeThis/totalnrTopAttrs+(1/totalnrTopAttrs)/2
 
         x = distanceFromLeft*self.parentItem().baseWidth-2*self.parentItem().border #type:ignore
-        y = 0#(self.parentItem().boundingRect().height()-self.parentItem().radius/2) #type:ignore
+        y = -config['node_radius']#(self.parentItem().boundingRect().height()-self.parentItem().radius/2) #type:ignore
 
         rect = QtCore.QRectF(QtCore.QRect(int(x), int(y), int(width), int(height)))
         return rect

@@ -15,8 +15,8 @@
 
     // Shapes > Edit values BUT do not delete.
     "node_width": 250,
-    "node_height": 25,
-    "node_radius": 15,
+    "node_height": 0,
+    "node_radius": 8,
     "node_border": 2,
     "node_attr_height": 30,
     "connection_width": 2,
@@ -66,27 +66,40 @@
         "border_sel": [170, 80, 80, 255],
         "text": [180, 180, 240, 255]
     },
-    "analysis": {
-        "bg": [80, 80, 180, 255],
+    "analysisMeasurement": {
+        "bg": [105, 77, 117, 255],
         "border": [50, 50, 50, 255],
         "border_sel": [170, 80, 80, 255],
         "text": [180, 180, 240, 255]
     },
-    "scoring": {
-        "bg": [80, 80, 180, 255],
+    "visualisation": {
+        "bg": [180, 99, 71, 255],
         "border": [50, 50, 50, 255],
         "border_sel": [170, 80, 80, 255],
         "text": [180, 180, 240, 255]
     },
-    "decision": {
-        "bg": [80, 80, 180, 255],
+    "realTimeAnalysis": {
+        "bg": [70, 130, 180, 255],
         "border": [50, 50, 50, 255],
         "border_sel": [170, 80, 80, 255],
         "text": [180, 180, 240, 255]
     },
 
-
+    "acqStart": {
+        "bg": [224, 195, 69, 255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
+    "acqEnd": {
+        "bg": [225, 79, 50,255],
+        "border": [50, 50, 50, 255],
+        "border_sel": [170, 80, 80, 255],
+        "text": [180, 180, 240, 255]
+    },
     
+
+
     "node_imaging": {
         "bg": [80, 80, 180, 255],
         "border": [50, 50, 50, 255],

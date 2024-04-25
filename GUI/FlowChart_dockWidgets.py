@@ -1220,6 +1220,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         init['NodeCounter'] = 0
         init['NodeCounterNeverReset'] = 0
         init['MaxNodeCounter'] = np.inf
+        init['NodeSize'] = 100
         return init
     
     def defineNodeInfo(self):
@@ -1252,24 +1253,20 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['visualisation']['name'] = 'visualisation'
         self.nodeInfo['visualisation']['displayName'] = 'Visualisation'
         self.nodeInfo['visualisation']['topAttributes'] = ['Start']
+        self.nodeInfo['visualisation']['NodeSize'] = 60
+        
         
         self.nodeInfo['realTimeAnalysis'] = self.singleNodeTypeInit()
         self.nodeInfo['realTimeAnalysis']['name'] = 'realTimeAnalysis'
         self.nodeInfo['realTimeAnalysis']['displayName'] = 'Real-Time analysis'
         self.nodeInfo['realTimeAnalysis']['topAttributes'] = ['Start']
+        self.nodeInfo['realTimeAnalysis']['NodeSize'] = 60
         
         self.nodeInfo['changeStagePos'] = self.singleNodeTypeInit()
         self.nodeInfo['changeStagePos']['name'] = 'changeStagePos'
         self.nodeInfo['changeStagePos']['displayName'] = 'Change Stage Position'
         self.nodeInfo['changeStagePos']['startAttributes'] = ['Start']
         self.nodeInfo['changeStagePos']['finishedAttributes'] = ['Done']
-        
-        self.nodeInfo['analysisGrayScaleTest'] = self.singleNodeTypeInit()
-        self.nodeInfo['analysisGrayScaleTest']['name'] = 'analysisGrayScaleTest'
-        self.nodeInfo['analysisGrayScaleTest']['displayName'] = 'Analysis Grayscale Test [Measurement]'
-        self.nodeInfo['analysisGrayScaleTest']['startAttributes'] = ['Analysis start']
-        self.nodeInfo['analysisGrayScaleTest']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['analysisGrayScaleTest']['dataAttributes'] = ['Output']
         
         self.nodeInfo['analysisMeasurement'] = self.singleNodeTypeInit()
         self.nodeInfo['analysisMeasurement']['name'] = 'analysisMeasurement'
@@ -1297,24 +1294,28 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['scoringStart']['displayName'] = 'Scoring start'
         self.nodeInfo['scoringStart']['finishedAttributes'] = ['Start']
         self.nodeInfo['scoringStart']['MaxNodeCounter'] = 1
+        self.nodeInfo['scoringStart']['NodeSize'] = 60
         
         self.nodeInfo['scoringEnd'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringEnd']['name'] = 'scoringEnd'
         self.nodeInfo['scoringEnd']['displayName'] = 'Scoring end'
         self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
         self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
+        self.nodeInfo['scoringEnd']['NodeSize'] = 60
         
         self.nodeInfo['acqStart'] = self.singleNodeTypeInit()
         self.nodeInfo['acqStart']['name'] = 'acqStart'
         self.nodeInfo['acqStart']['displayName'] = 'Acquiring start'
         self.nodeInfo['acqStart']['finishedAttributes'] = ['Start']
         self.nodeInfo['acqStart']['MaxNodeCounter'] = 1
+        self.nodeInfo['acqStart']['NodeSize'] = 60
         
         self.nodeInfo['acqEnd'] = self.singleNodeTypeInit()
         self.nodeInfo['acqEnd']['name'] = 'acqEnd'
         self.nodeInfo['acqEnd']['displayName'] = 'Acquiring end'
         self.nodeInfo['acqEnd']['startAttributes'] = ['End']
         self.nodeInfo['acqEnd']['MaxNodeCounter'] = 1
+        self.nodeInfo['acqEnd']['NodeSize'] = 60
         
         self.nodeInfo['onesectimer'] = self.singleNodeTypeInit()
         self.nodeInfo['onesectimer']['name'] = '1s timer'
@@ -1655,7 +1656,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             return
         
         #Create the new node with correct name and preset
-        newNode = self.createNode(name=nodeType+"_", preset = 'node_preset_1', position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'])
+        newNode = self.createNode(name=nodeType+"_", preset = 'node_preset_1', position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'],nodeInfo=self.nodeInfo[nodeType])
         
         #Do post-node-creation functions - does this via the pyqtsignal!
     
