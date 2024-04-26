@@ -2,6 +2,11 @@ from napariGlados import napariHandler
 from PyQt5.QtCore import QTimer
 import logging
 from PyQt5.QtCore import QObject, pyqtSignal
+
+import slack
+from flask import Flask
+from slackeventsapi import SlackEventAdapter
+
 """Shared data summary
 
     Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
@@ -29,6 +34,15 @@ class Shared_data(QObject):
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
+        
+        self.globalData = {}
+        self.globalData['SLACK'] = {}
+        self.globalData['SLACK']['TOKEN'] = "xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf"
+        self.globalData['SLACK']['SECRET'] = "e8cd04aa4cc9ec7c51729ec6ecf98c1c"
+        self.globalData['SLACK']['CHANNEL'] = "glados-bot"
+        if self.globalData['SLACK']['TOKEN'] is not None and not len(self.globalData['SLACK']['TOKEN']) == 0:
+            self.globalData['SLACK']['CLIENT'] = slack.WebClient(token=self.globalData['SLACK']['TOKEN'])
+            logging.info('Slack client initialised')
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
     

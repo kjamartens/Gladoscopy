@@ -39,7 +39,10 @@ class RT_counterV():
         return None
 
     def run(self,image,metadata,core,**kwargs):
-        print("At frame: "+metadata['ImageNumber'])
+        if 'ImageNumber' in metadata:
+            print("At frame: "+metadata['ImageNumber'])
+        else:
+            print("At axis-time: "+str(metadata['Axes']['time']))
     
     def visualise(self,image,metadata,core,**kwargs):
         print('optional visualising every time this is called!')

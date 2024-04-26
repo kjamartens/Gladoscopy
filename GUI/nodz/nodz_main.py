@@ -1960,6 +1960,18 @@ class NodeItem(QtWidgets.QGraphicsItem):
         offsetRight = 0
         nrBottomAttrs = 0
         nrTopAttrs = 0
+        
+        #self.attrs should be re-ordered so that bottom/topAttrs are at the bottom of the list
+        orderedAttrs_socketPlugs = []
+        orderedAttrs_bottomTop = []
+        for attr in self.attrs:
+            attrData = self.attrsData[attr]
+            if not attrData['topAttr'] and not attrData['bottomAttr']:
+                orderedAttrs_socketPlugs.append(attr)
+            else:
+                orderedAttrs_bottomTop.append(attr)
+        self.attrs = orderedAttrs_socketPlugs + orderedAttrs_bottomTop
+        
         for attr in self.attrs:
             nodzInst = self.scene().views()[0]
             config = nodzInst.config

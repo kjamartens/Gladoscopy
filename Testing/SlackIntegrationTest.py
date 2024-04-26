@@ -43,21 +43,21 @@ app = Flask(__name__)
 slack_event_adapter = SlackEventAdapter(SIGNING_SECRET, '/slack/eventsGlados/', app)
 
 client = slack.WebClient(token=SLACK_TOKEN)
-# client.chat_postMessage(channel="glados-bot",text="Hello World")
+client.chat_postMessage(channel="glados-bot",text="Hello World")
  
  
-@ slack_event_adapter.on('message')
-def message(payload):
-    event = payload.get('event', {})
-    channel_id = event.get('channel')
-    user_id = event.get('user')
-    text = event.get('text')
+# @ slack_event_adapter.on('message')
+# def message(payload):
+#     event = payload.get('event', {})
+#     channel_id = event.get('channel')
+#     user_id = event.get('user')
+#     text = event.get('text')
  
-    if text == "hi":
-        client.chat_postMessage(channel=channel_id,text="Hello")
+#     if text == "hi":
+#         client.chat_postMessage(channel=channel_id,text="Hello")
 
-    if text == "bye":
-        client.chat_postMessage(channel=channel_id,text="Bye-bye")
+#     if text == "bye":
+#         client.chat_postMessage(channel=channel_id,text="Bye-bye")
  
-if __name__ == "__main__":
-    app.run(debug=True)
+# if __name__ == "__main__":
+#     app.run(debug=True)

@@ -215,5 +215,12 @@ def getConnectedNodes(node, connectiontype):
                     connectedNodeName = connection.plugNode
                     connectedNode = findNodeByName(node.flowChart,connectedNodeName)
                     connectedNodes.append(connectedNode)
+    elif connectiontype == 'bottomAttr':
+        for attr in node.bottomAttrs:
+            if len(node.bottomAttrs[attr].connections)>0:
+                for connection in node.bottomAttrs[attr].connections:
+                    connectedNodeName = connection.socketNode
+                    connectedNode = findNodeByName(node.flowChart,connectedNodeName)
+                    connectedNodes.append(connectedNode)
     return connectedNodes
                     

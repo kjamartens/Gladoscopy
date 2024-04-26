@@ -1076,6 +1076,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
+        return displayHTMLtext
     
     def NodeDoubleClicked(self,nodeName):
         """
@@ -1154,10 +1155,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 for lineEdit in dialog.lineEdits:
                     dialogLineEdits.append(lineEdit.text())
                 self.update_scoring_end(currentNode,dialogLineEdits)
-                #Update the noce itself
+                #Update the node itself
                 self.update()
                 nodeType = self.nodeLookupName_withoutCounter(nodeName)
                 self.updateNumberStartFinishedDataAttributes(currentNode,nodeType)
+                self.update()
                 
                 #Update the decisionwidget:
                 self.decisionWidget.updateAllDecisions()
@@ -1169,52 +1171,58 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             
             #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
             import time
-            
-            current_sockets = [item[0] for item in list(currentNode.sockets.items())]
-            if dialogLineEdits != current_sockets:
-                
-                #We loop over the sockets:
-                for socket_id in reversed(range(len(currentNode.sockets))):
-                    socketFull = list(currentNode.sockets.items())[socket_id]
-                    socket = socketFull[0]
-                    #We check if the socket is in dialogLineEdits:
-                    if socket not in dialogLineEdits:
-                        #If it isn't, we just delete it:
-                        self.deleteAttribute(currentNode,socket_id)
-                        self.update()
-                        time.sleep(0.05)
-                
-                
-                #Check which are different (index-wise) between dialogLineEdits and current_sockets:
-                diff_indexes = []
-                same_indexes = []
-                for i in range(min(len(dialogLineEdits),len(current_sockets))):
-                    if dialogLineEdits[i] != current_sockets[i]:
-                        diff_indexes.append(i)
-                    else:
-                        same_indexes.append(i)
-                #Also append indexes if dialogLineEdits is longer than current_sockets:
-                if len(dialogLineEdits) > len(current_sockets):
-                    for i in range(len(current_sockets),len(dialogLineEdits)):
-                        diff_indexes.append(i)
-                
-                offset = 100
-                #Then we create new sockets or move existing sockets, only for those that have a different pos
-                for socket_new in ([dialogLineEdits[i] for i in diff_indexes]):
-                    pos_in_dialogLineEdits = dialogLineEdits.index(socket_new)
-                    if socket_new not in currentNode.sockets:
-                        self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits+offset, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
-                        self.update()
-                        time.sleep(0.05)
-                    else: #Else we move it from some other location to where we want it
-                        #Find this socket in currentNode.sockets.items():
-                        socketFull = list(currentNode.sockets.items())
-                        pos_in_node_info = [socket_id for socket_id in range(len(socketFull)) if socketFull[socket_id][0] == socket_new][0]
-                        old_pos = socketFull[pos_in_node_info][1].index
-                        #Physically move it
-                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits+offset)
-                        self.update()
-                        time.sleep(0.05)
+            sleepTime = 0.02
+            for _ in range(3): #Just repeat everything 3 times and hope it solves itself
+                self.update()
+                time.sleep(sleepTime)
+                current_sockets = [item[0] for item in list(currentNode.sockets.items())]
+                if dialogLineEdits != current_sockets:
+                    
+                    #We loop over the sockets:
+                    for socket_id in reversed(range(len(currentNode.sockets))):
+                        socketFull = list(currentNode.sockets.items())[socket_id]
+                        socket = socketFull[0]
+                        #We check if the socket is in dialogLineEdits:
+                        if socket not in dialogLineEdits:
+                            #If it isn't, we just delete it:
+                            self.deleteAttribute(currentNode,socket_id)
+                            time.sleep(sleepTime)
+                            self.update()
+                            time.sleep(sleepTime)
+                    
+                    
+                    #Check which are different (index-wise) between dialogLineEdits and current_sockets:
+                    diff_indexes = []
+                    same_indexes = []
+                    for i in range(min(len(dialogLineEdits),len(current_sockets))):
+                        if dialogLineEdits[i] != current_sockets[i]:
+                            diff_indexes.append(i)
+                        else:
+                            same_indexes.append(i)
+                    #Also append indexes if dialogLineEdits is longer than current_sockets:
+                    if len(dialogLineEdits) > len(current_sockets):
+                        for i in range(len(current_sockets),len(dialogLineEdits)):
+                            diff_indexes.append(i)
+                    
+                    offset = 100
+                    #Then we create new sockets or move existing sockets, only for those that have a different pos
+                    for socket_new in ([dialogLineEdits[i] for i in diff_indexes]):
+                        pos_in_dialogLineEdits = dialogLineEdits.index(socket_new)
+                        if socket_new not in currentNode.sockets:
+                            self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits+offset, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
+                            time.sleep(sleepTime)
+                            self.update()
+                            time.sleep(sleepTime)
+                        else: #Else we move it from some other location to where we want it
+                            #Find this socket in currentNode.sockets.items():
+                            socketFull = list(currentNode.sockets.items())
+                            pos_in_node_info = [socket_id for socket_id in range(len(socketFull)) if socketFull[socket_id][0] == socket_new][0]
+                            old_pos = socketFull[pos_in_node_info][1].index
+                            #Physically move it
+                            self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits+offset)
+                            time.sleep(sleepTime)
+                            self.update()
+                            time.sleep(sleepTime)
             
             #We loop over the sockets:
             # for socket_id in (range(len(currentNode.sockets))):
@@ -1272,12 +1280,17 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['visualisation']['topAttributes'] = ['Start']
         self.nodeInfo['visualisation']['NodeSize'] = 60
         
-        
         self.nodeInfo['realTimeAnalysis'] = self.singleNodeTypeInit()
         self.nodeInfo['realTimeAnalysis']['name'] = 'realTimeAnalysis'
         self.nodeInfo['realTimeAnalysis']['displayName'] = 'Real-Time analysis'
         self.nodeInfo['realTimeAnalysis']['topAttributes'] = ['Start']
         self.nodeInfo['realTimeAnalysis']['NodeSize'] = 60
+        
+        self.nodeInfo['reporting'] = self.singleNodeTypeInit()
+        self.nodeInfo['reporting']['name'] = 'reporting'
+        self.nodeInfo['reporting']['displayName'] = 'Report'
+        self.nodeInfo['reporting']['topAttributes'] = ['Start']
+        self.nodeInfo['reporting']['NodeSize'] = 40
         
         self.nodeInfo['changeStagePos'] = self.singleNodeTypeInit()
         self.nodeInfo['changeStagePos']['name'] = 'changeStagePos'
@@ -1317,6 +1330,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['scoringEnd']['name'] = 'scoringEnd'
         self.nodeInfo['scoringEnd']['displayName'] = 'Scoring end'
         self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
+        self.nodeInfo['scoringEnd']['bottomAttributes'] = ['Report']
         self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
         self.nodeInfo['scoringEnd']['NodeSize'] = 60
         
@@ -2134,7 +2148,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         try:
             testPassed = self.decisionWidget.testCurrentDecision()
             testPassedText = 'Test is Passed' if testPassed else 'Test is Not Passed'
-            self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
+            readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
             
             print('Scoring finished fully!')
             if testPassed:
@@ -2174,8 +2188,31 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             testPassed = False
             node.status = 'error'
             testPassedText = 'Error when assessing test'
-            self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
-            
+            readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
+        
+        
+        #Find the nodes connected to 'Report':
+        connectedNodes = nodz_utils.getConnectedNodes(node, 'bottomAttr')
+        for node in connectedNodes:
+            print(node.name)
+            if 'reporting_' in node.name:
+                node.status = 'running'
+                if 'SLACK' in self.shared_data.globalData:
+                    if self.shared_data.globalData['SLACK']['TOKEN'] is not None and not len(self.shared_data.globalData['SLACK']['TOKEN']) == 0:
+                        slackReadableText = readableText
+                        slackReadableText = slackReadableText.replace('<br>','\r\n')
+                        slackReadableText = slackReadableText.replace('<i>','_')
+                        slackReadableText = slackReadableText.replace('</i>','_')
+                        slackReadableText = slackReadableText.replace('<b>','*')
+                        slackReadableText = slackReadableText.replace('</b>','*')
+                        slackReadableText = "New Score: \n" + slackReadableText
+                        self.shared_data.globalData['SLACK']['CLIENT'].chat_postMessage(channel=self.shared_data.globalData['SLACK']['CHANNEL'],text=slackReadableText)
+                        node.status = 'finished'
+                    else:
+                        node.status = 'error'
+                else:
+                    node.status = 'error'
+        
         self.preventAcq = False
             
     def timerCallAction(self,node,timev):
