@@ -270,6 +270,7 @@ class pSMLM():
             print("At axis-time: "+str(metadata['Axes']['time']))
     
     def end(self,core,**kwargs):
+        time.sleep(1)
         self.file.close()
         print('end of pSMLM')
         return
