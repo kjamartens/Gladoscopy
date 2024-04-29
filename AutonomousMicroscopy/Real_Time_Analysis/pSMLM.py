@@ -250,8 +250,10 @@ class pSMLM():
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
+        self.pxsize = core.get_pixel_size_um()*1000
         
-        self.file = open("SMLM_locs.txt",'w')
+        self.file = open("SMLM_locs.csv",'w')
+        self.file.write("\"frame\",\"x [nm]\",\"y [nm]\"\n")
 
         print('in RT_counter at time '+str(time.time()))
         return None
@@ -259,16 +261,17 @@ class pSMLM():
     def run(self,image,metadata,core,**kwargs):
         locPeaks = getLocalPeaks_rawIm(image, int(kwargs['ROIradius']),stdmult=int(kwargs['stdmult']))
         SMLMlocs_2 = getLocalizationList(locPeaks, image, 4)
+        frameNumber = 0
+        if 'ImageNumber' in metadata:
+            frameNumber = float(metadata['ImageNumber'])
+        else:
+            frameNumber = float(metadata['Axes']['time'])
+    
         
         for i in range(0,len(SMLMlocs_2)):
-            self.file.write(str(SMLMlocs_2[i,0])+' '+str(SMLMlocs_2[i,1])+'\n')
+            self.file.write(str(int(frameNumber+1))+","+str(SMLMlocs_2[i,0]*self.pxsize)+","+str(SMLMlocs_2[i,1]*self.pxsize)+'\n')
             
         print(SMLMlocs_2)
-        if 'ImageNumber' in metadata:
-            print("At frame: "+metadata['ImageNumber'])
-        else:
-            print("At axis-time: "+str(metadata['Axes']['time']))
-    
     def end(self,core,**kwargs):
         time.sleep(1)
         self.file.close()
