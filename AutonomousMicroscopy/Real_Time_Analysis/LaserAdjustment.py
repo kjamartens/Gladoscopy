@@ -59,5 +59,9 @@ class laser_adjustment():
         # #Set value in Micromanager
     
     
+    def end(self,core,**kwargs):
+        print('end of laserAdj')
+        return
+    
     def visualise(self,image,metadata,core,**kwargs):
         print('optional visualising every time this is called!')

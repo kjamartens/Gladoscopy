@@ -44,5 +44,9 @@ class RT_counterV():
         else:
             print("At axis-time: "+str(metadata['Axes']['time']))
     
+    def end(self,core,**kwargs):
+        print('end of RTcounter')
+        return
+    
     def visualise(self,image,metadata,core,**kwargs):
         print('optional visualising every time this is called!')
