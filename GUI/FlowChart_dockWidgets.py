@@ -2191,7 +2191,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
         
         
-        #Find the nodes connected to 'Report':
+        #Find the reporting node(s)
         connectedNodes = nodz_utils.getConnectedNodes(node, 'bottomAttr')
         for node in connectedNodes:
             print(node.name)

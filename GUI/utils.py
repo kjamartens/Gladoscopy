@@ -920,6 +920,34 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
     if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
         return moduleMethodEvalTexts[0]
 
+def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
+    
+    methodKwargNames_method=[]
+    methodKwargValues_method=[]
+    #Loop over all entries of currentData:
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("LineEdit" in key):
+                # The objectName will be along the lines of foo#bar#str
+                #Check if the objectname is part of a method or part of a scoring
+                split_list = key.split('#')
+                methodName_method = split_list[1]
+                methodKwargNames_method.append(split_list[2])
+
+                #value could contain a file location. Thus, we need to swap out all \ for /:
+                methodKwargValues_method.append(value.replace('\\','/'))
+    
+    #Now we create evaluation-texts:
+    moduleMethodEvalTexts = []
+    if methodName_method != '':
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1))
+        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.end') #type:ignore
+        #append this to moduleEvalTexts
+        moduleMethodEvalTexts.append(EvalTextMethod)
+
+    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
+        return moduleMethodEvalTexts[0]
+
 def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,currentData,p1,p2,p3):
     
     methodKwargNames_method=[]
@@ -1116,6 +1144,18 @@ def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3):
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','v3')
+    #And run the .run function:
+    result = eval("RT_analysis_object" + evalText) #type:ignore
+
+    return result
+
+def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1):
+    #Get the classname from rt_analysis_info
+    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
+    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
+        if function[0] == functionDispName:
+            className = function[1]
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_end(className,rt_analysis_info,'v1')
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText) #type:ignore
 

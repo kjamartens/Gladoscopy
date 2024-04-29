@@ -627,6 +627,7 @@ class AnalysisThread_customFunction(QThread):
         """
         Stops the execution of the function
         """
+        self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         self.is_running = False
         #Also remove the image queue requestion from live mode
         if self.image_queue_analysis in self.shared_data.liveImageQueues:
@@ -653,6 +654,7 @@ class AnalysisThread_customFunction(QThread):
         Returns:
             None
         """
+        self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         try:
             print('Destroying '+str(self.analysisInfo))
         except:
@@ -740,6 +742,11 @@ class AnalysisThread_customFunction(QThread):
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):
         self.msleep(self.sleepTimeMs)
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
+        return result
+    
+    def endAnalysis(self,analysisInfo,core=None):
+        self.msleep(self.sleepTimeMs)
+        result = utils.realTimeAnalysis_end(self.RT_analysis_object,analysisInfo,core)
         return result
 
 
