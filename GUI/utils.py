@@ -519,7 +519,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #Update the layout
         curr_layout.update()
 
-def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4):
+def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4,showVisualisationBox=False):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
@@ -948,7 +948,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
     if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
         return moduleMethodEvalTexts[0]
 
-def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,currentData,p1,p2,p3):
+def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,currentData,p1,p2,p3,p4):
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
@@ -968,7 +968,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,current
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3))
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3)+','+str(p4))
         EvalTextMethod = EvalTextMethod.replace(methodName_method,'.visualise') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
@@ -1161,13 +1161,13 @@ def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1):
 
     return result
 
-def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3):
+def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,v4):
     #Get the classname from rt_analysis_info
     functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3')
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3','v4')
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText) #type:ignore
 

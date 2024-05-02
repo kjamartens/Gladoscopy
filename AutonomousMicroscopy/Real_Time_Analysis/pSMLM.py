@@ -22,7 +22,7 @@ def __function_metadata__():
             "help_string": "Real-time localization via pSMLM (phasor-based localization microscopy).",
             "display_name": "pSMLM localization",
             "run_delay": 0,
-            "visualise_delay": 500
+            "visualise_delay": 10
         }
     }
 
@@ -254,6 +254,8 @@ class pSMLM():
         
         self.file = open("SMLM_locs.csv",'w')
         self.file.write("\"frame\",\"x [nm]\",\"y [nm]\"\n")
+        
+        self.SMLMlocs = []
 
         print('in RT_counter at time '+str(time.time()))
         return None
@@ -271,12 +273,27 @@ class pSMLM():
         for i in range(0,len(SMLMlocs_2)):
             self.file.write(str(int(frameNumber+1))+","+str(SMLMlocs_2[i,0]*self.pxsize)+","+str(SMLMlocs_2[i,1]*self.pxsize)+'\n')
             
-        print(SMLMlocs_2)
+        print(f"Nr locs: {len(SMLMlocs_2)} ")
+        self.SMLMlocs=SMLMlocs_2
     def end(self,core,**kwargs):
         time.sleep(1)
         self.file.close()
         print('end of pSMLM')
         return
     
-    def visualise(self,image,metadata,core,**kwargs):
-        print('optional visualising every time this is called!')
+    
+    def visualise_init(self): 
+        layerName = 'pSMLM'
+        layerType = 'points' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
+        return layerName,layerType
+    
+    def visualise(self,image,metadata,core,napariLayer,**kwargs):
+        napariLayer.data = self.SMLMlocs[:, [1, 0]].copy()
+        time.sleep(0.05)
+        napariLayer.symbol = 'disc'
+        napariLayer.size = 5
+        napariLayer.edge_color='red'
+        napariLayer.face_color = [0,0,0,0]
+        napariLayer.selected_data = []
+        # napariLayer.data = np.append(napariLayer.data,self.SMLMlocs[:, [1, 0]].copy(),axis=0)
+

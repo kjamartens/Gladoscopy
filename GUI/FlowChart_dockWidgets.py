@@ -6,7 +6,7 @@ import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
 from MMcontrols import MMConfigUI, ConfigInfo
 from MDAGlados import MDAGlados
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QGridLayout, QPushButton
@@ -41,7 +41,7 @@ from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout,
 
 
 class AnalysisScoringVisualisationDialog(QDialog):
-    def __init__(self, parent=None, currentNode=None):
+    def __init__(self, parent=None, currentNode=None, addVisualisationBox = False):
         """
         Advanced input dialog.
 
@@ -62,12 +62,24 @@ class AnalysisScoringVisualisationDialog(QDialog):
         self.mainLayout = QGridLayout()
         layout.addLayout(self.mainLayout)
         
+        bottomHbox = QHBoxLayout()
+        
+        if addVisualisationBox:
+            self.visualisationBox = QCheckBox()
+            visualisationLabel = QLabel('Visualise')
+            visualiseHbox = QHBoxLayout()
+            visualiseHbox.addWidget(self.visualisationBox)
+            visualiseHbox.addWidget(visualisationLabel)
+            bottomHbox.addLayout(visualiseHbox)
+            
         #Add a OK/cancel button set:
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
+        
+        bottomHbox.addWidget(button_box)
         #Add this to the bottom of the layout, stretching horizontally but centering in the center:
-        layout.addWidget(button_box)
+        layout.addLayout(bottomHbox)
         
         self.setLayout(layout)
 
@@ -123,8 +135,8 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
 
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
-    def __init__(self, parent=None, currentNode=None):
-        super().__init__(parent, currentNode)
+    def __init__(self, parent=None, currentNode=None,addVisualisationBox=True):
+        super().__init__(parent, currentNode,addVisualisationBox)
         self.setWindowTitle("Real-Time Analysis Options")
         
         #Let's try to get all possible RT analysis options
@@ -155,7 +167,11 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         
         #Pre-load the options if they're in the current node info
         if 'real_time_analysis_currentData' in vars(currentNode):
+            if '__realTimeVisualisation__' in currentNode.real_time_analysis_currentData and currentNode.real_time_analysis_currentData['__realTimeVisualisation__']: #type:ignore
+                self.visualisationBox.setChecked(True)
+            
             utils.preLoadOptions_realtime(self.mainLayout,currentNode.real_time_analysis_currentData) #type:ignore
+
 
 
 class nodz_analysisMeasurementDialog(nodz_analysisDialog):
@@ -1142,6 +1158,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 #Update the results of this dialog into the nodz node
                 currentNode.real_time_analysis_currentData = dialog.currentData #type:ignore
                 currentNode.real_time_analysis_currentData['__selectedDropdownEntryRTAnalysis__'] = dialog.comboBox_RTanalysisFunctions.currentText() #type:ignore
+                currentNode.real_time_analysis_currentData['__realTimeVisualisation__'] = dialog.visualisationBox.isChecked() #type:ignore 
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
                 logging.info('Pressed OK on RTanalysis')
         elif 'timer' in nodeName:
@@ -2197,8 +2214,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             print(node.name)
             if 'reporting_' in node.name:
                 node.status = 'running'
-                if 'SLACK' in self.shared_data.globalData:
-                    if self.shared_data.globalData['SLACK']['TOKEN'] is not None and not len(self.shared_data.globalData['SLACK']['TOKEN']) == 0:
+                if 'SLACK' in self.shared_data.globalData: #type:ignore
+                    if self.shared_data.globalData['SLACK']['TOKEN'] is not None and not len(self.shared_data.globalData['SLACK']['TOKEN']) == 0: #type:ignore
                         slackReadableText = readableText
                         slackReadableText = slackReadableText.replace('<br>','\r\n')
                         slackReadableText = slackReadableText.replace('<i>','_')
@@ -2206,7 +2223,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                         slackReadableText = slackReadableText.replace('<b>','*')
                         slackReadableText = slackReadableText.replace('</b>','*')
                         slackReadableText = "New Score: \n" + slackReadableText
-                        self.shared_data.globalData['SLACK']['CLIENT'].chat_postMessage(channel=self.shared_data.globalData['SLACK']['CHANNEL'],text=slackReadableText)
+                        self.shared_data.globalData['SLACK']['CLIENT'].chat_postMessage(channel=self.shared_data.globalData['SLACK']['CHANNEL'],text=slackReadableText) #type:ignore
                         node.status = 'finished'
                     else:
                         node.status = 'error'

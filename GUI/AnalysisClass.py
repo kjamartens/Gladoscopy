@@ -36,7 +36,7 @@ import HelperFunctions  #type: ignore
 
 #Class for overlays and their update and such
 class napariOverlay():
-    def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',):
+    def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None):
         """
         Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
 
@@ -57,14 +57,37 @@ class napariOverlay():
         self.opacity = opacity
         self.visible = visible
         self.blending = blending
+        self.RT_analysisObject = RT_analysisObject
+        self.layerType = layerType
         try:
             self.layer_scale = napariViewer.layers[0].scale
         except:
             self.layer_scale = [1,1]
+        
+        #Get info from a RT analysis object (i.e. outside-based-analysis)
+        if self.RT_analysisObject is not None:
+            self.layer_name, self.layerType = self.RT_analysisObject.visualise_init()
+            
         #Create the layer if layer_name is not none
         #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
-        if layer_name is not None:
-            self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+        if self.layer_name is not None:
+            if self.layerType is not None:
+                if self.layerType == 'image':
+                    self.layer = napariViewer.add_image(name=self.layer_name,scale=self.layer_scale)
+                elif self.layerType == 'labels':
+                    self.layer = napariViewer.add_labels([],name=self.layer_name,scale=self.layer_scale)
+                elif self.layerType == 'points':
+                    self.layer = napariViewer.add_points(name=self.layer_name,scale=self.layer_scale)
+                elif self.layerType == 'shapes':
+                    self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+                elif self.layerType == 'surface':
+                    self.layer = napariViewer.add_surface([],name=self.layer_name,scale=self.layer_scale)
+                elif self.layerType == 'tracks':
+                    self.layer = napariViewer.add_tracks([],name=self.layer_name,scale=self.layer_scale)
+                elif self.layerType == 'vectors':
+                    self.layer = napariViewer.add_vectors(name=self.layer_name,scale=self.layer_scale)
+            else:
+                self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
         
     #Update the name of the overlay
     def changeName(self,new_name):
@@ -479,10 +502,10 @@ class AnalysisThread(QThread):
     """
     
     def changeStageAtFrame(self,image,metadata=None,core=None,frame=100):
-        print(float(metadata['ImageNumber']))
+        print(float(metadata['ImageNumber'])) #type:ignore
         
-        if float(metadata['ImageNumber'])>frame and self.notyetchanged == True:
-            core.set_relative_position('Z',100.0)
+        if float(metadata['ImageNumber'])>frame and self.notyetchanged == True: #type:ignore
+            core.set_relative_position('Z',100.0) #type:ignore
             self.notyetchanged = False
             print('Z position changed!')
         
@@ -551,6 +574,40 @@ class AnalysisThread(QThread):
 
 
 
+class AnalysisThread_customFunction_Visualisation(QThread):
+    finished = pyqtSignal()# signal to indicate that the thread has finished
+    def __init__(self,analysisObject,shared_data,analysisInfo: Union[str, None] = 'Random',delay=None):
+        super().__init__()
+        #Initiate some variables
+        if delay==None:
+            #Get the delay of the function from the realTimeAnalysis module
+            delay = utils.realTimeAnalysis_getDelay(analysisInfo,runOrVis='visualise')
+            
+        self.is_running = True
+        self.analysis_ongoing = False
+        self.shared_data = shared_data
+        self.analysisInfo = analysisInfo
+        self.napariViewer = shared_data.napariViewer
+        self.sleepTimeMs = delay
+        self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS')
+        self.visualisation_queue = queue.Queue()
+        #And start  the thread
+        self.running = True
+        # self.process_queue()
+    
+    def run(self):
+        while self.running:
+            time.sleep(self.sleepTimeMs/1000.0)
+            if not self.visualisation_queue.empty():
+                data = self.visualisation_queue.get()
+                RT_analysis_object,analysisInfo,image,metadata,core = data
+                self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
+            
+    
+    def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
+        # print('visualisation should be updated here :)')
+        utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
+        
 #This code gets some image and does some analysis on this
 class AnalysisThread_customFunction(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
@@ -578,9 +635,12 @@ class AnalysisThread_customFunction(QThread):
         self.napariViewer = shared_data.napariViewer
         self.image_queue_analysis = analysisQueue
         self.sleepTimeMs = sleepTimeMs
-        self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
+        self.napariOverlay = None
+        # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
         
         self.initAnalysis()
+        
+        # self.analysis_done_signal.connect(self.update_napariLayer)
         # if self.analysisInfo == 'CellSegmentOverlay':
         #     storageloc = './AutonomousMicroscopy/ExampleData/StarDistModel'
         #     # storageloc = './AutonomousMicroscopy/ExampleData/StarDist_hfx_20220823'
@@ -637,10 +697,10 @@ class AnalysisThread_customFunction(QThread):
     
         try:
             #check if there's a layer associated with this...
-            layer = self.getLayer()
+            # layer = self.getLayer()
             #and remove it
             self.shared_data.skipAnalysisThreadDeletion = True
-            self.shared_data.napariViewer.layers.remove(layer)
+            # self.shared_data.napariViewer.layers.remove(layer)
         except:
             pass
         
@@ -678,7 +738,10 @@ class AnalysisThread_customFunction(QThread):
         Returns:
             napari.layers.Layer: The layer associated with the napari overlay.
         """
-        return self.napariOverlay.getLayer()
+        if self.napariOverlay is not None:
+            return self.napariOverlay.getLayer()
+        else:
+            return None
     
     #Analysis is split into two parts: obtaining the analysis result and displaying this.
     #Here, we calculate the analysis result based on the analysisInfo
@@ -723,30 +786,45 @@ class AnalysisThread_customFunction(QThread):
 
 
 
-    #And here we perform the visualisation - can be fully separate from performing the analysis
-    #Initialisation is called upon creation
-    def initialise_napariLayer(self):
-        print('init_napariLayer')
+    # #And here we perform the visualisation - can be fully separate from performing the analysis
+    # #Initialisation is called upon creation
+    # def initialise_napariLayer(self):
+    #     print('init_napariLayer')
             
-    #Update ir called every time the analysis is done
-    def update_napariLayer(self,analysis_data):
-        print('napari Layer should be updated here :)')
+    # #Update ir called every time the analysis is done
+    # def update_napariLayer(self,analysisInfo,image,metadata=None,core=None):
+    #     self.visualisationObject.updateVisualisation(analysisInfo,image,metadata,core)
+    #     # utils.realTimeAnalysis_visualisation(self.RT_analysis_object,analysisInfo,image,metadata,core)
     
     
     
     
     def initAnalysis(self):
         self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core)
-        print('Called once to init the analysis!')
+        if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:
+            self.queue_visualisation = queue.Queue()
+            self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
+            self.visualisationObject.start()
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):
         self.msleep(self.sleepTimeMs)
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
+        
+        if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:
+            # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
+            if self.visualisationObject.visualisation_queue.empty():
+                data = (self.RT_analysis_object,analysisInfo,image,metadata,core)
+                self.visualisationObject.visualisation_queue.put(data)
+                # self.visualisationObject.process_queue()
+        
         return result
     
     def endAnalysis(self,analysisInfo,core=None):
         self.msleep(self.sleepTimeMs)
         result = utils.realTimeAnalysis_end(self.RT_analysis_object,analysisInfo,core)
+        
+        #End the visualisation
+        self.visualisationObject.running=False
         return result
 
 
@@ -802,7 +880,7 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal
-    analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay)
+    analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay) #type:ignore
     
     #TODO: make this depending on whether or not we want to do visualisation of the RT analysis
     # analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
