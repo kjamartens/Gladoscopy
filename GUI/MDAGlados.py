@@ -906,26 +906,28 @@ class MDAGlados(CustomMainWindow):
         #Look at the 'Visual' bottom attribute:
         visualAttr = nodeInfo.bottomAttrs['Visual']
         if len(visualAttr.connections) > 0:
-            visual_connected_node_name = visualAttr.connections[0].socketNode
-            for node in nodeInfo.flowChart.nodes:
-                if node.name == visual_connected_node_name:
-                    visual_connected_node = node
-                    if 'layerName' in visual_connected_node.visualisation_currentData and visual_connected_node.visualisation_currentData['layerName'] is not None:
-                        layerName = visual_connected_node.visualisation_currentData['layerName']
-                    else:
-                        visual_connected_node.visualisation_currentData['layerName'] = nodeName
-                        layerName = nodeName
-                        
-                    if 'colormap' in visual_connected_node.visualisation_currentData and visual_connected_node.visualisation_currentData['colormap'] is not None:
-                        colormap = visual_connected_node.visualisation_currentData['colormap']
-                    else:
-                        visual_connected_node.visualisation_currentData['colormap'] = 'gray'
-                        colormap = 'gray'
-                    
-                    visual_connected_node.status = 'running'
-                    break
-        
-            napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
+            for connection in visualAttr.connections:
+                if connection.plugAttr is not None and connection.socketAttr is not None and connection.plugItem is not None and connection.socketItem is not None and connection.plugNode is not None and connection.socketNode is not None:
+                    visual_connected_node_name = connection.socketNode
+                    for node in nodeInfo.flowChart.nodes:
+                        if node.name == visual_connected_node_name:
+                            visual_connected_node = node
+                            if 'layerName' in visual_connected_node.visualisation_currentData and visual_connected_node.visualisation_currentData['layerName'] is not None:
+                                layerName = visual_connected_node.visualisation_currentData['layerName']
+                            else:
+                                visual_connected_node.visualisation_currentData['layerName'] = nodeName
+                                layerName = nodeName
+                                
+                            if 'colormap' in visual_connected_node.visualisation_currentData and visual_connected_node.visualisation_currentData['colormap'] is not None:
+                                colormap = visual_connected_node.visualisation_currentData['colormap']
+                            else:
+                                visual_connected_node.visualisation_currentData['colormap'] = 'gray'
+                                colormap = 'gray'
+                            
+                            visual_connected_node.status = 'running'
+                            break
+                
+                    napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
         #And try to get real-time analysis attributes at bottom:
         

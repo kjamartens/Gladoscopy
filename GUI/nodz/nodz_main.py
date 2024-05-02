@@ -3,13 +3,12 @@ import re
 import json
 
 from PyQt5 import QtGui, QtCore, QtWidgets
-from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction
-from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
-from PyQt5.QtCore import QRectF
+from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction, QGraphicsSceneMouseEvent
+from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent
+from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt
 import nodz_utils as utils
 from nodz_custom import *
 import logging
-
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
 
@@ -1432,9 +1431,13 @@ class NodeScene(QtWidgets.QGraphicsScene):
 
         """
         for connection in [i for i in self.items() if isinstance(i, ConnectionItem)]:
-            connection.target_point = connection.target.center() #type:ignore
-            connection.source_point = connection.source.center() #type:ignore
-            connection.updatePath()
+            if connection.target is not None and connection.source is not None:
+                connection.target_point = connection.target.center() #type:ignore
+                connection.source_point = connection.source.center() #type:ignore
+                connection.updatePath()
+            elif connection.target is None or connection.source is None:
+                connection._remove()
+                
 
 
 class NodeItem(QtWidgets.QGraphicsItem):
@@ -2421,11 +2424,60 @@ class SlotItem(QtWidgets.QGraphicsItem):
 
                 self.newConnection.updatePath() #type:ignore
             else:
-                self.newConnection._remove() #type:ignore
+                try:
+                    if nodzInst.justDoubleClicked:
+                        nodzInst.justDoubleClicked = False
+                        return
+                    self.newConnection._remove() #type:ignore
+                except ValueError:
+                    pass
         else:
             super(SlotItem, self).mouseReleaseEvent(event)
 
         nodzInst.currentHoveredNode = None
+
+    def mouseDoubleClickEvent(self, event):
+        newNode = None
+        target = None
+        if self.slotType == 'bottomAttr':
+            if self.attribute == 'Visual':
+                # General instructions: get a newNode and a target attribute.
+                
+                #Create a visualisation node below this slot
+                nodzInst = self.scene().views()[0]
+                newPos = QPointF(self.parentItem().pos().x(), self.parentItem().pos().y() + 150)
+                newEvent = QMouseEvent(QEvent.GraphicsSceneMousePress, newPos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier) #type:ignore
+                newNode = nodzInst.createNewNode('visualisation', newEvent)
+                # newNode.setPos(QPointF(self.parentItem().pos().x()+.x()/2, self.parentItem().pos().y()))
+                newNode.setPos(QPointF(self.mapToScene(event.pos()).x()-newNode.boundingRect().width()/2, self.mapToScene(event.pos()).y()+newNode.boundingRect().height()/2+50))
+                target = newNode.topAttrs['Start']
+                
+                
+        #Create a new connection and fully update:
+        self.newConnection = ConnectionItem(self.center(),
+                                            self.mapToScene(event.pos()),
+                                            self,
+                                            None)
+
+        self.connections.append(self.newConnection)
+        self.scene().addItem(self.newConnection)
+
+        nodzInst = self.scene().views()[0]
+        nodzInst.sourceSlot = self
+        nodzInst.currentDataType = None
+
+        self.newConnection.target = target #type:ignore
+        self.newConnection.source = self #type:ignore
+        self.newConnection.target_point = target.center() #type:ignore
+        self.newConnection.source_point = self.center() #type:ignore
+
+        # Perform the ConnectionItem.
+        self.connect(target, self.newConnection) #type:ignore
+        target.connect(self, self.newConnection) #type:ignore
+        self.newConnection.updatePath() #type:ignore
+        nodzInst.justDoubleClicked = True
+        nodzInst.scene().updateScene() #type:ignore
+        nodzInst.update()
 
     def shape(self):
         """
@@ -2857,7 +2909,9 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
         for item in nodzInst.scene().items():
             if isinstance(item, ConnectionItem):
                 item.setZValue(0)
-
+        if nodzInst.justDoubleClicked:
+            nodzInst.justDoubleClicked = False
+            return
         nodzInst.drawingConnection = True
 
         d_to_target = (event.pos() - self.target_point).manhattanLength()

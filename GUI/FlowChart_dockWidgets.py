@@ -902,6 +902,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Find the last underscore ('_0, _1, etc')
         index_last_underscore = nodeName.rfind('_')
         nodeNameNC = nodeName[:index_last_underscore]
+        finalNodeName=None
         #Now get the correct lookup name by looking through all nodeInfo items
         for node_name, node_data in self.nodeInfo.items():
             # Check if the name matches the specific value
@@ -1727,6 +1728,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         newNode = self.createNode(name=nodeType+"_", preset = 'node_preset_1', position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'],nodeInfo=self.nodeInfo[nodeType])
         
         #Do post-node-creation functions - does this via the pyqtsignal!
+        return newNode
     
     def updateNumberStartFinishedDataAttributes(self,newNode,nodeType):
         
@@ -2042,33 +2044,34 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             srcNodeName = connection[0][:connection[0].rfind('.')]
             dstNodeName = connection[1][:connection[1].rfind('.')]
             
-            typeOfFinishedAttributes_of_srcNode = self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']
-            typeOfDataAttributes_of_srcNode = self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['dataAttributes']
-            typeOfStartAttributes_of_dstNode = self.nodeInfo[self.nodeLookupName_withoutCounter(dstNodeName)]['startAttributes']
+            if self.nodeLookupName_withoutCounter(srcNodeName) is not None and self.nodeLookupName_withoutCounter(dstNodeName) is not None:
+                typeOfFinishedAttributes_of_srcNode = self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['finishedAttributes']
+                typeOfDataAttributes_of_srcNode = self.nodeInfo[self.nodeLookupName_withoutCounter(srcNodeName)]['dataAttributes']
+                typeOfStartAttributes_of_dstNode = self.nodeInfo[self.nodeLookupName_withoutCounter(dstNodeName)]['startAttributes']
             
-            #Connect the finished event of the source node to the 'we finished one of the prerequisites' at the destination node
-            if plugAttribute in typeOfFinishedAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
-                srcNode = self.findNodeByName(srcNodeName)
-                dstNode = self.findNodeByName(dstNodeName)
-                #The destination node needs one extra to be started...
-                dstNode.n_connect_at_start += 1 #type: ignore
-                
-                #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
-                srcNode.customFinishedEmits.signals[0].connect(dstNode.oneConnectionAtStartIsFinished) #type: ignore
-                
-                logging.info(f"connected Finish {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
-            #Same for data
-            elif plugAttribute in typeOfDataAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
-                srcNode = self.findNodeByName(srcNodeName)
-                dstNode = self.findNodeByName(dstNodeName)
-                #The destination node needs one extra to be started...
-                dstNode.n_connect_at_start += 1 #type: ignore
-                
-                #And the finished event of the source node is connected to the 'we gave data' at the destination node
-                srcNode.customDataEmits.signals[0].connect(dstNode.oneConnectionAtStartProvidesData) #type: ignore
-                logging.info(f"connected Data {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
-            else:
-                logging.warning(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+                #Connect the finished event of the source node to the 'we finished one of the prerequisites' at the destination node
+                if plugAttribute in typeOfFinishedAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
+                    srcNode = self.findNodeByName(srcNodeName)
+                    dstNode = self.findNodeByName(dstNodeName)
+                    #The destination node needs one extra to be started...
+                    dstNode.n_connect_at_start += 1 #type: ignore
+                    
+                    #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
+                    srcNode.customFinishedEmits.signals[0].connect(dstNode.oneConnectionAtStartIsFinished) #type: ignore
+                    
+                    logging.info(f"connected Finish {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+                #Same for data
+                elif plugAttribute in typeOfDataAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
+                    srcNode = self.findNodeByName(srcNodeName)
+                    dstNode = self.findNodeByName(dstNodeName)
+                    #The destination node needs one extra to be started...
+                    dstNode.n_connect_at_start += 1 #type: ignore
+                    
+                    #And the finished event of the source node is connected to the 'we gave data' at the destination node
+                    srcNode.customDataEmits.signals[0].connect(dstNode.oneConnectionAtStartProvidesData) #type: ignore
+                    logging.info(f"connected Data {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+                else:
+                    logging.warning(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
     
     def acquiringStart(self,node):
         """

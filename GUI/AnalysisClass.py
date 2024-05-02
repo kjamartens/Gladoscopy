@@ -882,11 +882,7 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal
     analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay) #type:ignore
-    
-    #TODO: make this depending on whether or not we want to do visualisation of the RT analysis
-    # analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
-    
-    
+        
     analysis_thread.finished.connect(analysis_thread.deleteLater)
     analysis_thread.start()
     

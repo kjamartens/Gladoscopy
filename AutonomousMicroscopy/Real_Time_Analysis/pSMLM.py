@@ -276,7 +276,7 @@ class pSMLM():
         print(f"Nr locs: {len(SMLMlocs_2)} ")
         self.SMLMlocs=SMLMlocs_2
     def end(self,core,**kwargs):
-        time.sleep(1)
+        time.sleep(0.1)
         self.file.close()
         print('end of pSMLM')
         return
