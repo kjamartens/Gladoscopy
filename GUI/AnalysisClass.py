@@ -801,7 +801,7 @@ class AnalysisThread_customFunction(QThread):
     
     def initAnalysis(self):
         self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core)
-        if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:
+        if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']: #type:ignore
             self.queue_visualisation = queue.Queue()
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
@@ -810,7 +810,7 @@ class AnalysisThread_customFunction(QThread):
         self.msleep(self.sleepTimeMs)
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
         
-        if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:
+        if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             if self.visualisationObject.visualisation_queue.empty():
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,core)
@@ -823,8 +823,9 @@ class AnalysisThread_customFunction(QThread):
         self.msleep(self.sleepTimeMs)
         result = utils.realTimeAnalysis_end(self.RT_analysis_object,analysisInfo,core)
         
-        #End the visualisation
-        self.visualisationObject.running=False
+        if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
+            #End the visualisation
+            self.visualisationObject.running=False
         return result
 
 
