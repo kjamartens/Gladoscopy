@@ -580,6 +580,25 @@ class MMConfigUI(CustomMainWindow):
             self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],m-1+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],5-m+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
         
+        #Create a QGridBox for the movement sizes for each stage:
+        self.oneDMoveEditFieldGridLayouts={}
+        self.oneDMoveEditField={}
+        stageCounter = 0
+        for stage in allStages:
+            self.oneDMoveEditFieldGridLayouts[stage] = QGridLayout()
+            self.oneDMoveEditField[stage] = {}
+            for m in range(1,3):
+                self.oneDMoveEditFieldGridLayouts[stage].addWidget(QLabel("⮞"*(m)),m,0)
+                self.oneDMoveEditField[stage][f'LineEdit_{m}'] = QLineEdit()
+                self.oneDMoveEditFieldGridLayouts[stage].addWidget(self.oneDMoveEditField[stage][f'LineEdit_{m}'],m,1)
+                self.oneDMoveEditField[stage][f'LineEdit_{m}'].setText("10")
+            
+            #hide the gridlayout:
+            self.oneDMoveEditFieldGridLayouts[self.oneDstageDropdown.currentText()].setEnabled(False)
+        
+            self.oneDStageLayout.addLayout(self.oneDMoveEditFieldGridLayouts[self.oneDstageDropdown.currentText()],8+stageCounter,0,1,1)
+            stageCounter+=1
+        
         #Get current info of the widget
         self.oneDinfoWidget = QLabel()
         self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,0)
@@ -590,6 +609,13 @@ class MMConfigUI(CustomMainWindow):
     
     def updateOneDstageLayout(self):
         self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
+        
+        allStages = self.getDevicesOfDeviceType('StageDevice')
+        for stage in allStages:
+            if stage is not self.oneDstageDropdown.currentText():
+                self.oneDMoveEditFieldGridLayouts[stage].setEnabled(False)
+            else:
+                self.oneDMoveEditFieldGridLayouts[stage].setEnabled(True)
     
     def moveOneDStage(self,amount):
         #Get the currently selected one-D stage:
