@@ -201,7 +201,7 @@ class nodz_openMMConfigDialog(QDialog):
             self.MMlayout = parentNode.MMconfigInfo.mainLayout
             
             #Create a new MMconfigUI with the same components as parentNode.MMconfigInfo:
-            self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs, showLiveMode=parentNode.MMconfigInfo.showLiveMode, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM)
+            self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs, showLiveMode=parentNode.MMconfigInfo.showLiveMode, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM,autoSaveLoad=False)
             if parentNode.MMconfigInfo.changes_update_MM:
                 print('WARNING! Nodz is actually changing the configs real-time rather than only when they are ran!')
             
@@ -534,7 +534,7 @@ class FoVFindImaging_singleCh_configs(QDialog):
                 allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
             
             #Create the MM config via all config groups
-            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False, showCheckboxes=True)
+            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False, showCheckboxes=True,autoSaveLoad=False)
             
             button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             button_box.accepted.connect(self.accept)
@@ -1122,7 +1122,12 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         elif 'changeProperties' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #Show dialog:
-            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage) #type:ignore
+            if 'MMconfigInfo' in vars(currentNode):
+                storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage
+            else:
+                currentNode.MMconfigInfo = []
+                storedConfigsStrings = None
+            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = storedConfigsStrings) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
                 #Update the results of this dialog into the nodz node
@@ -1846,7 +1851,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
-            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True) # type: ignore
+            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,autoSaveLoad=False) # type: ignore
             
             
             #Add the callaction
@@ -1859,7 +1864,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
-            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=True,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,showRelativeStages = True) # type: ignore
+            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=True,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,showRelativeStages = True, autoSaveLoad=False) # type: ignore
             
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMstageChangeRan(node)

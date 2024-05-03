@@ -137,7 +137,7 @@ class ConfigInfo:
 #Create a big MM config ui and add all config groups with options
 from utils import CustomMainWindow
 class MMConfigUI(CustomMainWindow):
-    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False):
+    def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
         """
         Initializes the class with the given configuration groups.
 
@@ -157,7 +157,7 @@ class MMConfigUI(CustomMainWindow):
         
         super().__init__()
         self.fullyLoaded = False
-        self.autoSaveLoad = True
+        self.autoSaveLoad = autoSaveLoad
         self.showConfigs = showConfigs
         self.showStages = showStages
         self.showROIoptions = showROIoptions
@@ -910,7 +910,7 @@ def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
         allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
     
     #Create the MM config via all config groups
-    MMconfig = MMConfigUI(allConfigGroups)
+    MMconfig = MMConfigUI(allConfigGroups,autoSaveLoad=True)
     main_layout.addLayout(MMconfig.mainLayout,0,0)
     
     return MMconfig
