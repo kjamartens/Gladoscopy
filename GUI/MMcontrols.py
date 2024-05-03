@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
@@ -583,21 +583,22 @@ class MMConfigUI(CustomMainWindow):
         #Create a QGridBox for the movement sizes for each stage:
         self.oneDMoveEditFieldGridLayouts={}
         self.oneDMoveEditField={}
-        stageCounter = 0
+        self.oneDStackedWidget = QStackedWidget()
         for stage in allStages:
-            self.oneDMoveEditFieldGridLayouts[stage] = QGridLayout()
+            self.oneDMoveEditFieldGridLayouts[stage] = QWidget()
+            self.oneDMoveEditFieldGridLayouts[stage].setObjectName(stage)
+            internalLayout = QGridLayout()
+            self.oneDMoveEditFieldGridLayouts[stage].setLayout(internalLayout)
             self.oneDMoveEditField[stage] = {}
             for m in range(1,3):
-                self.oneDMoveEditFieldGridLayouts[stage].addWidget(QLabel("⮞"*(m)),m,0)
+                internalLayout.addWidget(QLabel("⮞"*(m)),m,0)
                 self.oneDMoveEditField[stage][f'LineEdit_{m}'] = QLineEdit()
-                self.oneDMoveEditFieldGridLayouts[stage].addWidget(self.oneDMoveEditField[stage][f'LineEdit_{m}'],m,1)
+                internalLayout.addWidget(self.oneDMoveEditField[stage][f'LineEdit_{m}'],m,1)
                 self.oneDMoveEditField[stage][f'LineEdit_{m}'].setText("10")
             
-            #hide the gridlayout:
-            self.oneDMoveEditFieldGridLayouts[self.oneDstageDropdown.currentText()].setEnabled(False)
+            self.oneDStackedWidget.addWidget(self.oneDMoveEditFieldGridLayouts[stage])
         
-            self.oneDStageLayout.addLayout(self.oneDMoveEditFieldGridLayouts[self.oneDstageDropdown.currentText()],8+stageCounter,0,1,1)
-            stageCounter+=1
+        self.oneDStageLayout.addWidget(self.oneDStackedWidget,8,0)
         
         #Get current info of the widget
         self.oneDinfoWidget = QLabel()
@@ -610,12 +611,10 @@ class MMConfigUI(CustomMainWindow):
     def updateOneDstageLayout(self):
         self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
         
-        allStages = self.getDevicesOfDeviceType('StageDevice')
-        for stage in allStages:
-            if stage is not self.oneDstageDropdown.currentText():
-                self.oneDMoveEditFieldGridLayouts[stage].setEnabled(False)
-            else:
-                self.oneDMoveEditFieldGridLayouts[stage].setEnabled(True)
+        for widget_id in range(0,self.oneDStackedWidget.count()):
+            widget = self.oneDStackedWidget.widget(widget_id)
+            if widget.objectName() == self.oneDstageDropdown.currentText():
+                self.oneDStackedWidget.setCurrentIndex(widget_id)
     
     def moveOneDStage(self,amount):
         #Get the currently selected one-D stage:
@@ -880,15 +879,16 @@ class MMConfigUI(CustomMainWindow):
         
         if self.autoSaveLoad:
             if self.fullyLoaded:
-                with open('glados_state.json', 'r') as file:
-                    gladosInfo = json.load(file)
-                    MMControlsInfo = gladosInfo['MMControls']
-            
-                #Hand-set the values that I want:
-                self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
-                for key, object in self.XYMoveEditField.items():
-                    if key in MMControlsInfo:
-                        object.setText(MMControlsInfo[key]['text'])
+                if os.path.exists('glados_state.json'):
+                    with open('glados_state.json', 'r') as file:
+                        gladosInfo = json.load(file)
+                        MMControlsInfo = gladosInfo['MMControls']
+                
+                    #Hand-set the values that I want:
+                    self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+                    for key, object in self.XYMoveEditField.items():
+                        if key in MMControlsInfo:
+                            object.setText(MMControlsInfo[key]['text'])
 
     def storeAllControlValues(self):
         if self.autoSaveLoad:

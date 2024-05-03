@@ -1330,6 +1330,12 @@ class CustomMainWindow(QWidget):
                 for keyC in vars(self)[key]:
                     valueC = vars(self)[key][keyC]
                     iterable.append((keyC,valueC))
+            if key == 'oneDStackedWidget':
+                for widget_id in range(0,vars(self)[key].count()):
+                    widget = vars(self)[key].widget(widget_id)
+                    for m in range(1,3):
+                        lineEdit = self.oneDMoveEditField[widget.objectName()][f'LineEdit_{m}']
+                        iterable.append(("oneDStackedWidget_"+widget.objectName()+"_"+str(m),lineEdit))
         
         for key, value in iterable:
             saveState = None
