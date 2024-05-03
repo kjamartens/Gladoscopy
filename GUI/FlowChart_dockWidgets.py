@@ -6,7 +6,7 @@ import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
 from MMcontrols import MMConfigUI, ConfigInfo
 from MDAGlados import MDAGlados
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QDoubleSpinBox
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QGridLayout, QPushButton
@@ -178,6 +178,36 @@ class nodz_analysisMeasurementDialog(nodz_analysisDialog):
     def __init__(self, parent=None, currentNode=None):
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Measurement Options")
+
+class nodz_openTimerDialog(QDialog):
+    def __init__(self, parentNode=None):
+        super().__init__(None)
+        self.setWindowTitle("Timer Dialog")
+        self.timerInfo = 0
+        if parentNode is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            self.timerInfo = parentNode.timerInfo
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        # Create a QWidget to contain the QGridLayout
+        entryVal = QDoubleSpinBox()
+        entryVal.setDecimals(2)
+        entryVal.setSingleStep(0.1)
+        entryVal.setValue(self.timerInfo)
+        entryVal.valueChanged.connect(lambda value: setattr(self, 'timerInfo', value))
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addWidget(entryVal)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+
 
 class nodz_openMMConfigDialog(QDialog):
     def __init__(self, parentNode=None, storedConfigsStrings=None):
@@ -1091,6 +1121,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             from datetime import datetime
             displayHTMLtext = "<b>Scoring started at:</b>"
             displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
+        elif nodeType == 'timer':
+            displayHTMLtext = f"<b>Timer:</b> wait {str(round(dialog.timerInfo, 2))} s"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext
@@ -1168,7 +1200,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
                 logging.info('Pressed OK on RTanalysis')
         elif 'timer' in nodeName:
-            currentNode.callAction(self) #type:ignore
+            dialog = nodz_openTimerDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.timerInfo = dialog.timerInfo #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'timer')
+            # currentNode.callAction(self) #type:ignore
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringEnd' in nodeName:
@@ -1371,21 +1407,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeInfo['acqEnd']['MaxNodeCounter'] = 1
         self.nodeInfo['acqEnd']['NodeSize'] = 60
         
-        self.nodeInfo['onesectimer'] = self.singleNodeTypeInit()
-        self.nodeInfo['onesectimer']['name'] = '1s timer'
-        self.nodeInfo['onesectimer']['displayName'] = '1s timer'
-        self.nodeInfo['onesectimer']['startAttributes'] = ['Start']
-        self.nodeInfo['onesectimer']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['twosectimer'] = self.singleNodeTypeInit()
-        self.nodeInfo['twosectimer']['name'] = '2s timer'
-        self.nodeInfo['twosectimer']['displayName'] = '2s timer'
-        self.nodeInfo['twosectimer']['startAttributes'] = ['Start']
-        self.nodeInfo['twosectimer']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['threesectimer'] = self.singleNodeTypeInit()
-        self.nodeInfo['threesectimer']['name'] = '3s timer'
-        self.nodeInfo['threesectimer']['displayName'] = '3s timer'
-        self.nodeInfo['threesectimer']['startAttributes'] = ['Start']
-        self.nodeInfo['threesectimer']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['timer'] = self.singleNodeTypeInit()
+        self.nodeInfo['timer']['name'] = 'timer'
+        self.nodeInfo['timer']['displayName'] = 'Timer'
+        self.nodeInfo['timer']['startAttributes'] = ['Start']
+        self.nodeInfo['timer']['finishedAttributes'] = ['Finished']
         
         
         #We also add some custom JSON info about the node layout (colors and such)
@@ -1875,14 +1901,8 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         elif nodeType == 'analysisMeasurement':
             newNode.callAction = lambda self, node=newNode: self.scoring_analysis_ran(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
-        elif nodeType == 'onesectimer':
-            newNode.callAction = lambda self, node=newNode, timev = 1: self.timerCallAction(node,timev=timev)
-            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
-        elif nodeType == 'twosectimer':
-            newNode.callAction = lambda self, node=newNode, timev = 2: self.timerCallAction(node,timev=timev)
-            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
-        elif nodeType == 'threesectimer':
-            newNode.callAction = lambda self, node=newNode, timev = 3: self.timerCallAction(node,timev=timev)
+        elif nodeType == 'timer':
+            newNode.callAction = lambda self, node=newNode: self.timerCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
@@ -2240,7 +2260,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         self.preventAcq = False
             
-    def timerCallAction(self,node,timev):
+    def timerCallAction(self,node):
         """
         This function is the action function for the Timer Call node in the Flowchart.
 
@@ -2248,15 +2268,11 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
 
         Args:
             node (nodz.Node): The node that has triggered the event.
-            timev (float): The time to wait in seconds.
-
         Returns:
             None
         """
         import time
-        print('start time sleeping')
-        time.sleep(timev)
-        print('end time sleeping')
+        time.sleep(node.timerInfo)
         self.finishedEmits(node)
 
     def createNodeFromRightClick(self,event,nodeType=None):
