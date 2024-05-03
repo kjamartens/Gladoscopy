@@ -1300,4 +1300,99 @@ class SmallWindow(QMainWindow):
         return self.fileLocationLineEdit
 
 
+import json
+
+class CustomMainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','data''config_groups']
+
+    def save_state_MMControls(self,filename):
+        if os.path.exists(filename):
+            #Load the mda state
+            with open(filename, 'r') as file:
+                state = json.load(file)
+        else:
+            state = {}
+            state['MMControls'] = {}
+        
+        if 'MMControls' not in state:
+            state['MMControls'] = {}
+        
+        import MMcontrols
+        import napariGlados
+        
+        iterable = []
+        
+        for key, value in vars(self).items():
+            iterable.append((key,value))
+            if key == 'XYMoveEditField':
+                for keyC in vars(self)[key]:
+                    valueC = vars(self)[key][keyC]
+                    iterable.append((keyC,valueC))
+        
+        for key, value in iterable:
+            saveState = None
+            if isinstance(value, QWidget):
+                maxParentInst = 10
+                currentParent = value
+                for _ in range(maxParentInst):
+                    if currentParent == None:
+                        break
+                    currentParent = currentParent.parent()
+                    if isinstance(currentParent, napariGlados.dockWidget_MMcontrol):
+                        saveState = 'MMControls'
+                        break
+                    
+                if saveState is not None:
+                    state[saveState][key] = {
+                        'text': value.text() if hasattr(value, 'text') else None,
+                        'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
+                        # Add more properties as needed
+                    }
+
+        with open(filename, 'w') as file:
+            json.dump(state, file, indent=4)
+            
+    def save_state_MDA(self, filename):
+        import napariGlados
+        import MDAGlados
+        logging.debug('SAVING STATE')
+        if os.path.exists(filename):
+            #Load the mda state
+            with open(filename, 'r') as file:
+                state = json.load(file)
+        else:
+            state = {}
+            state['MDA'] = {}
+        for key, value in vars(self).items():
+            saveState = None
+            if isinstance(value, QWidget):
+                maxParentInst = 10
+                currentParent = value
+                for _ in range(maxParentInst):
+                    if currentParent == None:
+                        break
+                    currentParent = currentParent.parent()
+                    if isinstance(currentParent, napariGlados.dockWidget_MDA):
+                        saveState = 'MDA'
+                        break
+                    
+                if saveState is not None:
+                    state[saveState][key] = {
+                        'text': value.text() if hasattr(value, 'text') else None,
+                        'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
+                        # Add more properties as needed
+                    }
+            else:
+                if isinstance(self, MDAGlados.MDAGlados):
+                    saveState = 'MDA'
+                if saveState is not None:
+                    if key not in self.storingExceptions:
+                        state[saveState][key] = value
+
+        with open(filename, 'w') as file:
+            json.dump(state, file, indent=4)
+
+
 # Utils to do with NODZ:

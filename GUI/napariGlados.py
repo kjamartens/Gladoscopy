@@ -106,6 +106,7 @@ def napariUpdateAnalysisThreads(DataStructure):
                 print(f'starting analysis thread: {analysisThread}')
                 analysisThread.start()
 
+
 class napariHandler():
     def __init__(self, shared_data,liveOrMda='live') -> None:
         self.shared_data = shared_data
@@ -397,10 +398,11 @@ class dockWidget_MDA(dockWidgets):
         logging.debug("dockWidget_MDA started")
         super().__init__()
         
-        if os.path.exists('mda_state.json'):
+        if os.path.exists('glados_state.json'):
             #Load the mda state
-            with open('mda_state.json', 'r') as file:
-                mdaInfo = json.load(file)
+            with open('glados_state.json', 'r') as file:
+                gladosInfo = json.load(file)
+                mdaInfo = gladosInfo['MDA']
             
             #Add the full micro manager controls UI
             self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,

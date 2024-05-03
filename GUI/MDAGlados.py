@@ -171,55 +171,36 @@ class XYStageList(InteractiveListWidget):
         self.setItem(rowPosition, 0, QTableWidgetItem(textEntry))
         self.setItem(rowPosition, 1, QTableWidgetItem(str(id)))
 
+from utils import CustomMainWindow
 
-class CustomMainWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','data']
 
-    def save_state(self, filename):
-        logging.debug('SAVING STATE')
-        state = {}
-        for key, value in vars(self).items():
-            if isinstance(value, QWidget):
-                state[key] = {
-                    'text': value.text() if hasattr(value, 'text') else None,
-                    'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
-                    # Add more properties as needed
-                }
-            else:
-                if key not in self.storingExceptions:
-                    state[key] = value
-
-        with open(filename, 'w') as file:
-            json.dump(state, file, indent=4)
-
-    def load_state(self, filename):
-        logging.debug('LOADING STATE')
-        with open(filename, 'r') as file:
-            state = json.load(file)
+    #Deprecated
+    # def load_state(self, filename):
+    #     logging.debug('LOADING STATE')
+    #     with open(filename, 'r') as file:
+    #         state = json.load(file)
             
-        for key, value in state.items():
-            try:
-                if eval('isinstance(self.'+key+',QWidget)'):
-                    isWidget = True
-                    isVar = False
-                elif eval('hasattr(self,\"'+key+'\")'):
-                    isVar = True
-                    isWidget = False
-                else:
-                    isVar = False
-                    isWidget = False
-                if isWidget:
-                    widget = eval('self.'+key)
-                    if value['text'] is not None:
-                        widget.setText(value['text'])
-                    if value['checked'] is not None:
-                        widget.setChecked(value['checked'])
-                elif isVar:
-                    setattr(self, key, value)
-            except:
-                pass
+    #     for key, value in state.items():
+    #         try:
+    #             if eval('isinstance(self.'+key+',QWidget)'):
+    #                 isWidget = True
+    #                 isVar = False
+    #             elif eval('hasattr(self,\"'+key+'\")'):
+    #                 isVar = True
+    #                 isWidget = False
+    #             else:
+    #                 isVar = False
+    #                 isWidget = False
+    #             if isWidget:
+    #                 widget = eval('self.'+key)
+    #                 if value['text'] is not None:
+    #                     widget.setText(value['text'])
+    #                 if value['checked'] is not None:
+    #                     widget.setChecked(value['checked'])
+    #             elif isVar:
+    #                 setattr(self, key, value)
+    #         except:
+    #             pass
             
             # if isinstance(value, dict):
             #     for widget_name, properties in value.items():
@@ -1107,7 +1088,7 @@ class MDAGlados(CustomMainWindow):
         logging.debug(f"mda: {self.mda}")
         if self.fully_started:
             if self.autoSaveLoad:
-                self.save_state('mda_state.json')
+                self.save_state_MDA('glados_state.json')
         logging.debug('ended get_MDA_events_from_GUI')
         
         pass

@@ -135,7 +135,8 @@ class ConfigInfo:
         return self.core.get_current_config(self.configGroupName())
 
 #Create a big MM config ui and add all config groups with options
-class MMConfigUI:
+from utils import CustomMainWindow
+class MMConfigUI(CustomMainWindow):
     def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False):
         """
         Initializes the class with the given configuration groups.
@@ -153,6 +154,10 @@ class MMConfigUI:
         Returns:
             None
         """
+        
+        super().__init__()
+        self.fullyLoaded = False
+        self.autoSaveLoad = True
         self.showConfigs = showConfigs
         self.showStages = showStages
         self.showROIoptions = showROIoptions
@@ -221,6 +226,7 @@ class MMConfigUI:
             self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 7)
         
         #Update everything for good measure at the end of init
+        self.fullyLoaded = True
         self.updateAllMMinfo()
         
         #Inactivate all configs if this is wanted
@@ -265,6 +271,7 @@ class MMConfigUI:
         #Add a 'exposure time' input field:
         self.exposureTimeInputField = QLineEdit()
         self.exposureTimeInputField.setText(str(100))
+        self.exposureTimeInputField.textChanged.connect(lambda: self.storeAllControlValues())
         liveModeLayout.addWidget(self.exposureTimeInputField,1,1)
         
         self.LiveModeButton = QPushButton("Start Live Mode")
@@ -452,13 +459,13 @@ class MMConfigUI:
     
     def XYstageLayout(self):
         #Obtain the stage info from MM:
-        XYStageName = self.core.get_xy_stage_device()
+        XYStageName = self.core.get_xy_stage_device() #type: ignore
         #Get the stage position
-        XYStagePos = self.core.get_xy_stage_position(XYStageName)
+        XYStagePos = self.core.get_xy_stage_position(XYStageName)#type: ignore
         
         #Get current pixel size via self.core.get_pixel_size_um()
         #Then move 0.1, 0.5, or 1 field with the arrows
-        field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]
+        field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
         field_move_fraction = [1,.5,.1]
         
         #Widget itself is a grid layout with 7x7 entries
@@ -470,20 +477,43 @@ class MMConfigUI:
         for m in range(1,4):
             #Initialize buttons
             self.XYmoveButtons[f'Up_{m}'] = QPushButton("⮝"*(4-m))
-            self.XYmoveButtons[f'Up_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,field_size_um[1]*field_move_fraction[m-1]))
+            self.XYmoveButtons[f'Up_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,float(self.XYMoveEditField[f"Y_{4-m}"].text())))
             self.XYmoveButtons[f'Down_{m}'] = QPushButton("⮟"*(4-m))
-            self.XYmoveButtons[f'Down_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,-field_size_um[1]*field_move_fraction[m-1]))
+            self.XYmoveButtons[f'Down_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,float(self.XYMoveEditField[f"Y_{4-m}"].text())*-1))
             self.XYmoveButtons[f'Left_{m}'] = QPushButton("⮜"*(4-m))
-            self.XYmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(-field_size_um[0]*field_move_fraction[m-1],0))
+            self.XYmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(float(self.XYMoveEditField[f"X_{4-m}"].text())*-1,0))
             self.XYmoveButtons[f'Right_{m}'] = QPushButton("⮞"*(4-m))
-            self.XYmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(field_size_um[0]*field_move_fraction[m-1],0))
+            self.XYmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(float(self.XYMoveEditField[f"X_{4-m}"].text()),0))
             
             #Add buttons to layout
             XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             XYStageLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             XYStageLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4,8-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                        
+        
+        XYStageSetMovementLayout = QGridLayout()
+        XYStageSetMovementLayout.addWidget(QLabel('X'),0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        XYStageSetMovementLayout.addWidget(QLabel('Y'),0,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.XYMoveEditField = {}
+        pushButtonLabelArr = ["0.1 field","1 field","3 fields"]
+        for m in range(1,4):
+            XYStageSetMovementLayout.addWidget(QLabel("⮞"*(m)),m,0,1,1, alignment=Qt.AlignmentFlag.AlignRight)
+            self.XYMoveEditField[f"X_{m}"] = QLineEdit()
+            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"X_{m}"],m,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            self.XYMoveEditField[f"X_{m}"].textChanged.connect(lambda: self.storeAllControlValues())
+            self.XYMoveEditField[f"Y_{m}"] = QLineEdit()
+            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Y_{m}"],m,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            self.XYMoveEditField[f"Y_{m}"].textChanged.connect(lambda: self.storeAllControlValues())
+            XYStageSetMovementLayout.addWidget(QLabel("μm"),m,3,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
+            self.XYMoveEditField[f"Button_{m}"] = QPushButton(pushButtonLabelArr[m-1])
+            
+            self.XYMoveEditField[f"Button_{m}"].clicked.connect(lambda index, m=m: self.setXYStageMovementValue(m-1,self.XYMoveEditField[f"X_{m}"],self.XYMoveEditField[f"Y_{m}"]))
+            
+            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Button_{m}"],m,4,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
+            
+        #Add the setmovementlayout to the XY stage layout
+        XYStageLayout.addLayout(XYStageSetMovementLayout,8,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
+                
         #Add a central label for info
         #this label contains the XY stage name, then an enter, then the current position:
         self.XYStageInfoWidget = QLabel()
@@ -493,12 +523,24 @@ class MMConfigUI:
         
         return XYStageLayout
     
+    def setXYStageMovementValue(self,m,xEditField,yEditField):
+        #Set the values in the XY EditFields based on the buttons
+        fieldUnits = [0.1,1,3]
+        fieldUnit = fieldUnits[m]
+        field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
+        
+        x_value_um = field_size_um[0]*fieldUnit
+        y_value_um = field_size_um[1]*fieldUnit
+        xEditField.setText(str(x_value_um))
+        yEditField.setText(str(y_value_um))
+        self.storeAllControlValues()
+    
     def getDevicesOfDeviceType(self,devicetype):
         #Find all devices that have a specific devicetype
         #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
         #for all devicetypes
         #Get devices
-        devices = self.core.get_loaded_devices()
+        devices = self.core.get_loaded_devices() #type:ignore
         devices = [devices.get(i) for i in range(devices.size())]
         devicesOfType = []
         #Loop over devices
@@ -809,7 +851,24 @@ class MMConfigUI:
         if self.showStages:
             self.updateXYStageInfoWidget()
             self.updateOneDstageLayout()
+        
+        if self.autoSaveLoad:
+            if self.fullyLoaded:
+                with open('glados_state.json', 'r') as file:
+                    gladosInfo = json.load(file)
+                    MMControlsInfo = gladosInfo['MMControls']
+            
+                #Hand-set the values that I want:
+                self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+                for key, object in self.XYMoveEditField.items():
+                    if key in MMControlsInfo:
+                        object.setText(MMControlsInfo[key]['text'])
 
+    def storeAllControlValues(self):
+        if self.autoSaveLoad:
+            if self.fullyLoaded:
+                self.save_state_MMControls('glados_state.json')
+                pass
 
 from PyQt5.QtCore import QSize, pyqtSignal
 
