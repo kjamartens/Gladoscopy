@@ -1,11 +1,10 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget
-from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget, QTableWidget, QWidget, QInputDialog, QTableWidgetItem
+from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
 from AnalysisClass import *
 import sys
 import os
-# import PyQt5.QtWidgets
 import json
 from pycromanager import Core, multi_d_acquisition_events, Acquisition
 import numpy as np
@@ -14,10 +13,9 @@ import asyncio
 import pyqtgraph as pg
 import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
-#For drawing
 import matplotlib
-matplotlib.use('Qt5Agg')
-# from PyQt5 import QtCore, QtWidgets
+import pickle
+from utils import CustomMainWindow
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import tifffile
@@ -28,28 +26,39 @@ from typing import List, Iterable
 import itertools
 import queue
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-from PyQt5.QtWidgets import QTableWidget, QWidget, QInputDialog, QTableWidgetItem
+#For drawing
+matplotlib.use('Qt5Agg')
 
 class ConfigInfo:
     def __init__(self,core,config_group_id):
+        """
+        This class contains information about a pycromanager config group
+        Contains info such as name, min/max value etc
+        
+        Attributes:
+            core (Core): The pycromanager core object
+            config_group_id (int): The id of the config group
+        """
         self.core = core
         self.config_group_id = config_group_id
         pass
     
-    #Returns the config group name
     def configGroupName(self):
+        """
+        Returns the config group name
+        """
         return self.core.get_available_config_groups().get(self.config_group_id)
     
-    #Returns the number of config options for this config group
     def nrConfigs(self):
+        """Returns the number of config options for this config group"""
         return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).size()
     
-    #Returns the name of the config within the config group
     def configName(self,config_id):
+        """Returns the name of the config within the config group"""
         return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).get(config_id)
     
-    #Returns the first device name and property from Verbose
     def deviceNameProperty_fromVerbose(self):
+        """Returns the first device name and property from Verbose"""
         verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
         start_index = verboseInfoCurrentConfigGroup.find("<html>") + len("<html>")
         end_index = verboseInfoCurrentConfigGroup.find(":")
@@ -59,8 +68,8 @@ class ConfigInfo:
         deviceProperty  = verboseInfoCurrentConfigGroup[start_index:end_index]
         return deviceName,deviceProperty
     
-    #Returns whether the config group has property limits
     def hasPropertyLimits(self):
+        """Returns whether the config group has property limits"""
         #Get the verbose info from the config group state
         verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
         #Determine the number of devices in the verbose info
@@ -75,8 +84,8 @@ class ConfigInfo:
         else:
             return False
     
-    #Finds lower limit of the device property
     def lowerLimit(self):
+        """Finds lower limit of the device property"""
         [deviceName,deviceProperty] = self.deviceNameProperty_fromVerbose()
         if self.core.has_property_limits(deviceName,deviceProperty):
             lowerLimit = self.core.get_property_lower_limit(deviceName,deviceProperty)
@@ -84,8 +93,8 @@ class ConfigInfo:
             lowerLimit = 0
         return lowerLimit
             
-    #Finds upper limit of the device property
     def upperLimit(self):
+        """Finds upper limit of the device property"""
         [deviceName,deviceProperty] = self.deviceNameProperty_fromVerbose()
         if self.core.has_property_limits(deviceName,deviceProperty):
             upperLimit = self.core.get_property_upper_limit(deviceName,deviceProperty)
@@ -93,15 +102,15 @@ class ConfigInfo:
             upperLimit = 0
         return upperLimit
             
-    #Returns Boolean whether the config group should be represented as a drop-down menu
     def isDropDown(self):
+        """Returns Boolean whether the config group should be represented as a drop-down menu"""
         if self.nrConfigs()>1:
             return True
         else:
             return False
         
-    #Returns Boolean whether the config group should be represented as a slider
     def isSlider(self):
+        """Returns Boolean whether the config group should be represented as a slider"""
         if self.nrConfigs()>1:
             return False
         else:
@@ -109,9 +118,9 @@ class ConfigInfo:
                 return True
             else:
                 return False
-        
-    #Returns Boolean whether the config group should be represented as an input field
+    
     def isInputField(self):
+        """Returns Boolean whether the config group should be represented as an input field"""
         if self.nrConfigs()>1:
             return False
         else:
@@ -121,6 +130,7 @@ class ConfigInfo:
                 return True
 
     def helpStringInfo(self):
+        """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
         infostring='No option for this config'
         if self.isDropDown():
             infostring = "Device {} should be an dropdown with {} options".format(self.configGroupName(),self.nrConfigs())
@@ -130,29 +140,33 @@ class ConfigInfo:
             infostring = "Device {} should be an input field".format(self.configGroupName())
         return infostring
     
-    #Get the current MM value of this config group:
     def getCurrentMMValue(self):
+        """Get the current MM value of this config group:"""
         return self.core.get_current_config(self.configGroupName())
 
-#Create a big MM config ui and add all config groups with options
-from utils import CustomMainWindow
 class MMConfigUI(CustomMainWindow):
     def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
         """
-        Initializes the class with the given configuration groups.
-
+        A class to create a MicroManager config UI with the given configuration groups.
+        
+        This class will create a UI with a layout of checkboxes, sliders, input fields, dropdowns, etc
+        The user can select which config groups to show and which configs to show for each config group. The user can also change the configs real-time. 
+        
         Parameters:
-            config_groups (list): A list of configuration groups.
-            showConfigs (bool): Whether to show the configurations in the UI.
-            showStages (bool): Whether to show the stages in the UI.
-            showROIoptions (bool): Whether to show the ROI options in the UI.
-            showLiveMode (bool): Whether to show the live mode in the UI.
-            showRelativeStages (bool): Whether to show stages with relative change (i.e. up by 10 um)
-            number_config_columns (int): The number of columns for the configuration.
-            changes_update_MM (bool): Whether to update the MM changes when configs are changed.
-
-        Returns:
-            None
+            config_groups (list): A list of configuration groups. Get this as follows:
+                nrconfiggroups = core.get_available_config_groups().size()
+                for config_group_id in range(nrconfiggroups):
+                    allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
+            showConfigs (bool, optional): Whether to show the configurations in the UI. Defaults to True.
+            showStages (bool, optional): Whether to show the stages in the UI. Defaults to True.
+            showROIoptions (bool, optional): Whether to show the ROI options in the UI. Defaults to True.
+            showLiveMode (bool, optional): Whether to show the live mode in the UI. Defaults to True.
+            number_config_columns (int, optional): The number of columns in the layout. Defaults to 5.
+            changes_update_MM (bool, optional): Whether to update the configs in MicroManager real-time. Defaults to True.
+            showCheckboxes (bool, optional): Whether to show checkboxes for each config group. Defaults to False.
+            checkboxStartInactive (bool, optional): Whether the checkboxes should start inactive. Defaults to True.
+            showRelativeStages (bool, optional): Whether to show the relative stages in the UI. Defaults to False.
+            autoSaveLoad (bool, optional): Whether to automatically save and load the configs to file when the UI is opened and closed. Defaults to False.
         """
         
         super().__init__()
@@ -237,32 +251,15 @@ class MMConfigUI(CustomMainWindow):
         #Change the font of everything in the layout
         self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
     
-    #Get all config information as set by the UI:
-    def getUIConfigInfo(self,onlyChecked=False):
-        configInfo = {}
-        for config_id in range(len(self.config_groups)):
-            if onlyChecked and not self.configCheckboxes[config_id].isChecked():
-                continue
-            configInfo[self.config_groups[config_id].configGroupName()] = self.currentConfigUISingleValue(config_id)
-        return configInfo
-    
-    def currentConfigUISingleValue(self,config_id):
-        #Get the value of a single config as currently determined by the UI
-        if self.config_groups[config_id].isDropDown():
-            currentUIvalue = self.dropDownBoxes[config_id].currentText()
-        elif self.config_groups[config_id].isSlider():
-            #Get the value from the slider:
-            sliderValue = self.sliders[config_id].value()
-            #Get the true value from the conversion:
-            currentUIvalue = sliderValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
-        elif self.config_groups[config_id].isInputField():
-            currentUIvalue = None
-        else:
-            currentUIvalue = None
-        return currentUIvalue
-    
-    #Live mode UI
+    #region live mode
     def liveModeLayout(self):
+        """
+        Creates the layout for the live mode options.
+        This includes an input field for the exposure time in ms.
+
+        Returns:
+            QGridLayout: The layout for the live mode options.
+        """
         #Create a Grid layout:
         liveModeLayout = QGridLayout()
         #Add a 'exposure time' label:
@@ -282,8 +279,10 @@ class MMConfigUI(CustomMainWindow):
         #Return the layout
         return liveModeLayout
     
-    #Changes live mode
     def changeLiveMode(self):
+        """
+        Function that should be called when live mode is changed. Sets the shared_data.liveMode to True or False.
+        """
         if shared_data.liveMode == False:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Stop Live Mode")
@@ -296,9 +295,50 @@ class MMConfigUI(CustomMainWindow):
             self.LiveModeButton.setText("Start Live Mode")
             #update live mode:
             shared_data.liveMode = False
+    #endregion
+
+    #region General
+    #Update everything there is update-able
+    def updateAllMMinfo(self):
+        """
+        Update all the info that can be updated from the microscope.
+        """
+        logging.debug('Updating all MM info')
+        if self.showConfigs:
+            self.updateConfigsFromMM()
+        if self.showStages:
+            self.updateXYStageInfoWidget()
+            self.updateOneDstageLayout()
+        
+        if self.autoSaveLoad:
+            if self.fullyLoaded:
+                if os.path.exists('glados_state.json'):
+                    with open('glados_state.json', 'r') as file:
+                        gladosInfo = json.load(file)
+                        MMControlsInfo = gladosInfo['MMControls']
                 
-    #Set the font of all buttons/labels in the layout recursively
+                    #Hand-set the values that I want:
+                    self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+                    for key, object in self.XYMoveEditField.items():
+                        if key in MMControlsInfo:
+                            object.setText(MMControlsInfo[key]['text'])
+
+    def storeAllControlValues(self):
+        """
+        Store all the control values in a dictionary, which can be used to save state.
+        """
+        if self.autoSaveLoad:
+            if self.fullyLoaded:
+                self.save_state_MMControls('glados_state.json')
+                pass
+
+
     def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
+        """
+        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
+        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
+
+        """
         if widget is None:
             return
         
@@ -321,8 +361,9 @@ class MMConfigUI(CustomMainWindow):
                         self.set_font_and_margins_recursive(item.widget(), font=font)
                     if hasattr(item, 'layout'):
                         self.set_font_and_margins_recursive(item.layout(), font=font)
+    #endregion
     
-    #Unused, but helpfull piece of code
+    #region deprecated
     def get_device_properties(self):
         core = self.core
         devices = core.get_loaded_devices()
@@ -372,7 +413,9 @@ class MMConfigUI(CustomMainWindow):
         separator_line.setFrameShadow(QFrame.Sunken)
         separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
         return separator_line
+    #endregion
     
+    #region ROI
     def ROIoptionsLayout(self):
         #Create a Grid layout:
         ROIoptionsLayout = QGridLayout()
@@ -392,7 +435,6 @@ class MMConfigUI(CustomMainWindow):
         ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomOut'],2,0)
         return ROIoptionsLayout
     
-    #Reset the ROI to full frame
     def resetROI(self):
         self.core.clear_roi()
     
@@ -444,7 +486,9 @@ class MMConfigUI(CustomMainWindow):
                 shared_data.liveMode = True
         except:
             logging.error('ZOOMING DIDN\'T WORK!')
+    #endregion
     
+    #region Stages
     def stagesLayout(self):
         stageLayout = QHBoxLayout()
         stageLayout.addLayout(self.XYstageLayout())
@@ -643,9 +687,13 @@ class MMConfigUI(CustomMainWindow):
         self.core.set_relative_xy_position(relX,relY)
         #Update the XYStageInfoWidget (if it exists)
         self.updateXYStageInfoWidget()
+    #endregion
     
+    #region MM-configs
     def addRow(self,config_id):
-        #Add a new row in the configLayout which will be populated with a label-dropdown/slider/inputField combination
+        """
+        Add a new row in the configLayout which will be populated with a label-dropdown/slider/inputField combination
+        """
         rowLayout = QHBoxLayout()
         #Add the label to it
         self.addLabel(rowLayout,config_id)
@@ -655,6 +703,10 @@ class MMConfigUI(CustomMainWindow):
         return rowLayout
     
     def addLabel(self,rowLayout,config_id):
+        """
+        Add a label to the given rowLayout with the label text provided in the MM config.
+
+        """
         if self.showCheckboxes:
             #Add a checkbox
             self.configCheckboxes[config_id] = QCheckBox()
@@ -677,6 +729,11 @@ class MMConfigUI(CustomMainWindow):
         # pass
     
     def addDropDown(self,rowLayout,config_id):
+        """
+        Add a drop-down menu to the given rowLayout
+        with the options provided in the MM config.
+
+        """
         #Create a drop-down menu:
         self.dropDownBoxes[config_id] = QComboBox()
         #Add an empty option:
@@ -715,7 +772,17 @@ class MMConfigUI(CustomMainWindow):
                 #Set in MM:
                 self.config_groups[config_id].core.set_config(configGroupName,newValue)
     
-    def addSlider(self,rowLayout,config_id):        
+    def addSlider(self,rowLayout,config_id):
+        """
+        Add a slider to a rowLayout for a given MMConfigItem.
+
+        Args:
+            rowLayout (QHBoxLayout): The rowLayout to add the slider to.
+            config_id (int): The ID of the MMConfigItem to add a slider for.
+
+        Returns:
+            None
+        """
         #Get the config group name
         configGroupName = self.config_groups[config_id].configGroupName()
         
@@ -779,12 +846,20 @@ class MMConfigUI(CustomMainWindow):
                 #Set this property:
                 self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
     
-    
     def addInputField(self,rowLayout,config_id):
+        #TODO: implement
         pass
     
-    #Update a single config based on current value in MM
     def updateValuefromMM(self,config_id):
+        """
+        Updates the value in the GUI for a single config_id based on the current value in MM
+
+        Args:
+            config_id (int): The ID of the config_group to update
+
+        Returns:
+            None
+        """
         logging.debug("Updating value from " + self.config_groups[config_id].configGroupName())
         #Get the value of the config_id from micromanager:
         currentValue = self.config_groups[config_id].getCurrentMMValue()
@@ -820,9 +895,18 @@ class MMConfigUI(CustomMainWindow):
         self.configLayoutEnableChange(config_id)
         pass
     
-    
     def updateValueInGUI(self,config_id, newValue):
-        #Set the value of the dropdown to the current MM value
+        """
+        Updates the GUI to reflect a change in the Micromanager config
+        Set the value of the dropdown to the current MM value
+
+        Args:
+            config_id (int): The ID of the config box to change
+            newValue (str): The new value of the config property
+
+        Returns:
+            None
+        """
         if self.config_groups[config_id].isDropDown():
             self.dropDownBoxes[config_id].setCurrentText(newValue)
         elif self.config_groups[config_id].isSlider():
@@ -840,8 +924,14 @@ class MMConfigUI(CustomMainWindow):
             
         elif self.config_groups[config_id].isInputField():
             pass
-        
+    
     def configLayoutEnableChange(self,config_id):
+        """
+        Enables or disables the GUI elements in the layout of the given config box
+
+        Args:
+            config_id (int): The ID of the config box to change
+        """
         if self.showCheckboxes:
             #Disable all children recursively
             def enableDisableLayout(self, layout,config_id,trueFalse):
@@ -861,44 +951,18 @@ class MMConfigUI(CustomMainWindow):
                 enableDisableLayout(self, self.configEntries[config_id],config_id,False)
         return
     
-    #Update all configs based on current value in MM
     def updateConfigsFromMM(self):
+        """
+        Updates all configs from the Micro-Manager backend.
+        
+        This function iterates over all configs and updates their values in the GUI
+        based on the current values in the Micro-Manager backend.
+        """
         #Update all values from MM:
         for config_id in range(len(self.config_groups)):
             self.updateValuefromMM(config_id)
         pass
-    
-    #Update everything there is update-able
-    def updateAllMMinfo(self):
-        logging.debug('Updating all MM info')
-        if self.showConfigs:
-            self.updateConfigsFromMM()
-        if self.showStages:
-            self.updateXYStageInfoWidget()
-            self.updateOneDstageLayout()
-        
-        if self.autoSaveLoad:
-            if self.fullyLoaded:
-                if os.path.exists('glados_state.json'):
-                    with open('glados_state.json', 'r') as file:
-                        gladosInfo = json.load(file)
-                        MMControlsInfo = gladosInfo['MMControls']
-                
-                    #Hand-set the values that I want:
-                    self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
-                    for key, object in self.XYMoveEditField.items():
-                        if key in MMControlsInfo:
-                            object.setText(MMControlsInfo[key]['text'])
-
-    def storeAllControlValues(self):
-        if self.autoSaveLoad:
-            if self.fullyLoaded:
-                self.save_state_MMControls('glados_state.json')
-                pass
-
-from PyQt5.QtCore import QSize, pyqtSignal
-
-import pickle
+    #endregion
 
 def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     global shared_data
@@ -917,5 +981,3 @@ def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     
     #Test line:
     # breakpoint
-    
-    
