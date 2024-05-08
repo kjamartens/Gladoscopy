@@ -504,7 +504,6 @@ class MDAGlados(CustomMainWindow):
     #endregion
     
     #region GUI
-    
     def initGUI(self, GUI_show_exposure=True, GUI_show_xy = True, GUI_show_z=True, GUI_show_channel=True, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_showOptions=True,GUI_acquire_button=True):
         """
         Initiate the GUI.

@@ -1,5 +1,7 @@
+#region imports
 #Add inclusion of this folder:
 import sys, os
+from PyQt5.QtWidgets import QGroupBox
 sys.path.append('.\\GUI\\nodz')
 from PyQt5 import QtCore, QtWidgets
 import nodz_main #type: ignore
@@ -13,6 +15,8 @@ from PyQt5.QtWidgets import QGridLayout, QPushButton
 from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
 from PyQt5.QtCore import QRectF
+from qtpy.QtWidgets import QFileDialog, QMessageBox
+from qtpy.QtWidgets import QFileDialog
 import numpy as np
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -34,13 +38,15 @@ import HelperFunctions #type: ignore
 import logging
 import utils
 from nodz import nodz_utils
-
 from PyQt5.QtWidgets import QApplication, QComboBox
-
 from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
+#endregion
 
-
+#region Dialogs_Nodz
 class AnalysisScoringVisualisationDialog(QDialog):
+    """
+    A Dialog that is created for analysis/scoring/visualisation methods in the Nodz layout. Basically based on EVE's flexible file-finding function methodology. Also used for real-time analysis dialog.
+    """
     def __init__(self, parent=None, currentNode=None, addVisualisationBox = False):
         """
         Advanced input dialog.
@@ -48,6 +54,7 @@ class AnalysisScoringVisualisationDialog(QDialog):
         Args:
             parent (QWidget): Parent widget.
             currentNode (Nodz): Node data.
+            addVisualisationBox: A boolean indicating whether to add a visualization CheckBox (default is False). 
 
         Returns:
             tuple: A tuple containing the line edit and combo box input from the user.
@@ -83,9 +90,21 @@ class AnalysisScoringVisualisationDialog(QDialog):
         
         self.setLayout(layout)
 
-
 class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
+    """
+    A Dialog that is created for analysis methods in the Nodz layout. Basically based on EVE's flexible file-finding function methodology.
+    """
     def __init__(self, parent=None, currentNode=None):
+        """
+        Initializes the Analysis Options window.
+        
+        Args:
+            parent: Parent widget (default is None).
+            currentNode: Current node (default is None).
+        
+        Returns:
+            None
+        """
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Options")
         
@@ -126,16 +145,29 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         #Also give it a connect-callback to store the currentinfo:
         self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
 
-        
         # pre-load all args/kwargs and their edit values - then hide all of them
         utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_analysisFunctions)
         
         #Pre-load the options if they're in the current node info
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
 
-
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
+    """
+    A Dialog that is created for real-time analysis methods in the Nodz layout. Basically based on EVE's flexible file-finding function methodology.
+    """
     def __init__(self, parent=None, currentNode=None,addVisualisationBox=True):
+        """
+        Initializes the Real-Time Analysis Options window.
+        
+        Args:
+            parent: The parent widget (default is None).
+            currentNode: The current node (default is None).
+            addVisualisationBox: A boolean indicating whether to add a visualization CheckBox (default is True). 
+        
+        Returns:
+            None
+        """
+        
         super().__init__(parent, currentNode,addVisualisationBox)
         self.setWindowTitle("Real-Time Analysis Options")
         
@@ -161,7 +193,6 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         #Also give it a connect-callback to store the currentinfo:
         self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
 
-        
         # pre-load all args/kwargs and their edit values - then hide all of them
         utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions)
         
@@ -172,15 +203,31 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
             
             utils.preLoadOptions_realtime(self.mainLayout,currentNode.real_time_analysis_currentData) #type:ignore
 
-
-
 class nodz_analysisMeasurementDialog(nodz_analysisDialog):
+    """
+    A Dialog that is created for analysis methods in the Nodz layout. Basically based on EVE's flexible file-finding function methodology.
+    """
     def __init__(self, parent=None, currentNode=None):
+        """
+        Dummy init function.
+        """
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Measurement Options")
 
 class nodz_openTimerDialog(QDialog):
+    """
+    A Dialog that is created for timer in the Nodz layout. 
+    """
     def __init__(self, parentNode=None):
+        """
+        Initializes the TimerDialog.
+        
+        Args:
+            parentNode: The parent node of the TimerDialog. If provided, the timerInfo will be set to the timerInfo of the parentNode.
+        
+        Returns:
+            None
+        """
         super().__init__(None)
         self.setWindowTitle("Timer Dialog")
         self.timerInfo = 0
@@ -208,11 +255,14 @@ class nodz_openTimerDialog(QDialog):
         
         self.setLayout(layout)
 
-
 class nodz_openMMConfigDialog(QDialog):
+    
+    """
+    Opens a dialog to modify the MM configs of a node
+    """
     def __init__(self, parentNode=None, storedConfigsStrings=None):
         """
-        Opens a dialog to modify the OpenMM configs of a node
+        Opens a dialog to modify the Micromanager configs of a node
         
         Args:
             parentNode (Node): The node to modify the configs of.
@@ -293,6 +343,9 @@ class nodz_openMMConfigDialog(QDialog):
     #     return self.mdaconfig
 
 class nodz_visualisationDialog(QDialog):
+    """
+    Opens a dialog to modify the visualisation settings
+    """
     def __init__(self, parentNode=None):
         """
         Opens a dialog to modify the visualisation settings
@@ -350,9 +403,11 @@ class nodz_visualisationDialog(QDialog):
             layout.addWidget(button_box)
             
             self.setLayout(layout)
-        
 
 class nodz_openMDADialog(QDialog):
+    """
+    Dialog for the MDA options within the Nodz environment.
+    """
     def __init__(self, parent=None, parentData=None, currentNode = None):
         """
         Dialog for the MDA options.
@@ -430,16 +485,48 @@ class nodz_openMDADialog(QDialog):
             self.setLayout(layout)
         
     def getInputs(self):
+        """
+        Get the inputs from the MDA configuration.
+        
+        Returns:
+            The inputs from the MDA configuration.
+        """
+        
         return self.mdaconfig.mda
 
     def getExposureTime(self):
+        """
+        Get the exposure time in milliseconds.
+        
+        Returns:
+            int: The exposure time in milliseconds.
+        """
         return self.mdaconfig.exposure_ms
 
     def getmdaData(self):
+        """
+        Get the MDA data.
+        
+        Returns:
+            The MDA configuration data.
+        """
         return self.mdaconfig
 
 class nodz_openScoringEndDialog(QDialog):
+    """
+    The ScoringEnd (i.e. the end of the scoring) dialog window.
+    """
     def __init__(self, parent=None, currentNode=None):
+        """
+        Initialize the ScoringEnd (i.e. the end of the scoring) dialog window.
+        
+        Args:
+            parent: The parent widget (default is None).
+            currentNode: The current node (default is None).
+        
+        Returns:
+            None
+        """
         super().__init__(parent)
         self.setWindowTitle("Scoring End")
         #Add an OK/Cancel box
@@ -500,6 +587,15 @@ class nodz_openScoringEndDialog(QDialog):
         # self.updateLayout()
         
     def updateLayout(self):
+        """
+        Updates the scoreEnd layout based on the number of variables (i.e. number of connectable score parameters) specified.
+        
+            Args:
+                None
+        
+            Returns:
+                None
+        """
         nrVars = self.nrVarsSpinbox.value()
         if nrVars == len(self.labels)-1: #If we want to remove the last one
             tobeRemovedLabel = self.labels[-1]
@@ -539,8 +635,13 @@ class nodz_openScoringEndDialog(QDialog):
                 self.lineEdits.append(lineEdit)
 
 class FoVFindImaging_singleCh_configs(QDialog):
+    """
+    I BELIEVE DEPRECATED (may 2024)
+    Advanced dialog for user to input the configuration for a single channel single FOV imaging experiment.
+    """
     def __init__(self, parent=None, parentData=None):
         """
+        I BELIEVE DEPRECATED (may 2024)
         Advanced dialog for user to input the configuration for a single channel single FOV imaging experiment.
 
         Args:
@@ -578,9 +679,23 @@ class FoVFindImaging_singleCh_configs(QDialog):
             self.setLayout(layout)
         
     def getInputs(self):
+        """
+        Get the UI configuration information.
+        
+        Args:
+            onlyChecked (bool): A boolean flag indicating whether to return only the checked UI configuration information.
+        
+        Returns:
+            dict: A dictionary containing the UI configuration information.
+        """
         return self.MMconfig.getUIConfigInfo(onlyChecked=True)
+#endregion
 
+#region NodzHelperClasses
 class CustomGraphicsView(QtWidgets.QGraphicsView):
+    """
+    Create a custom Graphics View for the Nodz container
+    """
     def resizeEvent(self, event):
         """
         Handles resizing of the graphics view.
@@ -606,6 +721,9 @@ class CustomGraphicsView(QtWidgets.QGraphicsView):
         nodz.setFixedSize(self.viewport().size())
 
 class GladosGraph():
+    """ 
+    Create a 'graph' in code-form of all connections in the scoring or acquisition flowchart. Basically gives information about what node is connected to what other nodes
+    """
     #Also adds these values correctly for each node:
         # self.n_connect_at_start = 0 #number of others connected at start (which should all be finished!)
         # self.connectedToFinish = []
@@ -614,6 +732,7 @@ class GladosGraph():
     def __init__(self,parent):
         """
         Initialize a GladosGraph object
+        Create a 'graph' in code-form of all connections in the scoring or acquisition flowchart. Basically gives information about what node is connected to what other nodes
 
         This function initializes a GladosGraph object.
 
@@ -676,6 +795,12 @@ class GladosGraph():
             self.nodes.append(self.parent.findNodeByName(nodeName))
 
 class NodeSignalManager(QObject):
+    """
+    The NodeSignalManager class is used to manage the signals emitted and received by nodes in the graph (i.e. those created by connections).
+    This is a generic class to handle the signals of any number of nodes.
+    """
+    
+    #pyqtSignals need to be outside init def
     new_signal = pyqtSignal()
     
     def __init__(self):
@@ -737,22 +862,29 @@ class NodeSignalManager(QObject):
         for signal in self.signals:
             signal.emit()
             logging.debug(f"emitting signal {signal}")
+#endregion
 
-class flowChart_dockWidgetF(nodz_main.Nodz):
+class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     """
     Class that represents a Flowchart dock widget in napari-Glados. 
     Inherits from Nodz, which is a graph drawing tool.
     
+    Main class of all Nodz-based Glados automisation.
     """
     def __init__(self,core=None,shared_data=None,MM_JSON=None):
         """
-        Class that represents a Flowchart dock widget in napari-Glados. 
+        Initializes the GladosNodzFlowChart_dockWidget in napari-Glados. 
         Inherits from Nodz, which is a graph drawing tool.
-
-        This functions initializes a flowchart dock widget in napari-Glados.
-        It takes the napari viewer, the core Micro-Manager object, a
-        shared_data object, and a JSON file containing the Micro-Manager
-        settings.
+        
+        Main class of all Nodz-based Glados automisation.
+        
+        Args:
+            core: Core object for MM/napari integration.
+            shared_data: Shared data object.
+            MM_JSON: JSON object for MM/napari integration.
+        
+        Returns:
+            None
         """
         #Create a QGridLayout:
         self.mainLayout = QGridLayout()
@@ -763,7 +895,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.buttonsArea = QVBoxLayout()
         self.loadPickleButton = QPushButton('Load Graph')
         self.buttonsArea.addWidget(self.loadPickleButton)
-        self.loadPickleButton.clicked.connect(lambda index: self.loadPickle())
+        self.loadPickleButton.clicked.connect(lambda index: self.loadGraphJSON())
         self.runScoringButton = QPushButton('Start run!')
         self.buttonsArea.addWidget(self.runScoringButton)
         self.runScoringButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
@@ -775,15 +907,13 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.runScoringButton.clicked.connect(lambda index: self.runScoring())
         self.storePickleButton = QPushButton('Store Graph')
         self.buttonsArea.addWidget(self.storePickleButton)
-        self.storePickleButton.clicked.connect(lambda index: self.storePickle())
+        self.storePickleButton.clicked.connect(lambda index: self.storeGraphJSON())
         self.runAcquiringButton = QPushButton('Run Acquiring')
         self.buttonsArea.addWidget(self.runAcquiringButton)
         self.runAcquiringButton.clicked.connect(lambda index: self.runAcquiring())
-        
         self.debugScoringButton = QPushButton('Debug Scoring')
         self.buttonsArea.addWidget(self.debugScoringButton)
         self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
-        
         
         #import qgroupbox:
         from qtpy.QtWidgets import QGroupBox    
@@ -792,7 +922,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         # self.buttonsArea.addWidget(self.decision_groupbox)
         self.decisionWidget = DecisionWidget(nodzinstance=self)
         self.decision_groupbox.setLayout(self.decisionWidget.layout())
-        
         
         self.scanwidget_groupbox = QGroupBox("Scan Widget")
         newgridlayout = QGridLayout()
@@ -803,7 +932,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
-        super(flowChart_dockWidgetF, self).__init__(parent=self.graphics_view)
+        super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
         self.defineNodeInfo()
         
         # Add the QGraphicsView to the mainLayout and allt he other layouts
@@ -827,7 +956,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.nodeCounter={}
         self.preventAcq=False #Set to true if you want to prevent smart acquisition (i.e. scoring-only, never passing to acq)
         
-        
         #Connect required deleted/double clicked signals
         self.signal_NodeDeleted.connect(self.NodeRemoved)
         self.signal_NodeCreatedNodeItself.connect(self.NodeAdded)
@@ -840,473 +968,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         #Focus on the nodes
         self._focus()
     
-    def explore_attributes(self, obj, indent=0):
-        """
-        Recursively print the attributes of an object.
-
-        This function is used for debugging purposes to explore the attributes of an object.
-        It will print the attributes of `obj` and all of its sub-attributes, up to a maximum
-        depth of 20.
-
-        Parameters
-        ----------
-        obj : object
-            The object to explore
-        indent : int, optional
-            The indentation level, by default 0
-        """
-        if indent < 20:
-            attributes = vars(obj)
-            for attr_name in attributes:
-                if not attr_name.startswith('_'):
-                    attr = getattr(obj, attr_name)
-                    if not callable(attr):
-                        print(" " * indent + attr_name)
-                    else:
-                        print(" " * indent + attr_name + '()')
-                    if hasattr(attr, '__dict__'):
-                        self.explore_attributes(attr, indent + 2)
-                # except:
-                #     pass
-    
-    def storePickle(self):
-        """
-        Save the current graph to a pickle file.
-
-        This function saves the current graph to a pickle file, which can be loaded later using `loadPickle()`.
-        """
-        from qtpy.QtWidgets import QFileDialog
-        filename, _ = QFileDialog.getSaveFileName(self, 'Save file', '', 'JSON files (*.json)')
-        if filename:
-            if not filename.endswith('.json'):
-                filename += '.json'
-            with open(filename, 'wb') as f:
-                self.saveGraph(filename)
-    
-    def loadPickle(self):
-        """
-        Load the graph from a pickle file.
-
-        This function loads the graph from a pickle file created using `storePickle()`.
-        """
-        import pickle, copy
-        
-        from qtpy.QtWidgets import QFileDialog, QMessageBox
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open file', '', 'JSON files (*.json)')
-        if filename:
-            try:
-                #Fully clear graph and delete all nodes from memory:
-                self.clearGraph()
-                self.nodes = []
-                #Set all counters to 0:
-                for nodeType in self.nodeInfo:
-                    self.nodeInfo[nodeType]['NodeCounter'] = 0
-                    self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
-                #Load the graph
-                with open(filename, 'rb') as f:
-                    self.loadGraph_KM(filename)
-            except:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Warning)
-                msg.setText("Could not load file: " + filename)
-                msg.setWindowTitle("Warning")
-                msg.setStandardButtons(QMessageBox.Ok)
-                msg.exec_()
-    
-    def nodeLookupName_withoutCounter(self,nodeName):
-        """
-        Returns the node name without the counter suffix.
-
-        Given a node name like "MyNode_0" this function returns "MyNode".
-
-        Parameters
-        ----------
-        nodeName : str
-            The node name to strip the counter from.
-
-        Returns
-        -------
-        str
-            The node name without the counter suffix.
-        """
-        #Find the last underscore ('_0, _1, etc')
-        index_last_underscore = nodeName.rfind('_')
-        nodeNameNC = nodeName[:index_last_underscore]
-        finalNodeName=None
-        #Now get the correct lookup name by looking through all nodeInfo items
-        for node_name, node_data in self.nodeInfo.items():
-            # Check if the name matches the specific value
-            if 'name' in node_data and node_data['name'] == nodeNameNC:
-                finalNodeName = node_name
-        
-        return finalNodeName
-    
-    def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        """
-        Handle when a plug or socket is connected.
-
-        When a plug or socket is connected, this function is called. It will check if the destination
-        node should be marked as 'started' or 'finished' based on the attributes connected.
-        """
-        logging.info(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
-    
-    def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        """
-        Handle when a plug or socket is disconnected.
-
-        When a plug or socket is disconnected, this function is called. It will disconnect
-        the finished event of the source node from the 'we finished one of the prerequisites' at the destination node.
-        """
-        logging.info('plugorsocketdisconnected')
-    
-    def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        """
-        Handle when a plug is connected.
-
-        When a plug is connected, this function is called. It will check if the destination
-        node should be marked as 'started' based on the attributes connected.
-        """
-        #Check if all are non-Nones:
-        logging.info('plug connected')
-
-    def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        """
-        Handle when a socket is connected.
-
-        When a socket is connected, this function is called. It does not do anything
-        special, it only exists to keep the Node class happy by having a method that
-        corresponds to the 'SocketConnected' signal from the FlowChart.
-        """
-        #Check if all are non-Nones:
-        logging.info('socket connected')
-        
-    def NodeRemoved(self,nodeNames):
-        """
-        Handle when one or more nodes are removed from the flowchart.
-
-        When one or more nodes are removed from the flowchart, this function is called.
-        It will update the node counters of the corresponding node types.
-        """
-        logging.info('one or more nodes are removed!')
-        for nodeName in nodeNames:
-            for node_type, node_data in self.nodeInfo.items():
-                if node_data['name'] in nodeName:
-                    # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
-                    self.nodeInfo[node_type]['NodeCounter'] -= 1
-            
-            #Also remove from self.nodes:
-            node = self.findNodeByName(nodeName)
-            try:
-                self.nodes.remove(node)
-            except:
-                print(f"failed to remove node: {nodeName}")
-    
-    def NodeFullyInitialised(self,node):
-        """
-        Handle when a node is fully initialised.
-        
-        Specifically, when all e.g. data['NODES_SCORING_SCORING'] from loading is added to the node, only after that, this will run.
-
-        This function is called when a node is fully initialised. It does some
-        post-initialisation processing for nodes based on their type.
-
-        Parameters
-        ----------
-        node : Node
-            The node that has been fully initialised.
-        """
-        nodeType = self.nodeLookupName_withoutCounter(node.name)
-        if nodeType == 'scoringEnd':
-            self.update_scoring_end(node,node.scoring_end_currentData['Variables'])
-    
-    def NodeAdded(self,node):
-        """
-        Handle when one or more nodes are created in the flowchart.
-
-        When one or more nodes are created in the flowchart, this function is called.
-        It does some pre-processing of the node and then calls performPostNodeCreation_Start.
-        """
-        logging.info('one or more nodes are created!')
-        nodeType = self.nodeLookupName_withoutCounter(node.name)
-        self.performPostNodeCreation_Start(node,nodeType)
-    
-    def set_readable_text_after_dialogChange(self,currentNode,dialog,nodeType):
-        """Script which sets a readable text inside the textfield of the currentNode after a dialog is closed (i.e. a popup window is closed).
-
-        Args:
-            currentNode (Nodz Node): Current Nodz Node
-            dialog (QDialog): Dialog output
-            nodeType (str): Type of node
-        """
-        displayHTMLtext = ''
-        if nodeType == 'analysisMeasurement':
-            methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
-            methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
-            reqKwValues = []
-            optKwValues = []
-            
-            reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
-            optKwargs = utils.optKwargsFromFunction(methodFunctionName)
-            
-            for key in dialog.currentData:
-                for rkw in reqKwargs:
-                    if rkw in key and '#'+methodFunctionName+'#' in key:
-                        reqKwValues.append(dialog.currentData[key])
-                for okw in optKwargs:
-                    if okw in key and '#'+methodFunctionName+'#' in key:
-                        optKwValues.append(dialog.currentData[key])
-            
-            displayHTMLtext = f"<b>{methodName}</b>"
-            for i in range(len(reqKwValues)):
-                displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
-            for i in range(len(optKwValues)):
-                displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
-        
-        elif nodeType == 'RTanalysisMeasurement':
-            methodName = dialog.currentData['__selectedDropdownEntryRTAnalysis__']
-            methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
-            reqKwValues = []
-            optKwValues = []
-            
-            reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
-            optKwargs = utils.optKwargsFromFunction(methodFunctionName)
-            
-            for key in dialog.currentData:
-                for rkw in reqKwargs:
-                    if rkw in key and '#'+methodFunctionName+'#' in key:
-                        reqKwValues.append(dialog.currentData[key])
-                for okw in optKwargs:
-                    if okw in key and '#'+methodFunctionName+'#' in key:
-                        optKwValues.append(dialog.currentData[key])
-            
-            displayHTMLtext = f"<b>{methodName}</b>"
-            for i in range(len(reqKwValues)):
-                displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
-            for i in range(len(optKwValues)):
-                displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
-        elif nodeType == 'visualisation':
-            displayHTMLtext = f"<b>Layer name: {dialog.layerNameEdit.text()}</b>"
-            if dialog.colormapComboBox.currentText() != 'None':
-                displayHTMLtext += f"<br>Colormap: {dialog.colormapComboBox.currentText()}"
-        elif nodeType == 'acquisition':
-            displayHTMLtext = f"<b>{len(dialog.getInputs())} frames with order {dialog.mdaconfig.order}</b>"
-            if dialog.mdaconfig.GUI_exposure_enabled:
-                displayHTMLtext += f"<br>{dialog.getExposureTime()} ms exposure time"
-            if dialog.mdaconfig.GUI_show_time:
-                displayHTMLtext += f"<br>{dialog.mdaconfig.num_time_points} time points"
-            if dialog.mdaconfig.GUI_show_channel:
-                displayHTMLtext += f"<br>{len(dialog.mdaconfig.channel_exposures_ms)} channels in group {dialog.mdaconfig.channel_group}"
-            if dialog.mdaconfig.GUI_show_xy:
-                displayHTMLtext += f"<br>{len(dialog.mdaconfig.xy_positions)} XY positions"
-            if dialog.mdaconfig.GUI_show_z:
-                if dialog.mdaconfig.z_nr_steps is not None:
-                    displayHTMLtext += f"<br>{dialog.mdaconfig.z_nr_steps} Z positions"
-                else:
-                    nrZsteps = (dialog.mdaconfig.z_end-dialog.mdaconfig.z_start)//dialog.mdaconfig.z_step_distance
-                    displayHTMLtext += f"<br>{nrZsteps} Z positions"
-        elif nodeType == 'changeProperties':
-            displayHTMLtext = f"Changing {len(dialog.ConfigsToBeChanged())} config(s):"
-            for config in dialog.ConfigsToBeChanged():
-                displayHTMLtext += f"<br>{config[0]} to {config[1]}"
-        elif nodeType == 'scoreEnd':
-            import time
-            from datetime import datetime
-            displayHTMLtext = f"<i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
-            for score_entry in dialog[0]:
-                displayHTMLtext += f"<br><b>{score_entry}:</b> {format(dialog[1][score_entry],'.2f')}"
-            if len(dialog) > 2:
-                displayHTMLtext += f"<br><b>{dialog[2]}</b>"
-        elif nodeType == 'scoreStart':
-            import time
-            from datetime import datetime
-            displayHTMLtext = "<b>Scoring started at:</b>"
-            displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
-        elif nodeType == 'timer':
-            displayHTMLtext = f"<b>Timer:</b> wait {str(round(dialog.timerInfo, 2))} s"
-        #And update the display
-        currentNode.updateDisplayText(displayHTMLtext)
-        return displayHTMLtext
-    
-    def NodeDoubleClicked(self,nodeName):
-        """
-        Handle double-clicking on a node in the flowchart.
-
-        When a node is double-clicked, this function is called. Depending on the node, this 
-        function will open a dialog to modify the node's data.
-        """
-        currentNode = self.findNodeByName(nodeName)
-        if 'acquisition' in nodeName:
-            dialog = nodz_openMDADialog(parentData=self,currentNode = currentNode)
-            if dialog.exec_() == QDialog.Accepted:
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'acquisition')
-                logging.debug(f"MDA dialog input: {dialog.getInputs()}")
-            
-            # currentNode.mdaData.exposure_ms = dialog.getExposureTime()
-            # currentNode.mdaData.mda = dialog.getInputs()#type:ignore
-            dialogmdaData = dialog.getmdaData()
-            attrs_to_not_copy = ['gui','core','shared_data','has_GUI','data','staticMetaObject','MDA_completed','MM_JSON']
-            #Loop over all attributes in dialogmdaData:
-            for attrs in vars(dialogmdaData):
-                if attrs not in attrs_to_not_copy:
-                    setattr(currentNode.mdaData,attrs,getattr(dialogmdaData,attrs)) #type:ignore
-            
-            currentNode.update() #type:ignore
-        elif 'changeProperties' in nodeName:
-            currentNode = self.findNodeByName(nodeName)
-            #Show dialog:
-            if 'MMconfigInfo' in vars(currentNode):
-                storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage
-            else:
-                currentNode.MMconfigInfo = []
-                storedConfigsStrings = None
-            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = storedConfigsStrings) #type:ignore
-            if dialog.exec_() == QDialog.Accepted:
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
-                #Update the results of this dialog into the nodz node
-                self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
-        elif 'visualisation_' in nodeName:
-            currentNode = self.findNodeByName(nodeName)
-            #Show dialog:
-            dialog = nodz_visualisationDialog(parentNode=currentNode) #type:ignore
-            if dialog.exec_() == QDialog.Accepted:
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'visualisation')
-                currentNode.visualisation_currentData['layerName'] = dialog.layerNameEdit.text() #type:ignore
-                currentNode.visualisation_currentData['colormap'] = dialog.colormapComboBox.currentText() #type:ignore
-        elif 'changeStagePos' in nodeName:
-            currentNode = self.findNodeByName(nodeName)
-            #Show dialog:
-            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage) #type:ignore
-            if dialog.exec_() == QDialog.Accepted:
-                #Update the results of this dialog into the nodz node
-                self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
-        elif 'analysisMeasurement' in nodeName:
-            currentNode = self.findNodeByName(nodeName)
-            #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
-            dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
-            if dialog.exec_() == QDialog.Accepted:
-                #Update the results of this dialog into the nodz node
-                currentNode.scoring_analysis_currentData = dialog.currentData #type:ignore
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
-                logging.info('Pressed OK on analysisMeasurementDialog')
-        elif 'realTimeAnalysis' in nodeName:
-            currentNode = self.findNodeByName(nodeName)
-            #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
-            dialog = nodz_realTimeAnalysisDialog(currentNode = currentNode, parent = self)
-            if dialog.exec_() == QDialog.Accepted:
-                #Update the results of this dialog into the nodz node
-                currentNode.real_time_analysis_currentData = dialog.currentData #type:ignore
-                currentNode.real_time_analysis_currentData['__selectedDropdownEntryRTAnalysis__'] = dialog.comboBox_RTanalysisFunctions.currentText() #type:ignore
-                currentNode.real_time_analysis_currentData['__realTimeVisualisation__'] = dialog.visualisationBox.isChecked() #type:ignore 
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
-                logging.info('Pressed OK on RTanalysis')
-        elif 'timer' in nodeName:
-            dialog = nodz_openTimerDialog(parentNode=currentNode) #type:ignore
-            if dialog.exec_() == QDialog.Accepted:
-                currentNode.timerInfo = dialog.timerInfo #type:ignore
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'timer')
-            # currentNode.callAction(self) #type:ignore
-        elif 'scoringStart' in nodeName:
-            currentNode.callAction(self) #type:ignore
-        elif 'scoringEnd' in nodeName:
-            dialog = nodz_openScoringEndDialog(parent=self,currentNode=currentNode)
-            if dialog.exec_() == QDialog.Accepted:
-                dialogLineEdits = []
-                for lineEdit in dialog.lineEdits:
-                    dialogLineEdits.append(lineEdit.text())
-                self.update_scoring_end(currentNode,dialogLineEdits)
-                #Update the node itself
-                self.update()
-                nodeType = self.nodeLookupName_withoutCounter(nodeName)
-                self.updateNumberStartFinishedDataAttributes(currentNode,nodeType)
-                self.update()
-                
-                #Update the decisionwidget:
-                self.decisionWidget.updateAllDecisions()
-                logging.info(dialogLineEdits)
-                logging.info('Pressed OK on scoringEnd')
-    
-    def update_scoring_end(self,currentNode,dialogLineEdits):
-            currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
-            
-            #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
-            import time
-            sleepTime = 0.02
-            for _ in range(3): #Just repeat everything 3 times and hope it solves itself
-                self.update()
-                time.sleep(sleepTime)
-                current_sockets = [item[0] for item in list(currentNode.sockets.items())]
-                if dialogLineEdits != current_sockets:
-                    
-                    #We loop over the sockets:
-                    for socket_id in reversed(range(len(currentNode.sockets))):
-                        socketFull = list(currentNode.sockets.items())[socket_id]
-                        socket = socketFull[0]
-                        #We check if the socket is in dialogLineEdits:
-                        if socket not in dialogLineEdits:
-                            #If it isn't, we just delete it:
-                            self.deleteAttribute(currentNode,socket_id)
-                            time.sleep(sleepTime)
-                            self.update()
-                            time.sleep(sleepTime)
-                    
-                    
-                    #Check which are different (index-wise) between dialogLineEdits and current_sockets:
-                    diff_indexes = []
-                    same_indexes = []
-                    for i in range(min(len(dialogLineEdits),len(current_sockets))):
-                        if dialogLineEdits[i] != current_sockets[i]:
-                            diff_indexes.append(i)
-                        else:
-                            same_indexes.append(i)
-                    #Also append indexes if dialogLineEdits is longer than current_sockets:
-                    if len(dialogLineEdits) > len(current_sockets):
-                        for i in range(len(current_sockets),len(dialogLineEdits)):
-                            diff_indexes.append(i)
-                    
-                    offset = 100
-                    #Then we create new sockets or move existing sockets, only for those that have a different pos
-                    for socket_new in ([dialogLineEdits[i] for i in diff_indexes]):
-                        pos_in_dialogLineEdits = dialogLineEdits.index(socket_new)
-                        if socket_new not in currentNode.sockets:
-                            self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits+offset, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
-                            time.sleep(sleepTime)
-                            self.update()
-                            time.sleep(sleepTime)
-                        else: #Else we move it from some other location to where we want it
-                            #Find this socket in currentNode.sockets.items():
-                            socketFull = list(currentNode.sockets.items())
-                            pos_in_node_info = [socket_id for socket_id in range(len(socketFull)) if socketFull[socket_id][0] == socket_new][0]
-                            old_pos = socketFull[pos_in_node_info][1].index
-                            #Physically move it
-                            self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits+offset)
-                            time.sleep(sleepTime)
-                            self.update()
-                            time.sleep(sleepTime)
-            
-            #We loop over the sockets:
-            # for socket_id in (range(len(currentNode.sockets))):
-            #     socketFull = list(currentNode.sockets.items())[socket_id]
-            #     socket = socketFull[0]
-            #     self.editAttribute(currentNode,socket_id,newName = None, newIndex=socket_id-offset)
-            
-            #We also need to add these attributes to the nodes startAttributes in self.nodeInfo:
-            self.nodeInfo[self.nodeLookupName_withoutCounter(currentNode.name)]['startAttributes'] = dialogLineEdits
-    
-    def singleNodeTypeInit(self):
-        init = {}
-        init['name'] = 'name'
-        init['displayName'] = 'DisplayName'
-        init['startAttributes'] = []
-        init['finishedAttributes'] = []
-        init['dataAttributes'] = []
-        init['bottomAttributes'] = []
-        init['topAttributes'] = []
-        init['NodeCounter'] = 0
-        init['NodeCounterNeverReset'] = 0
-        init['MaxNodeCounter'] = np.inf
-        init['NodeSize'] = 100
-        return init
-    
+    #region NodzFlowChart Node Methods
     def defineNodeInfo(self):
         """
         Define the node information for all nodes in the flowchart.
@@ -1454,362 +1116,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         }''')
         self.addConfig(self.nodeLayout)
     
-    def getDevicesOfDeviceType(self,devicetype):
-        #Find all devices that have a specific devicetype
-        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
-        #for all devicetypes
-        #Get devices
-        devices = self.shared_data.core.get_loaded_devices() #type:ignore
-        devices = [devices.get(i) for i in range(devices.size())]
-        devicesOfType = []
-        #Loop over devices
-        for device in devices:
-            if self.shared_data.core.get_device_type(device).to_string() == devicetype: #type:ignore
-                logging.debug("found " + device + " of type " + devicetype)
-                devicesOfType.append(device)
-        return devicesOfType
-    
-    def fullAutonomousRunStart(self):
-        print('Starting a full run')
-        self.preventAcq = True
-        
-        #General idea: first check if there are no glaring errors (scoring, position)
-        #then go to whatever start position based on the xy positions
-        #then run scoring+acquisition there
-        
-        self.fullRunOngoing = True
-        self.fullRunCurrentPos = 0
-        self.fullRunPositions = self.scanningWidget.getPositionInfo()
-        self.startNewScoreAcqAtPos()
-
-    def startNewScoreAcqAtPos(self):
-        
-        import time
-        positions = self.fullRunPositions
-        pos = self.fullRunCurrentPos
-        
-        #Set all stages correct
-        for stage in positions[pos]['STAGES']:
-            stagepos = positions[pos][stage]
-            #Check if this stage is an XY stage device...
-            #Since then we need to do something 2-dimensional
-            if stage in self.getDevicesOfDeviceType('XYStageDevice'):
-                logging.info(f'Moving stage {stage} to position {stagepos}')
-                self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
-                self.shared_data.core.wait_for_system() #type:ignore
-            else:#else we can move a 1d stage:
-                logging.info(f'Moving stage {stage} to position {stagepos}')
-                self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
-                self.shared_data.core.wait_for_system() #type:ignore
-        
-        self.runScoring()
-    
-    def runScoringOnly(self):
-        self.preventAcq = True
-        
-        #Find the scoring_start node:
-        scoreStartNode = None
-        flowChart = self
-        if len(flowChart.nodes) > 0:
-            #Find the scoringEnd node in flowChart:
-            for node in flowChart.nodes:
-                if 'scoringStart_' in node.name:
-                    scoreStartNode = node
-        
-        #Run the scoring_start routine:
-        if scoreStartNode is not None:
-            self.scoringStart(scoreStartNode)
-        else:
-            logging.error('Could not find scoringStart node in flowchart')
-    
-    def runScoring(self):
-        self.preventAcq = False
-        #Find the scoring_start node:
-        scoreStartNode = None
-        flowChart = self
-        if len(flowChart.nodes) > 0:
-            #Find the scoringEnd node in flowChart:
-            for node in flowChart.nodes:
-                if 'scoringStart_' in node.name:
-                    scoreStartNode = node
-        
-        
-        
-        #Run the scoring_start routine:
-        if scoreStartNode is not None:
-            self.scoringStart(scoreStartNode)
-        else:
-            logging.error('Could not find scoringStart node in flowchart')
-    
-    def runAcquiring(self):
-        print("Run Acquiring")
-        
-        #Find the acqStart node:
-        acqStartNode = None
-        flowChart = self
-        if len(flowChart.nodes) > 0:
-            #Find the scoringEnd node in flowChart:
-            for node in flowChart.nodes:
-                if 'acqStart_' in node.name:
-                    acqStartNode = node
-        
-        #Run the scoring_start routine:
-        if acqStartNode is not None:
-            self.acquiringStart(acqStartNode)
-        else:
-            logging.error('Could not find acqStart node in flowchart')
-    
-    def debugScoring(self):
-        """
-        Function to get some debug information from the scoring function(s)
-        """
-        print("Debug Scoring")
-        scoreGraph = self.prepareGraph(methodName = "Score")
-        
-        
-        print(self)
-        print(self.evaluateGraph())
-    
-    def prepareGraph(self, methodName='Score'):
-        """
-        Function to prepare a graph based on the flowchart's connections.
-        The resulting graph will have all nodes connected by edges based on the connections
-        in the flowchart
-        """
-        graphEval = self.evaluateGraph()
-        if methodName == 'Score':
-            scoreGraph = GladosGraph(self)
-            scoreGraph.addRawGraphEval(graphEval)
-            for node in scoreGraph.nodes:
-                self.giveInfoOnNode(node)
-            return scoreGraph
-
-    def findNodeByName(self, name):
-        """
-        Function to find a node based on its name attribute
-
-        Args:
-            name (str): The name of the node to find
-
-        Returns:
-            nodz.node: The node with the given name or None if not found
-        """
-        for node in self.nodes:
-            #check if the attribute 'name' is found:
-            if hasattr(node, 'name'):
-                if node.name == name:
-                    return node
-        return None
-    
-    def changeConfigStorageInNodz(self,currentNode,configNameSet):
-        """
-        Function to change the config storage of a nodz node from the double-click popup to the MMconfigInfo class stored inside the node.
-
-        This is useful when storing and loading configurations for a node, as the MMconfigInfo class can be serialized and deserialized.
-
-        Args:
-            currentNode (nodz.Node): The node to change the config storage of.
-            configNameSet (set of tuples): A set of tuples in the form (configName, selectedValue)
-        """
-        #Changes a config from a double-click config popup to the MMconfig stored inside the nodz node itself (i.e. storing/loading of configs)
-        
-        #Add all of them to the MMconfigInfo.config_string_storage:
-        currentNode.MMconfigInfo.config_string_storage=[]
-        for singleConfig in configNameSet:
-            currentNode.MMconfigInfo.config_string_storage.append([singleConfig[0],singleConfig[1]])
-        return
-    
-    #replace the contextMenuEvent in nodz with this custom function:
-    def contextMenuEvent(self, QMouseevent):
-        """
-        Function to create a context menu when right-clicking on the nodz canvas
-
-        This function creates a context menu with all available node types that the user can select from, and adds the node to the nodz canvas at the position of the mouse click.
-
-        Args:
-            QMouseevent (PyQt5.QtGui.QMouseEvent): The mouse event that triggered this context menu
-        """
-        #Check if we are right-clicking on a node:
-        item_at_mouse = self.scene().itemAt(self.mapToScene(QMouseevent.pos()), QtGui.QTransform())
-        
-        if item_at_mouse == None:
-            context_menu = QMenu(self)
-            
-            #Dynamically add all node types
-            for node_type, node_data in self.nodeInfo.items():
-                new_subAction = QAction(node_data['displayName'], self)
-                context_menu.addAction(new_subAction)
-                # Define a closure to capture the current value of node_type
-                def create_lambda(node_type):
-                    return lambda _, event=QMouseevent: self.createNodeFromRightClick(event, nodeType=node_type)
-                # Connect each action to its own lambda function
-                new_subAction.triggered.connect(create_lambda(node_type))
-                
-            # Show the context menu at the event's position
-            context_menu.exec_(QMouseevent.globalPos())
-        elif item_at_mouse in self.nodes:
-            
-            context_menu = QMenu(self)
-            
-            #Add a change-name option
-            changeName_subAction = QAction('Change name', self)
-            context_menu.addAction(changeName_subAction)
-            def create_lambda_changeName(item_at_mouse):
-                return lambda _, event=QMouseevent: self.changeNodeName(item_at_mouse, event)
-            changeName_subAction.triggered.connect(create_lambda_changeName(item_at_mouse))
-            
-            #Add a change-color option
-            changeColor_subAction = QAction('Change color', self)
-            context_menu.addAction(changeColor_subAction)
-            def create_lambda_changeColor(item_at_mouse):
-                return lambda _, event=QMouseevent: self.changeNodeColor(item_at_mouse, event)
-            changeColor_subAction.triggered.connect(create_lambda_changeColor(item_at_mouse))
-            
-            #Add a advanced-info option
-            advNodeInfo_subAction = QAction('Advanced Node info', self)
-            context_menu.addAction(advNodeInfo_subAction)
-            def create_lambda_advNodeInfo(item_at_mouse):
-                return lambda _, event=QMouseevent: self.advNodeInfo(item_at_mouse, event)
-            advNodeInfo_subAction.triggered.connect(create_lambda_advNodeInfo(item_at_mouse))
-            
-            context_menu.exec_(QMouseevent.globalPos())
-
-    def advNodeInfo(self,node,event):
-        #Create a quick popup window with a line edit and an ok/cancel:
-        dialog = QDialog()
-        dialog.setWindowTitle('Node info')
-        dialog.setModal(True)
-        layout = QVBoxLayout(dialog)
-
-        
-        textEdit = QTextEdit()
-        
-        attrs_to_show = ['name','displayName','nodePreset','plugs','sockets','scoring_analysis_currentData','scoring_end_currentData','scoring_scoring_currentData','scoring_visualisation_currentData','visualisation_currentData','real_time_analysis_currentData']
-        
-        text_to_show = ''
-        for attr in attrs_to_show:
-            if hasattr(node,attr):
-                text_to_show += f'{attr}: {str(getattr(node,attr))}\n'
-        
-        #Custom add these ones:
-        if hasattr(node,'mdaData'):
-            if hasattr(node.mdaData,'mda'):
-                text_to_show += f'mda: {str(node.mdaData.mda)}\n'
-        if hasattr(node,'MMconfigInfo'):
-            if hasattr(node.MMconfigInfo,'config_string_storage'):
-                text_to_show += f'config_string_storage: {str(node.MMconfigInfo.config_string_storage)}\n'
-        
-        textEdit.setText(text_to_show)
-        layout.addWidget(textEdit)
-
-        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok, dialog)
-        layout.addWidget(buttonBox)
-
-        buttonBox.accepted.connect(dialog.accept)
-        
-        if dialog.exec_() == QDialog.Accepted:
-            logging.debug('advanced node info closed')
-
-    def changeNodeName(self, node, event):
-        #Create a quick popup window with a line edit and an ok/cancel:
-        dialog = QDialog()
-        dialog.setWindowTitle('Change node name')
-        dialog.setModal(True)
-        layout = QVBoxLayout(dialog)
-
-        lineEdit = QLineEdit()
-        lineEdit.setText(node.displayName)
-        layout.addWidget(lineEdit)
-
-        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, dialog) #type:ignore
-        buttonBox.accepted.connect(dialog.accept)
-        buttonBox.rejected.connect(dialog.reject)
-        layout.addWidget(buttonBox)
-
-        if dialog.exec_() == QDialog.Accepted:
-            node.displayName = lineEdit.text()
-        
-    def changeNodeColor(self, node, event):
-        color = QColorDialog.getColor()
-        node.alternateFillColor = color.getRgb()
-        #Force the change in the node:
-        node.BGcolChanged()
-        node.update()
-        logging.debug(f"Node color changed to {node.alternateFillColor}")
-
-    def createNewNode(self, nodeType, event):
-        """
-        Creates a new node on the nodz canvas, with name and preset specified.
-
-        This function creates a new node on the nodz canvas at the position of the mouse event.
-        The name of the node is specified by appending a number to the nodeType parameter.
-        The preset of the node is set to 'node_preset_1'.
-
-        Args:
-            nodeType (str): The type of node to create.
-            event (PyQt5.QtGui.QMouseEvent): The mouse event that triggered this node creation.
-        Returns:
-            nodz.Node: The created nodz node.
-        """
-        if self.nodeInfo[nodeType]['NodeCounter'] >= self.nodeInfo[nodeType]['MaxNodeCounter']:
-            print('Not allowed! Maximum number of nodes of this type reached')
-            return
-        
-        #Create the new node with correct name and preset
-        newNode = self.createNode(name=nodeType+"_", preset = 'node_preset_1', position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'],nodeInfo=self.nodeInfo[nodeType])
-        
-        #Do post-node-creation functions - does this via the pyqtsignal!
-        return newNode
-    
-    def updateNumberStartFinishedDataAttributes(self,newNode,nodeType):
-        
-        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
-            newNode.customStartEmits = NodeSignalManager()
-        else:
-            newNode.customStartEmits = None
-        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
-            newNode.customFinishedEmits = NodeSignalManager()
-        else:
-            newNode.customFinishedEmits = None
-        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
-            newNode.customDataEmits = NodeSignalManager()
-        else:
-            newNode.customDataEmits = None
-        if len(self.nodeInfo[nodeType]['bottomAttributes']) > 0:
-            newNode.customBottomEmits = NodeSignalManager()
-        else:
-            newNode.customBottomEmits = None
-        if len(self.nodeInfo[nodeType]['topAttributes']) > 0:
-            newNode.customTopEmits = NodeSignalManager()
-        else:
-            newNode.customTopEmits = None
-            
-        #Add custom attributes where necessary
-        for attr in self.nodeInfo[nodeType]['startAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=True)
-            newNode.customStartEmits.add_signal(attr) #type: ignore
-        for attr in self.nodeInfo[nodeType]['finishedAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
-            newNode.customFinishedEmits.add_signal(attr) #type: ignore
-        for attr in self.nodeInfo[nodeType]['dataAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
-            newNode.customDataEmits.add_signal(attr) #type: ignore
-        for attr in self.nodeInfo[nodeType]['bottomAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=False, bottomAttr=True)
-            newNode.customBottomEmits.add_signal(attr) #type: ignore
-        for attr in self.nodeInfo[nodeType]['topAttributes']:
-            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=False, topAttr=True)
-            newNode.customTopEmits.add_signal(attr) #type: ignore
-        
-        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
-            newNode.customStartEmits.print_signals() #type: ignore
-        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
-            newNode.customFinishedEmits.print_signals() #type: ignore
-        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
-            newNode.customDataEmits.print_signals()  #type: ignore
-        
-        logging.debug("updated custom attributes")
-    
     def performPostNodeCreation_Start(self,newNode,nodeType):
         """
         Handles post-node-creation functions for nodes.
@@ -1868,9 +1174,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
         elif nodeType == 'changeProperties':
             #attach MMconfigUI to this:
-            
-            
-            
             # Get all config groups
             allConfigGroups={}
             nrconfiggroups = self.core.get_available_config_groups().size() #type:ignore
@@ -1878,7 +1181,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
             newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,autoSaveLoad=False) # type: ignore
-            
             
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMconfigChangeRan(node)
@@ -1899,7 +1201,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'analysisMeasurement':
-            newNode.callAction = lambda self, node=newNode: self.scoring_analysis_ran(node)
+            newNode.callAction = lambda self, node=newNode: self.AnalysisNode_started(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'timer':
             newNode.callAction = lambda self, node=newNode: self.timerCallAction(node)
@@ -1919,90 +1221,173 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             newNode.callAction = None
 
         newNode.update()
+
+    def NodeDoubleClicked(self,nodeName):
+        """
+        Handle double-clicking on a node in the flowchart.
+
+        When a node is double-clicked, this function is called. Depending on the node, this 
+        function will open a dialog to modify the node's data.
+        """
+        currentNode = self.findNodeByName(nodeName)
+        if 'acquisition' in nodeName:
+            dialog = nodz_openMDADialog(parentData=self,currentNode = currentNode)
+            if dialog.exec_() == QDialog.Accepted:
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'acquisition')
+                logging.debug(f"MDA dialog input: {dialog.getInputs()}")
+            
+            # currentNode.mdaData.exposure_ms = dialog.getExposureTime()
+            # currentNode.mdaData.mda = dialog.getInputs()#type:ignore
+            dialogmdaData = dialog.getmdaData()
+            attrs_to_not_copy = ['gui','core','shared_data','has_GUI','data','staticMetaObject','MDA_completed','MM_JSON']
+            #Loop over all attributes in dialogmdaData:
+            for attrs in vars(dialogmdaData):
+                if attrs not in attrs_to_not_copy:
+                    setattr(currentNode.mdaData,attrs,getattr(dialogmdaData,attrs)) #type:ignore
+            
+            currentNode.update() #type:ignore
+        elif 'changeProperties' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #Show dialog:
+            if 'MMconfigInfo' in vars(currentNode):
+                storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage #type: ignore
+            else:
+                currentNode.MMconfigInfo = [] #type: ignore
+                storedConfigsStrings = None
+            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = storedConfigsStrings) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
+                #Update the results of this dialog into the nodz node
+                self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
+        elif 'visualisation_' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #Show dialog:
+            dialog = nodz_visualisationDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'visualisation')
+                currentNode.visualisation_currentData['layerName'] = dialog.layerNameEdit.text() #type:ignore
+                currentNode.visualisation_currentData['colormap'] = dialog.colormapComboBox.currentText() #type:ignore
+        elif 'changeStagePos' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #Show dialog:
+            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
+        elif 'analysisMeasurement' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
+            dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                currentNode.scoring_analysis_currentData = dialog.currentData #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
+                logging.info('Pressed OK on analysisMeasurementDialog')
+        elif 'realTimeAnalysis' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
+            dialog = nodz_realTimeAnalysisDialog(currentNode = currentNode, parent = self)
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                currentNode.real_time_analysis_currentData = dialog.currentData #type:ignore
+                currentNode.real_time_analysis_currentData['__selectedDropdownEntryRTAnalysis__'] = dialog.comboBox_RTanalysisFunctions.currentText() #type:ignore
+                currentNode.real_time_analysis_currentData['__realTimeVisualisation__'] = dialog.visualisationBox.isChecked() #type:ignore 
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
+                logging.info('Pressed OK on RTanalysis')
+        elif 'timer' in nodeName:
+            dialog = nodz_openTimerDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.timerInfo = dialog.timerInfo #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'timer')
+            # currentNode.callAction(self) #type:ignore
+        elif 'scoringStart' in nodeName:
+            currentNode.callAction(self) #type:ignore
+        elif 'scoringEnd' in nodeName:
+            dialog = nodz_openScoringEndDialog(parent=self,currentNode=currentNode)
+            if dialog.exec_() == QDialog.Accepted:
+                dialogLineEdits = []
+                for lineEdit in dialog.lineEdits:
+                    dialogLineEdits.append(lineEdit.text())
+                self.update_scoring_end(currentNode,dialogLineEdits)
+                #Update the node itself
+                self.update()
+                nodeType = self.nodeLookupName_withoutCounter(nodeName)
+                self.updateNumberStartFinishedDataAttributes(currentNode,nodeType)
+                self.update()
+                
+                #Update the decisionwidget:
+                self.decisionWidget.updateAllDecisions()
+                logging.info(dialogLineEdits)
+                logging.info('Pressed OK on scoringEnd')
     
-    def scoring_analysis_ran(self,node):
+    def singleNodeTypeInit(self):
+        """ 
+        Initialise the info for a single node type. Hand-in-hand with defineNodeInfo.
+        """
+        init = {}
+        init['name'] = 'name'
+        init['displayName'] = 'DisplayName'
+        init['startAttributes'] = []
+        init['finishedAttributes'] = []
+        init['dataAttributes'] = []
+        init['bottomAttributes'] = []
+        init['topAttributes'] = []
+        init['NodeCounter'] = 0
+        init['NodeCounterNeverReset'] = 0
+        init['MaxNodeCounter'] = np.inf
+        init['NodeSize'] = 100
+        return init
+
+    def NodeAdded(self,node):
+        """
+        Handle when one or more nodes are created in the flowchart.
+
+        When one or more nodes are created in the flowchart, this function is called.
+        It does some pre-processing of the node and then calls performPostNodeCreation_Start.
+        """
+        logging.info('one or more nodes are created!')
+        nodeType = self.nodeLookupName_withoutCounter(node.name)
+        self.performPostNodeCreation_Start(node,nodeType)
+
+    def NodeFullyInitialised(self,node):
+        """
+        Handle when a node is fully initialised.
         
-        #Find the node that is connected (i.e. downstream) to this
-        connectedNode = None
-        for connection in self.evaluateGraph():
-            if connection[1][connection[1].rfind('.')+1:] == 'Analysis start':
-                if connection[1][:connection[1].rfind('.')] == node.name:
-                    connectedNodeName = connection[0][:connection[0].rfind('.')]
-                    connectedNode = self.findNodeByName(connectedNodeName)
-        if connectedNode is None:
-            print('Error! No connected node found for scoring analysis')
-            return
-        
-        #First assess that it's a MDA node:
-        if 'acquisition' not in connectedNode.name:
-            print('Error! Acquisition not connected to Grayscale test!')
-        else:
-            #And then find the mdaData object
-            mdaDataobject = connectedNode.mdaData
+        Specifically, when all e.g. data['NODES_SCORING_SCORING'] from loading is added to the node, only after that, this will run.
+
+        This function is called when a node is fully initialised. It does some
+        post-initialisation processing for nodes based on their type.
+
+        Parameters
+        ----------
+        node : Node
+            The node that has been fully initialised.
+        """
+        nodeType = self.nodeLookupName_withoutCounter(node.name)
+        if nodeType == 'scoringEnd':
+            self.update_scoring_end(node,node.scoring_end_currentData['Variables'])
+
+    def NodeRemoved(self,nodeNames):
+        """
+        Handle when one or more nodes are removed from the flowchart.
+
+        When one or more nodes are removed from the flowchart, this function is called.
+        It will update the node counters of the corresponding node types.
+        """
+        logging.info('one or more nodes are removed!')
+        for nodeName in nodeNames:
+            for node_type, node_data in self.nodeInfo.items():
+                if node_data['name'] in nodeName:
+                    # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
+                    self.nodeInfo[node_type]['NodeCounter'] -= 1
             
-            #Figure out which function is selected in the scoring_analysis node
-            selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-            #Figure out the belonging evaluation-text
-            evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
-            #And evaluate the custom function with custom parameters
-            output = eval(evalText) #type:ignore
-            
-            #Display final output to the user for now
-            logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
-            
-            node.scoring_analysis_currentData['__output__'] = output
-            
-            #Finish up
-            self.finishedEmits(node)
+            #Also remove from self.nodes:
+            node = self.findNodeByName(nodeName)
+            try:
+                self.nodes.remove(node)
+            except:
+                print(f"failed to remove node: {nodeName}")
     
-    def MMstageChangeRan(self,node):
-        logging.info('MMstageChange')
-        self.finishedEmits(node)
-        
-    def MMconfigChangeRan(self,node):
-        """
-        Handle the configuration change event for a node.
-
-        This function handles the configuration change event for a node, by
-        changing the desired configs in the Core.
-
-        Args:
-            node (nodz.Node): The node that has triggered the event.
-        """
-        logging.info('MMconfigChangeRan')
-        #We need to change some configs (probably):
-        for config_to_change in node.MMconfigInfo.config_string_storage:
-            #Change the config, and wait for the config to be changed
-            self.core.set_config(config_to_change[0],config_to_change[1]) #type:ignore
-            self.core.wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
-        self.finishedEmits(node)
-    
-    def GrayScaleTest(self,node):
-        """
-        This function is the action function for the Grayscale Test node in the Flowchart.
-
-        This function takes the data from the MDA node, which should be connected
-        to the Grayscale Test node, and performs a grayscale analysis on the data.
-
-        Args:
-            node (nodz.Node): The node that has triggered the event.
-
-        """
-        #Find the node that is connected to this
-        connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
-        #First assess that it's a MDA node:
-        if 'acquisition' not in connectedNode.name:
-            print('Error! Acquisition not connected to Grayscale test!')
-        else:
-            #And then find the mdaData object
-            mdaDataobject = connectedNode.mdaData
-            #Thow this into the analysis:
-            
-            avgGrayVal = eval(HelperFunctions.createFunctionWithKwargs("AverageIntensity.AvgGrayValue",NDTIFFStack="mdaDataobject.data",core="mdaDataobject.core"))
-            logging.info(f"found avg gray val: {avgGrayVal}")
-            
-        self.finishedEmits(node)
-
     def finishedEmits(self,node):
         """
         This function emits the customFinishedEmits signal of a node, and allt he customDataEmits
@@ -2020,6 +1405,430 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
             node.customDataEmits.emit_all_signals()
 
+    def giveInfoOnNode(self,node):
+        """
+        Prints information about a node in the flowchart
+
+        This function prints some basic information about a node in the flowchart.
+
+        Args:
+            node (nodz.Node): The node to get information about.
+
+        Returns:
+            None
+        """
+        print('--------')
+        print(node)
+        print(f"node name: {node.name}")
+        print(f"incoming connections: {node.n_connect_at_start}" )
+        if 'scoringEnd' in node.name:
+            print('hi')
+        # print(f"outgoing connections - finished: {node.connectedToFinish}")
+        # print(f"outgoing connections - data: {node.connectedToData}")
+    #endregion
+    
+    #region NodzFlowChart Helpers
+    def updateNumberStartFinishedDataAttributes(self,newNode,nodeType):
+        """
+        Updates custom attributes for a new node based on the specified node type.
+        
+        Args:
+            newNode: The new node to update custom attributes for.
+            nodeType: The type of the node to determine which custom attributes to update.
+        
+        Returns:
+            None
+        """
+        
+        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
+            newNode.customStartEmits = NodeSignalManager()
+        else:
+            newNode.customStartEmits = None
+        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
+            newNode.customFinishedEmits = NodeSignalManager()
+        else:
+            newNode.customFinishedEmits = None
+        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
+            newNode.customDataEmits = NodeSignalManager()
+        else:
+            newNode.customDataEmits = None
+        if len(self.nodeInfo[nodeType]['bottomAttributes']) > 0:
+            newNode.customBottomEmits = NodeSignalManager()
+        else:
+            newNode.customBottomEmits = None
+        if len(self.nodeInfo[nodeType]['topAttributes']) > 0:
+            newNode.customTopEmits = NodeSignalManager()
+        else:
+            newNode.customTopEmits = None
+            
+        #Add custom attributes where necessary
+        for attr in self.nodeInfo[nodeType]['startAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=True)
+            newNode.customStartEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['finishedAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
+            newNode.customFinishedEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['dataAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=True, socket=False)
+            newNode.customDataEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['bottomAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=False, bottomAttr=True)
+            newNode.customBottomEmits.add_signal(attr) #type: ignore
+        for attr in self.nodeInfo[nodeType]['topAttributes']:
+            self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=False, topAttr=True)
+            newNode.customTopEmits.add_signal(attr) #type: ignore
+        
+        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
+            newNode.customStartEmits.print_signals() #type: ignore
+        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
+            newNode.customFinishedEmits.print_signals() #type: ignore
+        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
+            newNode.customDataEmits.print_signals()  #type: ignore
+        
+        logging.debug("updated custom attributes")
+        
+    def advNodeInfo(self,node,event):
+        """
+        Show advanced information about a node in a popup window.
+        
+        Args:
+            node: The node object for which advanced information is to be displayed.
+            event: The event triggering the display of advanced information.
+        
+        Returns:
+            None
+        """
+        #Create a quick popup window with a line edit and an ok/cancel:
+        dialog = QDialog()
+        dialog.setWindowTitle('Node info')
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+
+        
+        textEdit = QTextEdit()
+        
+        attrs_to_show = ['name','displayName','nodePreset','plugs','sockets','scoring_analysis_currentData','scoring_end_currentData','scoring_scoring_currentData','scoring_visualisation_currentData','visualisation_currentData','real_time_analysis_currentData']
+        
+        text_to_show = ''
+        for attr in attrs_to_show:
+            if hasattr(node,attr):
+                text_to_show += f'{attr}: {str(getattr(node,attr))}\n'
+        
+        #Custom add these ones:
+        if hasattr(node,'mdaData'):
+            if hasattr(node.mdaData,'mda'):
+                text_to_show += f'mda: {str(node.mdaData.mda)}\n'
+        if hasattr(node,'MMconfigInfo'):
+            if hasattr(node.MMconfigInfo,'config_string_storage'):
+                text_to_show += f'config_string_storage: {str(node.MMconfigInfo.config_string_storage)}\n'
+        
+        textEdit.setText(text_to_show)
+        layout.addWidget(textEdit)
+
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok, dialog)
+        layout.addWidget(buttonBox)
+
+        buttonBox.accepted.connect(dialog.accept)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            logging.debug('advanced node info closed')
+
+    def explore_attributes(self, obj, indent=0):
+        """
+        Recursively print the attributes of an object.
+
+        This function is used for debugging purposes to explore the attributes of an object.
+        It will print the attributes of `obj` and all of its sub-attributes, up to a maximum
+        depth of 20.
+
+        Parameters
+        ----------
+        obj : object
+            The object to explore
+        indent : int, optional
+            The indentation level, by default 0
+        """
+        if indent < 20:
+            attributes = vars(obj)
+            for attr_name in attributes:
+                if not attr_name.startswith('_'):
+                    attr = getattr(obj, attr_name)
+                    if not callable(attr):
+                        print(" " * indent + attr_name)
+                    else:
+                        print(" " * indent + attr_name + '()')
+                    if hasattr(attr, '__dict__'):
+                        self.explore_attributes(attr, indent + 2)
+                # except:
+                #     pass
+
+    def nodeLookupName_withoutCounter(self,nodeName):
+        """
+        Returns the node name without the counter suffix.
+
+        Given a node name like "MyNode_0" this function returns "MyNode".
+
+        Parameters
+        ----------
+        nodeName : str
+            The node name to strip the counter from.
+
+        Returns
+        -------
+        str
+            The node name without the counter suffix.
+        """
+        #Find the last underscore ('_0, _1, etc')
+        index_last_underscore = nodeName.rfind('_')
+        nodeNameNC = nodeName[:index_last_underscore]
+        finalNodeName=None
+        #Now get the correct lookup name by looking through all nodeInfo items
+        for node_name, node_data in self.nodeInfo.items():
+            # Check if the name matches the specific value
+            if 'name' in node_data and node_data['name'] == nodeNameNC:
+                finalNodeName = node_name
+        
+        return finalNodeName
+    
+    def findNodeByName(self, name):
+        """
+        Function to find a node based on its name attribute
+
+        Args:
+            name (str): The name of the node to find
+
+        Returns:
+            nodz.node: The node with the given name or None if not found
+        """
+        for node in self.nodes:
+            #check if the attribute 'name' is found:
+            if hasattr(node, 'name'):
+                if node.name == name:
+                    return node
+        return None
+    
+    def changeNodeName(self, node, event):
+        """
+        Change the name of a node.
+        
+        Args:
+            node: The node whose name will be changed.
+            event: The event triggering the name change.
+        
+        Returns:
+            None
+        """
+        #Create a quick popup window with a line edit and an ok/cancel:
+        dialog = QDialog()
+        dialog.setWindowTitle('Change node name')
+        dialog.setModal(True)
+        layout = QVBoxLayout(dialog)
+
+        lineEdit = QLineEdit()
+        lineEdit.setText(node.displayName)
+        layout.addWidget(lineEdit)
+
+        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, dialog) #type:ignore
+        buttonBox.accepted.connect(dialog.accept)
+        buttonBox.rejected.connect(dialog.reject)
+        layout.addWidget(buttonBox)
+
+        if dialog.exec_() == QDialog.Accepted:
+            node.displayName = lineEdit.text()
+        
+    def changeNodeColor(self, node, event):
+        """
+        Change the color of a node.
+        
+        Args:
+            node: The node object whose color will be changed.
+            event: The event that triggers the color change.
+        
+        Returns:
+            None
+        """
+        color = QColorDialog.getColor()
+        node.alternateFillColor = color.getRgb()
+        #Force the change in the node:
+        node.BGcolChanged()
+        node.update()
+        logging.debug(f"Node color changed to {node.alternateFillColor}")
+
+    def set_readable_text_after_dialogChange(self,currentNode,dialog,nodeType):
+        """Script which sets a readable text inside the textfield of the currentNode after a dialog is closed (i.e. a popup window is closed).
+
+        Args:
+            currentNode (Nodz Node): Current Nodz Node
+            dialog (QDialog): Dialog output
+            nodeType (str): Type of node
+        """
+        displayHTMLtext = ''
+        if nodeType == 'analysisMeasurement':
+            methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
+            methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
+            reqKwValues = []
+            optKwValues = []
+            
+            reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
+            optKwargs = utils.optKwargsFromFunction(methodFunctionName)
+            
+            for key in dialog.currentData:
+                for rkw in reqKwargs:
+                    if rkw in key and '#'+methodFunctionName+'#' in key:
+                        reqKwValues.append(dialog.currentData[key])
+                for okw in optKwargs:
+                    if okw in key and '#'+methodFunctionName+'#' in key:
+                        optKwValues.append(dialog.currentData[key])
+            
+            displayHTMLtext = f"<b>{methodName}</b>"
+            for i in range(len(reqKwValues)):
+                displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
+            for i in range(len(optKwValues)):
+                displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+        
+        elif nodeType == 'RTanalysisMeasurement':
+            methodName = dialog.currentData['__selectedDropdownEntryRTAnalysis__']
+            methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
+            reqKwValues = []
+            optKwValues = []
+            
+            reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
+            optKwargs = utils.optKwargsFromFunction(methodFunctionName)
+            
+            for key in dialog.currentData:
+                for rkw in reqKwargs:
+                    if rkw in key and '#'+methodFunctionName+'#' in key:
+                        reqKwValues.append(dialog.currentData[key])
+                for okw in optKwargs:
+                    if okw in key and '#'+methodFunctionName+'#' in key:
+                        optKwValues.append(dialog.currentData[key])
+            
+            displayHTMLtext = f"<b>{methodName}</b>"
+            for i in range(len(reqKwValues)):
+                displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
+            for i in range(len(optKwValues)):
+                displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+        elif nodeType == 'visualisation':
+            displayHTMLtext = f"<b>Layer name: {dialog.layerNameEdit.text()}</b>"
+            if dialog.colormapComboBox.currentText() != 'None':
+                displayHTMLtext += f"<br>Colormap: {dialog.colormapComboBox.currentText()}"
+        elif nodeType == 'acquisition':
+            displayHTMLtext = f"<b>{len(dialog.getInputs())} frames with order {dialog.mdaconfig.order}</b>"
+            if dialog.mdaconfig.GUI_exposure_enabled:
+                displayHTMLtext += f"<br>{dialog.getExposureTime()} ms exposure time"
+            if dialog.mdaconfig.GUI_show_time:
+                displayHTMLtext += f"<br>{dialog.mdaconfig.num_time_points} time points"
+            if dialog.mdaconfig.GUI_show_channel:
+                displayHTMLtext += f"<br>{len(dialog.mdaconfig.channel_exposures_ms)} channels in group {dialog.mdaconfig.channel_group}"
+            if dialog.mdaconfig.GUI_show_xy:
+                displayHTMLtext += f"<br>{len(dialog.mdaconfig.xy_positions)} XY positions"
+            if dialog.mdaconfig.GUI_show_z:
+                if dialog.mdaconfig.z_nr_steps is not None:
+                    displayHTMLtext += f"<br>{dialog.mdaconfig.z_nr_steps} Z positions"
+                else:
+                    nrZsteps = (dialog.mdaconfig.z_end-dialog.mdaconfig.z_start)//dialog.mdaconfig.z_step_distance
+                    displayHTMLtext += f"<br>{nrZsteps} Z positions"
+        elif nodeType == 'changeProperties':
+            displayHTMLtext = f"Changing {len(dialog.ConfigsToBeChanged())} config(s):"
+            for config in dialog.ConfigsToBeChanged():
+                displayHTMLtext += f"<br>{config[0]} to {config[1]}"
+        elif nodeType == 'scoreEnd':
+            import time
+            from datetime import datetime
+            displayHTMLtext = f"<i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
+            for score_entry in dialog[0]:
+                displayHTMLtext += f"<br><b>{score_entry}:</b> {format(dialog[1][score_entry],'.2f')}"
+            if len(dialog) > 2:
+                displayHTMLtext += f"<br><b>{dialog[2]}</b>"
+        elif nodeType == 'scoreStart':
+            import time
+            from datetime import datetime
+            displayHTMLtext = "<b>Scoring started at:</b>"
+            displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
+        elif nodeType == 'timer':
+            displayHTMLtext = f"<b>Timer:</b> wait {str(round(dialog.timerInfo, 2))} s"
+        #And update the display
+        currentNode.updateDisplayText(displayHTMLtext)
+        return displayHTMLtext
+
+    def getDevicesOfDeviceType(self,devicetype):
+        """
+        Find all devices that have a specific devicetype.
+        
+        Args:
+            devicetype (str): The type of device to search for. Refer to https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html for all devicetypes.
+        
+        Returns:
+            list: A list of devices that match the specified devicetype.
+        """
+        
+        #Find all devices that have a specific devicetype
+        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+        #for all devicetypes
+        #Get devices
+        devices = self.shared_data.core.get_loaded_devices() #type:ignore
+        devices = [devices.get(i) for i in range(devices.size())]
+        devicesOfType = []
+        #Loop over devices
+        for device in devices:
+            if self.shared_data.core.get_device_type(device).to_string() == devicetype: #type:ignore
+                logging.debug("found " + device + " of type " + devicetype)
+                devicesOfType.append(device)
+        return devicesOfType
+
+    def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        """
+        Handle when a plug or socket is connected.
+
+        When a plug or socket is connected, this function is called. It will check if the destination
+        node should be marked as 'started' or 'finished' based on the attributes connected.
+        """
+        logging.info(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+    
+    def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        """
+        Handle when a plug or socket is disconnected.
+
+        When a plug or socket is disconnected, this function is called. It will disconnect
+        the finished event of the source node from the 'we finished one of the prerequisites' at the destination node.
+        """
+        logging.info('plugorsocketdisconnected')
+    
+    def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        """
+        Handle when a plug is connected.
+
+        When a plug is connected, this function is called. It will check if the destination
+        node should be marked as 'started' based on the attributes connected.
+        """
+        #Check if all are non-Nones:
+        logging.info('plug connected')
+
+    def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
+        """
+        Handle when a socket is connected.
+
+        When a socket is connected, this function is called. It does not do anything
+        special, it only exists to keep the Node class happy by having a method that
+        corresponds to the 'SocketConnected' signal from the FlowChart.
+        """
+        #Check if all are non-Nones:
+        logging.info('socket connected')
+    
+    def prepareGraph(self, methodName='Score'):
+        """
+        Function to prepare a graph based on the flowchart's connections.
+        The resulting graph will have all nodes connected by edges based on the connections
+        in the flowchart
+        """
+        graphEval = self.evaluateGraph()
+        if methodName == 'Score':
+            scoreGraph = GladosGraph(self)
+            scoreGraph.addRawGraphEval(graphEval)
+            for node in scoreGraph.nodes:
+                self.giveInfoOnNode(node)
+            return scoreGraph
+    
     def GraphToSignals(self):
         """Idea: we evaluate the graph at this time point, connect all signals/emits:
         
@@ -2098,6 +1907,250 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 else:
                     logging.warning(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
     
+    def getNodz(self):
+        """
+        Return the current instance of the class.
+        
+        Returns:
+            object: The current instance of the class.
+        """
+        return self
+    #endregion
+    
+    #region NodzFlowChart Saving Loading
+    def storeGraphJSON(self):
+        """
+        Save the current graph to a JSON file.
+
+        This function saves the current graph to a JSON file, which can be loaded later using `loadPickle()`.
+        """
+        filename, _ = QFileDialog.getSaveFileName(self, 'Save file', '', 'JSON files (*.json)')
+        if filename:
+            if not filename.endswith('.json'):
+                filename += '.json'
+            with open(filename, 'wb') as f:
+                self.saveGraph(filename)
+    
+    def loadGraphJSON(self):
+        """
+        Load the graph from a JSON file.
+
+        This function loads the graph from a JSON file created using `storeGraphJSON()`.
+        """        
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open file', '', 'JSON files (*.json)')
+        if filename:
+            try:
+                #Fully clear graph and delete all nodes from memory:
+                self.clearGraph()
+                self.nodes = []
+                #Set all counters to 0:
+                for nodeType in self.nodeInfo:
+                    self.nodeInfo[nodeType]['NodeCounter'] = 0
+                    self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
+                #Load the graph
+                with open(filename, 'rb') as f:
+                    self.loadGraph_KM(filename)
+            except:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Warning)
+                msg.setText("Could not load file: " + filename)
+                msg.setWindowTitle("Warning")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
+    #endregion
+    
+    #region NodzFlowChart Node-specific
+    def update_scoring_end(self,currentNode,dialogLineEdits):
+        """
+        Update the "scoring end" current node with new dialog line edits.
+        
+        Args:
+            currentNode: The current node to update.
+            dialogLineEdits: The new sockets of the current node.
+        
+        Returns:
+            None
+        """
+        
+        currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
+        
+        #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
+        import time
+        sleepTime = 0.02
+        for _ in range(3): #Just repeat everything 3 times and hope it solves itself
+            self.update()
+            time.sleep(sleepTime)
+            current_sockets = [item[0] for item in list(currentNode.sockets.items())]
+            if dialogLineEdits != current_sockets:
+                
+                #We loop over the sockets:
+                for socket_id in reversed(range(len(currentNode.sockets))):
+                    socketFull = list(currentNode.sockets.items())[socket_id]
+                    socket = socketFull[0]
+                    #We check if the socket is in dialogLineEdits:
+                    if socket not in dialogLineEdits:
+                        #If it isn't, we just delete it:
+                        self.deleteAttribute(currentNode,socket_id)
+                        time.sleep(sleepTime)
+                        self.update()
+                        time.sleep(sleepTime)
+                
+                
+                #Check which are different (index-wise) between dialogLineEdits and current_sockets:
+                diff_indexes = []
+                same_indexes = []
+                for i in range(min(len(dialogLineEdits),len(current_sockets))):
+                    if dialogLineEdits[i] != current_sockets[i]:
+                        diff_indexes.append(i)
+                    else:
+                        same_indexes.append(i)
+                #Also append indexes if dialogLineEdits is longer than current_sockets:
+                if len(dialogLineEdits) > len(current_sockets):
+                    for i in range(len(current_sockets),len(dialogLineEdits)):
+                        diff_indexes.append(i)
+                
+                offset = 100
+                #Then we create new sockets or move existing sockets, only for those that have a different pos
+                for socket_new in ([dialogLineEdits[i] for i in diff_indexes]):
+                    pos_in_dialogLineEdits = dialogLineEdits.index(socket_new)
+                    if socket_new not in currentNode.sockets:
+                        self.createAttribute(currentNode, name=socket_new, index=pos_in_dialogLineEdits+offset, preset='attr_default', plug=False, socket=True, dataType=None, socketMaxConnections=1)
+                        time.sleep(sleepTime)
+                        self.update()
+                        time.sleep(sleepTime)
+                    else: #Else we move it from some other location to where we want it
+                        #Find this socket in currentNode.sockets.items():
+                        socketFull = list(currentNode.sockets.items())
+                        pos_in_node_info = [socket_id for socket_id in range(len(socketFull)) if socketFull[socket_id][0] == socket_new][0]
+                        old_pos = socketFull[pos_in_node_info][1].index
+                        #Physically move it
+                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits+offset)
+                        time.sleep(sleepTime)
+                        self.update()
+                        time.sleep(sleepTime)
+        
+        #We also need to add these attributes to the nodes startAttributes in self.nodeInfo:
+        self.nodeInfo[self.nodeLookupName_withoutCounter(currentNode.name)]['startAttributes'] = dialogLineEdits
+    
+    def changeConfigStorageInNodz(self,currentNode,configNameSet):
+        """
+        Function to change the config storage of a nodz node from the double-click popup to the MMconfigInfo class stored inside the node.
+
+        This is useful when storing and loading configurations for a node, as the MMconfigInfo class can be serialized and deserialized.
+
+        Args:
+            currentNode (nodz.Node): The node to change the config storage of.
+            configNameSet (set of tuples): A set of tuples in the form (configName, selectedValue)
+        """
+        #Changes a config from a double-click config popup to the MMconfig stored inside the nodz node itself (i.e. storing/loading of configs)
+        
+        #Add all of them to the MMconfigInfo.config_string_storage:
+        currentNode.MMconfigInfo.config_string_storage=[]
+        for singleConfig in configNameSet:
+            currentNode.MMconfigInfo.config_string_storage.append([singleConfig[0],singleConfig[1]])
+        return
+    
+    def AnalysisNode_started(self,node):
+        """
+        Perform the Analysis set in a node
+        
+        Args:
+            node: The node for which calls the analysis
+        
+        Returns:
+            None
+        """
+        #Find the node that is connected (i.e. downstream) to this
+        connectedNode = None
+        for connection in self.evaluateGraph():
+            if connection[1][connection[1].rfind('.')+1:] == 'Analysis start':
+                if connection[1][:connection[1].rfind('.')] == node.name:
+                    connectedNodeName = connection[0][:connection[0].rfind('.')]
+                    connectedNode = self.findNodeByName(connectedNodeName)
+        if connectedNode is None:
+            print('Error! No connected node found for scoring analysis')
+            return
+        
+        #First assess that it's a MDA node:
+        if 'acquisition' not in connectedNode.name:
+            print('Error! Acquisition not connected to Grayscale test!')
+        else:
+            #And then find the mdaData object
+            mdaDataobject = connectedNode.mdaData
+            
+            #Figure out which function is selected in the scoring_analysis node
+            selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+            #Figure out the belonging evaluation-text
+            evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
+            #And evaluate the custom function with custom parameters
+            output = eval(evalText) #type:ignore
+            
+            #Display final output to the user for now
+            logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
+            
+            node.scoring_analysis_currentData['__output__'] = output
+            
+            #Finish up
+            self.finishedEmits(node)
+    
+    def MMstageChangeRan(self,node):
+        #TODO: Implement this :)
+        """
+        Change the stage of the microscope based on the node info
+        
+        Args:
+            node: The MM node to change the stage for.
+        
+        Returns:
+            None
+        """
+        logging.info('MMstageChange')
+        self.finishedEmits(node)
+        
+    def MMconfigChangeRan(self,node):
+        """
+        Handle the configuration change event for a node.
+
+        This function handles the configuration change event for a node, by
+        changing the desired configs in the Core.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+        """
+        logging.info('MMconfigChangeRan')
+        #We need to change some configs (probably):
+        for config_to_change in node.MMconfigInfo.config_string_storage:
+            #Change the config, and wait for the config to be changed
+            self.core.set_config(config_to_change[0],config_to_change[1]) #type:ignore
+            self.core.wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
+        self.finishedEmits(node)
+    
+    def GrayScaleTest(self,node):
+        """
+        This function is the action function for the Grayscale Test node in the Flowchart.
+
+        This function takes the data from the MDA node, which should be connected
+        to the Grayscale Test node, and performs a grayscale analysis on the data.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+
+        """
+        #Find the node that is connected to this
+        connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
+        #First assess that it's a MDA node:
+        if 'acquisition' not in connectedNode.name:
+            print('Error! Acquisition not connected to Grayscale test!')
+        else:
+            #And then find the mdaData object
+            mdaDataobject = connectedNode.mdaData
+            #Thow this into the analysis:
+            
+            avgGrayVal = eval(HelperFunctions.createFunctionWithKwargs("AverageIntensity.AvgGrayValue",NDTIFFStack="mdaDataobject.data",core="mdaDataobject.core"))
+            logging.info(f"found avg gray val: {avgGrayVal}")
+            
+        self.finishedEmits(node)
+
     def acquiringStart(self,node):
         """
         This function is the action function for the Acquiring Start node in the Flowchart.
@@ -2121,6 +2174,17 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             logging.warning('Would have started acquiring, but was prevented!')
     
     def acquiringEnd(self,node):
+        """
+        This function is the action function for the Acquiring End node in the Flowchart.
+
+        This function signals to the rest of the flowchart that the Acquiring routine is ended
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+
+        Returns:
+            None
+        """
         print("End Acquiring")
         if self.fullRunOngoing:
             #if there are more positions to look at...
@@ -2132,7 +2196,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                 self.singleRunOngoing = False
                 print('All done!')
         self.finishedEmits(node)
-        
+    
     def scoringStart(self,node):
         """
         This function is the action function for the Scoring Start node in the Flowchart.
@@ -2160,7 +2224,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         self.GraphToSignals()
         
         self.finishedEmits(node)
-        
+    
     def scoringEnd(self,node):
         """
         This function is the action function for the Scoring End node in the Flowchart.
@@ -2173,8 +2237,6 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         Returns:
             None
         """
-        
-        
         #Find the nodes that are connected downstream of this:
         data = {}
         attrs = []
@@ -2259,7 +2321,7 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
                     node.status = 'error'
         
         self.preventAcq = False
-            
+    
     def timerCallAction(self,node):
         """
         This function is the action function for the Timer Call node in the Flowchart.
@@ -2274,7 +2336,271 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
         import time
         time.sleep(node.timerInfo)
         self.finishedEmits(node)
+    #endregion
+    
+    #region NodzFlowChart runs
+    def fullAutonomousRunStart(self):
+        """
+        Starts a full autonomous run - i.e. scoring and acquisition
+        
+        Args:
+            self: The object instance.
+        
+        Returns:
+            None
+        """
+        print('Starting a full run')
+        self.preventAcq = True
+        
+        #General idea: first check if there are no glaring errors (scoring, position)
+        #then go to whatever start position based on the xy positions
+        #then run scoring+acquisition there
+        
+        self.fullRunOngoing = True
+        self.fullRunCurrentPos = 0
+        self.fullRunPositions = self.scanningWidget.getPositionInfo()
+        self.startNewScoreAcqAtPos()
 
+    def startNewScoreAcqAtPos(self):
+        """
+        Starts a new score acquisition at the current microscope position.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        
+        import time
+        positions = self.fullRunPositions
+        pos = self.fullRunCurrentPos
+        
+        #Set all stages correct
+        for stage in positions[pos]['STAGES']:
+            stagepos = positions[pos][stage]
+            #Check if this stage is an XY stage device...
+            #Since then we need to do something 2-dimensional
+            if stage in self.getDevicesOfDeviceType('XYStageDevice'):
+                logging.info(f'Moving stage {stage} to position {stagepos}')
+                self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
+                self.shared_data.core.wait_for_system() #type:ignore
+            else:#else we can move a 1d stage:
+                logging.info(f'Moving stage {stage} to position {stagepos}')
+                self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
+                self.shared_data.core.wait_for_system() #type:ignore
+        
+        self.runScoring()
+    
+    def runScoringOnly(self):
+        """
+        Run ONLY the scoring process at the current position. Actively prevents acquisition
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        self.preventAcq = True
+        
+        #Find the scoring_start node:
+        scoreStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'scoringStart_' in node.name:
+                    scoreStartNode = node
+        
+        #Run the scoring_start routine:
+        if scoreStartNode is not None:
+            self.scoringStart(scoreStartNode)
+        else:
+            logging.error('Could not find scoringStart node in flowchart')
+    
+    def runScoring(self):
+        """
+        Runs the scoring process starting from the scoring_start node, without inhibiting acquisition later - i.e. the scoring before a possible acquisition
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        self.preventAcq = False
+        #Find the scoring_start node:
+        scoreStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'scoringStart_' in node.name:
+                    scoreStartNode = node
+        
+        
+        
+        #Run the scoring_start routine:
+        if scoreStartNode is not None:
+            self.scoringStart(scoreStartNode)
+        else:
+            logging.error('Could not find scoringStart node in flowchart')
+    
+    def runAcquiring(self):
+        """
+        Run the acquiring process at this microscopy XY position
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        print("Run Acquiring")
+        
+        #Find the acqStart node:
+        acqStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'acqStart_' in node.name:
+                    acqStartNode = node
+        
+        #Run the scoring_start routine:
+        if acqStartNode is not None:
+            self.acquiringStart(acqStartNode)
+        else:
+            logging.error('Could not find acqStart node in flowchart')
+    
+    def debugScoring(self):
+        """
+        Function to get some debug information from the scoring function(s)
+        """
+        print("Debug Scoring")
+        scoreGraph = self.prepareGraph(methodName = "Score")
+        
+        
+        print(self)
+        print(self.evaluateGraph())
+    #endregion
+    
+    #region NodzFlowChart GraphArea functions
+    def contextMenuEvent(self, QMouseevent):
+        """
+        Function to create a context menu when right-clicking on the nodz canvas
+
+        This function creates a context menu with all available node types that the user can select from, and adds the node to the nodz canvas at the position of the mouse click.
+
+        Args:
+            QMouseevent (PyQt5.QtGui.QMouseEvent): The mouse event that triggered this context menu
+        """
+        #Check if we are right-clicking on a node:
+        item_at_mouse = self.scene().itemAt(self.mapToScene(QMouseevent.pos()), QtGui.QTransform())
+        
+        if item_at_mouse == None:
+            context_menu = QMenu(self)
+            
+            #Dynamically add all node types
+            for node_type, node_data in self.nodeInfo.items():
+                new_subAction = QAction(node_data['displayName'], self)
+                context_menu.addAction(new_subAction)
+                # Define a closure to capture the current value of node_type
+                def create_lambda(node_type):
+                    """
+                    Create a lambda function that calls the createNodeFromRightClick method with the specified node type.
+                    
+                    Args:
+                        node_type: The type of node to be created.
+                    
+                    Returns:
+                        A lambda function that takes an event and calls createNodeFromRightClick with the specified node type.
+                    """
+                    return lambda _, event=QMouseevent: self.createNodeFromRightClick(event, nodeType=node_type)
+                # Connect each action to its own lambda function
+                new_subAction.triggered.connect(create_lambda(node_type))
+                
+            # Show the context menu at the event's position
+            context_menu.exec_(QMouseevent.globalPos())
+        elif item_at_mouse in self.nodes:
+            
+            context_menu = QMenu(self)
+            
+            #Add a change-name option
+            changeName_subAction = QAction('Change name', self)
+            context_menu.addAction(changeName_subAction)
+            def create_lambda_changeName(item_at_mouse):
+                """
+                Creates a lambda function to change the name of a node.
+                
+                Args:
+                    item_at_mouse: The item at the mouse position.
+                
+                Returns:
+                    A lambda function that calls the changeNodeName method with the item_at_mouse and event as arguments.
+                """
+                return lambda _, event=QMouseevent: self.changeNodeName(item_at_mouse, event)
+            changeName_subAction.triggered.connect(create_lambda_changeName(item_at_mouse))
+            
+            #Add a change-color option
+            changeColor_subAction = QAction('Change color', self)
+            context_menu.addAction(changeColor_subAction)
+            def create_lambda_changeColor(item_at_mouse):
+                """
+                Creates a lambda function that changes the color of a node.
+                
+                Args:
+                    item_at_mouse: The item at the mouse position.
+                
+                Returns:
+                    A lambda function that calls the 'changeNodeColor' method with the specified item and event.
+                """
+                return lambda _, event=QMouseevent: self.changeNodeColor(item_at_mouse, event)
+            changeColor_subAction.triggered.connect(create_lambda_changeColor(item_at_mouse))
+            
+            #Add a advanced-info option
+            advNodeInfo_subAction = QAction('Advanced Node info', self)
+            context_menu.addAction(advNodeInfo_subAction)
+            def create_lambda_advNodeInfo(item_at_mouse):
+                """
+                Create a lambda function to call the advNodeInfo method with the given item at mouse position.
+                
+                Args:
+                    item_at_mouse: The item at the mouse position to be passed to the advNodeInfo method.
+                
+                Returns:
+                    A lambda function that calls the advNodeInfo method with the item_at_mouse and event parameters.
+                """
+                return lambda _, event=QMouseevent: self.advNodeInfo(item_at_mouse, event)
+            advNodeInfo_subAction.triggered.connect(create_lambda_advNodeInfo(item_at_mouse))
+            
+            context_menu.exec_(QMouseevent.globalPos())
+
+    def createNewNode(self, nodeType, event):
+        """
+        Creates a new node on the nodz canvas, with name and preset specified.
+
+        This function creates a new node on the nodz canvas at the position of the mouse event.
+        The name of the node is specified by appending a number to the nodeType parameter.
+        The preset of the node is set to 'node_preset_1'.
+
+        Args:
+            nodeType (str): The type of node to create.
+            event (PyQt5.QtGui.QMouseEvent): The mouse event that triggered this node creation.
+        Returns:
+            nodz.Node: The created nodz node.
+        """
+        if self.nodeInfo[nodeType]['NodeCounter'] >= self.nodeInfo[nodeType]['MaxNodeCounter']:
+            print('Not allowed! Maximum number of nodes of this type reached')
+            return
+        
+        #Create the new node with correct name and preset
+        newNode = self.createNode(name=nodeType+"_", preset = 'node_preset_1', position=self.mapToScene(event.pos()),displayName = self.nodeInfo[nodeType]['displayName'],nodeInfo=self.nodeInfo[nodeType])
+        
+        #Do post-node-creation functions - does this via the pyqtsignal!
+        return newNode
+    
     def createNodeFromRightClick(self,event,nodeType=None):
         """
         This function creates a new node in the flowchart when the user right-clicks in the flowchart area. Mostly a wrapper function
@@ -2287,37 +2613,36 @@ class flowChart_dockWidgetF(nodz_main.Nodz):
             None
         """
         self.createNewNode(nodeType,event)
-
-    def giveInfoOnNode(self,node):
+    
+    def focus(self):
         """
-        Prints information about a node in the flowchart
-
-        This function prints some basic information about a node in the flowchart.
-
+        Focuses on the entire canvas
+        
         Args:
-            node (nodz.Node): The node to get information about.
-
+            None
+        
         Returns:
             None
         """
-        print('--------')
-        print(node)
-        print(f"node name: {node.name}")
-        print(f"incoming connections: {node.n_connect_at_start}" )
-        if 'scoringEnd' in node.name:
-            print('hi')
-        # print(f"outgoing connections - finished: {node.connectedToFinish}")
-        # print(f"outgoing connections - data: {node.connectedToData}")
-
-    def getNodz(self):
-        return self
-    
-    def focus(self):
         self._focus()
+    #endregion
 
-
+#region ScanningWidget
 class ScanningWidget(QWidget):
+    """ 
+    The scanning widget which handles the xy(z) scanning in a full autonomous runs. Mainly contains multiple advScanGridLayouts() which each individually handle a single method of xy(z) scanning.
+    """
     def __init__(self, nodzinstance=None,parent=None):
+        """
+        Initializes the scanning widget class.
+        
+        Args:
+            nodzinstance: The nodz instance to be associated with.
+            parent: The parent widget.
+        
+        Returns:
+            None
+        """
         super().__init__(parent)
         # super().__init__()
         self.nodzinstance=nodzinstance
@@ -2331,19 +2656,26 @@ class ScanningWidget(QWidget):
         self.create_GUI()
     
     def create_GUI(self):
+        """
+        Create scanning widget GUI with mode dropdown and corresponding advScanGridLayout layouts.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems([option[1] for option in self.scanArray_modes])
         self.mode_layout = QGridLayout()
         self.mode_layout.addWidget(QLabel('Mode: '),0,0)
         self.mode_layout.addWidget(self.mode_dropdown,0,1)
 
-
         from PyQt5.QtWidgets import QHBoxLayout
         for mode_option in self.scanArray_modes:
             self.scanLayouts[mode_option[0]] = advScanGridLayout(mode=mode_option[0],parent=self)
             
             self.scanLayouts[mode_option[0]].setVisible(True) #False
-        
         
         self.layoutV = QVBoxLayout()
         self.layoutV.addLayout(self.mode_layout)
@@ -2357,6 +2689,15 @@ class ScanningWidget(QWidget):
         self.changeScanMode()
 
     def changeScanMode(self):
+        """
+        Change the scan mode based on the selected index. - i.e. hide all non-chosen advScanGridLayouts and show the chosen one.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         for groupbox in self.scanLayouts.values():
             groupbox.setVisible(False) #False
             
@@ -2368,10 +2709,159 @@ class ScanningWidget(QWidget):
             pass
 
     def getPositionInfo(self):
+        """
+        Get the position information of the chosen advScanGridLayout. (i.e. list of XY(Z) positions)
+        
+        Returns:
+            The position information.
+        """
         return self.scanLayouts[self.scanArray_modes[self.mode_dropdown.currentIndex()][0]].getPositionInfo()
 
+class advScanGridLayout(QGroupBox):
+    """ 
+    advScanGridLayouts each individually handle a single method of xy(z) scanning. Easiest example is 'loading a POS file'.
+    The advScanGridLayouts are created in the ScanningWidget class
+    The layouts should be based around the self.mode parameter, where the .mode is a string which defines the methodologies used. The modes are defined in the ScanningWidget class
+    Currently implemented:
+        'LoadPos': Load a POS list
+    """
+    def __init__(self, mode=None,parent=None):
+        """
+        Initializes the class with the given mode and parent.
+        
+        Args:
+            mode (str): The mode to be set for the class.
+            parent (object): The parent object associated with this class.
+        
+        Returns:
+            None
+        """
+        self.parent = parent #type:ignore
+        super().__init__(parent)
+        self.mode = mode
+        self.scanningInfoGUI = {}
+        #Create a QGridLayout to place in this groupbox:
+        try:
+            self.setLayout(QGridLayout())
+        except:
+            pass
+        #Create a quick label that we place in 1,1:
+        self.layout().addWidget(QLabel(f"{mode}",self))
+        if mode == 'LoadPos':
+            self.loadPos_update()
+    
+    def update(self):
+        """
+        General Update class, can be called from the parent class
+        
+        Args:
+            self: The object itself.
+        
+        Returns:
+            None
+        """
+        print('update')
+    
+    def getPositionInfo(self):
+        """
+        General method to get the opsition info. Should basically return a well-formatted XY(Z) position list - see self.mode == LoadPos for an example.
+        
+        Args:
+            None
+        
+        Returns:
+            dict: A dictionary containing position information
+        """
+        if self.mode == 'LoadPos':
+            positions = {}
+            #Read a JSON:
+            import json
+            with open(self.scanningInfoGUI['LoadPos']['fileName'], 'r') as f:
+                xypositionsRaw = json.load(f)
+
+            positions['nrPositions'] = len(xypositionsRaw['map']['StagePositions']['array'])
+            for pos_id in range(positions['nrPositions']):
+                positions[pos_id] = {}
+                positions[pos_id]['STAGES'] = []
+                if 'DefaultXYStage' in xypositionsRaw['map']['StagePositions']['array'][pos_id]:
+                    positions[pos_id]['STAGES'].append(xypositionsRaw['map']['StagePositions']['array'][pos_id]['DefaultXYStage']['scalar'])
+                if 'DefaultZStage' in xypositionsRaw['map']['StagePositions']['array'][pos_id]:
+                    positions[pos_id]['STAGES'].append(xypositionsRaw['map']['StagePositions']['array'][pos_id]['DefaultZStage']['scalar'])
+                
+                for stage in positions[pos_id]['STAGES']:
+                    devicePositions = xypositionsRaw['map']['StagePositions']['array'][pos_id]['DevicePositions']['array']
+                    for devicePosition in devicePositions:
+                        if stage == devicePosition['Device']['scalar']:
+                            positions[pos_id][stage] = devicePosition['Position_um']['array']
+                
+            return positions
+    
+    def loadPos_update(self):
+        """
+        Update function specific for the 'loadPos' method - linked from the general update() method.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        self.scanningInfoGUI['LoadPos'] = {}
+        
+        def load_pos_file():
+            """
+            Load POS file using QFileDialog and set the filename in the line edit widget.
+            
+            Args:
+                None
+            
+            Returns:
+                None
+            """
+            from qtpy.QtWidgets import QFileDialog
+            filename, _ = QFileDialog.getOpenFileName(self,'Open file', '', '*.POS Files (*.pos)')
+            if filename:
+                self.lineEdit_posFilename.setText(filename)
+                self.scanningInfoGUI['LoadPos']['fileName'] = filename
+
+        def update_file_name(new_file_name):
+            """
+            Update the file name in the scanning information GUI.
+            
+            Args:
+                new_file_name (str): The new file name to be set in the scanning information GUI.
+            
+            Returns:
+                None
+            """
+            self.scanningInfoGUI['LoadPos']['fileName'] = new_file_name
+    
+        self.lineEdit_posFilename = QLineEdit()
+        self.layout().addWidget(self.lineEdit_posFilename,1,0) #type:ignore
+        self.lineEdit_posFilename.textChanged.connect(lambda x: update_file_name(x))
+
+        button_browsePosFile = QPushButton('...')
+        self.layout().addWidget(button_browsePosFile,1,1) #type:ignore
+        button_browsePosFile.clicked.connect(load_pos_file)
+#endregion
+
+#region DecisionWidget
 class DecisionWidget(QWidget):
+    """ 
+    The decisionWidget handles having all the advDecisionLayouts, which are used for different scoring/passing/decision metrics (i.e. saying 'this field-of-view is good enough').
+    Look at advDecisionGridLayout for implementation of the actual decision routines.
+    """
     def __init__(self, nodzinstance=None,parent=None):
+        """
+        Initializes the DecisionWidget class.  Importantly defines the individual modes of the advDecisionLayout.
+        
+        Args:
+            nodzinstance (object, optional): An instance of the nodz class. Defaults to None.
+            parent (object, optional): The parent object. Defaults to None.
+        
+        Returns:
+            None
+        """
         super().__init__(parent)
         # super().__init__()
         self.nodzinstance=nodzinstance
@@ -2403,6 +2893,15 @@ class DecisionWidget(QWidget):
         self.create_GUI()
     
     def create_GUI(self):
+        """
+        Create GUI for decision making. Importantly adds all the advDecisionLayouts with individual modes.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         # self.setWindowTitle('Decision')
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems([option[1] for option in self.decisionArray_modes])
@@ -2451,6 +2950,15 @@ class DecisionWidget(QWidget):
         self.changeDecisionMode()
 
     def changeMode(self):
+        """
+        Change the mode of the decision layout. Mostly hides/shows individual decisionLayouts.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         for groupbox in self.decisionLayouts.values():
             groupbox.setVisible(False) #False
         try:
@@ -2459,6 +2967,15 @@ class DecisionWidget(QWidget):
             pass
 
     def changeDecisionMode(self):        
+        """
+        Change the decision mode by setting the visibility of decision layouts. Mostly hides/shows individual decisionLayouts and sets its own mode/decision.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         #Set all of these: self.decisionLayouts[currentMode][currentDecision].setVisible(True) to invis:
         for mode in self.decisionLayouts:
             for option in self.decisionLayouts[mode].decisiontypes:
@@ -2478,17 +2995,52 @@ class DecisionWidget(QWidget):
         self.currentDecision = currentDecision
     
     def updateAllDecisions(self):
+        """
+        Update all decisions in the decision layouts.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         for mode in self.decisionLayouts:
             for option in self.decisionLayouts[mode].decisiontypes:
                 self.decisionLayouts[mode].decisiontypes[option].update()
 
     def testCurrentDecision(self):
+        """
+        Tests whether the current FoV passes the currently selected Decision. Mostly wrapper for calling test_decision of the chosen decision in advDecisionGridLayout
+        
+        Args:
+            None
+        
+        Returns:
+            bool: True if the test for the current decision passed, False otherwise.
+        """
         testPassed = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision].test_decision()
         return testPassed
 
-from PyQt5.QtWidgets import QGroupBox
 class advDecisionGridLayout(QGroupBox):
+    """ 
+    advDecisionGridLayout each individually handle a single method of decision. Easiest example is DirectDecision mode with 'AND_SCORE' decision.
+    Each layout requires a MODE and a DECISION, where the MODE is one of four options (DirectDecision, fullscan, randomscan, stayonfov) --> see ScanningWidget init, and the DECISION is more flexible (i.e. 'all scores are passed', or 'at least 1 score is passed' in the DirectDecision mode)
+    The advDecisionGridLayout are created in the DecisionWidget class
+    Currently implemented:
+        'DirectDecision' --> 'AND_Score': Checks if all scores are passed.
+    """
     def __init__(self, mode=None,decision=None,parent=None):
+        """
+        Initialize the class with the provided mode, decision, and parent.
+        
+        Args:
+            mode (str): The mode to be set for the instance.
+            decision (str): The decision to be set for the instance.
+            parent (object): The parent object associated with this instance.
+        
+        Returns:
+            None
+        """
         self.parent = parent #type:ignore
         super().__init__(parent)
         self.mode = mode
@@ -2503,16 +3055,44 @@ class advDecisionGridLayout(QGroupBox):
                 self.directDecision_AND_Score_update()
     
     def update(self):
+        """
+        Update the object based on the current mode and decision.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         if self.mode == 'DirectDecision':
             if self.decision == 'AND_Score':
                 self.directDecision_AND_Score_update()
     
     def test_decision(self):
+        """
+        Make a decision based on the mode and decision type. Should always output a boolean
+        
+        Args:
+            mode (str): The mode of decision making.
+            decision (str): The type of decision to be made.
+        
+        Returns:
+            str: The result of the decision making process.
+        """
         if self.mode == 'DirectDecision':
             if self.decision == 'AND_Score':
                 return self.directDecision_AND_Score_test()
     
     def getScoreMetrics(self):
+        """
+        Get the score metrics from the scoringEnd node.
+        
+        Args:
+            None
+        
+        Returns:
+            list: A list of score metrics (i.e. sockets of score node).
+        """
         scoreMetrics = []
         #Get all score metrics (i.e. sockets of score node)
         flowChart = self.parent.nodzinstance
@@ -2528,6 +3108,15 @@ class advDecisionGridLayout(QGroupBox):
         return scoreMetrics
     
     def remove_widgets_in_layout(self,layout):
+        """
+        Removes all widgets in the given layout recursively.
+        
+        Args:
+            layout: The layout from which widgets will be removed.
+        
+        Returns:
+            None
+        """
         while layout.count():
             item = layout.takeAt(0)
             widget = item.widget()
@@ -2613,71 +3202,7 @@ class advDecisionGridLayout(QGroupBox):
             self.decisionInfoGUI[scoreMetric]['dropdown'] = dropdown
             self.decisionInfoGUI[scoreMetric]['lineedit'] = lineedit
             self.outerLayout.addLayout(hbox)
-
-class advScanGridLayout(QGroupBox):
-    def __init__(self, mode=None,parent=None):
-        self.parent = parent #type:ignore
-        super().__init__(parent)
-        self.mode = mode
-        self.scanningInfoGUI = {}
-        #Create a QGridLayout to place in this groupbox:
-        try:
-            self.setLayout(QGridLayout())
-        except:
-            pass
-        #Create a quick label that we place in 1,1:
-        self.layout().addWidget(QLabel(f"{mode}",self))
-        if mode == 'LoadPos':
-            self.loadPos_update()
-    
-    def update(self):
-        print('update')
-    
-    def getPositionInfo(self):        
-        if self.mode == 'LoadPos':
-            positions = {}
-            #Read a JSON:
-            import json
-            with open(self.scanningInfoGUI['LoadPos']['fileName'], 'r') as f:
-                xypositionsRaw = json.load(f)
-
-            positions['nrPositions'] = len(xypositionsRaw['map']['StagePositions']['array'])
-            for pos_id in range(positions['nrPositions']):
-                positions[pos_id] = {}
-                positions[pos_id]['STAGES'] = []
-                if 'DefaultXYStage' in xypositionsRaw['map']['StagePositions']['array'][pos_id]:
-                    positions[pos_id]['STAGES'].append(xypositionsRaw['map']['StagePositions']['array'][pos_id]['DefaultXYStage']['scalar'])
-                if 'DefaultZStage' in xypositionsRaw['map']['StagePositions']['array'][pos_id]:
-                    positions[pos_id]['STAGES'].append(xypositionsRaw['map']['StagePositions']['array'][pos_id]['DefaultZStage']['scalar'])
-                
-                for stage in positions[pos_id]['STAGES']:
-                    devicePositions = xypositionsRaw['map']['StagePositions']['array'][pos_id]['DevicePositions']['array']
-                    for devicePosition in devicePositions:
-                        if stage == devicePosition['Device']['scalar']:
-                            positions[pos_id][stage] = devicePosition['Position_um']['array']
-                
-            return positions
-    
-    def loadPos_update(self):
-        self.scanningInfoGUI['LoadPos'] = {}
-        
-        def load_pos_file():
-            from qtpy.QtWidgets import QFileDialog
-            filename, _ = QFileDialog.getOpenFileName(self,'Open file', '', '*.POS Files (*.pos)')
-            if filename:
-                self.lineEdit_posFilename.setText(filename)
-                self.scanningInfoGUI['LoadPos']['fileName'] = filename
-
-        def update_file_name(new_file_name):
-            self.scanningInfoGUI['LoadPos']['fileName'] = new_file_name
-    
-        self.lineEdit_posFilename = QLineEdit()
-        self.layout().addWidget(self.lineEdit_posFilename,1,0) #type:ignore
-        self.lineEdit_posFilename.textChanged.connect(lambda x: update_file_name(x))
-
-        button_browsePosFile = QPushButton('...')
-        self.layout().addWidget(button_browsePosFile,1,1) #type:ignore
-        button_browsePosFile.clicked.connect(load_pos_file)
+#endregion
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     """
@@ -2692,7 +3217,7 @@ def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
         sshared_data (Shared_data): A shared data class instance containing shared data between widgets.
 
     Returns:
-        flowChart_dockWidgetF: The flowchart dock widget.
+        GladosNodzFlowChart_dockWidget: The flowchart dock widget.
     """
 
     global shared_data, napariViewer
@@ -2700,7 +3225,7 @@ def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     napariViewer = shared_data.napariViewer
     
     #Create the a flowchart testing
-    flowChart_dockWidget = flowChart_dockWidgetF(core=core,shared_data=shared_data,MM_JSON=MM_JSON)
+    flowChart_dockWidget = GladosNodzFlowChart_dockWidget(core=core,shared_data=shared_data,MM_JSON=MM_JSON)
     main_layout.addLayout(flowChart_dockWidget.mainLayout,0,0)
     
     flowChart_dockWidget.getNodz()
