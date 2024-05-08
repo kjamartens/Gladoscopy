@@ -1,3 +1,4 @@
+#region imports
 from pycromanager import Core
 from pycromanager import start_headless
 import os
@@ -32,7 +33,7 @@ from Visualisation_Measurements import * #type: ignore
 from Visualisation_Shapes import * #type: ignore
 #Obtain the helperfunctions
 import HelperFunctions #type: ignore
-
+#endregion
 
 def perform_post_closing_actions(shared_data):
     """Performing closing actions
