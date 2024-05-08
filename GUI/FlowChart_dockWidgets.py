@@ -2088,6 +2088,65 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Display final output to the user for now
             logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
             
+            #Set the status of the nodz-coupled vis and real-time to finished:
+            #Look at the 'Visual' bottom attribute and visualise if needed
+            visualAttr = node.bottomAttrs['Visual']
+            if len(visualAttr.connections) > 0:
+                visual_connected_node_name = visualAttr.connections[0].socketNode
+                for nodeV in self.nodes:
+                    if nodeV.name == visual_connected_node_name:
+                        visual_connected_node = nodeV
+                        
+                        selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+                        visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer,mdaDataobject.data)','self.shared_data.core')
+                        visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
+                        
+                        chosenLayerType = 'points'
+                        
+                        layerTypeInfo = [
+                            ['Analysis_Measurements','points'],
+                            ['Analysis_Shapes','shapes'],
+                            ['Analysis_Images','image'],
+                        ]
+                        
+                        folderName = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.sep+'AutonomousMicroscopy'+os.sep
+                        
+                        for layerType in layerTypeInfo:
+                            for root, dirs, files in os.walk(folderName+layerType[0]):
+                                for file in files:
+                                    if selectedFunction.split('.')[0] in file: #type:ignore
+                                        if file.endswith(".py"):
+                                            with open(os.path.join(root, file), 'r') as f:
+                                                filecontent = f.read()
+                                            if selectedFunction.split('.')[1]+'(' in filecontent: #type:ignore
+                                                chosenLayerType = layerType[1]
+                                                break #to avoid searching in other files for this function
+                        
+                        layerName = visual_connected_node.visualisation_currentData['layerName']
+                        if chosenLayerType == 'points':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            napariLayer = viewer.add_points(
+                                data=None,
+                                text=None,
+                                name=layerName
+                            )
+                        elif chosenLayerType == 'shapes':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            napariLayer = viewer.add_shapes(
+                                data=None
+                            )
+                        elif chosenLayerType == 'image':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            im = np.random.random((30, 30))
+                            napariLayer = viewer.add_image(
+                                data=im
+                            )
+                        
+                        visualOutput = eval(visualEvalText)
+                        
+                        visual_connected_node.status = 'finished'
+            
+            
             node.scoring_analysis_currentData['__output__'] = output
             
             #Finish up

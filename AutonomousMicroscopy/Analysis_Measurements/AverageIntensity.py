@@ -27,6 +27,7 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 def AvgGrayValue(NDTIFFStack,core,**kwargs):
+    
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -48,3 +49,26 @@ def AvgGrayValue(NDTIFFStack,core,**kwargs):
     # print("Overall average intensity:", overall_avg_intensity)
     
     return overall_avg_intensity
+
+
+def AvgGrayValue_visualise(datastruct,core,**kwargs):
+    #This is how datastruct is organised...
+    output,pointsLayer,mdaDataobject = datastruct
+    
+    
+    # create features for each point
+    features = {
+        'outputval': output
+    }
+    # textv = {'string': 'Hi!','size':20,'color':'green','translation':np.array([-30,0])}
+    textv = {
+        'string': 'GrayValue {outputval:.2f}',
+        'size': 15,
+        'color': 'red',
+        'translation': np.array([0, 0]),
+        'anchor': 'upper_left',
+    }
+    pointsLayer.data = [0,0]
+    pointsLayer.features = features
+    pointsLayer.text = textv
+    pointsLayer.size = 0
