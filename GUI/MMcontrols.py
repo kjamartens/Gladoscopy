@@ -371,21 +371,21 @@ class MMConfigUI(CustomMainWindow):
     #region deprecated
     def get_device_properties(self):
         core = self.core
-        devices = core.get_loaded_devices()
+        devices = core.get_loaded_devices() #type:ignore
         devices = [devices.get(i) for i in range(devices.size())]
         device_items = []
         for device in devices:
             logging.debug('Device: '+device)
-            names = core.get_device_property_names(device)
+            names = core.get_device_property_names(device) #type:ignore
             props = [names.get(i) for i in range(names.size())]
             property_items = []
             for prop in props:
                 logging.debug('Property',prop)
-                value = core.get_property(device, prop)
-                is_read_only = core.is_property_read_only(device, prop)
-                if core.has_property_limits(device, prop):
-                    lower = core.get_property_lower_limit(device, prop)
-                    upper = core.get_property_upper_limit(device, prop)
+                value = core.get_property(device, prop) #type:ignore
+                is_read_only = core.is_property_read_only(device, prop) #type:ignore
+                if core.has_property_limits(device, prop): #type:ignore
+                    lower = core.get_property_lower_limit(device, prop) #type:ignore
+                    upper = core.get_property_upper_limit(device, prop) #type:ignore
                     allowed = {
                     "type": "range",
                     "min": lower,
@@ -393,7 +393,7 @@ class MMConfigUI(CustomMainWindow):
                     "readOnly": is_read_only,
                     }
                 else:
-                    allowed = core.get_allowed_property_values(device, prop)
+                    allowed = core.get_allowed_property_values(device, prop) #type:ignore
                     allowed = {
                     "type": "enum",
                     "options": [allowed.get(i) for i in range(allowed.size())],"readOnly": is_read_only,
@@ -508,11 +508,11 @@ class MMConfigUI(CustomMainWindow):
         logging.debug('Zooming ROI to ' + str(ROIpos))
         try:
             if shared_data.liveMode == False:
-                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3])
-                self.core.wait_for_system()
+                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]) #type:ignore
+                self.core.wait_for_system() #type:ignore
             else:
                 shared_data.liveMode = False
-                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3])
+                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]) #type:ignore
                 time.sleep(0.5)
                 shared_data.liveMode = True
         except:
@@ -616,6 +616,10 @@ class MMConfigUI(CustomMainWindow):
         return XYStageLayout
     
     def setXYStageMovementValue(self,m,xEditField,yEditField):
+        """
+        Set the XY stageLineEdits to specific values based on the Buttons next to the fields.
+        This function is called when the user presses the "Set" buttons next to the XY EditFields
+        """
         #Set the values in the XY EditFields based on the buttons
         fieldUnits = [0.1,1,3]
         fieldUnit = fieldUnits[m]
@@ -628,21 +632,26 @@ class MMConfigUI(CustomMainWindow):
         self.storeAllControlValues()
     
     def getDevicesOfDeviceType(self,devicetype):
+        """
         #Find all devices that have a specific devicetype
         #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
         #for all devicetypes
+        """
         #Get devices
         devices = self.core.get_loaded_devices() #type:ignore
         devices = [devices.get(i) for i in range(devices.size())]
         devicesOfType = []
         #Loop over devices
         for device in devices:
-            if self.core.get_device_type(device).to_string() == devicetype:
+            if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
                 logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
     
     def oneDstageLayout(self):
+        """
+        Creates a UI layout to place all found one-D stages in a QStackedWidget and add the LineEdits etc. Also see XYstageLayout()
+        """
         #Create a layout
         self.oneDStageLayout = QGridLayout()
         
@@ -705,6 +714,9 @@ class MMConfigUI(CustomMainWindow):
         return self.oneDStageLayout
     
     def updateOneDstageLayout(self):
+        """
+        Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
+        """
         self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}") #type:ignore
         
         for widget_id in range(0,self.oneDStackedWidget.count()):
@@ -713,6 +725,13 @@ class MMConfigUI(CustomMainWindow):
                 self.oneDStackedWidget.setCurrentIndex(widget_id)
     
     def moveOneDStage(self,amount):
+        """
+        Moves the selected one-D stage by the specified amount
+
+        Parameters
+        ----------
+        amount: int: 1 or 2, 'small step' or 'big step'
+        """
         #Get the currently selected one-D stage:
         selectedStage = self.oneDstageDropdown.currentText()
         
@@ -729,14 +748,21 @@ class MMConfigUI(CustomMainWindow):
             self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
         self.updateOneDstageLayout()
         
-    def updateXYStageInfoWidget(self):#Obtain the stage info from MM:
-        XYStageName = self.core.get_xy_stage_device()
+    def updateXYStageInfoWidget(self):
+        """
+        Updates the XY stage info widget with the current position of the stage
+
+        """
+        #Obtain the stage info from MM:
+        XYStageName = self.core.get_xy_stage_device() #type:ignore
         #Get the stage position
-        XYStagePos = self.core.get_xy_stage_position(XYStageName)
+        XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
         self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
         
     def moveXYStage(self,relX,relY):
-        #Move XY stage with um positions in relx, rely:
+        """
+        Move XY stage with um positions in relx, rely:
+        """
         self.core.set_relative_xy_position(relX,relY) #type:ignore
         #Update the XYStageInfoWidget (if it exists)
         self.updateXYStageInfoWidget()
@@ -950,6 +976,7 @@ class MMConfigUI(CustomMainWindow):
     
     def updateValueInGUI(self,config_id, newValue):
         """
+        I THINK DEPRECATED, BUT KEEPING FOR KEEPING SAKE
         Updates the GUI to reflect a change in the Micromanager config
         Set the value of the dropdown to the current MM value
 
