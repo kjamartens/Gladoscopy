@@ -47,14 +47,40 @@ def perform_post_closing_actions(shared_data):
     #     stop_headless()
 
 class Worker(QObject):
+    """
+    Worker wrapper for the runNapariPycroManager function
+    """
     finished = pyqtSignal()
 
     def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data,includeCustomUI=False):
+        """
+        Runs the NapariPycroManagerWrap function.
+        
+        Args:
+            core: The core object.
+            MM_JSON: The MM_JSON object.
+            shared_data: The shared data object.
+            includeCustomUI (bool, optional): Flag to include custom UI. Defaults to False.
+        
+        Returns:
+            None
+        """
+        
         # Your code for running the NapariPycroManager function goes here
         runNapariPycroManager(core, MM_JSON, shared_data,includecustomUI=includeCustomUI)
         self.finished.emit()
 
 def main():
+    """
+    Run the main function to start Glados-PycroManager-Napari interface for autonomous microscopy.
+    
+    Args:
+        None
+    
+    Returns:
+        None
+    """
+    
     #Create parser
     parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
