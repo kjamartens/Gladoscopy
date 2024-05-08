@@ -32,6 +32,8 @@ from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'AutonomousMicroscopy')
 #Import all scripts in the custom script folders
 from Analysis_Images import * #type: ignore
 from Analysis_Measurements import * #type: ignore

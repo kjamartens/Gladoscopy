@@ -1025,6 +1025,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['analysisMeasurement']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisMeasurement']['finishedAttributes'] = ['Finished']
         self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisMeasurement']['bottomAttributes'] = ['Visual']
         
         self.nodeInfo['analysisShapes'] = self.singleNodeTypeInit()
         self.nodeInfo['analysisShapes']['name'] = 'analysisShapes'
