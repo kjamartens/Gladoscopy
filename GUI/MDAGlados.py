@@ -1,15 +1,15 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton
+import sys
+import time
+from AnalysisClass import *
+from PyQt5.QtWidgets import QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
-from AnalysisClass import *
-import sys
 import os
 # import PyQt5.QtWidgets
 import json
 from pycromanager import Core, multi_d_acquisition_events, Acquisition
 import numpy as np
-import time
 import asyncio
 import pyqtgraph as pg
 import matplotlib.pyplot as plt
@@ -18,6 +18,7 @@ import napariGlados
 #For drawing
 import matplotlib
 import utils
+from utils import CustomMainWindow
 matplotlib.use('Qt5Agg')
 # from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -33,10 +34,23 @@ from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 from PyQt5.QtWidgets import QTableWidget, QWidget, QInputDialog, QTableWidgetItem
 
 
+#region List Widgets
 class InteractiveListWidget(QTableWidget):
-    """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
+    """
+    Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
     """
     def __init__(self,fontsize=6,columnCount=2):
+        """
+        Initializes an InteractiveListWidget.
+        
+        Args:
+            fontsize (int): The font size to be set for the widget. Default is 6.
+            columnCount (int): The number of columns to be displayed in the widget. Default is 2.
+        
+        Returns:
+            None
+        """
+        
         logging.debug('init InteractiveListWidget')
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
         self.horizontalHeader().setStretchLastSection(True)
@@ -50,49 +64,134 @@ class InteractiveListWidget(QTableWidget):
         self.parentWidget=None #type:ignore
             
     def setColumNames(self, names):
+        """
+        Set column names for the interactive list table.
+        
+        Args:
+            names (list): A list of column names to be set.
+        
+        Returns:
+            None
+        """
+        
         self.setColumnCount(len(names))
         self.setHorizontalHeaderLabels(names)
         
     def deleteSelected(self):
+        """
+        Deletes selected rows from the table.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        
         selectedRows = sorted(set(index.row() for index in self.selectedIndexes()), reverse=True)
         for row in selectedRows:
             self.removeRow(row)
 
     def deleteAll(self):
+        """
+        Deletes all rows in the table.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         for row in range(self.rowCount() - 1, -1, -1):
             self.removeRow(row)
 
     def moveUp(self):
+        """
+        Moves the current row up by swapping it with the row above.
+        
+            Args:
+                None
+        
+            Returns:
+                None
+        """
         row = self.currentRow()
         if row > 0:
             self.swapRows(row, row - 1)
             
     def moveDown(self):
+        """
+        Moves the current row down by swapping it with the row below.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         row = self.currentRow()
         if row < self.rowCount() - 1 and row != -1:
             self.swapRows(row, row + 1)
 
     def getIDValues(self):
+        """
+        Get the ID values from the second column of the table.
+        
+        Args:
+            None
+        
+        Returns:
+            list: A list of float values extracted from the second column of the table.
+        """
         id_values = []
         for row in range(self.rowCount()):
             item_id = self.takeItem(row, 1)
             if item_id:
                 id_values.append(float(item_id.text()))
         return id_values
-    
 
 class ChannelList(InteractiveListWidget):
-    """Creation of an interactive list widget, initially created for a nice channel list (similar to POS list in micromanager)
+    """
+    Creation of an interactive list widget, initially created for a nice channel list
+    Extends InteractiveListWidget
     """
     def __init__(self,parent=None):
+        """
+        Initializes the channellist class within the given parent widget.
+        
+        Args:
+            parent: The parent widget to set for the current instance.
+        
+        Returns:
+            None
+        """
         super().__init__(columnCount=3)
         self.channelName = ''
-        self.parentWidget=parent#type:ignore
+        self.parentWidget=parent #type:ignore
         
     def setChannelName(self, channelName):
+        """
+        Set the name of the channel.
+        
+        Args:
+            channelName: A string representing the name of the channel.
+        
+        Returns:
+            None
+        """
         self.channelName = channelName
         
     def swapRows(self, row1, row2):
+        """
+        Swap rows in the table.
+        
+        Args:
+            row1 (int): The index of the first row to swap.
+            row2 (int): The index of the second row to swap.
+        
+        Returns:
+            None
+        """
         for col in range(self.columnCount()):
             if col == 0:
                 combobox1 = self.cellWidget(row1, col)
@@ -111,6 +210,16 @@ class ChannelList(InteractiveListWidget):
         self.setCurrentCell(row2, 1)
         
     def addNewEntry(self,channelEntry=None,exposureEntry=None):
+        """
+        Add a new entry to the table.
+        
+        Args:
+            channelEntry (str): The channel entry to be added to the table.
+            exposureEntry (str): The exposure entry to be added to the table.
+        
+        Returns:
+            None
+        """
         #Add the current exposure time as text as textentry:
         if 'channelDropdown' in dir(self.parentWidget):
             rowPosition = self.rowCount()
@@ -138,16 +247,46 @@ class ChannelList(InteractiveListWidget):
                 self.setItem(rowPosition, 1, QTableWidgetItem(exposureEntry))
 
 class XYStageList(InteractiveListWidget):
-    """Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
+    """
+    Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
+    Extends InteractiveListWidget
     """
     def __init__(self):
+        """
+        Initializes the XY stage, only setting the name to empty
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
         super().__init__()
         self.XYstageName = ''
         
     def setXYStageName(self, XYstageName):
+        """
+        Set the name of the XY stage.
+        
+        Args:
+            XYstageName (str): The name of the XY stage to be set.
+        
+        Returns:
+            None
+        """
         self.XYstageName = XYstageName
     
     def swapRows(self, row1, row2):
+        """
+        Swap rows in the table widget.
+        
+        Args:
+            row1 (int): The index of the first row to swap.
+            row2 (int): The index of the second row to swap.
+        
+        Returns:
+            None
+        """
         for col in range(self.columnCount()):
             item1 = self.takeItem(row1, col)
             item2 = self.takeItem(row2, col)
@@ -156,6 +295,16 @@ class XYStageList(InteractiveListWidget):
         self.setCurrentCell(row2, 0)
         
     def addNewEntry(self,textEntry="New Entry",id=None):
+        """
+        Add a new entry to the table.
+        
+        Args:
+            textEntry (str): The text entry to be added. Default is "New Entry".
+            id (int): The ID of the new entry. If not provided, it will be automatically generated based on existing IDs.
+        
+        Returns:
+            None
+        """
         if id is None:
             if self.rowCount() == 0:
                 id = 1
@@ -170,56 +319,14 @@ class XYStageList(InteractiveListWidget):
         self.insertRow(rowPosition)
         self.setItem(rowPosition, 0, QTableWidgetItem(textEntry))
         self.setItem(rowPosition, 1, QTableWidgetItem(str(id)))
-
-from utils import CustomMainWindow
-
-
-    #Deprecated
-    # def load_state(self, filename):
-    #     logging.debug('LOADING STATE')
-    #     with open(filename, 'r') as file:
-    #         state = json.load(file)
-            
-    #     for key, value in state.items():
-    #         try:
-    #             if eval('isinstance(self.'+key+',QWidget)'):
-    #                 isWidget = True
-    #                 isVar = False
-    #             elif eval('hasattr(self,\"'+key+'\")'):
-    #                 isVar = True
-    #                 isWidget = False
-    #             else:
-    #                 isVar = False
-    #                 isWidget = False
-    #             if isWidget:
-    #                 widget = eval('self.'+key)
-    #                 if value['text'] is not None:
-    #                     widget.setText(value['text'])
-    #                 if value['checked'] is not None:
-    #                     widget.setChecked(value['checked'])
-    #             elif isVar:
-    #                 setattr(self, key, value)
-    #         except:
-    #             pass
-            
-            # if isinstance(value, dict):
-            #     for widget_name, properties in value.items():
-            #         widget = getattr(self, widget_name, None)
-            #         if widget is not None:
-            #             if hasattr(widget, 'setText') and 'text' in properties:
-            #                 widget.setText(properties['text'])
-            #             if hasattr(widget, 'setChecked') and 'checked' in properties:
-            #                 widget.setChecked(properties['checked'])
-            #             # Add more properties as needed
-            # else:
-
+#endregion
 
 class MDAGlados(CustomMainWindow):
+    """ 
+    Class that handles the multi-Dimensional acquisition of Pycromanager
+    """
+    #Pysignal should be outside the functions for proper init
     MDA_completed = pyqtSignal(bool)
-    def handleSizeChange(self, size):
-        newNrColumns = max(1,min(10, size.width() // 150))
-        self.GUI_grid_width = newNrColumns
-        
     def __init__(self,core,MM_JSON,layout,
                 shared_data,
                 hasGUI=False,
@@ -252,6 +359,49 @@ class MDAGlados(CustomMainWindow):
                 GUI_show_storage = True, 
                 GUI_acquire_button = True,
                 autoSaveLoad = False):
+        """
+        Initializes the MDAGlados class with the provided parameters.
+        
+        Args:
+            core: Core object for communication with the microscope.
+            MM_JSON: JSON object containing metadata.
+            layout: Layout object for GUI layout.
+            shared_data: Shared data object for communication between modules.
+            hasGUI: Boolean indicating whether GUI should be displayed (default is False).
+            num_time_points: Number of time points (default is 10).
+            time_interval_s: Time interval in seconds between acquisitions (default is 0).
+            z_start: Starting position of the Z-stack (default is None).
+            z_end: Ending position of the Z-stack (default is None).
+            z_step: Step size for Z-stack acquisition (default is None).
+            z_stage_sel: Selected Z-stage for acquisition (default is None).
+            z_nr_steps: Number of steps in the Z-stack (default is None).
+            z_step_distance: Distance between Z-stack steps (default is None).
+            z_nrsteps_radio_sel: Boolean indicating whether number of steps is selected (default is None).
+            z_stepdistance_radio_sel: Boolean indicating whether step distance is selected (default is None).
+            channel_group: Group of channels to acquire (default is None).
+            channels: List of channels to acquire (default is None).
+            channel_exposures_ms: List of exposure times for each channel in milliseconds (default is None).
+            xy_positions: Iterable of XY positions to acquire (default is None).
+            xyz_positions: Iterable of XYZ positions to acquire (default is None).
+            position_labels: List of labels for positions (default is None).
+            order: Order of acquisition (default is 'tpcz').
+            exposure_ms: Exposure time in milliseconds (default is 90).
+            storage_folder: Folder path for storing data (default is None).
+            storage_file_name: Name of the storage file (default is None).
+            GUI_show_exposure: Boolean indicating whether to show exposure settings in GUI (default is True).
+            GUI_show_xy: Boolean indicating whether to show XY settings in GUI (default is True).
+            GUI_show_z: Boolean indicating whether to show Z settings in GUI (default is True).
+            GUI_show_channel: Boolean indicating whether to show channel settings in GUI (default is True).
+            GUI_show_time: Boolean indicating whether to show time settings in GUI (default is True).
+            GUI_show_order: Boolean indicating whether to show order settings in GUI (default is True).
+            GUI_show_storage: Boolean indicating whether to show storage settings in GUI (default is True).
+            GUI_acquire_button: Boolean indicating whether to show the acquisition button in GUI (default is True).
+            autoSaveLoad: Boolean indicating whether to automatically save and load settings (default is False).
+        
+        Returns:
+            None
+        """
+        
         super().__init__()
         self.num_time_points = num_time_points
         self.time_interval_s = time_interval_s
@@ -319,27 +469,30 @@ class MDAGlados(CustomMainWindow):
         #     if self.autoSaveLoad:
         #         self.load_state('mda_state.json')
     
-    def getDevicesOfDeviceType(self,devicetype):
-        #Find all devices that have a specific devicetype
-        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
-        #for all devicetypes
-        #Get devices
-        devices = self.core.get_loaded_devices()
-        devices = [devices.get(i) for i in range(devices.size())]
-        devicesOfType = []
-        #Loop over devices
-        for device in devices:
-            if self.core.get_device_type(device).to_string() == devicetype:
-                logging.debug("found " + device + " of type " + devicetype)
-                devicesOfType.append(device)
-        return devicesOfType
-    
+    #region properties
     @property
     def GUI_grid_width(self):
+        """
+        Get the width of the GUI grid.
+        
+        Returns:
+            int: The width of the GUI grid.
+        """
+        
         return self._GUI_grid_width
     
     @GUI_grid_width.setter
     def GUI_grid_width(self, value):
+        """
+        Updates the width of the GUI grid.
+        
+        Args:
+            value: An integer representing the new width of the GUI grid.
+        
+        Returns:
+            None
+        """
+        
         if value != self._GUI_grid_width:
             self._GUI_grid_width = value
             if self.has_GUI and self.fully_started:
@@ -348,8 +501,29 @@ class MDAGlados(CustomMainWindow):
                     self.showOptionChanged()
                 except:
                     pass
-                
+    #endregion
+    
+    #region GUI
+    
     def initGUI(self, GUI_show_exposure=True, GUI_show_xy = True, GUI_show_z=True, GUI_show_channel=True, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_showOptions=True,GUI_acquire_button=True):
+        """
+        Initiate the GUI.
+        
+        Args:
+            GUI_show_exposure (bool): Whether to show the exposure widget. Default is True.
+            GUI_show_xy (bool): Whether to show the XY widget. Default is True.
+            GUI_show_z (bool): Whether to show the Z widget. Default is True.
+            GUI_show_channel (bool): Whether to show the Channel widget. Default is True.
+            GUI_show_time (bool): Whether to show the Time widget. Default is True.
+            GUI_show_order (bool): Whether to show the Order widget. Default is True.
+            GUI_show_storage (bool): Whether to show the Storage widget. Default is True.
+            GUI_showOptions (bool): Whether to show the Options widget. Default is True.
+            GUI_acquire_button (bool): Whether to show the Acquire button. Default is True.
+        
+        Returns:
+            None
+        """
+        
         #initiate the GUI
         #Create a Vertical+horizontal layout:
         self.gui = QGridLayout()
@@ -679,20 +853,61 @@ class MDAGlados(CustomMainWindow):
                         item.widget().setStyleSheet("padding: 2px; margin: 1px; spacing: 1px;")  # Change padding as needed
                 except:
                     pass
-        
-    def setZStart(self):
-        zstage = self.z_oneDstageDropdown.currentText()
-        #zstage value limited to 2 decimal places:
-        zstagePos = round(float(self.core.get_position(zstage)),2)
-        self.z_startEntry.setText(str(zstagePos))
     
-    def setZEnd(self):
-        zstage = self.z_oneDstageDropdown.currentText()
-        #zstage value limited to 2 decimal places:
-        zstagePos = round(float(self.core.get_position(zstage)),2)
-        self.z_endEntry.setText(str(zstagePos))
+    def handleSizeChange(self, size):
+        """
+        Handle a change in size by adjusting the number of columns in the GUI grid.
+        
+        Args:
+            size: The new size of the GUI window.
+        
+        Returns:
+            None
+        """
+        
+        newNrColumns = max(1,min(10, size.width() // 150))
+        self.GUI_grid_width = newNrColumns
+    
+    def getDevicesOfDeviceType(self,devicetype):
+        """
+        Find all devices that have a specific devicetype.
+        
+        Args:
+            devicetype (str): The type of device to search for. Refer to https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html for all devicetypes.
+        
+        Returns:
+            list: A list of devices that match the specified devicetype.
+        """
+        
+        #Find all devices that have a specific devicetype
+        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+        #for all devicetypes
+        #Get devices
+        devices = self.core.get_loaded_devices()
+        devices = [devices.get(i) for i in range(devices.size())]
+        devicesOfType = []
+        #Loop over devices
+        for device in devices:
+            if self.core.get_device_type(device).to_string() == devicetype:
+                logging.debug("found " + device + " of type " + devicetype)
+                devicesOfType.append(device)
+        return devicesOfType
     
     def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice = None):
+        """
+        Create an order ('t','tc', etc) layout based on the provided parameters.
+        
+        Args:
+            GUI_show_channel (bool): Whether to include channel in the layout.
+            GUI_show_time (bool): Whether to include time in the layout.
+            GUI_show_xy (bool): Whether to include xy in the layout.
+            GUI_show_z (bool): Whether to include z in the layout.
+            orderChoice (str, optional): The default order choice. Defaults to None.
+        
+        Returns:
+            QVBoxLayout: The layout containing the order dropdown and label.
+        """
+        
         orderLayout = QVBoxLayout()
         letters_to_include = ''
         if GUI_show_channel:
@@ -724,12 +939,34 @@ class MDAGlados(CustomMainWindow):
         return orderLayout
         
     def showOptionChanged(self):
+        """
+        Updates the GUI widgets based on the checkbox values.
+        
+        This function will be called when the checkboxes are clicked. It will update the GUI accordingly.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        
         self.setAllCheckBoxEnableValues()
         #This function will be called when the checkboxes are clicked. It will update the GUI accordingly:
         self.updateGUIwidgets(GUI_show_exposure=self.GUI_show_exposure_chkbox.isChecked(), GUI_show_xy = self.GUI_show_xy_chkbox.isChecked(), GUI_show_z=self.GUI_show_z_chkbox.isChecked(), GUI_show_channel=self.GUI_show_channel_chkbox.isChecked(), GUI_show_time=self.GUI_show_time_chkbox.isChecked(), GUI_show_storage=self.GUI_show_storage_chkbox.isChecked(),GUI_showOptions=True,GUI_acquire_button=self.GUI_acquire_button)
         self.get_MDA_events_from_GUI()
     
     def setAllCheckBoxEnableValues(self):
+        """
+        Set the enable values for all the checkboxes.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        
         self.GUI_exposure_enabled = self.GUI_show_exposure_chkbox.isChecked()
         self.GUI_xy_enabled = self.GUI_show_xy_chkbox.isChecked()
         self.GUI_z_enabled = self.GUI_show_z_chkbox.isChecked()
@@ -744,6 +981,24 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_storage = self.GUI_show_storage_chkbox.isChecked()
     
     def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4,GUI_acquire_button=True):
+        """
+        Updates the GUI widgets based on the specified parameters.
+        
+        Args:
+            GUI_show_exposure (bool): Whether to show the exposure widget. Default is True.
+            GUI_show_xy (bool): Whether to show the XY widget. Default is False.
+            GUI_show_z (bool): Whether to show the Z widget. Default is True.
+            GUI_show_channel (bool): Whether to show the channel widget. Default is False.
+            GUI_show_time (bool): Whether to show the time widget. Default is True.
+            GUI_show_storage (bool): Whether to show the storage widget. Default is True.
+            GUI_showOptions (bool): Whether to show the options widget. Default is True.
+            gridWidth (int): The width of the grid. Default is 4.
+            GUI_acquire_button (bool): Whether to show the acquire button. Default is True.
+        
+        Returns:
+            None
+        """
+        
         gridWidth = self.GUI_grid_width
         # Remove the widgets from their parent
         self.exposureGroupBox.setParent(None) # type: ignore
@@ -844,7 +1099,54 @@ class MDAGlados(CustomMainWindow):
         #redraw the self.gui:
         self.gui.update()
     
+    def printText(self):
+        """
+        Prints the events obtained from the getEvents method.
+        
+        Args:
+            self: The object instance.
+        
+        Returns:
+            None
+        """
+        print(self.getEvents())
+    
+    def getEvents(self):
+        """
+        Get the MDA events from the object.
+        
+        Returns:
+            The MDA events stored in the object.
+        """
+        return self.mda
+    
+    def getGui(self):
+        """
+        Returns the GUI object.
+        
+        Args:
+            None
+        
+        Returns:
+            The GUI object.
+        """
+        return self
+    #endregion
+    
+    #region Multi-D acquisition logic
     def MDA_acq_finished(self):
+        """
+        Signal that MDA acquisition has finished.
+        
+        Disconnects the signal, stores the acquired data, and updates the status of connected nodes in the nodz-coupled visualization and real-time analysis.
+        
+        Args:
+            self: The object instance.
+        
+        Returns:
+            None
+        """
+        
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         self.data = self.shared_data.mdaDatasets[-1]
         logging.info('MDA acq data finished and data stored!')
@@ -878,7 +1180,22 @@ class MDAGlados(CustomMainWindow):
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_Node(self, nodeInfo):
-        #Basically the same as MDA_from_GUI, but with the NodeInfo
+        """MDA_acq_from_Node(self, nodeInfo)
+        
+        Basically the same as MDA_from_GUI, but with the NodeInfo.
+        
+        Args:
+            self: The object itself.
+            nodeInfo: Information about the node.
+        
+        Returns:
+            None
+        
+        Raises:
+            None
+        
+        This function acquires data from a node and performs various operations based on the node information provided.
+        """
         logging.debug('At MDA_acq_from_node')
         nodeName = nodeInfo.name
         
@@ -948,6 +1265,20 @@ class MDAGlados(CustomMainWindow):
         pass
     
     def MDA_acq_from_GUI(self, mdaLayerName=None):
+        """
+        The MDA_acq_from_GUI function is called when the user presses the 'Start MDA' button in the GUI.
+        It sets all of the parameters for an MDA acquisition, and then starts it by calling startMDAacq()
+        
+        Args:
+            self: Refer to the instance of the class
+            mdaLayerName: Set the name of the napari layer that will be created for this mda
+        
+        Returns:
+            Nothing
+        
+        Doc Author:
+            Trelent
+        """
         logging.debug('At MDA_acq_from_GUI')
         self.shared_data._mdaMode = False
         
@@ -973,7 +1304,14 @@ class MDAGlados(CustomMainWindow):
         pass
     
     def get_MDA_events_from_GUI(self):
-        #This function will be run every time any option in the GUI is changed.
+        """
+        The get_MDA_events_from_GUI function is called every time the user changes any option in the GUI.
+        It will then update all variables that are used to create an MDA object, which can be used to run a multi-dimensional acquisition.
+        
+        
+        Args:
+            self: Refer to the object itself
+        """
         logging.debug('starting get_MDA_events_from_GUI')
         #Make this somewhat readable:
         if self.exposureGroupBox.isEnabled():
@@ -1093,14 +1431,47 @@ class MDAGlados(CustomMainWindow):
         
         pass
     
-    def printText(self):
-        print(self.getEvents())
+    def setZStart(self):
+        """
+        Set the starting Z position based on the selected zstage.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        
+        zstage = self.z_oneDstageDropdown.currentText()
+        #zstage value limited to 2 decimal places:
+        zstagePos = round(float(self.core.get_position(zstage)),2)
+        self.z_startEntry.setText(str(zstagePos))
     
-    def getEvents(self):
-        return self.mda
-    
-    def getGui(self):
-        return self
-    
+    def setZEnd(self):
+        """
+        Set the end position of the Z stage.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        
+        zstage = self.z_oneDstageDropdown.currentText()
+        #zstage value limited to 2 decimal places:
+        zstagePos = round(float(self.core.get_position(zstage)),2)
+        self.z_endEntry.setText(str(zstagePos))
+        
     def setMDAparams(self,mdaparams):
+        """
+        Set the MDA parameters.
+        
+        Args:
+            mdaparams: The MDA parameters to be set.
+        
+        Returns:
+            None
+        """
         self.mda = mdaparams
+    #endregion
