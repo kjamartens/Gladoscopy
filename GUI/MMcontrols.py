@@ -322,6 +322,11 @@ class MMConfigUI(CustomMainWindow):
                     for key, object in self.XYMoveEditField.items():
                         if key in MMControlsInfo:
                             object.setText(MMControlsInfo[key]['text'])
+                    for key,object in self.oneDMoveEditField.items():
+                        for objectLineEditKey in object:
+                            objectLineEdit = object[objectLineEditKey]
+                            if objectLineEditKey in MMControlsInfo:
+                                objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
 
     def storeAllControlValues(self):
         """
@@ -417,6 +422,14 @@ class MMConfigUI(CustomMainWindow):
     
     #region ROI
     def ROIoptionsLayout(self):
+        """
+        Create a layout with buttons for ROI options
+
+        Returns
+        -------
+        ROIoptionsLayout : QGridLayout
+            A layout with buttons for ROI options
+        """
         #Create a Grid layout:
         ROIoptionsLayout = QGridLayout()
         self.ROIoptionsButtons = {}
@@ -436,12 +449,25 @@ class MMConfigUI(CustomMainWindow):
         return ROIoptionsLayout
     
     def resetROI(self):
-        self.core.clear_roi()
+        """
+        Reset the ROI to its maximum size
+
+        This function resets the ROI to its maximum size, which is the size of the image
+        """
+        self.core.clear_roi() #type:ignore
     
     def zoomROI(self,option):
+        """
+        Zoom the ROI in or out from the center
+        
+        This function zooms the ROI in or out from the center.
+        It zooms the ROI by a factor of 2.
+        If the option is "ZoomIn", the ROI is zoomed in twice.
+        If the option is "ZoomOut", the ROI is zoomed out twice
+        """
         #Get the current ROI info
         #[x,y,width,height]
-        roiv = [self.core.get_roi().x,self.core.get_roi().y,self.core.get_roi().width,self.core.get_roi().height]
+        roiv = [self.core.get_roi().x,self.core.get_roi().y,self.core.get_roi().width,self.core.get_roi().height] #type:ignore
         logging.debug('ROI zoom requested, current size: '+str(roiv))
         if option == 'ZoomIn':
             #zoom in twice
@@ -473,6 +499,11 @@ class MMConfigUI(CustomMainWindow):
                 logging.error('ZOOMING IN DIDN\'T WORK!')
     
     def setROI(self,ROIpos):
+        """
+        Set the ROI to the specified position and size.
+        
+        The ROIpos should be a list of [x,y,width,height]
+        """
         #ROIpos should be a list of [x,y,width,height]
         logging.debug('Zooming ROI to ' + str(ROIpos))
         try:
@@ -490,18 +521,35 @@ class MMConfigUI(CustomMainWindow):
     
     #region Stages
     def stagesLayout(self):
+        """
+        Returns the layout with the XY and 1D stage widgets.
+
+        This layout is used when the user is not in relative mode.
+        """
         stageLayout = QHBoxLayout()
         stageLayout.addLayout(self.XYstageLayout())
         stageLayout.addLayout(self.oneDstageLayout())
         return stageLayout
     
     def relativeStagesLayout(self):
+        """
+        Returns the layout with the XY stage widgets in relative mode.
+
+        This layout is used when the user is in relative mode.
+        """
         stageLayout = QHBoxLayout()
         stageLayout.addLayout(self.XYstageLayout())
         stageLayout.addLayout(self.oneDstageLayout())
         return stageLayout
     
     def XYstageLayout(self):
+        """
+        Returns a layout with the XY stage widgets.
+
+        This layout includes a label with the current position,
+        three arrow buttons to move in the XY stage relative to the current position,
+        and text fields to set the size of the arrow buttons movement
+        """
         #Obtain the stage info from MM:
         XYStageName = self.core.get_xy_stage_device() #type: ignore
         #Get the stage position
@@ -636,9 +684,10 @@ class MMConfigUI(CustomMainWindow):
             self.oneDMoveEditField[stage] = {}
             for m in range(1,3):
                 internalLayout.addWidget(QLabel("⮞"*(m)),m,0)
-                self.oneDMoveEditField[stage][f'LineEdit_{m}'] = QLineEdit()
-                internalLayout.addWidget(self.oneDMoveEditField[stage][f'LineEdit_{m}'],m,1)
-                self.oneDMoveEditField[stage][f'LineEdit_{m}'].setText("10")
+                self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'] = QLineEdit()
+                internalLayout.addWidget(self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'],m,1)
+                self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].setText("10")
+                self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].textChanged.connect(lambda: self.storeAllControlValues())
             
             self.oneDStackedWidget.addWidget(self.oneDMoveEditFieldGridLayouts[stage])
         
@@ -650,10 +699,13 @@ class MMConfigUI(CustomMainWindow):
         #update the text
         self.updateOneDstageLayout()
         
+        #Store the values
+        self.storeAllControlValues()
+        
         return self.oneDStageLayout
     
     def updateOneDstageLayout(self):
-        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}")
+        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}") #type:ignore
         
         for widget_id in range(0,self.oneDStackedWidget.count()):
             widget = self.oneDStackedWidget.widget(widget_id)
@@ -664,16 +716,17 @@ class MMConfigUI(CustomMainWindow):
         #Get the currently selected one-D stage:
         selectedStage = self.oneDstageDropdown.currentText()
         
-        self.moveoneDstagesmallAmount = 10
-        self.moveoneDstagelargeAmount = 100
+        #Get the value currently in the LineEdit
+        self.moveoneDstagesmallAmount = float(self.oneDMoveEditField[selectedStage][f'oneDStackedWidget_{selectedStage}_1'].text())
+        self.moveoneDstagelargeAmount = float(self.oneDMoveEditField[selectedStage][f'oneDStackedWidget_{selectedStage}_2'].text())
         
         logging.debug("moving " + selectedStage + " by " + str(amount))
         
         #Move the stage relatively
         if abs(amount) == 2:
-            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float))
+            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float)) #type:ignore
         elif abs(amount) == 1:
-            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float))
+            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
         self.updateOneDstageLayout()
         
     def updateXYStageInfoWidget(self):#Obtain the stage info from MM:
@@ -684,7 +737,7 @@ class MMConfigUI(CustomMainWindow):
         
     def moveXYStage(self,relX,relY):
         #Move XY stage with um positions in relx, rely:
-        self.core.set_relative_xy_position(relX,relY)
+        self.core.set_relative_xy_position(relX,relY) #type:ignore
         #Update the XYStageInfoWidget (if it exists)
         self.updateXYStageInfoWidget()
     #endregion
