@@ -30,6 +30,10 @@ from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 matplotlib.use('Qt5Agg')
 
 class ConfigInfo:
+    """
+    This class contains information about a pycromanager config group
+    Contains info such as name, min/max value etc
+    """
     def __init__(self,core,config_group_id):
         """
         This class contains information about a pycromanager config group
@@ -145,6 +149,9 @@ class ConfigInfo:
         return self.core.get_current_config(self.configGroupName())
 
 class MMConfigUI(CustomMainWindow):
+    """
+        A class to create a MicroManager config UI
+    """
     def __init__(self, config_groups,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
         """
         A class to create a MicroManager config UI with the given configuration groups.
@@ -251,6 +258,75 @@ class MMConfigUI(CustomMainWindow):
         #Change the font of everything in the layout
         self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
     
+    #region General
+    def updateAllMMinfo(self):
+        """
+        Update all the info that can be updated from the microscope.
+        """
+        logging.debug('Updating all MM info')
+        if self.showConfigs:
+            self.updateConfigsFromMM()
+        if self.showStages:
+            self.updateXYStageInfoWidget()
+            self.updateOneDstageLayout()
+        
+        if self.autoSaveLoad:
+            if self.fullyLoaded:
+                if os.path.exists('glados_state.json'):
+                    with open('glados_state.json', 'r') as file:
+                        gladosInfo = json.load(file)
+                        MMControlsInfo = gladosInfo['MMControls']
+                
+                    #Hand-set the values that I want:
+                    self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+                    for key, object in self.XYMoveEditField.items():
+                        if key in MMControlsInfo:
+                            object.setText(MMControlsInfo[key]['text'])
+                    for key,object in self.oneDMoveEditField.items():
+                        for objectLineEditKey in object:
+                            objectLineEdit = object[objectLineEditKey]
+                            if objectLineEditKey in MMControlsInfo:
+                                objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
+
+    def storeAllControlValues(self):
+        """
+        Store all the control values in a dictionary, which can be used to save state.
+        """
+        if self.autoSaveLoad:
+            if self.fullyLoaded:
+                self.save_state_MMControls('glados_state.json')
+                pass
+
+    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
+        """
+        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
+        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
+
+        """
+        if widget is None:
+            return
+        
+        if isinstance(widget, (QLabel, QPushButton, QComboBox)):
+            widget.setFont(font)
+            widget.setContentsMargins(0, 0, 0, 0)
+            widget.setMinimumSize(0, 0)
+            # widget.setSizePolicy(
+            #     QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            # )
+
+        if hasattr(widget, 'layout'):
+            layout = widget.layout()
+            if layout:
+                layout.setContentsMargins(0, 0, 0, 0)
+                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
+                for i in range(layout.count()):
+                    item = layout.itemAt(i)
+                    if hasattr(item, 'widget'):
+                        self.set_font_and_margins_recursive(item.widget(), font=font)
+                    if hasattr(item, 'layout'):
+                        self.set_font_and_margins_recursive(item.layout(), font=font)
+    #endregion
+    
     #region live mode
     def liveModeLayout(self):
         """
@@ -297,129 +373,6 @@ class MMConfigUI(CustomMainWindow):
             shared_data.liveMode = False
     #endregion
 
-    #region General
-    #Update everything there is update-able
-    def updateAllMMinfo(self):
-        """
-        Update all the info that can be updated from the microscope.
-        """
-        logging.debug('Updating all MM info')
-        if self.showConfigs:
-            self.updateConfigsFromMM()
-        if self.showStages:
-            self.updateXYStageInfoWidget()
-            self.updateOneDstageLayout()
-        
-        if self.autoSaveLoad:
-            if self.fullyLoaded:
-                if os.path.exists('glados_state.json'):
-                    with open('glados_state.json', 'r') as file:
-                        gladosInfo = json.load(file)
-                        MMControlsInfo = gladosInfo['MMControls']
-                
-                    #Hand-set the values that I want:
-                    self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
-                    for key, object in self.XYMoveEditField.items():
-                        if key in MMControlsInfo:
-                            object.setText(MMControlsInfo[key]['text'])
-                    for key,object in self.oneDMoveEditField.items():
-                        for objectLineEditKey in object:
-                            objectLineEdit = object[objectLineEditKey]
-                            if objectLineEditKey in MMControlsInfo:
-                                objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
-
-    def storeAllControlValues(self):
-        """
-        Store all the control values in a dictionary, which can be used to save state.
-        """
-        if self.autoSaveLoad:
-            if self.fullyLoaded:
-                self.save_state_MMControls('glados_state.json')
-                pass
-
-
-    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
-        """
-        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
-        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
-
-        """
-        if widget is None:
-            return
-        
-        if isinstance(widget, (QLabel, QPushButton, QComboBox)):
-            widget.setFont(font)
-            widget.setContentsMargins(0, 0, 0, 0)
-            widget.setMinimumSize(0, 0)
-            # widget.setSizePolicy(
-            #     QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-            # )
-
-        if hasattr(widget, 'layout'):
-            layout = widget.layout()
-            if layout:
-                layout.setContentsMargins(0, 0, 0, 0)
-                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
-                for i in range(layout.count()):
-                    item = layout.itemAt(i)
-                    if hasattr(item, 'widget'):
-                        self.set_font_and_margins_recursive(item.widget(), font=font)
-                    if hasattr(item, 'layout'):
-                        self.set_font_and_margins_recursive(item.layout(), font=font)
-    #endregion
-    
-    #region deprecated
-    def get_device_properties(self):
-        core = self.core
-        devices = core.get_loaded_devices() #type:ignore
-        devices = [devices.get(i) for i in range(devices.size())]
-        device_items = []
-        for device in devices:
-            logging.debug('Device: '+device)
-            names = core.get_device_property_names(device) #type:ignore
-            props = [names.get(i) for i in range(names.size())]
-            property_items = []
-            for prop in props:
-                logging.debug('Property',prop)
-                value = core.get_property(device, prop) #type:ignore
-                is_read_only = core.is_property_read_only(device, prop) #type:ignore
-                if core.has_property_limits(device, prop): #type:ignore
-                    lower = core.get_property_lower_limit(device, prop) #type:ignore
-                    upper = core.get_property_upper_limit(device, prop) #type:ignore
-                    allowed = {
-                    "type": "range",
-                    "min": lower,
-                    "max": upper,
-                    "readOnly": is_read_only,
-                    }
-                else:
-                    allowed = core.get_allowed_property_values(device, prop) #type:ignore
-                    allowed = {
-                    "type": "enum",
-                    "options": [allowed.get(i) for i in range(allowed.size())],"readOnly": is_read_only,
-                    }
-                    property_items.append(
-                    {"device": device, "name": prop, "value": value, "allowed": allowed}
-                    )
-                    logging.debug('===>', device, prop, value, allowed)
-            if len(property_items) > 0:
-                device_items.append(
-                {
-                "name": device,
-                "value": "{} properties".format(len(props)),
-                "items": property_items,
-                }
-                )
-        return device_items
-
-    def Vseparator_line(self):
-        separator_line = QFrame()
-        separator_line.setFrameShape(QFrame.VLine)
-        separator_line.setFrameShadow(QFrame.Sunken)
-        separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
-        return separator_line
-    #endregion
-    
     #region ROI
     def ROIoptionsLayout(self):
         """
@@ -926,6 +879,9 @@ class MMConfigUI(CustomMainWindow):
                 self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
     
     def addInputField(self,rowLayout,config_id):
+        """ 
+        TODO
+        """
         #TODO: implement
         pass
     
@@ -1015,6 +971,17 @@ class MMConfigUI(CustomMainWindow):
         if self.showCheckboxes:
             #Disable all children recursively
             def enableDisableLayout(self, layout,config_id,trueFalse):
+                """
+                Enables or disables widgets in a layout based on the provided configuration ID.
+                
+                Args:
+                    layout: The layout containing the widgets to be enabled or disabled.
+                    config_id: The configuration ID used to identify the checkbox that should not be disabled.
+                    trueFalse: A boolean value indicating whether the widgets should be enabled (True) or disabled (False).
+                
+                Returns:
+                    None
+                """
                 for i in range(layout.count()):
                     item = layout.itemAt(i)
 
@@ -1044,7 +1011,91 @@ class MMConfigUI(CustomMainWindow):
         pass
     #endregion
 
+    #region deprecated
+    def get_device_properties(self):
+        """
+        Get device properties.
+        
+        Args:
+            self: The object itself.
+            
+        Returns:
+            List: A list of dictionaries containing device properties.
+        """
+        
+        core = self.core
+        devices = core.get_loaded_devices() #type:ignore
+        devices = [devices.get(i) for i in range(devices.size())]
+        device_items = []
+        for device in devices:
+            logging.debug('Device: '+device)
+            names = core.get_device_property_names(device) #type:ignore
+            props = [names.get(i) for i in range(names.size())]
+            property_items = []
+            for prop in props:
+                logging.debug('Property',prop)
+                value = core.get_property(device, prop) #type:ignore
+                is_read_only = core.is_property_read_only(device, prop) #type:ignore
+                if core.has_property_limits(device, prop): #type:ignore
+                    lower = core.get_property_lower_limit(device, prop) #type:ignore
+                    upper = core.get_property_upper_limit(device, prop) #type:ignore
+                    allowed = {
+                    "type": "range",
+                    "min": lower,
+                    "max": upper,
+                    "readOnly": is_read_only,
+                    }
+                else:
+                    allowed = core.get_allowed_property_values(device, prop) #type:ignore
+                    allowed = {
+                    "type": "enum",
+                    "options": [allowed.get(i) for i in range(allowed.size())],"readOnly": is_read_only,
+                    }
+                    property_items.append(
+                    {"device": device, "name": prop, "value": value, "allowed": allowed}
+                    )
+                    logging.debug('===>', device, prop, value, allowed)
+            if len(property_items) > 0:
+                device_items.append(
+                {
+                "name": device,
+                "value": "{} properties".format(len(props)),
+                "items": property_items,
+                }
+                )
+        return device_items
+
+    def Vseparator_line(self):
+        """
+        Creates a vertical separator line widget.
+        
+        Args:
+            None
+        
+        Returns:
+            QFrame: A vertical separator line widget with frame shape set to QFrame.VLine, frame shadow set to QFrame.Sunken, and background color set to #FFFFFF with a minimum width of 1px.
+        """
+        
+        separator_line = QFrame()
+        separator_line.setFrameShape(QFrame.VLine)
+        separator_line.setFrameShadow(QFrame.Sunken)
+        separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
+        return separator_line
+    #endregion
+    
 def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
+    """
+    Controls the Micro Manager UI.
+    
+    Args:
+        core: The Micro Manager core object.
+        MM_JSON: JSON object for Micro Manager.
+        main_layout: The main layout of the UI.
+        sshared_data: Shared data for the UI.
+    
+    Returns:
+        MMconfig: The Micro Manager configuration UI object.
+    """
     global shared_data
     shared_data = sshared_data
     # Get all config groups
