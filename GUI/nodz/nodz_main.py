@@ -923,7 +923,14 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES_SCORING_ANALYSIS'][node] = {}
             if 'scoring_analysis_currentData' in vars(nodeInst):
                 if nodeInst.scoring_analysis_currentData is not None:
-                    data['NODES_SCORING_ANALYSIS'][node] = nodeInst.scoring_analysis_currentData
+                    if len(nodeInst.scoring_analysis_currentData) is not 0:
+                        #Skip some attributes in nodes_mda:
+                        analysisattr_skip = ['__output__']
+                        for attr in nodeInst.scoring_analysis_currentData:
+                            if attr not in analysisattr_skip:
+                                if attr[:2] is not '__':
+                                    data['NODES_SCORING_ANALYSIS'][node][attr] = nodeInst.scoring_analysis_currentData[attr]
+                                    
                     
             data['NODES_SCORING_VISUALISATION'][node] = {}
             if 'scoring_visualisation_currentData' in vars(nodeInst):
@@ -948,7 +955,14 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES_RT_ANALYSIS'][node] = {}
             if 'real_time_analysis_currentData' in vars(nodeInst):
                 if nodeInst.real_time_analysis_currentData is not None:
-                    data['NODES_RT_ANALYSIS'][node] = nodeInst.real_time_analysis_currentData
+                    if len(nodeInst.real_time_analysis_currentData) is not 0:
+                        #Skip some attributes in nodes_mda:
+                        analysisattr_skip = ['__output__']
+                        for attr in nodeInst.real_time_analysis_currentData:
+                            if attr not in analysisattr_skip:
+                                if attr[:2] is not '__':
+                                    data['NODES_RT_ANALYSIS'][node][attr] = nodeInst.real_time_analysis_currentData[attr]
+
             
             data['NODES_TIMER'][node] = {}
             if 'timerInfo' in vars(nodeInst):

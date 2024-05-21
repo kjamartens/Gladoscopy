@@ -2123,24 +2123,37 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                                                 chosenLayerType = layerType[1]
                                                 break #to avoid searching in other files for this function
                         
+                        
                         layerName = visual_connected_node.visualisation_currentData['layerName']
+                        
+                        #If a layer with this name already exists, simply remove it:
+                        for layer in self.shared_data.napariViewer.layers: #type:ignore
+                            if layer.name == layerName:
+                                self.shared_data.napariViewer.layers.remove(layer) #type:ignore
+                                
+                        cmap = visual_connected_node.visualisation_currentData['colormap']
                         if chosenLayerType == 'points':
                             viewer = self.shared_data.napariViewer #type:ignore
                             napariLayer = viewer.add_points(
                                 data=None,
                                 text=None,
-                                name=layerName
+                                name=layerName,
+                                colormap = cmap
                             )
                         elif chosenLayerType == 'shapes':
                             viewer = self.shared_data.napariViewer #type:ignore
                             napariLayer = viewer.add_shapes(
-                                data=None
+                                data=None,
+                                name=layerName,
+                                colormap = cmap
                             )
                         elif chosenLayerType == 'image':
                             viewer = self.shared_data.napariViewer #type:ignore
                             im = np.random.random((30, 30))
                             napariLayer = viewer.add_image(
-                                data=im
+                                data=im,
+                                name=layerName,
+                                colormap = cmap
                             )
                         
                         visualOutput = eval(visualEvalText)
