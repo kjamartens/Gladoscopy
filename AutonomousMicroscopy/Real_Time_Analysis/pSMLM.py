@@ -290,7 +290,6 @@ class pSMLM():
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
         napariLayer.data = self.SMLMlocs[:, [1, 0]].copy()
         time.sleep(0.05)
-        napariLayer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
         napariLayer.symbol = 'disc'
         napariLayer.size = 5
         napariLayer.edge_color='red'
