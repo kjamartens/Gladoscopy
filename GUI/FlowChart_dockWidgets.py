@@ -2073,16 +2073,25 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             return
         
         #First assess that it's a MDA node:
-        if 'acquisition' not in connectedNode.name:
-            print('Error! Acquisition not connected to Grayscale test!')
+        if 'acquisition' not in connectedNode.name and 'analysisMeasurement' not in connectedNode.name:
+            print('Error! Acquisition or analysismeasurement not connected to analysismeasurement!')
         else:
-            #And then find the mdaData object
-            mdaDataobject = connectedNode.mdaData
-            
-            #Figure out which function is selected in the scoring_analysis node
-            selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-            #Figure out the belonging evaluation-text
-            evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
+            if 'acquisition' in connectedNode.name:
+                #And then find the mdaData object
+                mdaDataobject = connectedNode.mdaData
+                
+                #Figure out which function is selected in the scoring_analysis node
+                selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+                #Figure out the belonging evaluation-text
+                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
+            elif 'analysisMeasurement' in connectedNode.name:
+                dataobject = connectedNode.scoring_analysis_currentData['__output__']
+                
+                #Figure out which function is selected in the scoring_analysis node
+                selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+                #Figure out the belonging evaluation-text
+                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'dataobject','self.shared_data.core')
+                
             #And evaluate the custom function with custom parameters
             output = eval(evalText) #type:ignore
             

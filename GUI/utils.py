@@ -842,6 +842,7 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
+    methodName_method = ''
     #Loop over all entries of currentData:
     for key,value in currentData.items():
         if "#"+function+"#" in key:
@@ -859,8 +860,10 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
     moduleMethodEvalTexts = []
     if methodName_method != '':
         EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
+    else:
+        EvalTextMethod = function+'('+str(p1)+','+str(p2)+')'
+    #append this to moduleEvalTexts
+    moduleMethodEvalTexts.append(EvalTextMethod)
 
     if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
         return moduleMethodEvalTexts[0]
