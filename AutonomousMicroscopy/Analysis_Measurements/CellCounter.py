@@ -34,7 +34,6 @@ def CellCounter(dataobject,core,**kwargs):
     
     n_cells = np.max(np.max(dataobject['labels']))
     
-
     # Print the average intensity of each slice
     # print("Average intensity of each slice:")
     # print(slice_avg_intensity.compute())

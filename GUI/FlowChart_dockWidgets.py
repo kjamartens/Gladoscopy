@@ -1258,7 +1258,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = storedConfigsStrings) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
-                #Update the results of this dialog into the nodz node
+                #Update the results of this dialog into the nodz node   
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
         elif 'visualisation_' in nodeName:
             currentNode = self.findNodeByName(nodeName)
