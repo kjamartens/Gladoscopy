@@ -7,10 +7,11 @@
             "gui",
             "mda",
             "data",
-            "config_groups"
+            "config_groups",
+            "mainLayout"
         ],
         "num_time_points": 10,
-        "time_interval_s": 0.0,
+        "time_interval_s": 1.0,
         "z_start": 0,
         "z_end": 1,
         "z_step": 1,
@@ -107,7 +108,7 @@
                 "ChangeWaitTimeMs": "2000"
             }
         },
-        "lastTimeUpdateSize": 1716880199.6941185,
+        "lastTimeUpdateSize": 1716883789.1454625,
         "_GUI_grid_width": 10,
         "fully_started": true,
         "storageGroupBox": {
@@ -211,7 +212,7 @@
             "checked": null
         },
         "timeIntervalEntry": {
-            "text": "0.0",
+            "text": "1000",
             "checked": null
         },
         "timeIntervalDropdown": {
@@ -385,7 +386,7 @@
             "checked": false
         },
         "XYStageInfoWidget": {
-            "text": "XY\r\n 0/0",
+            "text": "XY\r\n 102/0",
             "checked": null
         },
         "oneDstageDropdown": {
@@ -401,7 +402,7 @@
             "checked": null
         },
         "oneDStackedWidget_Z_2": {
-            "text": "10",
+            "text": "100",
             "checked": null
         },
         "oneDinfoWidget": {
@@ -417,7 +418,7 @@
             "checked": false
         },
         "exposureTimeInputField": {
-            "text": "100",
+            "text": "30",
             "checked": null
         },
         "LiveModeButton": {

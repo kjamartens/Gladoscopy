@@ -1310,7 +1310,7 @@ import json
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','data','config_groups']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','data','config_groups','mainLayout']
 
     def save_state_MMControls(self,filename):
         if os.path.exists(filename):

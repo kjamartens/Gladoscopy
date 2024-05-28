@@ -331,6 +331,10 @@ class napariHandler():
         """
         if newSharedData is not None:
             self.shared_data = newSharedData
+            global napariViewer, shared_data, core
+            napariViewer = self.shared_data.napariViewer
+            shared_data = self.shared_data
+            core = self.shared_data.core
         if self.liveOrMda == 'live':
             #Hook the live mode into the scripts here
             if self.shared_data.liveMode == False:

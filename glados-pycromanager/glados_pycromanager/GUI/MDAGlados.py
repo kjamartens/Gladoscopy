@@ -358,7 +358,8 @@ class MDAGlados(CustomMainWindow):
                 GUI_show_order = True, 
                 GUI_show_storage = True, 
                 GUI_acquire_button = True,
-                autoSaveLoad = False):
+                autoSaveLoad = False,
+                parent=None):
         """
         Initializes the MDAGlados class with the provided parameters.
         
@@ -403,6 +404,13 @@ class MDAGlados(CustomMainWindow):
         """
         
         super().__init__()
+        
+        #If run as plugin, we need to specify the globals like this:
+        if parent is not None:
+            global livestate, napariViewer
+            livestate = parent.livestate
+            napariViewer = parent.napariViewer
+            
         self.num_time_points = num_time_points
         self.time_interval_s = time_interval_s
         self.z_start = z_start
@@ -840,7 +848,11 @@ class MDAGlados(CustomMainWindow):
         
         if self.layout is not None:
             #Add the layout to the main layout
-            self.layout.addLayout(self.gui,0,0)
+            try:
+                self.layout.addLayout(self.gui,0,0)
+            except:
+                self.setLayout(self.gui)
+                self.mainLayout = self.gui
             
             # Changing font and padding of all widgets
             font = QFont("Arial", 7)

@@ -79,9 +79,106 @@ import HelperFunctions #type: ignore
 
 
 
+class MMConfigWidget(QWidget):
+    """
+    The main glados-pycromanager widget that gets added to napari.
+    """
+    def __init__(self, viewer: napari.viewer.Viewer):
+        super().__init__()
+        self._viewer = viewer
+        global shared_data
+        
+        
+        includecustomUI = False
+        include_flowChart_automatedMicroscopy = True
+        
+        
+        core = None
+        MM_JSON = None
+        livestate = None
+        napariViewer = None
+        shared_data = None
+        print('2RUN NAPARI PYCROMANAGER PLUGIN')
+            
+        #Set up logging at correct level
+        log_file_path = 'logpath.txt'
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+
+        # Create the file handler to log to the file
+        file_handler = logging.FileHandler(log_file_path)
+        file_handler.setLevel(logging.INFO)
+
+        # Create the stream handler to log to the debug terminal
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setLevel(logging.INFO)
+
+        # Add the handlers to the logger
+        logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
+        
+        # Create an instance of the shared_data class
+        shared_data = Shared_data()
+        
+        core = Core()
+        shared_data.core = core
+        shared_data._headless = False
+    
+        MM_JSON = None
+        livestate = False
+        
+        napariViewer = viewer
+                
+        #Get some info from core to put in shared_data
+        shared_data._defaultFocusDevice = core.get_focus_device()
+        logging.info(f"Default focus device set to {shared_data._defaultFocusDevice}")
+        
+        self.core = core
+        self.MM_JSON = MM_JSON
+        self.livestate = livestate
+        self.shared_data = shared_data
+        self.napariViewer = napariViewer
+
+        # self.dockWidget = analysis_dockWidget_plugin(MM_JSON,self.layout,napariViewer,self,sharedData2=shared_data)
+
+        self.dockWidget = microManagerControlsUI_plugin(self)
+        self.setLayout(self.dockWidget)
+        print('2Finalise NAPARI PYCROMANAGER PLUGIN')
+
+
+class MDAWidget(QWidget):
+    def __init__(self, viewer: napari.viewer.Viewer):
+        logging.debug("dockWidget_MDA started")
+        super().__init__()
+        self._viewer = viewer
+        global shared_data 
+        
+        # Create an instance of the shared_data class
+        shared_data = Shared_data()
+        
+        core = Core()
+        shared_data.core = core
+        shared_data._headless = False
+    
+        MM_JSON = None
+        livestate = False
+        
+        napariViewer = viewer
+                
+        self.core = core
+        self.MM_JSON = MM_JSON
+        self.livestate = livestate
+        self.shared_data = shared_data
+        self.napariViewer = napariViewer
+        
+        self.dockWidget = MDAGlados_plugin(self)
+        self.setLayout(self.dockWidget)
+        
+
+
+
 class MainWidget(QWidget):
     """
-    Main Widget for napari-bleach-correct.
+    The main glados-pycromanager widget that gets added to napari.
     """
     def __init__(self, viewer: napari.viewer.Viewer):
         super().__init__()
@@ -128,22 +225,11 @@ class MainWidget(QWidget):
         livestate = False
         
         napariViewer = viewer
-                
-        #Get some info from core to put in shared_data
-        shared_data._defaultFocusDevice = core.get_focus_device()
-        logging.info(f"Default focus device set to {shared_data._defaultFocusDevice}")
         
-        self.core = core
-        self.MM_JSON = MM_JSON
-        self.livestate = livestate
-        self.shared_data = shared_data
-        self.napariViewer = napariViewer
+        MMconfigWidget = MMConfigWidget(viewer)
+        self._viewer.window.add_dock_widget(MMconfigWidget, area='top',tabify=True,name='Config')
+        
+        custom_widget_MDA = MDAWidget(viewer)
+        napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)
 
-        # self.dockWidget = analysis_dockWidget_plugin(MM_JSON,self.layout,napariViewer,self,sharedData2=shared_data)
-
-        self.dockWidget = microManagerControlsUI_plugin(self)
-
-        self.setLayout(self.dockWidget)
-        self.setWindowTitle("Bleaching Correction")
-                
         print('Finalise NAPARI PYCROMANAGER PLUGIN')

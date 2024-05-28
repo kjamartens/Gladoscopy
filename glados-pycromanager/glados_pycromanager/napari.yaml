@@ -11,11 +11,5 @@ contributions:
       title: Open my widget
       python_name: glados_pycromanager._dock_widget:MainWidget
   widgets:
-    - command: glados-pycromanager.say_hi  # note, same as command.id above
-      display_name: Hello World
-      autogenerate: true
-    - command: glados-pycromanager.run_gladospycromanager  # note, same as command.id above
-      display_name: Run Glados-pycromanager
-      autogenerate: true
     - command: glados-pycromanager.mainWidgetCall
-      display_name: Wizard
+      display_name: Glados

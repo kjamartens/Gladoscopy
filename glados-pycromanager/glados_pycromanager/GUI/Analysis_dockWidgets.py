@@ -102,6 +102,7 @@ matplotlib.use('Qt5Agg')
 
 
 from MMcontrols import *
+from MDAGlados import *
 
 def microManagerControlsUI_plugin(parent):
     """
@@ -134,3 +135,67 @@ def microManagerControlsUI_plugin(parent):
     
     return MMconfig.mainLayout
 
+
+def MDAGlados_plugin(parent):
+    
+    if os.path.exists('glados_state.json'):
+        #Load the mda state
+        with open('glados_state.json', 'r') as file:
+            gladosInfo = json.load(file)
+            mdaInfo = gladosInfo['MDA']
+        
+        
+        global core, livestate, napariViewer, shared_data, MM_JSON
+        core = parent.core
+        livestate = parent.livestate
+        shared_data = parent.shared_data
+        napariViewer = parent.napariViewer
+        shared_data.napariViewer = napariViewer
+        MM_JSON = None
+        
+        #Add the full micro manager controls UI
+        dockWidget = MDAGlados(core,None,parent.layout,shared_data,
+                    hasGUI=True,
+                    num_time_points = mdaInfo['num_time_points'], 
+                    time_interval_s = mdaInfo['time_interval_s'], 
+                    z_start = mdaInfo['z_start'],
+                    z_end = mdaInfo['z_end'],
+                    z_step = mdaInfo['z_step'],
+                    z_stage_sel = mdaInfo['z_stage_sel'],
+                    z_nr_steps = mdaInfo['z_nr_steps'],
+                    z_step_distance = mdaInfo['z_step_distance'],
+                    z_nrsteps_radio_sel = mdaInfo['z_nrsteps_radio_sel'],
+                    z_stepdistance_radio_sel = mdaInfo['z_stepdistance_radio_sel'],
+                    channel_group = mdaInfo['channel_group'],
+                    channels = mdaInfo['channels'],
+                    channel_exposures_ms = mdaInfo['channel_exposures_ms'],
+                    xy_positions = mdaInfo['xy_positions'],
+                    xyz_positions = mdaInfo['xyz_positions'],
+                    position_labels = mdaInfo['position_labels'],
+                    exposure_ms = mdaInfo['exposure_ms'],
+                    storage_folder = mdaInfo['storage_folder'],
+                    storage_file_name = mdaInfo['storage_file_name'],
+                    order = mdaInfo['order'],
+                    GUI_show_exposure = mdaInfo['GUI_show_exposure'], 
+                    GUI_show_xy = mdaInfo['GUI_show_xy'], 
+                    GUI_show_z = mdaInfo['GUI_show_z'], 
+                    GUI_show_channel = mdaInfo['GUI_show_channel'], 
+                    GUI_show_time = mdaInfo['GUI_show_time'], 
+                    GUI_show_order = mdaInfo['GUI_show_order'], 
+                    GUI_show_storage = mdaInfo['GUI_show_storage'], 
+                    GUI_acquire_button = True,
+                    autoSaveLoad=True).getGui()
+    else: #If no MDA state is yet saved, open a new MDAGlados from scratch
+        #Add the full micro manager controls UI
+        dockWidget = MDAGlados(core,None,parent.layout,shared_data,
+                    hasGUI=True,
+                    GUI_acquire_button = True,
+                    autoSaveLoad=True).getGui()
+        
+    # self.sizeChanged.connect(self.dockWidget.handleSizeChange)
+    
+    # #Create the MM config via all config groups
+    # MMconfig = MDAGlados(allConfigGroups,autoSaveLoad=True,parent=parent)
+    # # main_layout.addLayout(MMconfig.mainLayout,0,0)
+    
+    return dockWidget.mainLayout
