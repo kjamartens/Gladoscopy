@@ -11,7 +11,7 @@
             "mainLayout"
         ],
         "num_time_points": 10,
-        "time_interval_s": 1.0,
+        "time_interval_s": 0.0,
         "z_start": 0,
         "z_end": 1,
         "z_step": 1,
@@ -108,7 +108,7 @@
                 "ChangeWaitTimeMs": "2000"
             }
         },
-        "lastTimeUpdateSize": 1716883789.1454625,
+        "lastTimeUpdateSize": 1716909218.479809,
         "_GUI_grid_width": 10,
         "fully_started": true,
         "storageGroupBox": {
@@ -212,7 +212,7 @@
             "checked": null
         },
         "timeIntervalEntry": {
-            "text": "1000",
+            "text": "0.0",
             "checked": null
         },
         "timeIntervalDropdown": {
@@ -350,11 +350,11 @@
             "checked": false
         },
         "X_1": {
-            "text": "0",
+            "text": "51.2",
             "checked": null
         },
         "Y_1": {
-            "text": "0",
+            "text": "51.2",
             "checked": null
         },
         "Button_1": {
@@ -362,11 +362,11 @@
             "checked": false
         },
         "X_2": {
-            "text": "0",
+            "text": "512",
             "checked": null
         },
         "Y_2": {
-            "text": "0",
+            "text": "512",
             "checked": null
         },
         "Button_2": {
@@ -374,11 +374,11 @@
             "checked": false
         },
         "X_3": {
-            "text": "0",
+            "text": "1536",
             "checked": null
         },
         "Y_3": {
-            "text": "0",
+            "text": "1536",
             "checked": null
         },
         "Button_3": {
@@ -386,7 +386,7 @@
             "checked": false
         },
         "XYStageInfoWidget": {
-            "text": "XY\r\n 102/0",
+            "text": "XY\r\n 0/0",
             "checked": null
         },
         "oneDstageDropdown": {
@@ -402,7 +402,7 @@
             "checked": null
         },
         "oneDStackedWidget_Z_2": {
-            "text": "100",
+            "text": "10",
             "checked": null
         },
         "oneDinfoWidget": {
@@ -418,7 +418,7 @@
             "checked": false
         },
         "exposureTimeInputField": {
-            "text": "30",
+            "text": "100",
             "checked": null
         },
         "LiveModeButton": {

@@ -1961,15 +1961,15 @@ class NodeItem(QtWidgets.QGraphicsItem):
         #Draw the icon
         from PyQt5.QtGui import QPixmap
         if self.status == 'idle':
-            self.icon = QPixmap('GUI/Icons/node_pending.png')
+            self.icon = QPixmap('glados-pycromanager/glados_pycromanager/GUI/Icons/node_pending.png')
         elif self.status == 'running':
-            self.icon = QPixmap('GUI/Icons/node_inProgress.png')
+            self.icon = QPixmap('glados-pycromanager/glados_pycromanager/GUI/Icons/node_inProgress.png')
         elif self.status == 'finished':
-            self.icon = QPixmap('GUI/Icons/node_completed.png')
+            self.icon = QPixmap('glados-pycromanager/glados_pycromanager/GUI/Icons/node_completed.png')
         elif self.status == 'error':
-            self.icon = QPixmap('GUI/Icons/node_error.png')
+            self.icon = QPixmap('glados-pycromanager/glados_pycromanager/GUI/Icons/node_error.png')
         else:
-            self.icon = QPixmap('GUI/Icons/node_error.png')
+            self.icon = QPixmap('glados-pycromanager/glados_pycromanager/GUI/Icons/node_error.png')
             
         iconSize = 15
         painter.drawPixmap(int(-margin-iconSize+14-5-iconSize/2), int(-text_height+iconSize*.66), int(iconSize), int(iconSize), self.icon)

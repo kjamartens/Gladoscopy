@@ -299,7 +299,6 @@ class MMConfigUI(CustomMainWindow):
                         gladosInfo = json.load(file)
                         MMControlsInfo = gladosInfo['MMControls']
                 
-
                     #Hand-set the values that I want to save:
                     if 'exposureTimeInputField' in MMControlsInfo:
                         self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
@@ -1213,7 +1212,7 @@ class MMConfigUI(CustomMainWindow):
         separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
         return separator_line
     #endregion
-    
+
 def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     """
     Controls the Micro Manager UI.
