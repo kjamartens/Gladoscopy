@@ -111,7 +111,13 @@ class ConfigInfo:
         if self.nrConfigs()>1:
             return True
         else:
-            return False
+            #If there is exactly one option...
+            if self.nrConfigs() == 1:
+                #And the option is 'NewPreset', it means there are no presets specified
+                if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
+                    return False
+                else:
+                    return True
         
     def isSlider(self):
         """Returns Boolean whether the config group should be represented as a slider"""
@@ -128,10 +134,13 @@ class ConfigInfo:
         if self.nrConfigs()>1:
             return False
         else:
-            if self.hasPropertyLimits():
-                return False
-            else:
-                return True
+            #If there is exactly one option...
+            if self.nrConfigs() == 1:
+                #And the option is 'NewPreset', it means there are no presets specified
+                if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
+                    return True
+                else:
+                    return False
 
     def helpStringInfo(self):
         """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
@@ -202,6 +211,7 @@ class MMConfigUI(CustomMainWindow):
             self.core = None
         self.dropDownBoxes = {}
         self.sliders = {}
+        self.editFields = {}
         self.configCheckboxes = {}
         self.sliderPrecision = 100
         self.config_string_storage = []
@@ -924,7 +934,44 @@ class MMConfigUI(CustomMainWindow):
         """ 
         TODO
         """
-        #TODO: implement
+        
+        #Get the config group name
+        configGroupName = self.config_groups[config_id].configGroupName()
+        
+        self.editFields[config_id] = QLineEdit()
+        #Add a callback when it is changed:
+        self.editFields[config_id].textChanged.connect(lambda value, config_id = config_id: self.onEditFieldChanged(config_id))
+        # Add the editFields to the rowLayout:
+        rowLayout.addWidget(self.editFields[config_id])
+        pass
+    
+    def onEditFieldChanged(self,config_id):
+        """
+        Changes a micromanager config when an editfield has changed
+
+        Args:
+            config_id (int): The ID of the editfield box that triggered the event.
+
+        Returns:
+            None
+        """
+        #TODO
+        
+        CurrentText = self.editFields[config_id].text()
+        #Get the config group name:
+        configGroupName = self.config_groups[config_id].configGroupName()
+        
+        #An Editfield config by definition (?) only has a single property underneath, so get that:
+        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+        configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+        device_label = configdata.get_setting(0).get_device_label()
+        property_name = configdata.get_setting(0).get_property_name()
+
+        #Set this property:
+        self.config_groups[config_id].core.set_property(device_label,property_name,CurrentText)
+        
+        #And set the value in pycro/micromanager
+        # self.config_groups[config_id].core.define_config(configGroupName,CurrentText)
         pass
     
     def updateValuefromMM(self,config_id):
