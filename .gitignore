@@ -2,5 +2,6 @@
 *.bak
 *Testing*
 *ExampleData*
-temp*
+*temp*
+*MdaAcqShouldBeRemoved*
 Test_*
