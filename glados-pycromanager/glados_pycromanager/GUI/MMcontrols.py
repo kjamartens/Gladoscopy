@@ -299,7 +299,7 @@ class MMConfigUI(CustomMainWindow):
                         gladosInfo = json.load(file)
                         MMControlsInfo = gladosInfo['MMControls']
                 
-                    #Hand-set the values that I want:
+                    #Hand-set the values that I want to save:
                     self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
                     for key, object in self.XYMoveEditField.items():
                         if key in MMControlsInfo:

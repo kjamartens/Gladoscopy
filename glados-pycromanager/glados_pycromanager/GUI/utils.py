@@ -1319,10 +1319,13 @@ class CustomMainWindow(QWidget):
                 state = json.load(file)
         else:
             state = {}
+            state['MDA'] = {}
             state['MMControls'] = {}
         
         if 'MMControls' not in state:
             state['MMControls'] = {}
+        if 'MDA' not in state:
+            state['MDA'] = {}
         
         import MMcontrols
         import napariGlados
@@ -1376,6 +1379,13 @@ class CustomMainWindow(QWidget):
         else:
             state = {}
             state['MDA'] = {}
+            state['MMControls'] = {}
+        
+        if 'MMControls' not in state:
+            state['MMControls'] = {}
+        if 'MDA' not in state:
+            state['MDA'] = {}
+        
         for key, value in vars(self).items():
             saveState = None
             if isinstance(value, QWidget):
