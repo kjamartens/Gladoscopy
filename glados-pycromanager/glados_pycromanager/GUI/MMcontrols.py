@@ -138,7 +138,11 @@ class ConfigInfo:
             if self.nrConfigs() == 1:
                 #And the option is 'NewPreset', it means there are no presets specified
                 if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
-                    return True
+                    #check if it's not a slider...
+                    if self.hasPropertyLimits():
+                        return False
+                    else:
+                        return True
                 else:
                     return False
 
@@ -396,7 +400,7 @@ class MMConfigUI(CustomMainWindow):
         #Add a 'exposure time' input field:
         self.exposureTimeInputField = QLineEdit()
         self.exposureTimeInputField.setText(str(100))
-        self.exposureTimeInputField.textChanged.connect(lambda: self.storeAllControlValues())
+        self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
         liveModeLayout.addWidget(self.exposureTimeInputField,1,1)
         
         self.LiveModeButton = QPushButton("Start Live Mode")
@@ -597,10 +601,10 @@ class MMConfigUI(CustomMainWindow):
             XYStageSetMovementLayout.addWidget(QLabel("⮞"*(m)),m,0,1,1, alignment=Qt.AlignmentFlag.AlignRight)
             self.XYMoveEditField[f"X_{m}"] = QLineEdit()
             XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"X_{m}"],m,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.XYMoveEditField[f"X_{m}"].textChanged.connect(lambda: self.storeAllControlValues())
+            self.XYMoveEditField[f"X_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
             self.XYMoveEditField[f"Y_{m}"] = QLineEdit()
             XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Y_{m}"],m,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.XYMoveEditField[f"Y_{m}"].textChanged.connect(lambda: self.storeAllControlValues())
+            self.XYMoveEditField[f"Y_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
             XYStageSetMovementLayout.addWidget(QLabel("μm"),m,3,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
             self.XYMoveEditField[f"Button_{m}"] = QPushButton(pushButtonLabelArr[m-1])
             
@@ -701,7 +705,7 @@ class MMConfigUI(CustomMainWindow):
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'] = QLineEdit()
                 internalLayout.addWidget(self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'],m,1)
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].setText("10")
-                self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].textChanged.connect(lambda: self.storeAllControlValues())
+                self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].editingFinished.connect(lambda: self.storeAllControlValues())
             
             self.oneDStackedWidget.addWidget(self.oneDMoveEditFieldGridLayouts[stage])
         
@@ -886,18 +890,27 @@ class MMConfigUI(CustomMainWindow):
         #Sliders only work in integers, so we need to set some artificial precision and translate to this precision
         sliderPrecision = self.sliderPrecision
         sliderValInSliderPrecision = int(((currentSliderValue-lowerLimit)/(upperLimit-lowerLimit))*sliderPrecision)
+        
+        #First add an editfield that has the value numerically:
+        self.editFields[config_id] = QLineEdit()
+        self.editFields[config_id].setText(str(currentSliderValue))
+        #Only allow numbers/float values
+        self.editFields[config_id].setValidator(QDoubleValidator())
+        rowLayout.addWidget(self.editFields[config_id])
+        self.editFields[config_id].editingFinished.connect(lambda config_id = config_id: self.on_sliderChanged(config_id,fromText=True,fromSlider=False))
+        
         # #Create the slider:
         self.sliders[config_id] = QSlider(Qt.Horizontal) #type: ignore
         self.sliders[config_id].setRange(0,sliderPrecision)
         self.sliders[config_id].setValue(sliderValInSliderPrecision)
         self.sliders[config_id].slider_conversion_array = [lowerLimit,upperLimit,sliderPrecision]
         #Add a callback when it is changed:
-        self.sliders[config_id].valueChanged.connect(lambda value, config_id = config_id: self.on_sliderChanged(config_id))
+        self.sliders[config_id].valueChanged.connect(lambda value, config_id = config_id: self.on_sliderChanged(config_id,fromSlider=True,fromText=False))
         # #Add the slider to the rowLayout:
         rowLayout.addWidget(self.sliders[config_id])
         pass
     
-    def on_sliderChanged(self,config_id):
+    def on_sliderChanged(self,config_id,fromText=False,fromSlider=True):
         """
         Changes a micromanager config when a slider has changed
 
@@ -913,9 +926,17 @@ class MMConfigUI(CustomMainWindow):
             self.configCheckboxes[config_id].setChecked(True)
         if self.changes_update_MM:
             #Get the new value from the slider:
-            newValue = self.sliders[config_id].value()
-            #Get the true value from the conversion:
-            trueValue = newValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
+            if fromSlider:
+                newValue = self.sliders[config_id].value()
+                #Get the true value from the conversion:
+                trueValue = newValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
+            elif fromText:
+                if self.editFields[config_id].text() != "":
+                    trueValue = float(self.editFields[config_id].text())
+                else:
+                    trueValue = ""
+            else:
+                trueValue = "" #error out later on purpose
             #Change the value if it's a true value
             if trueValue != "" and trueValue != " ":
                 #Get the config group name:
@@ -929,6 +950,13 @@ class MMConfigUI(CustomMainWindow):
 
                 #Set this property:
                 self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
+                
+                #Set the slider/text if the other is changed
+                if fromSlider:
+                    self.editFields[config_id].setText(str(trueValue))
+                elif fromText:
+                    newValue = self.sliders[config_id].slider_conversion_array[2] * (trueValue - self.sliders[config_id].slider_conversion_array[0]) / (self.sliders[config_id].slider_conversion_array[1] - self.sliders[config_id].slider_conversion_array[0])
+                    self.sliders[config_id].setValue(int(newValue))
     
     def addInputField(self,rowLayout,config_id):
         """ 
@@ -940,7 +968,7 @@ class MMConfigUI(CustomMainWindow):
         
         self.editFields[config_id] = QLineEdit()
         #Add a callback when it is changed:
-        self.editFields[config_id].textChanged.connect(lambda value, config_id = config_id: self.onEditFieldChanged(config_id))
+        self.editFields[config_id].editingFinished.connect(lambda config_id = config_id: self.onEditFieldChanged(config_id))
         # Add the editFields to the rowLayout:
         rowLayout.addWidget(self.editFields[config_id])
         pass
@@ -970,8 +998,6 @@ class MMConfigUI(CustomMainWindow):
         #Set this property:
         self.config_groups[config_id].core.set_property(device_label,property_name,CurrentText)
         
-        #And set the value in pycro/micromanager
-        # self.config_groups[config_id].core.define_config(configGroupName,CurrentText)
         pass
     
     def updateValuefromMM(self,config_id):
@@ -1012,8 +1038,22 @@ class MMConfigUI(CustomMainWindow):
             self.sliders[config_id].setRange(0,sliderPrecision)
             self.sliders[config_id].setValue(sliderValInSliderPrecision)
             
+            #Also update the corresponding editField
+            self.editFields[config_id].setText(str(currentSliderValue))
+            
         elif self.config_groups[config_id].isInputField():
-            pass
+            
+            #A editfield config by definition (?) only has a single property underneath, so get that:
+            configGroupName = self.config_groups[config_id].configGroupName()
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+            configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+            device_label = configdata.get_setting(0).get_device_label()
+            property_name = configdata.get_setting(0).get_property_name()
+            
+            #Finally we get the current value of the editfield
+            currentValue = (self.config_groups[config_id].core.get_property(device_label,property_name))
+            
+            self.editFields[config_id].setText(currentValue)
         
         #Make inactive if the checkbox is inactive
         self.configLayoutEnableChange(config_id)
