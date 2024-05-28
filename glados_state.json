@@ -6,38 +6,33 @@
             "shared_data",
             "gui",
             "mda",
-            "dataconfig_groups"
+            "data",
+            "config_groups"
         ],
-        "num_time_points": 2,
-        "time_interval_s": 1.0,
+        "num_time_points": 10,
+        "time_interval_s": 0.0,
         "z_start": 0,
         "z_end": 1,
         "z_step": 1,
-        "z_stage_sel": "TIZDrive",
+        "z_stage_sel": "Z",
         "z_nr_steps": null,
         "z_step_distance": null,
         "z_nrsteps_radio_sel": true,
         "z_stepdistance_radio_sel": false,
-        "channel_group": "488_OnOff",
-        "channels": [
-            "Off",
-            "On"
-        ],
-        "channel_exposures_ms": [
-            100.0,
-            100.0
-        ],
+        "channel_group": "Camera",
+        "channels": [],
+        "channel_exposures_ms": [],
         "storage_folder": "",
         "storage_file_name": "",
         "xy_positions": null,
         "xyz_positions": null,
         "position_labels": null,
-        "order": "ct",
-        "exposure_ms": 100.0,
+        "order": "t",
+        "exposure_ms": 90.0,
         "GUI_show_exposure": true,
         "GUI_show_xy": false,
         "GUI_show_z": false,
-        "GUI_show_channel": true,
+        "GUI_show_channel": false,
         "GUI_show_time": true,
         "GUI_show_order": true,
         "GUI_show_storage": false,
@@ -45,7 +40,7 @@
         "GUI_exposure_enabled": true,
         "GUI_xy_enabled": false,
         "GUI_z_enabled": false,
-        "GUI_channel_enabled": true,
+        "GUI_channel_enabled": false,
         "GUI_time_enabled": true,
         "GUI_order_enabled": true,
         "GUI_storage_enabled": false,
@@ -112,9 +107,8 @@
                 "ChangeWaitTimeMs": "2000"
             }
         },
-        "lastTimeUpdateSize": 1714741837.2585056,
+        "lastTimeUpdateSize": 1716880199.6941185,
         "_GUI_grid_width": 10,
-        "data": null,
         "fully_started": true,
         "storageGroupBox": {
             "text": null,
@@ -158,7 +152,7 @@
         },
         "GUI_show_channel_chkbox": {
             "text": "Channel",
-            "checked": true
+            "checked": false
         },
         "GUI_show_time_chkbox": {
             "text": "Time",
@@ -197,7 +191,7 @@
             "checked": null
         },
         "exposureEntry": {
-            "text": "100",
+            "text": "90.0",
             "checked": null
         },
         "exposureDropdown": {
@@ -209,7 +203,7 @@
             "checked": null
         },
         "timePointEntry": {
-            "text": "2",
+            "text": "10",
             "checked": null
         },
         "timeIntervalLabel": {
@@ -217,7 +211,7 @@
             "checked": null
         },
         "timeIntervalEntry": {
-            "text": "1000",
+            "text": "0.0",
             "checked": null
         },
         "timeIntervalDropdown": {
@@ -355,11 +349,11 @@
             "checked": false
         },
         "X_1": {
-            "text": "131.31776",
+            "text": "0",
             "checked": null
         },
         "Y_1": {
-            "text": "13s1.31776",
+            "text": "0",
             "checked": null
         },
         "Button_1": {
@@ -367,11 +361,11 @@
             "checked": false
         },
         "X_2": {
-            "text": "1313.1776",
+            "text": "0",
             "checked": null
         },
         "Y_2": {
-            "text": "1313.1776",
+            "text": "0",
             "checked": null
         },
         "Button_2": {
@@ -379,11 +373,11 @@
             "checked": false
         },
         "X_3": {
-            "text": "3939.5328",
+            "text": "0",
             "checked": null
         },
         "Y_3": {
-            "text": "3939.5328",
+            "text": "0",
             "checked": null
         },
         "Button_3": {
@@ -391,7 +385,7 @@
             "checked": false
         },
         "XYStageInfoWidget": {
-            "text": "TIXYDrive\r\n 614/17090",
+            "text": "XY\r\n 0/0",
             "checked": null
         },
         "oneDstageDropdown": {
@@ -402,20 +396,16 @@
             "text": null,
             "checked": null
         },
-        "oneDStackedWidget_TIZDrive": {
+        "oneDStackedWidget_Z_1": {
             "text": "10",
             "checked": null
         },
-        "oneDStackedWidget_TIPFSOffset": {
-            "text": "10",
-            "checked": null
-        },
-        "oneDStackedWidget_TIRF1DStage": {
+        "oneDStackedWidget_Z_2": {
             "text": "10",
             "checked": null
         },
         "oneDinfoWidget": {
-            "text": "TIRF1DStage\r\n 0.0",
+            "text": "Z\r\n 0.0",
             "checked": null
         },
         "roiOptionsGroupBox": {
@@ -433,30 +423,6 @@
         "LiveModeButton": {
             "text": "Start Live Mode",
             "checked": false
-        },
-        "oneDStackedWidget_TIZDrive_1": {
-            "text": "10",
-            "checked": null
-        },
-        "oneDStackedWidget_TIZDrive_2": {
-            "text": "10",
-            "checked": null
-        },
-        "oneDStackedWidget_TIPFSOffset_1": {
-            "text": "10xcv",
-            "checked": null
-        },
-        "oneDStackedWidget_TIPFSOffset_2": {
-            "text": "10",
-            "checked": null
-        },
-        "oneDStackedWidget_TIRF1DStage_1": {
-            "text": "10s",
-            "checked": null
-        },
-        "oneDStackedWidget_TIRF1DStage_2": {
-            "text": "10",
-            "checked": null
         }
     }
 }

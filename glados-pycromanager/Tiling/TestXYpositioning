@@ -1,0 +1,47 @@
+
+from PycroManagerFunctions import *
+from TilingFunctions import *
+from CellScoringFunctions import *
+import numpy as np
+import time
+import json
+import glob
+from PIL import Image
+from datetime import datetime
+from pathlib import Path
+import pyperclip
+#Initiate the pycromanager
+mmc = InitiatePycroManager();
+'''
+mainFolder = 'E:/Data/Koen/20220909/Hfx/220909_1639/'
+daughterFolder = '';
+sztrue_x = 30
+sztrue_y = 30
+Overlap=40
+ImageSize = 512;
+
+SegmentAllBFImages(mainFolder,daughterFolder,sztrue_x,sztrue_y)
+RunRGStitchingAlgorithmInImageJ(1,1,mainFolder,daughterFolder,sztrue_x,sztrue_y,Overlap);
+CombineROIsAfterStitching(mainFolder,daughterFolder,ImageSize,sztrue_x*sztrue_y);
+'''
+
+Pycro_TurnOffBF(mmc)
+strobo_time_561 = 200;
+frametime = 200;
+power_561 = 400;
+#Set exposure
+mmc.set_exposure(frametime);
+#Set blinking of 561 and UV
+Pycro_Setup_sptSettings(mmc,strobo_time_561,power_561,frametime)
+time.sleep(1);
+#Pycro_Setup_stop_561_laser(mmc)
+
+'''
+
+startx = mmc.get_x_position()
+starty = mmc.get_y_position()
+print(startx)
+print(starty)
+
+mmc.set_xy_position(-2525.8,16681.6)
+'''

@@ -1,0 +1,2 @@
+[napari.manifest]
+glados-pycromanager = glados_pycromanager:napari.yaml

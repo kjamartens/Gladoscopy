@@ -1,0 +1,3 @@
+#pdoc --html --output-dir build my_package
+
+pdoc3 --html --output-dir Documentation GUI/AnalysisClass.py --force

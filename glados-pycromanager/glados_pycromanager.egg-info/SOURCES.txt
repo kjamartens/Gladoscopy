@@ -1,0 +1,10 @@
+README.txt
+pyproject.toml
+setup.cfg
+glados_pycromanager/__init__.py
+glados_pycromanager.egg-info/PKG-INFO
+glados_pycromanager.egg-info/SOURCES.txt
+glados_pycromanager.egg-info/dependency_links.txt
+glados_pycromanager.egg-info/entry_points.txt
+glados_pycromanager.egg-info/requires.txt
+glados_pycromanager.egg-info/top_level.txt

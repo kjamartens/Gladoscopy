@@ -1,0 +1,10 @@
+cd C:\Users\Koen Martens\Documents\GitHub\ScopeGUI\glados-pycromanager
+
+conda activate C:\CondaEnvironments\AutonomousMicroscopyEnv310
+
+I think only once:
+python -m pip install -e .
+
+napari
+
+

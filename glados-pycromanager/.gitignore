@@ -1,0 +1,6 @@
+*.pyc
+*.bak
+*Testing*
+*ExampleData*
+temp*
+Test_*

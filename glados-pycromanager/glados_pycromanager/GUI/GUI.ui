@@ -1,0 +1,1746 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>728</width>
+    <height>902</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>667</width>
+    <height>352</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>GladOS Microscopy</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="GladOS">
+    <normalon>:/MainIcon/MainIcon</normalon>
+   </iconset>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_5">
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="tabPosition">
+       <enum>QTabWidget::North</enum>
+      </property>
+      <property name="tabShape">
+       <enum>QTabWidget::Rounded</enum>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <property name="usesScrollButtons">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="tab_manual">
+       <attribute name="title">
+        <string>Manual</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <widget class="QScrollArea" name="scrollArea">
+          <property name="frameShadow">
+           <enum>QFrame::Plain</enum>
+          </property>
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <widget class="QWidget" name="scrollAreaWidgetContents">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>684</width>
+             <height>818</height>
+            </rect>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_3">
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_2">
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayout" stretch="3,1">
+                <item>
+                 <widget class="QGroupBox" name="LaserBox">
+                  <property name="minimumSize">
+                   <size>
+                    <width>477</width>
+                    <height>305</height>
+                   </size>
+                  </property>
+                  <property name="title">
+                   <string>Lasers</string>
+                  </property>
+                  <widget class="QWidget" name="layoutWidget_34">
+                   <property name="geometry">
+                    <rect>
+                     <x>20</x>
+                     <y>20</y>
+                     <width>91</width>
+                     <height>231</height>
+                    </rect>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout0">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_0">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_87" stretch="0,0,0">
+                      <property name="spacing">
+                       <number>0</number>
+                      </property>
+                      <item>
+                       <spacer name="horizontalSpacer_101">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QLineEdit" name="EditIntensity_Laser_0">
+                        <property name="maximumSize">
+                         <size>
+                          <width>30</width>
+                          <height>16777215</height>
+                         </size>
+                        </property>
+                        <property name="alignment">
+                         <set>Qt::AlignCenter</set>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_102">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_88">
+                      <property name="topMargin">
+                       <number>0</number>
+                      </property>
+                      <item>
+                       <spacer name="horizontalSpacer_103">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QSlider" name="SliderLaser_0">
+                        <property name="orientation">
+                         <enum>Qt::Vertical</enum>
+                        </property>
+                        <property name="tickPosition">
+                         <enum>QSlider::TicksBothSides</enum>
+                        </property>
+                        <property name="tickInterval">
+                         <number>10</number>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_104">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="PushLaser_0">
+                      <property name="palette">
+                       <palette>
+                        <active>
+                         <colorrole role="WindowText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Button">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Light">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>213</red>
+                            <green>255</green>
+                            <blue>127</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Midlight">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>191</red>
+                            <green>255</green>
+                            <blue>63</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Dark">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>85</red>
+                            <green>127</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Mid">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>113</red>
+                            <green>170</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Text">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="BrightText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>255</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ButtonText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Base">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>255</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Window">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Shadow">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="AlternateBase">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>212</red>
+                            <green>255</green>
+                            <blue>127</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ToolTipBase">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>220</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ToolTipText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                        </active>
+                        <inactive>
+                         <colorrole role="WindowText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Button">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Light">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>213</red>
+                            <green>255</green>
+                            <blue>127</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Midlight">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>191</red>
+                            <green>255</green>
+                            <blue>63</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Dark">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>85</red>
+                            <green>127</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Mid">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>113</red>
+                            <green>170</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Text">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="BrightText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>255</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ButtonText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Base">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>255</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Window">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Shadow">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="AlternateBase">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>212</red>
+                            <green>255</green>
+                            <blue>127</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ToolTipBase">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>220</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ToolTipText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                        </inactive>
+                        <disabled>
+                         <colorrole role="WindowText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>85</red>
+                            <green>127</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Button">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Light">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>213</red>
+                            <green>255</green>
+                            <blue>127</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Midlight">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>191</red>
+                            <green>255</green>
+                            <blue>63</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Dark">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>85</red>
+                            <green>127</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Mid">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>113</red>
+                            <green>170</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Text">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>85</red>
+                            <green>127</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="BrightText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>255</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ButtonText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>85</red>
+                            <green>127</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Base">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Window">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="Shadow">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="AlternateBase">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>170</red>
+                            <green>255</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ToolTipBase">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>255</red>
+                            <green>255</green>
+                            <blue>220</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                         <colorrole role="ToolTipText">
+                          <brush brushstyle="SolidPattern">
+                           <color alpha="255">
+                            <red>0</red>
+                            <green>0</green>
+                            <blue>0</blue>
+                           </color>
+                          </brush>
+                         </colorrole>
+                        </disabled>
+                       </palette>
+                      </property>
+                      <property name="font">
+                       <font>
+                        <weight>75</weight>
+                        <bold>true</bold>
+                       </font>
+                      </property>
+                      <property name="text">
+                       <string>PushButton</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                  <widget class="QWidget" name="layoutWidget_35">
+                   <property name="geometry">
+                    <rect>
+                     <x>110</x>
+                     <y>20</y>
+                     <width>91</width>
+                     <height>231</height>
+                    </rect>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout1">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_1">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_89" stretch="0,0,0">
+                      <property name="spacing">
+                       <number>0</number>
+                      </property>
+                      <item>
+                       <spacer name="horizontalSpacer_105">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QLineEdit" name="EditIntensity_Laser_1">
+                        <property name="maximumSize">
+                         <size>
+                          <width>30</width>
+                          <height>16777215</height>
+                         </size>
+                        </property>
+                        <property name="alignment">
+                         <set>Qt::AlignCenter</set>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_106">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_90">
+                      <item>
+                       <spacer name="horizontalSpacer_107">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QSlider" name="SliderLaser_1">
+                        <property name="orientation">
+                         <enum>Qt::Vertical</enum>
+                        </property>
+                        <property name="tickPosition">
+                         <enum>QSlider::TicksBothSides</enum>
+                        </property>
+                        <property name="tickInterval">
+                         <number>10</number>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_108">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="PushLaser_1">
+                      <property name="font">
+                       <font>
+                        <weight>75</weight>
+                        <bold>true</bold>
+                       </font>
+                      </property>
+                      <property name="text">
+                       <string>PushButton</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                  <widget class="QWidget" name="layoutWidget_36">
+                   <property name="geometry">
+                    <rect>
+                     <x>200</x>
+                     <y>20</y>
+                     <width>91</width>
+                     <height>231</height>
+                    </rect>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout2">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_2">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_91" stretch="0,0,0">
+                      <property name="spacing">
+                       <number>0</number>
+                      </property>
+                      <item>
+                       <spacer name="horizontalSpacer_109">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QLineEdit" name="EditIntensity_Laser_2">
+                        <property name="maximumSize">
+                         <size>
+                          <width>30</width>
+                          <height>16777215</height>
+                         </size>
+                        </property>
+                        <property name="alignment">
+                         <set>Qt::AlignCenter</set>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_110">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_92">
+                      <item>
+                       <spacer name="horizontalSpacer_111">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QSlider" name="SliderLaser_2">
+                        <property name="orientation">
+                         <enum>Qt::Vertical</enum>
+                        </property>
+                        <property name="tickPosition">
+                         <enum>QSlider::TicksBothSides</enum>
+                        </property>
+                        <property name="tickInterval">
+                         <number>10</number>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_112">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="PushLaser_2">
+                      <property name="font">
+                       <font>
+                        <weight>75</weight>
+                        <bold>true</bold>
+                       </font>
+                      </property>
+                      <property name="text">
+                       <string>PushButton</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                  <widget class="QWidget" name="layoutWidget_37">
+                   <property name="geometry">
+                    <rect>
+                     <x>290</x>
+                     <y>20</y>
+                     <width>91</width>
+                     <height>231</height>
+                    </rect>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout3">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_3">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_93" stretch="0,0,0">
+                      <property name="spacing">
+                       <number>0</number>
+                      </property>
+                      <item>
+                       <spacer name="horizontalSpacer_113">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QLineEdit" name="EditIntensity_Laser_3">
+                        <property name="maximumSize">
+                         <size>
+                          <width>30</width>
+                          <height>16777215</height>
+                         </size>
+                        </property>
+                        <property name="alignment">
+                         <set>Qt::AlignCenter</set>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_114">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_94">
+                      <item>
+                       <spacer name="horizontalSpacer_115">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QSlider" name="SliderLaser_3">
+                        <property name="orientation">
+                         <enum>Qt::Vertical</enum>
+                        </property>
+                        <property name="tickPosition">
+                         <enum>QSlider::TicksBothSides</enum>
+                        </property>
+                        <property name="tickInterval">
+                         <number>10</number>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_116">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="PushLaser_3">
+                      <property name="font">
+                       <font>
+                        <weight>75</weight>
+                        <bold>true</bold>
+                       </font>
+                      </property>
+                      <property name="text">
+                       <string>PushButton</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                  <widget class="QWidget" name="layoutWidget_38">
+                   <property name="geometry">
+                    <rect>
+                     <x>380</x>
+                     <y>20</y>
+                     <width>91</width>
+                     <height>231</height>
+                    </rect>
+                   </property>
+                   <layout class="QVBoxLayout" name="verticalLayout4">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_4">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_95" stretch="0,0,0">
+                      <property name="spacing">
+                       <number>0</number>
+                      </property>
+                      <item>
+                       <spacer name="horizontalSpacer_117">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QLineEdit" name="EditIntensity_Laser_4">
+                        <property name="maximumSize">
+                         <size>
+                          <width>30</width>
+                          <height>16777215</height>
+                         </size>
+                        </property>
+                        <property name="alignment">
+                         <set>Qt::AlignCenter</set>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_118">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <layout class="QHBoxLayout" name="horizontalLayout_96">
+                      <item>
+                       <spacer name="horizontalSpacer_119">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                      <item>
+                       <widget class="QSlider" name="SliderLaser_4">
+                        <property name="orientation">
+                         <enum>Qt::Vertical</enum>
+                        </property>
+                        <property name="tickPosition">
+                         <enum>QSlider::TicksBothSides</enum>
+                        </property>
+                        <property name="tickInterval">
+                         <number>10</number>
+                        </property>
+                       </widget>
+                      </item>
+                      <item>
+                       <spacer name="horizontalSpacer_120">
+                        <property name="orientation">
+                         <enum>Qt::Horizontal</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                         <size>
+                          <width>40</width>
+                          <height>20</height>
+                         </size>
+                        </property>
+                       </spacer>
+                      </item>
+                     </layout>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="PushLaser_4">
+                      <property name="font">
+                       <font>
+                        <weight>75</weight>
+                        <bold>true</bold>
+                       </font>
+                      </property>
+                      <property name="text">
+                       <string>PushButton</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                  <widget class="QGroupBox" name="groupBox_easyAdvancedLasers">
+                   <property name="geometry">
+                    <rect>
+                     <x>30</x>
+                     <y>260</y>
+                     <width>371</width>
+                     <height>51</height>
+                    </rect>
+                   </property>
+                   <property name="title">
+                    <string>Simple / Advanced lasers</string>
+                   </property>
+                   <widget class="QRadioButton" name="simpleLasers_RadioButton">
+                    <property name="geometry">
+                     <rect>
+                      <x>10</x>
+                      <y>20</y>
+                      <width>111</width>
+                      <height>17</height>
+                     </rect>
+                    </property>
+                    <property name="text">
+                     <string>Simple Lasers (top)</string>
+                    </property>
+                    <property name="checked">
+                     <bool>true</bool>
+                    </property>
+                   </widget>
+                   <widget class="QRadioButton" name="advancedLasers_RadioButton">
+                    <property name="geometry">
+                     <rect>
+                      <x>150</x>
+                      <y>20</y>
+                      <width>171</width>
+                      <height>17</height>
+                     </rect>
+                    </property>
+                    <property name="text">
+                     <string>Advanced lasers (bottom)</string>
+                    </property>
+                   </widget>
+                  </widget>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QVBoxLayout" name="verticalLayout_4" stretch="3,9,6">
+                  <item>
+                   <widget class="QGroupBox" name="groupBox">
+                    <property name="title">
+                     <string>FrameTime info</string>
+                    </property>
+                    <widget class="QLineEdit" name="frameTime_editBox">
+                     <property name="enabled">
+                      <bool>false</bool>
+                     </property>
+                     <property name="geometry">
+                      <rect>
+                       <x>110</x>
+                       <y>20</y>
+                       <width>41</width>
+                       <height>21</height>
+                      </rect>
+                     </property>
+                    </widget>
+                    <widget class="QPushButton" name="liveview_PushButton">
+                     <property name="geometry">
+                      <rect>
+                       <x>10</x>
+                       <y>20</y>
+                       <width>75</width>
+                       <height>23</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>LIVE</string>
+                     </property>
+                    </widget>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QGroupBox" name="FWBox">
+                    <property name="title">
+                     <string>Emission Filters</string>
+                    </property>
+                    <widget class="QRadioButton" name="FW_radioButton_0">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>20</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>50</weight>
+                       <bold>false</bold>
+                       <kerning>true</kerning>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                     <property name="checkable">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                    <widget class="QRadioButton" name="FW_radioButton_3">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>80</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                    </widget>
+                    <widget class="QRadioButton" name="FW_radioButton_4">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>100</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                    </widget>
+                    <widget class="QRadioButton" name="FW_radioButton_2">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>60</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                    </widget>
+                    <widget class="QRadioButton" name="FW_radioButton_1">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>40</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                    </widget>
+                    <widget class="QRadioButton" name="FW_radioButton_5">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>120</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                    </widget>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QGroupBox" name="BFBox">
+                    <property name="title">
+                     <string>Brightfield</string>
+                    </property>
+                    <widget class="QRadioButton" name="BF_radioButton_0">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>20</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <weight>50</weight>
+                       <bold>false</bold>
+                       <kerning>true</kerning>
+                      </font>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                     <property name="checkable">
+                      <bool>true</bool>
+                     </property>
+                    </widget>
+                    <widget class="QRadioButton" name="BF_radioButton_1">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>40</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                    </widget>
+                    <widget class="QRadioButton" name="BF_radioButton_2">
+                     <property name="geometry">
+                      <rect>
+                       <x>20</x>
+                       <y>60</y>
+                       <width>82</width>
+                       <height>17</height>
+                      </rect>
+                     </property>
+                     <property name="text">
+                      <string>RadioButton</string>
+                     </property>
+                    </widget>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="LaserTriggerSchemeBox">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>500</width>
+                  <height>420</height>
+                 </size>
+                </property>
+                <property name="title">
+                 <string>Laser Triggering Scheme Setup</string>
+                </property>
+                <widget class="PlotWidget" name="graphWidget" native="true">
+                 <property name="geometry">
+                  <rect>
+                   <x>10</x>
+                   <y>150</y>
+                   <width>641</width>
+                   <height>191</height>
+                  </rect>
+                 </property>
+                </widget>
+                <widget class="QPushButton" name="resetLasersTriggerButton">
+                 <property name="geometry">
+                  <rect>
+                   <x>240</x>
+                   <y>390</y>
+                   <width>141</width>
+                   <height>23</height>
+                  </rect>
+                 </property>
+                 <property name="text">
+                  <string>Reset Laser Triggers</string>
+                 </property>
+                </widget>
+                <widget class="QTextBrowser" name="VerboseBox">
+                 <property name="geometry">
+                  <rect>
+                   <x>390</x>
+                   <y>350</y>
+                   <width>261</width>
+                   <height>61</height>
+                  </rect>
+                 </property>
+                </widget>
+                <widget class="QWidget" name="horizontalLayoutWidget_21">
+                 <property name="geometry">
+                  <rect>
+                   <x>280</x>
+                   <y>20</y>
+                   <width>91</width>
+                   <height>95</height>
+                  </rect>
+                 </property>
+                 <layout class="QHBoxLayout" name="horizontalLayout_76">
+                  <item>
+                   <layout class="QVBoxLayout" name="verticalLayout_25">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_2_2">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_2"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_2"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_2"/>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+                <widget class="QWidget" name="horizontalLayoutWidget_22">
+                 <property name="geometry">
+                  <rect>
+                   <x>370</x>
+                   <y>20</y>
+                   <width>91</width>
+                   <height>95</height>
+                  </rect>
+                 </property>
+                 <layout class="QHBoxLayout" name="horizontalLayout_77">
+                  <item>
+                   <layout class="QVBoxLayout" name="verticalLayout_26">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_3_2">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_3"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_3"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_3"/>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+                <widget class="QWidget" name="horizontalLayoutWidget_23">
+                 <property name="geometry">
+                  <rect>
+                   <x>460</x>
+                   <y>20</y>
+                   <width>91</width>
+                   <height>95</height>
+                  </rect>
+                 </property>
+                 <layout class="QHBoxLayout" name="horizontalLayout_78">
+                  <item>
+                   <layout class="QVBoxLayout" name="verticalLayout_27">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_4_2">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_4"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_4"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_4"/>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+                <widget class="QWidget" name="horizontalLayoutWidget_24">
+                 <property name="geometry">
+                  <rect>
+                   <x>200</x>
+                   <y>20</y>
+                   <width>81</width>
+                   <height>95</height>
+                  </rect>
+                 </property>
+                 <layout class="QHBoxLayout" name="horizontalLayout_79">
+                  <item>
+                   <layout class="QVBoxLayout" name="verticalLayout_28">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_1_2">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_1"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_1"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_1"/>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+                <widget class="QWidget" name="horizontalLayoutWidget_25">
+                 <property name="geometry">
+                  <rect>
+                   <x>119</x>
+                   <y>20</y>
+                   <width>81</width>
+                   <height>95</height>
+                  </rect>
+                 </property>
+                 <layout class="QHBoxLayout" name="horizontalLayout_80">
+                  <item>
+                   <layout class="QVBoxLayout" name="verticalLayout_29">
+                    <item>
+                     <widget class="QLabel" name="NameLaser_0_2">
+                      <property name="text">
+                       <string>TextLabel</string>
+                      </property>
+                      <property name="alignment">
+                       <set>Qt::AlignCenter</set>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Length_Edit_Laser_0"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="Delay_Edit_Laser_0"/>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="BlinkFrames_Edit_Laser_0"/>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+                <widget class="QPushButton" name="ARMlaserTriggerPushButton">
+                 <property name="geometry">
+                  <rect>
+                   <x>554</x>
+                   <y>50</y>
+                   <width>101</width>
+                   <height>31</height>
+                  </rect>
+                 </property>
+                 <property name="font">
+                  <font>
+                   <pointsize>11</pointsize>
+                   <weight>75</weight>
+                   <bold>true</bold>
+                  </font>
+                 </property>
+                 <property name="text">
+                  <string>Arm lasers</string>
+                 </property>
+                </widget>
+                <widget class="QWidget" name="layoutWidget_31">
+                 <property name="geometry">
+                  <rect>
+                   <x>10</x>
+                   <y>40</y>
+                   <width>101</width>
+                   <height>71</height>
+                  </rect>
+                 </property>
+                 <layout class="QVBoxLayout" name="verticalLayout_30">
+                  <item>
+                   <widget class="QLabel" name="label_13">
+                    <property name="text">
+                     <string>Length pulse (us)</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_14">
+                    <property name="text">
+                     <string>Delay pulse (us)</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_15">
+                    <property name="text">
+                     <string>Which frames on?</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="UVLED_groupBox_2">
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="title">
+                 <string>UV LED</string>
+                </property>
+                <widget class="QPushButton" name="PushUVLED">
+                 <property name="geometry">
+                  <rect>
+                   <x>200</x>
+                   <y>20</y>
+                   <width>89</width>
+                   <height>23</height>
+                  </rect>
+                 </property>
+                 <property name="font">
+                  <font>
+                   <weight>75</weight>
+                   <bold>true</bold>
+                  </font>
+                 </property>
+                 <property name="text">
+                  <string>Blink UV!</string>
+                 </property>
+                </widget>
+                <widget class="QWidget" name="layoutWidget_32">
+                 <property name="geometry">
+                  <rect>
+                   <x>11</x>
+                   <y>21</y>
+                   <width>183</width>
+                   <height>22</height>
+                  </rect>
+                 </property>
+                 <layout class="QHBoxLayout" name="horizontalLayout_81">
+                  <item>
+                   <widget class="QLabel" name="QLabelUV0">
+                    <property name="text">
+                     <string>Duration:</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="UVLED_duration_EditField">
+                    <property name="maximumSize">
+                     <size>
+                      <width>60</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="text">
+                     <string>1000</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="QLabelUV1">
+                    <property name="text">
+                     <string>milliseconds</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_MMControls">
+       <attribute name="title">
+        <string>MM controls</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tab_autonomous">
+       <attribute name="title">
+        <string>Autonomous</string>
+       </attribute>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>pyqtgraph</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="Icons/GUI_resourceFileIcons.qrc"/>
+ </resources>
+ <connections/>
+</ui>

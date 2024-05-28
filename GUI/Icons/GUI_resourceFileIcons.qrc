@@ -1,5 +1,0 @@
-<RCC>
-  <qresource prefix="MainIcon">
-    <file alias="MainIcon">GladosIcon.png</file>
-  </qresource>
-</RCC>

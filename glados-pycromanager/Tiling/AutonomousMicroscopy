@@ -1,0 +1,285 @@
+'''
+Package list (pip install)
+imagej
+'''
+from PycroManagerFunctions import *
+from TilingFunctions import *
+from CellScoringFunctions import *
+import numpy as np
+import time
+import json
+import glob
+import os
+from PIL import Image
+from datetime import datetime
+from pathlib import Path
+import pyperclip
+from pycromanager import *
+
+doTiling = 1;
+doCellSegment = 1;
+doFoVcalc = 1;
+dosptMeasure = 1;
+
+#Initiate the pycromanager
+mmc = InitiatePycroManager();
+'''
+Tiling itself!
+'''
+#Enter information about size of FoV to obtain
+ImageSize = 512; #In pixels
+PixelSize = 108.5; #nm/pixel
+Size_Stitch_X = 1000; #micrometer of stitching size in x
+Size_Stitch_Y = 1000; #micrometer of stitching size in y
+FoVs_initial = 0; #number of FoVs to fix unsteady screws etc
+Overlap = 40; #Overlap in percent (i.e. 10 = 10%)
+x_dir = -1; #Change of x dir to get left-to-right-movement
+y_dir = -1; #Change of y-dir to get up-to-down movement
+#Set waittime after small or large movements to ensure full stop of (slow-moving) xy stages
+waittime_SmallMovement = 0.1;
+waittime_LargeMovement = 0.3;
+#set to one if you want to wait with image snapping to get PFS focus locked
+requirePFSfocus = 1;
+#Number of FoVs to Image!
+nrFoVs = 6;
+#Create folder with current datetime stamp
+filename = 'Hfx_rpoD_Dendra2';
+mainFolder = "E:/Data/Koen/20220909/Hfx";
+daughterFolder = "/"+datetime.now().strftime("%y%m%d_%H%M")+"/";
+Path(mainFolder+daughterFolder).mkdir(parents=True, exist_ok=True)
+
+offset_z_BF_spt = 0; #-12.5 ish
+
+# Start non-user-definable code here
+startsz = FoVs_initial;
+sztrue_x = int(np.ceil((((Size_Stitch_X*1000)/PixelSize)-ImageSize)/(ImageSize*(1-Overlap/100))+1));
+sztrue_y = int(np.ceil((((Size_Stitch_Y*1000)/PixelSize)-ImageSize)/(ImageSize*(1-Overlap/100))+1));
+overlap = Overlap;
+sz_x = startsz+sztrue_x;
+sz_y = startsz+sztrue_y;
+magncorrection = 60/60;
+#Calculate the actual movement between FoVs here
+mov = PixelSize/1000*ImageSize*(1-overlap/100)*magncorrection;
+#Get the current start position as initial point
+startx = mmc.get_x_position()
+starty = mmc.get_y_position()
+#Calculate the real start position - moving a little outside the FoV to ensure correct movement of the XY stage
+startx -= startsz*mov*x_dir;
+starty -= startsz*mov*y_dir;
+startSnaps = 0;#>0 if you want to have initial snapshots before starting imaging.
+
+#Currently, cells are in 'spt Focus'.
+#Move this to 'BF focus'
+PFSoffset_fullFocus = mmc.get_property('TIPFSOffset','Position');
+mmc.set_property('TIPFSOffset','Position',str(float(PFSoffset_fullFocus)+offset_z_BF_spt))
+
+#Get the list of xy positions, and corresponding boolean values whether or not a snap will take place.
+[xy,snap] = InitialiseXYPositions(sz_x,sz_y,startx,starty,mov,x_dir,y_dir,startsz,startSnaps)
+
+#Set to correct image size
+Pycro_set_ImageSize(mmc,(ImageSize, ImageSize))
+#Turn on brightfield mode
+Pycro_stopLiveMode(mmc)
+Pycro_TurnOnBF(mmc)
+
+#Determine JSONdata to store
+JSONdata = {
+    "startsz": startsz,
+    "x_dir" : x_dir,
+    "y_dir" : y_dir,
+    "sztrue_x" : sztrue_x,
+    "sztrue_y" : sztrue_y,
+    "mov" : mov,
+    "overlap": overlap,
+    "startSnaps": startSnaps,
+    "StartPosXYStage_X": startx,
+    "StartPosXYStage_Y": starty,
+}
+
+if(doTiling):
+    #Ensure that we only move within safety constraints
+    if mov < 1e4:
+        if max((max(xy[:,0])-min(xy[:,0])),(max(xy[:,1])-min(xy[:,1]))) < 2e4:
+            #Move a little around to ensure that screws are active and such
+            for it in range(0,1):
+                m = 5;
+                mmc.set_xy_position(startx-mov*m,starty-mov*m)
+                time.sleep(0.1)
+                mmc.set_xy_position(startx-mov*m,starty+mov*m)
+                time.sleep(0.1)
+                mmc.set_xy_position(startx+mov*m,starty+mov*m)
+                time.sleep(0.1)
+                mmc.set_xy_position(startx+mov*m,starty-mov*m)
+                time.sleep(0.1)
+                mmc.set_xy_position(startx,starty)
+                time.sleep(3)
+            '''
+            with Acquisition(foldername, filename) as acq:
+                events = []
+                events = multi_d_acquisition_events(xy_positions=xy,keep_shutter_open_between_channels=True)
+                acq.acquire(events)
+            '''
+            #Create the Tiling folder if it doesn't exist
+            Path(mainFolder+daughterFolder+"Tiling/").mkdir(parents=True, exist_ok=True)
+            #Loop over all positions
+            snapCounter = 0;
+            for i in range(0,len(xy)):
+                print("Tiling! " +str(Size_Stitch_X) +"x"+str(Size_Stitch_Y)+" um ("+str(sztrue_x)+"x"+str(sztrue_y) +" FoVs) " + str(round(i/len(xy)*100))+" % done ("+str(i)+"|"+str(len(xy))+")")
+                #Check if the xy stage moved a lot - let it rest a while if it did
+                totalMoved = 0;
+                if i > 0:
+                    totalMoved = np.sqrt((xy[i,0]-xy[i-1,0])**2+(xy[i,1]-xy[i-1,1])**2);
+                if totalMoved < 100:
+                    waittime = waittime_SmallMovement;
+                    if(requirePFSfocus):
+                        moveDistanceWaitingForPFS(mmc,xy[i,0],xy[i,1],50);
+                    else:
+                        mmc.set_xy_position(xy[i,0],xy[i,1])
+                else:
+                    waittime = waittime_LargeMovement;
+                    if(requirePFSfocus):
+                        moveDistanceWaitingForPFS(mmc,xy[i,0],xy[i,1],50);
+                    else:
+                        mmc.set_xy_position(xy[i,0],xy[i,1])
+                time.sleep(waittime);
+                #Snap the image if needed
+                lz = getLeadingZeros(snapCounter);
+                if snap[i]:
+                    im = Image.fromarray(snap_image(mmc))
+                    im.save(mainFolder+daughterFolder+"Tiling/"+"im_"+lz+str(snapCounter)+".tif")
+                    #Repeat the first image to get good lighting
+                    if snapCounter == 0:
+                        im = Image.fromarray(snap_image(mmc))
+                        im.save(mainFolder+daughterFolder+"Tiling/"+"im_"+lz+str(snapCounter)+".tif")
+                    snapCounter+=1;
+
+            #At the end, move back to orig position
+            if(requirePFSfocus):
+                moveDistanceWaitingForPFS(mmc,startx-mov*m,starty-mov*m,500);
+            else:
+                mmc.set_xy_position(startx-mov*m,starty-mov*m)
+            time.sleep(0.2)
+            #Also reset startx, starty for later use
+            startx += startsz*mov*x_dir;
+            starty += startsz*mov*y_dir;
+            if(requirePFSfocus):
+                moveDistanceWaitingForPFS(mmc,startx,starty,500);
+            else:
+                mmc.set_xy_position(startx,starty)
+
+
+    #Store some JSON info
+    with open(mainFolder+daughterFolder+"Tiling/"+'/acqTilingData.json', 'w', encoding='utf-8') as f:
+        json.dump(JSONdata, f, ensure_ascii=False, indent=4)
+    #Turn off brightfield
+    Pycro_TurnOffBF(mmc)
+    '''
+    Tiling BF images to Stiched, segmented cells and all their info
+    '''
+    if(doCellSegment):
+        SegmentAllBFImages(mainFolder,daughterFolder,sztrue_x,sztrue_y)
+        RunRGStitchingAlgorithmInImageJ(1,1,mainFolder,daughterFolder,sztrue_x,sztrue_y,Overlap);
+        CombineROIsAfterStitching(mainFolder,daughterFolder,ImageSize,sztrue_x*sztrue_y);
+    else:
+        RunStitchingAlgorithmInImageJ(1,1,mainFolder,daughterFolder,sztrue_x,sztrue_y,Overlap)
+
+'''
+Choosing the best FoVs to continue on
+'''
+
+if(doFoVcalc):
+    ROImeasureCSVname = 'StitchedROIs.csv'
+
+    #First we score the individual cells
+    scoreSettings = {
+        "Area": ('MinMax',250,550),
+        "Width": ('MinMax',0,2000),
+    };
+    #'MinMax': simply only give a score of 1 to cells between this score, 0 otherwise.
+    scorePerCell = scoreCells(mainFolder+daughterFolder+'/Tiling/',ROImeasureCSVname,scoreSettings)
+    # Now score the FoVs and create a map of this.
+    FoVinfo = {
+        "Shape":"Rectangle",
+        "Size":[512*0.5, 512*0.5],
+    }
+    FoVscore = calculateFoVScore(mainFolder+daughterFolder+'/Tiling/',ROImeasureCSVname,scorePerCell,FoVinfo)
+    #Finally, we determine the best FoVs to image from this map.
+    FoVBleachinfo = {
+        "Shape":"Rectangle",
+        "Size":[512*1.5, 512*1.5],
+    }
+    XYcenterPointList = determineFoVlist(FoVscore,nrFoVs,FoVBleachinfo)
+    print(XYcenterPointList)
+'''
+for i in range(0,nrFoVs):
+    #Move XY stage around so we start at top-left
+    mmc.set_xy_position(startx-mov*5,starty-mov*5)
+    time.sleep(1);
+    #Get position to go to
+    print("Going to pos: "+str(XYcenterPointList[i][0])+"|"+str(XYcenterPointList[i][1]))
+    XYpos_to_go_to = TransformCoordinates_Registered(XYcenterPointList[i],(startx, starty),ImageSize,mainFolder+daughterFolder+'/Tiling/Segmented/TileConfiguration.registered.txt',PixelSize)
+    #XYpos_to_go_to = TransformCoordinates_Registered((500,500),(startx, starty),ImageSize,mainFolder+daughterFolder+'/Tiling/Segmented/TileConfiguration.registered.txt',PixelSize)
+    XYpos_to_go_to -= np.array((((ImageSize*PixelSize)/1000)/2, ((ImageSize*PixelSize)/1000)/2))
+    mmc.set_xy_position(XYpos_to_go_to[0],XYpos_to_go_to[1]);
+    time.sleep(1);
+    #Now spt measurement here!
+
+
+mmc.set_xy_position(startx-mov*5,starty-mov*5)
+mmc.set_xy_position(startx,starty);
+'''
+#Pycro_TurnOnBF(mmc)
+#Pycro_startLiveMode(mmc)
+
+'''
+spt on these XYcenter points
+'''
+if(dosptMeasure):
+    #Move XY stage around so we start at top-left
+    moveDistanceWaitingForPFS(mmc,startx-mov*m,starty-mov*m,500);
+    time.sleep(5);
+    #Prepare lasers and such
+    strobo_time_561 = 4;
+    spt_frametime = 10;
+    BF_frametime = 100;
+    power_561 = 500;
+    nr_frames_spt = 10000;
+    #XYtestPos = ((0,0),(1024,0),(0,1024),(1024,1024))
+    for FoV_spt in range(0,nrFoVs):
+        #Move XY stage to wanted position
+        #Should be  TransformCoordinates_Registered(point_of_interest,startpos,imSize,RegistrationFileName,PixelSize): I think
+        #XYpos_to_go_to = TransformCoordinates_Registered(XYtestPos[FoV_spt],(startx, starty),ImageSize,mainFolder+daughterFolder+'/Tiling/Segmented/TileConfiguration.registered.txt',PixelSize,x_dir,y_dir)
+        #XYpos_to_go_to = TransformCoordinates_Registered(XYtestPos[FoV_spt],(startx, starty),ImageSize,mainFolder+daughterFolder+'/Tiling/Segmented/TileConfiguration.txt',PixelSize,x_dir,y_dir)
+        #print(XYpos_to_go_to)
+        #XYpos_to_go_to -= np.array((((ImageSize*PixelSize)/1000)/2, ((ImageSize*PixelSize)/1000)/2))
+        XYpos_to_go_to = TransformCoordinates_Registered(XYcenterPointList[FoV_spt],(startx, starty),ImageSize,mainFolder+daughterFolder+'/Tiling/Segmented/TileConfiguration.txt',PixelSize,x_dir,y_dir)
+        XYpos_to_go_to -= np.array((((ImageSize*PixelSize)/1000)/2, ((ImageSize*PixelSize)/1000)/2))
+        moveDistanceWaitingForPFS(mmc,XYpos_to_go_to[0],XYpos_to_go_to[1],500);
+        #mmc.set_xy_position(XYpos_to_go_to[0],XYpos_to_go_to[1]);
+        time.sleep(1);
+        #Do a quick BF
+        #Move Z (PFS) back to 'BF-focus'
+        Pycro_TurnOnBF(mmc)
+        mmc.set_property('TIPFSOffset','Position',str(float(PFSoffset_fullFocus)-offset_z_BF_spt))
+        mmc.set_exposure(BF_frametime);
+        time.sleep(1)
+        with Acquisition(directory=mainFolder+os.sep+daughterFolder, name='SPTTest_BF_'+str(FoV_spt)) as acq:
+            events = multi_d_acquisition_events(num_time_points=10, time_interval_s=0);
+            acq.acquire(events);
+        #Do spt!
+        #Move Z (PFS) back to 'spt-focus'
+        mmc.set_property('TIPFSOffset','Position',str(float(PFSoffset_fullFocus)))
+        Pycro_TurnOffBF(mmc)
+        #Set exposure
+        mmc.set_exposure(spt_frametime);
+        #Set blinking of 561 and UV
+        Pycro_Setup_sptSettings(mmc,strobo_time_561,power_561,spt_frametime)
+        #Give time for 561 to warm up
+        time.sleep(3);
+        with Acquisition(directory=mainFolder+os.sep+daughterFolder, name='SPTTest_'+str(FoV_spt)) as acq:
+            events = multi_d_acquisition_events(num_time_points=nr_frames_spt, time_interval_s=0);
+            acq.acquire(events);
+        Pycro_Setup_stop_561_laser(mmc)
+
+#Stop the 561 laser
+print('Done')
