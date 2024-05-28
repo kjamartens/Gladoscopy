@@ -1258,7 +1258,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = storedConfigsStrings) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
-                #Update the results of this dialog into the nodz node
+                #Update the results of this dialog into the nodz node   
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
         elif 'visualisation_' in nodeName:
             currentNode = self.findNodeByName(nodeName)
@@ -2073,16 +2073,25 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             return
         
         #First assess that it's a MDA node:
-        if 'acquisition' not in connectedNode.name:
-            print('Error! Acquisition not connected to Grayscale test!')
+        if 'acquisition' not in connectedNode.name and 'analysisMeasurement' not in connectedNode.name:
+            print('Error! Acquisition or analysismeasurement not connected to analysismeasurement!')
         else:
-            #And then find the mdaData object
-            mdaDataobject = connectedNode.mdaData
-            
-            #Figure out which function is selected in the scoring_analysis node
-            selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-            #Figure out the belonging evaluation-text
-            evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
+            if 'acquisition' in connectedNode.name:
+                #And then find the mdaData object
+                mdaDataobject = connectedNode.mdaData
+                
+                #Figure out which function is selected in the scoring_analysis node
+                selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+                #Figure out the belonging evaluation-text
+                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
+            elif 'analysisMeasurement' in connectedNode.name:
+                dataobject = connectedNode.scoring_analysis_currentData['__output__']
+                
+                #Figure out which function is selected in the scoring_analysis node
+                selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+                #Figure out the belonging evaluation-text
+                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'dataobject','self.shared_data.core')
+                
             #And evaluate the custom function with custom parameters
             output = eval(evalText) #type:ignore
             
@@ -2123,24 +2132,37 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                                                 chosenLayerType = layerType[1]
                                                 break #to avoid searching in other files for this function
                         
+                        
                         layerName = visual_connected_node.visualisation_currentData['layerName']
+                        
+                        #If a layer with this name already exists, simply remove it:
+                        for layer in self.shared_data.napariViewer.layers: #type:ignore
+                            if layer.name == layerName:
+                                self.shared_data.napariViewer.layers.remove(layer) #type:ignore
+                                
+                        cmap = visual_connected_node.visualisation_currentData['colormap']
                         if chosenLayerType == 'points':
                             viewer = self.shared_data.napariViewer #type:ignore
                             napariLayer = viewer.add_points(
                                 data=None,
                                 text=None,
-                                name=layerName
+                                name=layerName,
+                                colormap = cmap
                             )
                         elif chosenLayerType == 'shapes':
                             viewer = self.shared_data.napariViewer #type:ignore
                             napariLayer = viewer.add_shapes(
-                                data=None
+                                data=None,
+                                name=layerName,
+                                colormap = cmap
                             )
                         elif chosenLayerType == 'image':
                             viewer = self.shared_data.napariViewer #type:ignore
                             im = np.random.random((30, 30))
                             napariLayer = viewer.add_image(
-                                data=im
+                                data=im,
+                                name=layerName,
+                                colormap = cmap
                             )
                         
                         visualOutput = eval(visualEvalText)

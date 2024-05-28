@@ -333,6 +333,40 @@ class MMConfigUI(CustomMainWindow):
                         self.set_font_and_margins_recursive(item.widget(), font=font)
                     if hasattr(item, 'layout'):
                         self.set_font_and_margins_recursive(item.layout(), font=font)
+    
+    #Get all config information as set by the UI:
+    def getUIConfigInfo(self,onlyChecked=False):
+        """
+        Get all config information as set by the UI.
+
+        param onlyChecked: If True, only return information for checked configs.
+        """
+        configInfo = {}
+        for config_id in range(len(self.config_groups)):
+            if onlyChecked and not self.configCheckboxes[config_id].isChecked():
+                continue
+            configInfo[self.config_groups[config_id].configGroupName()] = self.currentConfigUISingleValue(config_id)
+        return configInfo
+
+    def currentConfigUISingleValue(self,config_id):
+        """
+        Get the value of a single config as currently determined by the UI.
+
+        param config_id: The ID of the config_group to get the value for.
+        """
+        #Get the value of a single config as currently determined by the UI
+        if self.config_groups[config_id].isDropDown():
+            currentUIvalue = self.dropDownBoxes[config_id].currentText()
+        elif self.config_groups[config_id].isSlider():
+            #Get the value from the slider:
+            sliderValue = self.sliders[config_id].value()
+            #Get the true value from the conversion:
+            currentUIvalue = sliderValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
+        elif self.config_groups[config_id].isInputField():
+            currentUIvalue = None
+        else:
+            currentUIvalue = None
+        return currentUIvalue
     #endregion
     
     #region live mode

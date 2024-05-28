@@ -34,13 +34,13 @@ def StarDistSegment_ImageVis(NDTIFFStack,core,**kwargs):
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}, nms_thresh changed to {str(kwargs["nms_thresh"])}')
-        labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=kwargs["prob_thresh"], nms_thresh=kwargs["nms_thresh"]) #type:ignore
+        labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"]), nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
-        labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=kwargs["prob_thresh"]) #type:ignore
+        labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
     elif "prob_thresh" not in provided_optional_args and "nms_thresh" in provided_optional_args:
         print(f'nms_thresh changed to {str(kwargs["nms_thresh"])}')
-        labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=kwargs["nms_thresh"]) #type:ignore
+        labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
     else:
         labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     
@@ -60,5 +60,5 @@ def StarDistSegment_ImageVis_visualise(datastruct,core,**kwargs):
     layer.data = rescaled
     layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
     layer.opacity = 0.6
-    layer.contrast_limits=(0,rescaled.max())
+    layer.contrast_limits=(0,0.1)#(0,rescaled.max())
     layer.blending = 'additive'
