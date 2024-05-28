@@ -152,6 +152,7 @@ class MDAWidget(QWidget):
         self._viewer = viewer
         global shared_data 
         
+        #TODO: shared_data, core, outside of MDAwidget but
         # Create an instance of the shared_data class
         shared_data = Shared_data()
         
@@ -171,6 +172,38 @@ class MDAWidget(QWidget):
         self.napariViewer = napariViewer
         
         self.dockWidget = MDAGlados_plugin(self)
+        self.setLayout(self.dockWidget)
+
+
+class AutonomousMicroscopyWidget(QWidget):
+    def __init__(self, viewer: napari.viewer.Viewer):
+        
+        
+        logging.debug("dockWidget_autonomousMicroscopy started")
+        super().__init__()
+        self._viewer = viewer
+        global shared_data 
+        # Create an instance of the shared_data class
+        shared_data = Shared_data()
+        
+        core = Core()
+        shared_data.core = core
+        shared_data._headless = False
+    
+        MM_JSON = None
+        livestate = False
+        
+        napariViewer = viewer
+        
+        self.core = core
+        self.MM_JSON = MM_JSON
+        self.livestate = livestate
+        self.shared_data = shared_data
+        self.napariViewer = napariViewer
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = autonomousMicroscopy_plugin(self)
+        
         self.setLayout(self.dockWidget)
         
 
@@ -231,5 +264,8 @@ class MainWidget(QWidget):
         
         custom_widget_MDA = MDAWidget(viewer)
         napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)
+
+        autonomousMicroscopyWidget = AutonomousMicroscopyWidget(viewer)
+        napariViewer.window.add_dock_widget(autonomousMicroscopyWidget, area="top", name="Glados",tabify=True)
 
         print('Finalise NAPARI PYCROMANAGER PLUGIN')

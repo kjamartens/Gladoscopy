@@ -199,3 +199,22 @@ def MDAGlados_plugin(parent):
     # # main_layout.addLayout(MMconfig.mainLayout,0,0)
     
     return dockWidget.mainLayout
+
+
+from FlowChart_dockWidgets import * 
+
+def autonomousMicroscopy_plugin(parent):
+    global shared_data, napariViewer
+    shared_data = parent.shared_data
+    napariViewer = shared_data.napariViewer
+    MM_JSON = None
+    core = shared_data.core
+    
+    #Create the a flowchart testing
+    flowChart_dockWidget = GladosNodzFlowChart_dockWidget(core=core,shared_data=shared_data,MM_JSON=MM_JSON,parent=parent)
+    # main_layout.addLayout(flowChart_dockWidget.mainLayout,0,0)
+    
+    flowChart_dockWidget.getNodz() #not sure if needed
+    
+    return flowChart_dockWidget.mainLayout
+

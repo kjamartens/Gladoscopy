@@ -871,7 +871,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     
     Main class of all Nodz-based Glados automisation.
     """
-    def __init__(self,core=None,shared_data=None,MM_JSON=None):
+    def __init__(self,core=None,shared_data=None,MM_JSON=None,parent=None):
         """
         Initializes the GladosNodzFlowChart_dockWidget in napari-Glados. 
         Inherits from Nodz, which is a graph drawing tool.
@@ -887,6 +887,16 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         #Create a QGridLayout:
+        
+        #If run as plugin, we need to specify the globals like this:
+        if parent is not None:
+            global livestate, napariViewer
+            livestate = parent.livestate
+            napariViewer = parent.napariViewer
+            parent.shared_data = shared_data
+            shared_data.napariViewer = napariViewer
+        
+        self.parent = parent
         self.mainLayout = QGridLayout()
         
         self.fullRunOngoing = False
@@ -1161,7 +1171,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Custom functions that should be done
         if nodeType == 'acquisition':
             #Attach a MDA data to this node
-            newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True) # type: ignore
+            parentV = None
+            if self.parent is not None:
+                parentV = self.parent
+            newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True,parent=parentV) # type: ignore
             
             #Do the acquisition upon callAction
             newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_Node(node)
