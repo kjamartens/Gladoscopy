@@ -258,6 +258,8 @@ class MainWidget(QWidget):
         livestate = False
         
         napariViewer = viewer
+        from napariHelperFunctions import showScaleBar
+        showScaleBar(viewer)
         
         MMconfigWidget = MMConfigWidget(viewer)
         self._viewer.window.add_dock_widget(MMconfigWidget, area='top',tabify=True,name='Config')

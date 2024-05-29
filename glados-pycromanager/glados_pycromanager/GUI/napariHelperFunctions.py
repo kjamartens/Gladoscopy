@@ -14,6 +14,14 @@ def getLayerIdFromName(layer_name,napariViewer):
     ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, '_name') and layer._name == layer_name]
     return ImageLayer
 
+def showScaleBar(napariViewer):
+    """
+    Shows the scale bar in napari
+    """
+    napariViewer.scale_bar.visible = True
+    napariViewer.scale_bar.unit = "um"
+    
+
 # @thread_worker
 def InitateNapariUI(napariViewer):
     """
@@ -34,6 +42,5 @@ def InitateNapariUI(napariViewer):
     napariViewer.window._qt_window.setWindowIcon(icon)
     
     #Turn on scalebar
-    napariViewer.scale_bar.visible = True
-    napariViewer.scale_bar.unit = "um"
+    showScaleBar(napariViewer)
     
