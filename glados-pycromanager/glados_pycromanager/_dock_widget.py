@@ -39,6 +39,7 @@ import HelperFunctions #type: ignore
 from napariHelperFunctions import showScaleBar #type: ignore
 #endregion
 
+#region Widget Definition
 class GladosWidget(QWidget):
     """
     The main Class of glados-pycromanager widget that gets added to napari.
@@ -92,7 +93,6 @@ class MDAWidget(GladosWidget):
         self.setLayout(self.dockWidget)
         logging.info("dockwidget_MDA started")
 
-
 class AutonomousMicroscopyWidget(GladosWidget):
     """
     The micromanager-glados-pycromanager autonomous microscopy widget plugin
@@ -108,7 +108,9 @@ class AutonomousMicroscopyWidget(GladosWidget):
         
         self.setLayout(self.dockWidget)
         logging.info("dockWidget_AutonomousMicroscopy started")
+#endregion
 
+#region Main Call
 class MainWidget(QWidget):
     """
     The main call when napari-glados is started
@@ -177,3 +179,5 @@ class MainWidget(QWidget):
         napariViewer.window.add_dock_widget(autonomousMicroscopyWidget, area="top", name="Glados",tabify=True)
 
         logging.info('Napari-glados-pycromanager plugin fully loaded')
+
+#endregion
