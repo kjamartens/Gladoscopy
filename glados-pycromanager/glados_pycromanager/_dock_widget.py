@@ -1,52 +1,17 @@
-from typing import Callable
-from dataclasses import dataclass
 
+#region imports
 import napari
-from qtpy.QtWidgets import QVBoxLayout, QWidget, QLabel
-from qtpy.QtCore import Qt
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget, QTableWidget, QWidget, QInputDialog, QTableWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
-from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
-from PyQt5 import uic
+from qtpy.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget
 from AnalysisClass import * #type:ignore
 from utils import CustomMainWindow #type:ignore
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
 import sys
 import os
-import json
-from pycromanager import Core, multi_d_acquisition_events, Acquisition
-import numpy as np
-import time
-import asyncio
-import pyqtgraph as pg
-import matplotlib.pyplot as plt
-from matplotlib import colormaps # type: ignore
-import matplotlib
-import pickle
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-import tifffile
-import time
-from PyQt5.QtCore import QTimer,QDateTime
-import logging
-from typing import List, Iterable
-import itertools
-import queue
-#For drawing
-matplotlib.use('Qt5Agg')
-
-#region imports
 from pycromanager import Core
-from pycromanager import start_headless
-import os
-os.environ['NAPARI_ASYNC'] = '1'
-import json
-import sys
-from PyQt5.QtWidgets import QApplication
-import shutil
 import logging
-import argparse
-
+from typing import List
+os.environ['NAPARI_ASYNC'] = '1'
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI")
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy")
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy\\MainScripts")
@@ -54,10 +19,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI\\nodz")
 from napariGlados import * #type: ignore
 from sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
 from utils import * #type: ignore
-
-from PyQt5.QtCore import QThread, QObject, pyqtSignal
-from PyQt5.QtWidgets import QApplication, QMainWindow
-import sys
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 #Import all scripts in the custom script folders

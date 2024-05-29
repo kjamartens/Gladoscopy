@@ -11,7 +11,7 @@
             "mainLayout"
         ],
         "num_time_points": 10,
-        "time_interval_s": 0.0,
+        "time_interval_s": 0.1,
         "z_start": 0,
         "z_end": 1,
         "z_step": 1,
@@ -29,7 +29,7 @@
         "xyz_positions": null,
         "position_labels": null,
         "order": "t",
-        "exposure_ms": 90.0,
+        "exposure_ms": 1.0,
         "GUI_show_exposure": true,
         "GUI_show_xy": false,
         "GUI_show_z": false,
@@ -48,7 +48,7 @@
         "has_GUI": true,
         "mda_analysis_thread": null,
         "MM_JSON": null,
-        "lastTimeUpdateSize": 1716965947.7556705,
+        "lastTimeUpdateSize": 1716967474.5912166,
         "_GUI_grid_width": 7,
         "fully_started": true
     },
