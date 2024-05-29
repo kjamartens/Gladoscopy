@@ -28,9 +28,12 @@ class Shared_data(QObject):
         self._mdaImageQueues = []
         self._defaultFocusDevice = ''
         self._mdaModeSaveLoc = ['','']
+        self._mdaModeAcqData = None
         self._mdaModeNapariViewer = None
         self.mdaDatasets = []
         self.activeMDAobject = None
+        self.allMDAslicesRendered = []
+        self.lastMDAThread = None #Keeps track of the last-created MDA analysis thread
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')

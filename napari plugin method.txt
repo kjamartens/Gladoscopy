@@ -8,3 +8,10 @@ python -m pip install -e .
 napari
 
 
+
+
+
+
+cd C:\Users\Koen Martens\Documents\GitHub\ScopeGUI\glados-pycromanager
+conda activate C:\CondaEnvironments\AutonomousMicroscopyEnv310
+napari

@@ -10,7 +10,7 @@
             "config_groups",
             "mainLayout"
         ],
-        "num_time_points": 10,
+        "num_time_points": 100,
         "time_interval_s": 0.0,
         "z_start": 0,
         "z_end": 1,
@@ -29,7 +29,7 @@
         "xyz_positions": null,
         "position_labels": null,
         "order": "t",
-        "exposure_ms": 90.0,
+        "exposure_ms": 100.0,
         "GUI_show_exposure": true,
         "GUI_show_xy": false,
         "GUI_show_z": false,
@@ -108,7 +108,7 @@
                 "ChangeWaitTimeMs": "2000"
             }
         },
-        "lastTimeUpdateSize": 1716909218.479809,
+        "lastTimeUpdateSize": 1716981361.121864,
         "_GUI_grid_width": 10,
         "fully_started": true,
         "storageGroupBox": {
@@ -192,7 +192,7 @@
             "checked": null
         },
         "exposureEntry": {
-            "text": "90.0",
+            "text": "100",
             "checked": null
         },
         "exposureDropdown": {
@@ -204,7 +204,7 @@
             "checked": null
         },
         "timePointEntry": {
-            "text": "10",
+            "text": "100",
             "checked": null
         },
         "timeIntervalLabel": {

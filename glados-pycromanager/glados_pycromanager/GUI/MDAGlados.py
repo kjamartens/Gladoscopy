@@ -1161,6 +1161,7 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         self.data = self.shared_data.mdaDatasets[-1]
         logging.info('MDA acq data finished and data stored!')
+        self.shared_data._mdaMode = False
         
         #Remove any existing nodz-coupled real-time analyses:
         if 'nodz_analysis_threads' in vars(self):
