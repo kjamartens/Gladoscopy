@@ -1,0 +1,15 @@
+name: glados-pycromanager
+contributions:
+  commands:
+    - id: glados-pycromanager.say_hi
+      title: Say hello, world!
+      python_name: glados_pycromanager:show_hello_message
+    - id: glados-pycromanager.run_gladospycromanager
+      title: Run glados-pycromanager
+      python_name: glados_pycromanager:run_glados_pycromanager
+    - id: glados-pycromanager.mainWidgetCall
+      title: Open my widget
+      python_name: glados_pycromanager._dock_widget:MainWidget
+  widgets:
+    - command: glados-pycromanager.mainWidgetCall
+      display_name: Glados

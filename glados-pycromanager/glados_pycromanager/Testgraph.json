@@ -1,0 +1,838 @@
+{
+    "CONNECTIONS": [
+        [
+            "acquisition_0.Visual",
+            "visualisation_0.Start"
+        ],
+        [
+            "acquisition_1.Finished",
+            "acqEnd_0.End"
+        ],
+        [
+            "acqStart_0.Start",
+            "acquisition_1.Acquisition start"
+        ],
+        [
+            "scoringStart_0.Start",
+            "acquisition_0.Acquisition start"
+        ],
+        [
+            "acquisition_0.Finished",
+            "analysisMeasurement_0.Analysis start"
+        ]
+    ],
+    "NODES": {
+        "acqEnd_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "End",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquiring end",
+            "position": [
+                2678.629729668685,
+                1116.0176247959262
+            ],
+            "preset": "acqEnd",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "acqStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquiring start",
+            "position": [
+                2152.631154642958,
+                1088.997150051454
+            ],
+            "preset": "acqStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "acquisition_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                2420.35024744327,
+                789.5241820900895
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">10 frames with order t</span><br />90.0 ms exposure time<br />10 time points</p></body></html>",
+            "textboxheight": 50
+        },
+        "acquisition_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                2413.8290771728566,
+                1128.0176247959262
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">50 frames with order t</span><br />90.0 ms exposure time<br />50 time points</p></body></html>",
+            "textboxheight": 50
+        },
+        "analysisMeasurement_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Output",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Analysis [Measurement]",
+            "position": [
+                2830.264885095363,
+                839.392334079815
+            ],
+            "preset": "analysisMeasurement",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Average gray value</span><br /><span style=\" font-weight:600;\">ReqKwarg1</span>: DefaultKwarg<br /><span style=\" font-weight:600;\">ReqKwarg2</span>: 0<br /><span style=\" font-style:italic;\">OptBool2</span>: False</p></body></html>",
+            "textboxheight": 60
+        },
+        "scoringStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Scoring start",
+            "position": [
+                2150.0,
+                774.5
+            ],
+            "preset": "scoringStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Scoring started at:</span><br /><span style=\" font-style:italic;\">2024-05-29 14:48:26</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "visualisation_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                2361.8199568956925,
+                957.7816568248895
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        }
+    },
+    "NODES_MDA": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {
+            "GUI_channel_enabled": "False",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "False",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "False",
+            "GUI_storage_enabled": "False",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_z_enabled": "False",
+            "_GUI_grid_width": "7",
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "Camera",
+            "channels": [],
+            "exposure_ms": "90.0",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1716986899.9848442",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "5"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "6"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "7"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "8"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "9"
+                    }
+                }
+            ],
+            "mda_analysis_thread": null,
+            "num_time_points": "10",
+            "order": "t",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "data",
+                "config_groups",
+                "mainLayout"
+            ],
+            "time_interval_s": "0.0",
+            "xy_positions": null,
+            "xyz_positions": null,
+            "z_end": "1",
+            "z_nr_steps": null,
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "Z",
+            "z_start": "0",
+            "z_step": "1",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "acquisition_1": {
+            "GUI_channel_enabled": "False",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "False",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "False",
+            "GUI_storage_enabled": "False",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_z_enabled": "False",
+            "_GUI_grid_width": "7",
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "Camera",
+            "channels": [],
+            "exposure_ms": "90.0",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1716986925.379827",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "5"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "6"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "7"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "8"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "9"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "10"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "11"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "12"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "13"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "14"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "15"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "16"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "17"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "18"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "19"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "20"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "21"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "22"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "23"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "24"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "25"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "26"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "27"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "28"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "29"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "30"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "31"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "32"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "33"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "34"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "35"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "36"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "37"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "38"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "39"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "40"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "41"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "42"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "43"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "44"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "45"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "46"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "47"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "48"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "49"
+                    }
+                }
+            ],
+            "mda_analysis_thread": null,
+            "num_time_points": "50",
+            "order": "t",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "data",
+                "config_groups",
+                "mainLayout"
+            ],
+            "time_interval_s": "0.0",
+            "xy_positions": null,
+            "xyz_positions": null,
+            "z_end": "1",
+            "z_nr_steps": null,
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "Z",
+            "z_start": "0",
+            "z_step": "1",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "analysisMeasurement_0": {},
+        "scoringStart_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_MMCONFIGCHANGE": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "scoringStart_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_RT_ANALYSIS": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "scoringStart_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_SCORING_ANALYSIS": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {
+            "LineEdit#AverageIntensity.AvgGrayValue#OptBool2": "False",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg2": "0",
+            "LineEdit#StarDist.StarDistSegment#modelStorageLoc": "",
+            "LineEdit#StarDist.StarDistSegment#nms_thresh": "",
+            "LineEdit#StarDist.StarDistSegment#prob_thresh": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#image_data": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#model": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#nms_thresh": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#prob_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "StarDist_image: StarDistSegment_ImageVis",
+                    "StarDist_image.StarDistSegment_ImageVis"
+                ],
+                [
+                    "Average gray value",
+                    "AverageIntensity.AvgGrayValue"
+                ],
+                [
+                    "Cell Counter",
+                    "CellCounter.CellCounter"
+                ],
+                [
+                    "StarDist: StarDistSegment",
+                    "StarDist.StarDistSegment"
+                ],
+                [
+                    "StarDist: StarDistSegment_preloadedModel",
+                    "StarDist.StarDistSegment_preloadedModel"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "Average gray value"
+        },
+        "scoringStart_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_SCORING_END": {
+        "acqEnd_0": {
+            "Variables": {}
+        },
+        "acqStart_0": {
+            "Variables": {}
+        },
+        "acquisition_0": {
+            "Variables": {}
+        },
+        "acquisition_1": {
+            "Variables": {}
+        },
+        "analysisMeasurement_0": {
+            "Variables": {}
+        },
+        "scoringStart_0": {
+            "Variables": {}
+        },
+        "visualisation_0": {
+            "Variables": {}
+        }
+    },
+    "NODES_SCORING_SCORING": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "scoringStart_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_SCORING_VISUALISATION": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "scoringStart_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_TIMER": {
+        "acqEnd_0": 1,
+        "acqStart_0": 1,
+        "acquisition_0": 1,
+        "acquisition_1": 1,
+        "analysisMeasurement_0": 1,
+        "scoringStart_0": 1,
+        "visualisation_0": 1
+    },
+    "NODES_VISUALISATION": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "scoringStart_0": {},
+        "visualisation_0": {}
+    }
+}
