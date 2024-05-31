@@ -1120,7 +1120,7 @@ class MDAGlados(CustomMainWindow):
         Returns:
             None
         """
-        print(self.getEvents())
+        logging.info(self.getEvents())
     
     def getEvents(self):
         """
@@ -1158,7 +1158,6 @@ class MDAGlados(CustomMainWindow):
             None
         """
         
-        print('MDA_acq_finished running')
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         self.data = self.shared_data.mdaDatasets[-1]
         logging.info('MDA acq data finished and data stored!')
@@ -1190,7 +1189,7 @@ class MDAGlados(CustomMainWindow):
                         rt_analysis_connected_node = node
                         rt_analysis_connected_node.status = 'finished'
         
-        print('about the emit MDA_completed')
+        logging.debug('about the emit MDA_completed')
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_Node(self, nodeInfo):

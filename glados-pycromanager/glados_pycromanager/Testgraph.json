@@ -1,10 +1,6 @@
 {
     "CONNECTIONS": [
         [
-            "acquisition_0.Visual",
-            "visualisation_0.Start"
-        ],
-        [
             "acquisition_1.Finished",
             "acqEnd_0.End"
         ],
@@ -13,12 +9,24 @@
             "acquisition_1.Acquisition start"
         ],
         [
-            "scoringStart_0.Start",
-            "acquisition_0.Acquisition start"
+            "analysisMeasurement_0.Output",
+            "scoringEnd_1.T"
         ],
         [
             "acquisition_0.Finished",
             "analysisMeasurement_0.Analysis start"
+        ],
+        [
+            "acquisition_0.Visual",
+            "visualisation_0.Start"
+        ],
+        [
+            "scoringStart_0.Start",
+            "acquisition_0.Acquisition start"
+        ],
+        [
+            "acquisition_1.Visual",
+            "visualisation_1.Start"
         ]
     ],
     "NODES": {
@@ -181,8 +189,8 @@
             ],
             "displayName": "Acquisition",
             "position": [
-                2413.8290771728566,
-                1128.0176247959262
+                2428.3285488141846,
+                1129.564832513002
             ],
             "preset": "acquisition",
             "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">50 frames with order t</span><br />90.0 ms exposure time<br />50 time points</p></body></html>",
@@ -246,6 +254,42 @@
             "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Average gray value</span><br /><span style=\" font-weight:600;\">ReqKwarg1</span>: DefaultKwarg<br /><span style=\" font-weight:600;\">ReqKwarg2</span>: 0<br /><span style=\" font-style:italic;\">OptBool2</span>: False</p></body></html>",
             "textboxheight": 60
         },
+        "scoringEnd_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "T",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_default",
+                    "socket": true,
+                    "socketMaxConnections": 1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Report",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Scoring end",
+            "position": [
+                3231.6119491851155,
+                888.826205639293
+            ],
+            "preset": "scoringEnd",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
         "scoringStart_0": {
             "alternate": true,
             "alternateFillColor": null,
@@ -268,7 +312,7 @@
                 774.5
             ],
             "preset": "scoringStart",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Scoring started at:</span><br /><span style=\" font-style:italic;\">2024-05-29 14:48:26</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Scoring started at:</span><br /><span style=\" font-style:italic;\">2024-05-31 10:49:44</span></p></body></html>",
             "textboxheight": 50
         },
         "visualisation_0": {
@@ -294,6 +338,31 @@
             ],
             "preset": "visualisation",
             "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "visualisation_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                2353.840835419693,
+                1294.8995391858457
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: acquisition_1</span><br />Colormap: bop purple</p></body></html>",
             "textboxheight": 50
         }
     },
@@ -709,8 +778,10 @@
             "z_stepdistance_radio_sel": "False"
         },
         "analysisMeasurement_0": {},
+        "scoringEnd_1": {},
         "scoringStart_0": {},
-        "visualisation_0": {}
+        "visualisation_0": {},
+        "visualisation_1": {}
     },
     "NODES_MMCONFIGCHANGE": {
         "acqEnd_0": {},
@@ -718,8 +789,10 @@
         "acquisition_0": {},
         "acquisition_1": {},
         "analysisMeasurement_0": {},
+        "scoringEnd_1": {},
         "scoringStart_0": {},
-        "visualisation_0": {}
+        "visualisation_0": {},
+        "visualisation_1": {}
     },
     "NODES_RT_ANALYSIS": {
         "acqEnd_0": {},
@@ -727,8 +800,10 @@
         "acquisition_0": {},
         "acquisition_1": {},
         "analysisMeasurement_0": {},
+        "scoringEnd_1": {},
         "scoringStart_0": {},
-        "visualisation_0": {}
+        "visualisation_0": {},
+        "visualisation_1": {}
     },
     "NODES_SCORING_ANALYSIS": {
         "acqEnd_0": {},
@@ -773,8 +848,10 @@
             ],
             "__selectedDropdownEntryAnalysis__": "Average gray value"
         },
+        "scoringEnd_1": {},
         "scoringStart_0": {},
-        "visualisation_0": {}
+        "visualisation_0": {},
+        "visualisation_1": {}
     },
     "NODES_SCORING_END": {
         "acqEnd_0": {
@@ -792,10 +869,18 @@
         "analysisMeasurement_0": {
             "Variables": {}
         },
+        "scoringEnd_1": {
+            "Variables": [
+                "T"
+            ]
+        },
         "scoringStart_0": {
             "Variables": {}
         },
         "visualisation_0": {
+            "Variables": {}
+        },
+        "visualisation_1": {
             "Variables": {}
         }
     },
@@ -805,8 +890,10 @@
         "acquisition_0": {},
         "acquisition_1": {},
         "analysisMeasurement_0": {},
+        "scoringEnd_1": {},
         "scoringStart_0": {},
-        "visualisation_0": {}
+        "visualisation_0": {},
+        "visualisation_1": {}
     },
     "NODES_SCORING_VISUALISATION": {
         "acqEnd_0": {},
@@ -814,8 +901,10 @@
         "acquisition_0": {},
         "acquisition_1": {},
         "analysisMeasurement_0": {},
+        "scoringEnd_1": {},
         "scoringStart_0": {},
-        "visualisation_0": {}
+        "visualisation_0": {},
+        "visualisation_1": {}
     },
     "NODES_TIMER": {
         "acqEnd_0": 1,
@@ -823,8 +912,10 @@
         "acquisition_0": 1,
         "acquisition_1": 1,
         "analysisMeasurement_0": 1,
+        "scoringEnd_1": 1,
         "scoringStart_0": 1,
-        "visualisation_0": 1
+        "visualisation_0": 1,
+        "visualisation_1": 1
     },
     "NODES_VISUALISATION": {
         "acqEnd_0": {},
@@ -832,7 +923,15 @@
         "acquisition_0": {},
         "acquisition_1": {},
         "analysisMeasurement_0": {},
+        "scoringEnd_1": {},
         "scoringStart_0": {},
-        "visualisation_0": {}
+        "visualisation_0": {
+            "colormap": "gray",
+            "layerName": "acquisition_0"
+        },
+        "visualisation_1": {
+            "colormap": "bop purple",
+            "layerName": "acquisition_1"
+        }
     }
 }
