@@ -52,7 +52,7 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
         shared_dataF = shared_data_throughput
     layerId = getLayerIdFromName(layer_name,napariViewer)
     if len(layerId) > 0:
-        print('updating layer')
+        logging.debug('updating layer')
         layer = napariViewer.layers[layerId[0]]
         if layer.data.ndim == 2:
             layer.data = np.expand_dims(layer.data, axis=0)
@@ -63,7 +63,7 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
         napariViewer.dims.set_current_step(0,current_slice)
             
     else: #create the layer
-        print('creating layer')
+        logging.debug('creating layer')
         layer = napariViewer.add_image(image_data,name = layer_name)
         #Set correct scale - in nm
         layer.scale = [shared_dataF.core.get_pixel_size_um(),shared_dataF.core.get_pixel_size_um()] #type:ignore
