@@ -165,7 +165,7 @@ class MMConfigUI(CustomMainWindow):
     """
         A class to create a MicroManager config UI
     """
-    def __init__(self, config_groups,parent=None,showConfigs = True,showStages=True,showROIoptions=True,showLiveSnapExposureButtons=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
+    def __init__(self, config_groups,parent=None,showConfigs = True,showStages=True,showROIoptions=True,showShutterOptions=True,showLiveSnapExposureButtons=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
         """
         A class to create a MicroManager config UI with the given configuration groups.
         
@@ -180,6 +180,7 @@ class MMConfigUI(CustomMainWindow):
             showConfigs (bool, optional): Whether to show the configurations in the UI. Defaults to True.
             showStages (bool, optional): Whether to show the stages in the UI. Defaults to True.
             showROIoptions (bool, optional): Whether to show the ROI options in the UI. Defaults to True.
+            showShutterOptions (bool, optional): Whether to show the Shutter options in the UI. Defaults to True.
             showLiveSnapExposureButtons (bool, optional): Whether to show the live mode in the UI. Defaults to True.
             number_config_columns (int, optional): The number of columns in the layout. Defaults to 5.
             changes_update_MM (bool, optional): Whether to update the configs in MicroManager real-time. Defaults to True.
@@ -202,6 +203,7 @@ class MMConfigUI(CustomMainWindow):
         self.showConfigs = showConfigs
         self.showStages = showStages
         self.showROIoptions = showROIoptions
+        self.showShutterOptions = showShutterOptions
         self.showLiveSnapExposureButtons = showLiveSnapExposureButtons
         self.showCheckboxes = showCheckboxes
         self.showRelativeStages = showRelativeStages
@@ -295,6 +297,8 @@ class MMConfigUI(CustomMainWindow):
         if self.showStages:
             self.updateXYStageInfoWidget()
             self.updateOneDstageLayout()
+        if self.showShutterOptions:
+            self.updateShutterOptions()
         
         if self.autoSaveLoad:
             if self.fullyLoaded:
@@ -427,16 +431,28 @@ class MMConfigUI(CustomMainWindow):
         #Add the button to the layout:
         liveModeLayout.addWidget(self.SnapButton,3,0,1,2)
         
+        
+        if self.showShutterOptions:
+            self.shutterOptionsGroupBox = QGroupBox("Shutter")
+            self.shutterOptionsGroupBox.setLayout(self.shutterOptionsLayout(orientation='horizontal'))
+            liveModeLayout.addWidget(self.shutterOptionsGroupBox, 4,0,1,2)
+            
+        
         if self.showROIoptions:
             #Now add the ROI options widget
             self.roiOptionsGroupBox = QGroupBox("ROI Options")
             self.roiOptionsGroupBox.setLayout(self.ROIoptionsLayout(orientation='horizontal'))
-            liveModeLayout.addWidget(self.roiOptionsGroupBox, 4,0,1,2)
+            liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
         
-
         #Add one of those spacers at the bottom:
         verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
         liveModeLayout.addItem(verticalSpacer)
+        
+        #Add a button to update all MM info
+        self.updateAllMMinfoButton = QPushButton("Update all MM info")
+        self.updateAllMMinfoButton.clicked.connect(self.updateAllMMinfo)
+        #all the way at the bottom of the layout
+        liveModeLayout.addWidget(self.updateAllMMinfoButton,99,0,1,2)
         
         #Return the layout
         return liveModeLayout
@@ -485,6 +501,88 @@ class MMConfigUI(CustomMainWindow):
             self.LiveModeButton.setText("Start Live Mode")
             #update live mode:
             shared_data.liveMode = False
+    #endregion
+
+    #region Shutter
+    def shutterOptionsLayout(self,orientation='horizontal'):
+        """
+        Create a layout with buttons for Shutter options
+
+        Returns
+        -------
+        ShutterOptionsLayout : QGridLayout
+            A layout with buttons for Shutter options
+        """
+        #Create a Grid layout:
+        shutterOptionsLayout = QGridLayout()
+        #Add a dropdown:
+        self.shutterChoiceDropdown = QComboBox()
+        shutterDevices = self.getDevicesOfDeviceType('ShutterDevice')
+        for shutterDevice in shutterDevices:
+            self.shutterChoiceDropdown.addItem(shutterDevice)
+        self.shutterChoiceDropdown.currentIndexChanged.connect(self.on_shutterChoiceChanged)
+        
+        self.shutterAutoCheckbox = QCheckBox("Auto")
+        self.shutterAutoCheckbox.stateChanged.connect(self.on_shutterAutoCheckboxChanged)
+        
+        self.shutterOpenCloseButton = QPushButton("Open")
+        self.shutterOpenCloseButton.clicked.connect(self.on_shutterOpenCloseButtonPressed)
+        
+        shutterOptionsLayout.addWidget(self.shutterChoiceDropdown,0,0,1,2)
+        shutterOptionsLayout.addWidget(self.shutterAutoCheckbox,1,0)
+        shutterOptionsLayout.addWidget(self.shutterOpenCloseButton,1,1)
+        
+        return shutterOptionsLayout
+
+    def on_shutterOpenCloseButtonPressed(self):
+        """" 
+        Method that's called when the Open/Close shutter button is pressed.
+        """
+        current_text = self.shutterOpenCloseButton.text()
+        if current_text == 'Open':
+            self.core.set_shutter_open(True) #type:ignore
+            self.shutterOpenCloseButton.setText('Close')
+        elif current_text == 'Close':
+            self.core.set_shutter_open(False) #type:ignore
+            self.shutterOpenCloseButton.setText('Open')
+
+    def on_shutterChoiceChanged(self):
+        """
+        Set the shutter to the new choice if the dropdown is changed
+        """ 
+        selected_item = self.shutterChoiceDropwdown.currentText()
+        self.core.set_shutter_device(selected_item) #type:ignore
+
+    def on_shutterAutoCheckboxChanged(self,state):
+        """
+        Set the auto-shutter to whether the checkbox is selected or not
+        """
+        if state == 2:
+            self.shutterOpenCloseButton.setEnabled(False)
+            self.core.set_auto_shutter(True) #type:ignore
+        else:
+            self.shutterOpenCloseButton.setEnabled(True)
+            self.core.set_auto_shutter(False) #type:ignore
+    
+    def updateShutterOptions(self):
+        """" 
+        Update the shutter GUI options based on what's what in MM
+        """
+        #Set the current shutter device to the one in MM
+        currentShutterDevice = self.core.get_shutter_device() #type:ignore
+        self.shutterChoiceDropdown.currentText = currentShutterDevice
+        #Set the auto-method to the one in MM:
+        currentShutterAuto = self.core.get_auto_shutter() #type:ignore
+        self.shutterAutoCheckbox.setChecked(currentShutterAuto)
+        if currentShutterAuto == False:
+            self.shutterOpenCloseButton.setEnabled(True)
+        #Set the button text
+        currentShutterOpen = self.core.get_shutter_open() #type:ignore
+        if currentShutterOpen == True:
+            self.shutterOpenCloseButton.setText('Close')
+        else:
+            self.shutterOpenCloseButton.setText('Open')
+        
     #endregion
 
     #region ROI
