@@ -236,7 +236,7 @@ class napariHandler():
         self.mda_acq_done_signal = pyqtSignal(bool)
 
         #Sleep time to keep responsiveness
-        self.sleep_time = 0.01
+        self.sleep_time = 0.1
         self.layerName = 'newLayer'
 
     def mdaacqdonefunction(self):
@@ -251,25 +251,20 @@ class napariHandler():
                 metadata: metadata from micromanager
         """
         if self.acqstate:
-            if self.img_queue.qsize() < 20:
-                self.img_queue.put_nowait([image,metadata])
+            if self.img_queue.qsize() < 3:
+                self.img_queue.put([image,metadata])
                 
             #Loop over all queues in shared_data.liveImageQueues and also append the image there:
             for queue in self.shared_data.liveImageQueues:
-                if queue.qsize() < 20:
-                    queue.put_nowait([image,metadata])
+                if queue.qsize() < 2:
+                    queue.put([image,metadata])
                         
             if self.image_queue_analysis.qsize() < 3:
-                self.image_queue_analysis.put_nowait([image,metadata])
+                self.image_queue_analysis.put([image,metadata])
             
         else:
             logging.info('Broke off live mode')
-            #stop all threads
-            event_queue.put_nowait(None)
-            self.img_queue.put_nowait(None)
-            for queue in self.shared_data.liveImageQueues:
-                queue.put_nowait(None)
-            self.image_queue_analysis.put_nowait(None)
+            event_queue.put(None)
             try:
                 acq.abort()
                 logging.info('aborted acquisition')
@@ -359,16 +354,17 @@ class napariHandler():
     @thread_worker(connect={'yielded': napariUpdateAnalysisThreads})
     def run_analysis_worker(self,parent,layerName='Layer',layerColorMap='gray'):
         """
-        Worker which handles the ANALYSIS of the MDA/live mode queue
+        Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
         """
         img_queue = parent.image_queue_analysis
         while self.acqstate:
-            time.sleep(0.01)
+            time.sleep(0)
             # get elements from queue while there is more than one element
-            while img_queue.qsize() > 0:
+            # playing it safe: I'm always leaving one element in the queue
+            while img_queue.qsize() > 1:
                 DataStructure = {}
-                DataStructure['data'] = img_queue.get_nowait()
+                DataStructure['data'] = img_queue.get(block = False)
                 DataStructure['napariViewer'] = self.shared_data.napariViewer
                 DataStructure['acqState'] = self.acqstate
                 DataStructure['core'] = self.shared_data.core
@@ -383,12 +379,13 @@ class napariHandler():
     @thread_worker(connect={'yielded': napariUpdateLive})
     def run_napariVisualisation_worker(self,parent,layerName='Layer',layerColorMap='gray'):
         """
-        Worker which handles the visualisation of the MDA/live mode queue
+        Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
         """
         img_queue = parent.img_queue
         while self.acqstate:
             time.sleep(self.sleep_time)
+            logging.debug('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
             # get elements from queue while there is more than one element
             # playing it safe: I'm always leaving one element in the queue
             while img_queue.qsize() > 0:
@@ -404,7 +401,7 @@ class napariHandler():
                 DataStructure['finalisationProcedure'] = False
                 yield DataStructure
                 # self.napariUpdateLive(img_queue.get(block=False))
- 
+
         # read out last remaining element(s) after end of acquisition
         while img_queue.qsize() > 0:
             DataStructure = {}
@@ -475,7 +472,6 @@ class napariHandler():
                 worker2 = self.run_analysis_worker(self) #type:ignore
                 
                 logging.info("Live mode started")
-                
         elif self.liveOrMda == 'mda':
             #Hook the live mode into the scripts here
             if self.shared_data.mdaMode == False:
@@ -487,23 +483,6 @@ class napariHandler():
                 # self.mdaacqdonefunction()
             else:
                 logging.debug('mdaMode changed to TRUE')
-                
-                #Create the layer:
-                layerName = 'MDA'
-                liveImageLayer = getLayerIdFromName(layerName,napariViewer)
-                shape = [len(shared_data._mdaModeParams)]
-                shared_data.mdaZarrData = zarr.open(
-                        str(tempfile.TemporaryDirectory().name),
-                        shape = shape+[shared_data.core.get_roi().width,shared_data.core.get_roi().height],
-                        chunks = tuple([1] * len(shape) + [shared_data.core.get_roi().width,shared_data.core.get_roi().height]),
-                        )
-                layer = napariViewer.add_image(shared_data.mdaZarrData, name = layerName)
-                #Set correct scale - in nm
-                layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
-                layer._keep_auto_contrast = True #type:ignore
-                #Move to the front of the layers
-                napariViewer.reset_view()
-                
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Start the two workers, one to run it, one to visualise it.
@@ -633,13 +612,13 @@ class dockWidget_mdaAnalysisScoringTest(dockWidgets):
         #Add the full micro manager controls UI
         self.dockWidget = mdaAnalysisScoringTest_dockWidget(core,MM_JSON,self.layout,shared_data)
 
-# class dockWidget_analysisThreads(dockWidgets):
-#     def __init__(self): 
-#         logging.debug("dockWidget_analysisThreads started")
-#         super().__init__()
-#         print("Hello!")
-#         #Add the full micro manager controls UI
-#         self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
+class dockWidget_analysisThreads(dockWidgets):
+    def __init__(self): 
+        logging.debug("dockWidget_analysisThreads started")
+        super().__init__()
+        
+        #Add the full micro manager controls UI
+        self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
 
 class dockWidget_fullGladosUI(QMainWindow):
     def __init__(self): 
@@ -655,15 +634,11 @@ class dockWidget_fullGladosUI(QMainWindow):
         # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
 
 def startLiveModeVisualisation(shared_data,layerName='Live'):
-    print('starting live visualisation thread')
-    shared_data.lastMDAThread = create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
-    
+    create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
     shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
 
 def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
-    print('starting mda visualisation thread')
-    shared_data.lastMDAThread = create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
-    
+    create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
 
 def layer_removed_event_callback(event, shared_data):
@@ -674,7 +649,6 @@ def layer_removed_event_callback(event, shared_data):
         if l.getLayer() is not None:
             if l.getLayer().name == layerRemoved:
                 #Destroy the analysis thread
-                print('removing an analysisThread')
                 shared_data.analysisThreads.remove(l)
                 
                 if 'skipAnalysisThreadDeletion' in vars(shared_data):
@@ -711,8 +685,8 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     InitateNapariUI(napariViewer)
     
     #Add widgets as wanted
-    # custom_widget_analysisThreads = dockWidget_analysisThreads()
-    # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
+    custom_widget_analysisThreads = dockWidget_analysisThreads()
+    napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
@@ -735,5 +709,3 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     
     # breakpoint
     return returnInfo
-
-
