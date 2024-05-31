@@ -22,6 +22,9 @@ from utils import * #type: ignore
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 #Import all scripts in the custom script folders
+										
+											   
+																				  
 from Analysis_Images import * #type: ignore
 from Analysis_Measurements import * #type: ignore
 from Analysis_Shapes import * #type: ignore
@@ -143,21 +146,33 @@ class MainWidget(QWidget):
         includecustomUI = False
         include_flowChart_automatedMicroscopy = True
         
-        #Set up logging at correct level
-        log_file_path = 'logpath.txt'
+        #Set up logging at correct level        
+        # Create handlers
+        file_handler = logging.FileHandler('Glados_logpath.log')
+        stream_handler = logging.StreamHandler()
+
+        # Create a formatter
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s [%(filename)s:%(funcName)s:%(lineno)d]")
+
+        # Set the formatter for both handlers
+        file_handler.setFormatter(formatter)
+        stream_handler.setFormatter(formatter)
+
+        # Get the root logger
         logger = logging.getLogger()
+
+        # Set the logging level
         logger.setLevel(logging.INFO)
 
-        # Create the file handler to log to the file
-        file_handler = logging.FileHandler(log_file_path)
-        file_handler.setLevel(logging.INFO)
+        # Remove existing streamhandlers
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                logger.removeHandler(handler)
+        # Add handlers to the root logger
+        logger.addHandler(file_handler)
+        logger.addHandler(stream_handler)
 
-        # Create the stream handler to log to the debug terminal
-        stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler.setLevel(logging.INFO)
-        
-        # Add the handlers to the logger
-        logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
+        # logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
         logging.info("Main napari Glados-pycromanager plugin started")
         
         #Initialise napari-scalebar

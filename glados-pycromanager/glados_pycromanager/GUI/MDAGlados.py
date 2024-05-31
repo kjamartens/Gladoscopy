@@ -1120,7 +1120,7 @@ class MDAGlados(CustomMainWindow):
         Returns:
             None
         """
-        print(self.getEvents())
+        logging.info(self.getEvents())
     
     def getEvents(self):
         """
@@ -1189,6 +1189,7 @@ class MDAGlados(CustomMainWindow):
                         rt_analysis_connected_node = node
                         rt_analysis_connected_node.status = 'finished'
         
+        logging.debug('about the emit MDA_completed')
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_Node(self, nodeInfo):

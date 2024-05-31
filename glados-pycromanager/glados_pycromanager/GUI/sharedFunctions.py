@@ -5,6 +5,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 import slack
 from flask import Flask
+import time
 from slackeventsapi import SlackEventAdapter
 
 """Shared data summary
@@ -22,18 +23,17 @@ class Shared_data(QObject):
         self._mdaModeParams = []
         self._napariViewer = None
         self._headless = False
+        self._busy = False
         self._analysisThreads = []
         self._core = []
         self._liveImageQueues = []
         self._mdaImageQueues = []
         self._defaultFocusDevice = ''
         self._mdaModeSaveLoc = ['','']
-        self._mdaModeAcqData = None
         self._mdaModeNapariViewer = None
         self.mdaDatasets = []
         self.activeMDAobject = None
-        self.allMDAslicesRendered = []
-        self.lastMDAThread = None #Keeps track of the last-created MDA analysis thread
+        self.mdaZarrData = None
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
@@ -46,11 +46,12 @@ class Shared_data(QObject):
         if self.globalData['SLACK']['TOKEN'] is not None and not len(self.globalData['SLACK']['TOKEN']) == 0:
             self.globalData['SLACK']['CLIENT'] = slack.WebClient(token=self.globalData['SLACK']['TOKEN'])
             logging.info('Slack client initialised')
+        self.globalData['MDAVISMETHOD'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
     
     def mdaacqdonefunction(self):
-        logging.debug('mda acq done in shared_data')
+        logging.info('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)
         
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
@@ -64,6 +65,7 @@ class Shared_data(QObject):
             self._liveMode = new_value
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
+        time.sleep(0.1)
         self._livemodeNapariHandler.acqModeChanged(newSharedData=self)
         
         
@@ -77,6 +79,8 @@ class Shared_data(QObject):
             self._mdaMode = new_value
             self.on_mdaMode_value_change()
     def on_mdaMode_value_change(self):
+        logging.info('shared_data.mdaMode changed to '+str(self._mdaMode))
+        time.sleep(0.1)
         self._mdamodeNapariHandler.acqModeChanged(newSharedData=self)
     
     #NapariViewer property   
@@ -137,6 +141,17 @@ class Shared_data(QObject):
             self.on_mdaImageQueues_value_change()
     def on_mdaImageQueues_value_change(self):
         logging.debug('mdaImageQueues changed')
+    
+    @property
+    def busy(self):
+        return self._busy
+    @busy.setter
+    def busy(self, new_value):
+        if new_value != self._busy:
+            self._busy = new_value
+            self.on_busy_value_change()
+    def on_busy_value_change(self):
+        logging.info(f"shared_data.busy changed to {self._busy}")
     
     def appendNewMDAdataset(self,mdadataset):
         self.mdaDatasets.append(mdadataset)

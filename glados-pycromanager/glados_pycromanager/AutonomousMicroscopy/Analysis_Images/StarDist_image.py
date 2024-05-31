@@ -1,5 +1,5 @@
 from MainScripts import FunctionHandling
-from stardist.models import StarDist2D
+# from stardist.models import StarDist2D
 from csbdeep.utils import normalize
 import inspect
 import dask.array as da

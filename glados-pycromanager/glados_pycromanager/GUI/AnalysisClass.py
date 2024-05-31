@@ -13,7 +13,7 @@ import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from napari.layers import Shapes
 from typing import Union, Tuple, List
-from stardist.models import StarDist2D
+# from stardist.models import StarDist2D
 from PIL import Image, ImageDraw
 import utils
 sys.path.append('AutonomousMicroscopy')

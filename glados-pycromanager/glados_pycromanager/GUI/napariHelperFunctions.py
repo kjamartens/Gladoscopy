@@ -43,4 +43,3 @@ def InitateNapariUI(napariViewer):
     
     #Turn on scalebar
     showScaleBar(napariViewer)
-    

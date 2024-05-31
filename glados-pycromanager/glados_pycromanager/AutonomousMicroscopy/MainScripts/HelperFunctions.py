@@ -3,10 +3,10 @@ import warnings
 import inspect
 import importlib
 from csbdeep.io import save_tiff_imagej_compatible
-from stardist import _draw_polygons, export_imagej_rois
+# from stardist import _draw_polygons, export_imagej_rois
 import re
 
-from stardist.models import StarDist2D
+# from stardist.models import StarDist2D
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 #Import all scripts in the custom script folders

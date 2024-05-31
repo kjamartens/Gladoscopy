@@ -196,7 +196,6 @@ class MMConfigUI(CustomMainWindow):
             shared_data = parent.shared_data
             napariViewer = parent.napariViewer
             shared_data.napariViewer = napariViewer
-        
         super().__init__()
         self.fullyLoaded = False
         self.autoSaveLoad = autoSaveLoad
@@ -299,7 +298,7 @@ class MMConfigUI(CustomMainWindow):
                         gladosInfo = json.load(file)
                         MMControlsInfo = gladosInfo['MMControls']
                 
-                    #Hand-set the values that I want to save:
+                    #Hand-set the values that I want:
                     if 'exposureTimeInputField' in MMControlsInfo:
                         self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
                     for key, object in self.XYMoveEditField.items():
@@ -892,6 +891,7 @@ class MMConfigUI(CustomMainWindow):
         sliderPrecision = self.sliderPrecision
         sliderValInSliderPrecision = int(((currentSliderValue-lowerLimit)/(upperLimit-lowerLimit))*sliderPrecision)
         
+        
         #First add an editfield that has the value numerically:
         self.editFields[config_id] = QLineEdit()
         self.editFields[config_id].setText(str(currentSliderValue))
@@ -899,8 +899,9 @@ class MMConfigUI(CustomMainWindow):
         self.editFields[config_id].setValidator(QDoubleValidator())
         rowLayout.addWidget(self.editFields[config_id])
         self.editFields[config_id].editingFinished.connect(lambda config_id = config_id: self.on_sliderChanged(config_id,fromText=True,fromSlider=False))
-        
-        # #Create the slider:
+
+
+        #Create the slider:
         self.sliders[config_id] = QSlider(Qt.Horizontal) #type: ignore
         self.sliders[config_id].setRange(0,sliderPrecision)
         self.sliders[config_id].setValue(sliderValInSliderPrecision)
@@ -961,35 +962,31 @@ class MMConfigUI(CustomMainWindow):
     
     def addInputField(self,rowLayout,config_id):
         """ 
-        TODO
+        Add a editfield to a rowLayout for a given MMConfigItem.
+
         """
-        
         #Get the config group name
         configGroupName = self.config_groups[config_id].configGroupName()
-        
+
         self.editFields[config_id] = QLineEdit()
         #Add a callback when it is changed:
         self.editFields[config_id].editingFinished.connect(lambda config_id = config_id: self.onEditFieldChanged(config_id))
         # Add the editFields to the rowLayout:
         rowLayout.addWidget(self.editFields[config_id])
-        pass
     
     def onEditFieldChanged(self,config_id):
         """
         Changes a micromanager config when an editfield has changed
-
         Args:
             config_id (int): The ID of the editfield box that triggered the event.
-
         Returns:
             None
         """
-        #TODO
-        
+
         CurrentText = self.editFields[config_id].text()
         #Get the config group name:
         configGroupName = self.config_groups[config_id].configGroupName()
-        
+
         #An Editfield config by definition (?) only has a single property underneath, so get that:
         underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
         configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
@@ -999,8 +996,6 @@ class MMConfigUI(CustomMainWindow):
         #Set this property:
         self.config_groups[config_id].core.set_property(device_label,property_name,CurrentText)
         
-        pass
-    
     def updateValuefromMM(self,config_id):
         """
         Updates the value in the GUI for a single config_id based on the current value in MM
@@ -1038,22 +1033,20 @@ class MMConfigUI(CustomMainWindow):
             # #Update the slider:
             self.sliders[config_id].setRange(0,sliderPrecision)
             self.sliders[config_id].setValue(sliderValInSliderPrecision)
-            
             #Also update the corresponding editField
             self.editFields[config_id].setText(str(currentSliderValue))
             
         elif self.config_groups[config_id].isInputField():
-            
             #A editfield config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.config_groups[config_id].configGroupName()
             underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
             device_label = configdata.get_setting(0).get_device_label()
             property_name = configdata.get_setting(0).get_property_name()
-            
+
             #Finally we get the current value of the editfield
             currentValue = (self.config_groups[config_id].core.get_property(device_label,property_name))
-            
+
             self.editFields[config_id].setText(currentValue)
         
         #Make inactive if the checkbox is inactive
@@ -1212,7 +1205,7 @@ class MMConfigUI(CustomMainWindow):
         separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
         return separator_line
     #endregion
-
+    
 def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     """
     Controls the Micro Manager UI.

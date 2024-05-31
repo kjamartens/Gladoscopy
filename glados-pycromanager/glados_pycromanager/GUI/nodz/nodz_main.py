@@ -1599,6 +1599,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
                     self.callAction(self)
 
     def finishedmda(self):
+        print('finishedmda ran')
         self.status = 'finished'
         self.update()
         logging.info('MDA finished within node')

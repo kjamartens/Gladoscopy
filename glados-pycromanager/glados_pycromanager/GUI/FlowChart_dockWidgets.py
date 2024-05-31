@@ -886,7 +886,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        #Create a QGridLayout:
         
         #If run as plugin, we need to specify the globals like this:
         if parent is not None:
@@ -897,6 +896,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             shared_data.napariViewer = napariViewer
         
         self.parent = parent
+        
+        #Create a QGridLayout:
         self.mainLayout = QGridLayout()
         
         self.fullRunOngoing = False
@@ -1174,6 +1175,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             parentV = None
             if self.parent is not None:
                 parentV = self.parent
+            #Attach a MDA data to this node
             newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True,parent=parentV) # type: ignore
             
             #Do the acquisition upon callAction
