@@ -28,10 +28,10 @@ import sys, os
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.path.sep+'AutonomousMicroscopy')
 #Import all scripts in the custom script folders
-from CellSegmentScripts import *
-from CellScoringScripts import *
-from ROICalcScripts import *
-from ScoringMetrics import *
+# from CellSegmentScripts import *
+# from CellScoringScripts import *
+# from ROICalcScripts import *
+# from ScoringMetrics import *
 #Obtain the helperfunctions
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.path.sep+'AutonomousMicroscopy'+os.path.sep+'MainScripts')
 import HelperFunctions

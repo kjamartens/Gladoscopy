@@ -2,6 +2,7 @@
 from PyQt5.QtGui import QIcon
 import logging
 from napari.qt import thread_worker
+import numpy as np
 
 """ 
 General napari functions
@@ -20,7 +21,26 @@ def showScaleBar(napariViewer):
     """
     napariViewer.scale_bar.visible = True
     napariViewer.scale_bar.unit = "um"
-    
+
+def checkIfLayerExistsOrCreate(napariViewer,layer_name,layer_type='image',shared_data_throughput = None, required_size = (256,256)):
+    """
+    Check if a layer with specific name exists. If it does, return this layer. If not, create the layer and return it.
+    """ 
+    if shared_data_throughput == None:
+        shared_dataF = shared_data #assumed to be global #type:ignore
+    else:
+        shared_dataF = shared_data_throughput
+    layerId = getLayerIdFromName(layer_name,napariViewer)
+    if len(layerId) > 0:
+        layer = napariViewer.layers[layerId[0]]
+        return layer
+    else: #create the layer
+        layer = napariViewer.add_image(np.zeros(required_size),name = layer_name)
+        #Set correct scale - in nm
+        layer.scale = [shared_dataF.core.get_pixel_size_um(),shared_dataF.core.get_pixel_size_um()] #type:ignore
+        layer._keep_auto_contrast = True #type:ignore
+        napariViewer.reset_view()
+        return layer
 
 # @thread_worker
 def InitateNapariUI(napariViewer):

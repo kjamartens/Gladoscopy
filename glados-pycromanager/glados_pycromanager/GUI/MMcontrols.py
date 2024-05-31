@@ -25,7 +25,7 @@ import logging
 from typing import List, Iterable
 import itertools
 import queue
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate
 #For drawing
 matplotlib.use('Qt5Agg')
 
@@ -165,7 +165,7 @@ class MMConfigUI(CustomMainWindow):
     """
         A class to create a MicroManager config UI
     """
-    def __init__(self, config_groups,parent=None,showConfigs = True,showStages=True,showROIoptions=True,showLiveMode=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
+    def __init__(self, config_groups,parent=None,showConfigs = True,showStages=True,showROIoptions=True,showLiveSnapExposureButtons=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
         """
         A class to create a MicroManager config UI with the given configuration groups.
         
@@ -180,7 +180,7 @@ class MMConfigUI(CustomMainWindow):
             showConfigs (bool, optional): Whether to show the configurations in the UI. Defaults to True.
             showStages (bool, optional): Whether to show the stages in the UI. Defaults to True.
             showROIoptions (bool, optional): Whether to show the ROI options in the UI. Defaults to True.
-            showLiveMode (bool, optional): Whether to show the live mode in the UI. Defaults to True.
+            showLiveSnapExposureButtons (bool, optional): Whether to show the live mode in the UI. Defaults to True.
             number_config_columns (int, optional): The number of columns in the layout. Defaults to 5.
             changes_update_MM (bool, optional): Whether to update the configs in MicroManager real-time. Defaults to True.
             showCheckboxes (bool, optional): Whether to show checkboxes for each config group. Defaults to False.
@@ -202,7 +202,7 @@ class MMConfigUI(CustomMainWindow):
         self.showConfigs = showConfigs
         self.showStages = showStages
         self.showROIoptions = showROIoptions
-        self.showLiveMode = showLiveMode
+        self.showLiveSnapExposureButtons = showLiveSnapExposureButtons
         self.showCheckboxes = showCheckboxes
         self.showRelativeStages = showRelativeStages
         self.config_groups = config_groups
@@ -221,13 +221,29 @@ class MMConfigUI(CustomMainWindow):
         #Create a Vertical+horizontal layout:
         self.mainLayout = QGridLayout()
         self.configEntries = {}
+        
+        
+        
+        
+        if showLiveSnapExposureButtons:
+            self.generalImagingGroupBox = QGroupBox("General")
+            
+            #Now add the live mode widget
+            # self.liveModeGroupBox = QGroupBox("Live Mode")
+            self.generalImagingGroupBox.setLayout(self.generalImagingLayout())
+            self.mainLayout.addWidget(self.generalImagingGroupBox, 0, 0)
+            
+            #TODO: add shutter here
+            
+            
+            
         if showConfigs:
             #Create a layout for the configs:
             self.configGroupBox = QGroupBox("Configurations")
             self.configLayout = QGridLayout()
             #Add this to the mainLayout via the groupbox:
             self.configGroupBox.setLayout(self.configLayout)
-            self.mainLayout.addWidget(self.configGroupBox,0,0)
+            self.mainLayout.addWidget(self.configGroupBox,0,2)
             #Fill the configLayout
             for config_id in range(len(config_groups)):
                 self.configEntries[config_id] = self.addRow(config_id)
@@ -248,19 +264,8 @@ class MMConfigUI(CustomMainWindow):
             # self.stagesWidget()
             self.stagesGroupBox = QGroupBox("Stages")
             self.stagesGroupBox.setLayout(self.stagesLayout())
-            self.mainLayout.addWidget(self.stagesGroupBox, 0, 2)
+            self.mainLayout.addWidget(self.stagesGroupBox, 0, 3)
         
-        if showROIoptions:
-            #Now add the ROI options widget
-            self.roiOptionsGroupBox = QGroupBox("ROI Options")
-            self.roiOptionsGroupBox.setLayout(self.ROIoptionsLayout())
-            self.mainLayout.addWidget(self.roiOptionsGroupBox, 0, 4)
-        
-        if showLiveMode:
-            #Now add the live mode widget
-            self.liveModeGroupBox = QGroupBox("Live Mode")
-            self.liveModeGroupBox.setLayout(self.liveModeLayout())
-            self.mainLayout.addWidget(self.liveModeGroupBox, 0, 6)
         
         if showRelativeStages:
             self.relativeStagesGroupBox = QGroupBox("RelativeStages")
@@ -339,7 +344,7 @@ class MMConfigUI(CustomMainWindow):
         if hasattr(widget, 'layout'):
             layout = widget.layout()
             if layout:
-                layout.setContentsMargins(0, 0, 0, 0)
+                # layout.setContentsMargins(0, 0, 0, 0)
                 # layout.setSpacing(0)  # Optionally, remove spacing between widgets
                 for i in range(layout.count()):
                     item = layout.itemAt(i)
@@ -383,11 +388,12 @@ class MMConfigUI(CustomMainWindow):
         return currentUIvalue
     #endregion
     
-    #region live mode
-    def liveModeLayout(self):
+    #region general imaging mode
+    def generalImagingLayout(self):
         """
-        Creates the layout for the live mode options.
+        Creates the layout for the general imaging mode options.
         This includes an input field for the exposure time in ms.
+        Basically, should be exposure time (ms), snap, addToAlbum, live start/stop
 
         Returns:
             QGridLayout: The layout for the live mode options.
@@ -396,20 +402,66 @@ class MMConfigUI(CustomMainWindow):
         liveModeLayout = QGridLayout()
         #Add a 'exposure time' label:
         exposureTimeLabel = QLabel("Exposure time (ms):")
-        liveModeLayout.addWidget(exposureTimeLabel,1,0)
+        liveModeLayout.addWidget(exposureTimeLabel,0,0)
         #Add a 'exposure time' input field:
         self.exposureTimeInputField = QLineEdit()
         self.exposureTimeInputField.setText(str(100))
         self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
-        liveModeLayout.addWidget(self.exposureTimeInputField,1,1)
+        liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
         self.LiveModeButton = QPushButton("Start Live Mode")
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.LiveModeButton,0,0,1,2)
+        liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
+        
+        self.SnapButton = QPushButton("Snap")
+        #add a connection to the button:
+        self.SnapButton.clicked.connect(lambda index: self.snapImage())
+        #Add the button to the layout:
+        liveModeLayout.addWidget(self.SnapButton,2,0,1,2)
+        
+        self.SnapButton = QPushButton("Add to Album")
+        #add a connection to the button:
+        self.SnapButton.clicked.connect(lambda index: self.addImageToAlbum())
+        #Add the button to the layout:
+        liveModeLayout.addWidget(self.SnapButton,3,0,1,2)
+        
+        if self.showROIoptions:
+            #Now add the ROI options widget
+            self.roiOptionsGroupBox = QGroupBox("ROI Options")
+            self.roiOptionsGroupBox.setLayout(self.ROIoptionsLayout(orientation='horizontal'))
+            liveModeLayout.addWidget(self.roiOptionsGroupBox, 4,0,1,2)
+        
+
+        #Add one of those spacers at the bottom:
+        verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        liveModeLayout.addItem(verticalSpacer)
+        
         #Return the layout
         return liveModeLayout
+    
+    def snapImage(self):
+        """
+        Function that's called when an image is snapped (i.e. get a single image), uses the float(self.exposureTimeInputField.text()) as time in ms
+        """
+        #Set the correct exposure time
+        shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
+        #Snap an image
+        shared_data.core.snap_image()
+        #Get the just-snapped image
+        newImage = shared_data.core.get_tagged_image()
+        snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.tags["Height"],newImage.tags["Width"]))
+        snapLayer.data = np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
+        return
+    
+    def addImageToAlbum(self):
+        """
+        Function that's called when an image should be added to album (i.e. get a single image and append it to layer named 'Album'), uses the float(self.exposureTimeInputField.text()) as time in ms
+        """
+        #TODO
+        print('addImageToAlbum should be implemented')
+        return
     
     def changeLiveMode(self):
         """
@@ -430,7 +482,7 @@ class MMConfigUI(CustomMainWindow):
     #endregion
 
     #region ROI
-    def ROIoptionsLayout(self):
+    def ROIoptionsLayout(self,orientation='horizontal'):
         """
         Create a layout with buttons for ROI options
 
@@ -446,15 +498,20 @@ class MMConfigUI(CustomMainWindow):
         #Reset ROI to max size
         self.ROIoptionsButtons['Reset'] = QPushButton("Reset ROI")
         self.ROIoptionsButtons['Reset'].clicked.connect(lambda index: self.resetROI())
-        ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)
         #Zoom in once to center
         self.ROIoptionsButtons['ZoomIn'] = QPushButton("Zoom In")
         self.ROIoptionsButtons['ZoomIn'].clicked.connect(lambda index: self.zoomROI('ZoomIn'))
-        ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomIn'],1,0)
         #Zoom out once from center
         self.ROIoptionsButtons['ZoomOut'] = QPushButton("Zoom Out")
         self.ROIoptionsButtons['ZoomOut'].clicked.connect(lambda index: self.zoomROI('ZoomOut'))
-        ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomOut'],2,0)
+        if orientation == 'vertical':
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomIn'],1,0)
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomOut'],2,0)
+        else:
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomIn'],0,1)
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomOut'],0,2)
         return ROIoptionsLayout
     
     def resetROI(self):
