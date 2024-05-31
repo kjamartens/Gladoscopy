@@ -10,8 +10,8 @@
             "config_groups",
             "mainLayout"
         ],
-        "num_time_points": 100,
-        "time_interval_s": 9.999999999999997e-80,
+        "num_time_points": 50,
+        "time_interval_s": 9.999999999999997e-83,
         "z_start": 0,
         "z_end": 1,
         "z_step": 1,
@@ -29,7 +29,7 @@
         "xyz_positions": null,
         "position_labels": null,
         "order": "t",
-        "exposure_ms": 30.0,
+        "exposure_ms": 100.0,
         "GUI_show_exposure": true,
         "GUI_show_xy": false,
         "GUI_show_z": false,
@@ -48,7 +48,7 @@
         "has_GUI": true,
         "mda_analysis_thread": null,
         "MM_JSON": null,
-        "lastTimeUpdateSize": 1717149321.6525338,
+        "lastTimeUpdateSize": 1717149532.9710722,
         "_GUI_grid_width": 7,
         "fully_started": true
     },

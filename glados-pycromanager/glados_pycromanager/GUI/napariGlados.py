@@ -131,6 +131,7 @@ def napariUpdateLive(DataStructure):
                     #Set correct scale - in nm
                     layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
                     layer._keep_auto_contrast = True #type:ignore
+                    napariViewer.dims.set_axis_label(0,'Frame')
                     #Move to the front of the layers
                     # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
                     napariViewer.reset_view()
@@ -154,7 +155,8 @@ def napariUpdateLive(DataStructure):
                     currentSlice = metadata['Axes']['time']
                     shared_data.mdaZarrData[currentSlice,:,:] = liveImage
                     #set to correct slice
-                    napariViewer.dims.set_point(0,currentSlice)
+                    napariViewer.dims.set_current_step(0,currentSlice)
+                    # napariViewer.update_forward_refs()
                     shared_data.allMDAslicesRendered.append(currentSlice)
                 else:
                     # layer is present, replace its data
