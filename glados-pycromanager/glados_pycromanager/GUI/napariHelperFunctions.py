@@ -42,6 +42,35 @@ def checkIfLayerExistsOrCreate(napariViewer,layer_name,layer_type='image',shared
         napariViewer.reset_view()
         return layer
 
+def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image',shared_data_throughput = None):
+    """
+    If a layer exist, add an image to it (i.e. album-mode). If it doesn't exist yet, create it.
+    """
+    if shared_data_throughput == None:
+        shared_dataF = shared_data #assumed to be global #type:ignore
+    else:
+        shared_dataF = shared_data_throughput
+    layerId = getLayerIdFromName(layer_name,napariViewer)
+    if len(layerId) > 0:
+        print('updating layer')
+        layer = napariViewer.layers[layerId[0]]
+        if layer.data.ndim == 2:
+            layer.data = np.expand_dims(layer.data, axis=0)
+        if image_data.ndim == 2:
+            image_data = np.expand_dims(image_data, axis=0)
+        layer.data = np.append(layer.data,image_data,axis=0)
+        current_slice = layer.data.shape[0]
+        napariViewer.dims.set_current_step(0,current_slice)
+            
+    else: #create the layer
+        print('creating layer')
+        layer = napariViewer.add_image(image_data,name = layer_name)
+        #Set correct scale - in nm
+        layer.scale = [shared_dataF.core.get_pixel_size_um(),shared_dataF.core.get_pixel_size_um()] #type:ignore
+        layer._keep_auto_contrast = True #type:ignore
+        napariViewer.reset_view()
+    
+
 # @thread_worker
 def InitateNapariUI(napariViewer):
     """

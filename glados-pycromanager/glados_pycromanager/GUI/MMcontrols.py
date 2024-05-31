@@ -25,7 +25,7 @@ import logging
 from typing import List, Iterable
 import itertools
 import queue
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate
+from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer
 #For drawing
 matplotlib.use('Qt5Agg')
 
@@ -457,10 +457,16 @@ class MMConfigUI(CustomMainWindow):
     
     def addImageToAlbum(self):
         """
-        Function that's called when an image should be added to album (i.e. get a single image and append it to layer named 'Album'), uses the float(self.exposureTimeInputField.text()) as time in ms
-        """
-        #TODO
-        print('addImageToAlbum should be implemented')
+        Add an image to the Album layer in napari
+        """ 
+        #Set the correct exposure time
+        shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
+        #Snap an image
+        shared_data.core.snap_image()
+        #Get the just-snapped image
+        newImage = shared_data.core.get_tagged_image()
+        #And add to the 'Album' layer
+        addToExistingOrNewLayer(napariViewer,'Album',np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]]),shared_data_throughput = shared_data)
         return
     
     def changeLiveMode(self):
