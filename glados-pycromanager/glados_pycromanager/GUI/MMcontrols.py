@@ -325,6 +325,7 @@ class MMConfigUI(CustomMainWindow):
         """
         if self.autoSaveLoad:
             if self.fullyLoaded:
+                logging.info('Storing glados state.json')
                 self.save_state_MMControls('glados_state.json')
                 pass
 

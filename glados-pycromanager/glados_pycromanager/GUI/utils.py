@@ -1354,9 +1354,19 @@ class CustomMainWindow(QWidget):
                     if currentParent == None:
                         break
                     currentParent = currentParent.parent()
-                    if isinstance(currentParent, napariGlados.dockWidget_MMcontrol):
-                        saveState = 'MMControls'
-                        break
+                    #Try to figure out if it's a MMControls instance or not:
+                    try:
+                        if isinstance(currentParent.dockwidget, napariGlados.dockWidget_MMcontrol):
+                            saveState = 'MMControls'
+                            break
+                    except:
+                        try:
+                            if currentParent.type == 'MMConfig':
+                                saveState = 'MMControls'
+                                break
+                        except:
+                            pass
+                        pass
                     
                 if saveState is not None:
                     state[saveState][key] = {
