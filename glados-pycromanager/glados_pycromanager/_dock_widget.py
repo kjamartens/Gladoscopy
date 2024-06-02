@@ -10,6 +10,8 @@ import sys
 import os
 from pycromanager import Core
 import logging
+from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QGroupBox, QLabel, QVBoxLayout, QPushButton, QSizePolicy
+
 from typing import List
 os.environ['NAPARI_ASYNC'] = '1'
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI")
@@ -52,7 +54,13 @@ class GladosWidget(QWidget):
         Init a glados widget, mostly passing around parent variables to daughter (plugin) variables. Used to be global-specified, but doesn't work with napari plugins for some reason.
         """
         super().__init__()
+        
+        self.setMinimumSize(0, 0)  # Force-set the minimum size to (0, 0)
+
+        self.setBaseSize(200,200)
+        
         self._viewer = viewer
+        self.type = None
         
         if parent is not None:
             self.core = parent.core
@@ -60,6 +68,101 @@ class GladosWidget(QWidget):
             self.livestate = parent.livestate
             self.shared_data = parent.shared_data
             self.napariViewer = parent.napariViewer
+    
+    def getFirstOrderWidgets(self):
+        firstOrderWidgets = []
+        for i in range(self.dockWidget.count()):
+            item = self.dockWidget.itemAt(i)
+            widget = item.widget()
+            if widget is not None:
+                firstOrderWidgets.append(widget)
+                widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+                logging.debug(f"Widget {i}: {widget.objectName() if widget.objectName() else widget}")
+        
+        print(firstOrderWidgets)
+        return firstOrderWidgets
+    
+    def getMainWindowSize(self):
+        width = self.size().width()
+        height = self.size().height()
+        print(f"width: {width}, height: {height}")
+        
+    def resizeEvent(self, event):
+        if self.type == None or self.type == "AutonomousMicroscopy":
+            super().resizeEvent(event)
+            return
+        else:
+            width = self.size().width()
+            height = self.size().height()
+            print(f"resize event caleld with type: {self.type}")
+            
+            # Determine the layout based on the window size
+            if width > height * 2:  # Wide window
+                self.set_groupBoxLayout(rowsOrColumns='rows', n_items=1)
+            elif height > width * 2:  # Tall window
+                self.set_groupBoxLayout(rowsOrColumns='columns', n_items=1)
+            elif width > height:  # Landscape
+                self.set_groupBoxLayout(rowsOrColumns='rows', n_items=2)
+            else:  # Portrait
+                self.set_groupBoxLayout(rowsOrColumns='columns', n_items=2)
+                
+            # self.getMainWindowSize()
+            super().resizeEvent(event)
+        
+    def set_groupBoxLayout(self, rowsOrColumns='rows', n_items=1):
+        
+        allWidgets = self.getFirstOrderWidgets()
+        n_widgets = len(allWidgets)
+        if rowsOrColumns == 'rows':
+            rows = n_items
+            columns = n_widgets // rows
+        elif rowsOrColumns == 'columns':
+            columns = n_items
+            rows = n_widgets // columns
+            
+            
+        # print(f"Minimum width dockwidget: {self.dockWidget.minimumWidth()} px")
+        # print(f"Minimum height dockwidget: {self.dockWidget.minimumHeight()} px")
+        
+        # self.dockWidget.setSizeConstraint(QGridLayout.SetMinAndMaxSize)
+        # # Clear the layout first
+        # for i in reversed(range(n_widgets)):
+        #     widget = allWidgets[i]
+        #     if widget is not None:
+        #         print(f"removing {widget}")
+        #         self.dockWidget.removeWidget(widget)
+        #         widget.setParent(None)
+        
+        # # Add group boxes to the layout
+        # for index, group_box in enumerate(allWidgets):
+        #     row = index // columns
+        #     column = index % columns
+        #     print(f"adding {group_box} to row {row}, column {column}")
+        #     # print(f"Minimum width widget: {group_box.minimumWidth()} px")
+        #     # print(f"Minimum height wiget: {group_box.minimumHeight()} px")
+        #     self.dockWidget.addWidget(group_box, row, column)
+
+        # Adjust stretch
+        # for row in range(rows):
+        #     self.dockWidget.setRowStretch(row, 1)
+        # for column in range(columns):
+        #     self.dockWidget.setColumnStretch(column, 1)
+            
+    
+    def set_widget_properties_recursive(self, widget):
+        """
+        Recursively sets the minimum size and size policy for a widget and all its children.
+        """
+        try:
+            widget.setMinimumSize(0, 0)
+            widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        except:
+            pass
+
+        for child in widget.findChildren(QWidget):
+            self.set_widget_properties_recursive(child)
+        for child in widget.findChildren(QGroupBox):
+            self.set_widget_properties_recursive(child)
 
 class MMConfigWidget(GladosWidget):
     """
@@ -71,6 +174,7 @@ class MMConfigWidget(GladosWidget):
         Initialize the micromanager-config plugin
         """
         super().__init__(viewer = viewer, parent=parent)
+        self.type = "MMConfig"
         
         #Get some info from core to put in shared_data
         self.shared_data._defaultFocusDevice = self.core.get_focus_device()
@@ -79,6 +183,16 @@ class MMConfigWidget(GladosWidget):
         #Start docwidget
         self.dockWidget = microManagerControlsUI_plugin(self) #type:ignore
         self.setLayout(self.dockWidget)
+        
+        
+        self.set_widget_properties_recursive(self)
+        
+        self.getFirstOrderWidgets()
+        self.getMainWindowSize()
+        
+        self.setMinimumSize(200, 200)
+        self.setBaseSize(200,200)
+        
         logging.info("dockWidget_MMConfig started")
 
 
@@ -91,9 +205,19 @@ class MDAWidget(GladosWidget):
         Initialize the Multi-D acquisition plugin
         """
         super().__init__(viewer = viewer, parent=parent)
+        self.type = "MDA"
         
         self.dockWidget = MDAGlados_plugin(self) #type:ignore
         self.setLayout(self.dockWidget)
+        
+        from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QGroupBox, QLabel, QVBoxLayout, QPushButton, QSizePolicy
+
+        # self.dockWidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        
+        self.getFirstOrderWidgets()
+        self.getMainWindowSize()
         logging.info("dockwidget_MDA started")
 
 class AutonomousMicroscopyWidget(GladosWidget):
@@ -111,6 +235,12 @@ class AutonomousMicroscopyWidget(GladosWidget):
         
         self.setLayout(self.dockWidget)
         logging.info("dockWidget_AutonomousMicroscopy started")
+    
+    def resizeEvent(self, event):
+        """"
+        We don't want the GladosWidget resizeEvent for AutonomousMicroscopy
+        """
+        return super().resizeEvent(event)
 #endregion
 
 #region Main Call

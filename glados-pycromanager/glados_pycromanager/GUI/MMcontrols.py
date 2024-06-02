@@ -337,14 +337,22 @@ class MMConfigUI(CustomMainWindow):
         """
         if widget is None:
             return
+        #Testing a few things
+        try:
+            widget.setSizePolicy(
+                QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+            )
+        except:
+            pass
+        try:
+            widget.setMinimumSize(0, 0)
+        except:
+            pass
         
         if isinstance(widget, (QLabel, QPushButton, QComboBox)):
             widget.setFont(font)
             widget.setContentsMargins(0, 0, 0, 0)
             widget.setMinimumSize(0, 0)
-            # widget.setSizePolicy(
-            #     QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-            # )
 
         if hasattr(widget, 'layout'):
             layout = widget.layout()
@@ -446,7 +454,7 @@ class MMConfigUI(CustomMainWindow):
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
         
         #Add one of those spacers at the bottom:
-        verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Expanding, QSizePolicy.Expanding)
         liveModeLayout.addItem(verticalSpacer)
         
         #Add a button to update all MM info
