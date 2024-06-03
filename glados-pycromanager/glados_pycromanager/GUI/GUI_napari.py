@@ -2,7 +2,8 @@
 from pycromanager import Core
 from pycromanager import start_headless
 import os
-os.environ['NAPARI_ASYNC'] = '1'
+os.environ['NAPARI_ASYNC'] = '0'
+os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
 import json
 import sys
 from PyQt5.QtWidgets import QApplication
