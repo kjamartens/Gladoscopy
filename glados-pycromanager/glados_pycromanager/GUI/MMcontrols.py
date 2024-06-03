@@ -661,14 +661,19 @@ class MMConfigUI(CustomMainWindow):
         #Zoom out once from center
         self.ROIoptionsButtons['ZoomOut'] = QPushButton("Zoom Out")
         self.ROIoptionsButtons['ZoomOut'].clicked.connect(lambda index: self.zoomROI('ZoomOut'))
+        #Draw a ROI
+        self.ROIoptionsButtons['drawROI'] = QPushButton("draw ROI")
+        self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.drawROI())
         if orientation == 'vertical':
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomIn'],1,0)
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomOut'],2,0)
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['drawROI'],3,0)
         else:
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomIn'],0,1)
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['ZoomOut'],0,2)
+            ROIoptionsLayout.addWidget(self.ROIoptionsButtons['drawROI'],0,3)
         return ROIoptionsLayout
     
     def resetROI(self):
@@ -740,6 +745,46 @@ class MMConfigUI(CustomMainWindow):
                 shared_data.liveMode = True
         except:
             logging.error('ZOOMING DIDN\'T WORK!')
+    
+    def drawROI(self):
+        """
+        Draw a ROI. Idea is to create a new layer, let the user draw a rectangle, and ask if they like it or not. Then a small popup window with 'OK', 'Let me draw again', 'Stop this futile attempt'
+        """
+        
+        # Create a shapes layer
+        self.drawROIlayer = shared_data.napariViewer.add_shapes(name='drawROI')
+
+        # Set the shapes layer mode to 'add_rectangle'
+        self.drawROIlayer.mode = 'add_rectangle'
+        
+        #Changes the button to a different method, which should be pressed once the rectangle is drawn:
+        self.ROIoptionsButtons['drawROI'].setText('ROI drawn')
+        self.ROIoptionsButtons['drawROI'].clicked.disconnect()
+        self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.setROItoDrawn())
+    
+    def setROItoDrawn(self):
+        
+        # Get the type of the last added shape
+        if len(self.drawROIlayer.data) > 0:
+            shape_type = self.drawROIlayer.shape_type[-1]
+            if shape_type == 'rectangle':
+                print("Rectangle added!")
+                vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
+                print(f"Vertices: {vertices}")
+            #TODO: add logic to set the ROI to this size of the camera
+        else:
+            logging.warning('Attempted to set ROI to drawn, but no shape was added')
+        
+        #remove the self.drawROIlayer:
+        try:
+            shared_data.napariViewer.layers.remove(self.drawROIlayer)
+        except:
+            logging.error('Failed to remove the drawROIlayer')
+        
+        #Reset the Draw ROI button
+        self.ROIoptionsButtons['drawROI'].setText('Draw ROI')
+        self.ROIoptionsButtons['drawROI'].clicked.disconnect()
+        self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.drawROI())
     #endregion
     
     #region Stages
