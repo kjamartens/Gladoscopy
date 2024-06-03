@@ -846,6 +846,11 @@ class MDAGlados(CustomMainWindow):
         # Add groupboxes to the main layout, only if they should be shown. The position of the gridbox is based on whether the previous ones are added or not:
         self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions,GUI_acquire_button=GUI_acquire_button)
         
+        #Change the font of everything in the layout
+        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", 7))
+        #Twice because it relies on dependancies inside qgridlayouts
+        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", 7))
+        
         if self.layout is not None:
             #Add the layout to the main layout
             try:
@@ -1102,8 +1107,8 @@ class MDAGlados(CustomMainWindow):
             # QCoreApplication.processEvents()
         
         
-        self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
-        self.gui.setRowStretch(99,gridWidth+1) # type: ignore
+        # self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
+        # self.gui.setRowStretch(99,gridWidth+1) # type: ignore
         
         QCoreApplication.processEvents()
         
@@ -1142,6 +1147,48 @@ class MDAGlados(CustomMainWindow):
             The GUI object.
         """
         return self
+    
+    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
+        """
+        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
+        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
+
+        """
+        
+        logging.info('in set_font_and_margins_recursive')
+        if isinstance(widget, (QPushButton)):
+            widget.setFont(font)
+            # widget.setContentsMargins(0, 0, 0, 0)
+            # widget.setMinimumSize(20, 20)
+        if isinstance(widget, (QLabel, QComboBox)):
+            widget.setFont(font)
+            # widget.setContentsMargins(0, 0, 0, 0)
+            # widget.setMinimumSize(20, 20)
+
+        if isinstance(widget, QGroupBox):
+            widget.setSizePolicy(
+                QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            )
+            # Ensure QGroupBox respects the size of its contents
+            widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
+
+        try:
+            widget.setMinimumSize(widget.minimumSizeHint())
+        except:
+            pass
+
+        if hasattr(widget, 'layout'):
+            layout = widget.layout()
+            if layout:
+                # layout.setContentsMargins(0, 0, 0, 0)
+                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
+                for i in range(layout.count()):
+                    item = layout.itemAt(i)
+                    if hasattr(item, 'widget'):
+                        self.set_font_and_margins_recursive(item.widget(), font=font)
+                    if hasattr(item, 'layout'):
+                        self.set_font_and_margins_recursive(item.layout(), font=font)
+    
     #endregion
     
     #region Multi-D acquisition logic

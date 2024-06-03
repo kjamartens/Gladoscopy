@@ -243,6 +243,7 @@ class MMConfigUI(CustomMainWindow):
             #Create a layout for the configs:
             self.configGroupBox = QGroupBox("Configurations")
             self.configLayout = QGridLayout()
+            self.configLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
             #Add this to the mainLayout via the groupbox:
             self.configGroupBox.setLayout(self.configLayout)
             self.mainLayout.addWidget(self.configGroupBox,0,2)
@@ -284,6 +285,8 @@ class MMConfigUI(CustomMainWindow):
                 self.configCheckboxes[config_id].setChecked(False)
                     
         #Change the font of everything in the layout
+        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
+        #Twice because it relies on dependancies inside qgridlayouts
         self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
     
     #region General
@@ -335,24 +338,43 @@ class MMConfigUI(CustomMainWindow):
         Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
 
         """
-        if widget is None:
-            return
+        # if widget is None:
+        #     return
         #Testing a few things
-        try:
-            widget.setSizePolicy(
-                QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-            )
-        except:
-            pass
-        try:
-            widget.setMinimumSize(0, 0)
-        except:
-            pass
+        # try:
+        #     widget.setSizePolicy(
+        #         QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        #     )
+        # except:
+        #     pass
+        # try:
+        #     widget.setMimimumSize(10, 10)
+        # except:
+        #     pass
         
-        if isinstance(widget, (QLabel, QPushButton, QComboBox)):
+        # if not isinstance(widget, (QPushButton,QComboBox)):
+        #     try:
+        #         widget.setSizePolicy(
+        #             QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        #         )
+        #     except:
+        #         pass
+        
+        if isinstance(widget, (QPushButton)):
             widget.setFont(font)
-            widget.setContentsMargins(0, 0, 0, 0)
-            widget.setMinimumSize(0, 0)
+            # widget.setContentsMargins(0, 0, 0, 0)
+            # widget.setMinimumSize(20, 20)
+        if isinstance(widget, (QLabel, QComboBox)):
+            widget.setFont(font)
+            # widget.setContentsMargins(0, 0, 0, 0)
+            # widget.setMinimumSize(20, 20)
+
+        if isinstance(widget, QGroupBox):
+            widget.setSizePolicy(
+                QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            )
+            # Ensure QGroupBox respects the size of its contents
+            widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
 
         if hasattr(widget, 'layout'):
             layout = widget.layout()
@@ -413,6 +435,7 @@ class MMConfigUI(CustomMainWindow):
         """
         #Create a Grid layout:
         liveModeLayout = QGridLayout()
+        liveModeLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
         #Add a 'exposure time' label:
         exposureTimeLabel = QLabel("Exposure time (ms):")
         liveModeLayout.addWidget(exposureTimeLabel,0,0)
@@ -454,7 +477,7 @@ class MMConfigUI(CustomMainWindow):
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
         
         #Add one of those spacers at the bottom:
-        verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
         liveModeLayout.addItem(verticalSpacer)
         
         #Add a button to update all MM info
@@ -702,12 +725,31 @@ class MMConfigUI(CustomMainWindow):
     def stagesLayout(self):
         """
         Returns the layout with the XY and 1D stage widgets.
-
-        This layout is used when the user is not in relative mode.
         """
         stageLayout = QHBoxLayout()
-        stageLayout.addLayout(self.XYstageLayout())
-        stageLayout.addLayout(self.oneDstageLayout())
+        # self.XYstageLayout()
+        xyStageLayout = self.XYstageLayout()
+        oneDstageLayout = self.oneDstageLayout()
+        stageLayout.addLayout(xyStageLayout)
+        stageLayout.addLayout(oneDstageLayout)
+        #Add a horizontal spacer:
+        stageLayout.addStretch(1)
+        stageLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
+        # print(stageLayout.children())
+        xyLayoutWidth = 0
+        for i in range(xyStageLayout.columnCount()):
+            xyLayoutWidth += xyStageLayout.columnMinimumWidth(i)
+        oneDstageLayoutWidth = 0
+        for i in range(oneDstageLayout.columnCount()):
+            oneDstageLayoutWidth += oneDstageLayout.columnMinimumWidth(i)
+        
+        containerWidget = QWidget()
+        containerWidget.setLayout(stageLayout)
+        containerWidget.setFixedWidth(xyLayoutWidth+oneDstageLayoutWidth)
+        
+        stageOvercapLayout = QHBoxLayout()
+        stageOvercapLayout.addWidget(containerWidget)
+        
         return stageLayout
     
     def relativeStagesLayout(self):
@@ -1073,6 +1115,8 @@ class MMConfigUI(CustomMainWindow):
 
         #Create the slider:
         self.sliders[config_id] = QSlider(Qt.Horizontal) #type: ignore
+        #Give it a minimum size:
+        self.sliders[config_id].setMinimumWidth(50)
         self.sliders[config_id].setRange(0,sliderPrecision)
         self.sliders[config_id].setValue(sliderValInSliderPrecision)
         self.sliders[config_id].slider_conversion_array = [lowerLimit,upperLimit,sliderPrecision]

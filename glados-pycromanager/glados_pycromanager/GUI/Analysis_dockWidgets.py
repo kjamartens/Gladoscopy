@@ -132,6 +132,7 @@ def microManagerControlsUI_plugin(parent):
     #Create the MM config via all config groups
     MMconfig = MMConfigUI(allConfigGroups,autoSaveLoad=True,parent=parent)
     # main_layout.addLayout(MMconfig.mainLayout,0,0)
+    parent.layoutInfo = MMconfig
     
     return MMconfig.mainLayout
 
@@ -192,11 +193,7 @@ def MDAGlados_plugin(parent):
                     GUI_acquire_button = True,
                     autoSaveLoad=True).getGui()
         
-    # self.sizeChanged.connect(self.dockWidget.handleSizeChange)
-    
-    # #Create the MM config via all config groups
-    # MMconfig = MDAGlados(allConfigGroups,autoSaveLoad=True,parent=parent)
-    # # main_layout.addLayout(MMconfig.mainLayout,0,0)
+    parent.layoutInfo = dockWidget
     
     return dockWidget.mainLayout
 
