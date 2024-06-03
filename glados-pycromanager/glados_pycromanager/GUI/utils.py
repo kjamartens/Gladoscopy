@@ -1426,4 +1426,11 @@ class CustomMainWindow(QWidget):
             json.dump(state, file, indent=4)
 
 
+
+def closeAllLayers(shared_data):
+    """
+    Closes all the layers in napari
+    """
+    for layer in reversed(shared_data.napariViewer.layers):
+        shared_data.napariViewer.layers.remove(layer)
 # Utils to do with NODZ:

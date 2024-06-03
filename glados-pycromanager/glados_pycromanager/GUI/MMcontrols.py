@@ -494,7 +494,12 @@ class MMConfigUI(CustomMainWindow):
         self.updateAllMMinfoButton = QPushButton("Update all MM info")
         self.updateAllMMinfoButton.clicked.connect(self.updateAllMMinfo)
         #all the way at the bottom of the layout
-        liveModeLayout.addWidget(self.updateAllMMinfoButton,99,0,1,2)
+        liveModeLayout.addWidget(self.updateAllMMinfoButton,99,0,1,1)
+        #Add a button to close all layers
+        self.closeAllLayersButton = QPushButton("Close all Layers")
+        self.closeAllLayersButton.clicked.connect(lambda index, shared_data=shared_data: utils.closeAllLayers(shared_data))
+        #all the way at the bottom of the layout
+        liveModeLayout.addWidget(self.closeAllLayersButton,99,1,1,1)
         
         #Return the layout
         return liveModeLayout

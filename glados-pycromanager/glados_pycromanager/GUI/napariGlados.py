@@ -45,6 +45,8 @@ from utils import cleanUpTemporaryFiles
 def napariUpdateLive(DataStructure):
     """ 
     Function that finally shows the  image in napari
+    
+    Basically the core visualisation method
     """
     napariViewer = DataStructure['napariViewer']
     acqstate = DataStructure['acqState']
