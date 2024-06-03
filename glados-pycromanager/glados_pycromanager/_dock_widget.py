@@ -323,6 +323,7 @@ class MainWidget(QWidget):
         self.core = core
         self.shared_data = shared_data
         self.napariViewer = viewer
+        
         self.MM_JSON = MM_JSON
         self.livestate = livestate
     

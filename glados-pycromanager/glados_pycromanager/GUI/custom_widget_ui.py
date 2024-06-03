@@ -14,8 +14,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_CustomDockWidget(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(728, 902)
-        MainWindow.setMinimumSize(QtCore.QSize(667, 352))
+        # MainWindow.resize(728, 902)
+        # MainWindow.setMinimumSize(QtCore.QSize(667, 352))
         icon = QtGui.QIcon.fromTheme("GladOS")
         MainWindow.setWindowIcon(icon)
         self.centralwidget = QtWidgets.QWidget(MainWindow)

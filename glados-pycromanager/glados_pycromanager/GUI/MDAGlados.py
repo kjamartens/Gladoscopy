@@ -1155,7 +1155,7 @@ class MDAGlados(CustomMainWindow):
 
         """
         
-        logging.info('in set_font_and_margins_recursive')
+        logging.debug('in set_font_and_margins_recursive')
         if isinstance(widget, (QPushButton)):
             widget.setFont(font)
             # widget.setContentsMargins(0, 0, 0, 0)
@@ -1173,7 +1173,9 @@ class MDAGlados(CustomMainWindow):
             widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
 
         try:
-            widget.setMinimumSize(widget.minimumSizeHint())
+            minsize = widget.minimumSizeHint()
+            if minsize[0] > -1 and minsize[1] > -1:
+                widget.setMinimumSize(widget.minimumSizeHint())
         except:
             pass
 

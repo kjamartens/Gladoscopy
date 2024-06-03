@@ -446,22 +446,32 @@ class MMConfigUI(CustomMainWindow):
         liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
         self.LiveModeButton = QPushButton("Start Live Mode")
+        icon = QIcon('./glados_pycromanager/GUI/Icons/General_Start.png')
+        # icon: Flaticon.com
+        self.LiveModeButton.setIcon(icon)
+        
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
         #Add the button to the layout:
         liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
         
         self.SnapButton = QPushButton("Snap")
+        icon = QIcon('./glados_pycromanager/GUI/Icons/General_Snap.png')
+        # icon: Flaticon.com
+        self.SnapButton.setIcon(icon)
         #add a connection to the button:
         self.SnapButton.clicked.connect(lambda index: self.snapImage())
         #Add the button to the layout:
         liveModeLayout.addWidget(self.SnapButton,2,0,1,2)
         
-        self.SnapButton = QPushButton("Add to Album")
+        self.AlbumButton = QPushButton("Add to Album")
         #add a connection to the button:
-        self.SnapButton.clicked.connect(lambda index: self.addImageToAlbum())
+        self.AlbumButton.clicked.connect(lambda index: self.addImageToAlbum())
+        icon = QIcon('./glados_pycromanager/GUI/Icons/General_Album.png')
+        # icon: Flaticon.com
+        self.AlbumButton.setIcon(icon)
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.SnapButton,3,0,1,2)
+        liveModeLayout.addWidget(self.AlbumButton,3,0,1,2)
         
         
         if self.showShutterOptions:
@@ -524,6 +534,9 @@ class MMConfigUI(CustomMainWindow):
         if shared_data.liveMode == False:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Stop Live Mode")
+            icon = QIcon('./glados_pycromanager/GUI/Icons/General_Stop.png')
+            # icon: Flaticon.com
+            self.LiveModeButton.setIcon(icon)
             #set exposure time first:
             shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
             #Then start live mode:
@@ -531,6 +544,9 @@ class MMConfigUI(CustomMainWindow):
         else:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Start Live Mode")
+            icon = QIcon('./glados_pycromanager/GUI/Icons/General_Start.png')
+            # icon: Flaticon.com
+            self.LiveModeButton.setIcon(icon)
             #update live mode:
             shared_data.liveMode = False
     #endregion
