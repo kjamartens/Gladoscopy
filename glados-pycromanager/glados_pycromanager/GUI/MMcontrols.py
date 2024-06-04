@@ -606,7 +606,7 @@ class MMConfigUI(CustomMainWindow):
         """
         Set the shutter to the new choice if the dropdown is changed
         """ 
-        selected_item = self.shutterChoiceDropwdown.currentText()
+        selected_item = self.shutterChoiceDropdown.currentText()
         self.core.set_shutter_device(selected_item) #type:ignore
 
     def on_shutterAutoCheckboxChanged(self,state):
