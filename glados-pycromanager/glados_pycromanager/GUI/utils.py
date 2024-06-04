@@ -1434,3 +1434,22 @@ def closeAllLayers(shared_data):
     for layer in reversed(shared_data.napariViewer.layers):
         shared_data.napariViewer.layers.remove(layer)
 # Utils to do with NODZ:
+
+def getDimensionsFromAcqData(acqData):
+    alldims = acqData[0]['axes']
+    n_dims = len(alldims)
+    dimOrder = []
+    n_entries_in_dims = []
+    uniqueEntriesAllDims = {}
+    for dim in alldims:
+        uniqueEntries = []
+        for i in range(0,len(acqData)):
+            uniqueEntries.append(acqData[i]['axes'][dim])
+        uniqueEntries = np.unique(uniqueEntries)
+        nEntries = len(uniqueEntries)
+        n_entries_in_dims.append(nEntries)
+        dimOrder.append(dim)
+        uniqueEntriesAllDims.update({dim:uniqueEntries})
+    logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
+    logging.debug(f"uniqueEntriesAllDims: {uniqueEntriesAllDims}")
+    return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
