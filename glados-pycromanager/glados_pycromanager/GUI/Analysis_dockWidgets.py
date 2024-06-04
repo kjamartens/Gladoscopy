@@ -145,7 +145,6 @@ def MDAGlados_plugin(parent):
             gladosInfo = json.load(file)
             mdaInfo = gladosInfo['MDA']
         
-        
         global core, livestate, napariViewer, shared_data, MM_JSON
         core = parent.core
         livestate = parent.livestate
@@ -159,6 +158,7 @@ def MDAGlados_plugin(parent):
                     hasGUI=True,
                     num_time_points = mdaInfo['num_time_points'], 
                     time_interval_s = mdaInfo['time_interval_s'], 
+                    time_interval_s_or_ms = mdaInfo['time_interval_s_or_ms'],
                     z_start = mdaInfo['z_start'],
                     z_end = mdaInfo['z_end'],
                     z_step = mdaInfo['z_step'],
@@ -174,6 +174,7 @@ def MDAGlados_plugin(parent):
                     xyz_positions = mdaInfo['xyz_positions'],
                     position_labels = mdaInfo['position_labels'],
                     exposure_ms = mdaInfo['exposure_ms'],
+                    exposure_s_or_ms = mdaInfo['exposure_s_or_ms'],
                     storage_folder = mdaInfo['storage_folder'],
                     storage_file_name = mdaInfo['storage_file_name'],
                     order = mdaInfo['order'],

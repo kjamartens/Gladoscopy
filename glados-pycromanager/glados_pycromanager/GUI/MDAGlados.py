@@ -332,6 +332,7 @@ class MDAGlados(CustomMainWindow):
                 hasGUI=False,
                 num_time_points: int | None = 10, 
                 time_interval_s: float | List[float] = 0, 
+                time_interval_s_or_ms: str = 'ms',
                 z_start: float | None = None, 
                 z_end: float | None = None, 
                 z_step: float | None = None, 
@@ -348,6 +349,7 @@ class MDAGlados(CustomMainWindow):
                 position_labels: List[str] | None = None, 
                 order: str = 'tpcz', 
                 exposure_ms: float | None = 90, 
+                exposure_s_or_ms: str = 'ms',
                 storage_folder: str | None = None,
                 storage_file_name: str | None = None,
                 GUI_show_exposure = True, 
@@ -413,6 +415,7 @@ class MDAGlados(CustomMainWindow):
             
         self.num_time_points = num_time_points
         self.time_interval_s = time_interval_s
+        self.time_interval_s_or_ms = time_interval_s_or_ms
         self.z_start = z_start
         self.z_end = z_end
         self.z_step = z_step
@@ -431,6 +434,7 @@ class MDAGlados(CustomMainWindow):
         self.position_labels = position_labels
         self.order = order
         self.exposure_ms = exposure_ms
+        self.exposure_s_or_ms = exposure_s_or_ms
         self.GUI_show_exposure = GUI_show_exposure
         self.GUI_show_xy = GUI_show_xy
         self.GUI_show_z = GUI_show_z
@@ -560,12 +564,17 @@ class MDAGlados(CustomMainWindow):
         #Exposure: add a label, an entry field, and a dropdown between 'ms' and 's':
         self.exposureLabel = QLabel("Exposure:")
         self.exposureEntry = QLineEdit()
-        self.exposureEntry.setText(str(self.exposure_ms))
+        if self.exposure_ms is not None:
+            if self.exposure_s_or_ms == 'ms':
+                self.exposureEntry.setText(str(self.exposure_ms))
+            elif self.exposure_s_or_ms == 's':
+                self.exposureEntry.setText(str(self.exposure_ms/1000))
         #ensure thatexposureEntry can only be a float:
         self.exposureEntry.setValidator(QDoubleValidator())
         self.exposureDropdown = QComboBox()
         self.exposureDropdown.addItem("ms")
         self.exposureDropdown.addItem("s")
+        self.exposureDropdown.setCurrentText(self.exposure_s_or_ms)
         exposureLayout.addWidget(self.exposureLabel)
         exposureLayout.addWidget(self.exposureEntry)
         exposureLayout.addWidget(self.exposureDropdown)
@@ -583,11 +592,15 @@ class MDAGlados(CustomMainWindow):
         self.timeIntervalLabel = QLabel("Time interval:")
         self.timeIntervalEntry = QLineEdit()
         if self.time_interval_s is not None:
-            self.timeIntervalEntry.setText(str(self.time_interval_s))
+            if self.time_interval_s_or_ms == 's':
+                self.timeIntervalEntry.setText(str(self.time_interval_s))
+            elif self.time_interval_s_or_ms == 'ms':
+                self.timeIntervalEntry.setText(str(self.time_interval_s*1000))
         self.timeIntervalEntry.setValidator(QDoubleValidator())
         self.timeIntervalDropdown = QComboBox()
         self.timeIntervalDropdown.addItem("ms")
         self.timeIntervalDropdown.addItem("s")
+        self.timeIntervalDropdown.setCurrentText(self.time_interval_s_or_ms)
         #Adding widgets to layout
         timeLayout.addWidget(self.timePointLabel,0,0)
         timeLayout.addWidget(self.timePointEntry,0,1)
@@ -799,21 +812,21 @@ class MDAGlados(CustomMainWindow):
                 self.channelListWidget.addNewEntry(channelEntry=self.channels[entry],exposureEntry=str(self.channel_exposures_ms[entry]))
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
-        self.GUI_show_exposure_chkbox = QCheckBox("Exposure")
+        self.GUI_show_exposure_chkbox = QCheckBox("Exposure") #Note: created but never rendered
         self.GUI_show_xy_chkbox = QCheckBox("XY")
         self.GUI_show_z_chkbox = QCheckBox("Z")
         self.GUI_show_channel_chkbox = QCheckBox("Channel")
         self.GUI_show_time_chkbox = QCheckBox("Time")
         self.GUI_show_storage_chkbox = QCheckBox("Storage")
         #initialise the checkboxes based on the values in this GUI:
-        self.GUI_show_exposure_chkbox.setChecked(self.GUI_show_exposure)
+        self.GUI_show_exposure_chkbox.setChecked(self.GUI_show_exposure) #Note: created but never rendered
         self.GUI_show_xy_chkbox.setChecked(self.GUI_show_xy)
         self.GUI_show_z_chkbox.setChecked(self.GUI_show_z)
         self.GUI_show_channel_chkbox.setChecked(self.GUI_show_channel)
         self.GUI_show_time_chkbox.setChecked(self.GUI_show_time)
         self.GUI_show_storage_chkbox.setChecked(self.GUI_show_storage)
         #Add lambda functions to all of them that all run the same function: showOptionChanged():
-        self.GUI_show_exposure_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
+        # self.GUI_show_exposure_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_xy_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_z_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_channel_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
@@ -826,12 +839,12 @@ class MDAGlados(CustomMainWindow):
         [checkbox.setFont(font) for checkbox in [self.GUI_show_exposure_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox, self.GUI_show_channel_chkbox, self.GUI_show_time_chkbox, self.GUI_show_storage_chkbox]]
 
         #Add all checkboxes to the options-layout
-        showOptionsLayout.addWidget(self.GUI_show_exposure_chkbox,0,0)
+        # showOptionsLayout.addWidget(self.GUI_show_exposure_chkbox,0,0)
+        showOptionsLayout.addWidget(self.GUI_show_time_chkbox,0,0)
         showOptionsLayout.addWidget(self.GUI_show_xy_chkbox,0,1)
         showOptionsLayout.addWidget(self.GUI_show_z_chkbox,0,2)
         showOptionsLayout.addWidget(self.GUI_show_channel_chkbox,1,0)
-        showOptionsLayout.addWidget(self.GUI_show_time_chkbox,1,1)
-        showOptionsLayout.addWidget(self.GUI_show_storage_chkbox,1,2)
+        showOptionsLayout.addWidget(self.GUI_show_storage_chkbox,1,1)
         
         # ---------- Combining all to the main layout -----------------------------------------
         # Set layouts for each groupbox
@@ -1110,6 +1123,20 @@ class MDAGlados(CustomMainWindow):
         # self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
         # self.gui.setRowStretch(99,gridWidth+1) # type: ignore
         
+        #try to trigger a dock widget resize event at this point.
+        mdawidget_object = self.gui.parent() #type:ignore
+        try:
+            logging.debug('attempting to update parent')
+            from PyQt5.QtCore import QEvent
+            current_size = mdawidget_object.size() #type:ignore
+            resize_event = QEvent(QEvent.Resize) #type:ignore
+            resize_event.oldSize = lambda: current_size #type:ignore
+            resize_event.size = lambda: current_size #type:ignore
+            QApplication.sendEvent(mdawidget_object, resize_event)
+        except:
+            logging.debug('did not attempt to update parent')
+        
+        
         QCoreApplication.processEvents()
         
         #redraw the self.gui:
@@ -1382,20 +1409,26 @@ class MDAGlados(CustomMainWindow):
         if self.exposureGroupBox.isEnabled():
             try:
                 self.exposure_ms = float(self.exposureEntry.text())
+                self.exposure_s_or_ms = 'ms'
                 if self.exposureDropdown.currentText() == 's':
                     self.exposure_ms *= 1000
+                    self.exposure_s_or_ms = 's'
             except:
                 self.exposure_ms = None
+                self.exposure_s_or_ms = 'ms'
         
         if self.timeGroupBox.isEnabled():
             try:
                 self.num_time_points = int(self.timePointEntry.text())
                 self.time_interval_s = float(self.timeIntervalEntry.text())
+                self.time_interval_s_or_ms = 's'
                 if self.timeIntervalDropdown.currentText() == 'ms':
+                    self.time_interval_s_or_ms = 'ms'
                     self.time_interval_s /= 1000
             except:
                 self.num_time_points = None
                 self.time_interval_s = None
+                self.time_interval_s_or_ms = 'ms'
                 
         if self.orderGroupBox.isEnabled():
             self.order = self.orderDropdown.currentText()
