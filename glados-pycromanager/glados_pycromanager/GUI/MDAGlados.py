@@ -53,7 +53,14 @@ class InteractiveListWidget(QTableWidget):
         
         logging.debug('init InteractiveListWidget')
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
-        self.horizontalHeader().setStretchLastSection(True)
+        # self.horizontalHeader().setStretchLastSection(True)
+        
+        colWidth = 100
+        # Set the minimum size for the table widget
+        self.setColumnWidth(0, int(colWidth*.9)) #Slightly smaller to prevent scrollbar to appear
+        self.setMinimumWidth(colWidth*columnCount) 
+        # Set the size policy to ensure the widget can expand but not shrink below the minimum size
+        self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         
         font = QFont()
         font.setPointSize(fontsize)
