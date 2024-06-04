@@ -579,6 +579,7 @@ class MMConfigUI(CustomMainWindow):
         self.shutterAutoCheckbox.stateChanged.connect(self.on_shutterAutoCheckboxChanged)
         
         self.shutterOpenCloseButton = QPushButton("Open")
+        self.shutterOpenCloseButton.setIcon(QIcon('./glados_pycromanager/GUI/Icons/ShutterOpen.png'))
         self.shutterOpenCloseButton.clicked.connect(self.on_shutterOpenCloseButtonPressed)
         
         shutterOptionsLayout.addWidget(self.shutterChoiceDropdown,0,0,1,2)
@@ -595,9 +596,11 @@ class MMConfigUI(CustomMainWindow):
         if current_text == 'Open':
             self.core.set_shutter_open(True) #type:ignore
             self.shutterOpenCloseButton.setText('Close')
+            self.shutterOpenCloseButton.setIcon(QIcon('./glados_pycromanager/GUI/Icons/ShutterClosed.png'))
         elif current_text == 'Close':
             self.core.set_shutter_open(False) #type:ignore
             self.shutterOpenCloseButton.setText('Open')
+            self.shutterOpenCloseButton.setIcon(QIcon('./glados_pycromanager/GUI/Icons/ShutterOpen.png'))
 
     def on_shutterChoiceChanged(self):
         """
@@ -654,15 +657,19 @@ class MMConfigUI(CustomMainWindow):
         #Following options should be added:
         #Reset ROI to max size
         self.ROIoptionsButtons['Reset'] = QPushButton("Reset ROI")
+        self.ROIoptionsButtons['Reset'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_reset.png'))
         self.ROIoptionsButtons['Reset'].clicked.connect(lambda index: self.resetROI())
         #Zoom in once to center
         self.ROIoptionsButtons['ZoomIn'] = QPushButton("Zoom In")
+        self.ROIoptionsButtons['ZoomIn'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_zoomIn.png'))
         self.ROIoptionsButtons['ZoomIn'].clicked.connect(lambda index: self.zoomROI('ZoomIn'))
         #Zoom out once from center
         self.ROIoptionsButtons['ZoomOut'] = QPushButton("Zoom Out")
+        self.ROIoptionsButtons['ZoomOut'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_zoomOut.png'))
         self.ROIoptionsButtons['ZoomOut'].clicked.connect(lambda index: self.zoomROI('ZoomOut'))
         #Draw a ROI
-        self.ROIoptionsButtons['drawROI'] = QPushButton("draw ROI")
+        self.ROIoptionsButtons['drawROI'] = QPushButton("Draw ROI")
+        self.ROIoptionsButtons['drawROI'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_select.png'))
         self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.drawROI())
         if orientation == 'vertical':
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)
