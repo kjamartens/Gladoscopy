@@ -1265,6 +1265,8 @@ class MDAGlados(CustomMainWindow):
                         rt_analysis_connected_node = node
                         rt_analysis_connected_node.status = 'finished'
         
+        #reset the MDA button in the GUI
+        self.resetMDAbutton(mdaLayerName='MDA')
         logging.debug('about the emit MDA_completed')
         self.MDA_completed.emit(True)
     
@@ -1393,7 +1395,34 @@ class MDAGlados(CustomMainWindow):
             napariGlados.startMDAVisualisation(self.shared_data,layerName=mdaLayerName)
         logging.debug('ended setting mdamode params')
         
+        #Set the Acquire button to say 'stop'
+        self.GUI_acquire_button.setText('Stop Acquisition') #type:ignore
+        #Remove active clicked-connect-calls:
+        self.GUI_acquire_button.clicked.disconnect() #type:ignore
+        self.GUI_acquire_button.clicked.connect(lambda index: self.stopMDA(mdaLayerName='MDA')) #type:ignore
         pass
+    
+    def resetMDAbutton(self,mdaLayerName='MDA'):
+        """
+        Function that resets the Acquire button (i.e. if acq is running, it shows 'stop acquisition', this should go back to 'acquire' and the connected call)
+        """
+        #ATM, first just update the button back and show that we can access this:
+        self.GUI_acquire_button.setText('Acquire') #type:ignore
+        #Remove active clicked-connect-calls:
+        self.GUI_acquire_button.clicked.disconnect() #type:ignore
+        self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName=mdaLayerName)) #type:ignore
+    
+    def stopMDA(self,mdaLayerName='MDA'):
+        """
+        The stopMDA function is called when the user presses the 'Stop Acquisition' button in the GUI.
+        It stops the MDA acquisition.
+        """
+        
+        logging.info('ATTEMPTING TO STOP AQCUISITION')
+        #Reset the button
+        self.resetMDAbutton(mdaLayerName=mdaLayerName)
+        #Abort the mda mode
+        self.shared_data._mdaModeAcqData.abort()
     
     def get_MDA_events_from_GUI(self):
         """
