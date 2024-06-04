@@ -1348,7 +1348,10 @@ class MDAGlados(CustomMainWindow):
         self.core.set_exposure(self.exposure_ms)
         
         #Set the location where to save the mda
-        self.shared_data._mdaModeSaveLoc = [self.storage_folder,self.storage_file_name]
+        if self.GUI_storage_enabled:
+            self.shared_data._mdaModeSaveLoc = [self.storage_folder,self.storage_file_name]
+        else:
+            self.shared_data._mdaModeSaveLoc = ['','']
         #Set whether the napariviewer should (also) try to connect to the mda
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
