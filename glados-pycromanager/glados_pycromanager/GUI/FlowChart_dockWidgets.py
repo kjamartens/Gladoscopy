@@ -2118,6 +2118,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             visualAttr = node.bottomAttrs['Visual']
             if len(visualAttr.connections) > 0:
                 visual_connected_node_name = visualAttr.connections[0].socketNode
+                logging.info(f'visual_connected_node_name: {visual_connected_node_name}')
                 for nodeV in self.nodes:
                     if nodeV.name == visual_connected_node_name:
                         visual_connected_node = nodeV
@@ -2172,8 +2173,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                                 colormap = cmap
                             )
                         elif chosenLayerType == 'image':
+                            logging.info('creating new image layer')
                             viewer = self.shared_data.napariViewer #type:ignore
-                            im = np.random.random((30, 30))
+                            im = np.random.random((10,30, 30))
                             napariLayer = viewer.add_image(
                                 data=im,
                                 name=layerName,

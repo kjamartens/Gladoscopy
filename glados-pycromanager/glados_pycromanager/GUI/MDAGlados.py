@@ -1323,6 +1323,7 @@ class MDAGlados(CustomMainWindow):
                             visual_connected_node.status = 'running'
                             break
                 
+                    logging.info('Starting Nodz-MDA visualisation')
                     napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
         #And try to get real-time analysis attributes at bottom:
@@ -1414,10 +1415,14 @@ class MDAGlados(CustomMainWindow):
         Function that resets the Acquire button (i.e. if acq is running, it shows 'stop acquisition', this should go back to 'acquire' and the connected call)
         """
         #ATM, first just update the button back and show that we can access this:
-        self.GUI_acquire_button.setText('Acquire') #type:ignore
-        #Remove active clicked-connect-calls:
-        self.GUI_acquire_button.clicked.disconnect() #type:ignore
-        self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName=mdaLayerName)) #type:ignore
+        if self.GUI_acquire_button is not None:
+            try:
+                self.GUI_acquire_button.setText('Acquire') #type:ignore
+                #Remove active clicked-connect-calls:
+                self.GUI_acquire_button.clicked.disconnect() #type:ignore
+                self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName=mdaLayerName)) #type:ignore
+            except RuntimeError:
+                pass #C/C++ object has been deleted if called from Nodz.
     
     def stopMDA(self,mdaLayerName='MDA'):
         """

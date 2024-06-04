@@ -56,7 +56,7 @@ def napariUpdateLive(DataStructure):
     logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
     
     #Visualise the MDA data on a frame-by-frame method - i.e. not a 'stack', but simply a single image which is replaced every frame update
-    if shared_data.globalData['MDAVISMETHOD'] == 'frameByFrame':
+    if shared_data.globalData['MDAVISMETHOD'] == 'frameByFrame' or DataStructure['layer_name']=='Live':
         liveImage = DataStructure['data'][0]
         metadata = DataStructure['data'][1]
         layerName = DataStructure['layer_name']
@@ -97,49 +97,51 @@ def napariUpdateLive(DataStructure):
                 return
             liveImageLayer = getLayerIdFromName(layerName,napariViewer)
         
-            #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
-            if liveImageLayer:
-                dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-                
-                #Assume the dimensions are correct
-                correctDimensions = True
-                
-                #Then check if anywhere the dimensions are wrong
-                #Check if we have the correct nr of dimensions
-                if napariViewer.dims.ndim != len(uniqueEntriesAllDims)+2: #Note: +2 for image xy
-                    correctDimensions = False
-                else:
-                    #Check each dimension as follows:
-                    for dim_id in range(0,len(uniqueEntriesAllDims)):
-                        #Check if it has the correct label
-                        logging.debug(f'axis_labels: {napariViewer.dims.axis_labels[dim_id]} vs {dimensionOrder[dim_id]}')
-                        if napariViewer.dims.axis_labels[dim_id] != dimensionOrder[dim_id]:
-                            correctDimensions = False
-                            break
-                        #Check it has the correct length:
-                        logging.debug(f'range: {napariViewer.dims.range[dim_id]} vs {n_entries_in_dims[dim_id]}')
-                        if int(napariViewer.dims.range[dim_id][1]) != n_entries_in_dims[dim_id]:
-                            correctDimensions = False
-                            break
-                        
-                #Remove the layer if the dimensions are wrong
-                if correctDimensions == False:
-                    logging.info('removing mdaZarrData - looping over layers')
-                    #Remove the mdaZarrData array and ensure that we create a new layer
-                    for tLayerIndex in range(0,len(napariViewer.layers)):
-                        tLayer = napariViewer.layers[tLayerIndex]
-                        logging.debug(f'layer: {tLayer}, comparing with {napariViewer.layers[liveImageLayer[0]].name}, boolTest {str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name)}')
-                        if str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name):
-                            #If we found the layer, delete it, and ensure we create a new one
-                            logging.debug(f'found layer to remove: {tLayer} at {tLayerIndex}')
-                            napariViewer.layers.pop(tLayerIndex)
-                            shared_data.mdaZarrData = None
-                            liveImageLayer = False
-                            break
+        
+            if layerName is not 'Live':
+                #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
+                if liveImageLayer:
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    
+                    #Assume the dimensions are correct
+                    correctDimensions = True
+                    
+                    #Then check if anywhere the dimensions are wrong
+                    #Check if we have the correct nr of dimensions
+                    if napariViewer.dims.ndim != len(uniqueEntriesAllDims)+2: #Note: +2 for image xy
+                        correctDimensions = False
+                    else:
+                        #Check each dimension as follows:
+                        for dim_id in range(0,len(uniqueEntriesAllDims)):
+                            #Check if it has the correct label
+                            logging.debug(f'axis_labels: {napariViewer.dims.axis_labels[dim_id]} vs {dimensionOrder[dim_id]}')
+                            if napariViewer.dims.axis_labels[dim_id] != dimensionOrder[dim_id]:
+                                correctDimensions = False
+                                break
+                            #Check it has the correct length:
+                            logging.debug(f'range: {napariViewer.dims.range[dim_id]} vs {n_entries_in_dims[dim_id]}')
+                            if int(napariViewer.dims.range[dim_id][1]) != n_entries_in_dims[dim_id]:
+                                correctDimensions = False
+                                break
+                            
+                    #Remove the layer if the dimensions are wrong
+                    if correctDimensions == False:
+                        logging.info('removing mdaZarrData - looping over layers')
+                        #Remove the mdaZarrData array and ensure that we create a new layer
+                        for tLayerIndex in range(0,len(napariViewer.layers)):
+                            tLayer = napariViewer.layers[tLayerIndex]
+                            logging.debug(f'layer: {tLayer}, comparing with {napariViewer.layers[liveImageLayer[0]].name}, boolTest {str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name)}')
+                            if str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name):
+                                #If we found the layer, delete it, and ensure we create a new one
+                                logging.debug(f'found layer to remove: {tLayer} at {tLayerIndex}')
+                                napariViewer.layers.pop(tLayerIndex)
+                                shared_data.mdaZarrData = None
+                                liveImageLayer = False
+                                break
         
             #If it's the first layer
             if not liveImageLayer:
-                if layerName == 'MDA':
+                if layerName is not 'Live':
                     logging.info(f'creating layer with name {layerName} via multiDstack method')
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
                     logging.info(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
@@ -179,7 +181,7 @@ def napariUpdateLive(DataStructure):
                     napariViewer.reset_view()
             #Else if the layer already exists, replace it!
             else:
-                if layerName == 'MDA':
+                if layerName is not 'Live':
                     # logging.info(f'updating layer with name {layerName} via multiDstack method')
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
                     
@@ -240,17 +242,20 @@ def napariUpdateLive(DataStructure):
                         if key == 'column':
                             readColumn = value
                     #Read this slice from the NDDataset:
-                    sliceImage = shared_data._mdaModeAcqData._dataset.read_image(channel=readChannel,z=readZ,time=readTime,position=readPosition,row=readRow,column=readColumn)
-                    
-                    #Find the correct slice to slot it in
-                    sliceTuple = ()
-                    for dim_id in range(len(n_entries_in_dims)):
-                        currentSlice = expectedEntry['axes'][dimensionOrder[dim_id]]
-                        currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
-                        sliceTuple += (int(currentSliceID),)
-                    #Put it in
-                    shared_data.mdaZarrData[sliceTuple + (slice(None),slice(None))] = sliceImage 
-                    logging.info(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
+                    try:
+                        sliceImage = shared_data._mdaModeAcqData._dataset.read_image(channel=readChannel,z=readZ,time=readTime,position=readPosition,row=readRow,column=readColumn)
+                        
+                        #Find the correct slice to slot it in
+                        sliceTuple = ()
+                        for dim_id in range(len(n_entries_in_dims)):
+                            currentSlice = expectedEntry['axes'][dimensionOrder[dim_id]]
+                            currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                            sliceTuple += (int(currentSliceID),)
+                        #Put it in
+                        shared_data.mdaZarrData[sliceTuple + (slice(None),slice(None))] = sliceImage 
+                        logging.info(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
+                    except:
+                        logging.info(f'Entry {expectedEntry} tried, but not acquired')
             
             logging.info('Finalised up visualisation...')
             #Move to the end
@@ -365,7 +370,7 @@ class napariHandler():
                 else:        
                     #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                     logging.debug('starting acq')
-                    shared_data.allMDAslicesRendered = []
+                    shared_data.allMDAslicesRendered = {}
                     with Acquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
                         shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
@@ -400,7 +405,7 @@ class napariHandler():
                     
                 napariViewer = None
                 showdisplay = False
-                shared_data.allMDAslicesRendered = []
+                shared_data.allMDAslicesRendered = {}
                 with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
                     shared_data._mdaModeAcqData = acq
                     events = shared_data._mdaModeParams
@@ -711,6 +716,8 @@ def startLiveModeVisualisation(shared_data,layerName='Live'):
     shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
 
 def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
+    
+    #Create an analysis thread which runs this MDA visualisation
     create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
 
