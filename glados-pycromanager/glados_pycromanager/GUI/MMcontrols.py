@@ -763,15 +763,28 @@ class MMConfigUI(CustomMainWindow):
         self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.setROItoDrawn())
     
     def setROItoDrawn(self):
-        
+        """
+        The setROItoDrawn function is used to set the ROI of the microscope to a drawn shape.
+        The function first checks if there are any shapes in self.drawROIlayer, and if so, it gets the vertices of the last added shape (which should be a rectangle). It then sets the ROI using these vertices as top left and bottom right corners.
+        It also removes self.drawROIlayer from shared_data.napariViewer
+        """
         # Get the type of the last added shape
         if len(self.drawROIlayer.data) > 0:
             shape_type = self.drawROIlayer.shape_type[-1]
             if shape_type == 'rectangle':
-                print("Rectangle added!")
                 vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
-                print(f"Vertices: {vertices}")
-            #TODO: add logic to set the ROI to this size of the camera
+                #Get the topleft, bottomright position from the drawn rectangle
+                topleftxy = np.floor(vertices[0])
+                bottomrightxy = np.ceil(vertices[2])
+                #Set the boundaries based on the camera
+                mintopleft = [0,0]
+                maxbottomright = [shared_data.core.get_roi().width, shared_data.core.get_roi().height]
+                #Find the bounded positions
+                topleftpos = np.maximum(topleftxy,mintopleft)
+                bottomrightpos = np.minimum(bottomrightxy,maxbottomright)
+                #Set the ROI correclty
+                shared_data.core.set_roi(int(topleftpos[0]),int(topleftpos[1]),int(bottomrightpos[0]-topleftpos[0]),int(bottomrightpos[1]-topleftpos[1]))
+                logging.info(f"Set ROI to {topleftpos[0]},{topleftpos[1]},{bottomrightpos[0]},{bottomrightpos[1]} px")
         else:
             logging.warning('Attempted to set ROI to drawn, but no shape was added')
         

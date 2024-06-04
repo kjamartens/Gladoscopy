@@ -689,8 +689,8 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     InitateNapariUI(napariViewer)
     
     #Add widgets as wanted
-    custom_widget_analysisThreads = dockWidget_analysisThreads()
-    napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
+    # custom_widget_analysisThreads = dockWidget_analysisThreads()
+    # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
