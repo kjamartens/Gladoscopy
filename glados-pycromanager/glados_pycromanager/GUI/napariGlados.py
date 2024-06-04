@@ -54,12 +54,12 @@ def napariUpdateLive(DataStructure):
     image_queue_analysisA = DataStructure['image_queue_analysis']
     analysisThreads = DataStructure['analysisThreads']
     logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
+    layerName = DataStructure['layer_name']
     
     #Visualise the MDA data on a frame-by-frame method - i.e. not a 'stack', but simply a single image which is replaced every frame update
     if shared_data.globalData['MDAVISMETHOD'] == 'frameByFrame' or DataStructure['layer_name']=='Live':
         liveImage = DataStructure['data'][0]
         metadata = DataStructure['data'][1]
-        layerName = DataStructure['layer_name']
         if liveImage is None:
             return
         if acqstate == False:
@@ -88,7 +88,6 @@ def napariUpdateLive(DataStructure):
         if DataStructure['finalisationProcedure'] == False:
             liveImage = DataStructure['data'][0]
             metadata = DataStructure['data'][1]
-            layerName = DataStructure['layer_name']
             latestImage = DataStructure['data'][0]
             metadata = DataStructure['data'][1]
             if latestImage is None:
@@ -106,21 +105,23 @@ def napariUpdateLive(DataStructure):
                     #Assume the dimensions are correct
                     correctDimensions = True
                     
-                    #Then check if anywhere the dimensions are wrong
+                    #Then check if anywhere the dimensions of the layer are wrong
                     #Check if we have the correct nr of dimensions
-                    if napariViewer.dims.ndim != len(uniqueEntriesAllDims)+2: #Note: +2 for image xy
+                    CurrentLayer = napariViewer.layers[liveImageLayer[0]]
+                    if CurrentLayer.ndim != len(uniqueEntriesAllDims)+2: #Note: +2 for image xy
                         correctDimensions = False
                     else:
+                        layerData = CurrentLayer.data
                         #Check each dimension as follows:
                         for dim_id in range(0,len(uniqueEntriesAllDims)):
                             #Check if it has the correct label
-                            logging.debug(f'axis_labels: {napariViewer.dims.axis_labels[dim_id]} vs {dimensionOrder[dim_id]}')
-                            if napariViewer.dims.axis_labels[dim_id] != dimensionOrder[dim_id]:
-                                correctDimensions = False
-                                break
+                            # logging.debug(f'axis_labels: {napariViewer.dims.axis_labels[dim_id]} vs {dimensionOrder[dim_id]}')
+                            # if napariViewer.dims.axis_labels[dim_id] != dimensionOrder[dim_id]:
+                            #     correctDimensions = False
+                            #     break
                             #Check it has the correct length:
-                            logging.debug(f'range: {napariViewer.dims.range[dim_id]} vs {n_entries_in_dims[dim_id]}')
-                            if int(napariViewer.dims.range[dim_id][1]) != n_entries_in_dims[dim_id]:
+                            logging.debug(f'range: {layerData.shape[dim_id]} vs {n_entries_in_dims[dim_id]}')
+                            if int(layerData.shape[dim_id]) != n_entries_in_dims[dim_id]:
                                 correctDimensions = False
                                 break
                             
@@ -135,7 +136,7 @@ def napariUpdateLive(DataStructure):
                                 #If we found the layer, delete it, and ensure we create a new one
                                 logging.debug(f'found layer to remove: {tLayer} at {tLayerIndex}')
                                 napariViewer.layers.pop(tLayerIndex)
-                                shared_data.mdaZarrData = None
+                                shared_data.mdaZarrData[layerName] = None
                                 liveImageLayer = False
                                 break
         
@@ -147,16 +148,16 @@ def napariUpdateLive(DataStructure):
                     logging.info(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
                     
                     shape = n_entries_in_dims
-                    shared_data.mdaZarrData = zarr.open(
+                    shared_data.mdaZarrData[layerName] = zarr.open(
                             str(tempfile.TemporaryDirectory().name),
                             shape = shape+[latestImage.shape[0],latestImage.shape[1]],
                             chunks = tuple([1] * len(shape) + [latestImage.shape[0],liveImage.shape[1]]),
                             )
                     #Changing the first image to the latest acquired image
-                    shared_data.mdaZarrData[(0,) * len(shape) + (slice(None),slice(None))] = latestImage
+                    shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
                     shared_data.allMDAslicesRendered = {}
                     
-                    layer = napariViewer.add_image(shared_data.mdaZarrData, colormap=DataStructure['layer_color_map'],name = layerName)
+                    layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
                     layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
                     layer._keep_auto_contrast = True #type:ignore
@@ -193,7 +194,7 @@ def napariUpdateLive(DataStructure):
                         logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
                         sliceTuple += (int(currentSliceID),)
                         
-                    shared_data.mdaZarrData[sliceTuple + (slice(None),slice(None))] = liveImage #type:ignore
+                    shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = liveImage #type:ignore
                     
                     #set the napariViewer to the correct slice:
                     for dim_id in range(len(n_entries_in_dims)):
@@ -252,7 +253,7 @@ def napariUpdateLive(DataStructure):
                             currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
                             sliceTuple += (int(currentSliceID),)
                         #Put it in
-                        shared_data.mdaZarrData[sliceTuple + (slice(None),slice(None))] = sliceImage 
+                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage 
                         logging.info(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
                     except:
                         logging.info(f'Entry {expectedEntry} tried, but not acquired')
