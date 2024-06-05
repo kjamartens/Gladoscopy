@@ -1511,6 +1511,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.scoring_scoring_currentData = {}
         self.scoring_visualisation_currentData = {}
         self.alternateFillColor = alternateFillColor
+        self.variablesNodz = {}
         
         self.scoring_end_currentData = {}
         self.scoring_end_currentData['Variables'] = {}

@@ -1251,8 +1251,42 @@ class MDAGlados(CustomMainWindow):
             for analysis_thread in self.nodz_analysis_threads:
                 analysis_thread.stop()
         
-        #Set the status of the nodz-coupled vis and real-time to finished:
+        #Set the status of the nodz-coupled vis and real-time to finished, and add nodz-based variables:
         if 'nodeInfo' in vars(self):
+            logging.info('This MDA acq data was connected to node: ' + self.nodeInfo.name)
+            self.nodeInfo.variablesNodz['data']['data'] = self.data
+            self.nodeInfo.variablesNodz['order']['data'] = self.order
+            self.nodeInfo.variablesNodz['exposure_ms']['data'] = self.exposure_ms
+            self.nodeInfo.variablesNodz['n_timepoints']['data'] = self.num_time_points
+            self.nodeInfo.variablesNodz['time_interval_ms']['data'] = self.time_interval_s*1000
+            if self.GUI_show_xy == True:
+                self.nodeInfo.variablesNodz['xy_positions']['data'] = self.xy_positions
+                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = len(self.xy_positions)
+            else:
+                self.nodeInfo.variablesNodz['xy_positions']['data'] = None
+                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = None
+            if self.GUI_show_z == True:
+                self.nodeInfo.variablesNodz['z_positions']['data'] = [self.z_start, self.z_step, self.z_end]
+                self.nodeInfo.variablesNodz['n_z_positions']['data'] = self.z_nr_steps
+            else:
+                self.nodeInfo.variablesNodz['z_positions']['data'] = None
+                self.nodeInfo.variablesNodz['n_z_positions']['data'] = None
+            if self.GUI_show_channel == True:
+                self.nodeInfo.variablesNodz['channel_group']['data'] = self.channel_group
+                self.nodeInfo.variablesNodz['channels']['data'] = self.channels
+                self.nodeInfo.variablesNodz['n_channels']['data'] = len(self.channels)
+            else:
+                self.nodeInfo.variablesNodz['channel_group']['data'] = None
+                self.nodeInfo.variablesNodz['channels']['data'] = None
+                self.nodeInfo.variablesNodz['n_channels']['data'] = None
+            if self.GUI_storage_enabled == True:
+                self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep()+self.storage_file_name
+            else:
+                self.nodeInfo.variablesNodz['storage_path']['data'] = None
+                
+
+            
+            
         #Look at the 'Visual' bottom attribute:
             visualAttr = self.nodeInfo.bottomAttrs['Visual']
             if len(visualAttr.connections) > 0:

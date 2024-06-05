@@ -939,7 +939,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.scanwidget_groupbox.setLayout(newgridlayout)
         self.scanningWidget = ScanningWidget(nodzinstance=self)
         newgridlayout.addWidget(self.scanningWidget)
-        # self.buttonsArea.addLayout(self.decisionWidget.layout())
+        
+        self.variablesWidget = VariablesWidget(nodzinstance=self)
+        newgridlayout.addWidget(self.variablesWidget)
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
@@ -951,6 +953,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.mainLayout.addLayout(self.buttonsArea,0,1)
         self.mainLayout.addWidget(self.decision_groupbox,0,2)
         self.mainLayout.addWidget(self.scanwidget_groupbox,0,3)
+        self.mainLayout.addWidget(self.variablesWidget,0,4)
         
         #Global variables for MM/napari
         self.core = core
@@ -1188,6 +1191,48 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             #Also connect the node's finishedMDA
             newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
+            
+            #Set the variableNodz info, maybe later do this in seperate function?
+            newNode.variablesNodz['data'] = {}
+            newNode.variablesNodz['data']['data'] = None
+            newNode.variablesNodz['data']['importance'] = 'Default'
+            newNode.variablesNodz['order'] = {}
+            newNode.variablesNodz['order']['data'] = None
+            newNode.variablesNodz['order']['importance'] = 'Informative'
+            newNode.variablesNodz['exposure_ms'] = {}
+            newNode.variablesNodz['exposure_ms']['data'] = None
+            newNode.variablesNodz['exposure_ms']['importance'] = 'Informative'
+            newNode.variablesNodz['n_timepoints'] = {}
+            newNode.variablesNodz['n_timepoints']['data'] = None
+            newNode.variablesNodz['n_timepoints']['importance'] = 'Informative'
+            newNode.variablesNodz['time_interval_ms'] = {}
+            newNode.variablesNodz['time_interval_ms']['data'] = None
+            newNode.variablesNodz['time_interval_ms']['importance'] = 'Informative'
+            newNode.variablesNodz['xy_positions'] = {}
+            newNode.variablesNodz['xy_positions']['data'] = None
+            newNode.variablesNodz['xy_positions']['importance'] = 'Informative'
+            newNode.variablesNodz['n_xy_positions'] = {}
+            newNode.variablesNodz['n_xy_positions']['data'] = None
+            newNode.variablesNodz['n_xy_positions']['importance'] = 'Informative'
+            newNode.variablesNodz['z_positions'] = {}
+            newNode.variablesNodz['z_positions']['data'] = None
+            newNode.variablesNodz['z_positions']['importance'] = 'Informative'
+            newNode.variablesNodz['n_z_positions'] = {}
+            newNode.variablesNodz['n_z_positions']['data'] = None
+            newNode.variablesNodz['n_z_positions']['importance'] = 'Informative'
+            newNode.variablesNodz['channel_group'] = {}
+            newNode.variablesNodz['channel_group']['data'] = None
+            newNode.variablesNodz['channel_group']['importance'] = 'Informative'
+            newNode.variablesNodz['channels'] = {}
+            newNode.variablesNodz['channels']['data'] = None
+            newNode.variablesNodz['channels']['importance'] = 'Informative'
+            newNode.variablesNodz['n_channels'] = {}
+            newNode.variablesNodz['n_channels']['data'] = None
+            newNode.variablesNodz['n_channels']['importance'] = 'Informative'
+            newNode.variablesNodz['storage_path'] = {}
+            newNode.variablesNodz['storage_path']['data'] = None
+            newNode.variablesNodz['storage_path']['importance'] = 'Informative'
+            
         elif nodeType == 'changeProperties':
             #attach MMconfigUI to this:
             # Get all config groups
@@ -1444,6 +1489,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     #endregion
     
     #region NodzFlowChart Helpers
+    def obtainAllNodes(self):
+        """ 
+        Obtain all nodes, return them
+        """
+        return self.nodes
+    
     def updateNumberStartFinishedDataAttributes(self,newNode,nodeType):
         """
         Updates custom attributes for a new node based on the specified node type.
@@ -2118,7 +2169,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             visualAttr = node.bottomAttrs['Visual']
             if len(visualAttr.connections) > 0:
                 visual_connected_node_name = visualAttr.connections[0].socketNode
-                logging.info(f'visual_connected_node_name: {visual_connected_node_name}')
                 for nodeV in self.nodes:
                     if nodeV.name == visual_connected_node_name:
                         visual_connected_node = nodeV
@@ -2175,7 +2225,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         elif chosenLayerType == 'image':
                             logging.info('creating new image layer')
                             viewer = self.shared_data.napariViewer #type:ignore
-                            im = np.random.random((10,30, 30))
+                            im = np.random.random((30, 30))
                             napariLayer = viewer.add_image(
                                 data=im,
                                 name=layerName,
@@ -3302,6 +3352,80 @@ class advDecisionGridLayout(QGroupBox):
             self.decisionInfoGUI[scoreMetric]['lineedit'] = lineedit
             self.outerLayout.addLayout(hbox)
 #endregion
+
+#region VariablesWidget
+class VariablesWidget(QWidget):
+    """ 
+    """
+    def __init__(self, nodzinstance:GladosNodzFlowChart_dockWidget,parent=None):
+        """
+        Initializes the scanning widget class.
+        
+        Args:
+            nodzinstance: The nodz instance to be associated with.
+            parent: The parent widget.
+        
+        Returns:
+            None
+        """
+        super().__init__(parent)
+        # super().__init__()
+        self.nodzinstance=nodzinstance
+        
+        self.create_GUI()
+    
+    def create_GUI(self):
+        """
+        """
+        logging.info('Inside variableswidget-createGUi')
+        self.buttonTest = QPushButton("Test")
+        self.buttonTest.clicked.connect(self.printVariables)
+        
+        from PyQt5.QtWidgets import QTableWidget
+        headers = ["CellValue", "Origin", "Name", "Value", "Importance", "LastChanged"]
+        self.variablesTableWidget = QTableWidget()
+        self.variablesTableWidget.setColumnCount(len(headers))
+        self.variablesTableWidget.setHorizontalHeaderLabels(headers)
+        
+        self.layoutV = QVBoxLayout()
+        self.layoutV.addWidget(self.buttonTest)
+        self.layoutV.addWidget(self.variablesTableWidget)
+        self.setLayout(self.layoutV)
+
+    def printVariables(self):
+        logging.info('To print variables here!')
+        allNodes = self.nodzinstance.obtainAllNodes()
+        
+        allvariableData = {}
+        for node in allNodes:
+            for var in node.variablesNodz:
+                pos = len(allvariableData)
+                allvariableData[pos] = node.variablesNodz[var]
+                allvariableData[pos]['NodeOrigin'] = node.name
+                allvariableData[pos]['VariableName'] = var
+            
+            
+        # Set the number of rows
+        self.variablesTableWidget.setRowCount(len(allvariableData))
+
+        from PyQt5.QtWidgets import QTableWidgetItem
+        # Fill the table with data
+        for row_id in range(len(allvariableData)):
+            print(row_id)
+            varData = allvariableData[row_id]
+            print(varData)
+            
+            # headers = ["CellValue", "Origin", "Name", "Value", "Importance", "LastChanged"]
+            self.variablesTableWidget.setItem(row_id, 1, QTableWidgetItem(str(varData['NodeOrigin'])))
+            self.variablesTableWidget.setItem(row_id, 2, QTableWidgetItem(str(varData['VariableName'])))
+            self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(str(varData['data'])))
+            self.variablesTableWidget.setItem(row_id, 4, QTableWidgetItem(str(varData['importance'])))
+
+        
+        #TODO: find all nodes, for each node, print each variable. Later, add these to a list
+#endregion
+
+
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     """
