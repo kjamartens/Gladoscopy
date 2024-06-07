@@ -1627,8 +1627,8 @@ class MDAGlados(CustomMainWindow):
         """
         Update Nodz variables (variablesNodz) with current data.
         """
-        logging.info("in updateNodzVariables()")
         if 'nodeInfo' in vars(self) and self.nodeInfo is not None:
+            utils.updateNodzVariablesTime(self.nodeInfo)
             self.nodeInfo.variablesNodz['data']['data'] = self.data
             self.nodeInfo.variablesNodz['order']['data'] = self.order
             self.nodeInfo.variablesNodz['exposure_ms']['data'] = self.exposure_ms

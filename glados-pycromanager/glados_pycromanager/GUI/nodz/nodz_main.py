@@ -1512,7 +1512,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.scoring_visualisation_currentData = {}
         self.alternateFillColor = alternateFillColor
         self.variablesNodz = {}
-        
+
         self.scoring_end_currentData = {}
         self.scoring_end_currentData['Variables'] = {}
         
@@ -1545,7 +1545,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.textboxheight = 50
         self.textboxborder = 5
         self.mdaData = None
-
     def updateDisplayText(self,new_display_text):
         h = self.textboxheight
         

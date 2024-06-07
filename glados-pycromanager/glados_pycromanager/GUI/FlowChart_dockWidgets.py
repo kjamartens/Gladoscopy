@@ -148,7 +148,10 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         # pre-load all args/kwargs and their edit values - then hide all of them
         utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_analysisFunctions)
         
-        #Pre-load the options if they're in the current node info
+        # if currentNode.scoring_analysis_currentData == {}: #type:ignore
+        #     utils.preLoadOptions_analysis(self.mainLayout,self.currentData)
+        # else: 
+            #Pre-load the options if they're in the current node info
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
@@ -1183,42 +1186,56 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             #Set the variableNodz info, maybe later do this in seperate function?
             newNode.variablesNodz['data'] = {}
+            from ndtiff import NDTiffDataset
+            newNode.variablesNodz['data']['type'] = [NDTiffDataset, np.ndarray]
             newNode.variablesNodz['data']['data'] = None
             newNode.variablesNodz['data']['importance'] = 'Default'
             newNode.variablesNodz['order'] = {}
+            newNode.variablesNodz['order']['type'] = [str]
             newNode.variablesNodz['order']['data'] = None
             newNode.variablesNodz['order']['importance'] = 'Informative'
             newNode.variablesNodz['exposure_ms'] = {}
+            newNode.variablesNodz['exposure_ms']['type'] = [float]
             newNode.variablesNodz['exposure_ms']['data'] = None
             newNode.variablesNodz['exposure_ms']['importance'] = 'Informative'
             newNode.variablesNodz['n_timepoints'] = {}
+            newNode.variablesNodz['n_timepoints']['type'] = [int]
             newNode.variablesNodz['n_timepoints']['data'] = None
             newNode.variablesNodz['n_timepoints']['importance'] = 'Informative'
             newNode.variablesNodz['time_interval_ms'] = {}
+            newNode.variablesNodz['time_interval_ms']['type'] = [float]
             newNode.variablesNodz['time_interval_ms']['data'] = None
             newNode.variablesNodz['time_interval_ms']['importance'] = 'Informative'
             newNode.variablesNodz['xy_positions'] = {}
+            newNode.variablesNodz['xy_positions']['type'] = [np.ndarray]
             newNode.variablesNodz['xy_positions']['data'] = None
             newNode.variablesNodz['xy_positions']['importance'] = 'Informative'
             newNode.variablesNodz['n_xy_positions'] = {}
+            newNode.variablesNodz['n_xy_positions']['type'] = [int]
             newNode.variablesNodz['n_xy_positions']['data'] = None
             newNode.variablesNodz['n_xy_positions']['importance'] = 'Informative'
             newNode.variablesNodz['z_positions'] = {}
+            newNode.variablesNodz['z_positions']['type'] = [np.ndarray]
             newNode.variablesNodz['z_positions']['data'] = None
             newNode.variablesNodz['z_positions']['importance'] = 'Informative'
             newNode.variablesNodz['n_z_positions'] = {}
+            newNode.variablesNodz['n_z_positions']['type'] = [int]
             newNode.variablesNodz['n_z_positions']['data'] = None
             newNode.variablesNodz['n_z_positions']['importance'] = 'Informative'
             newNode.variablesNodz['channel_group'] = {}
+            newNode.variablesNodz['channel_group']['type'] = [str]
             newNode.variablesNodz['channel_group']['data'] = None
             newNode.variablesNodz['channel_group']['importance'] = 'Informative'
             newNode.variablesNodz['channels'] = {}
+            newNode.variablesNodz['channels']['type'] = [np.ndarray]
             newNode.variablesNodz['channels']['data'] = None
             newNode.variablesNodz['channels']['importance'] = 'Informative'
             newNode.variablesNodz['n_channels'] = {}
+            newNode.variablesNodz['n_channels']['type'] = [int]
             newNode.variablesNodz['n_channels']['data'] = None
             newNode.variablesNodz['n_channels']['importance'] = 'Informative'
             newNode.variablesNodz['storage_path'] = {}
+            newNode.variablesNodz['storage_path']['type'] = [str]
             newNode.variablesNodz['storage_path']['data'] = None
             newNode.variablesNodz['storage_path']['importance'] = 'Informative'
             
@@ -1341,12 +1358,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
         elif 'analysisMeasurement' in nodeName:
             currentNode = self.findNodeByName(nodeName)
-            #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 currentNode.scoring_analysis_currentData = dialog.currentData #type:ignore
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
+                try:
+                    self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
+                except:
+                    logging.warning('Failed to set text in analysisMeasurementDialog')
                 logging.info('Pressed OK on analysisMeasurementDialog')
         elif 'realTimeAnalysis' in nodeName:
             currentNode = self.findNodeByName(nodeName)
@@ -3386,7 +3405,7 @@ class VariablesWidget(QWidget):
         self.buttonTest.clicked.connect(self.printVariables)
         
         from PyQt5.QtWidgets import QTableWidget
-        headers = ["CellValue", "Origin", "Name", "Value", "Importance", "LastChanged"]
+        headers = ["CellValue", "Origin", "Name", "Value", "Importance", "Type", "LastChanged"]
         self.variablesTableWidget = QTableWidget()
         self.variablesTableWidget.setColumnCount(len(headers))
         self.variablesTableWidget.setHorizontalHeaderLabels(headers)
@@ -3413,14 +3432,18 @@ class VariablesWidget(QWidget):
         self.variablesTableWidget.setRowCount(len(allvariableData))
 
         from PyQt5.QtWidgets import QTableWidgetItem
+        from datetime import datetime
         # Fill the table with data
         for row_id in range(len(allvariableData)):
             varData = allvariableData[row_id]
-            # headers = ["CellValue", "Origin", "Name", "Value", "Importance", "LastChanged"]
+            # headers = ["CellValue", "Origin", "Name", "Value", "Importance","Type", "LastChanged"]
             self.variablesTableWidget.setItem(row_id, 1, QTableWidgetItem(str(varData['NodeOrigin'])))
             self.variablesTableWidget.setItem(row_id, 2, QTableWidgetItem(str(varData['VariableName'])))
             self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(str(varData['data'])))
             self.variablesTableWidget.setItem(row_id, 4, QTableWidgetItem(str(varData['importance'])))
+            self.variablesTableWidget.setItem(row_id, 5, QTableWidgetItem(str(varData['type'])))
+            self.variablesTableWidget.setItem(row_id, 6, QTableWidgetItem(str(datetime.fromtimestamp(varData['lastUpdateTime']).strftime("%H:%M:%S %d-%m-%Y"))))
+            
 
         
         #TODO: find all nodes, for each node, print each variable. Later, add these to a list

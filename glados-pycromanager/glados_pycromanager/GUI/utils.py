@@ -394,6 +394,7 @@ def defaultValueFromKwarg(functionname,kwargname):
             if 'default' in functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]:
                 defaultEntry = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['default']
     
+    logging.debug(f"Default value for {functionname} - {kwargname} is {defaultEntry}")
     return defaultEntry
 
 def motherFunctionFromFunctionName(functionname):
@@ -520,12 +521,52 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         resetLayout(curr_layout,current_selected_function)
         #Update the layout
         curr_layout.update()
+        
+        #Force-set the current selected function
+        
+        currentSelectedFunctionReadable = None
+        for entry in curr_layout.parent().parent().currentData['__displayNameFunctionNameMap__']:
+            if entry[1] == current_selected_function:
+                currentSelectedFunctionReadable = entry[0]
+            
+        curr_layout.parent().parent().currentData['__selectedDropdownEntryAnalysis__'] = currentSelectedFunctionReadable
+        
+        #Show/hide varialbes/advanced lineedits and such
+        for i in range(curr_layout.count()):
+            item = curr_layout.itemAt(i)
+            if item.widget() is not None:
+                child = item.widget()
+                if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
+                    logging.warning(f"1Going to run hideAdvVariables with {child.objectName()}")
+                    curr_layout.update()
+                    hideAdvVariables(child,current_selected_function=current_selected_function)
+            else:
+                for index2 in range(item.count()):
+                    widget_sub_item = item.itemAt(index2)
+                    child = widget_sub_item.widget()
+                    if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
+                        logging.warning(f"2Going to run hideAdvVariables with {child.objectName()}")
+                        curr_layout.update()
+                        hideAdvVariables(child,current_selected_function=current_selected_function)
+                        
+        
+        
+        # parentObject = curr_layout.parent().parent()
+        # currentSelectedFunction = None
+        # for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
+        #     if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
+        #         currentSelectedFunction = entry[1]
+        #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
+        #                     hideAdvVariables(child)
+                        
 
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4,showVisualisationBox=False):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
     #Get the dropdown info
+    comboBoxSwitchesToUpdate = {}
+    
     if current_dropdown == None:
         return
     for index in range(current_dropdown.count()):
@@ -591,20 +632,76 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             changeDataVarUponKwargChange(line_edit)
                             
                     else: #'normal' type - int, float, string, whatever
+                        #Create a new HBox:
+                        SingleVar_Variables_boxLayout = QHBoxLayout()
+                        
                         #Creating a line-edit...
                         line_edit = QLineEdit()
                         line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
                         defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
+                        
+                        #Method for variables in Glados
+                        ShowVariablesOptions = True 
+                        if ShowVariablesOptions:
+                            #Advanced - flow + var via maths
+                            line_edit_adv = QLineEdit()
+                            line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{reqKwargs[k]}")
+                            line_edit_Button_adv = QPushButton("Add Var")
+                            line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{reqKwargs[k]}")
+                            #Only var
+                            line_edit_variable = QLineEdit()
+                            line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{reqKwargs[k]}")
+                            push_button_variable_adv = QPushButton("Choose Var")
+                            push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{reqKwargs[k]}")
+                            #Switch to switch between
+                            comboBox_switch = QComboBox()
+                            comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{reqKwargs[k]}")
+                            comboBox_switch.addItem("Value")
+                            comboBox_switch.addItem("Variable")
+                            comboBox_switch.addItem("Advanced")
+                        
                         #Actually placing it in the layout
                         if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                            SingleVar_Variables_boxLayout.addWidget(line_edit)
+                            if ShowVariablesOptions:
+                                
+                                SingleVar_Variables_boxLayout.addWidget(line_edit_variable)
+                                line_edit_variable.textChanged.connect(lambda text,line_edit=line_edit_variable: kwargValueInputChanged(line_edit))
+                                #Init the parent currentData storage:
+                                SingleVar_Variables_boxLayout.addWidget(push_button_variable_adv)
+                                
+                                SingleVar_Variables_boxLayout.addWidget(line_edit_adv)
+                                line_edit_adv.textChanged.connect(lambda text,line_edit=line_edit_adv: kwargValueInputChanged(line_edit))
+                                #Init the parent currentData storage:
+                                SingleVar_Variables_boxLayout.addWidget(line_edit_Button_adv)
+                                
+                                SingleVar_Variables_boxLayout.addWidget(comboBox_switch)
+                                comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
+                                comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
+                                comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
+                                
+                                
+                                
+                            
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                             if defaultValue is not None:
                                 line_edit.setText(str(defaultValue))
-                            curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                            curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                             #Add a on-change listener:
                             line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                             #Init the parent currentData storage:
                             changeDataVarUponKwargChange(line_edit)
+                            if ShowVariablesOptions:
+                                #Init the parent currentData storage:
+                                changeDataVarUponKwargChange(line_edit_variable)
+                                changeDataVarUponKwargChange(line_edit_adv)
+                                # changeDataVarUponKwargChange(comboBox_switch)
+                                # hideAdvVariables(comboBox_switch)
+                            
+                            # curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                        
+                        
+                        
                 else:
                     labelposoffset -= 1
                 
@@ -664,21 +761,52 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         
     #Hides everything except the current layout
     layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
-
+    
+    # resetLayout(curr_layout)
+        
 def preLoadOptions_analysis(curr_layout,currentData):
     """
     Preloads the kwarg values from the currentData dict into their respective widgets
     """
+    
+    parentObject = curr_layout.parent().parent()
+    currentSelectedFunction = None
+    for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
+        if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
+            currentSelectedFunction = entry[1]
+            
     for i in range(curr_layout.count()):
         item = curr_layout.itemAt(i)
         if item.widget() is not None:
             child = item.widget()
             if child.objectName() in currentData:
-                child.setText(str(currentData[child.objectName()]))
+                logging.debug(f"Preloading {child.objectName()} with {currentData[child.objectName()]}")
+                if isinstance(child,QComboBox):
+                    child.setCurrentText(currentData[child.objectName()])
+                    # if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
+                    #     hideAdvVariables(child)
+                else:
+                    child.setText(str(currentData[child.objectName()]))
                 
             #Also set the dropdown to the correct value:
             if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
                 child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
+        else:
+            for index2 in range(item.count()):
+                widget_sub_item = item.itemAt(index2)
+                child = widget_sub_item.widget()
+                if child.objectName() in currentData:
+                    logging.debug(f"2Preloading {child.objectName()} with {currentData[child.objectName()]}")
+                    if isinstance(child,QComboBox):
+                        child.setCurrentText(currentData[child.objectName()])
+                        # if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
+                        #     hideAdvVariables(child)
+                    else:
+                        child.setText(str(currentData[child.objectName()]))
+                    
+                #Also set the dropdown to the correct value:
+                if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
+                    child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
     
 def preLoadOptions_realtime(curr_layout,currentData):
     """
@@ -694,15 +822,73 @@ def preLoadOptions_realtime(curr_layout,currentData):
             #Also set the dropdown to the correct value:
             if 'comboBox_RTanalysisFunctions' in child.objectName() and '__selectedDropdownEntryRTAnalysis__' in currentData:
                 child.setCurrentText(currentData['__selectedDropdownEntryRTAnalysis__'])
-    
 
+def hideAdvVariables(comboBox,current_selected_function=None):
+    """ 
+    Hide/show the lineEdits/comboboxes of NodzVariables/Advanced/Normal input based on the comboBox variable
+    """
+    comboboxvalue = comboBox.currentText()
+    functionName = comboBox.objectName().split('#')[1]
+    kwargName = comboBox.objectName().split('#')[2]
+    parentObject = comboBox.parent()
+    
+    
+    
+    currentSelectedFunction = None
+    for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
+        if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
+            currentSelectedFunction = entry[1]
+    
+    if functionName != currentSelectedFunction:
+        return
+    
+    #Loop over all widgets in parent:
+    for child in parentObject.children():
+        if len(child.objectName().split('#')) > 2:
+            #Check if it's the same function and variable:
+            if child.objectName().split('#')[1] == functionName and child.objectName().split('#')[2] == kwargName:
+                logging.debug('Looking at ' + functionName + ' ' + kwargName)
+                normalVarAdvValue = child.objectName().split('#')[0]
+                if normalVarAdvValue != 'Label' and normalVarAdvValue != 'ComboBoxSwitch':
+                    #Hide/show simple/advanced/onlyVar based on the comboBox value:
+                    if comboboxvalue == 'Variable':
+                        if normalVarAdvValue == 'LineEditVariable' or normalVarAdvValue == 'PushButtonVariable':
+                            child.show()
+                            logging.debug(f'1Showing {child.objectName()}')
+                        else:
+                            child.hide()
+                            logging.debug(f'1Hiding {child.objectName()}')
+                    elif comboboxvalue == 'Advanced':
+                        if normalVarAdvValue == 'LineEditAdv' or normalVarAdvValue == 'PushButtonAdv':
+                            child.show()
+                            logging.debug(f'2Showing {child.objectName()}')
+                        else:
+                            child.hide()
+                            logging.debug(f'2Hiding {child.objectName()}')
+                    else:
+                        if normalVarAdvValue == 'LineEdit':
+                            child.show()
+                            logging.debug(f'3Showing {child.objectName()}')
+                        else:
+                            child.hide()
+                            logging.debug(f'3Hiding {child.objectName()}')
+    
+    # resetLayout(parentObject.mainLayout,currentSelectedFunction)
+                    
 def changeDataVarUponKwargChange(line_edit):
     #Idea: update the parent.currentData{} structure whenever a kwarg is changed, and this can be (re-)loaded when needed
-    parentObject = line_edit.parent()
-    newValue = line_edit.text()
-    parentObject.currentData[line_edit.objectName()] = newValue
-    #To be sure, also do this routine:
-    updateCurrentDataUponDropdownChange(parentObject)
+    if isinstance(line_edit,QLineEdit):
+        parentObject = line_edit.parent()
+        newValue = line_edit.text()
+        parentObject.currentData[line_edit.objectName()] = newValue
+        #To be sure, also do this routine:
+        updateCurrentDataUponDropdownChange(parentObject)
+    elif isinstance(line_edit,QComboBox):
+        parentObject = line_edit.parent()
+        newValue = line_edit.currentText()
+        parentObject.currentData[line_edit.objectName()] = newValue
+        #To be sure, also do this routine:
+        updateCurrentDataUponDropdownChange(parentObject)
 
 
 def updateCurrentDataUponDropdownChange(parentObject):
@@ -769,6 +955,7 @@ def checkAndShowWidget(layout, widgetName):
             if widget.objectName() == widgetName:
                 # Widget already exists, unhide it
                 widget.show()
+                logging.info('898 showing widget: '+widget.objectName())
                 return
         else:
             for index2 in range(item.count()):
@@ -780,6 +967,7 @@ def checkAndShowWidget(layout, widgetName):
                     if widget.objectName() == widgetName:
                         # Widget already exists, unhide it
                         widget.show()
+                        logging.info('909 showing widget: '+widget.objectName())
                         return
     return False
 
@@ -792,9 +980,10 @@ def resetLayout(curr_layout,className):
             widget = widget_item.widget()
             #If it's the dropdown segment, label it as such
             if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
-                logging.debug(f"Hiding {widget.objectName()}")
+                logging.debug(f"1Hiding {widget.objectName()}")
                 widget.hide()
             else:
+                logging.debug(f"1Showing {widget.objectName()}")
                 widget.show()
         else:
             for index2 in range(widget_item.count()):
@@ -804,10 +993,25 @@ def resetLayout(curr_layout,className):
                     widget = widget_sub_item.widget()
                     #If it's the dropdown segment, label it as such
                     if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
-                        logging.debug(f"Hiding {widget.objectName()}")
+                        logging.debug(f"2Hiding {widget.objectName()}")
                         widget.hide()
+                    else:
+                        logging.debug(f"2Showing {widget.objectName()}")
+                        widget.show()
                 else:
-                    widget.show()
+                    for index3 in range(widget_sub_item.count()):
+                        widget_sub_sub_item = widget_sub_item.itemAt(index3)
+                        # Check if the item is a widget (as opposed to a layout)
+                        if widget_sub_sub_item.widget() is not None:
+                            widget = widget_sub_sub_item.widget()
+                            #If it's the dropdown segment, label it as such
+                            if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
+                                logging.debug(f"3Hiding {widget.objectName()}")
+                                widget.hide()
+                        else:
+                            logging.debug(f"3Showing {widget.objectName()}")
+                            widget.show()
+    
 
 def getMethodDropdownInfo(curr_layout,className):
     curr_dropdown = []
@@ -835,7 +1039,6 @@ def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
 def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
     file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
     return file_path
-
 
 
 def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
@@ -1433,7 +1636,7 @@ def closeAllLayers(shared_data):
     """
     for layer in reversed(shared_data.napariViewer.layers):
         shared_data.napariViewer.layers.remove(layer)
-# Utils to do with NODZ:
+
 
 def getDimensionsFromAcqData(acqData):
     alldims = acqData[0]['axes']
@@ -1453,3 +1656,11 @@ def getDimensionsFromAcqData(acqData):
     logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
     logging.debug(f"uniqueEntriesAllDims: {uniqueEntriesAllDims}")
     return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
+
+def updateNodzVariablesTime(node):
+    
+    #self.nodeInfo.variablesNodz['data']['data']
+    for vars in node.variablesNodz:
+        node.variablesNodz[vars]['lastUpdateTime'] = time.time()
+        
+    print('updating nodz variables time')
