@@ -587,6 +587,9 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
         
             #Visual max number of rows before a 2nd column is started.
             labelposoffset = 0
+            
+            #Want to show variables in advanced mode?
+            ShowVariablesOptions = True 
 
             reqKwargs = reqKwargsFromFunction(current_selected_function)
             
@@ -641,7 +644,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
                         
                         #Method for variables in Glados
-                        ShowVariablesOptions = True 
                         if ShowVariablesOptions:
                             #Advanced - flow + var via maths
                             line_edit_adv = QLineEdit()
@@ -664,7 +666,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
                             SingleVar_Variables_boxLayout.addWidget(line_edit)
                             if ShowVariablesOptions:
-                                
                                 SingleVar_Variables_boxLayout.addWidget(line_edit_variable)
                                 line_edit_variable.textChanged.connect(lambda text,line_edit=line_edit_variable: kwargValueInputChanged(line_edit))
                                 #Init the parent currentData storage:
@@ -679,9 +680,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                                 comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
                                 comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
                                 comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
-                                
-                                
-                                
                             
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                             if defaultValue is not None:
@@ -695,11 +693,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                                 #Init the parent currentData storage:
                                 changeDataVarUponKwargChange(line_edit_variable)
                                 changeDataVarUponKwargChange(line_edit_adv)
-                                # changeDataVarUponKwargChange(comboBox_switch)
-                                # hideAdvVariables(comboBox_switch)
                             
-                            # curr_layout.addWidget(line_edit,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                        
                         
                         
                 else:
@@ -746,18 +740,63 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         line_edit_lookup.clicked.connect(lambda text2,line_edit_change_objName = line_edit,text="Select file",filter="*.*": lineEditFileLookup(line_edit_change_objName, text, filter,parent=parent))
                             
                 else:
+                    #Create a new HBox:
+                    SingleVar_Variables_boxLayout = QHBoxLayout()
+                        
                     line_edit = QLineEdit()
                     line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
                     defaultValue = defaultValueFromKwarg(current_selected_function,optKwargs[k])
+                    
+                    #Method for variables in Glados
+                    if ShowVariablesOptions:
+                        #Advanced - flow + var via maths
+                        line_edit_adv = QLineEdit()
+                        line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{optKwargs[k]}")
+                        line_edit_Button_adv = QPushButton("Add Var")
+                        line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{optKwargs[k]}")
+                        #Only var
+                        line_edit_variable = QLineEdit()
+                        line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{optKwargs[k]}")
+                        push_button_variable_adv = QPushButton("Choose Var")
+                        push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{optKwargs[k]}")
+                        #Switch to switch between
+                        comboBox_switch = QComboBox()
+                        comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{optKwargs[k]}")
+                        comboBox_switch.addItem("Value")
+                        comboBox_switch.addItem("Variable")
+                        comboBox_switch.addItem("Advanced")
+                    
                     if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                        SingleVar_Variables_boxLayout.addWidget(line_edit)
+                        
+                        if ShowVariablesOptions:
+                            SingleVar_Variables_boxLayout.addWidget(line_edit_variable)
+                            line_edit_variable.textChanged.connect(lambda text,line_edit=line_edit_variable: kwargValueInputChanged(line_edit))
+                            #Init the parent currentData storage:
+                            SingleVar_Variables_boxLayout.addWidget(push_button_variable_adv)
+                            
+                            SingleVar_Variables_boxLayout.addWidget(line_edit_adv)
+                            line_edit_adv.textChanged.connect(lambda text,line_edit=line_edit_adv: kwargValueInputChanged(line_edit))
+                            #Init the parent currentData storage:
+                            SingleVar_Variables_boxLayout.addWidget(line_edit_Button_adv)
+                            
+                            SingleVar_Variables_boxLayout.addWidget(comboBox_switch)
+                            comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
+                            comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
+                            comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
+                        
                         line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                         if defaultValue is not None:
                             line_edit.setText(str(defaultValue))
-                        curr_layout.addWidget(line_edit,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
+                        curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
                         #Add a on-change listener:
                         line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                         #Init the parent currentData storage:
                         changeDataVarUponKwargChange(line_edit)
+                        if ShowVariablesOptions:
+                            #Init the parent currentData storage:
+                            changeDataVarUponKwargChange(line_edit_variable)
+                            changeDataVarUponKwargChange(line_edit_adv)
                         
     #Hides everything except the current layout
     layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
