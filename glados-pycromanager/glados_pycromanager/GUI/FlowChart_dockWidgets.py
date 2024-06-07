@@ -461,7 +461,8 @@ class nodz_openMDADialog(QDialog):
                     position_labels=currentNode.mdaData.position_labels,
                     exposure_ms=currentNode.mdaData.exposure_ms,
                     storage_folder=currentNode.mdaData.storage_folder,
-                    storage_file_name=currentNode.mdaData.storage_file_name)
+                    storage_file_name=currentNode.mdaData.storage_file_name,
+                    node = currentNode)
             else: #This should never happen, but otherwise just open a new mdaglados instance
                 self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,hasGUI=True)
             
@@ -1178,19 +1179,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             parentV = None
             if self.parent is not None:
                 parentV = self.parent
-            #Attach a MDA data to this node
-            newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True,parent=parentV) # type: ignore
-            
-            #Do the acquisition upon callAction
-            newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_Node(node)
-            
-            #Add the node emits of 'finishing' upon MDA completion.
-            newNode.mdaData.MDA_completed.connect(lambda self, node = newNode: node.customFinishedEmits.emit_all_signals())
-            #Note: the recorded MDA data is stored in node.mdaData.data - any analysis method should find/read this.
-            #The core is at node.mdaData.core
-            
-            #Also connect the node's finishedMDA
-            newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
+                
             
             #Set the variableNodz info, maybe later do this in seperate function?
             newNode.variablesNodz['data'] = {}
@@ -1232,6 +1221,21 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.variablesNodz['storage_path'] = {}
             newNode.variablesNodz['storage_path']['data'] = None
             newNode.variablesNodz['storage_path']['importance'] = 'Informative'
+            
+            #Attach a MDA data to this node
+            newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True,parent=parentV,node=newNode) # type: ignore
+            
+            #Do the acquisition upon callAction
+            newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_Node(node)
+            
+            #Add the node emits of 'finishing' upon MDA completion.
+            newNode.mdaData.MDA_completed.connect(lambda self, node = newNode: node.customFinishedEmits.emit_all_signals())
+            #Note: the recorded MDA data is stored in node.mdaData.data - any analysis method should find/read this.
+            #The core is at node.mdaData.core
+            
+            #Also connect the node's finishedMDA
+            newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
+            
             
         elif nodeType == 'changeProperties':
             #attach MMconfigUI to this:
@@ -3411,10 +3415,7 @@ class VariablesWidget(QWidget):
         from PyQt5.QtWidgets import QTableWidgetItem
         # Fill the table with data
         for row_id in range(len(allvariableData)):
-            print(row_id)
             varData = allvariableData[row_id]
-            print(varData)
-            
             # headers = ["CellValue", "Origin", "Name", "Value", "Importance", "LastChanged"]
             self.variablesTableWidget.setItem(row_id, 1, QTableWidgetItem(str(varData['NodeOrigin'])))
             self.variablesTableWidget.setItem(row_id, 2, QTableWidgetItem(str(varData['VariableName'])))

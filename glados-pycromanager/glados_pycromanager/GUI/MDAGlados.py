@@ -368,7 +368,8 @@ class MDAGlados(CustomMainWindow):
                 GUI_show_storage = True, 
                 GUI_acquire_button = True,
                 autoSaveLoad = False,
-                parent=None):
+                parent=None,
+                node = None):
         """
         Initializes the MDAGlados class with the provided parameters.
         
@@ -419,7 +420,8 @@ class MDAGlados(CustomMainWindow):
             global livestate, napariViewer
             livestate = parent.livestate
             napariViewer = parent.napariViewer
-            
+        
+        self.nodeInfo = node
         self.num_time_points = num_time_points
         self.time_interval_s = time_interval_s
         self.time_interval_s_or_ms = time_interval_s_or_ms
@@ -450,7 +452,6 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_order = GUI_show_order
         self.GUI_show_storage = GUI_show_storage
         self.autoSaveLoad = autoSaveLoad
-
         
         self.GUI_exposure_enabled = GUI_show_exposure
         self.GUI_xy_enabled = GUI_show_xy
@@ -1254,39 +1255,8 @@ class MDAGlados(CustomMainWindow):
         #Set the status of the nodz-coupled vis and real-time to finished, and add nodz-based variables:
         if 'nodeInfo' in vars(self):
             logging.info('This MDA acq data was connected to node: ' + self.nodeInfo.name)
-            self.nodeInfo.variablesNodz['data']['data'] = self.data
-            self.nodeInfo.variablesNodz['order']['data'] = self.order
-            self.nodeInfo.variablesNodz['exposure_ms']['data'] = self.exposure_ms
-            self.nodeInfo.variablesNodz['n_timepoints']['data'] = self.num_time_points
-            self.nodeInfo.variablesNodz['time_interval_ms']['data'] = self.time_interval_s*1000
-            if self.GUI_show_xy == True:
-                self.nodeInfo.variablesNodz['xy_positions']['data'] = self.xy_positions
-                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = len(self.xy_positions)
-            else:
-                self.nodeInfo.variablesNodz['xy_positions']['data'] = None
-                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = None
-            if self.GUI_show_z == True:
-                self.nodeInfo.variablesNodz['z_positions']['data'] = [self.z_start, self.z_step, self.z_end]
-                self.nodeInfo.variablesNodz['n_z_positions']['data'] = self.z_nr_steps
-            else:
-                self.nodeInfo.variablesNodz['z_positions']['data'] = None
-                self.nodeInfo.variablesNodz['n_z_positions']['data'] = None
-            if self.GUI_show_channel == True:
-                self.nodeInfo.variablesNodz['channel_group']['data'] = self.channel_group
-                self.nodeInfo.variablesNodz['channels']['data'] = self.channels
-                self.nodeInfo.variablesNodz['n_channels']['data'] = len(self.channels)
-            else:
-                self.nodeInfo.variablesNodz['channel_group']['data'] = None
-                self.nodeInfo.variablesNodz['channels']['data'] = None
-                self.nodeInfo.variablesNodz['n_channels']['data'] = None
-            if self.GUI_storage_enabled == True:
-                self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep()+self.storage_file_name
-            else:
-                self.nodeInfo.variablesNodz['storage_path']['data'] = None
-                
+            self.updateNodzVariables()
 
-            
-            
         #Look at the 'Visual' bottom attribute:
             visualAttr = self.nodeInfo.bottomAttrs['Visual']
             if len(visualAttr.connections) > 0:
@@ -1505,8 +1475,8 @@ class MDAGlados(CustomMainWindow):
                 self.time_interval_s = None
                 self.time_interval_s_or_ms = 'ms'
                 
-        if self.orderGroupBox.isEnabled():
-            self.order = self.orderDropdown.currentText()
+        # if self.orderGroupBox.isEnabled():
+        self.order = self.orderDropdown.currentText()
         
         if self.storageGroupBox.isEnabled():
             self.storage_folder = self.storageFolderEntry.text()
@@ -1593,6 +1563,9 @@ class MDAGlados(CustomMainWindow):
             self.z_step = 1
             self.z_end = 1
         
+        #Also update the nodz variables info:
+        self.updateNodzVariables()
+        
         #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
         
@@ -1647,4 +1620,43 @@ class MDAGlados(CustomMainWindow):
             None
         """
         self.mda = mdaparams
+    #endregion
+    
+    #region Nodz-based
+    def updateNodzVariables(self):
+        """
+        Update Nodz variables (variablesNodz) with current data.
+        """
+        logging.info("in updateNodzVariables()")
+        if 'nodeInfo' in vars(self) and self.nodeInfo is not None:
+            self.nodeInfo.variablesNodz['data']['data'] = self.data
+            self.nodeInfo.variablesNodz['order']['data'] = self.order
+            self.nodeInfo.variablesNodz['exposure_ms']['data'] = self.exposure_ms
+            self.nodeInfo.variablesNodz['n_timepoints']['data'] = self.num_time_points
+            self.nodeInfo.variablesNodz['time_interval_ms']['data'] = self.time_interval_s*1000
+            if self.GUI_show_xy == True:
+                self.nodeInfo.variablesNodz['xy_positions']['data'] = self.xy_positions
+                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = len(self.xy_positions)
+            else:
+                self.nodeInfo.variablesNodz['xy_positions']['data'] = None
+                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = None
+            if self.GUI_show_z == True:
+                self.nodeInfo.variablesNodz['z_positions']['data'] = [self.z_start, self.z_step, self.z_end]
+                self.nodeInfo.variablesNodz['n_z_positions']['data'] = self.z_nr_steps
+            else:
+                self.nodeInfo.variablesNodz['z_positions']['data'] = None
+                self.nodeInfo.variablesNodz['n_z_positions']['data'] = None
+            if self.GUI_show_channel == True:
+                self.nodeInfo.variablesNodz['channel_group']['data'] = self.channel_group
+                self.nodeInfo.variablesNodz['channels']['data'] = self.channels
+                self.nodeInfo.variablesNodz['n_channels']['data'] = len(self.channels)
+            else:
+                self.nodeInfo.variablesNodz['channel_group']['data'] = None
+                self.nodeInfo.variablesNodz['channels']['data'] = None
+                self.nodeInfo.variablesNodz['n_channels']['data'] = None
+            if self.GUI_storage_enabled == True:
+                self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep()+self.storage_file_name
+            else:
+                self.nodeInfo.variablesNodz['storage_path']['data'] = None
+                
     #endregion
