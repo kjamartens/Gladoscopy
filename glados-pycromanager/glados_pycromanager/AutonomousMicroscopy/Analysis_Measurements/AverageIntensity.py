@@ -15,7 +15,7 @@ def __function_metadata__():
                 {"name": "ReqKwarg2", "description": "Second required kwarg", "default": 0, "type": int}
             ],
             "optional_kwargs": [
-                {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
+                {"name": "OptBool2", "description": "OptBool", "default": False, "type": float}
             ],
             "help_string": "Average gray value.",
             "display_name": "Average gray value"

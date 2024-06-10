@@ -762,6 +762,8 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{optKwargs[k]}")
                         push_button_variable_adv = QPushButton("Choose Var")
                         push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{optKwargs[k]}")
+                        #Add a click-callback:
+                        push_button_variable_adv.clicked.connect(lambda text,line_edit=line_edit_variable: PushButtonChooseVariableCallBack(line_edit, nodzInfo=nodzInfo))
                         #Switch to switch between
                         comboBox_switch = QComboBox()
                         comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{optKwargs[k]}")
@@ -1676,8 +1678,14 @@ class SmallWindow(QMainWindow):
 
 def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
     from FlowChart_dockWidgets import VariablesDialog
+    
+    #Find the associated kwarg/function:
+    associatedFunction = line_edit.objectName().split('#')[1]
+    associatedKwarg = line_edit.objectName().split('#')[2]
+    associatedType = typeFromKwarg(associatedFunction,associatedKwarg)
+    
     #open a variablesDialog:
-    variablesDialog = VariablesDialog(nodzinstance=nodzInfo)
+    variablesDialog = VariablesDialog(nodzinstance=nodzInfo,typeInfo=associatedType)
     result = variablesDialog.exec()
     if result == variablesDialog.Accepted:
         lineEditText = variablesDialog.selected_entry[2]+'@'+variablesDialog.selected_entry[1]

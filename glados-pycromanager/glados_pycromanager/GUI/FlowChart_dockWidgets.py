@@ -3386,6 +3386,8 @@ class HoverTableWidget(QTableWidget):
     def __init__(self,parent=None):
         super().__init__(parent)
         self.setMouseTracking(True)  # Enable mouse tracking without pressing a button
+        self.setSortingEnabled(True) #Enable sorting the columns
+        self.verticalHeader().hide() #Hide the row numbering
 
     def mouseMoveEvent(self, event):
         index = self.indexAt(event.pos())
@@ -3407,7 +3409,8 @@ class VariablesBase(QWidget):
                 parent=None,
                 doubleClickEffect=None,
                 doubleClickLineEditChange=None,
-                connectedNode_showOnlyDownstream=None):
+                connectedNode_showOnlyDownstream=None,
+                typeInfo=None):
         """
         Initializes the scanning widget class.
         
@@ -3423,6 +3426,23 @@ class VariablesBase(QWidget):
         super().__init__(parent)
         # super().__init__()
         self.nodzinstance=nodzinstance
+        
+        if typeInfo is not None:
+            #if typeInfo is not in an array, put it inside one
+            if isinstance(typeInfo,type):
+                typeInfo = [typeInfo]
+            
+            #Specifically check if there is a FLOAT type, but no INT type. If so, add the INT type as well
+            hasFloatInt = [0,0]
+            for typev in typeInfo:
+                if typev == int:
+                    hasFloatInt[1] = 1
+                elif typev == float:
+                    hasFloatInt[0] = 1
+            if hasFloatInt == [1,0]:
+                typeInfo.append(int)
+                
+        self.typeInfo = typeInfo
         
         self.create_GUI()
         
@@ -3453,6 +3473,7 @@ class VariablesBase(QWidget):
         self.layoutV.addWidget(self.lineEditHover)
         self.layoutV.addWidget(self.variablesTableWidget)
         self.setLayout(self.layoutV)
+        
 
     def on_cell_hovered(self, row, column):
         # Get the hovered entry
@@ -3496,16 +3517,26 @@ class VariablesBase(QWidget):
         """
         Update the nodz-variables.
         """
-        logging.info('To print variables here!')
         allNodes = self.nodzinstance.obtainAllNodes()
         
         allvariableData = {}
         for node in allNodes:
             for var in node.variablesNodz:
                 pos = len(allvariableData)
-                allvariableData[pos] = node.variablesNodz[var]
-                allvariableData[pos]['NodeOrigin'] = node.name
-                allvariableData[pos]['VariableName'] = var
+                correctTyping = False
+                if self.typeInfo is not None:
+                    variableTypes = node.variablesNodz[var]['type']
+                    for variableType in variableTypes:
+                        for selftype in self.typeInfo:
+                            if variableType == selftype:
+                                correctTyping = True
+                else: #if no typing specified, accept everything
+                    correctTyping = True
+                
+                if correctTyping:
+                    allvariableData[pos] = node.variablesNodz[var]
+                    allvariableData[pos]['NodeOrigin'] = node.name
+                    allvariableData[pos]['VariableName'] = var
             
             
         # Set the number of rows
@@ -3540,11 +3571,29 @@ class VariablesDialog(QDialog, VariablesBase):
         #Create a container layout:
         # layout = QVBoxLayout()
         
+        
+        # Set font size for all items in the table
+        font = QFont()
+        font.setPointSize(7)  # Set the desired font size
+        variablesWidget.variablesTableWidget.setFont(font)
+
+        # Set font size for headers
+        header_font = QFont()
+        header_font.setPointSize(10)  # Set the desired font size for headers
+        variablesWidget.variablesTableWidget.horizontalHeader().setFont(header_font)
+        variablesWidget.variablesTableWidget.verticalHeader().setFont(header_font)
+        
+        from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QHeaderView
+
+        # Make the table more compact
+        variablesWidget.variablesTableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        variablesWidget.variablesTableWidget.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        variablesWidget.variablesTableWidget.verticalHeader().setDefaultSectionSize(25)  # Set the default height of each row
+
+        
         #Update the variables
         variablesWidget.updateVariables()
         self.layout().addWidget(variablesWidget)
-        
-        
         
         
         
@@ -3554,6 +3603,8 @@ class VariablesDialog(QDialog, VariablesBase):
         
         # Add button box to the layout
         self.layout().addWidget(self.buttonBox)
+        self.setMinimumSize(600,300)
+        self.setBaseSize(600,300)
         
     def on_cell_double_clicked(self, row, column):
         super().on_cell_double_clicked(row, column)
