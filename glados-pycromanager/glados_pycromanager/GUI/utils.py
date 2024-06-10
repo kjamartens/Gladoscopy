@@ -559,7 +559,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
         #                     hideAdvVariables(child)
 
-def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4,showVisualisationBox=False):
+def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4,showVisualisationBox=False,nodzInfo=None):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
@@ -639,21 +639,25 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         
                         #Creating a line-edit...
                         line_edit = QLineEdit()
+                        
                         line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
                         defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
                         
                         #Method for variables in Glados
                         if ShowVariablesOptions:
                             #Advanced - flow + var via maths
-                            line_edit_adv = QLineEdit()
+                            line_edit_adv = CustomLineEdit()
                             line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{reqKwargs[k]}")
                             line_edit_Button_adv = QPushButton("Add Var")
                             line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{reqKwargs[k]}")
                             #Only var
-                            line_edit_variable = QLineEdit()
+                            line_edit_variable = CustomLineEdit()
+                            line_edit_variable.setEnabled(False)
                             line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{reqKwargs[k]}")
                             push_button_variable_adv = QPushButton("Choose Var")
                             push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{reqKwargs[k]}")
+                            #Add a click-callback:
+                            push_button_variable_adv.clicked.connect(lambda text,line_edit=line_edit_variable: PushButtonChooseVariableCallBack(line_edit, nodzInfo=nodzInfo))
                             #Switch to switch between
                             comboBox_switch = QComboBox()
                             comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{reqKwargs[k]}")
@@ -801,7 +805,72 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
     layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
     
     # resetLayout(curr_layout)
+
+import sys
+from PyQt5.QtWidgets import QApplication, QLineEdit
+from PyQt5.QtGui import QPainter, QIcon, QPixmap, QColor, QFontMetrics, QPalette, QPen
+from PyQt5.QtCore import Qt
+
+#Start of a customLineEdit class to format a variable in a kwarg.
+class CustomLineEdit(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.search_icon = QIcon("search_icon.png")  # Change this to your icon path
+        self.search_text = "Search"  # Change this to your desired text
+        self.highlight_search = False
+        self.setStyleSheet("color: white;")
+
         
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        with QPainter(self) as painter:
+            painter.setRenderHint(QPainter.Antialiasing)
+
+            # Draw the custom icon
+            # icon_rect = self.rect().adjusted(self.width() - self.icon_size - self.icon_padding,
+            #                                 (self.height() - self.icon_size) / 2,
+            #                                 -(self.width() - self.icon_padding),
+            #                                 (self.height() - self.icon_size) / 2 + self.icon_size)
+            # self.search_icon.paint(painter, icon_rect)
+
+            # Draw the text
+            painter.save()
+            fm = QFontMetrics(self.font())
+            text_rect = self.rect().adjusted(3, 3, 0, 0)
+            if self.highlight_search:
+                search_index = self.text().find(self.search_text)
+                if search_index != -1:
+                    prefix = self.text()[:search_index]
+                    match = self.text()[search_index:search_index+len(self.search_text)]
+                    suffix = self.text()[search_index+len(self.search_text):]
+                    prefix_width = fm.width(prefix)
+                    match_width = fm.width(match)
+
+                    # Draw the match text
+                    painter.setPen(QColor(0, 255, 0))  # Set pen color for text
+                    painter.drawText(text_rect.left() + prefix_width, text_rect.top() + fm.ascent(), match)
+                    
+                    # Draw underline
+                    underline_start = text_rect.left() + prefix_width
+                    underline_end = underline_start + match_width
+                    underline_y = text_rect.bottom() - 2  # Position the underline 2 pixels above the bottom
+                    underline_pen = QPen(QColor(0, 0, 255))
+                    underline_pen.setWidth(1)
+                    painter.setPen(underline_pen)
+                    painter.drawLine(underline_start, underline_y, underline_end, underline_y)
+                    
+
+            painter.restore()
+
+    def keyPressEvent(self, event):
+        super().keyPressEvent(event)
+        if self.text().find(self.search_text) != -1:
+            self.highlight_search = True
+        else:
+            self.highlight_search = False
+        self.update()
+
 def preLoadOptions_analysis(curr_layout,currentData):
     """
     Preloads the kwarg values from the currentData dict into their respective widgets
@@ -1603,6 +1672,18 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.fileLocationLineEdit
 
+
+
+def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
+    from FlowChart_dockWidgets import VariablesDialog
+    #open a variablesDialog:
+    variablesDialog = VariablesDialog(nodzinstance=nodzInfo)
+    result = variablesDialog.exec()
+    if result == variablesDialog.Accepted:
+        lineEditText = variablesDialog.selected_entry[2]+'@'+variablesDialog.selected_entry[1]
+        line_edit.setText(lineEditText)
+    else:
+        print("Dialog rejected (Cancel pressed or closed)")
 
 import json
 

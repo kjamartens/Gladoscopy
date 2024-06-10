@@ -146,7 +146,7 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
 
         # pre-load all args/kwargs and their edit values - then hide all of them
-        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_analysisFunctions)
+        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_analysisFunctions,nodzInfo=parent)
         
         # if currentNode.scoring_analysis_currentData == {}: #type:ignore
         #     utils.preLoadOptions_analysis(self.mainLayout,self.currentData)
@@ -197,7 +197,7 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
 
         # pre-load all args/kwargs and their edit values - then hide all of them
-        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions)
+        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions,nodzInfo=parent)
         
         #Pre-load the options if they're in the current node info
         if 'real_time_analysis_currentData' in vars(currentNode):
@@ -3377,16 +3377,45 @@ class advDecisionGridLayout(QGroupBox):
 #endregion
 
 #region VariablesWidget
-class VariablesWidget(QWidget):
+
+from PyQt5.QtWidgets import QTableWidget
+
+class HoverTableWidget(QTableWidget):
+    cellHovered = pyqtSignal(int, int)
+
+    def __init__(self,parent=None):
+        super().__init__(parent)
+        self.setMouseTracking(True)  # Enable mouse tracking without pressing a button
+
+    def mouseMoveEvent(self, event):
+        index = self.indexAt(event.pos())
+        if index.isValid():
+            self.cellHovered.emit(index.row(), index.column())
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        # Emit cellHovered signal with invalid index when mouse leaves
+        self.cellHovered.emit(-1, -1)
+        super().leaveEvent(event)
+        
+class VariablesBase(QWidget):
     """ 
+    Show the variables of all nodz-instances, possibly filtered on connectedNodz only.
     """
-    def __init__(self, nodzinstance:GladosNodzFlowChart_dockWidget,parent=None):
+    def __init__(self, 
+                nodzinstance:GladosNodzFlowChart_dockWidget,
+                parent=None,
+                doubleClickEffect=None,
+                doubleClickLineEditChange=None,
+                connectedNode_showOnlyDownstream=None):
         """
         Initializes the scanning widget class.
         
         Args:
             nodzinstance: The nodz instance to be associated with.
             parent: The parent widget.
+            doubleClickEffect: what you want to do if double-clicked. Options: None, 'updateLineEdit'
+            
         
         Returns:
             None
@@ -3396,26 +3425,77 @@ class VariablesWidget(QWidget):
         self.nodzinstance=nodzinstance
         
         self.create_GUI()
+        
+        return self
     
     def create_GUI(self):
         """
+        Create a QTableWidget GUI
         """
         logging.info('Inside variableswidget-createGUi')
-        self.buttonTest = QPushButton("Test")
-        self.buttonTest.clicked.connect(self.printVariables)
+        self.buttonTest = QPushButton("Update")
+        self.buttonTest.clicked.connect(self.updateVariables)
         
-        from PyQt5.QtWidgets import QTableWidget
+        self.lineEditHover = QLabel("Hover over a Cell",self)
+        self.lineEditHover.setEnabled(False)
+        
         headers = ["CellValue", "Origin", "Name", "Value", "Importance", "Type", "LastChanged"]
-        self.variablesTableWidget = QTableWidget()
+        self.variablesTableWidget = HoverTableWidget()
         self.variablesTableWidget.setColumnCount(len(headers))
         self.variablesTableWidget.setHorizontalHeaderLabels(headers)
         
+        # Connect the cellDoubleClicked signal to a custom slot
+        self.variablesTableWidget.cellDoubleClicked.connect(self.on_cell_double_clicked)
+        self.variablesTableWidget.cellHovered.connect(self.on_cell_hovered)
+        
         self.layoutV = QVBoxLayout()
         self.layoutV.addWidget(self.buttonTest)
+        self.layoutV.addWidget(self.lineEditHover)
         self.layoutV.addWidget(self.variablesTableWidget)
         self.setLayout(self.layoutV)
 
-    def printVariables(self):
+    def on_cell_hovered(self, row, column):
+        # Get the hovered entry
+        try:
+            #Specifically, get the origin Nodz
+            hovered_entry = self.variablesTableWidget.item(row,1).text()# self.variablesTableWidget.item(row, column).text()
+        except:
+            hovered_entry = None
+            
+        #Loop over the nods in the nodzinstance:
+        for node in self.nodzinstance.nodes:
+            from PyQt5.QtWidgets import QGraphicsColorizeEffect, QGraphicsEffect, QGraphicsDropShadowEffect, QGraphicsView, QApplication
+            if node.name == hovered_entry:                
+                #Add a green shadow effect if it's the one hovered over.
+                effect = QGraphicsDropShadowEffect()
+                effect.setBlurRadius(60)
+                effect.setColor(QColor(0, 200, 100, 230))
+                effect.setOffset(0,0)
+
+                node.setGraphicsEffect(effect)
+            else:
+                node.setGraphicsEffect(None)
+                
+        self.lineEditHover.setText(f"Hovered: {hovered_entry}")
+
+    def on_cell_double_clicked(self, row, column):
+        #Figure out the selected row
+        self.selected_entry = []
+        for col in range(self.variablesTableWidget.columnCount()):
+            textEntry = ''
+            try:
+                textEntry = self.variablesTableWidget.item(row, col).text()
+            except AttributeError:
+                textEntry = 'None'
+            self.selected_entry.append(textEntry)
+    
+    def get_selected_entry(self):
+        return getattr(self, 'selected_entry', None)
+    
+    def updateVariables(self):
+        """
+        Update the nodz-variables.
+        """
         logging.info('To print variables here!')
         allNodes = self.nodzinstance.obtainAllNodes()
         
@@ -3447,6 +3527,40 @@ class VariablesWidget(QWidget):
 
         
         #TODO: find all nodes, for each node, print each variable. Later, add these to a list
+
+class VariablesWidget(VariablesBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class VariablesDialog(QDialog, VariablesBase):
+    def __init__(self, *args, **kwargs):
+        QDialog.__init__(self)
+        variablesWidget = VariablesBase.__init__(self, *args, **kwargs)
+        self.setWindowTitle("Variables Dialog")
+        #Create a container layout:
+        # layout = QVBoxLayout()
+        
+        #Update the variables
+        variablesWidget.updateVariables()
+        self.layout().addWidget(variablesWidget)
+        
+        
+        
+        
+        
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        
+        # Add button box to the layout
+        self.layout().addWidget(self.buttonBox)
+        
+    def on_cell_double_clicked(self, row, column):
+        super().on_cell_double_clicked(row, column)
+        #remove hover-effect
+        self.variablesTableWidget.cellHovered.emit(-1, -1)
+        self.accept()  # Close the dialog with the Accepted result
+        
 #endregion
 
 
