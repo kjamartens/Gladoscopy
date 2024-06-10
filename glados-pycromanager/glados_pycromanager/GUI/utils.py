@@ -558,7 +558,6 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #         currentSelectedFunction = entry[1]
         #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
         #                     hideAdvVariables(child)
-                        
 
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=4,showVisualisationBox=False):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
@@ -1080,32 +1079,68 @@ def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',
     return file_path
 
 
-def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2):
+def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None):
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
+    methodKwargTypes_method=[]
     methodName_method = ''
+    
+    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
+    variableValueOrAdvanced = {}
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            print(key, value)
+            if ("ComboBoxSwitch#" in key):
+                kwargName = key.split('#')[2]
+                variableValueOrAdvanced[kwargName] = value
+    
     #Loop over all entries of currentData:
     for key,value in currentData.items():
         if "#"+function+"#" in key:
-            if ("LineEdit" in key):
+            split_list = key.split('#')
+            kwargName = split_list[2]
+            #Find variable/advance/normal (value) lineEdit
+            
+            #If not found, it's a Value:
+            if kwargName not in variableValueOrAdvanced:
+                variableValueOrAdvanced[kwargName] = 'Value'
+            if variableValueOrAdvanced[kwargName] == 'Variable':
+                lineEditNameVarAdv = "LineEditVariable#"
+            elif variableValueOrAdvanced[kwargName] == 'Advanced':
+                lineEditNameVarAdv = "LineEditAdv#"
+            else:
+                lineEditNameVarAdv = "LineEdit#"
+            
+            if (lineEditNameVarAdv in key):
                 # The objectName will be along the lines of foo#bar#str
                 #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
                 methodName_method = split_list[1]
                 methodKwargNames_method.append(split_list[2])
 
                 #value could contain a file location. Thus, we need to swap out all \ for /:
                 methodKwargValues_method.append(value.replace('\\','/'))
+                
+    
+    #Get the Value/Variable/Adv:
+    for entry in methodKwargNames_method:
+        if variableValueOrAdvanced[entry]  == 'Variable':
+            methodKwargTypes_method.append('Variable')
+        elif variableValueOrAdvanced[entry]  == 'Advanced':
+            methodKwargTypes_method.append('Advanced')
+        else:
+            methodKwargTypes_method.append('Value')
+        
     
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2),methodKwargTypes=methodKwargTypes_method,nodzInfo=nodzInfo)
     else:
         EvalTextMethod = function+'('+str(p1)+','+str(p2)+')'
     #append this to moduleEvalTexts
     moduleMethodEvalTexts.append(EvalTextMethod)
+
 
     if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
         return moduleMethodEvalTexts[0]
@@ -1291,7 +1326,7 @@ def getFunctionEvalText(layout,p1,p2):
     else:
         return None
     
-def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None):
+def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None, methodKwargTypes = None, nodzInfo = None):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
     #methodKwargNames: found kwarg NAMES from the GUI
@@ -1302,6 +1337,12 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     specialcaseKwarg = [] #Kwarg where the special case is used
     specialcaseKwargPartialStringAddition = [] #text to be eval-ed in case this kwarg is found
+    
+    #Addition of Value/Variable/Advanced:
+    #Assumption is normally all value, so:
+    if methodKwargTypes == None:
+        methodKwargTypes = ['Value']*len(methodKwargNames)
+    
     #We have the method name and all its kwargs, so:
     if len(methodName)>0: #if the method exists
         #Check if all req. kwargs have some value
@@ -1338,6 +1379,22 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                     GUIbasedIndex = methodKwargNames.index(reqKwargs[id])
                     #Get the value of the kwarg - we know the name already now due to reqKwargs.
                     kwargvalue = methodKwargValues[GUIbasedIndex]
+                    #Change this value if it's a variable or advanced:
+                    if methodKwargTypes[GUIbasedIndex] == 'Variable':
+                        #name@origin.
+                        originNodeName = kwargvalue.split('@')[1]
+                        variableName = kwargvalue.split('@')[0]
+                        #Find the correct node
+                        for node in nodzInfo.nodes:
+                            if node.name == originNodeName:
+                                #Find the correct variable data
+                                varData = node.variablesNodz[variableName]['data']
+                                #Set it to this kwarg value - str allways
+                                kwargvalue = str(varData)
+                                break
+                    elif methodKwargTypes[GUIbasedIndex] == 'Advanced':
+                        print('Hm')
+                    
                     #Add a comma if there is some info in the partialString already
                     if partialString != '':
                         partialString+=","

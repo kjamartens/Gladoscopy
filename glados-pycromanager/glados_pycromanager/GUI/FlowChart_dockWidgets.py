@@ -2172,14 +2172,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 #Figure out which function is selected in the scoring_analysis node
                 selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
                 #Figure out the belonging evaluation-text
-                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core')
+                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core',nodzInfo=self)
             elif 'analysisMeasurement' in connectedNode.name:
                 dataobject = connectedNode.scoring_analysis_currentData['__output__']
                 
                 #Figure out which function is selected in the scoring_analysis node
                 selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
                 #Figure out the belonging evaluation-text
-                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'dataobject','self.shared_data.core')
+                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'dataobject','self.shared_data.core',nodzInfo=self)
                 
             #And evaluate the custom function with custom parameters
             output = eval(evalText) #type:ignore
@@ -2197,7 +2197,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         visual_connected_node = nodeV
                         
                         selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-                        visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer,mdaDataobject.data)','self.shared_data.core')
+                        visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer,mdaDataobject.data)','self.shared_data.core',nodzInfo=self)
                         visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
                         
                         chosenLayerType = 'points'
