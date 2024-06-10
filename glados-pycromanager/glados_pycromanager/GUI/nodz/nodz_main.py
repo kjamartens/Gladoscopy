@@ -1956,6 +1956,26 @@ class NodeItem(QtWidgets.QGraphicsItem):
             painter.drawText(textRect,
                             QtCore.Qt.AlignCenter, #type:ignore
                             self.displayName)
+            
+            
+            #Set 'official name' just above this
+            painter.setPen(QColor(255,255,255,80))
+            #Also change font:
+            # Get the current font from QPainter
+            font = painter.font()
+            font.setPointSize(9)  # Set font size to 10
+            painter.setFont(font)
+            metrics = QtGui.QFontMetrics(painter.font())
+            text_width_small = metrics.boundingRect(self.name).width() + 14
+            text_height_small = metrics.boundingRect(self.name).height() + 14
+            margin_small = (text_width_small - self.baseWidth) * 0.5
+            textRect = QtCore.QRect(int(-margin_small),
+                                    int(-text_height-text_height/2),
+                                    int(text_width_small),
+                                    int(text_height_small))
+            painter.drawText(textRect,
+                            QtCore.Qt.AlignCenter, #type:ignore
+                            self.name)
 
         #Draw the icon
         from PyQt5.QtGui import QPixmap
