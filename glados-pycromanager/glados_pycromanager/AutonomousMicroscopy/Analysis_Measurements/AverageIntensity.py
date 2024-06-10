@@ -4,18 +4,24 @@ import math
 import numpy as np
 import inspect
 import dask.array as da
+import ndtiff
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
         "AvgGrayValue": {
+            "input_type": [ndtiff.NDTiffDataset],
+            "output":[
+                {"name": "overall_avg_intensity", "type": float, "importance": "Default"},
+                {"name": "slice_avg_intensity", "type": [np.array]}
+            ],
             "required_kwargs": [
                 {"name": "ReqKwarg1", "description": "First required kwarg", "default": 'DefaultKwarg', "type": str},
                 {"name": "ReqKwarg2", "description": "Second required kwarg", "default": 0, "type": int}
             ],
             "optional_kwargs": [
-                {"name": "OptBool2", "description": "OptBool", "default": False, "type": float}
+                {"name": "OptBool2", "description": "OptBool", "default": 20}
             ],
             "help_string": "Average gray value.",
             "display_name": "Average gray value"
@@ -38,6 +44,9 @@ def AvgGrayValue(NDTIFFStack,core,**kwargs):
     # Compute the average intensity of each slice
     slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2)) #type:ignore
 
+    #change dask array to np array:
+    slice_avg_intensity_np = slice_avg_intensity.compute()
+
     # Compute the overall average intensity
     overall_avg_intensity = slice_avg_intensity.mean().compute()
 
@@ -47,8 +56,11 @@ def AvgGrayValue(NDTIFFStack,core,**kwargs):
 
     # # Print the overall average intensity
     # print("Overall average intensity:", overall_avg_intensity)
+    output = {}
+    output['slice_avg_intensity'] = slice_avg_intensity_np
+    output['overall_avg_intensity'] = overall_avg_intensity
     
-    return overall_avg_intensity
+    return output
 
 
 def AvgGrayValue_visualise(datastruct,core,**kwargs):

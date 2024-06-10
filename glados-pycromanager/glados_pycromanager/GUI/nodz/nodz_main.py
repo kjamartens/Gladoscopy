@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboB
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent
 from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt
 import nodz_utils as utils
+import utils as full_utils
 from nodz_custom import *
 import logging
 
@@ -1091,6 +1092,9 @@ class Nodz(QtWidgets.QGraphicsView):
                 if 'scoring_analysis_currentData' in vars(node):
                     if data['NODES_SCORING_ANALYSIS'] is not None:
                         node.scoring_analysis_currentData = data['NODES_SCORING_ANALYSIS'][name] #type:ignore
+                        #Also add to variableNodz
+                        full_utils.analysis_outputs_to_variableNodz(node)
+                        
             if name in data['NODES_SCORING_VISUALISATION']:
                 if 'scoring_visualisation_currentData' in vars(node):
                     if data['NODES_SCORING_VISUALISATION'] is not None:

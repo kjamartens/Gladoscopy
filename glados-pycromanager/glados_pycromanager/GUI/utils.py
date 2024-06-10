@@ -230,6 +230,29 @@ def kwargsFromFunction(functionname):
             
     return [rkwarr_arr, okwarr_arr]
 
+def outputFromFunction(functionname):
+    try:
+        #Check if parent function
+        if not '.' in functionname:
+            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            #Loop over all entries
+            looprange = range(0,len(functionMetadata))
+        else: #or specific sub-function
+            #get the parent info
+            functionparent = functionname.split('.')[0]
+            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            #sub-select the looprange
+            loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
+            looprange = range(loopv,loopv+1) #type:ignore
+        
+        output_arr = []
+        for i in looprange:
+            output_arr.append(functionMetadata[list(functionMetadata.keys())[i]]["output"])
+    except AttributeError:
+        output_arr = []
+        return f"No __function_metadata__ in {functionname}"
+    
+    return output_arr
 #Obtain the help-file and info on kwargs on a specific function
 #Optional: Boolean kwarg showKwargs & Boolean kwarg showHelp
 def infoFromMetadata(functionname,**kwargs):
@@ -1815,6 +1838,7 @@ class CustomMainWindow(QWidget):
 
 
 
+
 def closeAllLayers(shared_data):
     """
     Closes all the layers in napari
@@ -1849,3 +1873,43 @@ def updateNodzVariablesTime(node):
         node.variablesNodz[vars]['lastUpdateTime'] = time.time()
         
     print('updating nodz variables time')
+
+def analysis_outputs_store_as_variableNodz(currentNode):
+    """
+    Stores the analysis output as variables - ran just before the next node is ran.
+    """ 
+    output = currentNode.scoring_analysis_currentData['__output__']
+    for outputtype in output:
+        if outputtype in currentNode.variablesNodz:
+            currentNode.variablesNodz[outputtype]['data'] = output[outputtype]
+        else:
+            logging.error(f'Critical! Error with outputs of function {currentNode.scoring_analysis_currentData["__selectedDropdownEntryAnalysis__"]} and variable {outputtype}')
+    #update the timing
+    updateNodzVariablesTime(currentNode)
+
+def analysis_outputs_to_variableNodz(currentNode):
+    """ 
+    Get the expected outputs from an analysis function, and store them as a node variableNodz. Called when a variableNode is updated or loaded. NOT when it's finished - look at analysis_outputs_store_as_variableNodz(currentNode) instead
+    """
+    
+    if 'scoring_analysis_currentData' in vars(currentNode) and len(currentNode.scoring_analysis_currentData) > 0:
+        selectedFunction = currentNode.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'] #type:ignore
+        for dn in currentNode.scoring_analysis_currentData['__displayNameFunctionNameMap__']: #type:ignore
+            if dn[0] == selectedFunction:
+                selectedFunctionName = dn[1]
+                
+        #Get the outputs to put in nodz-variables
+        expectedoutputs = outputFromFunction(selectedFunctionName)
+        for output in expectedoutputs[0]:
+            print(output)
+            currentNode.variablesNodz[output['name']] = {} #type:ignore
+            if 'type' in output:
+                currentNode.variablesNodz[output['name']]['type'] = output['type'] #type:ignore
+            else:
+                currentNode.variablesNodz[output['name']]['type'] = None #type:ignore
+            currentNode.variablesNodz[output['name']]['data'] = None #type:ignore
+            if 'importance' in output:
+                currentNode.variablesNodz[output['name']]['importance'] = output['importance'] #type:ignore
+            else:
+                currentNode.variablesNodz[output['name']]['importance'] = 'Informative' #type:ignore
+            currentNode.variablesNodz[output['name']]['lastUpdateTime'] = None

@@ -1634,7 +1634,7 @@ class MDAGlados(CustomMainWindow):
             self.nodeInfo.variablesNodz['exposure_ms']['data'] = self.exposure_ms
             self.nodeInfo.variablesNodz['n_timepoints']['data'] = self.num_time_points
             self.nodeInfo.variablesNodz['time_interval_ms']['data'] = self.time_interval_s*1000
-            if self.GUI_show_xy == True:
+            if self.GUI_show_xy == True and self.xy_positions is not None:
                 self.nodeInfo.variablesNodz['xy_positions']['data'] = self.xy_positions
                 self.nodeInfo.variablesNodz['n_xy_positions']['data'] = len(self.xy_positions)
             else:
@@ -1655,7 +1655,7 @@ class MDAGlados(CustomMainWindow):
                 self.nodeInfo.variablesNodz['channels']['data'] = None
                 self.nodeInfo.variablesNodz['n_channels']['data'] = None
             if self.GUI_storage_enabled == True:
-                self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep()+self.storage_file_name
+                self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name
             else:
                 self.nodeInfo.variablesNodz['storage_path']['data'] = None
                 

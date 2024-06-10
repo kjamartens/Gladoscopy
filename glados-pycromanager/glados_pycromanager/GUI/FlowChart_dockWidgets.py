@@ -1367,6 +1367,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 except:
                     logging.warning('Failed to set text in analysisMeasurementDialog')
                 logging.info('Pressed OK on analysisMeasurementDialog')
+            
+            
+            utils.analysis_outputs_to_variableNodz(currentNode)
+                    
         elif 'realTimeAnalysis' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 
@@ -2261,6 +2265,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             
             node.scoring_analysis_currentData['__output__'] = output
+            
+            #Store the output as NodzVariables
+            utils.analysis_outputs_store_as_variableNodz(node)
+            
             
             #Finish up
             self.finishedEmits(node)
@@ -3526,6 +3534,11 @@ class VariablesBase(QWidget):
                 correctTyping = False
                 if self.typeInfo is not None:
                     variableTypes = node.variablesNodz[var]['type']
+                    if isinstance(variableTypes,type):
+                        variableTypes = [variableTypes]
+                    if isinstance(self.typeInfo,type):
+                        self.typeInfo = [self.typeInfo]
+                    
                     for variableType in variableTypes:
                         for selftype in self.typeInfo:
                             if variableType == selftype:
@@ -3553,11 +3566,10 @@ class VariablesBase(QWidget):
             self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(str(varData['data'])))
             self.variablesTableWidget.setItem(row_id, 4, QTableWidgetItem(str(varData['importance'])))
             self.variablesTableWidget.setItem(row_id, 5, QTableWidgetItem(str(varData['type'])))
-            self.variablesTableWidget.setItem(row_id, 6, QTableWidgetItem(str(datetime.fromtimestamp(varData['lastUpdateTime']).strftime("%H:%M:%S %d-%m-%Y"))))
-            
-
-        
-        #TODO: find all nodes, for each node, print each variable. Later, add these to a list
+            if varData['lastUpdateTime'] is not None:
+                self.variablesTableWidget.setItem(row_id, 6, QTableWidgetItem(str(datetime.fromtimestamp(varData['lastUpdateTime']).strftime("%H:%M:%S %d-%m-%Y"))))
+            else:
+                self.variablesTableWidget.setItem(row_id, 6, QTableWidgetItem('None'))
 
 class VariablesWidget(VariablesBase):
     def __init__(self, *args, **kwargs):
