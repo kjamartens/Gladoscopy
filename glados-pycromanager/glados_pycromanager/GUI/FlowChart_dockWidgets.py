@@ -1298,6 +1298,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'analysisMeasurement':
             newNode.callAction = lambda self, node=newNode: self.AnalysisNode_started(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #initialise the scoring_analysis_currentData values:
+            #Rather stupidly, but I create the double-click-dialog, but just never show it.
+            dialog = nodz_analysisDialog(currentNode = newNode, parent = self)
+            newNode.scoring_analysis_currentData=dialog.currentData
+            
         elif nodeType == 'timer':
             newNode.callAction = lambda self, node=newNode: self.timerCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1919,6 +1925,45 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         special, it only exists to keep the Node class happy by having a method that
         corresponds to the 'SocketConnected' signal from the FlowChart.
         """
+        #Only one specific use-case at the moment:
+        #If a connection is made between any node N to an analysisMeasurement node, and if there is at least one acquisition node linked at or downstream of N, and if the input of the analysisMeasurement is not already defined, and if the input is actually an image, fill the input data of the analysisMeasurement node to be the data of this acquisition node.
+         
+        
+        #Possibly later, for any other nodes, set the 'input' of the right node to the 'default' of the left node, if typing accomodates.
+        
+        #TODO
+        #First, we need to create some function to look at the downstream-connected nodes of some node - this needs to be a rather proper function.
+        
+        if 'analysisMeasurement_' in dstNodeName:
+            import nodz.nodz_utils
+            srcNode = nodz_utils.findNodeByName(self,srcNodeName)
+            dstNode = nodz_utils.findNodeByName(self,dstNodeName)
+            
+            downstreamConnections = nodz_utils.findConnectedToNode(self.evaluateGraph(),dstNodeName,[],upstream=False,downstream=True) 
+            #Note: first entry is always closest to node.
+            #So we check if there is at least one acquisition node downstream of the dstNode:
+            shortestConnectedAcquisition = None
+            for connection in downstreamConnections:
+                if 'acquisition_' in connection:
+                    shortestConnectedAcquisition = nodz_utils.findNodeByName(self,connection)
+                    break
+            
+            if shortestConnectedAcquisition is not None:
+                for function in dstNode.scoring_analysis_currentData['__displayNameFunctionNameMap__']: #type:ignore
+                    inputOfFunction = utils.inputFromFunction(function[1])[0][0]
+                    
+                    lineEditName = 'LineEdit#'+function[1]+'#'+inputOfFunction['name'] #type:ignore
+                    lineEditVarName = 'LineEditVariable#'+function[1]+'#'+inputOfFunction['name'] #type:ignore
+                    lineEditAdvName = 'LineEditAdv#'+function[1]+'#'+inputOfFunction['name'] #type:ignore
+                    if lineEditVarName in dstNode.scoring_analysis_currentData: #type:ignore
+                        if dstNode.scoring_analysis_currentData[lineEditVarName] == '': #type:ignore
+                            import ndtiff
+                            if ndtiff.NDTiffDataset in inputOfFunction['type']: #type:ignore
+                                if ndtiff.NDTiffDataset in shortestConnectedAcquisition.variablesNodz['data']['type']:
+                                    dstNode.scoring_analysis_currentData[lineEditVarName] = 'data@'+shortestConnectedAcquisition.name #type:ignore
+                                
+        
+        
         #Check if all are non-Nones:
         logging.info('socket connected')
     
@@ -2177,6 +2222,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         if connectedNode is None:
             print('Error! No connected node found for scoring analysis')
             return
+        
+        #Dictionary of nodes to pass around variables.
+        nodeDict = utils.createNodeDictFromNodes(self.nodes)
         
         #First assess that it's a MDA node:
         if 'acquisition' not in connectedNode.name and 'analysisMeasurement' not in connectedNode.name:

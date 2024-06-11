@@ -3,12 +3,21 @@ from MainScripts import FunctionHandling
 from csbdeep.utils import normalize
 import inspect
 import dask.array as da
+import ndtiff
+import numpy as np
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
         "StarDistSegment": {
+            "input":[
+                {"name": "Image", "type": [ndtiff.NDTiffDataset]}
+            ],
+            "output":[
+                {"name": "overall_avg_intensity", "type": float, "importance": "Default"},
+                {"name": "slice_avg_intensity", "type": [np.array]}
+            ],
             "required_kwargs": [
                 {"name": "modelStorageLoc", "description": "The location of the stored model - Should be the folder in which TF_SavedModel is located"}
             ],
@@ -19,6 +28,13 @@ def __function_metadata__():
             "help_string": "StarDist segmentation based via a stored model. This is a rather slow implementation (look at StarDistSegment_preloadedModel for a faster implementation that requires pre-loading the stardist model)."
         },
         "StarDistSegment_preloadedModel": {
+            "input":[
+                {"name": "Image", "type": [ndtiff.NDTiffDataset]}
+            ],
+            "output":[
+                {"name": "overall_avg_intensity", "type": float, "importance": "Default"},
+                {"name": "slice_avg_intensity", "type": [np.array]}
+            ],
             "required_kwargs": [
                 {"name": "image_data", "description": "The image data"},
                 {"name": "model", "description": "The StarDist model pre-loaded via StarDist2D()"}

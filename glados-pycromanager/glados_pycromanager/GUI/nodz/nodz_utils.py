@@ -170,7 +170,7 @@ def _loadData(filePath):
 
 
 
-def findConnectedToNode(graphInfo,nodeName,fullNodeList):
+def findConnectedToNode(graphInfo,nodeName,fullNodeList,upstream=True,downstream=True):
     """
     Recursively search the connections of a node in a graph
     Example: NodeListConnections = findConnectedToNode(self.parent().evaluateGraph(),'scoringStart',[])
@@ -190,14 +190,16 @@ def findConnectedToNode(graphInfo,nodeName,fullNodeList):
     """
 
     for connection in graphInfo:
-        if nodeName in connection[0]:
-            if connection[1].split('.')[0] not in fullNodeList:
-                fullNodeList.append(connection[1].split('.')[0])
-                fullNodeList = findConnectedToNode(graphInfo,connection[1].split('.')[0],fullNodeList)
-        if nodeName in connection[1]:
-            if connection[0].split('.')[0] not in fullNodeList:
-                fullNodeList.append(connection[0].split('.')[0])
-                fullNodeList = findConnectedToNode(graphInfo,connection[0].split('.')[0],fullNodeList)
+        if upstream:
+            if nodeName in connection[0]:
+                if connection[1].split('.')[0] not in fullNodeList:
+                    fullNodeList.append(connection[1].split('.')[0])
+                    fullNodeList = findConnectedToNode(graphInfo,connection[1].split('.')[0],fullNodeList,upstream=upstream,downstream=downstream)
+        if downstream:
+            if nodeName in connection[1]:
+                if connection[0].split('.')[0] not in fullNodeList:
+                    fullNodeList.append(connection[0].split('.')[0])
+                    fullNodeList = findConnectedToNode(graphInfo,connection[0].split('.')[0],fullNodeList,upstream=upstream,downstream=downstream)
     
     return fullNodeList
 

@@ -4,12 +4,19 @@ import math
 import numpy as np
 import inspect
 import dask.array as da
+import ndtiff
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
         "CellCounter": {
+            "input":[
+                {"name": "Image", "type": [da.Array, np.ndarray, ndtiff.NDTiffDataset]}
+            ],
+            "output":[
+                {"name": "n_cells", "type": int, "importance": "Default"},
+            ],
             "required_kwargs": [
             ],
             "optional_kwargs": [

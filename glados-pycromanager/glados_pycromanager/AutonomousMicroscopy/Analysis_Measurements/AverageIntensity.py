@@ -11,7 +11,9 @@ import ndtiff
 def __function_metadata__():
     return {
         "AvgGrayValue": {
-            "input_type": [ndtiff.NDTiffDataset],
+            "input":[
+                {"name": "Image", "type": [ndtiff.NDTiffDataset]}
+            ],
             "output":[
                 {"name": "overall_avg_intensity", "type": float, "importance": "Default"},
                 {"name": "slice_avg_intensity", "type": [np.array]}
@@ -40,6 +42,7 @@ def AvgGrayValue(NDTIFFStack,core,**kwargs):
     # print(NDTIFFStack._summary_metadata)
     # print(NDTIFFStack.as_array())
     
+    NDTIFFStack = kwargs['Image']
     
     # Compute the average intensity of each slice
     slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2)) #type:ignore

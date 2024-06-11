@@ -3,12 +3,20 @@ from MainScripts import FunctionHandling
 from csbdeep.utils import normalize
 import inspect
 import dask.array as da
-
+import ndtiff
+import numpy as np
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():
     return {
         "StarDistSegment_ImageVis": {
+            "input":[
+                {"name": "Image", "type": [ndtiff.NDTiffDataset]}
+            ],
+            "output":[
+                {"name": "overall_avg_intensity", "type": float, "importance": "Default"},
+                {"name": "slice_avg_intensity", "type": [np.array]}
+            ],
             "required_kwargs": [
                 {"name": "modelStorageLoc", "description": "The location of the stored model - Should be the folder in which TF_SavedModel is located"}
             ],
