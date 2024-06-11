@@ -557,20 +557,21 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #Show/hide varialbes/advanced lineedits and such
         for i in range(curr_layout.count()):
             item = curr_layout.itemAt(i)
-            if item.widget() is not None:
-                child = item.widget()
-                if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
-                    logging.warning(f"1Going to run hideAdvVariables with {child.objectName()}")
-                    curr_layout.update()
-                    hideAdvVariables(child,current_selected_function=current_selected_function)
-            else:
-                for index2 in range(item.count()):
-                    widget_sub_item = item.itemAt(index2)
-                    child = widget_sub_item.widget()
+            if not isinstance(item,QSpacerItem):
+                if item.widget() is not None:
+                    child = item.widget()
                     if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
-                        logging.warning(f"2Going to run hideAdvVariables with {child.objectName()}")
+                        logging.warning(f"1Going to run hideAdvVariables with {child.objectName()}")
                         curr_layout.update()
                         hideAdvVariables(child,current_selected_function=current_selected_function)
+                else:
+                    for index2 in range(item.count()):
+                        widget_sub_item = item.itemAt(index2)
+                        child = widget_sub_item.widget()
+                        if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
+                            logging.warning(f"2Going to run hideAdvVariables with {child.objectName()}")
+                            curr_layout.update()
+                            hideAdvVariables(child,current_selected_function=current_selected_function)
                         
         
         
@@ -909,26 +910,11 @@ def preLoadOptions_analysis(curr_layout,currentData):
             
     for i in range(curr_layout.count()):
         item = curr_layout.itemAt(i)
-        if item.widget() is not None:
-            child = item.widget()
-            if child.objectName() in currentData:
-                logging.debug(f"Preloading {child.objectName()} with {currentData[child.objectName()]}")
-                if isinstance(child,QComboBox):
-                    child.setCurrentText(currentData[child.objectName()])
-                    # if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
-                    #     hideAdvVariables(child)
-                else:
-                    child.setText(str(currentData[child.objectName()]))
-                
-            #Also set the dropdown to the correct value:
-            if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
-                child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
-        else:
-            for index2 in range(item.count()):
-                widget_sub_item = item.itemAt(index2)
-                child = widget_sub_item.widget()
+        if not isinstance(item,QSpacerItem):
+            if item.widget() is not None:
+                child = item.widget()
                 if child.objectName() in currentData:
-                    logging.debug(f"2Preloading {child.objectName()} with {currentData[child.objectName()]}")
+                    logging.debug(f"Preloading {child.objectName()} with {currentData[child.objectName()]}")
                     if isinstance(child,QComboBox):
                         child.setCurrentText(currentData[child.objectName()])
                         # if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
@@ -939,6 +925,22 @@ def preLoadOptions_analysis(curr_layout,currentData):
                 #Also set the dropdown to the correct value:
                 if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
                     child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
+            else:
+                for index2 in range(item.count()):
+                    widget_sub_item = item.itemAt(index2)
+                    child = widget_sub_item.widget()
+                    if child.objectName() in currentData:
+                        logging.debug(f"2Preloading {child.objectName()} with {currentData[child.objectName()]}")
+                        if isinstance(child,QComboBox):
+                            child.setCurrentText(currentData[child.objectName()])
+                            # if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
+                            #     hideAdvVariables(child)
+                        else:
+                            child.setText(str(currentData[child.objectName()]))
+                        
+                    #Also set the dropdown to the correct value:
+                    if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
+                        child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
     
 def preLoadOptions_realtime(curr_layout,currentData):
     """
@@ -1107,42 +1109,43 @@ def checkAndShowWidget(layout, widgetName):
 def resetLayout(curr_layout,className):
     for index in range(curr_layout.count()):
         widget_item = curr_layout.itemAt(index)
-        # Check if the item is a widget (as opposed to a layout)
-        if widget_item.widget() is not None:
-            widget = widget_item.widget()
-            #If it's the dropdown segment, label it as such
-            if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
-                logging.debug(f"1Hiding {widget.objectName()}")
-                widget.hide()
-            else:
-                logging.debug(f"1Showing {widget.objectName()}")
-                widget.show()
-        else:
-            for index2 in range(widget_item.count()):
-                widget_sub_item = widget_item.itemAt(index2)
-                # Check if the item is a widget (as opposed to a layout)
-                if widget_sub_item.widget() is not None:
-                    widget = widget_sub_item.widget()
-                    #If it's the dropdown segment, label it as such
-                    if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
-                        logging.debug(f"2Hiding {widget.objectName()}")
-                        widget.hide()
-                    else:
-                        logging.debug(f"2Showing {widget.objectName()}")
-                        widget.show()
+        if not isinstance(widget_item,QSpacerItem):
+            # Check if the item is a widget (as opposed to a layout)
+            if widget_item.widget() is not None:
+                widget = widget_item.widget()
+                #If it's the dropdown segment, label it as such
+                if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
+                    logging.debug(f"1Hiding {widget.objectName()}")
+                    widget.hide()
                 else:
-                    for index3 in range(widget_sub_item.count()):
-                        widget_sub_sub_item = widget_sub_item.itemAt(index3)
-                        # Check if the item is a widget (as opposed to a layout)
-                        if widget_sub_sub_item.widget() is not None:
-                            widget = widget_sub_sub_item.widget()
-                            #If it's the dropdown segment, label it as such
-                            if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
-                                logging.debug(f"3Hiding {widget.objectName()}")
-                                widget.hide()
+                    logging.debug(f"1Showing {widget.objectName()}")
+                    widget.show()
+            else:
+                for index2 in range(widget_item.count()):
+                    widget_sub_item = widget_item.itemAt(index2)
+                    # Check if the item is a widget (as opposed to a layout)
+                    if widget_sub_item.widget() is not None:
+                        widget = widget_sub_item.widget()
+                        #If it's the dropdown segment, label it as such
+                        if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
+                            logging.debug(f"2Hiding {widget.objectName()}")
+                            widget.hide()
                         else:
-                            logging.debug(f"3Showing {widget.objectName()}")
+                            logging.debug(f"2Showing {widget.objectName()}")
                             widget.show()
+                    else:
+                        for index3 in range(widget_sub_item.count()):
+                            widget_sub_sub_item = widget_sub_item.itemAt(index3)
+                            # Check if the item is a widget (as opposed to a layout)
+                            if widget_sub_sub_item.widget() is not None:
+                                widget = widget_sub_sub_item.widget()
+                                #If it's the dropdown segment, label it as such
+                                if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
+                                    logging.debug(f"3Hiding {widget.objectName()}")
+                                    widget.hide()
+                            else:
+                                logging.debug(f"3Showing {widget.objectName()}")
+                                widget.show()
     
 
 def getMethodDropdownInfo(curr_layout,className):

@@ -107,6 +107,8 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         """
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Options")
+        self.setMinimumSize(400,100)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         #Let's try to get all possible analysis options
         analysisFunctions_Images = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Images')
@@ -151,8 +153,19 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         # if currentNode.scoring_analysis_currentData == {}: #type:ignore
         #     utils.preLoadOptions_analysis(self.mainLayout,self.currentData)
         # else: 
-            #Pre-load the options if they're in the current node info
+            
+        #Add an expanding spacer at the bottom:
+        spacer_item = QSpacerItem(
+            20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding
+        )
+        # Add the spacer item to the grid layout
+        self.mainLayout.addItem(spacer_item, 99, 0)
+        
+        #Pre-load the options if they're in the current node info
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
+        
+        
+        print('hi')
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
     """
