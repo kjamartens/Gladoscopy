@@ -3486,6 +3486,7 @@ class VariablesBase(QWidget):
         self.variablesTableWidget.setHorizontalHeaderLabels(headers)
         
         # Connect the cellDoubleClicked signal to a custom slot
+        self.variablesTableWidget.cellClicked.connect(self.on_cell_clicked)
         self.variablesTableWidget.cellDoubleClicked.connect(self.on_cell_double_clicked)
         self.variablesTableWidget.cellHovered.connect(self.on_cell_hovered)
         
@@ -3520,6 +3521,16 @@ class VariablesBase(QWidget):
                 
         self.lineEditHover.setText(f"Hovered: {hovered_entry}")
 
+    def on_cell_clicked(self, row, column):
+        self.selected_entry = []
+        for col in range(self.variablesTableWidget.columnCount()):
+            textEntry = ''
+            try:
+                textEntry = self.variablesTableWidget.item(row, col).text()
+            except AttributeError:
+                textEntry = 'None'
+            self.selected_entry.append(textEntry)
+            
     def on_cell_double_clicked(self, row, column):
         #Figure out the selected row
         self.selected_entry = []
