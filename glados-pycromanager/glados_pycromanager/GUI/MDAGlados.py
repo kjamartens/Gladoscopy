@@ -1244,6 +1244,7 @@ class MDAGlados(CustomMainWindow):
         
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         self.data = self.shared_data.mdaDatasets[-1]
+        
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
         
@@ -1655,7 +1656,12 @@ class MDAGlados(CustomMainWindow):
                 self.nodeInfo.variablesNodz['channels']['data'] = None
                 self.nodeInfo.variablesNodz['n_channels']['data'] = None
             if self.GUI_storage_enabled == True:
-                self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name
+                try:
+                    #Update to the actually-stored-path.
+                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.data.path
+                except AttributeError:
+                    #Update to the expectedpath.
+                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name+'_1//'
             else:
                 self.nodeInfo.variablesNodz['storage_path']['data'] = None
                 

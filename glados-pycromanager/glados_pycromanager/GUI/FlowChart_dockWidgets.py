@@ -164,8 +164,6 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         #Pre-load the options if they're in the current node info
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
         
-        
-        print('hi')
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
     """
@@ -230,6 +228,59 @@ class nodz_analysisMeasurementDialog(nodz_analysisDialog):
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Measurement Options")
 
+class nodz_openStoreDataDialog(QDialog):
+    def __init__(self, parentNode=None):
+        """
+        Initializes the TimerDialog.
+        
+        Args:
+            parentNode: The parent node of the TimerDialog. If provided, the timerInfo will be set to the timerInfo of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(None)
+        self.setWindowTitle("StoreData Dialog")
+        self.storeDataInfo = 0
+        if parentNode is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            self.storeDataInfo = parentNode.storeDataInfo
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.updateFields)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        #Create two line-edits and add them:
+        self.item_to_store_lineEdit = QLineEdit()
+        if 'item_to_store' in self.storeDataInfo: #type:ignore
+            self.item_to_store_lineEdit.setText(self.storeDataInfo['item_to_store']) #type:ignore
+        else:
+            self.storeDataInfo['item_to_store'] = ''
+        self.item_to_store_lineEdit.textChanged.connect(lambda value: self.updateFields)
+        self.store_location_lineEdit = QLineEdit()
+        if 'store_location' in self.storeDataInfo: #type:ignore
+            self.store_location_lineEdit.setText(self.storeDataInfo['store_location']) #type:ignore
+        else:
+            self.storeDataInfo['store_location'] = ''
+        self.store_location_lineEdit.textChanged.connect(lambda value: self.updateFields)
+            
+
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addWidget(self.item_to_store_lineEdit)
+        layout.addWidget(self.store_location_lineEdit)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+        
+    def updateFields(self):
+        self.storeDataInfo['item_to_store'] = self.item_to_store_lineEdit.text()
+        self.storeDataInfo['store_location'] = self.store_location_lineEdit.text()
+        
 class nodz_openTimerDialog(QDialog):
     """
     A Dialog that is created for timer in the Nodz layout. 
@@ -270,6 +321,8 @@ class nodz_openTimerDialog(QDialog):
         layout.addWidget(button_box)
         
         self.setLayout(layout)
+
+
 
 class nodz_openMMConfigDialog(QDialog):
     
@@ -1108,6 +1161,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['timer']['startAttributes'] = ['Start']
         self.nodeInfo['timer']['finishedAttributes'] = ['Finished']
         
+        self.nodeInfo['storeData'] = self.singleNodeTypeInit()
+        self.nodeInfo['storeData']['name'] = 'storeData'
+        self.nodeInfo['storeData']['displayName'] = 'Store Data'
+        self.nodeInfo['storeData']['startAttributes'] = ['Store']
         
         #We also add some custom JSON info about the node layout (colors and such)
         import json
@@ -1309,6 +1366,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'timer':
             newNode.callAction = lambda self, node=newNode: self.timerCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'storeData':
+            newNode.callAction = lambda self, node=newNode: self.storeDataCallAction(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1410,6 +1470,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.timerInfo = dialog.timerInfo #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'timer')
             # currentNode.callAction(self) #type:ignore
+        elif 'storeData' in nodeName:
+            dialog = nodz_openStoreDataDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.storeDataInfo = dialog.storeDataInfo #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'storeData')
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringEnd' in nodeName:
@@ -1863,6 +1928,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
         elif nodeType == 'timer':
             displayHTMLtext = f"<b>Timer:</b> wait {str(round(dialog.timerInfo, 2))} s"
+        elif nodeType == 'storeData':
+            displayHTMLtext = "TODO-StoreData"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext
@@ -2579,6 +2646,66 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         import time
         time.sleep(node.timerInfo)
+        self.finishedEmits(node)
+    
+    def storeDataCallAction(self,node):
+        
+        """
+        This function is the action function for the storeData Call node in the Flowchart.
+
+        This function stores data.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+        """
+        
+        #Get the store-data from a variable
+        data_to_store = node.storeDataInfo['item_to_store']
+        if '@' in data_to_store:
+            nodeDict = utils.createNodeDictFromNodes(node.flowChart.nodes)
+            storeInfo = nodeDict[data_to_store.split('@')[1]].variablesNodz[data_to_store.split('@')[0]]['data']
+        else:
+            storeInfo = data_to_store
+            
+        store_location = node.storeDataInfo['store_location']
+        if '@' in store_location and '{' in store_location and '}' in store_location:
+            nodeDict = utils.createNodeDictFromNodes(node.flowChart.nodes)
+            #Find a regex like this:
+            import re
+            matches = re.finditer("{[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+}",store_location)
+            #Find all the matches
+            updating_string = store_location
+            for match in matches:
+                startpos = match.regs[0][0]
+                endpos = match.regs[0][1]
+                foundstring = store_location[startpos:endpos]
+                #Remove the curly braces
+                foundstring_data = foundstring[1:-1]
+                #run getting the data of this match
+                #Assuming string
+                data = str(nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['data'])
+                
+                #Replace this in the updating_string
+                updating_string = updating_string.replace(foundstring,"'"+data+"'")
+            
+            #Replace backslashes since they're escapechars
+            updating_string_backslash = updating_string.replace('\\','\\\\')
+            storeLoc = eval(updating_string_backslash)
+            
+        else:
+            storeLoc = store_location
+        
+        # storeInfo
+        # storeLoc
+        
+        #Check if storeInfo is image-like:
+        if isinstance(storeInfo, np.ndarray) and storeInfo.ndim > 1:
+            #Check if we want to store a tiff
+            if storeLoc[-4:] == '.tif' or storeLoc[-5:] == '.tiff':
+                import tifffile
+                tifffile.imsave(storeLoc,storeInfo)
+                logging.info(f'Stored TIF image at {storeLoc}')
+        
         self.finishedEmits(node)
     #endregion
     

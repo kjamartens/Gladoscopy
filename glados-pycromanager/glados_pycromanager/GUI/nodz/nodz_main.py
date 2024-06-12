@@ -872,6 +872,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_VISUALISATION'] = dict()
         data['NODES_RT_ANALYSIS'] = dict()
         data['NODES_TIMER'] = dict()
+        data['NODES_STORE_DATA'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -969,6 +970,12 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'timerInfo' in vars(nodeInst):
                 if nodeInst.timerInfo is not None:
                     data['NODES_TIMER'][node] = nodeInst.timerInfo
+                    
+            data['NODES_STORE_DATA'][node] = {}
+            if 'storeDataInfo' in vars(nodeInst):
+                if nodeInst.storeDataInfo is not None:
+                    data['NODES_STORE_DATA'][node] = nodeInst.storeDataInfo
+            
             
             
             attrs = nodeInst.attrs
@@ -1119,11 +1126,18 @@ class Nodz(QtWidgets.QGraphicsView):
                 if 'real_time_analysis_currentData' in vars(node):
                     if data['NODES_RT_ANALYSIS'] is not None:
                         node.real_time_analysis_currentData = data['NODES_RT_ANALYSIS'][name] #type:ignore
+            
             if 'NODES_TIMER' in data:
                 if name in data['NODES_TIMER']:
                     if 'timerInfo' in vars(node):
                         if data['NODES_TIMER'] is not None:
                             node.timerInfo = data['NODES_TIMER'][name] #type:ignore
+            
+            if 'NODES_STORE_DATA' in data:
+                if name in data['NODES_STORE_DATA']:
+                    if 'storeDataInfo' in vars(node):
+                        if data['NODES_STORE_DATA'] is not None:
+                            node.storeDataInfo = data['NODES_STORE_DATA'][name] #type:ignore
             #Do an emit after full loading:
             self.signal_NodeFullyInitialisedNodeItself.emit(node)
             allNodes.append(node)
@@ -1523,6 +1537,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.visualisation_currentData = {}
         self.real_time_analysis_currentData = {}
         self.timerInfo = 1
+        self.storeDataInfo = {}
         
         self.status = 'idle' #status should be 'idle','running','finished'
 
