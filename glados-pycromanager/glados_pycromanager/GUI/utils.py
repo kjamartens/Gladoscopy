@@ -1013,7 +1013,7 @@ class CustomLineEdit(QLineEdit):
             self.highlight_search = False
         self.update()
 
-def preLoadOptions_analysis(curr_layout,currentData):
+def preLoadOptions_analysis(curr_layout,currentData,functionName='comboBox_analysisFunctions',analysisName='__selectedDropdownEntryAnalysis__'):
     """
     Preloads the kwarg values from the currentData dict into their respective widgets
     """
@@ -1021,7 +1021,7 @@ def preLoadOptions_analysis(curr_layout,currentData):
     parentObject = curr_layout.parent().parent()
     currentSelectedFunction = None
     for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
-        if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
+        if entry[0] == parentObject.currentData[analysisName]:
             currentSelectedFunction = entry[1]
             
     for i in range(curr_layout.count()):
@@ -1039,8 +1039,8 @@ def preLoadOptions_analysis(curr_layout,currentData):
                         child.setText(str(currentData[child.objectName()]))
                     
                 #Also set the dropdown to the correct value:
-                if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
-                    child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
+                if functionName in child.objectName() and analysisName in currentData:
+                    child.setCurrentText(currentData[analysisName])
             else:
                 for index2 in range(item.count()):
                     widget_sub_item = item.itemAt(index2)
@@ -1055,23 +1055,25 @@ def preLoadOptions_analysis(curr_layout,currentData):
                             child.setText(str(currentData[child.objectName()]))
                         
                     #Also set the dropdown to the correct value:
-                    if 'comboBox_analysisFunctions' in child.objectName() and '__selectedDropdownEntryAnalysis__' in currentData:
-                        child.setCurrentText(currentData['__selectedDropdownEntryAnalysis__'])
+                    if functionName in child.objectName() and analysisName in currentData:
+                        child.setCurrentText(currentData[analysisName])
     
 def preLoadOptions_realtime(curr_layout,currentData):
     """
     Preloads the kwarg values from the currentData dict into their respective widgets
     """
-    for i in range(curr_layout.count()):
-        item = curr_layout.itemAt(i)
-        if item.widget() is not None:
-            child = item.widget()
-            if child.objectName() in currentData:
-                child.setText(str(currentData[child.objectName()]))
+    
+    preLoadOptions_analysis(curr_layout,currentData,functionName='comboBox_RTanalysisFunctions',analysisName='__selectedDropdownEntryAnalysis__')
+    # for i in range(curr_layout.count()):
+    #     item = curr_layout.itemAt(i)
+    #     if item.widget() is not None:
+            # child = item.widget()
+            # if child.objectName() in currentData:
+            #     child.setText(str(currentData[child.objectName()]))
                 
-            #Also set the dropdown to the correct value:
-            if 'comboBox_RTanalysisFunctions' in child.objectName() and '__selectedDropdownEntryRTAnalysis__' in currentData:
-                child.setCurrentText(currentData['__selectedDropdownEntryRTAnalysis__'])
+            # #Also set the dropdown to the correct value:
+            # if 'comboBox_RTanalysisFunctions' in child.objectName() and '__selectedDropdownEntryRTAnalysis__' in currentData:
+            #     child.setCurrentText(currentData['__selectedDropdownEntryRTAnalysis__'])
 
 def hideAdvVariables(comboBox,current_selected_function=None):
     """ 
@@ -1303,7 +1305,6 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None,
     variableValueOrAdvanced = {}
     for key,value in currentData.items():
         if "#"+function+"#" in key:
-            print(key, value)
             if ("ComboBoxSwitch#" in key):
                 kwargName = key.split('#')[2]
                 variableValueOrAdvanced[kwargName] = value
@@ -1370,6 +1371,15 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
     methodKwargNames_method=[]
     methodKwargValues_method=[]
     variableValueOrAdvanced={}
+    
+    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
+    variableValueOrAdvanced = {}
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("ComboBoxSwitch#" in key):
+                kwargName = key.split('#')[2]
+                variableValueOrAdvanced[kwargName] = value
+                
     #Loop over all entries of currentData:
     for key,value in currentData.items():
         if "#"+function+"#" in key:
@@ -1423,10 +1433,33 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
+    variableValueOrAdvanced={}
+    
+    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
+    variableValueOrAdvanced = {}
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("ComboBoxSwitch#" in key):
+                kwargName = key.split('#')[2]
+                variableValueOrAdvanced[kwargName] = value
+                
     #Loop over all entries of currentData:
     for key,value in currentData.items():
         if "#"+function+"#" in key:
-            if ("LineEdit" in key):
+            
+            split_list = key.split('#')
+            kwargName = split_list[2]
+            #If not found, it's a Value:
+            if kwargName not in variableValueOrAdvanced:
+                variableValueOrAdvanced[kwargName] = 'Value'
+            if variableValueOrAdvanced[kwargName] == 'Variable':
+                lineEditNameVarAdv = "LineEditVariable#"
+            elif variableValueOrAdvanced[kwargName] == 'Advanced':
+                lineEditNameVarAdv = "LineEditAdv#"
+            else:
+                lineEditNameVarAdv = "LineEdit#"
+                
+            if (lineEditNameVarAdv in key):
                 # The objectName will be along the lines of foo#bar#str
                 #Check if the objectname is part of a method or part of a scoring
                 split_list = key.split('#')
@@ -1436,11 +1469,22 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
                 #value could contain a file location. Thus, we need to swap out all \ for /:
                 methodKwargValues_method.append(value.replace('\\','/'))
     
+    methodKwargTypes_method = []
+    #Get the Value/Variable/Adv:
+    for entry in methodKwargNames_method:
+        if variableValueOrAdvanced[entry]  == 'Variable':
+            methodKwargTypes_method.append('Variable')
+        elif variableValueOrAdvanced[entry]  == 'Advanced':
+            methodKwargTypes_method.append('Advanced')
+        else:
+            methodKwargTypes_method.append('Value')
+    
+    logging.info(f'RTeval: {methodKwargTypes_method}')
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
         #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3),skipInput=True)
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3),methodKwargTypes=methodKwargTypes_method,skipInput=True)
         EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
@@ -1452,10 +1496,33 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
+    variableValueOrAdvanced={}
+    
+    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
+    variableValueOrAdvanced = {}
+    for key,value in currentData.items():
+        if "#"+function+"#" in key:
+            if ("ComboBoxSwitch#" in key):
+                kwargName = key.split('#')[2]
+                variableValueOrAdvanced[kwargName] = value
+                
     #Loop over all entries of currentData:
     for key,value in currentData.items():
         if "#"+function+"#" in key:
-            if ("LineEdit" in key):
+            
+            split_list = key.split('#')
+            kwargName = split_list[2]
+            #If not found, it's a Value:
+            if kwargName not in variableValueOrAdvanced:
+                variableValueOrAdvanced[kwargName] = 'Value'
+            if variableValueOrAdvanced[kwargName] == 'Variable':
+                lineEditNameVarAdv = "LineEditVariable#"
+            elif variableValueOrAdvanced[kwargName] == 'Advanced':
+                lineEditNameVarAdv = "LineEditAdv#"
+            else:
+                lineEditNameVarAdv = "LineEdit#"
+                
+            if (lineEditNameVarAdv in key):
                 # The objectName will be along the lines of foo#bar#str
                 #Check if the objectname is part of a method or part of a scoring
                 split_list = key.split('#')
@@ -1465,11 +1532,21 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
                 #value could contain a file location. Thus, we need to swap out all \ for /:
                 methodKwargValues_method.append(value.replace('\\','/'))
     
+    methodKwargTypes_method = []
+    #Get the Value/Variable/Adv:
+    for entry in methodKwargNames_method:
+        if variableValueOrAdvanced[entry]  == 'Variable':
+            methodKwargTypes_method.append('Variable')
+        elif variableValueOrAdvanced[entry]  == 'Advanced':
+            methodKwargTypes_method.append('Advanced')
+        else:
+            methodKwargTypes_method.append('Value')
+        
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
         #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1),skipInput=True)
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1),methodKwargTypes=methodKwargTypes_method,skipInput=True)
         EvalTextMethod = EvalTextMethod.replace(methodName_method,'.end') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
@@ -1650,7 +1727,7 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                         ignoreQuotes = True #ignore quotes - use it as a variable, not a string
                                 # break
                     elif methodKwargTypes[GUIbasedIndex] == 'Advanced':
-                        print('Hm')
+                        logging.error('To implement!')
                     
                     #Add a comma if there is some info in the partialString already
                     if partialString != '':
@@ -1690,37 +1767,55 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
             return None
         
 
-def realTimeAnalysis_init(rt_analysis_info,core=None):
+def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
     #Get the classname from rt_analysis_info
     functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
     
+    if nodzInfo is not None:
+        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
+    else:
+        nodeDict = None
+
     #Get the object
     RT_analysis_object = eval(getFunctionEvalTextFromCurrentData_RTAnalysis_init(className,rt_analysis_info)) #type:ignore
     
     return RT_analysis_object
 
-def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3):
+def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3, nodzInfo=None):
     #Get the classname from rt_analysis_info
     functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','v3')
+    logging.info(f'RTanalysistext:{evalText}')
+    
+    if nodzInfo is not None:
+        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
+    else:
+        nodeDict = None
+        
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText) #type:ignore
 
     return result
 
-def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1):
+def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None):
     #Get the classname from rt_analysis_info
     functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_end(className,rt_analysis_info,'v1')
+    
+    if nodzInfo is not None:
+        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
+    else:
+        nodeDict = None
+        
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText) #type:ignore
 
@@ -2045,7 +2140,7 @@ def updateNodzVariablesTime(node):
     for vars in node.variablesNodz:
         node.variablesNodz[vars]['lastUpdateTime'] = time.time()
         
-    print('updating nodz variables time')
+    logging.debug('updating nodz variables time')
 
 def analysis_outputs_store_as_variableNodz(currentNode):
     """
@@ -2074,7 +2169,6 @@ def analysis_outputs_to_variableNodz(currentNode):
         #Get the outputs to put in nodz-variables
         expectedoutputs = outputFromFunction(selectedFunctionName)
         for output in expectedoutputs[0]:
-            print(output)
             currentNode.variablesNodz[output['name']] = {} #type:ignore
             if 'type' in output:
                 currentNode.variablesNodz[output['name']]['type'] = output['type'] #type:ignore

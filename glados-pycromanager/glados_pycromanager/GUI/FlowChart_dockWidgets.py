@@ -1401,6 +1401,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.real_time_analysis_currentData['__realTimeVisualisation__'] = dialog.visualisationBox.isChecked() #type:ignore 
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
                 logging.info('Pressed OK on RTanalysis')
+                
         elif 'timer' in nodeName:
             dialog = nodz_openTimerDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:

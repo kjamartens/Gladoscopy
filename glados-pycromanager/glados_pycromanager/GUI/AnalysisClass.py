@@ -614,7 +614,7 @@ class AnalysisThread_customFunction(QThread):
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=100):
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=100,nodzInfo=None):
         """
         Initializes the AnalysisThread object.
 
@@ -636,6 +636,7 @@ class AnalysisThread_customFunction(QThread):
         self.image_queue_analysis = analysisQueue
         self.sleepTimeMs = sleepTimeMs
         self.napariOverlay = None
+        self.nodzInfo=nodzInfo
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
         
         self.initAnalysis()
@@ -800,7 +801,7 @@ class AnalysisThread_customFunction(QThread):
     
     
     def initAnalysis(self):
-        self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core)
+        self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core,nodzInfo=self.nodzInfo)
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']: #type:ignore
             self.queue_visualisation = queue.Queue()
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
@@ -808,7 +809,7 @@ class AnalysisThread_customFunction(QThread):
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):
         self.msleep(self.sleepTimeMs)
-        result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
+        result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core,nodzInfo=self.nodzInfo)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
@@ -821,7 +822,7 @@ class AnalysisThread_customFunction(QThread):
     
     def endAnalysis(self,analysisInfo,core=None):
         self.msleep(self.sleepTimeMs)
-        result = utils.realTimeAnalysis_end(self.RT_analysis_object,analysisInfo,core)
+        result = utils.realTimeAnalysis_end(self.RT_analysis_object,analysisInfo,core,nodzInfo=self.nodzInfo)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             #End the visualisation
@@ -862,7 +863,7 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
     return analysis_thread
 
 #Use this function from now on
-def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewThread = True,throughputThread=None,delay: float|None = None):
+def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewThread = True,throughputThread=None,delay: float|None = None,nodzInfo=None):
     
     #Created/tested via nodz
     
@@ -881,7 +882,7 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal
-    analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay) #type:ignore
+    analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
         
     analysis_thread.finished.connect(analysis_thread.deleteLater)
     analysis_thread.start()

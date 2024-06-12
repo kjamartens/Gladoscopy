@@ -1342,7 +1342,7 @@ class MDAGlados(CustomMainWindow):
                     rt_analysis_connected_node = node
                     rt_analysis_info = rt_analysis_connected_node.real_time_analysis_currentData
                     
-                    new_analysis_thread = create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None)
+                    new_analysis_thread = create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None,nodzInfo=nodeInfo.flowChart)
                     self.nodz_analysis_threads.append(new_analysis_thread)
                     rt_analysis_connected_node.status = 'running'
                     

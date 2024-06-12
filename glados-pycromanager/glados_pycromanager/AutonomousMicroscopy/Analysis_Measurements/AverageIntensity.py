@@ -41,7 +41,7 @@ def AvgGrayValue(core,**kwargs):
 
     # print(NDTIFFStack._summary_metadata)
     # print(NDTIFFStack.as_array())
-    
+    print(kwargs)
     NDTIFFStack = kwargs['Image']
     
     # Compute the average intensity of each slice

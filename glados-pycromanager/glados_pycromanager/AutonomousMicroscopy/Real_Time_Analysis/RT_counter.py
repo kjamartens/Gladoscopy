@@ -43,6 +43,7 @@ class RT_counterV():
             print("At frame: "+metadata['ImageNumber'])
         else:
             print("At axis-time: "+str(metadata['Axes']['time']))
+        print(kwargs)
     
     def end(self,core,**kwargs):
         print('end of RTcounter')
