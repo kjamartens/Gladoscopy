@@ -210,7 +210,7 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
 
         # pre-load all args/kwargs and their edit values - then hide all of them
-        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions,nodzInfo=parent)
+        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions,nodzInfo=parent,skipInput=True)
         
         #Pre-load the options if they're in the current node info
         if 'real_time_analysis_currentData' in vars(currentNode):

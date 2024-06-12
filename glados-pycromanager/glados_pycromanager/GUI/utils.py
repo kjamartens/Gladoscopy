@@ -607,7 +607,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
         #                     hideAdvVariables(child)
 
-def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None):
+def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
@@ -638,91 +638,92 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
             #Want to show variables in advanced mode?
             ShowVariablesOptions = True 
 
-            #TODO: add the input here, similar to a reqKwarg, but from INPUT
-            inputData = inputFromFunction(current_selected_function)
-            
-            for k in range(len(inputData)):
-                #TODO: display name if wanted
-                label = QLabel(f"<b><i>{inputData[0][k]['name']}</i></b>")
-                label.setObjectName(f"Label#{current_selected_function}#{inputData[0][k]['name']}")
-                if checkAndShowWidget(curr_layout,label.objectName()) == False:
-                    #TODO: actual tooltip
-                    label.setToolTip("INPUT DATA")
-                    curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
-                    #Create a new HBox:
-                    SingleVar_Variables_boxLayout = QHBoxLayout()
-                    
-                #Creating a line-edit...
-                line_edit = QLineEdit()
+            k=0
+            if not skipInput:
+                inputData = inputFromFunction(current_selected_function)
                 
-                line_edit.setObjectName(f"LineEdit#{current_selected_function}#{inputData[0][k]['name']}")
-                #This defaultValue is actually important later, leave it at DefaultInput.
-                defaultValue = 'DefaultInput'
-                
-                #Method for variables in Glados
-                if ShowVariablesOptions:
-                    #Advanced - flow + var via maths
-                    line_edit_adv = CustomLineEdit()
-                    line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{inputData[0][k]['name']}")
-                    line_edit_Button_adv = QPushButton("Add Var")
-                    line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{inputData[0][k]['name']}")
-                    #Only var
-                    line_edit_variable = CustomLineEdit()
-                    line_edit_variable.setEnabled(False)
-                    line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{inputData[0][k]['name']}")
-                    push_button_variable_adv = QPushButton("Choose Var")
-                    push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{inputData[0][k]['name']}")
-                    #Add a click-callback:
-                    push_button_variable_adv.clicked.connect(lambda text,line_edit=line_edit_variable: PushButtonChooseVariableCallBack(line_edit, nodzInfo=nodzInfo))
-                    #Switch to switch between
-                    comboBox_switch = QComboBox()
-                    comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{inputData[0][k]['name']}")
-                    comboBox_switch.addItem("Value")
-                    comboBox_switch.addItem("Variable")
-                    comboBox_switch.addItem("Advanced")
-                
-                #Actually placing it in the layout
-                if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                    SingleVar_Variables_boxLayout.addWidget(line_edit)
-                    if ShowVariablesOptions:
-                        SingleVar_Variables_boxLayout.addWidget(line_edit_variable)
-                        #TODO: Figure out if this can stay callback kwargValueInputChanged
-                        line_edit_variable.textChanged.connect(lambda text,line_edit=line_edit_variable: kwargValueInputChanged(line_edit))
-                        #Init the parent currentData storage:
-                        SingleVar_Variables_boxLayout.addWidget(push_button_variable_adv)
+                for k in range(len(inputData)):
+                    #TODO: display name if wanted
+                    label = QLabel(f"<b><i>{inputData[0][k]['name']}</i></b>")
+                    label.setObjectName(f"Label#{current_selected_function}#{inputData[0][k]['name']}")
+                    if checkAndShowWidget(curr_layout,label.objectName()) == False:
+                        #TODO: actual tooltip
+                        label.setToolTip("INPUT DATA")
+                        curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
+                        #Create a new HBox:
+                        SingleVar_Variables_boxLayout = QHBoxLayout()
                         
-                        SingleVar_Variables_boxLayout.addWidget(line_edit_adv)
-                        #TODO: Figure out if this can stay callback kwargValueInputChanged
-                        line_edit_adv.textChanged.connect(lambda text,line_edit=line_edit_adv: kwargValueInputChanged(line_edit))
-                        #Init the parent currentData storage:
-                        SingleVar_Variables_boxLayout.addWidget(line_edit_Button_adv)
-                        
-                        SingleVar_Variables_boxLayout.addWidget(comboBox_switch)
-                        comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
-                        comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
-                        comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
-                        #Change the switch-combobox to variable and update as required:
-                        comboBox_switch.setCurrentText("Variable")
-                        # hideAdvVariables(comboBox_switch)
+                    #Creating a line-edit...
+                    line_edit = QLineEdit()
                     
-                    #TODO: get tooltip
-                    line_edit.setToolTip('TOOLTIP')
-                    if defaultValue is not None:
-                        line_edit.setText(str(defaultValue))
-                    curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                    #Add a on-change listener:
-                    #TODO: Figure out if this can stay kwargvalueinputchanged
-                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
-                    #Init the parent currentData storage:
-                    #TODO: Figure out if this can stay kwargvalueinputchanged
-                    changeDataVarUponKwargChange(line_edit)
+                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{inputData[0][k]['name']}")
+                    #This defaultValue is actually important later, leave it at DefaultInput.
+                    defaultValue = 'DefaultInput'
+                    
+                    #Method for variables in Glados
                     if ShowVariablesOptions:
+                        #Advanced - flow + var via maths
+                        line_edit_adv = CustomLineEdit()
+                        line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{inputData[0][k]['name']}")
+                        line_edit_Button_adv = QPushButton("Add Var")
+                        line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{inputData[0][k]['name']}")
+                        #Only var
+                        line_edit_variable = CustomLineEdit()
+                        line_edit_variable.setEnabled(False)
+                        line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{inputData[0][k]['name']}")
+                        push_button_variable_adv = QPushButton("Choose Var")
+                        push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{inputData[0][k]['name']}")
+                        #Add a click-callback:
+                        push_button_variable_adv.clicked.connect(lambda text,line_edit=line_edit_variable: PushButtonChooseVariableCallBack(line_edit, nodzInfo=nodzInfo))
+                        #Switch to switch between
+                        comboBox_switch = QComboBox()
+                        comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{inputData[0][k]['name']}")
+                        comboBox_switch.addItem("Value")
+                        comboBox_switch.addItem("Variable")
+                        comboBox_switch.addItem("Advanced")
+                    
+                    #Actually placing it in the layout
+                    if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
+                        SingleVar_Variables_boxLayout.addWidget(line_edit)
+                        if ShowVariablesOptions:
+                            SingleVar_Variables_boxLayout.addWidget(line_edit_variable)
+                            #TODO: Figure out if this can stay callback kwargValueInputChanged
+                            line_edit_variable.textChanged.connect(lambda text,line_edit=line_edit_variable: kwargValueInputChanged(line_edit))
+                            #Init the parent currentData storage:
+                            SingleVar_Variables_boxLayout.addWidget(push_button_variable_adv)
+                            
+                            SingleVar_Variables_boxLayout.addWidget(line_edit_adv)
+                            #TODO: Figure out if this can stay callback kwargValueInputChanged
+                            line_edit_adv.textChanged.connect(lambda text,line_edit=line_edit_adv: kwargValueInputChanged(line_edit))
+                            #Init the parent currentData storage:
+                            SingleVar_Variables_boxLayout.addWidget(line_edit_Button_adv)
+                            
+                            SingleVar_Variables_boxLayout.addWidget(comboBox_switch)
+                            comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
+                            comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
+                            comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
+                            #Change the switch-combobox to variable and update as required:
+                            comboBox_switch.setCurrentText("Variable")
+                            # hideAdvVariables(comboBox_switch)
+                        
+                        #TODO: get tooltip
+                        line_edit.setToolTip('TOOLTIP')
+                        if defaultValue is not None:
+                            line_edit.setText(str(defaultValue))
+                        curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                        #Add a on-change listener:
+                        #TODO: Figure out if this can stay kwargvalueinputchanged
+                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                         #Init the parent currentData storage:
                         #TODO: Figure out if this can stay kwargvalueinputchanged
-                        changeDataVarUponKwargChange(line_edit_variable)
-                        changeDataVarUponKwargChange(line_edit_adv)
-                        changeDataVarUponKwargChange(comboBox_switch)
-                
+                        changeDataVarUponKwargChange(line_edit)
+                        if ShowVariablesOptions:
+                            #Init the parent currentData storage:
+                            #TODO: Figure out if this can stay kwargvalueinputchanged
+                            changeDataVarUponKwargChange(line_edit_variable)
+                            changeDataVarUponKwargChange(line_edit_adv)
+                            changeDataVarUponKwargChange(comboBox_switch)
+                    
             #Add a visual thick line:
             # Create a widget for the line
             label = QLabel(f"")
@@ -838,8 +839,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                                 changeDataVarUponKwargChange(line_edit_variable)
                                 changeDataVarUponKwargChange(line_edit_adv)
                             
-                        
-                        
                 else:
                     labelposoffset -= 1
                 
@@ -1370,10 +1369,24 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
+    variableValueOrAdvanced={}
     #Loop over all entries of currentData:
     for key,value in currentData.items():
         if "#"+function+"#" in key:
-            if ("LineEdit" in key):
+            
+            split_list = key.split('#')
+            kwargName = split_list[2]
+            #If not found, it's a Value:
+            if kwargName not in variableValueOrAdvanced:
+                variableValueOrAdvanced[kwargName] = 'Value'
+            if variableValueOrAdvanced[kwargName] == 'Variable':
+                lineEditNameVarAdv = "LineEditVariable#"
+            elif variableValueOrAdvanced[kwargName] == 'Advanced':
+                lineEditNameVarAdv = "LineEditAdv#"
+            else:
+                lineEditNameVarAdv = "LineEdit#"
+                
+            if (lineEditNameVarAdv in key):
                 # The objectName will be along the lines of foo#bar#str
                 #Check if the objectname is part of a method or part of a scoring
                 split_list = key.split('#')
@@ -1383,10 +1396,22 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
                 #value could contain a file location. Thus, we need to swap out all \ for /:
                 methodKwargValues_method.append(value.replace('\\','/'))
     
+    methodKwargTypes_method = []
+    #Get the Value/Variable/Adv:
+    for entry in methodKwargNames_method:
+        if variableValueOrAdvanced[entry]  == 'Variable':
+            methodKwargTypes_method.append('Variable')
+        elif variableValueOrAdvanced[entry]  == 'Advanced':
+            methodKwargTypes_method.append('Advanced')
+        else:
+            methodKwargTypes_method.append('Value')
+        
+    
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart='core=core')
+        #note that RT analysis methods do not have an input, thus we skipInput.
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart='core=core',methodKwargTypes=methodKwargTypes_method,skipInput=True)
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
 
@@ -1414,7 +1439,8 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3))
+        #note that RT analysis methods do not have an input, thus we skipInput.
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3),skipInput=True)
         EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
@@ -1442,7 +1468,8 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1))
+        #note that RT analysis methods do not have an input, thus we skipInput.
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1),skipInput=True)
         EvalTextMethod = EvalTextMethod.replace(methodName_method,'.end') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
@@ -1546,7 +1573,7 @@ def getFunctionEvalText(layout,p1,p2):
     else:
         return None
     
-def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None, methodKwargTypes = None, nodzInfo = None):
+def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None, methodKwargTypes = None, nodzInfo = None,skipInput=False):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
     #methodKwargNames: found kwarg NAMES from the GUI
@@ -1567,8 +1594,9 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
     if len(methodName)>0: #if the method exists
         #Check if all req. kwargs have some value
         inputKwargs = []
-        for k in range(len(inputFromFunction(methodName)[0])):
-            inputKwargs.append(inputFromFunction(methodName)[0][k]['name'])
+        if not skipInput:
+            for k in range(len(inputFromFunction(methodName)[0])):
+                inputKwargs.append(inputFromFunction(methodName)[0][k]['name'])
         
         reqKwargs = reqKwargsFromFunction(methodName)
         
