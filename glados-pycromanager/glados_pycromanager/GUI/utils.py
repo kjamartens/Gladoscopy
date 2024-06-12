@@ -539,21 +539,24 @@ def functionNameFromDisplayName(displayname,map):
 def typeFromKwarg(functionname,kwargname):
     #Check if the function has a 'type' entry for the specific kwarg. If not, return None. Otherwise, return the type value.
     typing=None
-    functionparent = functionname.split('.')[0]
-    #Get the full function metadata
-    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
-    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
-        if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
-            #check if this has a default value:
-            if 'type' in functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]:
-                typing = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['type']
-    #look over required kwargs
-    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
-        if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == kwargname:
-            #check if this has a default value:
-            if 'type' in functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]:
-                typing = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['type']
-    
+    try:
+        functionparent = functionname.split('.')[0]
+        #Get the full function metadata
+        functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+        for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
+            if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
+                #check if this has a default value:
+                if 'type' in functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]:
+                    typing = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['type']
+        #look over required kwargs
+        for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
+            if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == kwargname:
+                #check if this has a default value:
+                if 'type' in functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]:
+                    typing = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['type']
+        
+    except:
+        typing=None
     return typing
 
 def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap,parent=None):
@@ -607,12 +610,102 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
         #                     hideAdvVariables(child)
 
+
+
+
+
+class multiLineEdit_valueVarAdv(QHBoxLayout):
+    
+    def __init__(self,current_selected_function,inputData,curr_layout,nodzInfo,ShowVariablesOptions=True,textChangeCallback=None):
+        super().__init__()
+        
+        self.line_edit = None
+        self.line_edit_variable = None
+        self.line_edit_adv = None
+        self.comboBox_switch = None
+        
+        #Create a random string of 10 characters:
+        import string
+        import random
+        randomName2 = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+        
+        #Create a new HBox:
+        
+        k=0
+        #Creating a line-edit...
+        self.line_edit = QLineEdit()
+        
+        #Method for variables in Glados
+        if ShowVariablesOptions:
+            #Advanced - flow + var via maths
+            self.line_edit_adv = CustomLineEdit()
+            self.line_edit_Button_adv = QPushButton("Add Var")
+            #Only var
+            self.line_edit_variable = CustomLineEdit()
+            self.line_edit_variable.setEnabled(False)
+            self.push_button_variable_adv = QPushButton("Choose Var")
+            #Add a click-callback:
+            self.push_button_variable_adv.clicked.connect(lambda text,line_edit=self.line_edit_variable: PushButtonChooseVariableCallBack(line_edit, nodzInfo=nodzInfo))
+            #Switch to switch between
+            self.comboBox_switch = QComboBox()
+            self.comboBox_switch.addItem("Value")
+            self.comboBox_switch.addItem("Variable")
+            self.comboBox_switch.addItem("Advanced")
+            
+            #Check if it's the standard list of list of dicts for analysis
+            if type(inputData) == list and type(inputData[0]) == list and type(inputData[0][0]) == dict:
+                self.line_edit.setObjectName(f"LineEdit#{current_selected_function}#{inputData[0][k]['name']}")
+                self.line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{inputData[0][k]['name']}")
+                self.line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{inputData[0][k]['name']}")
+                self.line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{inputData[0][k]['name']}")
+                self.push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{inputData[0][k]['name']}")
+                self.comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{inputData[0][k]['name']}")
+            else: #Otherwise is a non-user-settable function.
+                self.line_edit.setObjectName(f"LineEdit#{current_selected_function}#{inputData}")
+                self.line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{inputData}")
+                self.line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{inputData}")
+                self.line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{inputData}")
+                self.push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{inputData}")
+                self.comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{inputData}")
+        
+        #Actually placing it in the layout
+        if checkAndShowWidget(curr_layout,self.line_edit.objectName()) == False or (current_selected_function is None and inputData is None):
+            self.addWidget(self.line_edit)
+            if ShowVariablesOptions:
+                self.addWidget(self.line_edit_variable)
+                #TODO: Figure out if this can stay callback kwargValueInputChanged
+                
+                #Init the parent currentData storage:
+                self.addWidget(self.push_button_variable_adv)
+                
+                self.addWidget(self.line_edit_adv)
+                #TODO: Figure out if this can stay callback kwargValueInputChanged
+                #Init the parent currentData storage:
+                self.addWidget(self.line_edit_Button_adv)
+                
+                self.addWidget(self.comboBox_switch)
+                #Change the switch-combobox to variable and update as required:
+                self.comboBox_switch.setCurrentText("Variable")
+                # hideAdvVariables(comboBox_switch)
+                
+                # if textChangeCallback == None:
+                self.line_edit_variable.textChanged.connect(lambda text,line_edit=self.line_edit_variable: kwargValueInputChanged(line_edit))
+                self.line_edit_adv.textChanged.connect(lambda text,line_edit=self.line_edit_adv: kwargValueInputChanged(line_edit))
+                self.comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=self.comboBox_switch: changeDataVarUponKwargChange(comboBox))
+                self.comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=self.comboBox_switch: hideAdvVariables(comboBox))
+                if textChangeCallback is not None:
+                    self.line_edit.textChanged.connect(textChangeCallback)
+                    self.line_edit_variable.textChanged.connect(textChangeCallback)
+                    self.line_edit_adv.textChanged.connect(textChangeCallback)
+                    self.comboBox_switch.currentIndexChanged.connect(textChangeCallback)
+                    # self.comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=self.comboBox_switch: hideAdvVariables(comboBox))
+            
+
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
     #Get the dropdown info
-    comboBoxSwitchesToUpdate = {}
     
     if current_dropdown == None:
         return
@@ -650,79 +743,32 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         #TODO: actual tooltip
                         label.setToolTip("INPUT DATA")
                         curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
-                        #Create a new HBox:
-                        SingleVar_Variables_boxLayout = QHBoxLayout()
                         
-                    #Creating a line-edit...
-                    line_edit = QLineEdit()
-                    
-                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{inputData[0][k]['name']}")
                     #This defaultValue is actually important later, leave it at DefaultInput.
                     defaultValue = 'DefaultInput'
                     
-                    #Method for variables in Glados
-                    if ShowVariablesOptions:
-                        #Advanced - flow + var via maths
-                        line_edit_adv = CustomLineEdit()
-                        line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{inputData[0][k]['name']}")
-                        line_edit_Button_adv = QPushButton("Add Var")
-                        line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{inputData[0][k]['name']}")
-                        #Only var
-                        line_edit_variable = CustomLineEdit()
-                        line_edit_variable.setEnabled(False)
-                        line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{inputData[0][k]['name']}")
-                        push_button_variable_adv = QPushButton("Choose Var")
-                        push_button_variable_adv.setObjectName(f"PushButtonVariable#{current_selected_function}#{inputData[0][k]['name']}")
-                        #Add a click-callback:
-                        push_button_variable_adv.clicked.connect(lambda text,line_edit=line_edit_variable: PushButtonChooseVariableCallBack(line_edit, nodzInfo=nodzInfo))
-                        #Switch to switch between
-                        comboBox_switch = QComboBox()
-                        comboBox_switch.setObjectName(f"ComboBoxSwitch#{current_selected_function}#{inputData[0][k]['name']}")
-                        comboBox_switch.addItem("Value")
-                        comboBox_switch.addItem("Variable")
-                        comboBox_switch.addItem("Advanced")
+                    SingleVar_Variables_boxLayout = multiLineEdit_valueVarAdv(current_selected_function,inputData,curr_layout,nodzInfo,ShowVariablesOptions=True)
                     
-                    #Actually placing it in the layout
-                    if checkAndShowWidget(curr_layout,line_edit.objectName()) == False:
-                        SingleVar_Variables_boxLayout.addWidget(line_edit)
-                        if ShowVariablesOptions:
-                            SingleVar_Variables_boxLayout.addWidget(line_edit_variable)
-                            #TODO: Figure out if this can stay callback kwargValueInputChanged
-                            line_edit_variable.textChanged.connect(lambda text,line_edit=line_edit_variable: kwargValueInputChanged(line_edit))
-                            #Init the parent currentData storage:
-                            SingleVar_Variables_boxLayout.addWidget(push_button_variable_adv)
-                            
-                            SingleVar_Variables_boxLayout.addWidget(line_edit_adv)
-                            #TODO: Figure out if this can stay callback kwargValueInputChanged
-                            line_edit_adv.textChanged.connect(lambda text,line_edit=line_edit_adv: kwargValueInputChanged(line_edit))
-                            #Init the parent currentData storage:
-                            SingleVar_Variables_boxLayout.addWidget(line_edit_Button_adv)
-                            
-                            SingleVar_Variables_boxLayout.addWidget(comboBox_switch)
-                            comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
-                            comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
-                            comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
-                            #Change the switch-combobox to variable and update as required:
-                            comboBox_switch.setCurrentText("Variable")
-                            # hideAdvVariables(comboBox_switch)
-                        
-                        #TODO: get tooltip
-                        line_edit.setToolTip('TOOLTIP')
-                        if defaultValue is not None:
-                            line_edit.setText(str(defaultValue))
-                        curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                        #Add a on-change listener:
-                        #TODO: Figure out if this can stay kwargvalueinputchanged
-                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                    line_edit = SingleVar_Variables_boxLayout.line_edit
+                    line_edit_variable = SingleVar_Variables_boxLayout.line_edit_variable
+                    line_edit_adv = SingleVar_Variables_boxLayout.line_edit_adv
+                    comboBox_switch = SingleVar_Variables_boxLayout.comboBox_switch
+                    
+                    #TODO: get tooltip
+                    line_edit.setToolTip('TOOLTIP')
+                    if defaultValue is not None:
+                        line_edit.setText(str(defaultValue))
+                    curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                    #Add a on-change listener:
+                    line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                    #Init the parent currentData storage:
+                    changeDataVarUponKwargChange(line_edit)
+                    if ShowVariablesOptions:
                         #Init the parent currentData storage:
                         #TODO: Figure out if this can stay kwargvalueinputchanged
-                        changeDataVarUponKwargChange(line_edit)
-                        if ShowVariablesOptions:
-                            #Init the parent currentData storage:
-                            #TODO: Figure out if this can stay kwargvalueinputchanged
-                            changeDataVarUponKwargChange(line_edit_variable)
-                            changeDataVarUponKwargChange(line_edit_adv)
-                            changeDataVarUponKwargChange(comboBox_switch)
+                        changeDataVarUponKwargChange(line_edit_variable)
+                        changeDataVarUponKwargChange(line_edit_adv)
+                        changeDataVarUponKwargChange(comboBox_switch)
                     
             #Add a visual thick line:
             # Create a widget for the line
@@ -824,7 +870,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                                 SingleVar_Variables_boxLayout.addWidget(comboBox_switch)
                                 comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
                                 comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
-                                comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
                             
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                             if defaultValue is not None:
@@ -928,7 +973,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             SingleVar_Variables_boxLayout.addWidget(comboBox_switch)
                             comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: changeDataVarUponKwargChange(comboBox))
                             comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
-                            comboBoxSwitchesToUpdate[len(comboBoxSwitchesToUpdate)]=comboBox_switch
                         
                         line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                         if defaultValue is not None:
@@ -946,6 +990,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
     #Hides everything except the current layout
     layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
     
+    logging.info('done')
     # resetLayout(curr_layout)
 
 import sys
@@ -962,7 +1007,6 @@ class CustomLineEdit(QLineEdit):
         self.highlight_search = False
         self.setStyleSheet("color: white;")
 
-        
     def paintEvent(self, event):
         super().paintEvent(event)
 
@@ -1084,47 +1128,46 @@ def hideAdvVariables(comboBox,current_selected_function=None):
     kwargName = comboBox.objectName().split('#')[2]
     parentObject = comboBox.parent()
     
-    
-    
     currentSelectedFunction = None
     if hasattr(parentObject, 'currentData'):
         for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
             if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
                 currentSelectedFunction = entry[1]
     
-    if functionName != currentSelectedFunction:
-        return
+        if functionName != currentSelectedFunction:
+            return
     
     #Loop over all widgets in parent:
     for child in parentObject.children():
+        print(child.objectName())
         if len(child.objectName().split('#')) > 2:
             #Check if it's the same function and variable:
             if child.objectName().split('#')[1] == functionName and child.objectName().split('#')[2] == kwargName:
-                logging.debug('Looking at ' + functionName + ' ' + kwargName)
+                logging.info('Looking at ' + functionName + ' ' + kwargName)
                 normalVarAdvValue = child.objectName().split('#')[0]
                 if normalVarAdvValue != 'Label' and normalVarAdvValue != 'ComboBoxSwitch':
                     #Hide/show simple/advanced/onlyVar based on the comboBox value:
                     if comboboxvalue == 'Variable':
                         if normalVarAdvValue == 'LineEditVariable' or normalVarAdvValue == 'PushButtonVariable':
                             child.show()
-                            logging.debug(f'1Showing {child.objectName()}')
+                            logging.info(f'1Showing {child.objectName()}')
                         else:
                             child.hide()
-                            logging.debug(f'1Hiding {child.objectName()}')
+                            logging.info(f'1Hiding {child.objectName()}')
                     elif comboboxvalue == 'Advanced':
                         if normalVarAdvValue == 'LineEditAdv' or normalVarAdvValue == 'PushButtonAdv':
                             child.show()
-                            logging.debug(f'2Showing {child.objectName()}')
+                            logging.info(f'2Showing {child.objectName()}')
                         else:
                             child.hide()
-                            logging.debug(f'2Hiding {child.objectName()}')
+                            logging.info(f'2Hiding {child.objectName()}')
                     else:
                         if normalVarAdvValue == 'LineEdit':
                             child.show()
-                            logging.debug(f'3Showing {child.objectName()}')
+                            logging.info(f'3Showing {child.objectName()}')
                         else:
                             child.hide()
-                            logging.debug(f'3Hiding {child.objectName()}')
+                            logging.info(f'3Hiding {child.objectName()}')
     
     # resetLayout(parentObject.mainLayout,currentSelectedFunction)
                     

@@ -66,15 +66,12 @@ def StarDistSegment_ImageVis(core,**kwargs):
     output = {}
     output['segmented_image'] = labels
     output['details'] = details
-    #Return the coordinates of the ROIs (could also return the labeled inage via 'labels')
+    
     return output
 
 def StarDistSegment_ImageVis_visualise(datastruct,core,**kwargs):
     #This is how datastruct is organised...
     output,layer = datastruct
-    
-    
-    
     
     layer.data = output['segmented_image']
     layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]

@@ -231,10 +231,10 @@ class nodz_analysisMeasurementDialog(nodz_analysisDialog):
 class nodz_openStoreDataDialog(QDialog):
     def __init__(self, parentNode=None):
         """
-        Initializes the TimerDialog.
+        Initializes the StoreDataDialog.
         
         Args:
-            parentNode: The parent node of the TimerDialog. If provided, the timerInfo will be set to the timerInfo of the parentNode.
+            parentNode: The parent node of the StoreDataDialog. If provided, the storeDataInfo will be set to the storeDataInfo of the parentNode.
         
         Returns:
             None
@@ -323,7 +323,84 @@ class nodz_openTimerDialog(QDialog):
         self.setLayout(layout)
 
 
+class nodz_openChangeGlobalVarDialog(QDialog):
+    """
+    A Dialog that is created for changeGlobalVar in the Nodz layout. 
+    """
+    def __init__(self, parentNode=None):
+        """
+        Initializes the changeGlobalVarDialog.
+        
+        Args:
+            parentNode: The parent node of the changeGlobalVarDialog. If provided, the changeGlobalVarInfo will be set to the changeGlobalVarInfo of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(None)
+        self.setWindowTitle("changeGlobalVarInfo  Dialog")
+        self.changeGlobalVarInfo  = 0
+        if parentNode is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            self.changeGlobalVarInfo  = parentNode.changeGlobalVarInfo 
 
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        
+        connection = self.updateFields
+        self.var1_layout = utils.multiLineEdit_valueVarAdv('globalVarChange','Var1',layout,parentNode.flowChart,ShowVariablesOptions=True,textChangeCallback = connection)
+        
+        layout.addLayout(self.var1_layout)
+        
+        #Pre-load the values if they exist
+        for lineEditVal in ['line_edit','line_edit_adv','line_edit_variable']:
+            this_line_edit = getattr(self.var1_layout, lineEditVal)
+            if this_line_edit.objectName() in self.changeGlobalVarInfo: #type:ignore
+                this_line_edit.textChanged.disconnect(connection)
+                this_line_edit.setText(self.changeGlobalVarInfo[this_line_edit.objectName()]) #type:ignore
+                this_line_edit.textChanged.connect(connection)
+        
+        
+        #Create two line-edits and add them:
+        self.globalVarName_lineEdit = QLineEdit()
+        if 'globalVarName' in self.changeGlobalVarInfo: #type:ignore
+            self.globalVarName_lineEdit.setText(self.changeGlobalVarInfo['globalVarName']) #type:ignore
+        else:
+            self.changeGlobalVarInfo['globalVarName'] = ''
+        self.globalVarName_lineEdit.textChanged.connect(self.updateFields)
+        
+        self.globalVarValue_lineEdit = QLineEdit()
+        if 'globalVarValue' in self.changeGlobalVarInfo: #type:ignore
+            self.globalVarValue_lineEdit.setText(self.changeGlobalVarInfo['globalVarValue']) #type:ignore
+        else:
+            self.changeGlobalVarInfo['globalVarValue'] = ''
+        self.globalVarValue_lineEdit.textChanged.connect(self.updateFields)
+            
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addWidget(self.globalVarName_lineEdit)
+        layout.addWidget(self.globalVarValue_lineEdit)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+
+    def updateFields(self):
+        try:
+            self.changeGlobalVarInfo[self.var1_layout.line_edit.objectName()] = self.var1_layout.line_edit.text()
+            self.changeGlobalVarInfo[self.var1_layout.line_edit_adv.objectName()] = self.var1_layout.line_edit_adv.text()
+            self.changeGlobalVarInfo[self.var1_layout.line_edit_variable.objectName()] = self.var1_layout.line_edit_variable.text()
+            
+            self.changeGlobalVarInfo['globalVarName'] = self.globalVarName_lineEdit.text()
+            self.changeGlobalVarInfo['globalVarValue'] = self.globalVarValue_lineEdit.text()
+        except:
+            pass
+        
+        
 class nodz_openMMConfigDialog(QDialog):
     
     """
@@ -837,23 +914,6 @@ class GladosGraph():
             None
 
         """
-        
-        #We'll get a structure like this:
-        # [('scoreStart_0.Start', '1s timer_0.start'), ('1s timer_0.Finished', '2s timer_0.start'), ('2s timer_0.Finished', 'scoreEnd_0.End')]
-        
-        # for graphEvalPartFull in graphEval:
-        #     sendingNode = self.parent.findNodeByName(graphEvalPartFull[0].split('.')[0])
-            
-        #     receivingNode = self.parent.findNodeByName(graphEvalPartFull[1].split('.')[0])
-        #     if graphEvalPartFull[0].split('.')[1] == 'Finished': #Later determine based on defineNodeInfo
-        #         sendingNode.connectedToFinish.append(receivingNode)
-                
-        #     if graphEvalPartFull[1].split('.')[1] == 'Done': #Later determine based on defineNodeInfo
-        #         sendingNode.connectedToData.append(receivingNode)
-            
-        #     if graphEvalPartFull[1].split('.')[1] == 'Start': #Later determine based on defineNodeInfo
-        #         receivingNode.n_connect_at_start += 1
-            
         #Also generate a list of all nodes in this graph
         self.allNodeNames = []
         for graphEvalPartFull in graphEval:
@@ -996,6 +1056,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.debugScoringButton = QPushButton('Debug Scoring')
         self.buttonsArea.addWidget(self.debugScoringButton)
         self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
+        
+        self.globalVariables={}
+        self.globalVariables['TrialGlobalVariable']={}
+        self.globalVariables['TrialGlobalVariable']['type'] = str
+        self.globalVariables['TrialGlobalVariable']['data'] = 'test'
+        self.globalVariables['TrialGlobalVariable']['importance'] = 'Informative'
         
         #import qgroupbox:
         from qtpy.QtWidgets import QGroupBox    
@@ -1160,11 +1226,19 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['timer']['displayName'] = 'Timer'
         self.nodeInfo['timer']['startAttributes'] = ['Start']
         self.nodeInfo['timer']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['timer']['NodeSize'] = 40
         
         self.nodeInfo['storeData'] = self.singleNodeTypeInit()
         self.nodeInfo['storeData']['name'] = 'storeData'
         self.nodeInfo['storeData']['displayName'] = 'Store Data'
         self.nodeInfo['storeData']['startAttributes'] = ['Store']
+        self.nodeInfo['storeData']['NodeSize'] = 40
+        
+        self.nodeInfo['changeGlobalVar'] = self.singleNodeTypeInit()
+        self.nodeInfo['changeGlobalVar']['name'] = 'changeGlobalVar'
+        self.nodeInfo['changeGlobalVar']['displayName'] = 'Change Global Variable'
+        self.nodeInfo['changeGlobalVar']['startAttributes'] = ['Start']
+        self.nodeInfo['changeGlobalVar']['finishedAttributes'] = ['Finished']
         
         #We also add some custom JSON info about the node layout (colors and such)
         import json
@@ -1369,6 +1443,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'storeData':
             newNode.callAction = lambda self, node=newNode: self.storeDataCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'changeGlobalVar':
+            newNode.callAction = lambda self, node=newNode: self.changeGlobalVarCallAction(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1475,6 +1552,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.storeDataInfo = dialog.storeDataInfo #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'storeData')
+        elif 'changeGlobalVar' in nodeName:
+            dialog = nodz_openChangeGlobalVarDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.changeGlobalVarInfo = dialog.changeGlobalVarInfo #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'changeGlobalVar')
+            # currentNode.callAction(self) #type:ignore
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringEnd' in nodeName:
@@ -1930,6 +2013,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             displayHTMLtext = f"<b>Timer:</b> wait {str(round(dialog.timerInfo, 2))} s"
         elif nodeType == 'storeData':
             displayHTMLtext = "TODO-StoreData"
+        elif nodeType == 'changeGlobalVar':
+            displayHTMLtext = "TODO-ChangeGlobalVar"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext
@@ -2695,9 +2780,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         else:
             storeLoc = store_location
         
-        # storeInfo
-        # storeLoc
-        
         #Check if storeInfo is image-like:
         if isinstance(storeInfo, np.ndarray) and storeInfo.ndim > 1:
             #Check if we want to store a tiff
@@ -2706,6 +2788,18 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 tifffile.imsave(storeLoc,storeInfo)
                 logging.info(f'Stored TIF image at {storeLoc}')
         
+        self.finishedEmits(node)
+    
+    
+    def changeGlobalVarCallAction(self,node):
+        """
+        The changeGlobalVarCallAction function is the action function for the change global var Call node in the Flowchart.
+        
+        Args:
+            self: Refer to the class itself
+            node: Identify which node triggered the event
+        """
+        import time
         self.finishedEmits(node)
     #endregion
     
@@ -3727,9 +3821,34 @@ class VariablesBase(QWidget):
         """
         Update the nodz-variables.
         """
-        allNodes = self.nodzinstance.obtainAllNodes()
         
         allvariableData = {}
+        #Add all global variables
+        for var in self.nodzinstance.globalVariables:
+            pos = len(allvariableData)
+            correctTyping = False
+            if self.typeInfo is not None:
+                variableTypes = self.nodzinstance.globalVariables[var]['type']
+                if isinstance(variableTypes,type):
+                    variableTypes = [variableTypes]
+                if isinstance(self.typeInfo,type):
+                    self.typeInfo = [self.typeInfo]
+                
+                for variableType in variableTypes:
+                    for selftype in self.typeInfo:
+                        if variableType == selftype:
+                            correctTyping = True
+            else: #if no typing specified, accept everything
+                correctTyping = True
+            
+            if correctTyping:
+                allvariableData[pos] = self.nodzinstance.globalVariables[var]
+                allvariableData[pos]['NodeOrigin'] = 'Global'
+                allvariableData[pos]['VariableName'] = var
+            
+        #Add all variables of all nodes
+        allNodes = self.nodzinstance.obtainAllNodes()
+        
         for node in allNodes:
             for var in node.variablesNodz:
                 pos = len(allvariableData)
@@ -3753,7 +3872,7 @@ class VariablesBase(QWidget):
                     allvariableData[pos]['NodeOrigin'] = node.name
                     allvariableData[pos]['VariableName'] = var
             
-            
+        
         # Set the number of rows
         self.variablesTableWidget.setRowCount(len(allvariableData))
 
@@ -3768,7 +3887,7 @@ class VariablesBase(QWidget):
             self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(str(varData['data'])))
             self.variablesTableWidget.setItem(row_id, 4, QTableWidgetItem(str(varData['importance'])))
             self.variablesTableWidget.setItem(row_id, 5, QTableWidgetItem(str(varData['type'])))
-            if varData['lastUpdateTime'] is not None:
+            if 'lastUpdateTime' in varData and varData['lastUpdateTime'] is not None:
                 self.variablesTableWidget.setItem(row_id, 6, QTableWidgetItem(str(datetime.fromtimestamp(varData['lastUpdateTime']).strftime("%H:%M:%S %d-%m-%Y"))))
             else:
                 self.variablesTableWidget.setItem(row_id, 6, QTableWidgetItem('None'))

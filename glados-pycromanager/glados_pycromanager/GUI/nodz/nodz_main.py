@@ -873,6 +873,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_RT_ANALYSIS'] = dict()
         data['NODES_TIMER'] = dict()
         data['NODES_STORE_DATA'] = dict()
+        data['NODES_CHANGE_GLOBAL_VAR'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -975,6 +976,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'storeDataInfo' in vars(nodeInst):
                 if nodeInst.storeDataInfo is not None:
                     data['NODES_STORE_DATA'][node] = nodeInst.storeDataInfo
+            
+            data['NODES_CHANGE_GLOBAL_VAR'][node] = {}
+            if 'changeGlobalVarInfo' in vars(nodeInst):
+                if nodeInst.changeGlobalVarInfo is not None:
+                    data['NODES_CHANGE_GLOBAL_VAR'][node] = nodeInst.changeGlobalVarInfo 
             
             
             
@@ -1138,6 +1144,14 @@ class Nodz(QtWidgets.QGraphicsView):
                     if 'storeDataInfo' in vars(node):
                         if data['NODES_STORE_DATA'] is not None:
                             node.storeDataInfo = data['NODES_STORE_DATA'][name] #type:ignore
+                            
+            if 'NODES_CHANGE_GLOBAL_VAR' in data:
+                if name in data['NODES_CHANGE_GLOBAL_VAR']:
+                    if 'changeGlobalVarInfo' in vars(node):
+                        if data['NODES_CHANGE_GLOBAL_VAR'] is not None:
+                            node.changeGlobalVarInfo  = data['NODES_CHANGE_GLOBAL_VAR'][name] #type:ignore
+                            
+                            
             #Do an emit after full loading:
             self.signal_NodeFullyInitialisedNodeItself.emit(node)
             allNodes.append(node)
@@ -1538,6 +1552,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.real_time_analysis_currentData = {}
         self.timerInfo = 1
         self.storeDataInfo = {}
+        self.changeGlobalVarInfo  = {}
         
         self.status = 'idle' #status should be 'idle','running','finished'
 
