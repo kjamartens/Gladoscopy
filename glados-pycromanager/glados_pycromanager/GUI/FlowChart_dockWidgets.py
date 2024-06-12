@@ -297,7 +297,8 @@ class nodz_openMMConfigDialog(QDialog):
             self.MMlayout = parentNode.MMconfigInfo.mainLayout
             
             #Create a new MMconfigUI with the same components as parentNode.MMconfigInfo:
-            self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs, showLiveMode=parentNode.MMconfigInfo.showLiveMode, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM,autoSaveLoad=False)
+            self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs,showShutterOptions=parentNode.MMconfigInfo.showShutterOptions, showLiveSnapExposureButtons=parentNode.MMconfigInfo.showLiveSnapExposureButtons, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM,autoSaveLoad=False)
+            
             if parentNode.MMconfigInfo.changes_update_MM:
                 print('WARNING! Nodz is actually changing the configs real-time rather than only when they are ran!')
             
@@ -1275,7 +1276,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
-            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,autoSaveLoad=False) # type: ignore
+        
+            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = True,showStages=False,showROIoptions=False,showShutterOptions=False,showLiveSnapExposureButtons=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,autoSaveLoad=False) # type: ignore
             
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMconfigChangeRan(node)

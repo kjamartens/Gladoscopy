@@ -1253,7 +1253,7 @@ class MDAGlados(CustomMainWindow):
                 analysis_thread.stop()
         
         #Set the status of the nodz-coupled vis and real-time to finished, and add nodz-based variables:
-        if 'nodeInfo' in vars(self):
+        if 'nodeInfo' in vars(self) and self.nodeInfo is not None:
             logging.info('This MDA acq data was connected to node: ' + self.nodeInfo.name)
             self.updateNodzVariables()
 
