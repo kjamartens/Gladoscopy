@@ -2332,7 +2332,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     visual_connected_node = nodeV
                     
                     selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-                    visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer,mdaDataobject.data)','self.shared_data.core',nodzInfo=self)
+                    visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer)','self.shared_data.core',nodzInfo=self)
                     visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
                     
                     chosenLayerType = 'points'

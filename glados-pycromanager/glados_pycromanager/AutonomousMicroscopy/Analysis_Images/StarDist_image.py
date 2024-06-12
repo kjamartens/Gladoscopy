@@ -14,8 +14,8 @@ def __function_metadata__():
                 {"name": "Image", "type": [ndtiff.NDTiffDataset]}
             ],
             "output":[
-                {"name": "overall_avg_intensity", "type": float, "importance": "Default"},
-                {"name": "slice_avg_intensity", "type": [np.array]}
+                {"name": "segmented_image", "type": [np.ndarray], "importance": "Default"},
+                {"name": "details", "type": dict}
             ],
             "required_kwargs": [
                 {"name": "modelStorageLoc", "description": "The location of the stored model - Should be the folder in which TF_SavedModel is located"}
@@ -29,12 +29,14 @@ def __function_metadata__():
     }
 
 #Normal stardist segmentation, requires image_data and modelStorageLoc as required kwargs
-def StarDistSegment_ImageVis(NDTIFFStack,core,**kwargs):
+def StarDistSegment_ImageVis(core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     
+    NDTIFFStack = kwargs['Image']
+    
     mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
-
+    from stardist.models import StarDist2D
     modelDirectory = kwargs["modelStorageLoc"].rsplit('/', 1)
     #Load the model - better to do this out of the loop for time reasons
     stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
@@ -54,18 +56,27 @@ def StarDistSegment_ImageVis(NDTIFFStack,core,**kwargs):
     
     #Extract detailed info
     coord, points, prob = details['coord'], details['points'], details['prob'] #type:ignore
-    details['labels'] = labels
+    # details['labels'] = labels
 
+    # import matplotlib.pyplot as plt
+    # plt.imshow(labels)
+    # plt.show()
+
+
+    output = {}
+    output['segmented_image'] = labels
+    output['details'] = details
     #Return the coordinates of the ROIs (could also return the labeled inage via 'labels')
-    return details
+    return output
 
 def StarDistSegment_ImageVis_visualise(datastruct,core,**kwargs):
     #This is how datastruct is organised...
-    output,layer,mdaDataobject = datastruct
+    output,layer = datastruct
     
-    rescaled = output['labels']
     
-    layer.data = rescaled
+    
+    
+    layer.data = output['segmented_image']
     layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
     layer.opacity = 0.6
     layer.contrast_limits=(0,0.1)#(0,rescaled.max())
