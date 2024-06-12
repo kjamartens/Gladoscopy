@@ -1293,7 +1293,7 @@ def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',
     return file_path
 
 
-def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None):
+def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None,skipp2=False):
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
@@ -1349,9 +1349,15 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None)
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2),methodKwargTypes=methodKwargTypes_method,nodzInfo=nodzInfo)
+        if not skipp2:
+            EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2),methodKwargTypes=methodKwargTypes_method,nodzInfo=nodzInfo)
+        elif skipp2:
+            EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1),methodKwargTypes=methodKwargTypes_method,nodzInfo=nodzInfo)
     else:
-        EvalTextMethod = function+'('+str(p1)+','+str(p2)+')'
+        if not skipp2:
+            EvalTextMethod = function+'('+str(p1)+','+str(p2)+')'
+        elif skipp2:
+            EvalTextMethod = function+'('+str(p1)+')'
     #append this to moduleEvalTexts
     moduleMethodEvalTexts.append(EvalTextMethod)
 

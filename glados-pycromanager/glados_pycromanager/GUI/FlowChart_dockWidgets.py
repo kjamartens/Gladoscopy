@@ -2226,113 +2226,113 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Dictionary of nodes to pass around variables.
         nodeDict = utils.createNodeDictFromNodes(self.nodes)
         
-        #First assess that it's a MDA node:
-        if 'acquisition' not in connectedNode.name and 'analysisMeasurement' not in connectedNode.name:
-            print('Error! Acquisition or analysismeasurement not connected to analysismeasurement!')
-        else:
-            if 'acquisition' in connectedNode.name:
-                #And then find the mdaData object
-                mdaDataobject = connectedNode.mdaData
+        #Figure out which function is selected in the scoring_analysis node
+        selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+        #Figure out the belonging evaluation-text
+        evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
+        # #First assess that it's a MDA node:
+        # if 'acquisition' not in connectedNode.name and 'analysisMeasurement' not in connectedNode.name:
+        #     print('Error! Acquisition or analysismeasurement not connected to analysismeasurement!')
+        # else:
+        #     if 'acquisition' in connectedNode.name:
+        #         #And then find the mdaData object
+        #         mdaDataobject = connectedNode.mdaData
                 
-                #Figure out which function is selected in the scoring_analysis node
-                selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-                #Figure out the belonging evaluation-text
-                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'mdaDataobject.data','self.shared_data.core',nodzInfo=self)
-            elif 'analysisMeasurement' in connectedNode.name:
-                dataobject = connectedNode.scoring_analysis_currentData['__output__']
+        #     elif 'analysisMeasurement' in connectedNode.name:
+        #         dataobject = connectedNode.scoring_analysis_currentData['__output__']
                 
-                #Figure out which function is selected in the scoring_analysis node
-                selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-                #Figure out the belonging evaluation-text
-                evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'dataobject','self.shared_data.core',nodzInfo=self)
+        #         #Figure out which function is selected in the scoring_analysis node
+        #         selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+        #         #Figure out the belonging evaluation-text
+        #         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'dataobject','self.shared_data.core',nodzInfo=self)
                 
-            #And evaluate the custom function with custom parameters
-            output = eval(evalText) #type:ignore
-            
-            #Display final output to the user for now
-            logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
-            
-            #Set the status of the nodz-coupled vis and real-time to finished:
-            #Look at the 'Visual' bottom attribute and visualise if needed
-            visualAttr = node.bottomAttrs['Visual']
-            if len(visualAttr.connections) > 0:
-                visual_connected_node_name = visualAttr.connections[0].socketNode
-                for nodeV in self.nodes:
-                    if nodeV.name == visual_connected_node_name:
-                        visual_connected_node = nodeV
-                        
-                        selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-                        visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer,mdaDataobject.data)','self.shared_data.core',nodzInfo=self)
-                        visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
-                        
-                        chosenLayerType = 'points'
-                        
-                        layerTypeInfo = [
-                            ['Analysis_Measurements','points'],
-                            ['Analysis_Shapes','shapes'],
-                            ['Analysis_Images','image'],
-                        ]
-                        
-                        folderName = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.sep+'AutonomousMicroscopy'+os.sep
-                        
-                        for layerType in layerTypeInfo:
-                            for root, dirs, files in os.walk(folderName+layerType[0]):
-                                for file in files:
-                                    if selectedFunction.split('.')[0] in file: #type:ignore
-                                        if file.endswith(".py"):
-                                            with open(os.path.join(root, file), 'r') as f:
-                                                filecontent = f.read()
-                                            if selectedFunction.split('.')[1]+'(' in filecontent: #type:ignore
-                                                chosenLayerType = layerType[1]
-                                                break #to avoid searching in other files for this function
-                        
-                        
-                        layerName = visual_connected_node.visualisation_currentData['layerName']
-                        
-                        #If a layer with this name already exists, simply remove it:
-                        for layer in self.shared_data.napariViewer.layers: #type:ignore
-                            if layer.name == layerName:
-                                self.shared_data.napariViewer.layers.remove(layer) #type:ignore
-                                
-                        cmap = visual_connected_node.visualisation_currentData['colormap']
-                        if chosenLayerType == 'points':
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            napariLayer = viewer.add_points(
-                                data=None,
-                                text=None,
-                                name=layerName,
-                                colormap = cmap
-                            )
-                        elif chosenLayerType == 'shapes':
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            napariLayer = viewer.add_shapes(
-                                data=None,
-                                name=layerName,
-                                colormap = cmap
-                            )
-                        elif chosenLayerType == 'image':
-                            logging.info('creating new image layer')
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            im = np.random.random((30, 30))
-                            napariLayer = viewer.add_image(
-                                data=im,
-                                name=layerName,
-                                colormap = cmap
-                            )
-                        
-                        visualOutput = eval(visualEvalText)
-                        
-                        visual_connected_node.status = 'finished'
-            
-            
-            node.scoring_analysis_currentData['__output__'] = output
-            
-            #Store the output as NodzVariables
-            utils.analysis_outputs_store_as_variableNodz(node)
+        #And evaluate the custom function with custom parameters
+        output = eval(evalText) #type:ignore
+        
+        #Display final output to the user for now
+        logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
+        
+        #Set the status of the nodz-coupled vis and real-time to finished:
+        #Look at the 'Visual' bottom attribute and visualise if needed
+        visualAttr = node.bottomAttrs['Visual']
+        if len(visualAttr.connections) > 0:
+            visual_connected_node_name = visualAttr.connections[0].socketNode
+            for nodeV in self.nodes:
+                if nodeV.name == visual_connected_node_name:
+                    visual_connected_node = nodeV
+                    
+                    selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+                    visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer,mdaDataobject.data)','self.shared_data.core',nodzInfo=self)
+                    visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
+                    
+                    chosenLayerType = 'points'
+                    
+                    layerTypeInfo = [
+                        ['Analysis_Measurements','points'],
+                        ['Analysis_Shapes','shapes'],
+                        ['Analysis_Images','image'],
+                    ]
+                    
+                    folderName = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.sep+'AutonomousMicroscopy'+os.sep
+                    
+                    for layerType in layerTypeInfo:
+                        for root, dirs, files in os.walk(folderName+layerType[0]):
+                            for file in files:
+                                if selectedFunction.split('.')[0] in file: #type:ignore
+                                    if file.endswith(".py"):
+                                        with open(os.path.join(root, file), 'r') as f:
+                                            filecontent = f.read()
+                                        if selectedFunction.split('.')[1]+'(' in filecontent: #type:ignore
+                                            chosenLayerType = layerType[1]
+                                            break #to avoid searching in other files for this function
+                    
+                    
+                    layerName = visual_connected_node.visualisation_currentData['layerName']
+                    
+                    #If a layer with this name already exists, simply remove it:
+                    for layer in self.shared_data.napariViewer.layers: #type:ignore
+                        if layer.name == layerName:
+                            self.shared_data.napariViewer.layers.remove(layer) #type:ignore
+                            
+                    cmap = visual_connected_node.visualisation_currentData['colormap']
+                    if chosenLayerType == 'points':
+                        viewer = self.shared_data.napariViewer #type:ignore
+                        napariLayer = viewer.add_points(
+                            data=None,
+                            text=None,
+                            name=layerName,
+                            colormap = cmap
+                        )
+                    elif chosenLayerType == 'shapes':
+                        viewer = self.shared_data.napariViewer #type:ignore
+                        napariLayer = viewer.add_shapes(
+                            data=None,
+                            name=layerName,
+                            colormap = cmap
+                        )
+                    elif chosenLayerType == 'image':
+                        logging.info('creating new image layer')
+                        viewer = self.shared_data.napariViewer #type:ignore
+                        im = np.random.random((30, 30))
+                        napariLayer = viewer.add_image(
+                            data=im,
+                            name=layerName,
+                            colormap = cmap
+                        )
+                    
+                    visualOutput = eval(visualEvalText)
+                    
+                    visual_connected_node.status = 'finished'
             
             
-            #Finish up
-            self.finishedEmits(node)
+        node.scoring_analysis_currentData['__output__'] = output
+        
+        #Store the output as NodzVariables
+        utils.analysis_outputs_store_as_variableNodz(node)
+        
+        
+        #Finish up
+        self.finishedEmits(node)
     
     def MMstageChangeRan(self,node):
         #TODO: Implement this :)
