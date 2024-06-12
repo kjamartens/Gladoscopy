@@ -1087,9 +1087,10 @@ def hideAdvVariables(comboBox,current_selected_function=None):
     
     
     currentSelectedFunction = None
-    for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
-        if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
-            currentSelectedFunction = entry[1]
+    if hasattr(parentObject, 'currentData'):
+        for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
+            if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
+                currentSelectedFunction = entry[1]
     
     if functionName != currentSelectedFunction:
         return
@@ -1132,15 +1133,17 @@ def changeDataVarUponKwargChange(line_edit):
     if isinstance(line_edit,QLineEdit):
         parentObject = line_edit.parent()
         newValue = line_edit.text()
-        parentObject.currentData[line_edit.objectName()] = newValue
-        #To be sure, also do this routine:
-        updateCurrentDataUponDropdownChange(parentObject)
+        if hasattr(parentObject, 'currentData'):
+            parentObject.currentData[line_edit.objectName()] = newValue
+            #To be sure, also do this routine:
+            updateCurrentDataUponDropdownChange(parentObject)
     elif isinstance(line_edit,QComboBox):
         parentObject = line_edit.parent()
         newValue = line_edit.currentText()
-        parentObject.currentData[line_edit.objectName()] = newValue
-        #To be sure, also do this routine:
-        updateCurrentDataUponDropdownChange(parentObject)
+        if hasattr(parentObject, 'currentData'):
+            parentObject.currentData[line_edit.objectName()] = newValue
+            #To be sure, also do this routine:
+            updateCurrentDataUponDropdownChange(parentObject)
 
 
 def updateCurrentDataUponDropdownChange(parentObject):
