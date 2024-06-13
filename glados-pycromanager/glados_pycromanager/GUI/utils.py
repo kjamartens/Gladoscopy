@@ -610,6 +610,30 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
         #                     hideAdvVariables(child)
 
+def attemptToEvaluateVariables(value,nodzInfo):
+    """
+    Idea: check if 'value' can be assessed as a variable (abc@def) or as an advanced thing ({abc@def}+'t'+{abc2#def2}). If so, return the assessed value, else, return the initial value.
+    """
+    try:
+        #Check for exactly a single variable abc@def, no spaces etc before/after
+        checkExactlySingleVariable = bool(re.match("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+",value))
+        checkAdvanced = bool(re.match("{[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+}",value))
+        if checkExactlySingleVariable:
+            try:
+                finalVal = nodz_evaluateVar(value,nodzInfo)
+            except:
+                finalVal = value
+        elif checkAdvanced:
+            try:
+                finalVal = nodz_evaluateAdv(value,nodzInfo)
+            except:
+                finalVal = value
+        else:
+            finalVal = value
+    except TypeError: #if value is not a string at all, return the initial value
+        finalVal = value
+    
+    return finalVal
 
 def nodz_setVariableToValue(variable,value,nodzInfo):
     """
