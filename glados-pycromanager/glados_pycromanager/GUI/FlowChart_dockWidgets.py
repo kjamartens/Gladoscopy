@@ -323,7 +323,97 @@ class nodz_openTimerDialog(QDialog):
         self.setLayout(layout)
 
 
-class nodz_openChangeGlobalVarDialog(QDialog):
+#General class for dialogs with simple line-edits only:
+# class nodz_generalAdvancedLineEditDialog(QDialog):
+
+class nodz_generalAdvancedLineEditDialog(QDialog):
+    """
+    A Dialog that is created for changeGlobalVar in the Nodz layout. 
+    """
+    def __init__(self, parentNode=None,title="Title",internalName='internalName',advLineEdits=[{'LineEdit1:':['intLineEdit1','Value']},{'LineEdit2:': ['intLineEdit2','Variable']}],storeVarName='storeVarName'):
+        """
+        Initializes the changeGlobalVarDialog.
+        
+        Args:
+            parentNode: The parent node of the changeGlobalVarDialog. If provided, the changeGlobalVarInfo will be set to the changeGlobalVarInfo of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(None)
+        self.setWindowTitle(title)
+        self.storeVarName = storeVarName
+        
+        setattr(self,storeVarName,0)
+        # selfvar = getattr(self,storeVarName)
+        if parentNode is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            setattr(self,storeVarName,getattr(parentNode,storeVarName))
+            # self.changeGlobalVarInfo  = parentNode.changeGlobalVarInfo 
+
+        # Create the QVBoxLayout
+        layout = QGridLayout()
+
+        self.advLineEditLayouts={}
+        GridCounter = 0
+        #Create a lineEditWidget for each requested
+        for lineEditWidget in advLineEdits:
+            labelName = list(lineEditWidget.keys())[0]
+            varName = list(lineEditWidget.values())[0][0]
+            standardChoice = list(lineEditWidget.values())[0][1]
+        
+            connection = self.updateFields
+            self.advLineEditLayouts[varName] = utils.multiLineEdit_valueVarAdv(internalName,varName,layout,parentNode.flowChart,ShowVariablesOptions=True,textChangeCallback = connection,valueVarAdv=standardChoice) #type:ignore
+            
+            layout.addWidget(QLabel(labelName),GridCounter,0)
+            layout.addLayout(self.advLineEditLayouts[varName],GridCounter,1)
+            GridCounter+=1
+            
+            #Pre-load the values if they exist
+            for lineEditVal in ['line_edit','line_edit_adv','line_edit_variable']:
+                this_line_edit = getattr(self.advLineEditLayouts[varName], lineEditVal)
+                if this_line_edit.objectName() in getattr(self,storeVarName): #type:ignore
+                    this_line_edit.textChanged.disconnect(connection)
+                    this_line_edit.setText(getattr(self,storeVarName)[this_line_edit.objectName()]) #type:ignore
+                    this_line_edit.textChanged.connect(connection)
+            #Pre-load the value of the comboboxswitch:
+            try:
+                self.advLineEditLayouts[varName].comboBox_switch.setCurrentText(getattr(self,storeVarName)[self.advLineEditLayouts[varName].comboBox_switch.objectName()]) #type:ignore
+            except:
+                pass
+            
+            #When loading, hide the non-relevants:
+            customParentChildren = [self.advLineEditLayouts[varName].line_edit,self.advLineEditLayouts[varName].line_edit_adv,self.advLineEditLayouts[varName].line_edit_variable,self.advLineEditLayouts[varName].line_edit_Button_adv,self.advLineEditLayouts[varName].push_button_variable_adv]
+            utils.hideAdvVariables(self.advLineEditLayouts[varName].comboBox_switch,customParentChildren=customParentChildren)
+        
+        
+        #OK/Cancel buttonBox.
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box,99,0,1,2)
+        
+        self.setLayout(layout)
+
+    def updateFields(self):
+        
+        
+        for entry in self.advLineEditLayouts:
+            lineEditLayout = self.advLineEditLayouts[entry]
+        
+            try:
+                #Set the value of the lineedits to storage
+                getattr(self,self.storeVarName)[lineEditLayout.line_edit.objectName()] = lineEditLayout.line_edit.text()
+                getattr(self,self.storeVarName)[lineEditLayout.line_edit_adv.objectName()] = lineEditLayout.line_edit_adv.text()
+                getattr(self,self.storeVarName)[lineEditLayout.line_edit_variable.objectName()] = lineEditLayout.line_edit_variable.text()
+                #Store the value of the combobox
+                getattr(self,self.storeVarName)[lineEditLayout.comboBox_switch.objectName()] = lineEditLayout.comboBox_switch.currentText()
+                
+            except:
+                pass
+        
+
+class nodz_openChangeGlobalVarDialog(nodz_generalAdvancedLineEditDialog):
     """
     A Dialog that is created for changeGlobalVar in the Nodz layout. 
     """
@@ -337,94 +427,11 @@ class nodz_openChangeGlobalVarDialog(QDialog):
         Returns:
             None
         """
-        super().__init__(None)
-        self.setWindowTitle("changeGlobalVarInfo  Dialog")
-        self.changeGlobalVarInfo  = 0
-        if parentNode is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
-            self.changeGlobalVarInfo  = parentNode.changeGlobalVarInfo 
-
-        
-        # Create the QVBoxLayout
-        layout = QGridLayout()
-
-        
-        connection = self.updateFields
-        self.globalVarNameLayout = utils.multiLineEdit_valueVarAdv('globalVarChange','globalVarName',layout,parentNode.flowChart,ShowVariablesOptions=True,textChangeCallback = connection) #type:ignore
-        
-        layout.addWidget(QLabel("Variable to change:"),0,0)
-        layout.addLayout(self.globalVarNameLayout,0,1)
-        
-        #Pre-load the values if they exist
-        for lineEditVal in ['line_edit','line_edit_adv','line_edit_variable']:
-            this_line_edit = getattr(self.globalVarNameLayout, lineEditVal)
-            if this_line_edit.objectName() in self.changeGlobalVarInfo: #type:ignore
-                this_line_edit.textChanged.disconnect(connection)
-                this_line_edit.setText(self.changeGlobalVarInfo[this_line_edit.objectName()]) #type:ignore
-                this_line_edit.textChanged.connect(connection)
-        #Pre-load the value of the comboboxswitch:
-        try:
-            self.globalVarNameLayout.comboBox_switch.setCurrentText(self.changeGlobalVarInfo[self.globalVarNameLayout.comboBox_switch.objectName()]) #type:ignore
-        except:
-            pass
-                
-                
-        
-        #When loading, hide the non-relevants:
-        customParentChildren = [self.globalVarNameLayout.line_edit,self.globalVarNameLayout.line_edit_adv,self.globalVarNameLayout.line_edit_variable,self.globalVarNameLayout.line_edit_Button_adv,self.globalVarNameLayout.push_button_variable_adv]
-        utils.hideAdvVariables(self.globalVarNameLayout.comboBox_switch,customParentChildren=customParentChildren)
-        
-        
-        
-        connection = self.updateFields
-        self.globalVarValueLayout = utils.multiLineEdit_valueVarAdv('globalVarChange','globalVarValue',layout,parentNode.flowChart,ShowVariablesOptions=True,textChangeCallback = connection) #type:ignore
-        
-        layout.addWidget(QLabel("Change to value:"),1,0)
-        layout.addLayout(self.globalVarValueLayout,1,1)
-        
-        #Pre-load the values if they exist
-        for lineEditVal in ['line_edit','line_edit_adv','line_edit_variable']:
-            this_line_edit = getattr(self.globalVarValueLayout, lineEditVal)
-            if this_line_edit.objectName() in self.changeGlobalVarInfo: #type:ignore
-                this_line_edit.textChanged.disconnect(connection)
-                this_line_edit.setText(self.changeGlobalVarInfo[this_line_edit.objectName()]) #type:ignore
-                this_line_edit.textChanged.connect(connection)
-        #Pre-load the value of the comboboxswitch:
-        try:
-            self.globalVarValueLayout.comboBox_switch.setCurrentText(self.changeGlobalVarInfo[self.globalVarValueLayout.comboBox_switch.objectName()]) #type:ignore
-        except:
-            pass
-        
-        #When loading, hide the non-relevants:
-        customParentChildren = [self.globalVarValueLayout.line_edit,self.globalVarValueLayout.line_edit_adv,self.globalVarValueLayout.line_edit_variable,self.globalVarValueLayout.line_edit_Button_adv,self.globalVarValueLayout.push_button_variable_adv]
-        utils.hideAdvVariables(self.globalVarValueLayout.comboBox_switch,customParentChildren=customParentChildren)
-        
-        #OK/Cancel buttonBox.
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box,10,0,1,2)
-        
-        self.setLayout(layout)
-
-    def updateFields(self):
-        try:
-            #Set the value of the lineedits to storage
-            self.changeGlobalVarInfo[self.globalVarNameLayout.line_edit.objectName()] = self.globalVarNameLayout.line_edit.text()
-            self.changeGlobalVarInfo[self.globalVarNameLayout.line_edit_adv.objectName()] = self.globalVarNameLayout.line_edit_adv.text()
-            self.changeGlobalVarInfo[self.globalVarNameLayout.line_edit_variable.objectName()] = self.globalVarNameLayout.line_edit_variable.text()
-            #Store the value of the combobox
-            self.changeGlobalVarInfo[self.globalVarNameLayout.comboBox_switch.objectName()] = self.globalVarNameLayout.comboBox_switch.currentText()
-            
-            #Set the value of the lineedits to storage
-            self.changeGlobalVarInfo[self.globalVarValueLayout.line_edit.objectName()] = self.globalVarValueLayout.line_edit.text()
-            self.changeGlobalVarInfo[self.globalVarValueLayout.line_edit_adv.objectName()] = self.globalVarValueLayout.line_edit_adv.text()
-            self.changeGlobalVarInfo[self.globalVarValueLayout.line_edit_variable.objectName()] = self.globalVarValueLayout.line_edit_variable.text()
-            #Store the value of the combobox
-            self.changeGlobalVarInfo[self.globalVarValueLayout.comboBox_switch.objectName()] = self.globalVarValueLayout.comboBox_switch.currentText()
-            
-        except:
-            pass
+        super().__init__(parentNode=parentNode,
+                        title="changeGlobalVarInfo  Dialog",
+                        internalName='globalVarChange',
+                        advLineEdits=[{'Variable to change:':['globalVarName','Variable']},{'Change to value:':['globalVarValue','Advanced']}],
+                        storeVarName='changeGlobalVarInfo')
         
         
 class nodz_openMMConfigDialog(QDialog):
@@ -2825,7 +2832,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             self: Refer to the class itself
             node: Identify which node triggered the event
         """
-        import time
+        varInfo = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.changeGlobalVarInfo,node.flowChart)
+        varInfo['globalVarName'][0]
+        varInfo['globalVarValue'][0]
         self.finishedEmits(node)
     #endregion
     

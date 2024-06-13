@@ -610,19 +610,128 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
         #                     hideAdvVariables(child)
 
+def nodz_evaluateVar(varName,nodzInfo):
+    originNodeName = varName.split('@')[1]
+    variableName = varName.split('@')[0]
+    varData = None
+    
+    #Find the correct node
+    if originNodeName != 'Global':
+        #Done it like this to have access to kwargvalue if needed (not retported right now)
+        nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
+        kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+    
+        varData = eval(kwargvalue)
+    
+    else:
+        varData = nodzInfo.globalVariables[variableName]['data']
+    return varData
 
+def nodz_evaluateAdv(varName,nodzInfo):
+    print(varName)
+    if '@' in varName and '{' in varName and '}' in varName:
+        nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
+        #Find a regex like this:
+        import re
+        matches = re.finditer("{[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+}",varName)
+        #Find all the matches
+        calculatable = True
+        #First check the typing (i.e. calculatable or not)
+        for match in matches:
+            startpos = match.regs[0][0]
+            endpos = match.regs[0][1]
+            foundstring = varName[startpos:endpos]
+            #Remove the curly braces
+            foundstring_data = foundstring[1:-1]
+            #run getting the data of this match
+            #Assuming string
+            if foundstring_data.split('@')[1] == 'Global':
+                type = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+            else:
+                type = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
+            #Check if it's calculatable
+            if type not in [int, float, np.ndarray]:
+                calculatable = False
+        
+        updating_string = varName
+        matches = re.finditer("{[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+}",varName)
+        #Now check the data
+        for match in matches:
+            startpos = match.regs[0][0]
+            endpos = match.regs[0][1]
+            foundstring = varName[startpos:endpos]
+            #Remove the curly braces
+            foundstring_data = foundstring[1:-1]
+            #run getting the data of this match
+            #Assuming string
+            if foundstring_data.split('@')[1] == 'Global':
+                data = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['data']
+                type = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+            else:
+                data = str(nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['data'])
+                type = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
+            
+            #Replace this in the updating_string
+            if calculatable: #if calculatable
+                updating_string = updating_string.replace(foundstring,""+data+"")
+            else: #uncalculatable, add as string
+                updating_string = updating_string.replace(foundstring,"'"+data+"'")
+                
+        #Replace backslashes since they're escapechars
+        updating_string_backslash = updating_string.replace('\\','\\\\')
+        
+        try:
+            finalData = eval(updating_string_backslash)
+        except:
+            logging.error(f"Error when assessing adv variable {varName}: {updating_string_backslash}")
+            finalData = None
+        return finalData
+    else:
+        logging.error(f'Wrong syntax for advanced variable! Details: {varName}')
+        return None
 
+def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo):
+    allData = {}
+    for entry in relevantData:
+        if 'ComboBoxSwitch#' in entry:
+            print(entry)
+            valueVarOrAdv = relevantData[entry]
+            kwargName = entry.split('#')[2]
+            if valueVarOrAdv == 'Value':
+                lineEditName = 'LineEdit'
+            elif valueVarOrAdv == 'Variable':
+                lineEditName = 'LineEditVariable'
+            elif valueVarOrAdv == 'Advanced':
+                lineEditName = 'LineEditAdv'
+            
+            finalValue = None
+            for entry in relevantData:
+                if lineEditName+'#' in entry and '#'+kwargName in entry:
+                    finalValue = relevantData[entry]
 
+            if valueVarOrAdv == 'Variable':
+                evaluatedVar = nodz_evaluateVar(finalValue,nodzInfo)
+            elif valueVarOrAdv == 'Advanced':
+                evaluatedVar = nodz_evaluateAdv(finalValue,nodzInfo)
+            else:
+                evaluatedVar = finalValue
+            allData[kwargName] = [evaluatedVar,valueVarOrAdv]
+
+    return allData
 
 class multiLineEdit_valueVarAdv(QHBoxLayout):
     
-    def __init__(self,current_selected_function,inputData,curr_layout,nodzInfo,ShowVariablesOptions=True,textChangeCallback=None):
+    def __init__(self,current_selected_function,inputData,curr_layout,nodzInfo,ShowVariablesOptions=True,textChangeCallback=None,valueVarAdv='Value'):
         super().__init__()
         
         self.line_edit = None
         self.line_edit_variable = None
         self.line_edit_adv = None
         self.comboBox_switch = None
+        
+        if valueVarAdv not in ['Value','Variable','Advanced']:
+            valueVarAdv = 'Value'
+            logging.error('Wrong entry!')
         
         #Create a random string of 10 characters:
         import string
@@ -685,7 +794,7 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
                 
                 self.addWidget(self.comboBox_switch)
                 #Change the switch-combobox to variable and update as required:
-                self.comboBox_switch.setCurrentText("Variable")
+                self.comboBox_switch.setCurrentText(valueVarAdv)
                 # hideAdvVariables(comboBox_switch)
                 
                 # if textChangeCallback == None:
@@ -2157,6 +2266,7 @@ def createNodeDictFromNodes(nodes):
     for node in nodes:
         nodeDict[node.name] = node
     
+    #Add global variables
     return nodeDict
 
 def closeAllLayers(shared_data):
