@@ -874,6 +874,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_TIMER'] = dict()
         data['NODES_STORE_DATA'] = dict()
         data['NODES_CHANGE_GLOBAL_VAR'] = dict()
+        data['NODES_RUN_INLINE_SCRIPT'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -981,6 +982,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'changeGlobalVarInfo' in vars(nodeInst):
                 if nodeInst.changeGlobalVarInfo is not None:
                     data['NODES_CHANGE_GLOBAL_VAR'][node] = nodeInst.changeGlobalVarInfo 
+            
+            data['NODES_RUN_INLINE_SCRIPT'][node] = {}
+            if 'InlineScriptInfo' in vars(nodeInst):
+                if nodeInst.InlineScriptInfo is not None:
+                    data['NODES_RUN_INLINE_SCRIPT'][node] = nodeInst.InlineScriptInfo  
             
             
             
@@ -1151,6 +1157,11 @@ class Nodz(QtWidgets.QGraphicsView):
                         if data['NODES_CHANGE_GLOBAL_VAR'] is not None:
                             node.changeGlobalVarInfo  = data['NODES_CHANGE_GLOBAL_VAR'][name] #type:ignore
                             
+            if 'NODES_RUN_INLINE_SCRIPT' in data:
+                if name in data['NODES_RUN_INLINE_SCRIPT']:
+                    if 'InlineScriptInfo' in vars(node):
+                        if data['NODES_RUN_INLINE_SCRIPT'] is not None:
+                            node.InlineScriptInfo = data['NODES_RUN_INLINE_SCRIPT'][name] #type:ignore
                             
             #Do an emit after full loading:
             self.signal_NodeFullyInitialisedNodeItself.emit(node)
@@ -1553,6 +1564,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.timerInfo = 1
         self.storeDataInfo = {}
         self.changeGlobalVarInfo  = {}
+        self.InlineScriptInfo  = ''
         
         self.status = 'idle' #status should be 'idle','running','finished'
 

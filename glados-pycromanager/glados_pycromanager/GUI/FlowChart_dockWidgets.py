@@ -270,6 +270,48 @@ class nodz_openTimerDialog(QDialog):
         self.setLayout(layout)
 
 
+class nodz_openInlineScriptDialog(QDialog):
+    """
+    A Dialog that is created for timer in the Nodz layout. 
+    """
+    def __init__(self, parentNode=None):
+        """
+        Initializes the TimerDialog.
+        
+        Args:
+            parentNode: The parent node of the TimerDialog. If provided, the timerInfo will be set to the timerInfo of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(None)
+        self.setWindowTitle("InlineScript Dialog")
+        self.InlineScriptInfo  = ''
+        if parentNode is not None:
+            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+            self.InlineScriptInfo  = parentNode.InlineScriptInfo
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        #add a big editable text box:
+        scriptinfo = QTextEdit()
+        scriptinfo.setPlainText(self.InlineScriptInfo)
+        scriptinfo.textChanged.connect(lambda: setattr(self, 'InlineScriptInfo', scriptinfo.toPlainText()))
+
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addWidget(scriptinfo)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+
+
+
 #General class for dialogs with simple line-edits only:
 # class nodz_generalAdvancedLineEditDialog(QDialog):
 
@@ -1238,6 +1280,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['changeGlobalVar']['startAttributes'] = ['Start']
         self.nodeInfo['changeGlobalVar']['finishedAttributes'] = ['Finished']
         
+        self.nodeInfo['runInlineScript'] = self.singleNodeTypeInit()
+        self.nodeInfo['runInlineScript']['name'] = 'runInlineScript'
+        self.nodeInfo['runInlineScript']['displayName'] = 'Run advanced script'
+        self.nodeInfo['runInlineScript']['startAttributes'] = ['Start']
+        self.nodeInfo['runInlineScript']['finishedAttributes'] = ['Finished']
+        
         #We also add some custom JSON info about the node layout (colors and such)
         import json
         self.nodeLayout = json.loads('''{
@@ -1444,6 +1492,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'changeGlobalVar':
             newNode.callAction = lambda self, node=newNode: self.changeGlobalVarCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'runInlineScript':
+            newNode.callAction = lambda self, node=newNode: self.runInlineScriptCallAction(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1555,6 +1606,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.changeGlobalVarInfo = dialog.changeGlobalVarInfo #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeGlobalVar')
+            # currentNode.callAction(self) #type:ignore
+        elif 'runInlineScript' in nodeName:
+            dialog = nodz_openInlineScriptDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.InlineScriptInfo = dialog.InlineScriptInfo #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'InlineScript')
             # currentNode.callAction(self) #type:ignore
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
@@ -2013,6 +2070,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             displayHTMLtext = "TODO-StoreData"
         elif nodeType == 'changeGlobalVar':
             displayHTMLtext = "TODO-ChangeGlobalVar"
+        elif nodeType == 'changeGlobalVar':
+            displayHTMLtext = "TODO-INLINESCRIPT"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext
@@ -2775,6 +2834,28 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         utils.nodz_setVariableToValue(variable,value,node.flowChart)
         
+        
+        self.finishedEmits(node)
+    
+    def runInlineScriptCallAction(self,node):
+        scriptText = node.InlineScriptInfo
+        
+        core = shared_data.core
+        #Go over each line of scriptText, broken by a \n:
+        lineData = scriptText.split('\n')
+        errored=False
+        for line in lineData:
+            if errored:
+                break
+            try:
+                eval(line)
+                logging.info(f'Ran commdand succesfully: {line}')
+            except Exception as e:
+                logging.error(f'Error with line {line}: {e}. Script broken off')
+                errored=True
+        
+        if errored==False:
+            logging.info('Fully ran custom script!')
         
         self.finishedEmits(node)
     #endregion
