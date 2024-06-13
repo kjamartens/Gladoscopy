@@ -1119,26 +1119,32 @@ def preLoadOptions_realtime(curr_layout,currentData):
             # if 'comboBox_RTanalysisFunctions' in child.objectName() and '__selectedDropdownEntryRTAnalysis__' in currentData:
             #     child.setCurrentText(currentData['__selectedDropdownEntryRTAnalysis__'])
 
-def hideAdvVariables(comboBox,current_selected_function=None):
+def hideAdvVariables(comboBox,current_selected_function=None,customParentChildren=None):
     """ 
     Hide/show the lineEdits/comboboxes of NodzVariables/Advanced/Normal input based on the comboBox variable
     """
     comboboxvalue = comboBox.currentText()
     functionName = comboBox.objectName().split('#')[1]
     kwargName = comboBox.objectName().split('#')[2]
-    parentObject = comboBox.parent()
+    if customParentChildren == None:
+        parentObject = comboBox.parent()
+        parentChildren = parentObject.children()
+        
+        #Go out if wrong function
+        currentSelectedFunction = None
+        if hasattr(parentObject, 'currentData'):
+            for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
+                if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
+                    currentSelectedFunction = entry[1]
+        
+            if functionName != currentSelectedFunction:
+                return
+    else:
+        parentChildren = customParentChildren
     
-    currentSelectedFunction = None
-    if hasattr(parentObject, 'currentData'):
-        for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
-            if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
-                currentSelectedFunction = entry[1]
-    
-        if functionName != currentSelectedFunction:
-            return
     
     #Loop over all widgets in parent:
-    for child in parentObject.children():
+    for child in parentChildren:
         print(child.objectName())
         if len(child.objectName().split('#')) > 2:
             #Check if it's the same function and variable:
