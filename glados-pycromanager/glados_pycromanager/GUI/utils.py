@@ -610,6 +610,33 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
         #                     hideAdvVariables(child)
 
+
+def nodz_setVariableToValue(variable,value,nodzInfo):
+    """
+    The nodz_setVariableToValue function is used to set a global variable to a value.
+    
+    Args:
+        variable: Specify the variable you want to set
+        value: Set the value of the variable
+        nodzInfo: Pass information between functions
+    """
+    originNodeName = variable.split('@')[1]
+    variableName = variable.split('@')[0]
+    
+    if originNodeName != 'Global':
+        logging.error('Attempting to set non-Global var. This is not allowed')
+    else:
+        #Add typing to an array if not yet.
+        if type(nodzInfo.globalVariables[variableName]['type']) == type:
+            nodzInfo.globalVariables[variableName]['type'] = [nodzInfo.globalVariables[variableName]['type']]
+        
+        if type(value) in nodzInfo.globalVariables[variableName]['type']:
+            nodzInfo.globalVariables[variableName]['data'] = value
+            logging.info(f"Set global variable {variableName} to {value}")
+        else:
+            logging.error(f'Type mismatch in variable setting! {variableName} and {value}')
+    return
+
 def nodz_evaluateVar(varName,nodzInfo):
     originNodeName = varName.split('@')[1]
     variableName = varName.split('@')[0]
@@ -690,7 +717,7 @@ def nodz_evaluateAdv(varName,nodzInfo):
         logging.error(f'Wrong syntax for advanced variable! Details: {varName}')
         return None
 
-def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo):
+def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluate=False):
     allData = {}
     for entry in relevantData:
         if 'ComboBoxSwitch#' in entry:
@@ -715,7 +742,7 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo):
                 evaluatedVar = nodz_evaluateAdv(finalValue,nodzInfo)
             else:
                 evaluatedVar = finalValue
-            allData[kwargName] = [evaluatedVar,valueVarOrAdv]
+            allData[kwargName] = [evaluatedVar,finalValue,valueVarOrAdv]
 
     return allData
 

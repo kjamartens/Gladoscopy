@@ -2833,8 +2833,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             node: Identify which node triggered the event
         """
         varInfo = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.changeGlobalVarInfo,node.flowChart)
-        varInfo['globalVarName'][0]
-        varInfo['globalVarValue'][0]
+        
+        variable = varInfo['globalVarName'][1]
+        value = varInfo['globalVarValue'][0]
+        
+        utils.nodz_setVariableToValue(variable,value,node.flowChart)
+        
+        
         self.finishedEmits(node)
     #endregion
     
