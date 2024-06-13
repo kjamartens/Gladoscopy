@@ -228,59 +228,6 @@ class nodz_analysisMeasurementDialog(nodz_analysisDialog):
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Measurement Options")
 
-class nodz_openStoreDataDialog(QDialog):
-    def __init__(self, parentNode=None):
-        """
-        Initializes the StoreDataDialog.
-        
-        Args:
-            parentNode: The parent node of the StoreDataDialog. If provided, the storeDataInfo will be set to the storeDataInfo of the parentNode.
-        
-        Returns:
-            None
-        """
-        super().__init__(None)
-        self.setWindowTitle("StoreData Dialog")
-        self.storeDataInfo = 0
-        if parentNode is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
-            self.storeDataInfo = parentNode.storeDataInfo
-
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.updateFields)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        
-        # Create the QVBoxLayout
-        layout = QVBoxLayout()
-
-        #Create two line-edits and add them:
-        self.item_to_store_lineEdit = QLineEdit()
-        if 'item_to_store' in self.storeDataInfo: #type:ignore
-            self.item_to_store_lineEdit.setText(self.storeDataInfo['item_to_store']) #type:ignore
-        else:
-            self.storeDataInfo['item_to_store'] = ''
-        self.item_to_store_lineEdit.textChanged.connect(lambda value: self.updateFields)
-        self.store_location_lineEdit = QLineEdit()
-        if 'store_location' in self.storeDataInfo: #type:ignore
-            self.store_location_lineEdit.setText(self.storeDataInfo['store_location']) #type:ignore
-        else:
-            self.storeDataInfo['store_location'] = ''
-        self.store_location_lineEdit.textChanged.connect(lambda value: self.updateFields)
-            
-
-        # Add the QMainWindow to the QVBoxLayout
-        layout.addWidget(self.item_to_store_lineEdit)
-        layout.addWidget(self.store_location_lineEdit)
-
-        layout.addWidget(button_box)
-        
-        self.setLayout(layout)
-        
-    def updateFields(self):
-        self.storeDataInfo['item_to_store'] = self.item_to_store_lineEdit.text()
-        self.storeDataInfo['store_location'] = self.store_location_lineEdit.text()
-        
 class nodz_openTimerDialog(QDialog):
     """
     A Dialog that is created for timer in the Nodz layout. 
@@ -433,7 +380,25 @@ class nodz_openChangeGlobalVarDialog(nodz_generalAdvancedLineEditDialog):
                         advLineEdits=[{'Variable to change:':['globalVarName','Variable']},{'Change to value:':['globalVarValue','Advanced']}],
                         storeVarName='changeGlobalVarInfo')
         
+
+class nodz_openStoreDataDialog(nodz_generalAdvancedLineEditDialog):
+    def __init__(self, parentNode=None):
+        """
+        Initializes the StoreDataDialog.
         
+        Args:
+            parentNode: The parent node of the StoreDataDialog. If provided, the storeDataInfo will be set to the storeDataInfo of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(parentNode=parentNode,
+                        title="Store Data",
+                        internalName='storeDataDialog',
+                        advLineEdits=[{'Data:':['item_to_store','Variable']},{'Location:':['store_location','Advanced']}],
+                        storeVarName='storeDataInfo')
+
+
 class nodz_openMMConfigDialog(QDialog):
     
     """
@@ -2777,41 +2742,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             node (nodz.Node): The node that has triggered the event.
         """
         
+        #Extract Data
+        varInfo = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.storeDataInfo,node.flowChart)
+        
         #Get the store-data from a variable
-        data_to_store = node.storeDataInfo['item_to_store']
-        if '@' in data_to_store:
-            nodeDict = utils.createNodeDictFromNodes(node.flowChart.nodes)
-            storeInfo = nodeDict[data_to_store.split('@')[1]].variablesNodz[data_to_store.split('@')[0]]['data']
-        else:
-            storeInfo = data_to_store
-            
-        store_location = node.storeDataInfo['store_location']
-        if '@' in store_location and '{' in store_location and '}' in store_location:
-            nodeDict = utils.createNodeDictFromNodes(node.flowChart.nodes)
-            #Find a regex like this:
-            import re
-            matches = re.finditer("{[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+}",store_location)
-            #Find all the matches
-            updating_string = store_location
-            for match in matches:
-                startpos = match.regs[0][0]
-                endpos = match.regs[0][1]
-                foundstring = store_location[startpos:endpos]
-                #Remove the curly braces
-                foundstring_data = foundstring[1:-1]
-                #run getting the data of this match
-                #Assuming string
-                data = str(nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['data'])
-                
-                #Replace this in the updating_string
-                updating_string = updating_string.replace(foundstring,"'"+data+"'")
-            
-            #Replace backslashes since they're escapechars
-            updating_string_backslash = updating_string.replace('\\','\\\\')
-            storeLoc = eval(updating_string_backslash)
-            
-        else:
-            storeLoc = store_location
+        storeInfo = varInfo['item_to_store'][0]
+        storeLoc = varInfo['store_location'][0]
         
         #Check if storeInfo is image-like:
         if isinstance(storeInfo, np.ndarray) and storeInfo.ndim > 1:
