@@ -822,6 +822,165 @@ class nodz_openScoringEndDialog(QDialog):
                 self.variableContainer.addWidget(lineEdit,i,1)
                 self.lineEdits.append(lineEdit)
 
+class nodz_caseSwitchDialog(QDialog):
+    """
+    The ScoringEnd (i.e. the end of the scoring) dialog window.
+    """
+    def __init__(self, parentNode=None, currentNode=None):
+        """
+        Initialize the ScoringEnd (i.e. the end of the scoring) dialog window.
+        
+        Args:
+            parent: The parent widget (default is None).
+            currentNode: The current node (default is None).
+        
+        Returns:
+            None
+        """
+        super().__init__()
+        self.caseSwitchInfo = currentNode.caseSwitchInfo
+        self.setWindowTitle("CaseSwitch")
+        #Add an OK/Cancel box
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        # Create a QWidget to contain the QGridLayout
+        self.grid_widget = QGridLayout()
+            
+        self.varSwitchAdvLineEdit = utils.multiLineEdit_valueVarAdv('CaseSwitch','Var',self.grid_widget,currentNode.flowChart,True,self.textChanged,'Variable')
+        #Set the current variables:
+        try:
+            self.varSwitchAdvLineEdit.line_edit.textChanged.disconnect(self.textChanged)
+            self.varSwitchAdvLineEdit.line_edit.setText(self.caseSwitchInfo[self.varSwitchAdvLineEdit.line_edit.objectName()])
+            self.varSwitchAdvLineEdit.line_edit.textChanged.connect(self.textChanged)
+            
+            self.varSwitchAdvLineEdit.line_edit_variable.textChanged.disconnect(self.textChanged)
+            self.varSwitchAdvLineEdit.line_edit_variable.setText(self.caseSwitchInfo[self.varSwitchAdvLineEdit.line_edit_variable.objectName()])
+            self.varSwitchAdvLineEdit.line_edit_variable.textChanged.connect(self.textChanged)
+            
+            self.varSwitchAdvLineEdit.line_edit_adv.textChanged.disconnect(self.textChanged)
+            self.varSwitchAdvLineEdit.line_edit_adv.setText(self.caseSwitchInfo[self.varSwitchAdvLineEdit.line_edit_adv.objectName()])
+            self.varSwitchAdvLineEdit.line_edit_adv.textChanged.connect(self.textChanged)
+            
+            self.varSwitchAdvLineEdit.comboBox_switch.currentIndexChanged.disconnect(self.textChanged)
+            self.varSwitchAdvLineEdit.comboBox_switch.setCurrentText(self.caseSwitchInfo[self.varSwitchAdvLineEdit.comboBox_switch.objectName()])
+            self.varSwitchAdvLineEdit.comboBox_switch.currentIndexChanged.connect(self.textChanged)
+        except:
+            pass
+        
+        #Finally actually add it to layout
+        self.grid_widget.addLayout(self.varSwitchAdvLineEdit,0,0)
+        #update the hiding of value/adv/variable
+        customParentChildren = [self.varSwitchAdvLineEdit.line_edit,self.varSwitchAdvLineEdit.line_edit_adv,self.varSwitchAdvLineEdit.line_edit_variable,self.varSwitchAdvLineEdit.line_edit_Button_adv,self.varSwitchAdvLineEdit.push_button_variable_adv]
+        utils.hideAdvVariables(self.varSwitchAdvLineEdit.comboBox_switch,customParentChildren=customParentChildren)
+            
+        self.nrVarsSpinbox = QSpinBox()
+        self.nrVarsSpinbox.setMinimum(1)
+        self.nrVarsSpinbox.valueChanged.connect(self.updateLayout)
+        self.grid_widget.addWidget(self.nrVarsSpinbox,1,0)
+
+        self.variableContainer = QGridLayout()
+        # self.grid_widget.addLayout(self.variableContainer,1,0)
+        
+        self.variableContainerscrollArea = QScrollArea(self)
+        self.variableContainerscrollArea.setWidgetResizable(True)
+        self.variableContainerscrollAreaWidgetContents = QWidget()
+        self.variableContainerscrollAreaWidgetContents.setLayout(self.variableContainer)
+        self.variableContainerscrollArea.setWidget(self.variableContainerscrollAreaWidgetContents)
+        self.grid_widget.addWidget(self.variableContainerscrollArea,2,0)
+        
+        # Set a fixed size for the QScrollArea
+        self.variableContainerscrollArea.setFixedSize(QSize(300, 300))  # Adjust the size as needed
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addLayout(self.grid_widget)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+        
+        #Add a spacer item at the bottom of the variableContainer so it's pushing it down down down
+        spacerItem = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.variableContainer.addItem(spacerItem, 999, 0)
+
+        #Pre-load labels/line-Edits with the current plugs:
+        self.labels = []
+        self.lineEdits = []
+        if currentNode is not None:
+            currentPlugs = list(currentNode.plugs.items())
+            for socket in currentPlugs:
+                label = QLabel(f"Option {len(self.labels)+1}:")
+                lineEdit = QLineEdit()
+                lineEdit.setText(socket[0])
+                self.variableContainer.addWidget(label,len(self.labels),0)
+                self.variableContainer.addWidget(lineEdit,len(self.labels),1)
+                self.labels.append(label)
+                self.lineEdits.append(lineEdit)
+        
+        self.nrVarsSpinbox.setValue(len(self.labels)) 
+        
+        #And update the layout at the start:
+        # self.updateLayout()
+    def textChanged(self):
+        self.caseSwitchInfo[self.varSwitchAdvLineEdit.line_edit.objectName()] = self.varSwitchAdvLineEdit.line_edit.text()
+        self.caseSwitchInfo[self.varSwitchAdvLineEdit.line_edit_variable.objectName()] = self.varSwitchAdvLineEdit.line_edit_variable.text()
+        self.caseSwitchInfo[self.varSwitchAdvLineEdit.line_edit_adv.objectName()] = self.varSwitchAdvLineEdit.line_edit_adv.text()
+        self.caseSwitchInfo[self.varSwitchAdvLineEdit.comboBox_switch.objectName()] = self.varSwitchAdvLineEdit.comboBox_switch.currentText()
+        self.caseSwitchInfo
+    
+    def updateLayout(self):
+        """
+        Updates the scoreEnd layout based on the number of variables (i.e. number of connectable score parameters) specified.
+        
+            Args:
+                None
+        
+            Returns:
+                None
+        """
+        nrVars = self.nrVarsSpinbox.value()
+        if nrVars == len(self.labels)-1: #If we want to remove the last one
+            tobeRemovedLabel = self.labels[-1]
+            tobeRemovedLineEdit = self.lineEdits[-1]
+            self.layout().removeWidget(tobeRemovedLabel)
+            tobeRemovedLabel.deleteLater()
+            self.layout().removeWidget(tobeRemovedLineEdit)
+            tobeRemovedLineEdit.deleteLater()
+            self.labels.pop()
+            self.lineEdits.pop()
+        elif nrVars == len(self.labels)+1: #if we want to add one...
+            label = QLabel(f"Option {len(self.labels)+1}:")
+            lineEdit = QLineEdit()
+            self.variableContainer.addWidget(label,len(self.labels),0)
+            self.variableContainer.addWidget(lineEdit,len(self.labels),1)
+            self.labels.append(label)
+            self.lineEdits.append(lineEdit)
+        elif nrVars == len(self.labels): 
+            pass
+        else: #Else, we added a fully new number, so we reset everything
+            for label in self.labels:
+                self.layout().removeWidget(label)
+                label.deleteLater()
+            for lineEdit in self.lineEdits:
+                self.layout().removeWidget(lineEdit)
+                lineEdit.deleteLater()
+
+            self.labels = []
+            self.lineEdits = []
+
+            for i in range(nrVars):
+                label = QLabel(f"Option {i+1}:")
+                lineEdit = QLineEdit()
+                self.variableContainer.addWidget(label,i,0)
+                self.labels.append(label)
+                self.variableContainer.addWidget(lineEdit,i,1)
+                self.lineEdits.append(lineEdit)
+
+
+
 class FoVFindImaging_singleCh_configs(QDialog):
     """
     I BELIEVE DEPRECATED (may 2024)
@@ -1004,8 +1163,9 @@ class NodeSignalManager(QObject):
             None
         """
         # Dynamically add a new signal to the object
-        setattr(self, signal_name, self.new_signal)
-        self.signals.append(self.new_signal)
+        setattr(self, signal_name, eval('self.new_signal'))
+        self.signals.append(eval('self.new_signal'))
+        
 
     def print_signals(self):
         """
@@ -1286,6 +1446,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['runInlineScript']['startAttributes'] = ['Start']
         self.nodeInfo['runInlineScript']['finishedAttributes'] = ['Finished']
         
+        self.nodeInfo['caseSwitch'] = self.singleNodeTypeInit()
+        self.nodeInfo['caseSwitch']['name'] = 'caseSwitch'
+        self.nodeInfo['caseSwitch']['displayName'] = 'Case/Switch'
+        self.nodeInfo['caseSwitch']['startAttributes'] = ['Start']
+        self.nodeInfo['caseSwitch']['finishedAttributes'] = ['Error']
+        
         #We also add some custom JSON info about the node layout (colors and such)
         import json
         self.nodeLayout = json.loads('''{
@@ -1495,6 +1661,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'runInlineScript':
             newNode.callAction = lambda self, node=newNode: self.runInlineScriptCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'caseSwitch':
+            newNode.callAction = lambda self, node=newNode: self.runCaseSwitchCallAction(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1613,6 +1782,28 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.InlineScriptInfo = dialog.InlineScriptInfo #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'InlineScript')
             # currentNode.callAction(self) #type:ignore
+        elif 'caseSwitch' in nodeName:
+            dialog = nodz_caseSwitchDialog(parentNode=currentNode,currentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                dialogLineEdits = []
+                for lineEdit in dialog.lineEdits:
+                    dialogLineEdits.append(lineEdit.text())
+                self.update_plugs_fromDialog(currentNode,dialogLineEdits)
+                
+                currentNode.caseSwitchInfo = dialog.caseSwitchInfo
+                currentNode.caseSwitchInfo['Plugs'] = dialogLineEdits
+                
+                #Update the node itself
+                self.update()
+                nodeType = self.nodeLookupName_withoutCounter(nodeName)
+                for _ in range(3):
+                    self.updateNumberStartFinishedDataAttributes(currentNode,nodeType)
+                    self.update()
+                
+                logging.info(dialogLineEdits)
+                logging.info('Pressed OK on scoringEnd')
+            # currentNode.callAction(self) #type:ignore
+        
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringEnd' in nodeName:
@@ -1679,6 +1870,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         nodeType = self.nodeLookupName_withoutCounter(node.name)
         if nodeType == 'scoringEnd':
             self.update_scoring_end(node,node.scoring_end_currentData['Variables'])
+        if nodeType == 'caseSwitch':
+            self.update_plugs_fromDialog(node,node.caseSwitchInfo['Plugs'])
 
     def NodeRemoved(self,nodeNames):
         """
@@ -2347,18 +2540,15 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             current_sockets = [item[0] for item in list(currentNode.sockets.items())]
             if dialogLineEdits != current_sockets:
                 
-                #We loop over the sockets:
-                for socket_id in reversed(range(len(currentNode.sockets))):
-                    socketFull = list(currentNode.sockets.items())[socket_id]
-                    socket = socketFull[0]
+                for socket_id in reversed(range(len(currentNode.attrs))):
+                    socket = currentNode.attrs[socket_id]
                     #We check if the socket is in dialogLineEdits:
-                    if socket not in dialogLineEdits:
+                    if socket not in dialogLineEdits and socket in current_sockets:
                         #If it isn't, we just delete it:
                         self.deleteAttribute(currentNode,socket_id)
                         time.sleep(sleepTime)
                         self.update()
                         time.sleep(sleepTime)
-                
                 
                 #Check which are different (index-wise) between dialogLineEdits and current_sockets:
                 diff_indexes = []
@@ -2395,6 +2585,74 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         #We also need to add these attributes to the nodes startAttributes in self.nodeInfo:
         self.nodeInfo[self.nodeLookupName_withoutCounter(currentNode.name)]['startAttributes'] = dialogLineEdits
+    
+    def update_plugs_fromDialog(self,currentNode,dialogLineEdits):
+        """
+        Update the "scoring end" current node with new dialog line edits.
+        
+        Args:
+            currentNode: The current node to update.
+            dialogLineEdits: The new sockets of the current node.
+        
+        Returns:
+            None
+        """
+                
+        #the dialogLineEdits should be the new plugs of the current node. However, if a plug with the name already exists, it shouldn't be changed.
+        import time
+        sleepTime = 0.02
+        for _ in range(3): #Just repeat everything 3 times and hope it solves itself
+            self.update()
+            time.sleep(sleepTime)
+            current_plugs = [item[0] for item in list(currentNode.plugs.items())]
+            if dialogLineEdits != current_plugs:
+                
+                for plug_id in reversed(range(len(currentNode.attrs))):
+                    plug = currentNode.attrs[plug_id]
+                    #We check if the plug is in dialogLineEdits:
+                    if plug not in dialogLineEdits and plug in current_plugs:
+                        print(plug_id)
+                        #If it isn't, we just delete it:
+                        self.deleteAttribute(currentNode,plug_id)
+                        time.sleep(sleepTime)
+                        self.update()
+                        time.sleep(sleepTime)
+                
+                #Check which are different (index-wise) between dialogLineEdits and current_plugs:
+                diff_indexes = []
+                same_indexes = []
+                for i in range(min(len(dialogLineEdits),len(current_plugs))):
+                    if dialogLineEdits[i] != current_plugs[i]:
+                        diff_indexes.append(i)
+                    else:
+                        same_indexes.append(i)
+                #Also append indexes if dialogLineEdits is longer than current_plugs:
+                if len(dialogLineEdits) > len(current_plugs):
+                    for i in range(len(current_plugs),len(dialogLineEdits)):
+                        diff_indexes.append(i)
+                
+                offset = 100
+                #Then we create new plugs or move existing plugs, only for those that have a different pos
+                for plug_new in ([dialogLineEdits[i] for i in diff_indexes]):
+                    pos_in_dialogLineEdits = dialogLineEdits.index(plug_new)
+                    if plug_new not in currentNode.plugs:
+                        self.createAttribute(currentNode, name=plug_new, index=pos_in_dialogLineEdits+offset, preset='attr_default', plug=True, socket=False, dataType=None)
+                        time.sleep(sleepTime)
+                        self.update()
+                        time.sleep(sleepTime)
+                    else: #Else we move it from some other location to where we want it
+                        #Find this plug in currentNode.plugs.items():
+                        plugFull = list(currentNode.plugs.items())
+                        pos_in_node_info = [plug_id for plug_id in range(len(plugFull)) if plugFull[plug_id][0] == plug_new][0]
+                        old_pos = plugFull[pos_in_node_info][1].index
+                        #Physically move it
+                        self.editAttribute(currentNode,old_pos,newName = None, newIndex=pos_in_dialogLineEdits+offset)
+                        time.sleep(sleepTime)
+                        self.update()
+                        time.sleep(sleepTime)
+        
+        #We also need to add these attributes to the nodes startAttributes in self.nodeInfo:
+        self.nodeInfo[self.nodeLookupName_withoutCounter(currentNode.name)]['finishedAttributes'] = dialogLineEdits
     
     def changeConfigStorageInNodz(self,currentNode,configNameSet):
         """
@@ -2858,6 +3116,36 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             logging.info('Fully ran custom script!')
         
         self.finishedEmits(node)
+    
+    def runCaseSwitchCallAction(self,node):
+        
+        CurrentValueWantedVariable = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.caseSwitchInfo,node.flowChart)['Var'][0]
+        
+        
+        #Alright so emitting the signals doesn't work because they're all connected.
+        #So, idea is to evaluate the graph, find the correct linked node, and start that one from here.
+        correctPlugFound = False
+        graph = node.flowChart.evaluateGraph()
+        for graphConnection in graph:
+            if correctPlugFound == False and graphConnection[0] == node.name+'.'+str(CurrentValueWantedVariable):
+                foundNodeName = graphConnection[1].split('.')[0]
+                logging.info(f"Node {node.name} found a case/switch with value {CurrentValueWantedVariable} connected to node {foundNodeName}")
+                foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
+                foundNode.oneConnectionAtStartIsFinished()
+                correctPlugFound = True
+                node.status='finished'
+                break
+            
+        #If none are found:
+        if correctPlugFound == False:
+            logging.warning('Case/Switch not found, using the Error')
+            for graphConnection in graph:
+                if graphConnection[0] == node.name+'.Error':
+                    foundNodeName = graphConnection[1].split('.')[0]
+                    foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
+                    foundNode.oneConnectionAtStartIsFinished()
+                    node.status='finished'
+            
     #endregion
     
     #region NodzFlowChart runs

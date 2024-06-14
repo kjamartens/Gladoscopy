@@ -875,6 +875,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_STORE_DATA'] = dict()
         data['NODES_CHANGE_GLOBAL_VAR'] = dict()
         data['NODES_RUN_INLINE_SCRIPT'] = dict()
+        data['NODES_CASE_SWITCH'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -987,6 +988,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'InlineScriptInfo' in vars(nodeInst):
                 if nodeInst.InlineScriptInfo is not None:
                     data['NODES_RUN_INLINE_SCRIPT'][node] = nodeInst.InlineScriptInfo  
+                    
+            data['NODES_CASE_SWITCH'][node] = {}
+            if 'caseSwitchInfo' in vars(nodeInst):
+                if nodeInst.caseSwitchInfo is not None:
+                    data['NODES_CASE_SWITCH'][node] = nodeInst.caseSwitchInfo  
             
             
             
@@ -1162,6 +1168,12 @@ class Nodz(QtWidgets.QGraphicsView):
                     if 'InlineScriptInfo' in vars(node):
                         if data['NODES_RUN_INLINE_SCRIPT'] is not None:
                             node.InlineScriptInfo = data['NODES_RUN_INLINE_SCRIPT'][name] #type:ignore
+                            
+            if 'NODES_CASE_SWITCH' in data:
+                if name in data['NODES_CASE_SWITCH']:
+                    if 'caseSwitchInfo' in vars(node):
+                        if data['NODES_CASE_SWITCH'] is not None:
+                            node.caseSwitchInfo = data['NODES_CASE_SWITCH'][name] #type:ignore
                             
             #Do an emit after full loading:
             self.signal_NodeFullyInitialisedNodeItself.emit(node)
@@ -1562,9 +1574,11 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.visualisation_currentData = {}
         self.real_time_analysis_currentData = {}
         self.timerInfo = 1
+    
         self.storeDataInfo = {}
         self.changeGlobalVarInfo  = {}
         self.InlineScriptInfo  = ''
+        self.caseSwitchInfo = {}
         
         self.status = 'idle' #status should be 'idle','running','finished'
 
@@ -1885,10 +1899,14 @@ class NodeItem(QtWidgets.QGraphicsItem):
         if name in self.plugs.keys():
             for connection in self.plugs[name].connections:
                 connection._remove()
-            for connection in self.bottomAttrs[name].connections:
-                connection._remove()
-            for connection in self.topAttrs[name].connections:
-                connection._remove()
+            if hasattr(self,'bottomAttrs'):
+                if name in self.bottomAttrs:
+                    for connection in self.bottomAttrs[name].connections:
+                        connection._remove()
+            if hasattr(self,'topAttrs'):
+                if name in self.topAttrs:
+                    for connection in self.topAttrs[name].connections:
+                        connection._remove()
 
             self.scene().removeItem(self.plugs[name])
             self.plugs.pop(name)
