@@ -1281,20 +1281,24 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.scanningWidget = ScanningWidget(nodzinstance=self)
         newgridlayout.addWidget(self.scanningWidget)
         
+        self.variablesWidgetGroupbox = QGroupBox("Variables")
+        newgridlayout = QGridLayout()
+        self.variablesWidgetGroupbox.setLayout(newgridlayout)
         self.variablesWidget = VariablesWidget(nodzinstance=self)
         newgridlayout.addWidget(self.variablesWidget)
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
+        self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.defineNodeInfo()
         
         # Add the QGraphicsView to the mainLayout and allt he other layouts
-        self.mainLayout.addWidget(self.graphics_view,0,0)
-        self.mainLayout.addLayout(self.buttonsArea,0,1)
-        self.mainLayout.addWidget(self.decision_groupbox,0,2)
-        self.mainLayout.addWidget(self.scanwidget_groupbox,0,3)
-        self.mainLayout.addWidget(self.variablesWidget,0,4)
+        self.mainLayout.addWidget(self.graphics_view,0,0,2,1)
+        self.mainLayout.addLayout(self.buttonsArea,0,1,2,1)
+        self.mainLayout.addWidget(self.decision_groupbox,0,2,1,1)
+        self.mainLayout.addWidget(self.scanwidget_groupbox,1,2,1,1)
+        self.mainLayout.addWidget(self.variablesWidgetGroupbox,0,3,2,1)
         
         #Global variables for MM/napari
         self.core = core
@@ -4285,8 +4289,9 @@ class VariablesDialog(QDialog, VariablesBase):
         
         # Add button box to the layout
         self.layout().addWidget(self.buttonBox)
-        self.setMinimumSize(600,300)
-        self.setBaseSize(600,300)
+        self.setMinimumSize(300,300)
+        self.setBaseSize(300,300)
+        self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
         
     def on_cell_double_clicked(self, row, column):
         super().on_cell_double_clicked(row, column)
