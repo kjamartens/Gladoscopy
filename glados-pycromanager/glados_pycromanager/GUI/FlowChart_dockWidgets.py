@@ -1262,6 +1262,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.globalVariables['TrialGlobalVariable']['type'] = str
         self.globalVariables['TrialGlobalVariable']['data'] = 'test'
         self.globalVariables['TrialGlobalVariable']['importance'] = 'Informative'
+        self.globalVariables['XY_pos_measurementArray']={}
+        self.globalVariables['XY_pos_measurementArray']['type'] = [np.ndarray,list]
+        self.globalVariables['XY_pos_measurementArray']['data'] = []
+        self.globalVariables['XY_pos_measurementArray']['importance'] = 'Informative'
         
         #import qgroupbox:
         from qtpy.QtWidgets import QGroupBox    
@@ -2695,6 +2699,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         #Dictionary of nodes to pass around variables.
         nodeDict = utils.createNodeDictFromNodes(self.nodes)
+        nodzInfo = node.flowChart
         
         #Figure out which function is selected in the scoring_analysis node
         selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
@@ -3075,8 +3080,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 logging.info(f'Stored TIF image at {storeLoc}')
         
         self.finishedEmits(node)
-    
-    
+
     def changeGlobalVarCallAction(self,node):
         """
         The changeGlobalVarCallAction function is the action function for the change global var Call node in the Flowchart.

@@ -658,7 +658,12 @@ def nodz_setVariableToValue(variable,value,nodzInfo):
             nodzInfo.globalVariables[variableName]['data'] = value
             logging.info(f"Set global variable {variableName} to {value}")
         else:
-            logging.error(f'Type mismatch in variable setting! {variableName} and {value}')
+            try:
+                if type(eval(value)) in nodzInfo.globalVariables[variableName]['type']:
+                    nodzInfo.globalVariables[variableName]['data'] = eval(value)
+                    logging.info(f"Set global variable {variableName} to {eval(value)}")
+            except:
+                logging.error(f'Type mismatch in variable setting! {variableName} and {value}')
     return
 
 def nodz_evaluateVar(varName,nodzInfo):
@@ -724,7 +729,10 @@ def nodz_evaluateAdv(varName,nodzInfo):
             
             #Replace this in the updating_string
             if calculatable: #if calculatable
-                updating_string = updating_string.replace(foundstring,""+data+"")
+                try:
+                    updating_string = updating_string.replace(foundstring,""+data+"")
+                except:
+                    updating_string = updating_string.replace(foundstring,""+str(data)+"")
             else: #uncalculatable, add as string
                 updating_string = updating_string.replace(foundstring,"'"+data+"'")
                 
@@ -1927,6 +1935,7 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                     #Change this value if it's a variable or advanced:
                     if methodKwargTypes[GUIbasedIndex] == 'Variable':
                         #name@origin.
+                        # kwargvalue = nodz_evaluateVar(kwargvalue, nodzInfo)
                         originNodeName = kwargvalue.split('@')[1]
                         variableName = kwargvalue.split('@')[0]
                         # #Find the correct node
@@ -1935,7 +1944,10 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                         #         #Find the correct variable data
                         #         varData = node.variablesNodz[variableName]['data']
                         #         #Set it to this kwarg value - str allways
-                        kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+                        if originNodeName != 'Global':
+                            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+                        else:
+                            kwargvalue = "nodzInfo.globalVariables['"+variableName+"']['data']"
                         ignoreQuotes = True #ignore quotes - use it as a variable, not a string
                                 # break
                     elif methodKwargTypes[GUIbasedIndex] == 'Advanced':

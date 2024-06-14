@@ -1,0 +1,51 @@
+from MainScripts import FunctionHandling
+from shapely import Polygon, affinity
+import math
+import numpy as np
+import inspect
+import dask.array as da
+import ndtiff
+
+# Required function __function_metadata__
+# Should have an entry for every function in this file
+def __function_metadata__():
+    return {
+        "CheckVsList": {
+            "input":[
+                {"name": "Position", "type": [np.ndarray,list]}
+            ],
+            "output":[
+                {"name": "within_range", "type": [bool], "importance": "Default"}
+            ],
+            "required_kwargs": [
+                {"name": "List", "description": "List", "default": [], "type": [np.ndarray,list]},
+                {"name": "Distance", "description": "List", "default": 10, "type": [int, float]}
+            ],
+            "optional_kwargs": [
+            ],
+            "help_string": "Check whether Position is closer than Distance to any entry in List.",
+            "display_name": "Check Position for closeness to List"
+        }
+    }
+
+
+#-------------------------------------------------------------------------------------------------------------------------------
+#Callable functions
+#-------------------------------------------------------------------------------------------------------------------------------
+def CheckVsList(core,**kwargs):
+    
+    #Check if we have the required kwargs
+    [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
+
+    output = {}
+    output['within_range'] = False
+    
+    for entry in kwargs['List']:
+        totalEuclidianDist = math.sqrt((eval(kwargs['Position'])[0]-entry[0])**2 + (eval(kwargs['Position'])[1]-entry[1])**2)
+        if totalEuclidianDist < float(kwargs['Distance']):
+            output['within_range'] = True
+            break
+    
+    
+    return output
+
