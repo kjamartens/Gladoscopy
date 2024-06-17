@@ -466,7 +466,7 @@ class nodz_openMMConfigDialog(QDialog):
     """
     Opens a dialog to modify the MM configs of a node
     """
-    def __init__(self, parentNode=None, storedConfigsStrings=None):
+    def __init__(self, parentNode=None, storedConfigsStrings=None, storedrelStagesString=None):
         """
         Opens a dialog to modify the Micromanager configs of a node
         
@@ -487,7 +487,7 @@ class nodz_openMMConfigDialog(QDialog):
             self.MMlayout = parentNode.MMconfigInfo.mainLayout
             
             #Create a new MMconfigUI with the same components as parentNode.MMconfigInfo:
-            self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs,showShutterOptions=parentNode.MMconfigInfo.showShutterOptions, showLiveSnapExposureButtons=parentNode.MMconfigInfo.showLiveSnapExposureButtons, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM,autoSaveLoad=False)
+            self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs,showShutterOptions=parentNode.MMconfigInfo.showShutterOptions, showLiveSnapExposureButtons=parentNode.MMconfigInfo.showLiveSnapExposureButtons, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM,showRelativeStages=parentNode.MMconfigInfo.showRelativeStages,autoSaveLoad=False)
             
             if parentNode.MMconfigInfo.changes_update_MM:
                 print('WARNING! Nodz is actually changing the configs real-time rather than only when they are ran!')
@@ -505,6 +505,21 @@ class nodz_openMMConfigDialog(QDialog):
                             #Set the value correctly in the GUI:
                             self.newConfigUI.updateValueInGUI(foundConfigId,storedConfigString[1])
                             break
+            
+            if storedrelStagesString is not None:
+                allRelStages = self.newConfigUI.oneDRelStackedWidget.children()
+                #Set the values of all the stages
+                for relstage in allRelStages:
+                    objName = relstage.objectName()
+                    if objName != '':
+                        for storedrelstage in storedrelStagesString:
+                            if objName == storedrelstage[0]:
+                                relstage.children()[2].setText(str(storedrelstage[1]))
+                
+                #Set the currently-selected stage:
+                for storedrelstage in storedrelStagesString:
+                    if storedrelstage[0] == '__chosenRelStage__':
+                        self.newConfigUI.oneDstageRelDropdown.setCurrentText(storedrelstage[1])
             
             button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             button_box.accepted.connect(self.accept)
@@ -542,7 +557,17 @@ class nodz_openMMConfigDialog(QDialog):
         return ConfigsToBeChanged
         
         return self.newConfigUI
+    
+    def RelStageInfo(self):
+        relStageInfo = []
+        allRelStages = self.newConfigUI.oneDRelStackedWidget.children()
+        for relstage in allRelStages:
+            objName = relstage.objectName()
+            if objName != '':
+                relStageInfo.append([objName,float(relstage.children()[2].text())])
+        relStageInfo.append(['__chosenRelStage__',self.newConfigUI.oneDstageRelDropdown.currentText()])
 
+        return relStageInfo
     # def getExposureTime(self):
     #     return self.mdaconfig.exposure_ms
 
@@ -1674,13 +1699,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callAction = lambda self, node=newNode: self.MMconfigChangeRan(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'changeStagePos':
-            # Get all config groups
+            # Get all config group s
             allConfigGroups={}
             nrconfiggroups = self.core.get_available_config_groups().size() #type:ignore
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
-            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=True,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,showRelativeStages = True, autoSaveLoad=False) # type: ignore
+            newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=False,showROIoptions=False,showShutterOptions=False,showLiveSnapExposureButtons=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = False,showRelativeStages = True, autoSaveLoad=False) # type: ignore
             
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMstageChangeRan(node)
@@ -1784,10 +1809,16 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif 'changeStagePos' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #Show dialog:
-            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = currentNode.MMconfigInfo.config_string_storage) #type:ignore
+            if 'MMconfigInfo' in vars(currentNode):
+                storedRelStagesString = currentNode.MMconfigInfo.relstage_string_storage #type: ignore
+            else:
+                currentNode.MMconfigInfo = [] #type: ignore
+                storedRelStagesString = None
+            dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedrelStagesString = storedRelStagesString) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
-                self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
+                self.changeRelStageStorageInNodz(currentNode,dialog.RelStageInfo())
+                
         elif 'analysisMeasurement' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
@@ -2742,6 +2773,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             currentNode.MMconfigInfo.config_string_storage.append([singleConfig[0],singleConfig[1]])
         return
     
+    def changeRelStageStorageInNodz(self,currentNode,relstageinfo):
+        
+        currentNode.MMconfigInfo.relstage_string_storage=relstageinfo
+    
     def AnalysisNode_started(self,node):
         """
         Perform the Analysis set in a node
@@ -2886,7 +2921,17 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        logging.info('MMstageChange')
+        
+        for stor in node.MMconfigInfo.relstage_string_storage:
+            if stor[0] == '__chosenRelStage__':
+                stageToMove = stor[1]
+        
+        for stor in node.MMconfigInfo.relstage_string_storage:
+            if stor[0] == stageToMove:
+                distToMove = float(stor[1])
+        
+        self.core.set_relative_position(stageToMove,distToMove)
+        
         self.finishedEmits(node)
         
     def MMconfigChangeRan(self,node):

@@ -220,6 +220,7 @@ class MMConfigUI(CustomMainWindow):
         self.configCheckboxes = {}
         self.sliderPrecision = 100
         self.config_string_storage = []
+        self.relstage_string_storage = []
         #Create a Vertical+horizontal layout:
         self.mainLayout = QGridLayout()
         self.configEntries = {}
@@ -273,7 +274,8 @@ class MMConfigUI(CustomMainWindow):
         if showRelativeStages:
             self.relativeStagesGroupBox = QGroupBox("RelativeStages")
             self.relativeStagesGroupBox.setLayout(self.relativeStagesLayout())
-            self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 7)
+            # self.relativeStagesGroupBox.setLayout(QLayout())
+            self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
         
         #Update everything for good measure at the end of init
         self.fullyLoaded = True
@@ -845,8 +847,8 @@ class MMConfigUI(CustomMainWindow):
         This layout is used when the user is in relative mode.
         """
         stageLayout = QHBoxLayout()
-        stageLayout.addLayout(self.XYstageLayout())
-        stageLayout.addLayout(self.oneDstageLayout())
+        # stageLayout.addLayout(self.XYstageLayout())
+        stageLayout.addLayout(self.oneDstageRelLayout())
         return stageLayout
     
     def XYstageLayout(self):
@@ -1054,7 +1056,71 @@ class MMConfigUI(CustomMainWindow):
         elif abs(amount) == 1:
             self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
         self.updateOneDstageLayout()
+    
+    
+    def oneDstageRelLayout(self):
+        """
+        Creates a UI layout to place all found one-D stages in a QStackedWidget and add the LineEdits etc. Also see oneDstageLayout()
+        """
+        #Create a layout
+        self.oneDStageRelLayout = QGridLayout()
         
+        #Creates a UI layout to move all found 1D stages
+        #Find all 1D stages
+        allStages = self.getDevicesOfDeviceType('StageDevice')
+        
+        #Create a drop-down menu that has these stages as options
+        self.oneDstageRelDropdown = QComboBox()
+        for stage in allStages:
+            self.oneDstageRelDropdown.addItem(stage)
+        #If it changes, call the update routine
+        self.oneDstageRelDropdown.currentTextChanged.connect(lambda index: self.updateOneDstageRelLayout())
+        #Add the dropdown to the layout:
+        self.oneDStageRelLayout.addWidget(self.oneDstageRelDropdown,0,0)
+        
+        #Create a QGridBox for the movement sizes for each stage:
+        self.oneDMoveRelEditFieldGridLayouts={}
+        self.oneDMoveRelEditField={}
+        self.oneDRelStackedWidget = QStackedWidget()
+        for stage in allStages:
+            self.oneDMoveRelEditFieldGridLayouts[stage] = QWidget()
+            self.oneDMoveRelEditFieldGridLayouts[stage].setObjectName(stage)
+            internalLayout = QGridLayout()
+            self.oneDMoveRelEditFieldGridLayouts[stage].setLayout(internalLayout)
+            self.oneDMoveRelEditField[stage] = {}
+            
+            internalLayout.addWidget(QLabel("Move"),0,0)
+            self.oneDMoveRelEditField[stage] = QLineEdit()
+            internalLayout.addWidget(self.oneDMoveRelEditField[stage],1,0)
+            self.oneDMoveRelEditField[stage].setText("10")
+            self.oneDMoveRelEditField[stage].editingFinished.connect(lambda: self.storeAllControlValues())
+            
+            self.oneDRelStackedWidget.addWidget(self.oneDMoveRelEditFieldGridLayouts[stage])
+        
+        self.oneDStageRelLayout.addWidget(self.oneDRelStackedWidget,1,0)
+        
+        #Get current info of the widget
+        self.oneDinfoRelWidget = QLabel()
+        self.oneDStageRelLayout.addWidget(self.oneDinfoRelWidget,2,0)
+        #update the text
+        # self.updateOneDstageRelLayout()
+        
+        #Store the values
+        # self.storeAllControlValues()
+        
+        return self.oneDStageRelLayout
+    
+    def updateOneDstageRelLayout(self):
+        """
+        Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
+        """
+        self.oneDinfoRelWidget.setText(f"{self.oneDstageRelDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageRelDropdown.currentText()):.1f}") #type:ignore
+        
+        for widget_id in range(0,self.oneDRelStackedWidget.count()):
+            widget = self.oneDRelStackedWidget.widget(widget_id)
+            if widget.objectName() == self.oneDstageRelDropdown.currentText():
+                self.oneDRelStackedWidget.setCurrentIndex(widget_id)
+    
     def updateXYStageInfoWidget(self):
         """
         Updates the XY stage info widget with the current position of the stage

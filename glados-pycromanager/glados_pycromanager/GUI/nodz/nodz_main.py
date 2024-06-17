@@ -865,6 +865,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES'] = dict()
         data['NODES_MDA'] = dict()
         data['NODES_MMCONFIGCHANGE'] = dict()
+        data['NODES_RELSTAGECHANGE'] = dict()
         data['NODES_SCORING_ANALYSIS'] = dict()
         data['NODES_SCORING_VISUALISATION'] = dict()
         data['NODES_SCORING_SCORING'] = dict()
@@ -924,6 +925,12 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'MMconfigInfo' in vars(nodeInst): 
                 if nodeInst.MMconfigInfo is not None:
                     data['NODES_MMCONFIGCHANGE'][node] = nodeInst.MMconfigInfo.config_string_storage
+
+            #Storing required MM-config-changing info:
+            data['NODES_RELSTAGECHANGE'][node] = {}
+            if 'MMconfigInfo' in vars(nodeInst): 
+                if nodeInst.MMconfigInfo is not None:
+                    data['NODES_RELSTAGECHANGE'][node] = nodeInst.MMconfigInfo.relstage_string_storage
 
             
             data['NODES_SCORING_ANALYSIS'][node] = {}
@@ -1117,6 +1124,14 @@ class Nodz(QtWidgets.QGraphicsView):
                     if data['NODES_MMCONFIGCHANGE'] is not None:
                         mmconfigchangedata = data['NODES_MMCONFIGCHANGE'][name]
                         node.MMconfigInfo.config_string_storage = mmconfigchangedata #type:ignore
+                        
+                        
+            #Restore oneDstageMove(rel) data
+            if name in data['NODES_RELSTAGECHANGE']:
+                if 'MMconfigInfo' in vars(node):
+                    if data['NODES_RELSTAGECHANGE'] is not None:
+                        mmrelstagechangedata = data['NODES_RELSTAGECHANGE'][name]
+                        node.MMconfigInfo.relstage_string_storage = mmrelstagechangedata #type:ignore
                 
             #Restore scoring-data:
             if name in data['NODES_SCORING_ANALYSIS']:
