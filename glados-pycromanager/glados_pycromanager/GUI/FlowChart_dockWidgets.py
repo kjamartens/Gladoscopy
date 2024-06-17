@@ -1321,15 +1321,22 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.loadPickleButton = QPushButton('Load Graph')
         self.buttonsArea.addWidget(self.loadPickleButton)
         self.loadPickleButton.clicked.connect(lambda index: self.loadGraphJSON())
-        self.runScoringButton = QPushButton('Start run!')
-        self.buttonsArea.addWidget(self.runScoringButton)
-        self.runScoringButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
+        self.fullRunButton = QPushButton('Start run!')
+        self.buttonsArea.addWidget(self.fullRunButton)
+        self.fullRunButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
+        
+        self.runInitButton = QPushButton('Run Init Only')
+        self.buttonsArea.addWidget(self.runInitButton)
+        self.runInitButton.clicked.connect(lambda index: self.runInitOnly())
+        
         self.runScoringButton = QPushButton('Run Scoring Only')
         self.buttonsArea.addWidget(self.runScoringButton)
         self.runScoringButton.clicked.connect(lambda index: self.runScoringOnly())
-        self.runScoringButton = QPushButton('Run Scoring + Acq')
-        self.buttonsArea.addWidget(self.runScoringButton)
-        self.runScoringButton.clicked.connect(lambda index: self.runScoring())
+        
+        self.runScoringPlusAcqButton = QPushButton('Run Scoring + Acq')
+        self.buttonsArea.addWidget(self.runScoringPlusAcqButton)
+        self.runScoringPlusAcqButton.clicked.connect(lambda index: self.runScoring())
+        
         self.storePickleButton = QPushButton('Store Graph')
         self.buttonsArea.addWidget(self.storePickleButton)
         self.storePickleButton.clicked.connect(lambda index: self.storeGraphJSON())
@@ -1398,6 +1405,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodes = []
         self.nodeCounter={}
         self.preventAcq=False #Set to true if you want to prevent smart acquisition (i.e. scoring-only, never passing to acq)
+        self.preventScoring=False #Set to true if you want to prevent smart scoring (i.e. init-only, never passing to scoring)
         
         #Connect required deleted/double clicked signals
         self.signal_NodeDeleted.connect(self.NodeRemoved)
@@ -1465,6 +1473,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['changeStagePos']['displayName'] = 'Change Stage Position'
         self.nodeInfo['changeStagePos']['startAttributes'] = ['Start']
         self.nodeInfo['changeStagePos']['finishedAttributes'] = ['Done']
+        self.nodeInfo['changeStagePos']['NodeSize'] = 60
         
         self.nodeInfo['analysisMeasurement'] = self.singleNodeTypeInit()
         self.nodeInfo['analysisMeasurement']['name'] = 'analysisMeasurement'
@@ -1474,19 +1483,19 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisMeasurement']['bottomAttributes'] = ['Visual']
         
-        self.nodeInfo['analysisShapes'] = self.singleNodeTypeInit()
-        self.nodeInfo['analysisShapes']['name'] = 'analysisShapes'
-        self.nodeInfo['analysisShapes']['displayName'] = 'Analysis [Shapes]'
-        self.nodeInfo['analysisShapes']['startAttributes'] = ['Analysis start']
-        self.nodeInfo['analysisShapes']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['analysisShapes']['dataAttributes'] = ['Output']
+        # self.nodeInfo['analysisShapes'] = self.singleNodeTypeInit()
+        # self.nodeInfo['analysisShapes']['name'] = 'analysisShapes'
+        # self.nodeInfo['analysisShapes']['displayName'] = 'Analysis [Shapes]'
+        # self.nodeInfo['analysisShapes']['startAttributes'] = ['Analysis start']
+        # self.nodeInfo['analysisShapes']['finishedAttributes'] = ['Finished']
+        # self.nodeInfo['analysisShapes']['dataAttributes'] = ['Output']
         
-        self.nodeInfo['analysisImages'] = self.singleNodeTypeInit()
-        self.nodeInfo['analysisImages']['name'] = 'analysisImages'
-        self.nodeInfo['analysisImages']['displayName'] = 'Analysis [Images]'
-        self.nodeInfo['analysisImages']['startAttributes'] = ['Analysis start']
-        self.nodeInfo['analysisImages']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['analysisImages']['dataAttributes'] = ['Output']
+        # self.nodeInfo['analysisImages'] = self.singleNodeTypeInit()
+        # self.nodeInfo['analysisImages']['name'] = 'analysisImages'
+        # self.nodeInfo['analysisImages']['displayName'] = 'Analysis [Images]'
+        # self.nodeInfo['analysisImages']['startAttributes'] = ['Analysis start']
+        # self.nodeInfo['analysisImages']['finishedAttributes'] = ['Finished']
+        # self.nodeInfo['analysisImages']['dataAttributes'] = ['Output']
         
         self.nodeInfo['scoringStart'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringStart']['name'] = 'scoringStart'
@@ -1495,13 +1504,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['scoringStart']['MaxNodeCounter'] = 1
         self.nodeInfo['scoringStart']['NodeSize'] = 60
         
-        self.nodeInfo['scoringEnd'] = self.singleNodeTypeInit()
-        self.nodeInfo['scoringEnd']['name'] = 'scoringEnd'
-        self.nodeInfo['scoringEnd']['displayName'] = 'Scoring end'
-        self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
-        self.nodeInfo['scoringEnd']['bottomAttributes'] = ['Report']
-        self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
-        self.nodeInfo['scoringEnd']['NodeSize'] = 60
+        # self.nodeInfo['scoringEnd'] = self.singleNodeTypeInit()
+        # self.nodeInfo['scoringEnd']['name'] = 'scoringEnd'
+        # self.nodeInfo['scoringEnd']['displayName'] = 'Scoring end'
+        # self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
+        # self.nodeInfo['scoringEnd']['bottomAttributes'] = ['Report']
+        # self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
+        # self.nodeInfo['scoringEnd']['NodeSize'] = 60
         
         self.nodeInfo['scoringEndVar'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringEndVar']['name'] = 'scoringEndVar'
@@ -1525,6 +1534,20 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['acqEnd']['MaxNodeCounter'] = 1
         self.nodeInfo['acqEnd']['NodeSize'] = 60
         
+        self.nodeInfo['initStart'] = self.singleNodeTypeInit()
+        self.nodeInfo['initStart']['name'] = 'initStart'
+        self.nodeInfo['initStart']['displayName'] = 'Initialisation start'
+        self.nodeInfo['initStart']['finishedAttributes'] = ['Start']
+        self.nodeInfo['initStart']['MaxNodeCounter'] = 1
+        self.nodeInfo['initStart']['NodeSize'] = 60
+        
+        self.nodeInfo['initEnd'] = self.singleNodeTypeInit()
+        self.nodeInfo['initEnd']['name'] = 'initEnd'
+        self.nodeInfo['initEnd']['displayName'] = 'Initialisation end'
+        self.nodeInfo['initEnd']['startAttributes'] = ['End']
+        self.nodeInfo['initEnd']['MaxNodeCounter'] = 1
+        self.nodeInfo['initEnd']['NodeSize'] = 60
+        
         self.nodeInfo['timer'] = self.singleNodeTypeInit()
         self.nodeInfo['timer']['name'] = 'timer'
         self.nodeInfo['timer']['displayName'] = 'Timer'
@@ -1543,12 +1566,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['newGlobalVar']['displayName'] = 'New Global Variable'
         self.nodeInfo['newGlobalVar']['startAttributes'] = ['Start']
         self.nodeInfo['newGlobalVar']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['newGlobalVar']['NodeSize'] = 60
         
         self.nodeInfo['changeGlobalVar'] = self.singleNodeTypeInit()
         self.nodeInfo['changeGlobalVar']['name'] = 'changeGlobalVar'
         self.nodeInfo['changeGlobalVar']['displayName'] = 'Change Global Variable'
         self.nodeInfo['changeGlobalVar']['startAttributes'] = ['Start']
         self.nodeInfo['changeGlobalVar']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['changeGlobalVar']['NodeSize'] = 60
         
         self.nodeInfo['runInlineScript'] = self.singleNodeTypeInit()
         self.nodeInfo['runInlineScript']['name'] = 'runInlineScript'
@@ -1561,11 +1586,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['caseSwitch']['displayName'] = 'Case/Switch'
         self.nodeInfo['caseSwitch']['startAttributes'] = ['Start']
         self.nodeInfo['caseSwitch']['finishedAttributes'] = ['Error']
+        self.nodeInfo['caseSwitch']['NodeSize'] = 60
         
         self.nodeInfo['slackReport'] = self.singleNodeTypeInit()
         self.nodeInfo['slackReport']['name'] = 'slackReport'
         self.nodeInfo['slackReport']['displayName'] = 'Slack Report'
         self.nodeInfo['slackReport']['startAttributes'] = ['Start']
+        self.nodeInfo['slackReport']['NodeSize'] = 60
         
         #We also add some custom JSON info about the node layout (colors and such)
         import json
@@ -1578,13 +1605,37 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 "text": [180, 180, 240, 255]
             },
             "scoringEnd": {
-                "bg": [180, 80, 80, 255],
+                "bg": [120, 180, 120, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
             "scoringEndVar": {
-                "bg": [180, 80, 80, 255],
+                "bg": [120, 180, 120, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "acqStart": {
+                "bg": [224, 195, 69, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "acqEnd": {
+                "bg": [234, 205, 109, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "initStart": {
+                "bg": [180, 80, 180, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "initEnd": {
+                "bg": [180, 120, 180, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
@@ -1806,6 +1857,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             self.decisionWidget.updateAllDecisions()
         elif nodeType == 'acqEnd':
             newNode.callAction = lambda self, node=newNode: self.acquiringEnd(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'initStart':
+            newNode.callAction = lambda self, node=newNode: self.initStart(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'initEnd':
+            newNode.callAction = lambda self, node=newNode: self.initEnd(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         else:
             newNode.callAction = None
@@ -3143,6 +3200,57 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 print('All done!')
         self.finishedEmits(node)
     
+    def initStart(self,node):
+        """
+        This function is the action function for the Initialisation Start node in the Flowchart.
+
+        This function signals to the rest of the flowchart that it's time to start
+        the init routine.
+
+        Args:
+            node (nodz.Node): The node that has triggered the event.
+
+        Returns:
+            None
+        """
+        print('Starting the initialisation routine!')
+        
+        #Set all connected nodes to idle
+        connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
+        for connectedNode in connectedNodes:
+            for nodeC in self.nodes:
+                if nodeC.name == connectedNode:
+                    nodeC.status='idle'
+        
+        self.set_readable_text_after_dialogChange(node,'','initStart')
+        
+        self.GraphToSignals()
+        #Effectively, only finishes the initStart node
+        self.finishedEmits(node)
+    
+    def initEnd(self,node):
+    
+        print('Initialisation finished fully!')
+        #Find the acqStart node:
+        scoringStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for nodeF in flowChart.nodes:
+                if 'scoringStart_' in nodeF.name:
+                    scoringStartNode = nodeF
+        
+        #Run the scoring_start routine:
+        if scoringStartNode is not None:
+            if self.fullRunOngoing:
+                logging.info('Starting full run routine!')
+                self.startNewScoreAcqAtPos()
+            else:
+                logging.info('Starting single scoring only!')
+                self.scoringStart(scoringStartNode)
+        else:
+            logging.error('Could not find scoringStartNode node in flowchart')
+    
     def scoringStart(self,node):
         """
         This function is the action function for the Scoring Start node in the Flowchart.
@@ -3156,21 +3264,25 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        print('Starting the score routine!')
         
-        #Set all connected nodes to idle
-        connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
-        for connectedNode in connectedNodes:
-            for nodeC in self.nodes:
-                if nodeC.name == connectedNode:
-                    nodeC.status='idle'
-        
-        self.set_readable_text_after_dialogChange(node,'','scoreStart')
-        
-        self.GraphToSignals()
-        
-        self.finishedEmits(node)
-    
+        if self.preventScoring == False:
+            print('Starting the score routine!')
+            
+            #Set all connected nodes to idle
+            connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
+            for connectedNode in connectedNodes:
+                for nodeC in self.nodes:
+                    if nodeC.name == connectedNode:
+                        nodeC.status='idle'
+            
+            self.set_readable_text_after_dialogChange(node,'','scoreStart')
+            
+            self.GraphToSignals()
+            
+            self.finishedEmits(node)
+        else:
+            logging.warning('Actively blocked scoring due to self.preventScoring!')
+            
     def scoringEnd(self,node):
         """
         This function is the action function for the Scoring End node in the Flowchart.
@@ -3423,6 +3535,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Call action to send a message to Slack
         """
         readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
+        if readableText == None:
+            readableText = node.slackReportInfo
         if 'SLACK' in self.shared_data.globalData: #type:ignore
             if self.shared_data.globalData['SLACK']['TOKEN'] is not None and not len(self.shared_data.globalData['SLACK']['TOKEN']) == 0: #type:ignore
                 slackReadableText = readableText
@@ -3447,16 +3561,34 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         print('Starting a full run')
-        self.preventAcq = True
+        self.preventAcq = False
+        self.preventScoring = False
         
         #General idea: first check if there are no glaring errors (scoring, position)
         #then go to whatever start position based on the xy positions
         #then run scoring+acquisition there
         
+            
+        
         self.fullRunOngoing = True
         self.fullRunCurrentPos = 0
         self.fullRunPositions = self.scanningWidget.getPositionInfo()
-        self.startNewScoreAcqAtPos()
+        # self.startNewScoreAcqAtPos()
+        
+        #Find the init_start node:
+        initStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'initStart_' in node.name:
+                    initStartNode = node
+        
+        #Run the init_start routine:
+        if initStartNode is not None:
+            self.initStart(initStartNode)
+        else:
+            logging.error('Could not find initStart node in flowchart')
 
     def startNewScoreAcqAtPos(self):
         """
@@ -3475,19 +3607,49 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         #Set all stages correct
         for stage in positions[pos]['STAGES']:
-            stagepos = positions[pos][stage]
-            #Check if this stage is an XY stage device...
-            #Since then we need to do something 2-dimensional
-            if stage in self.getDevicesOfDeviceType('XYStageDevice'):
-                logging.info(f'Moving stage {stage} to position {stagepos}')
-                self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
-                self.shared_data.core.wait_for_system() #type:ignore
-            else:#else we can move a 1d stage:
-                logging.info(f'Moving stage {stage} to position {stagepos}')
-                self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
-                self.shared_data.core.wait_for_system() #type:ignore
+            if stage != '':
+                stagepos = positions[pos][stage]
+                #Check if this stage is an XY stage device...
+                #Since then we need to do something 2-dimensional
+                if stage in self.getDevicesOfDeviceType('XYStageDevice'):
+                    logging.info(f'Moving stage {stage} to position {stagepos}')
+                    self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
+                    self.shared_data.core.wait_for_system() #type:ignore
+                else:#else we can move a 1d stage:
+                    logging.info(f'Moving stage {stage} to position {stagepos}')
+                    self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
+                    self.shared_data.core.wait_for_system() #type:ignore
         
         self.runScoring()
+    
+    def runInitOnly(self):
+        """
+        Run ONLY the init process at the current position. Actively prevents scoring
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        self.preventScoring = True
+        self.preventAcq = False
+        
+        #Find the scoring_start node:
+        initStartNode = None
+        flowChart = self
+        if len(flowChart.nodes) > 0:
+            #Find the scoringEnd node in flowChart:
+            for node in flowChart.nodes:
+                if 'initStart_' in node.name:
+                    initStartNode = node
+        
+        #Run the scoring_start routine:
+        if initStartNode is not None:
+            self.initStart(initStartNode)
+        else:
+            logging.error('Could not find initStart node in flowchart')
+            
     
     def runScoringOnly(self):
         """
@@ -3500,6 +3662,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         self.preventAcq = True
+        self.preventScoring = False
         
         #Find the scoring_start node:
         scoreStartNode = None
@@ -3527,6 +3690,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         self.preventAcq = False
+        self.preventScoring=False
         #Find the scoring_start node:
         scoreStartNode = None
         flowChart = self
