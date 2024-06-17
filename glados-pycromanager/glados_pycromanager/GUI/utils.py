@@ -683,7 +683,7 @@ def nodz_evaluateVar(varName,nodzInfo):
         varData = nodzInfo.globalVariables[variableName]['data']
     return varData
 
-def nodz_evaluateAdv(varName,nodzInfo):
+def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
     print(varName)
     if '@' in varName and '{' in varName and '}' in varName:
         nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
@@ -702,11 +702,13 @@ def nodz_evaluateAdv(varName,nodzInfo):
             #run getting the data of this match
             #Assuming string
             if foundstring_data.split('@')[1] == 'Global':
-                type = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+                if isinstance(nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'],type):
+                    nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'] = [nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type']]
+                typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
             else:
-                type = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
+                typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
             #Check if it's calculatable
-            if type not in [int, float, np.ndarray]:
+            if typev not in [int, float, np.ndarray]:
                 calculatable = False
         
         updating_string = varName
@@ -722,10 +724,10 @@ def nodz_evaluateAdv(varName,nodzInfo):
             #Assuming string
             if foundstring_data.split('@')[1] == 'Global':
                 data = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['data']
-                type = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+                typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
             else:
                 data = str(nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['data'])
-                type = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
+                typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
             
             #Replace this in the updating_string
             if calculatable: #if calculatable
@@ -739,12 +741,16 @@ def nodz_evaluateAdv(varName,nodzInfo):
         #Replace backslashes since they're escapechars
         updating_string_backslash = updating_string.replace('\\','\\\\')
         
-        try:
-            finalData = eval(updating_string_backslash)
-        except:
-            logging.error(f"Error when assessing adv variable {varName}: {updating_string_backslash}")
-            finalData = None
-        return finalData
+        if skipEval:
+            finalData = updating_string_backslash
+            return finalData
+        else:
+            try:
+                finalData = eval(updating_string_backslash)
+            except:
+                logging.error(f"Error when assessing adv variable {varName}: {updating_string_backslash}")
+                finalData = None
+            return finalData
     else:
         logging.error(f'Wrong syntax for advanced variable! Details: {varName}')
         return None

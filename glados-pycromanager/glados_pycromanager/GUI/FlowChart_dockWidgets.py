@@ -310,6 +310,37 @@ class nodz_openInlineScriptDialog(QDialog):
         
         self.setLayout(layout)
 
+class nodz_slackReportDialog(QDialog):
+    """
+    """
+    def __init__(self, parentNode=None):
+        """
+        """
+        super().__init__(None)
+        self.setWindowTitle("Slack Report Dialog")
+        self.slackReportInfo  = ''
+        if parentNode is not None:
+            self.slackReportInfo   = parentNode.slackReportInfo
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        #add a big editable text box:
+        slackReportInfo = QTextEdit()
+        slackReportInfo.setPlainText(self.slackReportInfo)
+        slackReportInfo.textChanged.connect(lambda: setattr(self, 'slackReportInfo', slackReportInfo.toPlainText()))
+
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addWidget(slackReportInfo)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+
 
 
 #General class for dialogs with simple line-edits only:
@@ -1519,6 +1550,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['caseSwitch']['startAttributes'] = ['Start']
         self.nodeInfo['caseSwitch']['finishedAttributes'] = ['Error']
         
+        self.nodeInfo['slackReport'] = self.singleNodeTypeInit()
+        self.nodeInfo['slackReport']['name'] = 'slackReport'
+        self.nodeInfo['slackReport']['displayName'] = 'Slack Report'
+        self.nodeInfo['slackReport']['startAttributes'] = ['Start']
+        
         #We also add some custom JSON info about the node layout (colors and such)
         import json
         self.nodeLayout = json.loads('''{
@@ -1740,6 +1776,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'caseSwitch':
             newNode.callAction = lambda self, node=newNode: self.runCaseSwitchCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'slackReport':
+            newNode.callAction = lambda self, node=newNode: self.runslackReportCallAction(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1894,6 +1933,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     self.update()
                 
                 logging.info(dialogLineEdits)
+                logging.info('Pressed OK on caseSwitch')
+            # currentNode.callAction(self) #type:ignore
+        elif 'slackReport' in nodeName:
+            dialog = nodz_slackReportDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.slackReportInfo = dialog.slackReportInfo
                 logging.info('Pressed OK on caseSwitch')
             # currentNode.callAction(self) #type:ignore
         
@@ -3269,7 +3314,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.finishedEmits(node)
     
     def runCaseSwitchCallAction(self,node):
-        
+        """ 
+        Call action to runa  case/switch statement.
+        """
         CurrentValueWantedVariable = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.caseSwitchInfo,node.flowChart)['Var'][0]
         
         
@@ -3296,7 +3343,22 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
                     foundNode.oneConnectionAtStartIsFinished()
                     node.status='finished'
-            
+    
+    def runslackReportCallAction(self,node):
+        """
+        Call action to send a message to Slack
+        """
+        readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
+        if 'SLACK' in self.shared_data.globalData: #type:ignore
+            if self.shared_data.globalData['SLACK']['TOKEN'] is not None and not len(self.shared_data.globalData['SLACK']['TOKEN']) == 0: #type:ignore
+                slackReadableText = readableText
+                slackReadableText = slackReadableText.replace('<br>','\r\n')
+                slackReadableText = slackReadableText.replace('<i>','_')
+                slackReadableText = slackReadableText.replace('</i>','_')
+                slackReadableText = slackReadableText.replace('<b>','*')
+                slackReadableText = slackReadableText.replace('</b>','*')
+                self.shared_data.globalData['SLACK']['CLIENT'].chat_postMessage(channel=self.shared_data.globalData['SLACK']['CHANNEL'],text=slackReadableText) 
+    
     #endregion
     
     #region NodzFlowChart runs

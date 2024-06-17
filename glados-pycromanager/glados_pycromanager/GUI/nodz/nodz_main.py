@@ -878,6 +878,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_NEW_GLOBAL_VAR'] = dict()
         data['NODES_RUN_INLINE_SCRIPT'] = dict()
         data['NODES_CASE_SWITCH'] = dict()
+        data['NODES_SLACK_REPORT'] = dict()
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -1006,6 +1007,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'caseSwitchInfo' in vars(nodeInst):
                 if nodeInst.caseSwitchInfo is not None:
                     data['NODES_CASE_SWITCH'][node] = nodeInst.caseSwitchInfo  
+                    
+            data['NODES_SLACK_REPORT'][node] = {}
+            if 'slackReportInfo' in vars(nodeInst):
+                if nodeInst.slackReportInfo is not None:
+                    data['NODES_SLACK_REPORT'][node] = nodeInst.slackReportInfo  
             
             
             
@@ -1201,6 +1207,12 @@ class Nodz(QtWidgets.QGraphicsView):
                     if 'caseSwitchInfo' in vars(node):
                         if data['NODES_CASE_SWITCH'] is not None:
                             node.caseSwitchInfo = data['NODES_CASE_SWITCH'][name] #type:ignore
+                            
+            if 'NODES_SLACK_REPORT' in data:
+                if name in data['NODES_SLACK_REPORT']:
+                    if 'slackReportInfo' in vars(node):
+                        if data['NODES_SLACK_REPORT'] is not None:
+                            node.slackReportInfo = data['NODES_SLACK_REPORT'][name] #type:ignore
                             
             #Do an emit after full loading:
             self.signal_NodeFullyInitialisedNodeItself.emit(node)
@@ -1601,6 +1613,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.visualisation_currentData = {}
         self.real_time_analysis_currentData = {}
         self.timerInfo = 1
+        self.slackReportInfo = ''
     
         self.storeDataInfo = {}
         self.changeGlobalVarInfo  = {}
