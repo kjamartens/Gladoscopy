@@ -4322,7 +4322,6 @@ class VariablesBase(QWidget):
         self.layoutV.addWidget(self.variablesTableWidget)
         self.setLayout(self.layoutV)
         
-
     def on_cell_hovered(self, row, column):
         # Get the hovered entry
         try:
@@ -4356,6 +4355,11 @@ class VariablesBase(QWidget):
             except AttributeError:
                 textEntry = 'None'
             self.selected_entry.append(textEntry)
+        
+        import pyperclip
+        copystr = f'{self.selected_entry[2]}@{self.selected_entry[1]}'
+        pyperclip.copy(copystr)
+        
             
     def on_cell_double_clicked(self, row, column):
         #Figure out the selected row
