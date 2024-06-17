@@ -422,6 +422,26 @@ class nodz_openChangeGlobalVarDialog(nodz_generalAdvancedLineEditDialog):
                         advLineEdits=[{'Variable to change:':['globalVarName','Variable']},{'Change to value:':['globalVarValue','Advanced']}],
                         storeVarName='changeGlobalVarInfo')
         
+class nodz_openNewGlobalVarDialog(nodz_generalAdvancedLineEditDialog):
+    """
+    A Dialog that is created for newGlobalVar in the Nodz layout. 
+    """
+    def __init__(self, parentNode=None):
+        """
+        Initializes the newGlobalVarDialog.
+        
+        Args:
+            parentNode: The parent node of the newGlobalVarDialog. If provided, the newGlobalVarDialog will be set to the newGlobalVarDialog of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(parentNode=parentNode,
+                        title="newGlobalVarInfo Dialog",
+                        internalName='newVarChange',
+                        advLineEdits=[{'Variable Name:':['globalVarName','Value']},{'Initial Value:':['globalVarValue','Value']}],
+                        storeVarName='newGlobalVarInfo')
+        
 
 class nodz_openStoreDataDialog(nodz_generalAdvancedLineEditDialog):
     def __init__(self, parentNode=None):
@@ -1415,6 +1435,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
         self.nodeInfo['scoringEnd']['NodeSize'] = 60
         
+        self.nodeInfo['scoringEndVar'] = self.singleNodeTypeInit()
+        self.nodeInfo['scoringEndVar']['name'] = 'scoringEndVar'
+        self.nodeInfo['scoringEndVar']['displayName'] = 'Scoring end w/ VAR'
+        self.nodeInfo['scoringEndVar']['startAttributes'] = ['End']
+        self.nodeInfo['scoringEndVar']['bottomAttributes'] = ['Report']
+        self.nodeInfo['scoringEndVar']['MaxNodeCounter'] = 1
+        self.nodeInfo['scoringEndVar']['NodeSize'] = 60
+        
         self.nodeInfo['acqStart'] = self.singleNodeTypeInit()
         self.nodeInfo['acqStart']['name'] = 'acqStart'
         self.nodeInfo['acqStart']['displayName'] = 'Acquiring start'
@@ -1441,6 +1469,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['storeData']['displayName'] = 'Store Data'
         self.nodeInfo['storeData']['startAttributes'] = ['Store']
         self.nodeInfo['storeData']['NodeSize'] = 40
+        
+        self.nodeInfo['newGlobalVar'] = self.singleNodeTypeInit()
+        self.nodeInfo['newGlobalVar']['name'] = 'newGlobalVar'
+        self.nodeInfo['newGlobalVar']['displayName'] = 'New Global Variable'
+        self.nodeInfo['newGlobalVar']['startAttributes'] = ['Start']
+        self.nodeInfo['newGlobalVar']['finishedAttributes'] = ['Finished']
         
         self.nodeInfo['changeGlobalVar'] = self.singleNodeTypeInit()
         self.nodeInfo['changeGlobalVar']['name'] = 'changeGlobalVar'
@@ -1471,6 +1505,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 "text": [180, 180, 240, 255]
             },
             "scoringEnd": {
+                "bg": [180, 80, 80, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "scoringEndVar": {
                 "bg": [180, 80, 80, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
@@ -1666,6 +1706,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'changeGlobalVar':
             newNode.callAction = lambda self, node=newNode: self.changeGlobalVarCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'newGlobalVar':
+            newNode.callAction = lambda self, node=newNode: self.newGlobalVarCallAction(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'runInlineScript':
             newNode.callAction = lambda self, node=newNode: self.runInlineScriptCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1676,6 +1719,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'scoringEnd':
+            newNode.callAction = lambda self, node=newNode: self.scoringEnd(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            #Update the decisionwidget after loading the scoringEnd node:
+            self.decisionWidget.updateAllDecisions()
+        elif nodeType == 'scoringEndVar':
             newNode.callAction = lambda self, node=newNode: self.scoringEnd(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             #Update the decisionwidget after loading the scoringEnd node:
@@ -1784,6 +1832,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.changeGlobalVarInfo = dialog.changeGlobalVarInfo #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeGlobalVar')
             # currentNode.callAction(self) #type:ignore
+        elif 'newGlobalVar' in nodeName:
+            dialog = nodz_openNewGlobalVarDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.newGlobalVarInfo = dialog.newGlobalVarInfo #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'newGlobalVar')
+            # currentNode.callAction(self) #type:ignore
         elif 'runInlineScript' in nodeName:
             dialog = nodz_openInlineScriptDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
@@ -1809,11 +1863,17 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     self.update()
                 
                 logging.info(dialogLineEdits)
-                logging.info('Pressed OK on scoringEnd')
+                logging.info('Pressed OK on caseSwitch')
             # currentNode.callAction(self) #type:ignore
         
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
+        elif 'scoringEndVar' in nodeName:
+            dialog = nodz_openScoringEndVarDialog(parent=self,currentNode=currentNode)
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the decisionwidget:
+                self.decisionWidget.updateAllDecisions()
+                logging.info('Pressed OK on scoringEndVar')
         elif 'scoringEnd' in nodeName:
             dialog = nodz_openScoringEndDialog(parent=self,currentNode=currentNode)
             if dialog.exec_() == QDialog.Accepted:
@@ -2271,8 +2331,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             displayHTMLtext = "TODO-StoreData"
         elif nodeType == 'changeGlobalVar':
             displayHTMLtext = "TODO-ChangeGlobalVar"
-        elif nodeType == 'changeGlobalVar':
+        elif nodeType == 'runInlineScript':
             displayHTMLtext = "TODO-INLINESCRIPT"
+        elif nodeType == 'newGlobalVar':
+            displayHTMLtext = "TODO-NEWGLOBALVar"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext
@@ -2958,24 +3020,27 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         #Find the nodes that are connected downstream of this:
-        data = {}
-        attrs = []
-        for attr in node.attrs:
-            connectedNode = None
-            for connection in self.evaluateGraph():
-                if connection[1][connection[1].rfind('.')+1:] == attr:
-                    if connection[1][:connection[1].rfind('.')] == node.name:
-                        connectedNodeName = connection[0][:connection[0].rfind('.')]
-                        connectedNode = self.findNodeByName(connectedNodeName)
-        
-                    data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
-                    attrs.append(attr)
-                    print(f"Data found for {attr}: {data[attr]}")
+        try:
+            data = {}
+            attrs = []
+            for attr in node.attrs:
+                connectedNode = None
+                for connection in self.evaluateGraph():
+                    if connection[1][connection[1].rfind('.')+1:] == attr:
+                        if connection[1][:connection[1].rfind('.')] == node.name:
+                            connectedNodeName = connection[0][:connection[0].rfind('.')]
+                            connectedNode = self.findNodeByName(connectedNodeName)
+            
+                        data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
+                        attrs.append(attr)
+                        print(f"Data found for {attr}: {data[attr]}")
+        except:
+            pass
         
         try:
             testPassed = self.decisionWidget.testCurrentDecision()
             testPassedText = 'Test is Passed' if testPassed else 'Test is Not Passed'
-            readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
+            # readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
             
             print('Scoring finished fully!')
             if testPassed:
@@ -3099,6 +3164,39 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         value = varInfo['globalVarValue'][0]
         
         utils.nodz_setVariableToValue(variable,value,node.flowChart)
+        
+        
+        self.finishedEmits(node)
+        
+        
+    def newGlobalVarCallAction(self,node):
+        """
+        The newGlobalVarCallAction function is the action function for the new global var Call node in the Flowchart.
+        
+        Args:
+            self: Refer to the class itself
+            node: Identify which node triggered the event
+        """
+        varInfo = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.newGlobalVarInfo,node.flowChart)
+        
+        variable = varInfo['globalVarName'][1]
+        value = varInfo['globalVarValue'][0]
+        
+        #Create the new global Variable
+        if variable  in node.flowChart.globalVariables:
+            #If it's already present, give a warning for now, but still set it.
+            logging.warning(f'New global variable {variable} defined with same name as already existing - overwriting it!')
+            
+        node.flowChart.globalVariables[variable] = {}
+        node.flowChart.globalVariables[variable]['data'] = value
+        #Try to find the type of the variable automatically, else just set it as str
+        try:
+            node.flowChart.globalVariables[variable]['type'] = [(type(eval(value)))]
+        except: #This will effectively set it as a string.
+            node.flowChart.globalVariables[variable]['type'] = [(type((value)))]
+        node.flowChart.globalVariables[variable]['importance'] = 'informative'
+        import time
+        node.flowChart.globalVariables[variable]['lastUpdateTime'] = time.time()
         
         
         self.finishedEmits(node)
@@ -3693,6 +3791,7 @@ class DecisionWidget(QWidget):
         self.decisionArray_decisionTypes = {}
         self.decisionArray_decisionTypes['DirectDecision'] = [
                             ['AND_Score','All scoring conditions met'],
+                            ['AND_Score_VAR','All VAR scoring conditions met'],
                             ['OR_Score','Any scoring condition met'],
                             ['Advanced','Advanced scoring condition']]
         self.decisionArray_decisionTypes['FullScan'] = [
@@ -3723,6 +3822,7 @@ class DecisionWidget(QWidget):
         # self.setWindowTitle('Decision')
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems([option[1] for option in self.decisionArray_modes])
+        self.mode_dropdown.currentIndexChanged.connect(self.updateAllDecisions)
         self.mode_layout = QGridLayout()
         self.mode_layout.addWidget(QLabel('Mode: '),0,0)
         self.mode_layout.addWidget(self.mode_dropdown,0,1)
@@ -3736,6 +3836,7 @@ class DecisionWidget(QWidget):
             self.decisionLayouts[mode_option[0]].setVisible(False) #False
             
             self.decisionLayouts[mode_option[0]].mode_dropdown = QComboBox()
+            self.decisionLayouts[mode_option[0]].mode_dropdown.currentIndexChanged.connect(self.updateAllDecisions)
             self.decisionLayouts[mode_option[0]].mode_dropdown.addItems([option[1] for option in self.decisionArray_decisionTypes[mode_option[0]]])
             
             self.decisionLayouts[mode_option[0]].mode_layout = QGridLayout()
@@ -3846,6 +3947,7 @@ class advDecisionGridLayout(QGroupBox):
     The advDecisionGridLayout are created in the DecisionWidget class
     Currently implemented:
         'DirectDecision' --> 'AND_Score': Checks if all scores are passed.
+        'DirectDecision' --> 'AND_Score_VAR': Checks if all scores, based on variables, are passed.
     """
     def __init__(self, mode=None,decision=None,parent=None):
         """
@@ -3864,6 +3966,7 @@ class advDecisionGridLayout(QGroupBox):
         self.mode = mode
         self.decision = decision
         self.decisionInfoGUI = {} #Will finally contain all decision info in GUI form!
+        self.decisionInfoGUIVAR = {} #Will finally contain all decision info in GUI form!
         #Create a QGridLayout to place in this groupbox:
         self.setLayout(QGridLayout())
         #Create a quick label that we place in 1,1:
@@ -3871,6 +3974,8 @@ class advDecisionGridLayout(QGroupBox):
         if mode == 'DirectDecision':
             if decision == 'AND_Score':
                 self.directDecision_AND_Score_update()
+            elif decision == 'AND_Score_VAR':
+                self.directDecision_AND_Score_VAR_update()
     
     def update(self):
         """
@@ -3885,6 +3990,8 @@ class advDecisionGridLayout(QGroupBox):
         if self.mode == 'DirectDecision':
             if self.decision == 'AND_Score':
                 self.directDecision_AND_Score_update()
+            elif self.decision == 'AND_Score_VAR':
+                self.directDecision_AND_Score_VAR_update()
     
     def test_decision(self):
         """
@@ -3900,6 +4007,8 @@ class advDecisionGridLayout(QGroupBox):
         if self.mode == 'DirectDecision':
             if self.decision == 'AND_Score':
                 return self.directDecision_AND_Score_test()
+            if self.decision == 'AND_Score_VAR':
+                return self.directDecision_AND_Score_VAR_test()
     
     def getScoreMetrics(self):
         """
@@ -4019,6 +4128,98 @@ class advDecisionGridLayout(QGroupBox):
             self.decisionInfoGUI[scoreMetric] = {}
             self.decisionInfoGUI[scoreMetric]['dropdown'] = dropdown
             self.decisionInfoGUI[scoreMetric]['lineedit'] = lineedit
+            self.outerLayout.addLayout(hbox)
+    
+    
+    def directDecision_AND_Score_VAR_test(self):
+        """
+        Code to test whether the current score passes the decision matrix or not. Should always output a boolean
+        """
+        finalTest = False
+        #Data now contains the values of the scores
+        self.decisionInfoGUIVAR
+        
+        totalTrueTests = 0
+        requiredTrueTests = 0
+        for decision in self.decisionInfoGUIVAR:
+            if self.decisionInfoGUIVAR[decision]['varName'].text() != '':
+                requiredTrueTests+=1
+                print(self.decisionInfoGUIVAR[decision]['varName'].text())
+                
+                #We get the value of the variable:
+                varCurrentValue = utils.nodz_evaluateVar(self.decisionInfoGUIVAR[decision]['varName'].text(),self.parent.nodzinstance)
+                
+                operator = self.decisionInfoGUIVAR[decision]['dropdown'].currentText()
+                varTestValue = self.decisionInfoGUIVAR[decision]['lineedit'].text()
+                
+                varcurrentvalEvaluable = False
+                try:
+                    eval(f"{varCurrentValue}")
+                    varcurrentvalEvaluable = True
+                except:
+                    varcurrentvalEvaluable = False
+                    
+                vartestvalEvaluable = False
+                try:
+                    eval(f"{varTestValue}")
+                    vartestvalEvaluable = True
+                except:
+                    vartestvalEvaluable = False
+                    
+                if not varcurrentvalEvaluable and not vartestvalEvaluable:
+                    evalText = f"'{varCurrentValue}' {operator} '{varTestValue}'"
+                elif varcurrentvalEvaluable and not vartestvalEvaluable:
+                    evalText = f"{varCurrentValue} {operator} '{varTestValue}'"
+                elif not varcurrentvalEvaluable and vartestvalEvaluable:
+                    evalText = f"'{varCurrentValue}' {operator} {varTestValue}"
+                else:
+                    evalText = f"{varCurrentValue} {operator} {varTestValue}"
+                
+                print(evalText)
+                
+                if eval(evalText):
+                    totalTrueTests+=1
+        
+        if totalTrueTests == requiredTrueTests:
+            finalTest = True
+        
+        return finalTest
+    
+    def directDecision_AND_Score_VAR_update(self):
+        """
+        Code to update the GUI of the DirectDecision_AND_Score groupbox
+        """
+        from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
+        self.remove_widgets_in_layout(self.layout())
+        
+        self.outerLayout = QVBoxLayout()
+        self.layout().addLayout(self.outerLayout,0,0) #type:ignore
+        
+        #Get out of this function if flowChart isn't initialised yet (i.e. first start-up):
+        try:
+            self.parent.nodzinstance.nodes
+        except RuntimeError:
+            return
+        
+        n_score_metrics = 5
+        
+        for n in range(n_score_metrics):
+            hbox = QHBoxLayout()
+            label = QLabel(str(n+1)+':')
+            hbox.addWidget(label)
+            
+            varName = QLineEdit()
+            hbox.addWidget(varName)
+            
+            dropdown = QComboBox()
+            dropdown.addItems(['>','>=','==','<=','<','!='])
+            hbox.addWidget(dropdown)
+            lineedit = QLineEdit()
+            hbox.addWidget(lineedit)
+            self.decisionInfoGUIVAR[n] = {}
+            self.decisionInfoGUIVAR[n]['varName'] = varName
+            self.decisionInfoGUIVAR[n]['dropdown'] = dropdown
+            self.decisionInfoGUIVAR[n]['lineedit'] = lineedit
             self.outerLayout.addLayout(hbox)
 #endregion
 

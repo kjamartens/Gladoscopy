@@ -874,6 +874,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_TIMER'] = dict()
         data['NODES_STORE_DATA'] = dict()
         data['NODES_CHANGE_GLOBAL_VAR'] = dict()
+        data['NODES_NEW_GLOBAL_VAR'] = dict()
         data['NODES_RUN_INLINE_SCRIPT'] = dict()
         data['NODES_CASE_SWITCH'] = dict()
 
@@ -983,6 +984,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'changeGlobalVarInfo' in vars(nodeInst):
                 if nodeInst.changeGlobalVarInfo is not None:
                     data['NODES_CHANGE_GLOBAL_VAR'][node] = nodeInst.changeGlobalVarInfo 
+            
+            data['NODES_NEW_GLOBAL_VAR'][node] = {}
+            if 'newGlobalVarInfo' in vars(nodeInst):
+                if nodeInst.newGlobalVarInfo is not None:
+                    data['NODES_NEW_GLOBAL_VAR'][node] = nodeInst.newGlobalVarInfo 
             
             data['NODES_RUN_INLINE_SCRIPT'][node] = {}
             if 'InlineScriptInfo' in vars(nodeInst):
@@ -1162,6 +1168,12 @@ class Nodz(QtWidgets.QGraphicsView):
                     if 'changeGlobalVarInfo' in vars(node):
                         if data['NODES_CHANGE_GLOBAL_VAR'] is not None:
                             node.changeGlobalVarInfo  = data['NODES_CHANGE_GLOBAL_VAR'][name] #type:ignore
+                            
+            if 'NODES_NEW_GLOBAL_VAR' in data:
+                if name in data['NODES_NEW_GLOBAL_VAR']:
+                    if 'newGlobalVarInfo' in vars(node):
+                        if data['NODES_NEW_GLOBAL_VAR'] is not None:
+                            node.newGlobalVarInfo  = data['NODES_NEW_GLOBAL_VAR'][name] #type:ignore
                             
             if 'NODES_RUN_INLINE_SCRIPT' in data:
                 if name in data['NODES_RUN_INLINE_SCRIPT']:
@@ -1577,6 +1589,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
     
         self.storeDataInfo = {}
         self.changeGlobalVarInfo  = {}
+        self.newGlobalVarInfo  = {}
         self.InlineScriptInfo  = ''
         self.caseSwitchInfo = {}
         
