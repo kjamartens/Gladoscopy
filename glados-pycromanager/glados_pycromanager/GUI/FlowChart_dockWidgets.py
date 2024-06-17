@@ -228,47 +228,6 @@ class nodz_analysisMeasurementDialog(nodz_analysisDialog):
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Measurement Options")
 
-class nodz_openTimerDialog(QDialog):
-    """
-    A Dialog that is created for timer in the Nodz layout. 
-    """
-    def __init__(self, parentNode=None):
-        """
-        Initializes the TimerDialog.
-        
-        Args:
-            parentNode: The parent node of the TimerDialog. If provided, the timerInfo will be set to the timerInfo of the parentNode.
-        
-        Returns:
-            None
-        """
-        super().__init__(None)
-        self.setWindowTitle("Timer Dialog")
-        self.timerInfo = 0
-        if parentNode is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
-            self.timerInfo = parentNode.timerInfo
-
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        
-        # Create the QVBoxLayout
-        layout = QVBoxLayout()
-
-        # Create a QWidget to contain the QGridLayout
-        entryVal = QDoubleSpinBox()
-        entryVal.setDecimals(2)
-        entryVal.setSingleStep(0.1)
-        entryVal.setValue(self.timerInfo)
-        entryVal.valueChanged.connect(lambda value: setattr(self, 'timerInfo', value))
-        # Add the QMainWindow to the QVBoxLayout
-        layout.addWidget(entryVal)
-
-        layout.addWidget(button_box)
-        
-        self.setLayout(layout)
-
 
 class nodz_openInlineScriptDialog(QDialog):
     """
@@ -490,6 +449,54 @@ class nodz_openStoreDataDialog(nodz_generalAdvancedLineEditDialog):
                         internalName='storeDataDialog',
                         advLineEdits=[{'Data:':['item_to_store','Variable']},{'Location:':['store_location','Advanced']}],
                         storeVarName='storeDataInfo')
+
+
+
+class nodz_openTimerDialog(nodz_generalAdvancedLineEditDialog):
+    """
+    A Dialog that is created for timer in the Nodz layout. 
+    """
+    def __init__(self, parentNode=None):
+        super().__init__(parentNode=parentNode,
+                        title="Timer",
+                        internalName='timerDialog',
+                        advLineEdits=[{'Time to wait (s):':['wait_time','Value']}],
+                        storeVarName='timerInfo')
+    #     """
+    #     Initializes the TimerDialog.
+        
+    #     Args:
+    #         parentNode: The parent node of the TimerDialog. If provided, the timerInfo will be set to the timerInfo of the parentNode.
+        
+    #     Returns:
+    #         None
+    #     """
+    #     super().__init__(None)
+    #     self.setWindowTitle("Timer Dialog")
+    #     self.timerInfo = 0
+    #     if parentNode is not None:
+    #         from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
+    #         self.timerInfo = parentNode.timerInfo
+
+    #     button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    #     button_box.accepted.connect(self.accept)
+    #     button_box.rejected.connect(self.reject)
+        
+    #     # Create the QVBoxLayout
+    #     layout = QVBoxLayout()
+
+    #     # Create a QWidget to contain the QGridLayout
+    #     entryVal = QDoubleSpinBox()
+    #     entryVal.setDecimals(2)
+    #     entryVal.setSingleStep(0.1)
+    #     entryVal.setValue(self.timerInfo)
+    #     entryVal.valueChanged.connect(lambda value: setattr(self, 'timerInfo', value))
+    #     # Add the QMainWindow to the QVBoxLayout
+    #     layout.addWidget(entryVal)
+
+    #     layout.addWidget(button_box)
+        
+    #     self.setLayout(layout)
 
 
 class nodz_openMMConfigDialog(QDialog):
@@ -3276,7 +3283,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         import time
-        time.sleep(node.timerInfo)
+        vardata = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.timerInfo,node.flowChart)
+        time.sleep(float(vardata['wait_time'][0]))
         self.finishedEmits(node)
     
     def storeDataCallAction(self,node):

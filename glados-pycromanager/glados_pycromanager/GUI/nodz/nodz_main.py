@@ -1612,7 +1612,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         self.visualisation_currentData = {}
         self.real_time_analysis_currentData = {}
-        self.timerInfo = 1
+        self.timerInfo = {}
         self.slackReportInfo = ''
     
         self.storeDataInfo = {}
