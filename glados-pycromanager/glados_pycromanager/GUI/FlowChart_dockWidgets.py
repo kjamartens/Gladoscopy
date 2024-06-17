@@ -1343,6 +1343,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.globalVariables['XY_pos_measurementArray']['data'] = []
         self.globalVariables['XY_pos_measurementArray']['importance'] = 'Informative'
         
+        
         #import qgroupbox:
         from qtpy.QtWidgets import QGroupBox    
     
@@ -1402,6 +1403,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         #Focus on the nodes
         self._focus()
+        
+        
+        self.coreVariables={}
+        self.updateCoreVariables()
     
     #region NodzFlowChart Node Methods
     def defineNodeInfo(self):
@@ -1800,6 +1805,18 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
 
         newNode.update()
 
+    def nodeRan(self,node):
+        """ 
+        Function that's called at the start of every node
+        Updates the core variables and the variables in the UI.
+        """
+        try:
+            self.updateCoreVariables()
+            self.variablesWidget.updateVariables()
+        except:
+            pass
+        logging.debug(f'Node with name {node.name} ran')
+
     def NodeDoubleClicked(self,nodeName):
         """
         Handle double-clicking on a node in the flowchart.
@@ -2048,6 +2065,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
+        self.updateCoreVariables()
         node.status='finished'
         self.update()
         if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
@@ -2142,7 +2160,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.customDataEmits.print_signals()  #type: ignore
         
         logging.debug("updated custom attributes")
-        
+    
     def advNodeInfo(self,node,event):
         """
         Show advanced information about a node in a popup window.
@@ -2618,6 +2636,55 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             object: The current instance of the class.
         """
         return self
+    
+    def updateCoreVariables(self):
+        """
+        
+        Idea, get information like this:
+        self.coreVariables is initialised like {}
+        
+        self.coreVariables['TrialGlobalVariable']={}
+        self.coreVariables['TrialGlobalVariable']['type'] = str
+        self.coreVariables['TrialGlobalVariable']['data'] = 'test'
+        self.coreVariables['TrialGlobalVariable']['importance'] = 'Informative'
+        
+        """
+        allXYstages = utils.getCoreDevicesOfDeviceType(self.core,'XYStageDevice')
+        all1Dstages = utils.getCoreDevicesOfDeviceType(self.core,'StageDevice')
+        
+        #Core variables to store:
+        #Stage positions, all stages
+        for stage in allXYstages:
+            xypos = self.core.get_xy_stage_position(stage) #type:ignore
+            self.createSingleCoreVar(stage+'_current_pos',[xypos.x,xypos.y],[list,np.ndarray]) #type:ignore
+        
+        for stage in all1Dstages:
+            pos = self.core.get_position(stage) #type:ignore
+            self.createSingleCoreVar(stage+'_current_pos',[pos],[list,np.ndarray]) #type:ignore
+        
+        #Config values, all configs
+        from MMcontrols import ConfigInfo
+        nrconfiggroups = self.core.get_available_config_groups().size()
+        for config_id in range(nrconfiggroups):
+            configInfo = ConfigInfo(self.core,config_id)
+            configName = configInfo.configGroupName()
+            configValue = configInfo.getStorableValue()
+            try:
+                typev = [type(configValue)]
+            except:
+                typev = [str]
+            self.createSingleCoreVar('config_'+configName,configValue,typev) #type:ignore
+        
+        #Pixel size, ROI size
+        self.createSingleCoreVar('Pixel_size_um',self.core.get_pixel_size_um(),[float]) #type:ignore
+        self.createSingleCoreVar('ROI_size',[self.core.get_roi().width,self.core.get_roi().height],[list,np.ndarray]) #type:ignore
+    
+    def createSingleCoreVar(self,name,data,type,importance='Informative'):
+        self.coreVariables[name] = {} 
+        self.coreVariables[name]['type'] = type 
+        self.coreVariables[name]['data'] = data 
+        self.coreVariables[name]['importance'] = importance 
+    
     #endregion
     
     #region NodzFlowChart Saving Loading
@@ -3257,8 +3324,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         
         self.finishedEmits(node)
-        
-        
+    
     def newGlobalVarCallAction(self,node):
         """
         The newGlobalVarCallAction function is the action function for the new global var Call node in the Flowchart.
@@ -4487,6 +4553,8 @@ class VariablesBase(QWidget):
         Update the nodz-variables.
         """
         
+        self.nodzinstance.updateCoreVariables()
+        
         allvariableData = {}
         #Add all global variables
         for var in self.nodzinstance.globalVariables:
@@ -4509,6 +4577,29 @@ class VariablesBase(QWidget):
             if correctTyping:
                 allvariableData[pos] = self.nodzinstance.globalVariables[var]
                 allvariableData[pos]['NodeOrigin'] = 'Global'
+                allvariableData[pos]['VariableName'] = var
+            
+        #Add all core variables
+        for var in self.nodzinstance.coreVariables:
+            pos = len(allvariableData)
+            correctTyping = False
+            if self.typeInfo is not None:
+                variableTypes = self.nodzinstance.coreVariables[var]['type']
+                if isinstance(variableTypes,type):
+                    variableTypes = [variableTypes]
+                if isinstance(self.typeInfo,type):
+                    self.typeInfo = [self.typeInfo]
+                
+                for variableType in variableTypes:
+                    for selftype in self.typeInfo:
+                        if variableType == selftype:
+                            correctTyping = True
+            else: #if no typing specified, accept everything
+                correctTyping = True
+            
+            if correctTyping:
+                allvariableData[pos] = self.nodzinstance.coreVariables[var]
+                allvariableData[pos]['NodeOrigin'] = 'Core'
                 allvariableData[pos]['VariableName'] = var
             
         #Add all variables of all nodes

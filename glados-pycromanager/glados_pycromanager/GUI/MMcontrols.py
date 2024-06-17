@@ -161,6 +161,34 @@ class ConfigInfo:
         """Get the current MM value of this config group:"""
         return self.core.get_current_config(self.configGroupName())
 
+    def getStorableValue(self):
+        """Get the current MM value of this config group, in a storable manner - i.e. depending on slider, input, dropdown:"""
+        if self.isDropDown():
+            return self.core.get_current_config(self.configGroupName())
+        if self.isSlider():
+            #A slider config by definition (?) only has a single property underneath, so get that:
+            configGroupName = self.configGroupName()
+            underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
+            configdata = self.core.get_config_data(configGroupName,underlyingProperty)
+            device_label = configdata.get_setting(0).get_device_label()
+            property_name = configdata.get_setting(0).get_property_name()
+            
+            #Finally we get the current value of the slider
+            currentSliderValue = float(self.core.get_property(device_label,property_name))
+            return currentSliderValue
+        if self.isInputField():
+            #An input field config by definition (?) only has a single property underneath, so get that:
+            configGroupName = self.configGroupName()
+            underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
+            configdata = self.core.get_config_data(configGroupName,underlyingProperty)
+            device_label = configdata.get_setting(0).get_device_label()
+            property_name = configdata.get_setting(0).get_property_name()
+            
+            #Finally we get the current value of the slider
+            currentValue = float(self.core.get_property(device_label,property_name))
+            return currentValue
+        
+
 class MMConfigUI(CustomMainWindow):
     """
         A class to create a MicroManager config UI

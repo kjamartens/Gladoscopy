@@ -1691,6 +1691,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
             logging.info(f"Starting call action of node with name: {self.name}")
             self.status = 'running'
             self.update()
+            #Run the general 'this node is running' action (Flowchart_dockwidgets.py):
+            self.flowChart.nodeRan(self) #type:ignore
             if self.callAction is not None:
                 if self.callActionRelatedObject is not None:
                     self.callAction(self.callActionRelatedObject) #type:ignore

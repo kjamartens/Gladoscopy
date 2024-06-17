@@ -672,15 +672,17 @@ def nodz_evaluateVar(varName,nodzInfo):
     varData = None
     
     #Find the correct node
-    if originNodeName != 'Global':
+    if originNodeName == 'Global':
+        varData = nodzInfo.globalVariables[variableName]['data']
+    elif originNodeName == 'Core':
+        varData = nodzInfo.coreVariables[variableName]['data']
+    else:
         #Done it like this to have access to kwargvalue if needed (not retported right now)
         nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
         kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
     
         varData = eval(kwargvalue)
     
-    else:
-        varData = nodzInfo.globalVariables[variableName]['data']
     return varData
 
 def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
@@ -705,6 +707,10 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
                 if isinstance(nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'],type):
                     nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'] = [nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type']]
                 typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+            elif foundstring_data.split('@')[1] == 'Core':
+                if isinstance(nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'],type):
+                    nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'] = [nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type']]
+                typev = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'][0]
             else:
                 typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
             #Check if it's calculatable
@@ -725,6 +731,9 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
             if foundstring_data.split('@')[1] == 'Global':
                 data = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['data']
                 typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+            elif foundstring_data.split('@')[1] == 'Core':
+                data = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['data']
+                typev = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'][0]
             else:
                 data = str(nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['data'])
                 typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
@@ -736,7 +745,10 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
                 except:
                     updating_string = updating_string.replace(foundstring,""+str(data)+"")
             else: #uncalculatable, add as string
-                updating_string = updating_string.replace(foundstring,"'"+data+"'")
+                try:
+                    updating_string = updating_string.replace(foundstring,""+data+"")
+                except:
+                    updating_string = updating_string.replace(foundstring,""+str(data)+"")
                 
         #Replace backslashes since they're escapechars
         updating_string_backslash = updating_string.replace('\\','\\\\')
@@ -1950,10 +1962,13 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                         #         #Find the correct variable data
                         #         varData = node.variablesNodz[variableName]['data']
                         #         #Set it to this kwarg value - str allways
-                        if originNodeName != 'Global':
-                            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
-                        else:
+                        
+                        if originNodeName == 'Global':
                             kwargvalue = "nodzInfo.globalVariables['"+variableName+"']['data']"
+                        elif originNodeName == 'Core':
+                            kwargvalue = "nodzInfo.coreVariables['"+variableName+"']['data']"
+                        else:
+                            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
                         ignoreQuotes = True #ignore quotes - use it as a variable, not a string
                                 # break
                     elif methodKwargTypes[GUIbasedIndex] == 'Advanced':
@@ -2411,3 +2426,24 @@ def analysis_outputs_to_variableNodz(currentNode):
             else:
                 currentNode.variablesNodz[output['name']]['importance'] = 'Informative' #type:ignore
             currentNode.variablesNodz[output['name']]['lastUpdateTime'] = None
+            
+
+
+def getCoreDevicesOfDeviceType(core,devicetype):
+    """
+    #Find all devices that have a specific devicetype
+    #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+    #for all devicetypes
+    """
+    #Get devices
+    devices = core.get_loaded_devices() #type:ignore
+    devices = [devices.get(i) for i in range(devices.size())]
+    devicesOfType = []
+    #Loop over devices
+    for device in devices:
+        if core.get_device_type(device).to_string() == devicetype: #type:ignore
+            logging.debug("found " + device + " of type " + devicetype)
+            devicesOfType.append(device)
+    return devicesOfType
+
+
