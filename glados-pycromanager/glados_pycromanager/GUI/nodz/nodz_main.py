@@ -1636,6 +1636,15 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.bottomAttrs = dict()
         self.topAttrs = dict()
 
+
+        #Find the iconPath folder
+        if os.path.exists('./glados_pycromanager/GUI/Icons/node_pending.png'):
+            self.iconFolder = './glados_pycromanager/GUI/Icons/'
+        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/node_pending.png'):
+            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+        else:
+            self.iconFolder = ''
+
         # Methods.
         import copy
         self.config = config.copy()
@@ -2106,15 +2115,15 @@ class NodeItem(QtWidgets.QGraphicsItem):
         #Draw the icon
         from PyQt5.QtGui import QPixmap
         if self.status == 'idle':
-            self.icon = QPixmap('./glados_pycromanager/GUI/Icons/node_pending.png')
+            self.icon = QPixmap(self.iconFolder+os.sep+'node_pending.png')
         elif self.status == 'running':
-            self.icon = QPixmap('./glados_pycromanager/GUI/Icons/node_inProgress.png')
+            self.icon = QPixmap(self.iconFolder+os.sep+'node_inProgress.png')
         elif self.status == 'finished':
-            self.icon = QPixmap('./glados_pycromanager/GUI/Icons/node_completed.png')
+            self.icon = QPixmap(self.iconFolder+os.sep+'node_completed.png')
         elif self.status == 'error':
-            self.icon = QPixmap('./glados_pycromanager/GUI/Icons/node_error.png')
+            self.icon = QPixmap(self.iconFolder+os.sep+'node_error.png')
         else:
-            self.icon = QPixmap('./glados_pycromanager/GUI/Icons/node_error.png')
+            self.icon = QPixmap(self.iconFolder+os.sep+'node_error.png')
             
         iconSize = 15
         painter.drawPixmap(int(-margin-iconSize+14-5-iconSize/2), int(-text_height+iconSize*.66), int(iconSize), int(iconSize), self.icon)
@@ -2313,10 +2322,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         td = QTextDocument()
         textToDisplay = ''
-        # if self.nodePreset is not None:
-        #     textToDisplay = textToDisplay+self.nodePreset
-        #     if self.nodePreset == 'node_imaging':
-        #         textToDisplay = textToDisplay+"<br><img src=\"GUI\\nodz\\nodz2.png\" width=\"50\" height = \"50\">"
         if self.displayText is not None:
             textToDisplay = self.displayText
         

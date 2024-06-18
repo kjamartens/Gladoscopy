@@ -1885,7 +1885,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Updates the core variables and the variables in the UI.
         """
         try:
-            self.updateCoreVariables()
+            self.update()
+            # self.updateCoreVariables()
             self.variablesWidget.updateVariables()
         except:
             pass
@@ -3551,6 +3552,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         Call action to send a message to Slack
         """
+        node.status='finished'
         readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
         if readableText == None:
             readableText = node.slackReportInfo

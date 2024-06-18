@@ -253,6 +253,13 @@ class MMConfigUI(CustomMainWindow):
         self.mainLayout = QGridLayout()
         self.configEntries = {}
         
+        #Find the iconPath folder
+        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+            self.iconFolder = './glados_pycromanager/GUI/Icons/'
+        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+        else:
+            self.iconFolder = ''
         
         
         
@@ -476,7 +483,7 @@ class MMConfigUI(CustomMainWindow):
         liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
         self.LiveModeButton = QPushButton("Start Live Mode")
-        icon = QIcon('./glados_pycromanager/GUI/Icons/General_Start.png')
+        icon = QIcon(self.iconFolder+os.sep+'General_Start.png')
         # icon: Flaticon.com
         self.LiveModeButton.setIcon(icon)
         
@@ -486,7 +493,7 @@ class MMConfigUI(CustomMainWindow):
         liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
         
         self.SnapButton = QPushButton("Snap")
-        icon = QIcon('./glados_pycromanager/GUI/Icons/General_Snap.png')
+        icon = QIcon(self.iconFolder+os.sep+'General_Snap.png')
         # icon: Flaticon.com
         self.SnapButton.setIcon(icon)
         #add a connection to the button:
@@ -497,7 +504,7 @@ class MMConfigUI(CustomMainWindow):
         self.AlbumButton = QPushButton("Add to Album")
         #add a connection to the button:
         self.AlbumButton.clicked.connect(lambda index: self.addImageToAlbum())
-        icon = QIcon('./glados_pycromanager/GUI/Icons/General_Album.png')
+        icon = QIcon(self.iconFolder+os.sep+'General_Album.png')
         # icon: Flaticon.com
         self.AlbumButton.setIcon(icon)
         #Add the button to the layout:
@@ -569,7 +576,7 @@ class MMConfigUI(CustomMainWindow):
         if shared_data.liveMode == False:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Stop Live Mode")
-            icon = QIcon('./glados_pycromanager/GUI/Icons/General_Stop.png')
+            icon = QIcon(self.iconFolder+os.sep+'General_Stop.png')
             # icon: Flaticon.com
             self.LiveModeButton.setIcon(icon)
             #set exposure time first:
@@ -579,7 +586,7 @@ class MMConfigUI(CustomMainWindow):
         else:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Start Live Mode")
-            icon = QIcon('./glados_pycromanager/GUI/Icons/General_Start.png')
+            icon = QIcon(self.iconFolder+os.sep+'General_Start.png')
             # icon: Flaticon.com
             self.LiveModeButton.setIcon(icon)
             #update live mode:
@@ -609,7 +616,7 @@ class MMConfigUI(CustomMainWindow):
         self.shutterAutoCheckbox.stateChanged.connect(self.on_shutterAutoCheckboxChanged)
         
         self.shutterOpenCloseButton = QPushButton("Open")
-        self.shutterOpenCloseButton.setIcon(QIcon('./glados_pycromanager/GUI/Icons/ShutterOpen.png'))
+        self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterOpen.png'))
         self.shutterOpenCloseButton.clicked.connect(self.on_shutterOpenCloseButtonPressed)
         
         shutterOptionsLayout.addWidget(self.shutterChoiceDropdown,0,0,1,2)
@@ -626,11 +633,11 @@ class MMConfigUI(CustomMainWindow):
         if current_text == 'Open':
             self.core.set_shutter_open(True) #type:ignore
             self.shutterOpenCloseButton.setText('Close')
-            self.shutterOpenCloseButton.setIcon(QIcon('./glados_pycromanager/GUI/Icons/ShutterClosed.png'))
+            self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterClosed.png'))
         elif current_text == 'Close':
             self.core.set_shutter_open(False) #type:ignore
             self.shutterOpenCloseButton.setText('Open')
-            self.shutterOpenCloseButton.setIcon(QIcon('./glados_pycromanager/GUI/Icons/ShutterOpen.png'))
+            self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterOpen.png'))
 
     def on_shutterChoiceChanged(self):
         """
@@ -687,19 +694,19 @@ class MMConfigUI(CustomMainWindow):
         #Following options should be added:
         #Reset ROI to max size
         self.ROIoptionsButtons['Reset'] = QPushButton("Reset ROI")
-        self.ROIoptionsButtons['Reset'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_reset.png'))
+        self.ROIoptionsButtons['Reset'].setIcon(QIcon(self.iconFolder+os.sep+'ROI_reset.png'))
         self.ROIoptionsButtons['Reset'].clicked.connect(lambda index: self.resetROI())
         #Zoom in once to center
         self.ROIoptionsButtons['ZoomIn'] = QPushButton("Zoom In")
-        self.ROIoptionsButtons['ZoomIn'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_zoomIn.png'))
+        self.ROIoptionsButtons['ZoomIn'].setIcon(QIcon(self.iconFolder+os.sep+'ROI_zoomIn.png'))
         self.ROIoptionsButtons['ZoomIn'].clicked.connect(lambda index: self.zoomROI('ZoomIn'))
         #Zoom out once from center
         self.ROIoptionsButtons['ZoomOut'] = QPushButton("Zoom Out")
-        self.ROIoptionsButtons['ZoomOut'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_zoomOut.png'))
+        self.ROIoptionsButtons['ZoomOut'].setIcon(QIcon(self.iconFolder+os.sep+'ROI_zoomOut.png'))
         self.ROIoptionsButtons['ZoomOut'].clicked.connect(lambda index: self.zoomROI('ZoomOut'))
         #Draw a ROI
         self.ROIoptionsButtons['drawROI'] = QPushButton("Draw ROI")
-        self.ROIoptionsButtons['drawROI'].setIcon(QIcon('./glados_pycromanager/GUI/Icons/ROI_select.png'))
+        self.ROIoptionsButtons['drawROI'].setIcon(QIcon(self.iconFolder+os.sep+'ROI_select.png'))
         self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.drawROI())
         if orientation == 'vertical':
             ROIoptionsLayout.addWidget(self.ROIoptionsButtons['Reset'],0,0)

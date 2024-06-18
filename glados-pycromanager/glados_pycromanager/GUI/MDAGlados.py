@@ -1257,6 +1257,8 @@ class MDAGlados(CustomMainWindow):
         if 'nodeInfo' in vars(self) and self.nodeInfo is not None:
             logging.info('This MDA acq data was connected to node: ' + self.nodeInfo.name)
             self.updateNodzVariables()
+            self.nodeInfo.status='finished'
+            self.nodeInfo.flowChart.update()
 
         #Look at the 'Visual' bottom attribute:
             visualAttr = self.nodeInfo.bottomAttrs['Visual']
@@ -1279,7 +1281,7 @@ class MDAGlados(CustomMainWindow):
         
         #reset the MDA button in the GUI
         self.resetMDAbutton(mdaLayerName='MDA')
-        logging.debug('about the emit MDA_completed')
+        logging.debug('about to emit MDA_completed')
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_Node(self, nodeInfo):
@@ -1667,5 +1669,4 @@ class MDAGlados(CustomMainWindow):
                     self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name+'_1//'
             else:
                 self.nodeInfo.variablesNodz['storage_path']['data'] = None
-                
     #endregion
