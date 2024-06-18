@@ -1594,6 +1594,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['slackReport']['startAttributes'] = ['Start']
         self.nodeInfo['slackReport']['NodeSize'] = 60
         
+        self.nodeInfo['ANDlogic'] = self.singleNodeTypeInit()
+        self.nodeInfo['ANDlogic']['name'] = 'ANDlogic'
+        self.nodeInfo['ANDlogic']['displayName'] = 'AND-Logic'
+        self.nodeInfo['ANDlogic']['startAttributes'] = ['In']
+        self.nodeInfo['ANDlogic']['finishedAttributes'] = ['Out']
+        self.nodeInfo['ANDlogic']['NodeSize'] = 30
+        
         #We also add some custom JSON info about the node layout (colors and such)
         import json
         self.nodeLayout = json.loads('''{
@@ -1863,6 +1870,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'initEnd':
             newNode.callAction = lambda self, node=newNode: self.initEnd(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'ANDlogic':
+            newNode.callAction = lambda self, node=newNode: self.and_logicCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         else:
             newNode.callAction = None
@@ -3382,6 +3392,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     node.status = 'error'
         
         self.preventAcq = False
+    
+    def and_logicCallAction(self,node):
+        """ 
+        Runs when the and_logic gate is fully completed
+        """
+        #Honestly just needs to run the next nodes
+        self.finishedEmits(node)
     
     def timerCallAction(self,node):
         """

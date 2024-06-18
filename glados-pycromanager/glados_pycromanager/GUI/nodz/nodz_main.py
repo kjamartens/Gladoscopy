@@ -1687,19 +1687,36 @@ class NodeItem(QtWidgets.QGraphicsItem):
         logging.debug('Called oneConnectionAtStartIsFinished')
         logging.debug(f"n_connect_at_start_finished: {self.n_connect_at_start_finished}")
         logging.debug(f"n_connect_at_start: {self.n_connect_at_start}")
-        if self.n_connect_at_start_finished == self.n_connect_at_start:
-            self.n_connect_at_start_finished = 0 #to allow for looping :)
-            logging.debug('All connections at start are finished')
-            logging.info(f"Starting call action of node with name: {self.name}")
-            self.status = 'running'
-            self.update()
-            #Run the general 'this node is running' action (Flowchart_dockwidgets.py):
-            self.flowChart.nodeRan(self) #type:ignore
-            if self.callAction is not None:
-                if self.callActionRelatedObject is not None:
-                    self.callAction(self.callActionRelatedObject) #type:ignore
-                else:
-                    self.callAction(self)
+        
+        if not "ANDlogic_" in self.name:
+            #NEW, ANY-based logic
+            if self.status == 'idle':
+                logging.info(f"Starting call action of node with name: {self.name}")
+                self.status = 'running'
+                self.update()
+                #Run the general 'this node is running' action (Flowchart_dockwidgets.py):
+                self.flowChart.nodeRan(self) #type:ignore
+                if self.callAction is not None:
+                    if self.callActionRelatedObject is not None:
+                        self.callAction(self.callActionRelatedObject) #type:ignore
+                    else:
+                        self.callAction(self)
+        else:
+            logging.info(f"AND NODE now has {self.n_connect_at_start_finished} connections ouf of {self.n_connect_at_start}")
+            #OLD, AND-based logic
+            if self.n_connect_at_start_finished == self.n_connect_at_start:
+                self.n_connect_at_start_finished = 0 #to allow for looping :)
+                logging.debug('All connections at start are finished')
+                logging.info(f"Starting call action of node with name: {self.name}")
+                self.status = 'running'
+                self.update()
+                #Run the general 'this node is running' action (Flowchart_dockwidgets.py):
+                self.flowChart.nodeRan(self) #type:ignore
+                if self.callAction is not None:
+                    if self.callActionRelatedObject is not None:
+                        self.callAction(self.callActionRelatedObject) #type:ignore
+                    else:
+                        self.callAction(self)
 
     def finishedmda(self):
         print('finishedmda ran')
