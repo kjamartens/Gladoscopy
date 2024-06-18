@@ -15,6 +15,7 @@ def __function_metadata__():
             ],
             "output":[
                 {"name": "segmented_image", "type": [np.ndarray], "importance": "Default"},
+                {"name": "n_segmented_cells", "type": [int]},
                 {"name": "details", "type": dict}
             ],
             "required_kwargs": [
@@ -65,6 +66,7 @@ def StarDistSegment_ImageVis(core,**kwargs):
 
     output = {}
     output['segmented_image'] = labels
+    output['n_segmented_cells'] = len(np.unique(labels))
     output['details'] = details
     
     return output

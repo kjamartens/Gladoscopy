@@ -1823,7 +1823,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
     def finishedmda(self):
         print('finishedmda ran')
         self.status = 'finished'
-        self.update()
+        # self.update()
         logging.info('MDA finished within node')
         #MDA data is stored as self.mdaData.data
         logging.info(self.name)

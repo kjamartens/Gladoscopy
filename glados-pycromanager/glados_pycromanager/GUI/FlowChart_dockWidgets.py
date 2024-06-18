@@ -1592,6 +1592,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['slackReport']['name'] = 'slackReport'
         self.nodeInfo['slackReport']['displayName'] = 'Slack Report'
         self.nodeInfo['slackReport']['startAttributes'] = ['Start']
+        self.nodeInfo['slackReport']['finishedAttributes'] = ['Send']
         self.nodeInfo['slackReport']['NodeSize'] = 60
         
         self.nodeInfo['ANDlogic'] = self.singleNodeTypeInit()
@@ -3181,6 +3182,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         if self.preventAcq == False:
             print('Starting the acquiring routine!')
             
+            #Set all connected nodes to idle
+            connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
+            for connectedNode in connectedNodes:
+                for nodeC in self.nodes:
+                    if nodeC.name == connectedNode:
+                        nodeC.status='idle'
+            self.update()
+                        
             self.GraphToSignals()
             
             self.finishedEmits(node)
@@ -3199,17 +3208,24 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        print("End Acquiring")
+        #This finishedEmit needs to be at the start of this function :) 
+        self.finishedEmits(node)
+        print("End Acquiring----------------------------------------------------------")
         if self.fullRunOngoing:
             #if there are more positions to look at...
             if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
+                print(f'Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!--------------------------------------------------------')
                 self.fullRunCurrentPos +=1
                 #And start a new score/acq at a new pos:
                 self.startNewScoreAcqAtPos()
             else:
+                print(f'ALLDONE Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!----------------------------------------------------------')
                 self.singleRunOngoing = False
                 print('All done!')
-        self.finishedEmits(node)
+        else:
+            print("ACQUIRING FULL RUN IS NOT ONGOING--------------------------------------------")
+        print("End Acquiring2------------------------------------------------------------")
+        
     
     def initStart(self,node):
         """
@@ -3306,6 +3322,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
+        self.finishedEmits(node)
         #Find the nodes that are connected downstream of this:
         try:
             data = {}
@@ -3361,7 +3378,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         self.singleRunOngoing = False
                         print('All done!')
             print('----------------------')
-            self.finishedEmits(node)
 
         except:
             testPassed = False
@@ -3566,6 +3582,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 slackReadableText = slackReadableText.replace('</b>','*')
                 self.shared_data.globalData['SLACK']['CLIENT'].chat_postMessage(channel=self.shared_data.globalData['SLACK']['CHANNEL'],text=slackReadableText) 
     
+        self.finishedEmits(node)
     #endregion
     
     #region NodzFlowChart runs
@@ -3623,6 +3640,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         import time
         positions = self.fullRunPositions
         pos = self.fullRunCurrentPos
+        
+        print(f'Starting new score acq at position {pos} -------------------------------------------------------------------------------')
         
         #Set all stages correct
         for stage in positions[pos]['STAGES']:
@@ -4922,6 +4941,8 @@ def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     #Create the a flowchart testing
     flowChart_dockWidget = GladosNodzFlowChart_dockWidget(core=core,shared_data=shared_data,MM_JSON=MM_JSON)
     main_layout.addLayout(flowChart_dockWidget.mainLayout,0,0)
+    
+    shared_data.nodzInstance = flowChart_dockWidget.getNodz()
     
     flowChart_dockWidget.getNodz()
     

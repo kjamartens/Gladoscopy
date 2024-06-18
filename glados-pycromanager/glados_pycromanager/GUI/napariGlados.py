@@ -395,8 +395,16 @@ class napariHandler():
                 savename = 'MdaAcqShouldBeRemoved'
                 if shared_data._mdaModeSaveLoc[0] != '':
                     savefolder = shared_data._mdaModeSaveLoc[0]
+                    
+                    savefolderAdv = utils.nodz_evaluateAdv(savefolder,shared_data.nodzInstance)
+                    if savefolderAdv != None:
+                        savefolder = savefolderAdv
+                    
                 if shared_data._mdaModeSaveLoc[1] != '':
                     savename = shared_data._mdaModeSaveLoc[1]
+                    savenameAdv = utils.nodz_evaluateAdv(savename,shared_data.nodzInstance)
+                    if savenameAdv != None:
+                        savename = savenameAdv
                 if shared_data._mdaModeNapariViewer != None:
                     napariViewer = shared_data._mdaModeNapariViewer
                     showdisplay = True

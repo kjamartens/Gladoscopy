@@ -185,7 +185,10 @@ class ConfigInfo:
             property_name = configdata.get_setting(0).get_property_name()
             
             #Finally we get the current value of the slider
-            currentValue = float(self.core.get_property(device_label,property_name))
+            try:
+                currentValue = (self.core.get_property(device_label,property_name))
+            except:
+                currentValue = 0
             return currentValue
         
 
