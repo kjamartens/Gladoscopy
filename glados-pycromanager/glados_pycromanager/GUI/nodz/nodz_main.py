@@ -3,7 +3,7 @@ import re
 import json
 
 from PyQt5 import QtGui, QtCore, QtWidgets
-from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction, QGraphicsSceneMouseEvent
+from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction, QGraphicsSceneMouseEvent, QCheckBox
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent
 from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt
 import nodz_utils as utils
@@ -879,6 +879,42 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_RUN_INLINE_SCRIPT'] = dict()
         data['NODES_CASE_SWITCH'] = dict()
         data['NODES_SLACK_REPORT'] = dict()
+        
+        #Attempt to store the decision widget data
+        data['DECISION_WIDGET_INFO'] = dict()
+        data['DECISION_WIDGET_INFO']['currentDecision'] = self.decisionWidget.currentDecision
+        data['DECISION_WIDGET_INFO']['currentMode'] = self.decisionWidget.currentMode
+        data['DECISION_WIDGET_INFO']['PYQTentries'] = {}
+        
+        #recusively loop over allc hildren of the decisionWidget, and if they have an object name, store it:
+        def recursively_store_children(child, dataloc):
+            """
+            Recursively store children of a pyqt child, if it has an objectname
+            """
+            for childN in child.children():
+                if hasattr(childN, 'objectName'):
+                    if isinstance(childN, QLineEdit):
+                        dataloc[childN.objectName()] = childN.text()
+                    elif isinstance(childN, QComboBox):
+                        dataloc[childN.objectName()] = childN.currentText()
+                    elif isinstance(childN, QCheckBox):
+                        dataloc[childN.objectName()] = childN.isChecked()
+                    else:
+                        try:
+                            dataloc[childN.objectName()] = childN.text()
+                        except:
+                            pass
+                #Check if it has more children:
+                if len(childN.children()) > 0:
+                    for childNN in childN.children():
+                        recursively_store_children(childNN, dataloc)
+        
+        for decisionlayout in self.decisionWidget.decisionLayouts:
+            decisionLayoutFull = self.decisionWidget.decisionLayouts[decisionlayout]
+            if len(decisionLayoutFull.decisiontypes) > 0:
+                for decisiontype in decisionLayoutFull.decisiontypes:
+                    recursively_store_children(decisionLayoutFull.decisiontypes[decisiontype], data['DECISION_WIDGET_INFO']['PYQTentries'])
+        #End of decision widget data info
 
         nodes = self.scene().nodes.keys() #type:ignore
         for node in nodes:
@@ -1240,8 +1276,65 @@ class Nodz(QtWidgets.QGraphicsView):
         
         self._focus()
         
+        
+        #Update the decisionwidget after loading all nodes:
+        if 'DECISION_WIDGET_INFO' in data:
+            decisionWidgetData = data['DECISION_WIDGET_INFO']
+            
+            
+            #First set the two main dropdowns:
+            readable_currentMode = decisionWidgetData['currentMode']
+            true_currentMode = ''
+            for match in self.decisionWidget.decisionArray_modes:
+                if match[0] == readable_currentMode:
+                    true_currentMode = match[1]
+            self.decisionWidget.mode_dropdown.setCurrentText(true_currentMode)
+            
+            #First set the two main dropdowns:
+            readable_currentDecision = decisionWidgetData['currentDecision']
+            true_currentDecision = ''
+            for match in self.decisionWidget.decisionArray_decisionTypes[readable_currentMode]:
+                if match[0] == readable_currentDecision:
+                    true_currentDecision = match[1]
+                    
+            self.decisionWidget.decisionLayouts[readable_currentMode].mode_dropdown.setCurrentText(true_currentDecision)
+            
+            #Then fill all info
+        
+            #recusively loop over allc hildren of the decisionWidget, and if they have an object name, store it:
+            def recursively_set_children(child, dataloc):
+                """
+                Recursively store children of a pyqt child, if it has an objectname
+                """
+                for childN in child.children():
+                    if hasattr(childN, 'objectName'):
+                        if isinstance(childN, QLineEdit):
+                            childN.setText(dataloc[childN.objectName()])
+                        elif isinstance(childN, QComboBox):
+                            childN.setCurrentText(dataloc[childN.objectName()])
+                        elif isinstance(childN, QCheckBox):
+                            childN.setChecked(dataloc[childN.objectName()])
+                        # else:
+                        #     try:
+                        #         childN.setText(dataloc[childN.objectName()])
+                        #     except:
+                        #         pass
+                    #Check if it has more children:
+                    if len(childN.children()) > 0:
+                        for childNN in childN.children():
+                            recursively_set_children(childNN, dataloc)
+            
+            for decisionlayout in self.decisionWidget.decisionLayouts:
+                decisionLayoutFull = self.decisionWidget.decisionLayouts[decisionlayout]
+                if len(decisionLayoutFull.decisiontypes) > 0:
+                    for decisiontype in decisionLayoutFull.decisiontypes:
+                        recursively_set_children(decisionLayoutFull.decisiontypes[decisiontype], decisionWidgetData['PYQTentries'])
+        
+        
         #Update the decisionwidget after loading the scoringEnd node:
         node.flowChart.decisionWidget.updateAllDecisions() #type:ignore
+
+
 
         # Emit signal.
         self.signal_GraphLoaded.emit()

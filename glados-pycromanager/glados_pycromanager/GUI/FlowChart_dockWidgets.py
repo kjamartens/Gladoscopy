@@ -4494,7 +4494,6 @@ class advDecisionGridLayout(QGroupBox):
             self.decisionInfoGUI[scoreMetric]['lineedit'] = lineedit
             self.outerLayout.addLayout(hbox)
     
-    
     def directDecision_AND_Score_VAR_test(self):
         """
         Code to test whether the current score passes the decision matrix or not. Should always output a boolean
@@ -4573,12 +4572,15 @@ class advDecisionGridLayout(QGroupBox):
             hbox.addWidget(label)
             
             varName = QLineEdit()
+            varName.setObjectName('directDecision_AND_Score_VAR__varName_'+str(n+1))
             hbox.addWidget(varName)
             
             dropdown = QComboBox()
             dropdown.addItems(['>','>=','==','<=','<','!='])
+            dropdown.setObjectName('directDecision_AND_Score_VAR__dropdown_'+str(n+1))
             hbox.addWidget(dropdown)
             lineedit = QLineEdit()
+            lineedit.setObjectName('directDecision_AND_Score_VAR__lineedit_'+str(n+1))
             hbox.addWidget(lineedit)
             self.decisionInfoGUIVAR[n] = {}
             self.decisionInfoGUIVAR[n]['varName'] = varName
