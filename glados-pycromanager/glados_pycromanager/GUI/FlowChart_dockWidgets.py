@@ -1450,6 +1450,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Global variables for MM/napari
         self.core = core
         self.shared_data = shared_data
+        self.shared_data.nodzInstance = self
         self.MM_JSON=MM_JSON
         
         global nodz
@@ -5054,8 +5055,7 @@ def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     #Create the a flowchart testing
     flowChart_dockWidget = GladosNodzFlowChart_dockWidget(core=core,shared_data=shared_data,MM_JSON=MM_JSON)
     main_layout.addLayout(flowChart_dockWidget.mainLayout,0,0)
-    
-    shared_data.nodzInstance = flowChart_dockWidget.getNodz()
+    #should have nodes
     
     flowChart_dockWidget.getNodz()
     
