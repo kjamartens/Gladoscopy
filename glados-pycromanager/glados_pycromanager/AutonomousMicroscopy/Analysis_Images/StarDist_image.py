@@ -45,7 +45,21 @@ def StarDistSegment_ImageVis(core,**kwargs):
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}, nms_thresh changed to {str(kwargs["nms_thresh"])}')
-        labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"]), nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
+        
+        try:
+            probThreshVal = float(kwargs["prob_thresh"])
+            nmsThreshVal = float(kwargs["nms_thresh"])
+            labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"]),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
+        except:
+            try:
+                probThreshVal = float(kwargs["prob_thresh"])
+                labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
+            except:
+                try:
+                    nmsThreshVal = float(kwargs["nms_thresh"])
+                    labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
+                except:
+                    labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
         labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore

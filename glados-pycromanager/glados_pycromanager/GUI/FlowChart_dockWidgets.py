@@ -1559,6 +1559,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['storeData']['name'] = 'storeData'
         self.nodeInfo['storeData']['displayName'] = 'Store Data'
         self.nodeInfo['storeData']['startAttributes'] = ['Store']
+        self.nodeInfo['storeData']['finishedAttributes'] = ['Stored']
         self.nodeInfo['storeData']['NodeSize'] = 40
         
         self.nodeInfo['newGlobalVar'] = self.singleNodeTypeInit()

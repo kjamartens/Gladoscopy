@@ -40,11 +40,21 @@ def CheckVsList(core,**kwargs):
     output = {}
     output['within_range'] = False
     
-    for entry in kwargs['List']:
-        totalEuclidianDist = math.sqrt((eval(kwargs['Position'])[0]-entry[0])**2 + (eval(kwargs['Position'])[1]-entry[1])**2)
-        if totalEuclidianDist < float(kwargs['Distance']):
-            output['within_range'] = True
-            break
+    try:
+        listInfo = eval(kwargs['List'])
+    except:
+        listInfo = kwargs['List']
+        
+    if len(listInfo)>0:
+        for entry in listInfo:
+            if len(entry) == 2:
+                try:
+                    totalEuclidianDist = math.sqrt((eval(kwargs['Position'])[0]-entry[0])**2 + (eval(kwargs['Position'])[1]-entry[1])**2)
+                except:
+                    totalEuclidianDist = math.sqrt(((kwargs['Position'])[0]-entry[0])**2 + ((kwargs['Position'])[1]-entry[1])**2)
+                if totalEuclidianDist < float(kwargs['Distance']):
+                    output['within_range'] = True
+                    break
     
     
     return output
