@@ -28,6 +28,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Analysis_Images import * #type: ignore
 from Analysis_Measurements import * #type: ignore
 from Analysis_Shapes import * #type: ignore
+from CustomFunctions import * #type: ignore
 from Scoring_Images import * #type: ignore
 from Scoring_Measurements import * #type: ignore
 from Scoring_Shapes import * #type: ignore

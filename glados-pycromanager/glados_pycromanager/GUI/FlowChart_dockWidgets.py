@@ -24,6 +24,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Analysis_Images import * #type: ignore
 from Analysis_Measurements import * #type: ignore
 from Analysis_Shapes import * #type: ignore
+from CustomFunctions import * #type: ignore
 from Scoring_Images import * #type: ignore
 from Scoring_Measurements import * #type: ignore
 from Scoring_Shapes import * #type: ignore
@@ -3176,6 +3177,36 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Store the output as NodzVariables
         utils.analysis_outputs_store_as_variableNodz(node)
         
+        
+        #Finish up
+        self.finishedEmits(node)
+    
+    def CustomFunctionNode_started(self,node):
+        """
+        Perform the Custom Function set in a node
+        
+        Args:
+            node: The node for which calls the analysis
+        
+        Returns:
+            None
+        """
+        #Dictionary of nodes to pass around variables.
+        nodeDict = utils.createNodeDictFromNodes(self.nodes)
+        nodzInfo = node.flowChart
+        
+        #Figure out which function is selected in the customFunction node
+        selectedFunction = utils.functionNameFromDisplayName(node.customFunction_currentData['__selectedDropdownEntryAnalysis__'],node.customFunction_currentData['__displayNameFunctionNameMap__'])
+        #Figure out the belonging evaluation-text
+        evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.customFunction_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
+        
+        #And evaluate the custom function with custom parameters
+        output = eval(evalText) #type:ignore
+        
+        node.customFunction_currentData['__output__'] = output
+        
+        #Store the output as NodzVariables
+        # utils.analysis_outputs_store_as_variableNodz(node)
         
         #Finish up
         self.finishedEmits(node)
