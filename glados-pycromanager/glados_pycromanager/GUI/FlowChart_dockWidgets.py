@@ -165,6 +165,61 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
         
 
+class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
+    def __init__(self, parent=None, currentNode=None):
+        """
+        Initializes the Analysis Options window.
+        
+        Args:
+            parent: Parent widget (default is None).
+            currentNode: Current node (default is None).
+        
+        Returns:
+            None
+        """
+        super().__init__(parent, currentNode)
+        self.setWindowTitle("Custom Function Options")
+        self.setMinimumSize(400,100)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        #Let's try to get all possible analysis options
+        customFunctions = utils.functionNamesFromDir('AutonomousMicroscopy\\CustomFunctions')
+        #Also add them back to back
+        all_analysisFunctions = customFunctions
+        
+        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
+        #Store this mapping also in the node
+        self.currentData['__displayNameFunctionNameMap__'] = displaynameMapping
+        
+        #Add a dropbox with all the options
+        self.comboBox_analysisFunctions = QComboBox(self)
+        if len(customFunctions) > 0:
+            for item in customFunctions:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+                
+        self.mainLayout.addWidget(self.comboBox_analysisFunctions, 0, 1)
+        #give it an objectName:
+        self.comboBox_analysisFunctions.setObjectName('comboBox_customFunctions_KEEP')
+        #Give it a connect-callback if it's changed (then the layout should be changed)
+        self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, layout=self.mainLayout, dropdown=self.comboBox_analysisFunctions,displaynameMapping=displaynameMapping: utils.layout_changedDropdown(layout,dropdown,displaynameMapping))
+        #Also give it a connect-callback to store the currentinfo:
+        self.comboBox_analysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
+
+        # pre-load all args/kwargs and their edit values - then hide all of them
+        utils.layout_init(self.mainLayout,'',displaynameMapping,current_dropdown = self.comboBox_analysisFunctions,nodzInfo=parent,skipInput=True)
+        
+        #Add an expanding spacer at the bottom:
+        spacer_item = QSpacerItem(
+            20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding
+        )
+        # Add the spacer item to the grid layout
+        self.mainLayout.addItem(spacer_item, 99, 0)
+        
+        #Pre-load the options if they're in the current node info
+        utils.preLoadOptions_analysis(self.mainLayout,currentNode.customFunction_currentData) #type:ignore
+        
+
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
     """
     A Dialog that is created for real-time analysis methods in the Nodz layout. Basically based on EVE's flexible file-finding function methodology.
@@ -1483,6 +1538,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisMeasurement']['bottomAttributes'] = ['Visual']
         
+        self.nodeInfo['customFunction'] = self.singleNodeTypeInit()
+        self.nodeInfo['customFunction']['name'] = 'customFunction'
+        self.nodeInfo['customFunction']['displayName'] = 'Custom Function'
+        self.nodeInfo['customFunction']['startAttributes'] = ['Function start']
+        self.nodeInfo['customFunction']['finishedAttributes'] = ['Finished']
+        
         # self.nodeInfo['analysisShapes'] = self.singleNodeTypeInit()
         # self.nodeInfo['analysisShapes']['name'] = 'analysisShapes'
         # self.nodeInfo['analysisShapes']['displayName'] = 'Analysis [Shapes]'
@@ -1821,6 +1882,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'analysisGrayScaleTest':
             newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'customFunction':
+            newNode.callAction = lambda self, node=newNode: self.CustomFunctionNode_started(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #initialise the scoring_analysis_currentData values:
+            #Rather stupidly, but I create the double-click-dialog, but just never show it.
+            dialog = nodz_customFunctionDialog(currentNode = newNode, parent = self)
+            newNode.scoring_analysis_currentData=dialog.currentData
         elif nodeType == 'analysisMeasurement':
             newNode.callAction = lambda self, node=newNode: self.AnalysisNode_started(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1964,9 +2033,21 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     logging.warning('Failed to set text in analysisMeasurementDialog')
                 logging.info('Pressed OK on analysisMeasurementDialog')
             
+            utils.analysis_outputs_to_variableNodz(currentNode)
+        elif 'customFunction' in nodeName:
+            currentNode = self.findNodeByName(nodeName)
+            dialog = nodz_customFunctionDialog(currentNode = currentNode, parent = self)
+            if dialog.exec_() == QDialog.Accepted:
+                #Update the results of this dialog into the nodz node
+                currentNode.customFunction_currentData = dialog.currentData #type:ignore
+                try:
+                    self.set_readable_text_after_dialogChange(currentNode,dialog,'customFunction')
+                except:
+                    logging.warning('Failed to set text in analysisMeasurementDialog')
+                logging.info('Pressed OK on customFunctionDialog')
             
             utils.analysis_outputs_to_variableNodz(currentNode)
-                    
+            
         elif 'realTimeAnalysis' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             #TODO: pre-load dialog.currentData with currentNode.currentData if that exists (better naming i guess) to hold all pre-selected data 

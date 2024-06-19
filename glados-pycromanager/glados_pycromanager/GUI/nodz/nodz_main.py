@@ -867,6 +867,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_MMCONFIGCHANGE'] = dict()
         data['NODES_RELSTAGECHANGE'] = dict()
         data['NODES_SCORING_ANALYSIS'] = dict()
+        data['NODES_CUSTOMFUNCTION'] = dict()
         data['NODES_SCORING_VISUALISATION'] = dict()
         data['NODES_SCORING_SCORING'] = dict()
         data['NODES_SCORING_END'] = dict()
@@ -980,6 +981,18 @@ class Nodz(QtWidgets.QGraphicsView):
                             if attr not in analysisattr_skip:
                                 if attr[:2] is not '__':
                                     data['NODES_SCORING_ANALYSIS'][node][attr] = nodeInst.scoring_analysis_currentData[attr]
+                                    
+                                    
+            data['NODES_CUSTOMFUNCTION'][node] = {}
+            if 'scoring_analysis_currentData' in vars(nodeInst):
+                if nodeInst.customFunction_currentData is not None:
+                    if len(nodeInst.customFunction_currentData) is not 0:
+                        #Skip some attributes in nodes_mda:
+                        analysisattr_skip = ['__output__']
+                        for attr in nodeInst.customFunction_currentData:
+                            if attr not in analysisattr_skip:
+                                if attr[:2] is not '__':
+                                    data['NODES_CUSTOMFUNCTION'][node][attr] = nodeInst.customFunction_currentData[attr]
                                     
                     
             data['NODES_SCORING_VISUALISATION'][node] = {}
@@ -1181,6 +1194,14 @@ class Nodz(QtWidgets.QGraphicsView):
                 if 'scoring_analysis_currentData' in vars(node):
                     if data['NODES_SCORING_ANALYSIS'] is not None:
                         node.scoring_analysis_currentData = data['NODES_SCORING_ANALYSIS'][name] #type:ignore
+                        #Also add to variableNodz
+                        full_utils.analysis_outputs_to_variableNodz(node)
+                        
+            #Restore custom Function-data:
+            if name in data['NODES_CUSTOMFUNCTION']:
+                if 'customFunction_currentData' in vars(node):
+                    if data['NODES_CUSTOMFUNCTION'] is not None:
+                        node.customFunction_currentData = data['NODES_CUSTOMFUNCTION'][name] #type:ignore
                         #Also add to variableNodz
                         full_utils.analysis_outputs_to_variableNodz(node)
                         
@@ -1708,6 +1729,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         self.visualisation_currentData = {}
         self.real_time_analysis_currentData = {}
+        self.customFunction_currentData = {}
         self.timerInfo = {}
         self.slackReportInfo = ''
     
