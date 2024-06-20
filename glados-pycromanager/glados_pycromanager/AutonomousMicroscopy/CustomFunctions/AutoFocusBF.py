@@ -89,6 +89,9 @@ def auto_focus_bf(core,**kwargs):
     #make the top and bottom 5% of points 0:
     derivRedondo[:int(len(derivRedondo)*0.05)] = np.mean(derivRedondo)
     derivRedondo[int(len(derivRedondo)*0.95):] = np.mean(derivRedondo)
+    #check if the peak is negative or positive:
+    if sum(derivRedondo) < 0:
+        derivRedondo *= -1
     derivRedondo_smoothed = savgol_filter(derivRedondo, window_length=int(numsteps/20)+1, polyorder=1)
     #Find the max of the deriv:
     derivRedondo_max_index = np.argmax(derivRedondo_smoothed)
