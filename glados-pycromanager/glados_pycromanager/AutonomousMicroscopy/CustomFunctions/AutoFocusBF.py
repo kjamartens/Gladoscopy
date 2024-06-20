@@ -19,10 +19,10 @@ def __function_metadata__():
                 {"name": "StageName", "description": "Name of the stage",  "default": 'TIPFSOffset', "type": str},
                 {"name": "startPosition", "description": "Starting position, relative from current", "default": -75, "type": float},
                 {"name": "endPosition", "description": "Ending position, relative from current", "default": 75, "type": float},
-                {"name": "numsteps", "description": "Number of z steps", "default": 2, "type": int}
+                {"name": "numsteps", "description": "Number of z steps", "default": 50, "type": int}
             ],
             "optional_kwargs": [
-                {"name": "final_offset", "description": "Final offset from 'perfect' position", "default": 6, "type": float}
+                {"name": "final_offset", "description": "Final offset from 'perfect' position", "default": 12, "type": float}
             ],
             "help_string": "",
             "display_name": "Auto-focus BF"

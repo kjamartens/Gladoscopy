@@ -1198,12 +1198,13 @@ class Nodz(QtWidgets.QGraphicsView):
                         full_utils.analysis_outputs_to_variableNodz(node)
                         
             #Restore custom Function-data:
-            if name in data['NODES_CUSTOMFUNCTION']:
-                if 'customFunction_currentData' in vars(node):
-                    if data['NODES_CUSTOMFUNCTION'] is not None:
-                        node.customFunction_currentData = data['NODES_CUSTOMFUNCTION'][name] #type:ignore
-                        #Also add to variableNodz
-                        full_utils.analysis_outputs_to_variableNodz(node)
+            if 'NODES_CUSTOMFUNCTION' in data:
+                if name in data['NODES_CUSTOMFUNCTION']:
+                    if 'customFunction_currentData' in vars(node):
+                        if data['NODES_CUSTOMFUNCTION'] is not None:
+                            node.customFunction_currentData = data['NODES_CUSTOMFUNCTION'][name] #type:ignore
+                            #Also add to variableNodz
+                            full_utils.analysis_outputs_to_variableNodz(node)
                         
             if name in data['NODES_SCORING_VISUALISATION']:
                 if 'scoring_visualisation_currentData' in vars(node):

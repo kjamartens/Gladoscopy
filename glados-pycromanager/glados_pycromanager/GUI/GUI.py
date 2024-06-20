@@ -2,12 +2,13 @@ from pycromanager import core
 import sys
 sys.path.append('GUI\\nodz')
 
-
+import os
 from LaserControlScripts import *
-from AutonomousMicroscopyScripts import *
-from MMcontrols import *
+# from AutonomousMicroscopyScripts import *
+# from MMcontrols import *
 from napariGlados import *
-from MDAGlados import MDAGlados
+from PyQt5.QtWidgets import QMainWindow,QApplication
+# from MDAGlados import MDAGlados
 
 class Shared_data:
     def __init__(self):
@@ -37,6 +38,7 @@ if __name__ == "__main__":
             MM_JSON = json.load(f)
 
         #Setup UI
+        
         app = QApplication(sys.argv)
         window = MainWindow()
         window.show()
