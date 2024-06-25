@@ -28,6 +28,7 @@
     "slot_border": [50, 50, 50, 255],
     "non_connectable_color": [100, 100, 100, 255],
     "connection_color": [255, 155, 0, 255],
+    "connection_color_ran": [105, 185, 105, 255],
 
     "node_default": {
         "bg": [130, 130, 130, 255],

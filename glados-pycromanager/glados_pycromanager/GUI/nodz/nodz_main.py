@@ -1819,6 +1819,12 @@ class NodeItem(QtWidgets.QGraphicsItem):
             if self.status == 'idle':
                 logging.info(f"Starting call action of node with name: {self.name}")
                 self.status = 'running'
+                #Set the incoming connections to a 'ran' color
+                for attr in self.sockets:
+                    connections = self.sockets[attr].connections
+                    for connection in connections:
+                        connection._pen.setColor(QColor(*self.config['connection_color_ran']))
+                        connection.updatePath()
                 self.update()
                 #Run the general 'this node is running' action (Flowchart_dockwidgets.py):
                 self.flowChart.nodeRan(self) #type:ignore

@@ -3567,6 +3567,36 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     if nodeC.name == connectedNode:
                         nodeC.status='idle'
             
+            #Get all connections:
+            allConnections = []
+            for connectedNode in connectedNodes:
+                for nodeC in self.nodes:
+                    if nodeC.name == connectedNode:
+                        for attr in nodeC.sockets:
+                            connections = nodeC.sockets[attr].connections
+                            for connection in connections:
+                                if connection not in allConnections:
+                                    allConnections.append(connection)
+                        for attr in nodeC.plugs:
+                            connections = nodeC.plugs[attr].connections
+                            for connection in connections:
+                                if connection not in allConnections:
+                                    allConnections.append(connection)
+                        for attr in nodeC.topAttrs:
+                            connections = nodeC.topAttrs[attr].connections
+                            for connection in connections:
+                                if connection not in allConnections:
+                                    allConnections.append(connection)
+                        for attr in nodeC.bottomAttrs:
+                            connections = nodeC.bottomAttrs[attr].connections
+                            for connection in connections:
+                                if connection not in allConnections:
+                                    allConnections.append(connection)
+            
+            for connection in allConnections:
+                connection._pen.setColor(QColor(*self.config['connection_color']))
+                connection.updatePath()
+            
             self.set_readable_text_after_dialogChange(node,'','scoreStart')
             
             self.GraphToSignals()
