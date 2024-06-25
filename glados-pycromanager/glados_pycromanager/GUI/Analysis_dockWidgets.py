@@ -223,3 +223,30 @@ def autonomousMicroscopy_plugin(parent):
     
     return flowChart_dockWidget.mainLayout
 
+def gladosSliders_plugin(parent):
+    global shared_data, napariViewer
+    shared_data = parent.shared_data
+    napariViewer = shared_data.napariViewer
+    MM_JSON = None
+    core = shared_data.core
+    
+    print("dockWidget_fullGladosUI started")
+    
+    #new QWidget:
+    tempWidget = QMainWindow()
+    
+    ui = Ui_CustomDockWidget()
+    ui.setupUi(tempWidget)
+    #Open JSON file with MM settings
+    # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+    with open("C:/Users/Koen Martens/Documents/GitHub\ScopeGUI/glados-pycromanager/glados_pycromanager/GUI/MM_PycroManager_JSON.json") as f:
+        MM_JSON = json.load(f)
+    #Run the laserController UI
+    print("dockWidget_fullGladosUI halfway")
+    from LaserControlScripts import runlaserControllerUI
+    runlaserControllerUI(core,MM_JSON,ui,shared_data)
+    
+    print("dockWidget_fullGladosUI initted")
+    
+    return ui
+

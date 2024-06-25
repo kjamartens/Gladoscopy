@@ -694,6 +694,7 @@ class dockWidget_flowChart(dockWidgets):
         
         #Add the full micro manager controls UI
         self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
+        print('asdf')
 
 #--- below here not fully necessary---
 class dockWidget_mdaAnalysisScoringTest(dockWidgets):
@@ -716,13 +717,21 @@ class dockWidget_fullGladosUI(QMainWindow):
     def __init__(self): 
         logging.info("dockWidget_fullGladosUI started")
         super().__init__()
-        self.ui = Ui_CustomDockWidget()
-        self.ui.setupUi(self)
+        #new QWidget:
+        tempWidget = QMainWindow()
+        
+        ui = Ui_CustomDockWidget()
+        ui.setupUi(tempWidget)
         #Open JSON file with MM settings
-        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+        # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+        with open("C:/Users/Koen Martens/Documents/GitHub\ScopeGUI/glados-pycromanager/glados_pycromanager/GUI/MM_PycroManager_JSON.json") as f:
             MM_JSON = json.load(f)
         #Run the laserController UI
-        runlaserControllerUI(core,MM_JSON,self.ui,shared_data)
+        print("dockWidget_fullGladosUI halfway")
+        from LaserControlScripts import runlaserControllerUI
+        
+        self.dockWidget = ui.tab_manual
+        print('adsf')
         # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
 
 def startLiveModeVisualisation(shared_data,layerName='Live'):
@@ -782,8 +791,14 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     # custom_widget_analysisThreads = dockWidget_analysisThreads()
     # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
     
+    print('In runNapariPycroManager')
+    
+    
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
+    
+    gladosLaserInfo = dockWidget_fullGladosUI()
+    napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI",tabify=True)
     
     custom_widget_MDA = dockWidget_MDA()
     napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)

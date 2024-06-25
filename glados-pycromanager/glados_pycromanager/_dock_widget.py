@@ -285,10 +285,36 @@ class AutonomousMicroscopyWidget(GladosWidget):
         super().__init__(viewer = viewer, parent=parent)
         
         #Add the full micro manager controls UI
+        from Analysis_dockWidgets import autonomousMicroscopy_plugin
         self.dockWidget = autonomousMicroscopy_plugin(self) #type:ignore
         
         self.setLayout(self.dockWidget)
         logging.info("dockWidget_AutonomousMicroscopy started")
+    
+    def resizeEvent(self, event):
+        """"
+        We don't want the GladosWidget resizeEvent for AutonomousMicroscopy
+        """
+        return super().resizeEvent(event)
+    
+
+
+class GladosSlidersWidget(GladosWidget):
+    """
+    The GladosSlidersWidget widget plugin
+    """
+    def __init__(self, viewer: napari.viewer.Viewer, parent=None): #type:ignore
+        """
+        Initialize the GladosSlidersWidget plugin
+        """
+        super().__init__(viewer = viewer, parent=parent)
+        
+        #Add the full micro manager controls UI
+        from Analysis_dockWidgets import gladosSliders_plugin
+        self.dockWidget = gladosSliders_plugin(self) #type:ignore
+        
+        self.setLayout(self.dockWidget)
+        logging.info("dockWidget_GladosSliders started")
     
     def resizeEvent(self, event):
         """"
@@ -365,6 +391,10 @@ class MainWidget(QWidget):
         showScaleBar(viewer)
         
         #Add the individual widgets
+        
+        #GladosLasers
+        GladosLaserWidget = GladosSlidersWidget(viewer, parent=self)
+        self._viewer.window.add_dock_widget(GladosLaserWidget, area='right',tabify=True,name='Lasers')
         
         #Full MM control
         MMconfigWidget = MMConfigWidget(viewer, parent=self)

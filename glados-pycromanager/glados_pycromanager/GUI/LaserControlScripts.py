@@ -444,12 +444,14 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
     shared_data = sshared_data
 
     #Get onoff and intensity from MM
-    InitLaserButtonLabels(MM_JSON)
-    InitLaserSliders(MM_JSON)
-    InitFilterWheelRadioCheckbox()
-    InitBFRadioCheckbox()
-
+    try:
+        InitLaserButtonLabels(MM_JSON)
+        InitLaserSliders(MM_JSON)
+        InitFilterWheelRadioCheckbox()
+    except:
+        print('Error in InitLaserButtonLabels or InitLaserSliders')
     #Get frametimeinfo
+    InitBFRadioCheckbox()
     global frameduration;
     frameduration = getFrameTimeInfo(0);
 
@@ -482,16 +484,18 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
 
     #Initialise the laser triggering boxes
     initLaserTrigEditBoxes();
-    #Draw the laser trigger plot
-    #Also see https://www.pythonguis.com/tutorials/plotting-pyqtgraph/
-    drawplot(frameduration)
+    try:
+        #Draw the laser trigger plot
+        #Also see https://www.pythonguis.com/tutorials/plotting-pyqtgraph/
+        drawplot(frameduration)
 
-    #Change laser trigger scheme when values in boxes are changed
-    for i in range(0,5):
-        exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-        exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-        exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-
+        #Change laser trigger scheme when values in boxes are changed
+        for i in range(0,5):
+            exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+            exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+    except:
+        print("error in execing forms")
     #Arm lasers button
     form.ARMlaserTriggerPushButton.clicked.connect(lambda: armLaserTriggering());
 
@@ -531,7 +535,12 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
     #Don't display warning
     updateColorArming(0)
 
-    #Reset laser triggers when startup for properly expected behaviour
-    ResetLasersTrigger();
-    #Initialise laser trigger edit buttons
-    initLaserTrigEditBoxes();
+    try:
+        #Reset laser triggers when startup for properly expected behaviour
+        ResetLasersTrigger();
+        #Initialise laser trigger edit buttons
+        initLaserTrigEditBoxes();
+    except:
+        print("error in resetting laser boxes")
+    
+    return form
