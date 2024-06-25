@@ -56,7 +56,7 @@ class Worker(QObject):
     """
     finished = pyqtSignal()
 
-    def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data,includeCustomUI=False):
+    def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data,includeCustomUI=True):
         """
         Runs the NapariPycroManagerWrap function.
         

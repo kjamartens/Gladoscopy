@@ -218,7 +218,7 @@ class MMConfigUI(CustomMainWindow):
             showCheckboxes (bool, optional): Whether to show checkboxes for each config group. Defaults to False.
             checkboxStartInactive (bool, optional): Whether the checkboxes should start inactive. Defaults to True.
             showRelativeStages (bool, optional): Whether to show the relative stages in the UI. Defaults to False.
-            autoSaveLoad (bool, optional): Whether to automatically save and load the configs to file when the UI is opened and closed. Defaults to False.
+            autoSaveLoad (bool, optional): Whether to automatically save and load the configs to file when the UI is opened and closed. Defaults to False. 
         """
         
         if parent is not None:# from napari plugin run

@@ -703,28 +703,33 @@ class dockWidget_flowChart(dockWidgets):
         print('asdf')
 
 #--- below here not fully necessary---
-class dockWidget_mdaAnalysisScoringTest(dockWidgets):
-    def __init__(self): 
-        logging.debug("dockwidgetMDAANALYSISSCORINGTEST started")
-        super().__init__()
+# class dockWidget_mdaAnalysisScoringTest(dockWidgets):
+#     def __init__(self): 
+#         logging.debug("dockwidgetMDAANALYSISSCORINGTEST started")
+#         super().__init__()
         
-        #Add the full micro manager controls UI
-        self.dockWidget = mdaAnalysisScoringTest_dockWidget(core,MM_JSON,self.layout,shared_data)
+#         #Add the full micro manager controls UI
+#         self.dockWidget = mdaAnalysisScoringTest_dockWidget(core,MM_JSON,self.layout,shared_data)
 
-class dockWidget_analysisThreads(dockWidgets):
-    def __init__(self): 
-        logging.debug("dockWidget_analysisThreads started")
-        super().__init__()
+# class dockWidget_analysisThreads(dockWidgets):
+#     def __init__(self): 
+#         logging.debug("dockWidget_analysisThreads started")
+#         super().__init__()
         
-        #Add the full micro manager controls UI
-        self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
+#         #Add the full micro manager controls UI
+#         self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
 
-class dockWidget_fullGladosUI(QMainWindow):
+class dockWidget_fullGladosUI(dockWidgets):
     def __init__(self): 
         logging.info("dockWidget_fullGladosUI started")
         super().__init__()
-        #new QWidget:
+        # #new QWidget:
         tempWidget = QMainWindow()
+        
+        
+        
+    
+    
         
         ui = Ui_CustomDockWidget()
         ui.setupUi(tempWidget)
@@ -733,13 +738,25 @@ class dockWidget_fullGladosUI(QMainWindow):
         # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
         with open(MM_JSON_path) as f:
             MM_JSON = json.load(f)
+            
+        runlaserControllerUI(core,MM_JSON,ui,shared_data)
         #Run the laserController UI
         print("dockWidget_fullGladosUI halfway")
-        from LaserControlScripts import runlaserControllerUI
         
-        self.dockWidget = ui.tab_manual
+        #
+        #Create a Vertical+horizontal layout:
+        self.dockwidgetLayout = QGridLayout()
+        #Create a layout for the configs:
+        self.analysisLayout = QGridLayout()
+        #Add this to the mainLayout:
+        self.dockwidgetLayout.addLayout(self.analysisLayout,0,0)
+        
+        self.analysisLayout.addWidget(ui.centralwidget.children()[1].children()[0],1,1)
+        
+        self.dockWidget = self.layout.addLayout(self.dockwidgetLayout,0,0)
+
         print('adsf')
-        # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
+        
 
 def startLiveModeVisualisation(shared_data,layerName='Live'):
     create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
@@ -803,9 +820,6 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
     
-    gladosLaserInfo = dockWidget_fullGladosUI()
-    napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI",tabify=True)
-    
     custom_widget_MDA = dockWidget_MDA()
     napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)
     
@@ -815,8 +829,8 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
         custom_widget_flowChart.dockWidget.focus()
     
     if includecustomUI:
-        custom_widget_gladosUI = dockWidget_fullGladosUI()
-        napariViewer.window.add_dock_widget(custom_widget_gladosUI, area="right", name="GladosUI")
+        gladosLaserInfo = dockWidget_fullGladosUI()
+        napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI")
 
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
