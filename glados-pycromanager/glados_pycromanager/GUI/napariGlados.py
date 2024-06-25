@@ -638,9 +638,15 @@ class dockWidget_MDA(dockWidgets):
         logging.debug("dockWidget_MDA started")
         super().__init__()
         
-        if os.path.exists('glados_state.json'):
+        #load from appdata
+        appdata_folder = os.getenv('APPDATA')
+        if appdata_folder is None:
+            raise EnvironmentError("APPDATA environment variable not found")
+        app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+        os.makedirs(app_specific_folder, exist_ok=True)
+        if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
             #Load the mda state
-            with open('glados_state.json', 'r') as file:
+            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
                 gladosInfo = json.load(file)
                 mdaInfo = gladosInfo['MDA']
             
@@ -723,8 +729,9 @@ class dockWidget_fullGladosUI(QMainWindow):
         ui = Ui_CustomDockWidget()
         ui.setupUi(tempWidget)
         #Open JSON file with MM settings
+        MM_JSON_path = os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')
         # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
-        with open("C:/Users/Koen Martens/Documents/GitHub\ScopeGUI/glados-pycromanager/glados_pycromanager/GUI/MM_PycroManager_JSON.json") as f:
+        with open(MM_JSON_path) as f:
             MM_JSON = json.load(f)
         #Run the laserController UI
         print("dockWidget_fullGladosUI halfway")
@@ -792,7 +799,6 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
     
     print('In runNapariPycroManager')
-    
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)

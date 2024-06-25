@@ -1578,7 +1578,13 @@ class MDAGlados(CustomMainWindow):
         logging.debug(f"mda: {self.mda}")
         if self.fully_started:
             if self.autoSaveLoad:
-                self.save_state_MDA('glados_state.json')
+                #Store in appdata
+                appdata_folder = os.getenv('APPDATA')
+                if appdata_folder is None:
+                    raise EnvironmentError("APPDATA environment variable not found")
+                app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+                os.makedirs(app_specific_folder, exist_ok=True)
+                self.save_state_MDA(os.path.join(app_specific_folder, 'glados_state.json'))
         logging.debug('ended get_MDA_events_from_GUI')
         
         pass

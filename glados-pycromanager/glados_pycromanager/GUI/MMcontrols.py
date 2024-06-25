@@ -345,8 +345,14 @@ class MMConfigUI(CustomMainWindow):
         
         if self.autoSaveLoad:
             if self.fullyLoaded:
-                if os.path.exists('glados_state.json'):
-                    with open('glados_state.json', 'r') as file:
+                #Store in appdata
+                appdata_folder = os.getenv('APPDATA')
+                if appdata_folder is None:
+                    raise EnvironmentError("APPDATA environment variable not found")
+                app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+                os.makedirs(app_specific_folder, exist_ok=True)
+                if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
+                    with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
                         gladosInfo = json.load(file)
                         MMControlsInfo = gladosInfo['MMControls']
                 
@@ -369,7 +375,14 @@ class MMConfigUI(CustomMainWindow):
         if self.autoSaveLoad:
             if self.fullyLoaded:
                 logging.info('Storing glados state.json')
-                self.save_state_MMControls('glados_state.json')
+                
+                #Store in appdata
+                appdata_folder = os.getenv('APPDATA')
+                if appdata_folder is None:
+                    raise EnvironmentError("APPDATA environment variable not found")
+                app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+                os.makedirs(app_specific_folder, exist_ok=True)
+                self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
                 pass
 
     def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):

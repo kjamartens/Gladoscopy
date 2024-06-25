@@ -138,9 +138,15 @@ def microManagerControlsUI_plugin(parent):
 
 def MDAGlados_plugin(parent):
     
-    if os.path.exists('glados_state.json'):
+    appdata_folder = os.getenv('APPDATA')
+    if appdata_folder is None:
+        raise EnvironmentError("APPDATA environment variable not found")
+    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+    os.makedirs(app_specific_folder, exist_ok=True)
+    
+    if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
         #Load the mda state
-        with open('glados_state.json', 'r') as file:
+        with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
             gladosInfo = json.load(file)
             mdaInfo = gladosInfo['MDA']
         
