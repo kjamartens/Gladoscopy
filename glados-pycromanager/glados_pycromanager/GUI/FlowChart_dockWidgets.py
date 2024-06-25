@@ -220,6 +220,10 @@ class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
         #Pre-load the options if they're in the current node info
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.customFunction_currentData) #type:ignore
         
+        #Set the current dropdown to be correct
+        correctFunction = currentNode.customFunction_currentData['__selectedDropdownEntryAnalysis__'] #type:ignore
+        self.comboBox_analysisFunctions.setCurrentText(correctFunction)
+        
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
     """
@@ -1478,6 +1482,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.signal_PlugConnected.connect(self.PlugConnected)
         self.signal_PlugDisconnected.connect(self.PlugOrSocketDisconnected)
         self.signal_SocketConnected.connect(self.SocketConnected)
+        
+        #Handling of the CallAction threads belonging to nodes is done via a QThreadPool
+        from PyQt5.QtCore import QThreadPool
+        self.thread_pool = QThreadPool.globalInstance()
         
         #Focus on the nodes
         self._focus()
@@ -3253,12 +3261,16 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             node (nodz.Node): The node that has triggered the event.
         """
         logging.info('MMconfigChangeRan')
-        #We need to change some configs (probably):
-        for config_to_change in node.MMconfigInfo.config_string_storage:
-            #Change the config, and wait for the config to be changed
-            self.core.set_config(config_to_change[0],config_to_change[1]) #type:ignore
-            self.core.wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
-        self.finishedEmits(node)
+        
+        
+        #Create the worker
+        worker = generalNodzCallActionWorker(nodzType='MMconfigChangeRan',args={"config_string_storage":node.MMconfigInfo.config_string_storage, "core": self.core})
+        #Add the finished emit
+        worker.signals.finished.connect(lambda: self.finishedEmits(node))
+        #Star the worker
+        self.thread_pool.start(worker)
+        
+        # self.finishedEmits(node)
     
     def GrayScaleTest(self,node):
         """
@@ -3547,11 +3559,17 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             node (nodz.Node): The node that has triggered the event.
         Returns:
             None
-        """
-        import time
-        vardata = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.timerInfo,node.flowChart)
-        time.sleep(float(vardata['wait_time'][0]))
-        self.finishedEmits(node)
+        """        
+        #Get info
+        vardata = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.timerInfo, node.flowChart)
+        wait_time = float(vardata['wait_time'][0])
+
+        #Create the worker
+        worker = generalNodzCallActionWorker(nodzType='Timer',args={"wait_time":wait_time})
+        #Add the finished emit
+        worker.signals.finished.connect(lambda: self.finishedEmits(node))
+        #Star the worker
+        self.thread_pool.start(worker)
     
     def storeDataCallAction(self,node):
         
@@ -5036,6 +5054,53 @@ class VariablesDialog(QDialog, VariablesBase):
         
 #endregion
 
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QPushButton, QWidget
+from PyQt5.QtCore import QThreadPool, QRunnable, pyqtSlot
+# Define a WorkerSignals class to handle signals
+class WorkerSignals(QObject):
+    """  
+    Signals belonging to generalNodzCallActionWorker
+    """
+    finished = pyqtSignal()
+
+
+class generalNodzCallActionWorker(QRunnable):
+    
+    """ 
+    General worker that can do async running of callActions belonging to nodes.
+    """
+    
+    def __init__(self,nodzType,args):
+        """ 
+        Init only passes nodzType and args to the super class.
+        """
+        super(generalNodzCallActionWorker,self).__init__()
+        self.nodzType = nodzType
+        self.args = args
+        self.signals = WorkerSignals()
+        logging.debug(f"GeneralNodzCallActionworker INIT with nodzType: {self.nodzType} and args: {self.args}")
+    
+    
+    def run(self):
+        """ 
+        Running of the different callActions belonging to all nodes.
+        """
+        import logging
+        logging.debug(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
+        #Timer
+        if self.nodzType == 'Timer':
+            import time
+            time.sleep(self.args['wait_time'])
+        elif self.nodzType == 'MMconfigChangeRan':
+            #We need to change some configs (probably):
+            for config_to_change in self.args['config_string_storage']:
+                #Change the config, and wait for the config to be changed
+                self.args['core'].set_config(config_to_change[0],config_to_change[1]) #type:ignore
+                self.args['core'].wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
+        
+        
+        #Emit that the node is finished :) 
+        self.signals.finished.emit()
 
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
