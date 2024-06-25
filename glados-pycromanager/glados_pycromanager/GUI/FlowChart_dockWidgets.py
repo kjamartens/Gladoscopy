@@ -1680,6 +1680,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['ANDlogic']['finishedAttributes'] = ['Out']
         self.nodeInfo['ANDlogic']['NodeSize'] = 30
         
+        self.nodeInfo['analysisMeasurementDEBUG'] = self.singleNodeTypeInit()
+        self.nodeInfo['analysisMeasurementDEBUG']['name'] = 'analysisMeasurementDEBUG'
+        self.nodeInfo['analysisMeasurementDEBUG']['displayName'] = 'DEBUG Analysis [Measurement]'
+        self.nodeInfo['analysisMeasurementDEBUG']['startAttributes'] = ['Analysis start']
+        self.nodeInfo['analysisMeasurementDEBUG']['finishedAttributes'] = ['Finished']
+        self.nodeInfo['analysisMeasurementDEBUG']['dataAttributes'] = ['Output']
+        self.nodeInfo['analysisMeasurementDEBUG']['bottomAttributes'] = ['Visual']
+        
         #We also add some custom JSON info about the node layout (colors and such)
         import json
         self.nodeLayout = json.loads('''{
@@ -1914,7 +1922,15 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Rather stupidly, but I create the double-click-dialog, but just never show it.
             dialog = nodz_analysisDialog(currentNode = newNode, parent = self)
             newNode.scoring_analysis_currentData=dialog.currentData
+        elif nodeType == 'analysisMeasurementDEBUG':
+            #This is a DEBUG type of analysis measurement which blocks the main thread, but allows for easier debugging.
+            newNode.callAction = lambda self, node=newNode: self.AnalysisNode_DEBUG_started(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
+            #initialise the scoring_analysis_currentData values:
+            #Rather stupidly, but I create the double-click-dialog, but just never show it.
+            dialog = nodz_analysisDialog(currentNode = newNode, parent = self)
+            newNode.scoring_analysis_currentData=dialog.currentData
         elif nodeType == 'timer':
             newNode.callAction = lambda self, node=newNode: self.timerCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -2037,7 +2053,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 #Update the results of this dialog into the nodz node
                 self.changeRelStageStorageInNodz(currentNode,dialog.RelStageInfo())
                 
-        elif 'analysisMeasurement' in nodeName:
+        elif 'analysisMeasurement' in nodeName or 'analysisMeasurementDEBUG' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
@@ -2511,7 +2527,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             nodeType (str): Type of node
         """
         displayHTMLtext = ''
-        if nodeType == 'analysisMeasurement':
+        if nodeType == 'analysisMeasurement' or nodeType == 'analysisMeasurementDEBUG':
             methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
             methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
             reqKwValues = []
@@ -2677,7 +2693,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #TODO
         #First, we need to create some function to look at the downstream-connected nodes of some node - this needs to be a rather proper function.
         
-        if 'analysisMeasurement_' in dstNodeName:
+        if 'analysisMeasurement_' in dstNodeName or 'analysisMeasurementDEBUG_' in dstNodeName:
             import nodz.nodz_utils
             srcNode = nodz_utils.findNodeByName(self,srcNodeName)
             dstNode = nodz_utils.findNodeByName(self,dstNodeName)
@@ -3063,7 +3079,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         currentNode.MMconfigInfo.relstage_string_storage=relstageinfo
     
-    def AnalysisNode_started(self,node):
+    def AnalysisNode_DEBUG_started(self,node):
         """
         Perform the Analysis set in a node
         
@@ -3092,22 +3108,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
         #Figure out the belonging evaluation-text
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
-        # #First assess that it's a MDA node:
-        # if 'acquisition' not in connectedNode.name and 'analysisMeasurement' not in connectedNode.name:
-        #     print('Error! Acquisition or analysismeasurement not connected to analysismeasurement!')
-        # else:
-        #     if 'acquisition' in connectedNode.name:
-        #         #And then find the mdaData object
-        #         mdaDataobject = connectedNode.mdaData
-                
-        #     elif 'analysisMeasurement' in connectedNode.name:
-        #         dataobject = connectedNode.scoring_analysis_currentData['__output__']
-                
-        #         #Figure out which function is selected in the scoring_analysis node
-        #         selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
-        #         #Figure out the belonging evaluation-text
-        #         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'dataobject','self.shared_data.core',nodzInfo=self)
-                
+        
         #And evaluate the custom function with custom parameters
         output = eval(evalText) #type:ignore
         
@@ -3188,6 +3189,138 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             
         node.scoring_analysis_currentData['__output__'] = output
+        
+        #Store the output as NodzVariables
+        utils.analysis_outputs_store_as_variableNodz(node)
+        
+        
+        #Finish up
+        self.finishedEmits(node)
+    
+    def AnalysisNode_started(self,node):
+        """
+        Perform the Analysis set in a node
+        
+        Args:
+            node: The node for which calls the analysis
+        
+        Returns:
+            None
+        """
+        #Find the node that is connected (i.e. downstream) to this
+        connectedNode = None
+        for connection in self.evaluateGraph():
+            if connection[1][connection[1].rfind('.')+1:] == 'Analysis start':
+                if connection[1][:connection[1].rfind('.')] == node.name:
+                    connectedNodeName = connection[0][:connection[0].rfind('.')]
+                    connectedNode = self.findNodeByName(connectedNodeName)
+        if connectedNode is None:
+            print('Error! No connected node found for scoring analysis')
+            return
+        
+        #Dictionary of nodes to pass around variables.
+        nodeDict = utils.createNodeDictFromNodes(self.nodes)
+        nodzInfo = node.flowChart
+        
+        #Figure out which function is selected in the scoring_analysis node
+        selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+        #Figure out the belonging evaluation-text
+        evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
+        
+        
+        worker = generalNodzCallActionWorker(nodzType='AnalysisNode',args={"evalText":evalText, "nodeDict":nodeDict, "node":node, "core": self.core, "shared_data": self.shared_data})
+        #Add the finished emit
+        worker.signals.finished.connect(lambda: self.analysisNode_finished(node))
+        #Star the worker
+        self.thread_pool.start(worker)
+        
+        # #And evaluate the custom function with custom parameters
+        # output = eval(evalText) #type:ignore
+        
+        # #Display final output to the user for now
+        # logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
+        
+        
+    def analysisNode_finished(self,node):
+        #Set the status of the nodz-coupled vis and real-time to finished:
+        #Look at the 'Visual' bottom attribute and visualise if needed
+        output = node.output
+        #Dictionary of nodes to pass around variables.
+        nodeDict = utils.createNodeDictFromNodes(self.nodes)
+        nodzInfo = node.flowChart
+        
+        visualAttr = node.bottomAttrs['Visual']
+        if len(visualAttr.connections) > 0:
+            visual_connected_node_name = visualAttr.connections[0].socketNode
+            for nodeV in self.nodes:
+                if nodeV.name == visual_connected_node_name:
+                    visual_connected_node = nodeV
+                    
+                    selectedFunction = utils.functionNameFromDisplayName(node.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'],node.scoring_analysis_currentData['__displayNameFunctionNameMap__'])
+                    visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer)','self.shared_data.core',nodzInfo=self)
+                    visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
+                    
+                    chosenLayerType = 'points'
+                    
+                    layerTypeInfo = [
+                        ['Analysis_Measurements','points'],
+                        ['Analysis_Shapes','shapes'],
+                        ['Analysis_Images','image'],
+                    ]
+                    
+                    folderName = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.sep+'AutonomousMicroscopy'+os.sep
+                    
+                    for layerType in layerTypeInfo:
+                        for root, dirs, files in os.walk(folderName+layerType[0]):
+                            for file in files:
+                                if selectedFunction.split('.')[0] in file: #type:ignore
+                                    if file.endswith(".py"):
+                                        with open(os.path.join(root, file), 'r') as f:
+                                            filecontent = f.read()
+                                        if selectedFunction.split('.')[1]+'(' in filecontent: #type:ignore
+                                            chosenLayerType = layerType[1]
+                                            break #to avoid searching in other files for this function
+                    
+                    
+                    layerName = visual_connected_node.visualisation_currentData['layerName']
+                    
+                    #If a layer with this name already exists, simply remove it:
+                    for layer in self.shared_data.napariViewer.layers: #type:ignore
+                        if layer.name == layerName:
+                            self.shared_data.napariViewer.layers.remove(layer) #type:ignore
+                            
+                    cmap = visual_connected_node.visualisation_currentData['colormap']
+                    if chosenLayerType == 'points':
+                        viewer = self.shared_data.napariViewer #type:ignore
+                        napariLayer = viewer.add_points(
+                            data=None,
+                            text=None,
+                            name=layerName,
+                            colormap = cmap
+                        )
+                    elif chosenLayerType == 'shapes':
+                        viewer = self.shared_data.napariViewer #type:ignore
+                        napariLayer = viewer.add_shapes(
+                            data=None,
+                            name=layerName,
+                            colormap = cmap
+                        )
+                    elif chosenLayerType == 'image':
+                        logging.info('creating new image layer')
+                        viewer = self.shared_data.napariViewer #type:ignore
+                        im = np.random.random((30, 30))
+                        napariLayer = viewer.add_image(
+                            data=im,
+                            name=layerName,
+                            colormap = cmap
+                        )
+                    
+                    visualOutput = eval(visualEvalText)
+                    
+                    visual_connected_node.status = 'finished'
+        
+        
+        node.scoring_analysis_currentData['__output__'] = node.output
         
         #Store the output as NodzVariables
         utils.analysis_outputs_store_as_variableNodz(node)
@@ -5086,7 +5219,7 @@ class generalNodzCallActionWorker(QRunnable):
         Running of the different callActions belonging to all nodes.
         """
         import logging
-        logging.debug(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
+        logging.info(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
         #Timer
         if self.nodzType == 'Timer':
             import time
@@ -5097,7 +5230,17 @@ class generalNodzCallActionWorker(QRunnable):
                 #Change the config, and wait for the config to be changed
                 self.args['core'].set_config(config_to_change[0],config_to_change[1]) #type:ignore
                 self.args['core'].wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
-        
+        elif self.nodzType == 'AnalysisNode':
+            #Get all the necessary info
+            evalText = self.args['evalText']
+            nodeDict = self.args['nodeDict']
+            node = self.args['node']
+            core = self.args['core']
+            shared_data = self.args['shared_data']
+            self.shared_data = shared_data
+            print(evalText)
+            #Finally do the analysis
+            node.output = eval(evalText)
         
         #Emit that the node is finished :) 
         self.signals.finished.emit()
