@@ -221,13 +221,20 @@ class MMConfigUI(CustomMainWindow):
             autoSaveLoad (bool, optional): Whether to automatically save and load the configs to file when the UI is opened and closed. Defaults to False.
         """
         
-        if parent is not None:
+        if parent is not None:# from napari plugin run
             global core, livestate, napariViewer, shared_data
             core = parent.core
             livestate = parent.livestate
             shared_data = parent.shared_data
             napariViewer = parent.napariViewer
             shared_data.napariViewer = napariViewer
+        else: #assuming shared_data is global - from .py run
+            try:
+                # global core, napariViewer
+                core = shared_data.core
+                napariViewer = shared_data.napariViewer
+            except:
+                print('Line 237 fails')
         super().__init__()
         self.fullyLoaded = False
         self.autoSaveLoad = autoSaveLoad

@@ -1358,12 +1358,18 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         
         #If run as plugin, we need to specify the globals like this:
-        if parent is not None:
+        if parent is not None: # from napari plugin run
             global livestate, napariViewer
             livestate = parent.livestate
             napariViewer = parent.napariViewer
             parent.shared_data = shared_data
             shared_data.napariViewer = napariViewer
+        else: #assuming shared_data is global - from .py run
+            try:
+                # global core, napariViewer
+                napariViewer = shared_data.napariViewer
+            except:
+                print('Line 1372 fails')
         
         self.parent = parent
         

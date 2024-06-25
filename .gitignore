@@ -1,0 +1,5 @@
+
+*.tif
+*.index
+*.pyc
+*.h5
