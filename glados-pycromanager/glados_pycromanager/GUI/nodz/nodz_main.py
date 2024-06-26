@@ -1782,7 +1782,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         text_option = QTextOption()
         text_option.setAlignment(Qt.AlignLeft)
-        text_option.setWrapMode(QTextOption.WordWrap)  # Add WordWrap
+        text_option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)  # Add WordWrap
         td.setDefaultTextOption(text_option)
         
         textToDisplay = ''
@@ -2462,7 +2462,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         from PyQt5.QtGui import QTextOption
         text_option = QTextOption()
         text_option.setAlignment(Qt.AlignLeft)
-        text_option.setWrapMode(QTextOption.WordWrap)  # Add WordWrap
+        text_option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)  # Add WordWrap
         td.setDefaultTextOption(text_option)
         td.setTextWidth(self.boundingRect().width() - 2 * self.textboxborder)
         

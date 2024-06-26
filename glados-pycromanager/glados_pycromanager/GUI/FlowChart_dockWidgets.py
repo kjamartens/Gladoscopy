@@ -1548,11 +1548,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['realTimeAnalysis']['topAttributes'] = ['Start']
         self.nodeInfo['realTimeAnalysis']['NodeSize'] = 60
         
-        self.nodeInfo['reporting'] = self.singleNodeTypeInit()
-        self.nodeInfo['reporting']['name'] = 'reporting'
-        self.nodeInfo['reporting']['displayName'] = 'Report'
-        self.nodeInfo['reporting']['topAttributes'] = ['Start']
-        self.nodeInfo['reporting']['NodeSize'] = 40
+        # self.nodeInfo['reporting'] = self.singleNodeTypeInit()
+        # self.nodeInfo['reporting']['name'] = 'reporting'
+        # self.nodeInfo['reporting']['displayName'] = 'Report'
+        # self.nodeInfo['reporting']['topAttributes'] = ['Start']
+        # self.nodeInfo['reporting']['NodeSize'] = 40
         
         self.nodeInfo['changeStagePos'] = self.singleNodeTypeInit()
         self.nodeInfo['changeStagePos']['name'] = 'changeStagePos'
@@ -1891,7 +1891,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Also connect the node's finishedMDA
             newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
             
-            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+        elif nodeType == 'realTimeAnalysis':
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+        elif nodeType == 'visualisation':
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'changeProperties':
             #attach MMconfigUI to this:
             # Get all config groups
@@ -1906,6 +1913,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMconfigChangeRan(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'changeStagePos':
             # Get all config group s
             allConfigGroups={}
@@ -1918,6 +1928,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Add the callaction
             newNode.callAction = lambda self, node=newNode: self.MMstageChangeRan(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within 
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'analysisGrayScaleTest':
             newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1929,6 +1941,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Rather stupidly, but I create the double-click-dialog, but just never show it.
             dialog = nodz_customFunctionDialog(currentNode = newNode, parent = self)
             newNode.scoring_analysis_currentData=dialog.currentData
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'analysisMeasurement':
             newNode.callAction = lambda self, node=newNode: self.AnalysisNode_started(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1937,6 +1952,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Rather stupidly, but I create the double-click-dialog, but just never show it.
             dialog = nodz_analysisDialog(currentNode = newNode, parent = self)
             newNode.scoring_analysis_currentData=dialog.currentData
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'analysisMeasurementDEBUG':
             #This is a DEBUG type of analysis measurement which blocks the main thread, but allows for easier debugging.
             newNode.callAction = lambda self, node=newNode: self.AnalysisNode_DEBUG_started(node)
@@ -1946,27 +1964,51 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Rather stupidly, but I create the double-click-dialog, but just never show it.
             dialog = nodz_analysisDialog(currentNode = newNode, parent = self)
             newNode.scoring_analysis_currentData=dialog.currentData
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'timer':
             newNode.callAction = lambda self, node=newNode: self.timerCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'storeData':
             newNode.callAction = lambda self, node=newNode: self.storeDataCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'changeGlobalVar':
             newNode.callAction = lambda self, node=newNode: self.changeGlobalVarCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'newGlobalVar':
             newNode.callAction = lambda self, node=newNode: self.newGlobalVarCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'runInlineScript':
             newNode.callAction = lambda self, node=newNode: self.runInlineScriptCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'caseSwitch':
             newNode.callAction = lambda self, node=newNode: self.runCaseSwitchCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'slackReport':
             newNode.callAction = lambda self, node=newNode: self.runslackReportCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1992,6 +2034,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'ANDlogic':
             newNode.callAction = lambda self, node=newNode: self.and_logicCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+        elif nodeType == 'caseSwitch':
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         else:
             newNode.callAction = None
 
@@ -2147,7 +2192,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.InlineScriptInfo = dialog.InlineScriptInfo #type:ignore
                 currentNode.dialogInfo = dialog #type:ignore
-                self.set_readable_text_after_dialogChange(currentNode,dialog,'InlineScript')
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'runInlineScript')
             # currentNode.callAction(self) #type:ignore
         elif 'caseSwitch' in nodeName:
             dialog = nodz_caseSwitchDialog(parentNode=currentNode,currentNode=currentNode) #type:ignore
@@ -2167,8 +2212,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     self.updateNumberStartFinishedDataAttributes(currentNode,nodeType)
                     self.update()
                 
-                logging.info(dialogLineEdits)
-                logging.info('Pressed OK on caseSwitch')
+                logging.debug(dialogLineEdits)
+                logging.debug('Pressed OK on caseSwitch')
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'caseSwitch')
             # currentNode.callAction(self) #type:ignore
         elif 'slackReport' in nodeName:
             dialog = nodz_slackReportDialog(parentNode=currentNode) #type:ignore
@@ -2550,6 +2596,21 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         node.update()
         logging.debug(f"Node color changed to {node.alternateFillColor}")
 
+    def limitTextLength(self,text,textLength:int=40):
+        """ 
+        Get a string (text) and return a "abc...def" string if it's too long.
+        """
+        if type(text) != str:
+            text = str(text)
+        textLength = int(textLength)
+        if textLength % 1 == 0: #if odd length, make it even
+            textLength = int(textLength+1)
+        if len(text) > textLength:
+            displayVal = text[:20] + '...' + text[-20:]
+        else:
+            displayVal = text
+        return displayVal
+
     def set_readable_text_after_dialogChange(self,currentNode,dialog,nodeType=None):
         """Script which sets a readable text inside the textfield of the currentNode after a dialog is closed (i.e. a popup window is closed).
 
@@ -2580,15 +2641,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart)
             
             for rkw in reqKwargs:
-                displayVal = str(allValues[rkw][1])
-                if len(displayVal) > 40:
-                    displayVal = displayVal[:20] + '...' + displayVal[-20:]
+                displayVal = self.limitTextLength(str(allValues[rkw][1]))
                 displayHTMLtext += f"<br><b>{rkw}</b>: {displayVal}"
 
             for okw in optKwargs:
-                displayVal = str(allValues[okw][1])
-                if len(displayVal) > 40:
-                    displayVal = displayVal[:20] + '...' + displayVal[-20:]
+                displayVal = self.limitTextLength(str(allValues[okw][1]))
                 displayHTMLtext += f"<br><i>{okw}</i>: {displayVal}"
             
             displayHTMLtext += "<br><br>Output:"
@@ -2599,8 +2656,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 importance = currentNode.variablesNodz[varName]['importance']
                 
                 if currData is not None:
-                    if len(currData) > 40:
-                        currData = currData[:20] + '...' + currData[-20:]
+                    currData = self.limitTextLength(currData)
                 else:
                     currData = 'None'
                 
@@ -2674,13 +2730,21 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
             displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
         elif nodeType == 'storeData':
-            displayHTMLtext = "TODO-StoreData"
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.storeDataInfo,currentNode.flowChart)
+            displayHTMLtext = f"Store data <b>{self.limitTextLength(values['item_to_store'][1])}</b> at location <b>{self.limitTextLength(values['store_location'][1])}</b>"
         elif nodeType == 'changeGlobalVar':
-            displayHTMLtext = "TODO-ChangeGlobalVar"
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.changeGlobalVarInfo,currentNode.flowChart)
+            displayHTMLtext = f"Change global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> to <b>{self.limitTextLength(values['globalVarValue'][1],textLength = 60)}</b>"
         elif nodeType == 'runInlineScript':
-            displayHTMLtext = "TODO-INLINESCRIPT"
+            scriptInfo = currentNode.InlineScriptInfo
+            n_lines = len(scriptInfo.split('\n'))
+            if n_lines == 1:
+                displayHTMLtext = f"Run a pycromanager script with <b>{n_lines} line</b>"
+            else:
+                displayHTMLtext = f"Run a pycromanager script with <b>{n_lines} lines</b>"
         elif nodeType == 'newGlobalVar':
-            displayHTMLtext = "TODO-NEWGLOBALVar"
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.newGlobalVarInfo,currentNode.flowChart)
+            displayHTMLtext = f"Create new global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> with value <b>{self.limitTextLength(values['globalVarValue'][1])}</b>"
         elif nodeType == 'customFunction':
             methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
             methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
@@ -2725,7 +2789,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             if not htmloutputadded:
                 displayHTMLtext += f"<br>None"
-            
         elif nodeType == "changeStagePos":
             #Find the chosen stage and corresponding set movement (relative only for now)
             for key in dialog.RelStageInfo():
@@ -2736,6 +2799,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     setMovement = key[1]
             #Set the displayHTML text:
             displayHTMLtext = "<b>Relative</b> movement of stage <b>"+chosenStage+"</b> by <b>"+str(setMovement)+"</b> units"
+        elif nodeType == "caseSwitch":
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.caseSwitchInfo,currentNode.flowChart)
+            displayHTMLtext = "Perform a case/switch logic based on variable <b>"+self.limitTextLength(values['Var'][1])+"</b>"
+        
+        elif nodeType == "__InitRequireUserDoubleClick__":
+            displayHTMLtext = "<font color='#a00000'>Double-click this node to initialize it correctly.</font>"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext
