@@ -2010,6 +2010,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             dialog = nodz_openMDADialog(parentData=self,currentNode = currentNode)
             if dialog.exec_() == QDialog.Accepted:
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'acquisition')
+                currentNode.dialogInfo = dialog #type:ignore
                 logging.debug(f"MDA dialog input: {dialog.getInputs()}")
             
             # currentNode.mdaData.exposure_ms = dialog.getExposureTime()
@@ -2032,6 +2033,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 storedConfigsStrings = None
             dialog = nodz_openMMConfigDialog(parentNode=currentNode,storedConfigsStrings = storedConfigsStrings) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeProperties')
                 #Update the results of this dialog into the nodz node   
                 self.changeConfigStorageInNodz(currentNode,dialog.ConfigsToBeChanged())
@@ -2040,6 +2042,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Show dialog:
             dialog = nodz_visualisationDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'visualisation')
                 currentNode.visualisation_currentData['layerName'] = dialog.layerNameEdit.text() #type:ignore
                 currentNode.visualisation_currentData['colormap'] = dialog.colormapComboBox.currentText() #type:ignore
@@ -2055,34 +2058,37 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 self.changeRelStageStorageInNodz(currentNode,dialog.RelStageInfo())
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeStagePos')
                 
         elif 'analysisMeasurement' in nodeName or 'analysisMeasurementDEBUG' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
+                
+                utils.analysis_outputs_to_variableNodz(currentNode)
                 #Update the results of this dialog into the nodz node
                 currentNode.scoring_analysis_currentData = dialog.currentData #type:ignore
                 try:
+                    currentNode.dialogInfo = dialog #type:ignore
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
                 except:
                     logging.warning('Failed to set text in analysisMeasurementDialog')
                 logging.info('Pressed OK on analysisMeasurementDialog')
-            
-            utils.analysis_outputs_to_variableNodz(currentNode)
         elif 'customFunction' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             dialog = nodz_customFunctionDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
+                utils.analysis_outputs_to_variableNodz(currentNode)
                 #Update the results of this dialog into the nodz node
                 currentNode.customFunction_currentData = dialog.currentData #type:ignore
                 try:
+                    currentNode.dialogInfo = dialog #type:ignore
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'customFunction')
                 except:
                     logging.warning('Failed to set text in analysisMeasurementDialog')
                 logging.info('Pressed OK on customFunctionDialog')
             
-            utils.analysis_outputs_to_variableNodz(currentNode)
             
         elif 'realTimeAnalysis' in nodeName:
             currentNode = self.findNodeByName(nodeName)
@@ -2093,6 +2099,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.real_time_analysis_currentData = dialog.currentData #type:ignore
                 currentNode.real_time_analysis_currentData['__selectedDropdownEntryRTAnalysis__'] = dialog.comboBox_RTanalysisFunctions.currentText() #type:ignore
                 currentNode.real_time_analysis_currentData['__realTimeVisualisation__'] = dialog.visualisationBox.isChecked() #type:ignore 
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
                 logging.info('Pressed OK on RTanalysis')
                 
@@ -2100,29 +2107,34 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             dialog = nodz_openTimerDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.timerInfo = dialog.timerInfo #type:ignore
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'timer')
             # currentNode.callAction(self) #type:ignore
         elif 'storeData' in nodeName:
             dialog = nodz_openStoreDataDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.storeDataInfo = dialog.storeDataInfo #type:ignore
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'storeData')
         elif 'changeGlobalVar' in nodeName:
             dialog = nodz_openChangeGlobalVarDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.changeGlobalVarInfo = dialog.changeGlobalVarInfo #type:ignore
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeGlobalVar')
             # currentNode.callAction(self) #type:ignore
         elif 'newGlobalVar' in nodeName:
             dialog = nodz_openNewGlobalVarDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.newGlobalVarInfo = dialog.newGlobalVarInfo #type:ignore
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'newGlobalVar')
             # currentNode.callAction(self) #type:ignore
         elif 'runInlineScript' in nodeName:
             dialog = nodz_openInlineScriptDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.InlineScriptInfo = dialog.InlineScriptInfo #type:ignore
+                currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'InlineScript')
             # currentNode.callAction(self) #type:ignore
         elif 'caseSwitch' in nodeName:
@@ -2261,11 +2273,15 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         self.updateCoreVariables()
         node.status='finished'
+        
         self.update()
         if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
             node.customFinishedEmits.emit_all_signals()
         if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
             node.customDataEmits.emit_all_signals()
+
+        if 'dialogInfo' in vars(node):
+            self.set_readable_text_after_dialogChange(node,node.dialogInfo)
 
     def giveInfoOnNode(self,node):
         """
@@ -2522,7 +2538,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         node.update()
         logging.debug(f"Node color changed to {node.alternateFillColor}")
 
-    def set_readable_text_after_dialogChange(self,currentNode,dialog,nodeType):
+    def set_readable_text_after_dialogChange(self,currentNode,dialog,nodeType=None):
         """Script which sets a readable text inside the textfield of the currentNode after a dialog is closed (i.e. a popup window is closed).
 
         Args:
@@ -2531,6 +2547,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             nodeType (str): Type of node
         """
         displayHTMLtext = ''
+        if nodeType == None:
+            nodeType = currentNode.name.split('_')[0]
         if nodeType == 'analysisMeasurement' or nodeType == 'analysisMeasurementDEBUG':
             methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
             methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
@@ -2540,19 +2558,47 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
             optKwargs = utils.optKwargsFromFunction(methodFunctionName)
             
-            for key in dialog.currentData:
-                for rkw in reqKwargs:
-                    if rkw in key and '#'+methodFunctionName+'#' in key:
-                        reqKwValues.append(dialog.currentData[key])
-                for okw in optKwargs:
-                    if okw in key and '#'+methodFunctionName+'#' in key:
-                        optKwValues.append(dialog.currentData[key])
+            displayHTMLtext = f"<b>{methodName}</b><br>Input:"
             
-            displayHTMLtext = f"<b>{methodName}</b>"
-            for i in range(len(reqKwValues)):
-                displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
-            for i in range(len(optKwValues)):
-                displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+            relativeData = {}
+            for key in dialog.currentData:
+                if '#'+methodFunctionName+'#' in key:
+                    relativeData[key] = dialog.currentData[key]
+            
+            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart)
+            
+            for rkw in reqKwargs:
+                displayVal = str(allValues[rkw][1])
+                if len(displayVal) > 40:
+                    displayVal = displayVal[:20] + '...' + displayVal[-20:]
+                displayHTMLtext += f"<br><b>{rkw}</b>: {displayVal}"
+
+            for okw in optKwargs:
+                displayVal = str(allValues[okw][1])
+                if len(displayVal) > 40:
+                    displayVal = displayVal[:20] + '...' + displayVal[-20:]
+                displayHTMLtext += f"<br><i>{okw}</i>: {displayVal}"
+            
+            displayHTMLtext += "<br><br>Output:"
+            htmloutputadded=False
+            for varName in currentNode.variablesNodz:
+                currData = str(currentNode.variablesNodz[varName]['data'])
+                typing = currentNode.variablesNodz[varName]['type']
+                importance = currentNode.variablesNodz[varName]['importance']
+                
+                if currData is not None:
+                    if len(currData) > 40:
+                        currData = currData[:20] + '...' + currData[-20:]
+                else:
+                    currData = 'None'
+                
+                displayHTMLtext += f"<br><b>{varName}</b>: {str(currData)}"
+                htmloutputadded=True
+            
+            if not htmloutputadded:
+                displayHTMLtext += f"<br>None"
+            
+            
         elif nodeType == 'RTanalysisMeasurement':
             methodName = dialog.currentData['__selectedDropdownEntryRTAnalysis__']
             methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
@@ -2613,7 +2659,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             displayHTMLtext = "<b>Scoring started at:</b>"
             displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
         elif nodeType == 'timer':
-            displayHTMLtext = f"<b>Timer:</b> wait {str(round(dialog.timerInfo, 2))} s"
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
+            displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
         elif nodeType == 'storeData':
             displayHTMLtext = "TODO-StoreData"
         elif nodeType == 'changeGlobalVar':
@@ -2641,12 +2688,32 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart)
             
             for rkw in reqKwargs:
-                displayHTMLtext += f"<br><b>{rkw}</b>: {allValues[rkw][0]}"
+                displayVal = str(allValues[rkw][1])
+                if len(displayVal) > 40:
+                    displayVal = displayVal[:20] + '...' + displayVal[-20:]
+                displayHTMLtext += f"<br><b>{rkw}</b>: {displayVal}"
 
             for okw in optKwargs:
-                displayHTMLtext += f"<br><i>{okw}</i>: {allValues[okw][0]}"
+                displayVal = str(allValues[okw][1])
+                if len(displayVal) > 40:
+                    displayVal = displayVal[:20] + '...' + displayVal[-20:]
+                displayHTMLtext += f"<br><i>{okw}</i>: {displayVal}"
             
-            displayHTMLtext += "<br><br>Output: TODO"
+            
+            displayHTMLtext += "<br><br>Output:"
+            
+            htmloutputadded=False
+            
+            for varName in currentNode.variablesNodz:
+                currData = currentNode.variablesNodz[varName]['data']
+                typing = currentNode.variablesNodz[varName]['type']
+                importance = currentNode.variablesNodz[varName]['importance']
+                displayHTMLtext += f"<br><b>{varName}</b>: {str(currData)}"
+                htmloutputadded=True
+            
+            if not htmloutputadded:
+                displayHTMLtext += f"<br>None"
+            
         elif nodeType == "changeStagePos":
             #Find the chosen stage and corresponding set movement (relative only for now)
             for key in dialog.RelStageInfo():

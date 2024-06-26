@@ -668,26 +668,26 @@ def nodz_setVariableToValue(variable,value,nodzInfo):
     return
 
 def nodz_evaluateVar(varName,nodzInfo):
-    originNodeName = varName.split('@')[1]
-    variableName = varName.split('@')[0]
     varData = None
-    
-    #Find the correct node
-    if originNodeName == 'Global':
-        varData = nodzInfo.globalVariables[variableName]['data']
-    elif originNodeName == 'Core':
-        varData = nodzInfo.coreVariables[variableName]['data']
-    else:
-        #Done it like this to have access to kwargvalue if needed (not retported right now)
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
-        kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
-    
-        varData = eval(kwargvalue)
-    
+    if '@' in varName:
+        originNodeName = varName.split('@')[1]
+        variableName = varName.split('@')[0]
+        
+        #Find the correct node
+        if originNodeName == 'Global':
+            varData = nodzInfo.globalVariables[variableName]['data']
+        elif originNodeName == 'Core':
+            varData = nodzInfo.coreVariables[variableName]['data']
+        else:
+            #Done it like this to have access to kwargvalue if needed (not retported right now)
+            nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
+            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+        
+            varData = eval(kwargvalue)
+        
     return varData
 
 def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
-    print(varName)
     if '@' in varName and '{' in varName and '}' in varName:
         nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
         #Find a regex like this:
@@ -765,8 +765,8 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
                 finalData = None
             return finalData
     else:
-        logging.error(f'Wrong syntax for advanced variable! Details: {varName}')
-        return None
+        logging.error(f'Wrong syntax for advanced variable! Details: {varName} - interpreting as value')
+        return varName
 
 def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluate=False):
     allData = {}
