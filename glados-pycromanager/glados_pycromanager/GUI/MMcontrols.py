@@ -234,7 +234,7 @@ class MMConfigUI(CustomMainWindow):
                 core = shared_data.core
                 napariViewer = shared_data.napariViewer
             except:
-                print('Line 237 fails')
+                logging.error('Line 237 fails')
         super().__init__()
         self.fullyLoaded = False
         self.autoSaveLoad = autoSaveLoad

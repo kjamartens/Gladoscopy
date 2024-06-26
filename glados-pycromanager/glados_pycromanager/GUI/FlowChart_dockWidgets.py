@@ -1514,9 +1514,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['__RightClickMenuNodeOrder__'] = [
             'acquisition','changeProperties','changeStagePos','|',
             'analysisMeasurement','customFunction','storeData','timer','|',
-            'realTimeAnalysis','visualisation','reporting','|',
+            'realTimeAnalysis','visualisation','|',
             'newGlobalVar','changeGlobalVar','caseSwitch','ANDlogic','|',
-            'slackReport','reporting','|',
+            'slackReport','|',
             'initStart','initEnd','scoringStart','scoringEndVar','acqStart','acqEnd','|',
             'runInlineScript','analysisMeasurementDEBUG']
         #If we miss any in here, they'll be added at the bottom in later logic
@@ -1700,11 +1700,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['analysisMeasurementDEBUG']['displayName'] = 'DEBUG Analysis [Measurement]'
         self.nodeInfo['analysisMeasurementDEBUG']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisMeasurementDEBUG']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['analysisMeasurementDEBUG']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisMeasurementDEBUG']['bottomAttributes'] = ['Visual']
         
         #We also add some custom JSON info about the node layout (colors and such)
         import json
+        #NOTE: taking a lot of these by grouping-colors. I.e. I create one color (acquisition), then for others in the same 'group', I use analogous scheme of colorffy.com
         self.nodeLayout = json.loads('''{
             
             "scoringStart": {
@@ -1749,20 +1749,117 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
+            
+            
+            
             "acquisition": {
-                "bg": [80, 80, 180, 255],
+                "bg": [79, 79, 183, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
             "changeProperties": {
-                "bg": [180, 80, 180, 255],
+                "bg": [121, 79, 183, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
             "changeStagePos": {
-                "bg": [120, 20, 180, 255],
+                "bg": [79, 100, 183, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            
+            
+            "analysisMeasurement": {
+                "bg": [240, 113, 103, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "customFunction": {
+                "bg": [240, 168, 103, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "storeData": {
+                "bg": [240, 140, 103, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "timer": {
+                "bg": [197, 93, 85, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            
+            
+            "realTimeAnalysis": {
+                "bg": [63, 99, 129, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "visualisation": {
+                "bg": [63, 125, 129, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "reporting": {
+                "bg": [63, 129, 107, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            
+            
+            "newGlobalVar": {
+                "bg": [38, 130, 46, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "changeGlobalVar": {
+                "bg": [38, 130, 64, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "caseSwitch": {
+                "bg": [36, 111, 56, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "ANDlogic": {
+                "bg": [30, 73, 39, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            
+            
+            "slackReport": {
+                "bg": [68, 129, 168, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            
+            
+            "runInlineScript": {
+                "bg": [179, 98, 122, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "analysisMeasurementDEBUG": {
+                "bg": [162, 65, 98, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]

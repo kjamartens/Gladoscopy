@@ -1344,7 +1344,7 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
     
     #Loop over all widgets in parent:
     for child in parentChildren:
-        print(child.objectName())
+        logging.debug(child.objectName())
         if len(child.objectName().split('#')) > 2:
             #Check if it's the same function and variable:
             if child.objectName().split('#')[1] == functionName and child.objectName().split('#')[2] == kwargName:
@@ -2234,7 +2234,7 @@ def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
         lineEditText = variablesDialog.selected_entry[2]+'@'+variablesDialog.selected_entry[1]
         line_edit.setText(lineEditText)
     else:
-        print("Dialog rejected (Cancel pressed or closed)")
+        logging.warning("Dialog rejected (Cancel pressed or closed)")
 
 import json
 

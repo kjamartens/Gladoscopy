@@ -1,0 +1,1271 @@
+{
+    "CONNECTIONS": [],
+    "DECISION_WIDGET_INFO": {
+        "PYQTentries": {
+            "": "DirectDecision and Advanced"
+        },
+        "currentDecision": "AND_Score",
+        "currentMode": "DirectDecision"
+    },
+    "NODES": {
+        "ANDlogic_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "In",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Out",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "AND-Logic",
+            "position": [
+                644.8780545380855,
+                1035.8489740637226
+            ],
+            "preset": "ANDlogic",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "acquisition_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                372.27976019075595,
+                358.21597567756777
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "analysisMeasurementDEBUG_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Output",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "DEBUG Analysis [Measurement]",
+            "position": [
+                1533.8739846110927,
+                1282.555062045152
+            ],
+            "preset": "analysisMeasurementDEBUG",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "analysisMeasurement_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Analysis [Measurement]",
+            "position": [
+                990.7117115458916,
+                421.279760190756
+            ],
+            "preset": "analysisMeasurement",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "caseSwitch_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Error",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Case/Switch",
+            "position": [
+                677.4271046094084,
+                1151.80496494281
+            ],
+            "preset": "caseSwitch",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "changeGlobalVar_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Change Global Variable",
+            "position": [
+                559.4367981008628,
+                1127.393177389318
+            ],
+            "preset": "changeGlobalVar",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "changeProperties_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Done",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Change Properties",
+            "position": [
+                345.83365700780604,
+                527.2700666993015
+            ],
+            "preset": "changeProperties",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "changeStagePos_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Done",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Change Stage Position",
+            "position": [
+                569.6083762481512,
+                454.03470403882494
+            ],
+            "preset": "changeStagePos",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "customFunction_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Function start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Custom Function",
+            "position": [
+                982.5744490280607,
+                649.3290044667625
+            ],
+            "preset": "customFunction",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "newGlobalVar_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "New Global Variable",
+            "position": [
+                445.51512285123255,
+                1086.7068648001643
+            ],
+            "preset": "newGlobalVar",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "realTimeAnalysis_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Real-Time analysis",
+            "position": [
+                459.7553322574363,
+                817.4517267474116
+            ],
+            "preset": "realTimeAnalysis",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "runInlineScript_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Run advanced script",
+            "position": [
+                1232.7952714513556,
+                1294.207059004848
+            ],
+            "preset": "runInlineScript",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "slackReport_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Send",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Slack Report",
+            "position": [
+                1190.0746432327444,
+                1072.4666553939605
+            ],
+            "preset": "slackReport",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "storeData_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Store",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Stored",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Store Data",
+            "position": [
+                1116.8392805722679,
+                551.6818542527938
+            ],
+            "preset": "storeData",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "timer_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Timer",
+            "position": [
+                1230.760955821898,
+                624.9172169132703
+            ],
+            "preset": "timer",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "visualisation_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                299.04439753027935,
+                831.6919361536155
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textboxheight": 50
+        }
+    },
+    "NODES_CASE_SWITCH": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_CHANGE_GLOBAL_VAR": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_CUSTOMFUNCTION": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_MDA": {
+        "ANDlogic_0": {},
+        "acquisition_0": {
+            "GUI_channel_enabled": "True",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_show_channel": "True",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "True",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "True",
+            "GUI_show_z": "True",
+            "GUI_storage_enabled": "True",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "True",
+            "GUI_z_enabled": "True",
+            "_GUI_grid_width": "7",
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "405_OnOff",
+            "channels": [],
+            "exposure_ms": "90.0",
+            "exposure_s_or_ms": "ms",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1719417076.762417",
+            "mda": [],
+            "mda_analysis_thread": null,
+            "num_time_points": "10",
+            "order": "tpcz",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "data",
+                "config_groups",
+                "mainLayout"
+            ],
+            "time_interval_s": "0.0",
+            "time_interval_s_or_ms": "ms",
+            "xy_positions": null,
+            "xyz_positions": null,
+            "z_end": "1",
+            "z_nr_steps": null,
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "TIZDrive",
+            "z_start": "0",
+            "z_step": "1",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_MMCONFIGCHANGE": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": [],
+        "changeStagePos_0": [],
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_NEW_GLOBAL_VAR": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_RELSTAGECHANGE": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": [],
+        "changeStagePos_0": [],
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_RT_ANALYSIS": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_RUN_INLINE_SCRIPT": {
+        "ANDlogic_0": "",
+        "acquisition_0": "",
+        "analysisMeasurementDEBUG_0": "",
+        "analysisMeasurement_0": "",
+        "caseSwitch_0": "",
+        "changeGlobalVar_0": "",
+        "changeProperties_0": "",
+        "changeStagePos_0": "",
+        "customFunction_0": "",
+        "newGlobalVar_0": "",
+        "realTimeAnalysis_0": "",
+        "runInlineScript_0": "",
+        "slackReport_0": "",
+        "storeData_0": "",
+        "timer_0": "",
+        "visualisation_0": ""
+    },
+    "NODES_SCORING_ANALYSIS": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {
+            "ComboBoxSwitch#AverageImage.AvgImage#Image": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#Image": "Value",
+            "ComboBoxSwitch#CellCounter.CellCounter#Image": "Value",
+            "ComboBoxSwitch#StarDist.StarDistSegment#Image": "Value",
+            "ComboBoxSwitch#StarDist.StarDistSegment_preloadedModel#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_ImageVis#Image": "Value",
+            "ComboBoxSwitch#checkAgainstList.CheckVsList#Position": "Value",
+            "LineEdit#AverageImage.AvgImage#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#OptBool2": "20",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg2": "0",
+            "LineEdit#CellCounter.CellCounter#Image": "DefaultInput",
+            "LineEdit#StarDist.StarDistSegment#Image": "DefaultInput",
+            "LineEdit#StarDist.StarDistSegment#modelStorageLoc": "",
+            "LineEdit#StarDist.StarDistSegment#nms_thresh": "",
+            "LineEdit#StarDist.StarDistSegment#prob_thresh": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#Image": "DefaultInput",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#image_data": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#model": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#nms_thresh": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#prob_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEdit#checkAgainstList.CheckVsList#Distance": "10",
+            "LineEdit#checkAgainstList.CheckVsList#List": "[]",
+            "LineEdit#checkAgainstList.CheckVsList#Position": "DefaultInput",
+            "LineEditAdv#AverageImage.AvgImage#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditAdv#CellCounter.CellCounter#Image": "",
+            "LineEditAdv#StarDist.StarDistSegment#Image": "",
+            "LineEditAdv#StarDist.StarDistSegment#modelStorageLoc": "",
+            "LineEditAdv#StarDist.StarDistSegment#nms_thresh": "",
+            "LineEditAdv#StarDist.StarDistSegment#prob_thresh": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#Image": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#image_data": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#model": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#nms_thresh": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#prob_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#List": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Position": "",
+            "LineEditVariable#AverageImage.AvgImage#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditVariable#CellCounter.CellCounter#Image": "",
+            "LineEditVariable#StarDist.StarDistSegment#Image": "",
+            "LineEditVariable#StarDist.StarDistSegment#modelStorageLoc": "",
+            "LineEditVariable#StarDist.StarDistSegment#nms_thresh": "",
+            "LineEditVariable#StarDist.StarDistSegment#prob_thresh": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#Image": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#image_data": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#model": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#nms_thresh": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#prob_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#List": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Position": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "StarDist_image: StarDistSegment_ImageVis",
+                    "StarDist_image.StarDistSegment_ImageVis"
+                ],
+                [
+                    "Average image (time)",
+                    "AverageImage.AvgImage"
+                ],
+                [
+                    "Average gray value",
+                    "AverageIntensity.AvgGrayValue"
+                ],
+                [
+                    "Cell Counter",
+                    "CellCounter.CellCounter"
+                ],
+                [
+                    "Check Position for closeness to List",
+                    "checkAgainstList.CheckVsList"
+                ],
+                [
+                    "StarDist: StarDistSegment",
+                    "StarDist.StarDistSegment"
+                ],
+                [
+                    "StarDist: StarDistSegment_preloadedModel",
+                    "StarDist.StarDistSegment_preloadedModel"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "StarDist_image: StarDistSegment_ImageVis"
+        },
+        "analysisMeasurement_0": {
+            "ComboBoxSwitch#AverageImage.AvgImage#Image": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#Image": "Value",
+            "ComboBoxSwitch#CellCounter.CellCounter#Image": "Value",
+            "ComboBoxSwitch#StarDist.StarDistSegment#Image": "Value",
+            "ComboBoxSwitch#StarDist.StarDistSegment_preloadedModel#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_ImageVis#Image": "Value",
+            "ComboBoxSwitch#checkAgainstList.CheckVsList#Position": "Value",
+            "LineEdit#AverageImage.AvgImage#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#OptBool2": "20",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg2": "0",
+            "LineEdit#CellCounter.CellCounter#Image": "DefaultInput",
+            "LineEdit#StarDist.StarDistSegment#Image": "DefaultInput",
+            "LineEdit#StarDist.StarDistSegment#modelStorageLoc": "",
+            "LineEdit#StarDist.StarDistSegment#nms_thresh": "",
+            "LineEdit#StarDist.StarDistSegment#prob_thresh": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#Image": "DefaultInput",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#image_data": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#model": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#nms_thresh": "",
+            "LineEdit#StarDist.StarDistSegment_preloadedModel#prob_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEdit#checkAgainstList.CheckVsList#Distance": "10",
+            "LineEdit#checkAgainstList.CheckVsList#List": "[]",
+            "LineEdit#checkAgainstList.CheckVsList#Position": "DefaultInput",
+            "LineEditAdv#AverageImage.AvgImage#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditAdv#CellCounter.CellCounter#Image": "",
+            "LineEditAdv#StarDist.StarDistSegment#Image": "",
+            "LineEditAdv#StarDist.StarDistSegment#modelStorageLoc": "",
+            "LineEditAdv#StarDist.StarDistSegment#nms_thresh": "",
+            "LineEditAdv#StarDist.StarDistSegment#prob_thresh": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#Image": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#image_data": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#model": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#nms_thresh": "",
+            "LineEditAdv#StarDist.StarDistSegment_preloadedModel#prob_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#List": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Position": "",
+            "LineEditVariable#AverageImage.AvgImage#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditVariable#CellCounter.CellCounter#Image": "",
+            "LineEditVariable#StarDist.StarDistSegment#Image": "",
+            "LineEditVariable#StarDist.StarDistSegment#modelStorageLoc": "",
+            "LineEditVariable#StarDist.StarDistSegment#nms_thresh": "",
+            "LineEditVariable#StarDist.StarDistSegment#prob_thresh": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#Image": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#image_data": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#model": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#nms_thresh": "",
+            "LineEditVariable#StarDist.StarDistSegment_preloadedModel#prob_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#List": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Position": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "StarDist_image: StarDistSegment_ImageVis",
+                    "StarDist_image.StarDistSegment_ImageVis"
+                ],
+                [
+                    "Average image (time)",
+                    "AverageImage.AvgImage"
+                ],
+                [
+                    "Average gray value",
+                    "AverageIntensity.AvgGrayValue"
+                ],
+                [
+                    "Cell Counter",
+                    "CellCounter.CellCounter"
+                ],
+                [
+                    "Check Position for closeness to List",
+                    "checkAgainstList.CheckVsList"
+                ],
+                [
+                    "StarDist: StarDistSegment",
+                    "StarDist.StarDistSegment"
+                ],
+                [
+                    "StarDist: StarDistSegment_preloadedModel",
+                    "StarDist.StarDistSegment_preloadedModel"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "StarDist_image: StarDistSegment_ImageVis"
+        },
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#StageName": "TIPFSOffset",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#aggressiveness": "5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#endPosition": "400",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#n_positions": "6",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#startPosition": "0",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#wantedResolution": "0.5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#StageName": "TIPFSOffset",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#aggressiveness": "5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#endPosition": "75",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#n_positions": "6",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#startPosition": "-75",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#wantedResolution": "0.5",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#StageName": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#aggressiveness": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#endPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#n_positions": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#startPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#wantedResolution": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#StageName": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#aggressiveness": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#endPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#n_positions": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#startPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#wantedResolution": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#StageName": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#aggressiveness": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#endPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#n_positions": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#startPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#wantedResolution": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#StageName": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#aggressiveness": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#endPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#n_positions": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#startPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#wantedResolution": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Iterative Auto-focus BF [Relative Position]",
+                    "AutoFocusBF.auto_focus_iter_rel_bf"
+                ],
+                [
+                    "Iterative Auto-focus BF [Absolute Position]",
+                    "AutoFocusBF.auto_focus_iter_abs_bf"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "Iterative Auto-focus BF [Relative Position]"
+        },
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_SCORING_END": {
+        "ANDlogic_0": {
+            "Variables": {}
+        },
+        "acquisition_0": {
+            "Variables": {}
+        },
+        "analysisMeasurementDEBUG_0": {
+            "Variables": {}
+        },
+        "analysisMeasurement_0": {
+            "Variables": {}
+        },
+        "caseSwitch_0": {
+            "Variables": {}
+        },
+        "changeGlobalVar_0": {
+            "Variables": {}
+        },
+        "changeProperties_0": {
+            "Variables": {}
+        },
+        "changeStagePos_0": {
+            "Variables": {}
+        },
+        "customFunction_0": {
+            "Variables": {}
+        },
+        "newGlobalVar_0": {
+            "Variables": {}
+        },
+        "realTimeAnalysis_0": {
+            "Variables": {}
+        },
+        "runInlineScript_0": {
+            "Variables": {}
+        },
+        "slackReport_0": {
+            "Variables": {}
+        },
+        "storeData_0": {
+            "Variables": {}
+        },
+        "timer_0": {
+            "Variables": {}
+        },
+        "visualisation_0": {
+            "Variables": {}
+        }
+    },
+    "NODES_SCORING_SCORING": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_SCORING_VISUALISATION": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_SLACK_REPORT": {
+        "ANDlogic_0": "",
+        "acquisition_0": "",
+        "analysisMeasurementDEBUG_0": "",
+        "analysisMeasurement_0": "",
+        "caseSwitch_0": "",
+        "changeGlobalVar_0": "",
+        "changeProperties_0": "",
+        "changeStagePos_0": "",
+        "customFunction_0": "",
+        "newGlobalVar_0": "",
+        "realTimeAnalysis_0": "",
+        "runInlineScript_0": "",
+        "slackReport_0": "",
+        "storeData_0": "",
+        "timer_0": "",
+        "visualisation_0": ""
+    },
+    "NODES_STORE_DATA": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_TIMER": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    },
+    "NODES_VISUALISATION": {
+        "ANDlogic_0": {},
+        "acquisition_0": {},
+        "analysisMeasurementDEBUG_0": {},
+        "analysisMeasurement_0": {},
+        "caseSwitch_0": {},
+        "changeGlobalVar_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "customFunction_0": {},
+        "newGlobalVar_0": {},
+        "realTimeAnalysis_0": {},
+        "runInlineScript_0": {},
+        "slackReport_0": {},
+        "storeData_0": {},
+        "timer_0": {},
+        "visualisation_0": {}
+    }
+}
