@@ -146,8 +146,8 @@ def auto_focus_iter_rel_bf(core,**kwargs):
                     max_index = np.argmax(redondo_arr)
                 #If we are at the end, we measure another position at the end
                 elif max_index == len(redondo_arr)-1:
-                    logging.debug('Doing new position at end at '+str(additional_position))
                     additional_position = position_array_test[-1]+(position_array_test[-1]-position_array_test[-2])
+                    logging.debug('Doing new position at end at '+str(additional_position))
                     newEntry = single_redondo(core,additional_position,zmovestage)
                     redondo_arr = np.insert(redondo_arr,len(redondo_arr),newEntry)
                     position_array_test = np.insert(position_array_test,len(position_array_test),additional_position)
@@ -232,8 +232,8 @@ def auto_focus_iter_abs_bf(core,**kwargs):
                     max_index = np.argmax(redondo_arr)
                 #If we are at the end, we measure another position at the end
                 elif max_index == len(redondo_arr)-1:
-                    logging.debug('Doing new position at end at '+str(additional_position))
                     additional_position = position_array_test[-1]+(position_array_test[-1]-position_array_test[-2])
+                    logging.debug('Doing new position at end at '+str(additional_position))
                     newEntry = single_redondo(core,additional_position,zmovestage)
                     redondo_arr = np.insert(redondo_arr,len(redondo_arr),newEntry)
                     position_array_test = np.insert(position_array_test,len(position_array_test),additional_position)
