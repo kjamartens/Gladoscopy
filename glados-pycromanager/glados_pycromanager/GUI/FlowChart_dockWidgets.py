@@ -1510,6 +1510,18 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         self.nodeInfo = {}
         
+        #Order: ChangeMicroscope|AnalysisMethods|RealTimeThings|Logics|Reports|StartStops|Advanceds
+        self.nodeInfo['__RightClickMenuNodeOrder__'] = [
+            'acquisition','changeProperties','changeStagePos','|',
+            'analysisMeasurement','customFunction','storeData','timer','|',
+            'realTimeAnalysis','visualisation','reporting','|',
+            'newGlobalVar','changeGlobalVar','caseSwitch','ANDlogic','|',
+            'slackReport','reporting','|',
+            'initStart','initEnd','scoringStart','scoringEndVar','acqStart','acqEnd','|',
+            'runInlineScript','analysisMeasurementDEBUG']
+        #If we miss any in here, they'll be added at the bottom in later logic
+        #  
+        
         #We define the node info for each type of node like this: (might be expanded in the future)
         self.nodeInfo['acquisition'] = self.singleNodeTypeInit()
         self.nodeInfo['acquisition']['name'] = 'acquisition'
@@ -1554,7 +1566,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['analysisMeasurement']['displayName'] = 'Analysis [Measurement]'
         self.nodeInfo['analysisMeasurement']['startAttributes'] = ['Analysis start']
         self.nodeInfo['analysisMeasurement']['finishedAttributes'] = ['Finished']
-        self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
+        # self.nodeInfo['analysisMeasurement']['dataAttributes'] = ['Output']
         self.nodeInfo['analysisMeasurement']['bottomAttributes'] = ['Visual']
         
         self.nodeInfo['customFunction'] = self.singleNodeTypeInit()
@@ -4219,8 +4231,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         if item_at_mouse == None:
             context_menu = QMenu(self)
             
-            #Dynamically add all node types
-            for node_type, node_data in self.nodeInfo.items():
+            def addToContextMenu(context_menu,node_type,node_data):
+                """  
+                Add a node type with node data to the right-click context menu
+                """
                 new_subAction = QAction(node_data['displayName'], self)
                 context_menu.addAction(new_subAction)
                 # Define a closure to capture the current value of node_type
@@ -4237,7 +4251,30 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     return lambda _, event=QMouseevent: self.createNodeFromRightClick(event, nodeType=node_type)
                 # Connect each action to its own lambda function
                 new_subAction.triggered.connect(create_lambda(node_type))
-                
+            
+            
+            #Every type of node should be in here:
+            allEntries = self.nodeInfo['__RightClickMenuNodeOrder__']
+            
+            addedMissedNodeType = False
+            #But, we also loop over all entries in self.nodeInfo, and see if we missed any. If we did, we add them to the context menu.
+            for nodeType in self.nodeInfo:
+                if nodeType != '__RightClickMenuNodeOrder__' and nodeType not in allEntries:
+                    if not addedMissedNodeType:
+                        allEntries.append('|')
+                        addedMissedNodeType = True
+                    allEntries.append(nodeType)
+            
+            #We loop over all entries in here:
+            for nodeType in allEntries:
+                if nodeType == '|':
+                    context_menu.addSeparator()
+                else:
+                    if nodeType in self.nodeInfo:
+                        node_type = nodeType
+                        node_data = self.nodeInfo[nodeType]
+                        addToContextMenu(context_menu,node_type,node_data)
+            
             # Show the context menu at the event's position
             context_menu.exec_(QMouseevent.globalPos())
         elif item_at_mouse in self.nodes:
