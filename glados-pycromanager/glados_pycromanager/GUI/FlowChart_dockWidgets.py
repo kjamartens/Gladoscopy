@@ -218,11 +218,14 @@ class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
         self.mainLayout.addItem(spacer_item, 99, 0)
         
         #Pre-load the options if they're in the current node info
-        utils.preLoadOptions_analysis(self.mainLayout,currentNode.customFunction_currentData) #type:ignore
+        utils.preLoadOptions_analysis(self.mainLayout,currentNode.customFunction_currentData,functionName = 'comboBox_customFunctions') #type:ignore
         
-        #Set the current dropdown to be correct
-        correctFunction = currentNode.customFunction_currentData['__selectedDropdownEntryAnalysis__'] #type:ignore
-        self.comboBox_analysisFunctions.setCurrentText(correctFunction)
+        try:
+            #Set the current dropdown to be correct
+            correctFunction = currentNode.customFunction_currentData['__selectedDropdownEntryAnalysis__'] #type:ignore
+            self.comboBox_analysisFunctions.setCurrentText(correctFunction)
+        except KeyError:
+            pass
         
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
@@ -2549,7 +2552,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
             for i in range(len(optKwValues)):
                 displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
-        
         elif nodeType == 'RTanalysisMeasurement':
             methodName = dialog.currentData['__selectedDropdownEntryRTAnalysis__']
             methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
@@ -2619,6 +2621,32 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             displayHTMLtext = "TODO-INLINESCRIPT"
         elif nodeType == 'newGlobalVar':
             displayHTMLtext = "TODO-NEWGLOBALVar"
+        elif nodeType == 'customFunction':
+            methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
+            methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
+            reqKwValues = []
+            optKwValues = []
+            
+            reqKwargs = utils.reqKwargsFromFunction(methodFunctionName)
+            optKwargs = utils.optKwargsFromFunction(methodFunctionName)
+            
+            displayHTMLtext = f"<b>{methodName}</b><br>Input:"
+            
+            relativeData = {}
+            for key in dialog.currentData:
+                if '#'+methodFunctionName+'#' in key:
+                    relativeData[key] = dialog.currentData[key]
+            
+            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart)
+            
+            for rkw in reqKwargs:
+                displayHTMLtext += f"<br><b>{rkw}</b>: {allValues[rkw][0]}"
+
+            for okw in optKwargs:
+                displayHTMLtext += f"<br><i>{okw}</i>: {allValues[okw][0]}"
+            
+            displayHTMLtext += "<br><br>Output: TODO"
+            
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext
@@ -3234,12 +3262,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Star the worker
         self.thread_pool.start(worker)
         
-        # #And evaluate the custom function with custom parameters
-        # output = eval(evalText) #type:ignore
-        
-        # #Display final output to the user for now
-        # logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
-        
         
     def analysisNode_finished(self,node):
         #Set the status of the nodz-coupled vis and real-time to finished:
@@ -3348,17 +3370,35 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Figure out the belonging evaluation-text
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.customFunction_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
-        #And evaluate the custom function with custom parameters
-        output = eval(evalText) #type:ignore
+        worker = generalNodzCallActionWorker(nodzType='CustomFunctionNode',args={"evalText":evalText, "nodeDict":nodeDict, "node":node, "core": self.core, "shared_data": self.shared_data})
+        #Add the finished emit
+        worker.signals.finished.connect(lambda: self.CustomFunctionNode_finished(node))
+        #Star the worker
+        self.thread_pool.start(worker)
         
-        node.customFunction_currentData['__output__'] = output
+        # #And evaluate the custom function with custom parameters
+        # output = eval(evalText) #type:ignore
         
-        #Store the output as NodzVariables
+        # node.customFunction_currentData['__output__'] = output
+        
+        # #Store the output as NodzVariables
+        # # utils.analysis_outputs_store_as_variableNodz(node)
+        
+        # #Finish up
+        # self.finishedEmits(node)
+    
+    def CustomFunctionNode_finished(self,node):
+        
+        output = node.output
+        node.scoring_analysis_currentData['__output__'] = node.output
+        
+        #Store the output as NodzVariables #TODO
         # utils.analysis_outputs_store_as_variableNodz(node)
         
         #Finish up
         self.finishedEmits(node)
-    
+        
+        
     def MMstageChangeRan(self,node):
         #TODO: Implement this :)
         """
@@ -5243,7 +5283,6 @@ class generalNodzCallActionWorker(QRunnable):
         self.signals = WorkerSignals()
         logging.debug(f"GeneralNodzCallActionworker INIT with nodzType: {self.nodzType} and args: {self.args}")
     
-    
     def run(self):
         """ 
         Running of the different callActions belonging to all nodes.
@@ -5260,7 +5299,7 @@ class generalNodzCallActionWorker(QRunnable):
                 #Change the config, and wait for the config to be changed
                 self.args['core'].set_config(config_to_change[0],config_to_change[1]) #type:ignore
                 self.args['core'].wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
-        elif self.nodzType == 'AnalysisNode':
+        elif self.nodzType == 'AnalysisNode' or self.nodzType == 'CustomFunctionNode':
             #Get all the necessary info
             evalText = self.args['evalText']
             nodeDict = self.args['nodeDict']

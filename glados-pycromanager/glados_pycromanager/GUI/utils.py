@@ -770,30 +770,44 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
 
 def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluate=False):
     allData = {}
+    
+    uniqueVars = []
     for entry in relevantData:
-        if 'ComboBoxSwitch#' in entry:
-            print(entry)
-            valueVarOrAdv = relevantData[entry]
-            kwargName = entry.split('#')[2]
-            if valueVarOrAdv == 'Value':
-                lineEditName = 'LineEdit'
-            elif valueVarOrAdv == 'Variable':
-                lineEditName = 'LineEditVariable'
-            elif valueVarOrAdv == 'Advanced':
-                lineEditName = 'LineEditAdv'
-            
-            finalValue = None
-            for entry in relevantData:
-                if lineEditName+'#' in entry and '#'+kwargName in entry:
-                    finalValue = relevantData[entry]
+        if len(entry.split('#')) == 3:
+            newEntry = entry.split('#')[2]
+            if newEntry not in uniqueVars:
+                uniqueVars.append(entry.split('#')[2])
+    
+    
+    for var in uniqueVars:
+        # if 'ComboBoxSwitch#' in entry:
+        # print(entry)
+        #See if we have any of the ComboBox# objectnames:
+        lineEditName = 'LineEdit'
+        valueVarOrAdv = 'Value'
+        for entry in relevantData:
+            if 'ComboBoxSwitch#' in entry and '#'+var in entry:
+                valueVarOrAdv = relevantData[entry]
+                kwargName = entry.split('#')[2]
+                if valueVarOrAdv == 'Value':
+                    lineEditName = 'LineEdit'
+                elif valueVarOrAdv == 'Variable':   
+                    lineEditName = 'LineEditVariable'
+                elif valueVarOrAdv == 'Advanced':
+                    lineEditName = 'LineEditAdv'
+        
+        finalValue = None
+        for entry in relevantData:
+            if lineEditName+'#' in entry and '#'+var in entry:
+                finalValue = relevantData[entry]
 
-            if valueVarOrAdv == 'Variable':
-                evaluatedVar = nodz_evaluateVar(finalValue,nodzInfo)
-            elif valueVarOrAdv == 'Advanced':
-                evaluatedVar = nodz_evaluateAdv(finalValue,nodzInfo)
-            else:
-                evaluatedVar = finalValue
-            allData[kwargName] = [evaluatedVar,finalValue,valueVarOrAdv]
+        if valueVarOrAdv == 'Variable':
+            evaluatedVar = nodz_evaluateVar(finalValue,nodzInfo)
+        elif valueVarOrAdv == 'Advanced':
+            evaluatedVar = nodz_evaluateAdv(finalValue,nodzInfo)
+        else:
+            evaluatedVar = finalValue
+        allData[var] = [evaluatedVar,finalValue,valueVarOrAdv]
 
     return allData
 
@@ -1386,7 +1400,7 @@ def updateCurrentDataUponDropdownChange(parentObject):
     #Figure out the current selected dropdown entry:
     #loop over all children:
     for child in parentObject.children():
-        if 'comboBox_analysisFunctions' in child.objectName():
+        if 'comboBox_analysisFunctions' in child.objectName() or 'comboBox_customFunctions' in child.objectName():
             parentObject.currentData['__selectedDropdownEntryAnalysis__'] = child.currentText()
 
 def kwargValueInputChanged(line_edit):
