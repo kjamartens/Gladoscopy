@@ -1819,25 +1819,25 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             
             "newGlobalVar": {
-                "bg": [38, 130, 46, 255],
+                "bg": [123, 194, 112, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
             "changeGlobalVar": {
-                "bg": [38, 130, 64, 255],
+                "bg": [134, 203, 151, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
             "caseSwitch": {
-                "bg": [36, 111, 56, 255],
+                "bg": [112, 194, 134, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
             "ANDlogic": {
-                "bg": [30, 73, 39, 255],
+                "bg": [112, 194, 118, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
@@ -2839,10 +2839,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
             displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
         elif nodeType == 'storeData':
-            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.storeDataInfo,currentNode.flowChart)
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.storeDataInfo,currentNode.flowChart,dontEvaluate=True)
             displayHTMLtext = f"Store data <b>{self.limitTextLength(values['item_to_store'][1])}</b> at location <b>{self.limitTextLength(values['store_location'][1])}</b>"
         elif nodeType == 'changeGlobalVar':
-            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.changeGlobalVarInfo,currentNode.flowChart)
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.changeGlobalVarInfo,currentNode.flowChart,dontEvaluate=True)
             displayHTMLtext = f"Change global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> to <b>{self.limitTextLength(values['globalVarValue'][1],textLength = 60)}</b>"
         elif nodeType == 'runInlineScript':
             scriptInfo = currentNode.InlineScriptInfo
@@ -2852,7 +2852,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             else:
                 displayHTMLtext = f"Run a pycromanager script with <b>{n_lines} lines</b>"
         elif nodeType == 'newGlobalVar':
-            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.newGlobalVarInfo,currentNode.flowChart)
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.newGlobalVarInfo,currentNode.flowChart,dontEvaluate=True)
             displayHTMLtext = f"Create new global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> with value <b>{self.limitTextLength(values['globalVarValue'][1])}</b>"
         elif nodeType == 'customFunction':
             methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
@@ -2870,7 +2870,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 if '#'+methodFunctionName+'#' in key:
                     relativeData[key] = dialog.currentData[key]
             
-            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart)
+            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart,dontEvaluate=True)
             
             for rkw in reqKwargs:
                 displayVal = str(allValues[rkw][1])
@@ -2909,7 +2909,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Set the displayHTML text:
             displayHTMLtext = "<b>Relative</b> movement of stage <b>"+chosenStage+"</b> by <b>"+str(setMovement)+"</b> units"
         elif nodeType == "caseSwitch":
-            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.caseSwitchInfo,currentNode.flowChart)
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.caseSwitchInfo,currentNode.flowChart,dontEvaluate=True)
             displayHTMLtext = "Perform a case/switch logic based on variable <b>"+self.limitTextLength(values['Var'][1])+"</b>"
         
         elif nodeType == "__InitRequireUserDoubleClick__":
@@ -3787,16 +3787,15 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         if self.fullRunOngoing:
             #if there are more positions to look at...
             if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                print(f'Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!--------------------------------------------------------')
+                logging.info(f'Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!--------------------------------------------------------')
                 self.fullRunCurrentPos +=1
                 #And start a new score/acq at a new pos:
                 self.startNewScoreAcqAtPos()
             else:
-                print(f'ALLDONE Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!----------------------------------------------------------')
+                logging.info(f'ALLDONE Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!----------------------------------------------------------')
                 self.singleRunOngoing = False
-                print('All done!')
         else:
-            print("ACQUIRING FULL RUN IS NOT ONGOING--------------------------------------------")
+            logging.info("ACQUIRING FULL RUN IS NOT ONGOING--------------------------------------------")
         logging.debug("End Acquiring2------------------------------------------------------------")
         
     
@@ -3979,7 +3978,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         self.startNewScoreAcqAtPos()
                     else:
                         self.singleRunOngoing = False
-                        print('All done!')
+                        logging.info('All done!')
             logging.info('----------------------')
 
         except:

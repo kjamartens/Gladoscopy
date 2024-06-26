@@ -703,54 +703,60 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
             #Remove the curly braces
             foundstring_data = foundstring[1:-1]
             #run getting the data of this match
-            #Assuming string
-            if foundstring_data.split('@')[1] == 'Global':
-                if isinstance(nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'],type):
-                    nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'] = [nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type']]
-                typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
-            elif foundstring_data.split('@')[1] == 'Core':
-                if isinstance(nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'],type):
-                    nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'] = [nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type']]
-                typev = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'][0]
-            else:
-                typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
-            #Check if it's calculatable
-            if typev not in [int, float, np.ndarray]:
+            try:
+                #Assuming string
+                if foundstring_data.split('@')[1] == 'Global':
+                    if isinstance(nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'],type):
+                        nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'] = [nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type']]
+                    typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+                elif foundstring_data.split('@')[1] == 'Core':
+                    if isinstance(nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'],type):
+                        nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'] = [nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type']]
+                    typev = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'][0]
+                else:
+                    typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
+                #Check if it's calculatable
+                if typev not in [int, float, np.ndarray]:
+                    calculatable = False
+            except KeyError:
+                typev = None
                 calculatable = False
-        
-        updating_string = varName
-        matches = re.finditer("{[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+}",varName)
-        #Now check the data
-        for match in matches:
-            startpos = match.regs[0][0]
-            endpos = match.regs[0][1]
-            foundstring = varName[startpos:endpos]
-            #Remove the curly braces
-            foundstring_data = foundstring[1:-1]
-            #run getting the data of this match
-            #Assuming string
-            if foundstring_data.split('@')[1] == 'Global':
-                data = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['data']
-                typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
-            elif foundstring_data.split('@')[1] == 'Core':
-                data = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['data']
-                typev = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'][0]
-            else:
-                data = str(nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['data'])
-                typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
-            
-            #Replace this in the updating_string
-            if calculatable: #if calculatable
-                try:
-                    updating_string = updating_string.replace(foundstring,""+data+"")
-                except:
-                    updating_string = updating_string.replace(foundstring,""+str(data)+"")
-            else: #uncalculatable, add as string
-                try:
-                    updating_string = updating_string.replace(foundstring,""+data+"")
-                except:
-                    updating_string = updating_string.replace(foundstring,""+str(data)+"")
                 
+        updating_string = varName
+        try:
+            matches = re.finditer("{[a-zA-Z0-9._%+-]+@[a-zA-Z0-9._%+-]+}",varName)
+            #Now check the data
+            for match in matches:
+                startpos = match.regs[0][0]
+                endpos = match.regs[0][1]
+                foundstring = varName[startpos:endpos]
+                #Remove the curly braces
+                foundstring_data = foundstring[1:-1]
+                #run getting the data of this match
+                #Assuming string
+                if foundstring_data.split('@')[1] == 'Global':
+                    data = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['data']
+                    typev = nodzInfo.globalVariables[foundstring_data.split('@')[0]]['type'][0]
+                elif foundstring_data.split('@')[1] == 'Core':
+                    data = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['data']
+                    typev = nodzInfo.coreVariables[foundstring_data.split('@')[0]]['type'][0]
+                else:
+                    data = str(nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['data'])
+                    typev = nodeDict[foundstring_data.split('@')[1]].variablesNodz[foundstring_data.split('@')[0]]['type'][0]
+                
+                #Replace this in the updating_string
+                if calculatable: #if calculatable
+                    try:
+                        updating_string = updating_string.replace(foundstring,""+data+"")
+                    except:
+                        updating_string = updating_string.replace(foundstring,""+str(data)+"")
+                else: #uncalculatable, add as string
+                    try:
+                        updating_string = updating_string.replace(foundstring,""+data+"")
+                    except:
+                        updating_string = updating_string.replace(foundstring,""+str(data)+"")
+        except KeyError:
+            pass
         #Replace backslashes since they're escapechars
         updating_string_backslash = updating_string.replace('\\','\\\\')
         
@@ -804,7 +810,7 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
         if valueVarOrAdv == 'Variable':
             evaluatedVar = nodz_evaluateVar(finalValue,nodzInfo)
         elif valueVarOrAdv == 'Advanced':
-            evaluatedVar = nodz_evaluateAdv(finalValue,nodzInfo)
+            evaluatedVar = nodz_evaluateAdv(finalValue,nodzInfo,skipEval = dontEvaluate)
         else:
             evaluatedVar = finalValue
         allData[var] = [evaluatedVar,finalValue,valueVarOrAdv]

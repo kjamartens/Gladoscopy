@@ -2,7 +2,22 @@
     "CONNECTIONS": [],
     "DECISION_WIDGET_INFO": {
         "PYQTentries": {
-            "": "DirectDecision and Advanced"
+            "": "DirectDecision and Advanced",
+            "directDecision_AND_Score_VAR__dropdown_1": ">",
+            "directDecision_AND_Score_VAR__dropdown_2": ">",
+            "directDecision_AND_Score_VAR__dropdown_3": ">",
+            "directDecision_AND_Score_VAR__dropdown_4": ">",
+            "directDecision_AND_Score_VAR__dropdown_5": ">",
+            "directDecision_AND_Score_VAR__lineedit_1": "",
+            "directDecision_AND_Score_VAR__lineedit_2": "",
+            "directDecision_AND_Score_VAR__lineedit_3": "",
+            "directDecision_AND_Score_VAR__lineedit_4": "",
+            "directDecision_AND_Score_VAR__lineedit_5": "",
+            "directDecision_AND_Score_VAR__varName_1": "",
+            "directDecision_AND_Score_VAR__varName_2": "",
+            "directDecision_AND_Score_VAR__varName_3": "",
+            "directDecision_AND_Score_VAR__varName_4": "",
+            "directDecision_AND_Score_VAR__varName_5": ""
         },
         "currentDecision": "AND_Score",
         "currentMode": "DirectDecision"
@@ -95,11 +110,11 @@
             ],
             "displayName": "Acquisition",
             "position": [
-                372.27976019075595,
-                358.21597567756777
+                468.0580173880546,
+                350.23445424445964
             ],
             "preset": "acquisition",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">10 frames with order t</span><br />90.0 ms exposure time<br />10 time points</p></body></html>",
             "textboxheight": 50
         },
         "analysisMeasurementDEBUG_0": {
@@ -121,17 +136,6 @@
                     "bottomAttr": false,
                     "dataType": null,
                     "name": "Finished",
-                    "plug": true,
-                    "plugMaxConnections": -1,
-                    "preset": "attr_preset_1",
-                    "socket": false,
-                    "socketMaxConnections": -1,
-                    "topAttr": false
-                },
-                {
-                    "bottomAttr": false,
-                    "dataType": null,
-                    "name": "Output",
                     "plug": true,
                     "plugMaxConnections": -1,
                     "preset": "attr_preset_1",
@@ -200,12 +204,12 @@
             ],
             "displayName": "Analysis [Measurement]",
             "position": [
-                990.7117115458916,
-                421.279760190756
+                1820.7899405891471,
+                491.7335637735265
             ],
             "preset": "analysisMeasurement",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
-            "textboxheight": 50
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">StarDist_image: StarDistSegment_ImageVis</span><br />Input:<br /><span style=\" font-weight:600;\">modelStorageLoc</span>: <br /><span style=\" font-style:italic;\">prob_thresh</span>: <br /><span style=\" font-style:italic;\">nms_thresh</span>: <br /><br />Output:<br /><span style=\" font-weight:600;\">segmented_image</span>: None<br /><span style=\" font-weight:600;\">n_segmented_cells</span>: None<br /><span style=\" font-weight:600;\">details</span>: None</p></body></html>",
+            "textboxheight": 151
         },
         "caseSwitch_0": {
             "alternate": true,
@@ -312,7 +316,7 @@
                 527.2700666993015
             ],
             "preset": "changeProperties",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Changing 1 config(s):<br />XYStageSpeed to Fast</p></body></html>",
             "textboxheight": 50
         },
         "changeStagePos_0": {
@@ -348,7 +352,7 @@
                 454.03470403882494
             ],
             "preset": "changeStagePos",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:#a00000;\">Double-click this node to initialize it correctly.</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Relative</span> movement of stage <span style=\" font-weight:600;\">TIPFSOffset</span> by <span style=\" font-weight:600;\">10.0</span> units</p></body></html>",
             "textboxheight": 50
         },
         "customFunction_0": {
@@ -675,20 +679,20 @@
     "NODES_MDA": {
         "ANDlogic_0": {},
         "acquisition_0": {
-            "GUI_channel_enabled": "True",
+            "GUI_channel_enabled": "False",
             "GUI_exposure_enabled": "True",
             "GUI_order_enabled": "True",
-            "GUI_show_channel": "True",
+            "GUI_show_channel": "False",
             "GUI_show_exposure": "True",
             "GUI_show_order": "True",
-            "GUI_show_storage": "True",
+            "GUI_show_storage": "False",
             "GUI_show_time": "True",
-            "GUI_show_xy": "True",
-            "GUI_show_z": "True",
-            "GUI_storage_enabled": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "False",
+            "GUI_storage_enabled": "False",
             "GUI_time_enabled": "True",
-            "GUI_xy_enabled": "True",
-            "GUI_z_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_z_enabled": "False",
             "_GUI_grid_width": "7",
             "autoSaveLoad": "False",
             "channel_exposures_ms": [],
@@ -698,11 +702,62 @@
             "exposure_s_or_ms": "ms",
             "fully_started": "True",
             "has_GUI": "True",
-            "lastTimeUpdateSize": "1719417076.762417",
-            "mda": [],
+            "lastTimeUpdateSize": "1719417501.9594772",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "5"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "6"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "7"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "8"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "9"
+                    }
+                }
+            ],
             "mda_analysis_thread": null,
             "num_time_points": "10",
-            "order": "tpcz",
+            "order": "t",
             "position_labels": null,
             "storage_file_name": "",
             "storage_folder": "",
@@ -751,7 +806,12 @@
         "analysisMeasurement_0": {},
         "caseSwitch_0": {},
         "changeGlobalVar_0": {},
-        "changeProperties_0": [],
+        "changeProperties_0": [
+            [
+                "XYStageSpeed",
+                "Fast"
+            ]
+        ],
         "changeStagePos_0": [],
         "customFunction_0": {},
         "newGlobalVar_0": {},
@@ -788,7 +848,24 @@
         "caseSwitch_0": {},
         "changeGlobalVar_0": {},
         "changeProperties_0": [],
-        "changeStagePos_0": [],
+        "changeStagePos_0": [
+            [
+                "TIRF1DStage",
+                10.0
+            ],
+            [
+                "TIZDrive",
+                10.0
+            ],
+            [
+                "TIPFSOffset",
+                10.0
+            ],
+            [
+                "__chosenRelStage__",
+                "TIPFSOffset"
+            ]
+        ],
         "customFunction_0": {},
         "newGlobalVar_0": {},
         "realTimeAnalysis_0": {},
