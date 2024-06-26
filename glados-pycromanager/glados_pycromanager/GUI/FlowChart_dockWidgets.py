@@ -2055,6 +2055,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the results of this dialog into the nodz node
                 self.changeRelStageStorageInNodz(currentNode,dialog.RelStageInfo())
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'changeStagePos')
                 
         elif 'analysisMeasurement' in nodeName or 'analysisMeasurementDEBUG' in nodeName:
             currentNode = self.findNodeByName(nodeName)
@@ -2646,7 +2647,16 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 displayHTMLtext += f"<br><i>{okw}</i>: {allValues[okw][0]}"
             
             displayHTMLtext += "<br><br>Output: TODO"
-            
+        elif nodeType == "changeStagePos":
+            #Find the chosen stage and corresponding set movement (relative only for now)
+            for key in dialog.RelStageInfo():
+                if key[0] == '__chosenRelStage__':
+                    chosenStage = key[1]
+            for key in dialog.RelStageInfo():
+                if key[0] == chosenStage:
+                    setMovement = key[1]
+            #Set the displayHTML text:
+            displayHTMLtext = "<b>Relative</b> movement of stage <b>"+chosenStage+"</b> by <b>"+str(setMovement)+"</b> units"
         #And update the display
         currentNode.updateDisplayText(displayHTMLtext)
         return displayHTMLtext

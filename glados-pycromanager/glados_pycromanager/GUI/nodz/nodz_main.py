@@ -1778,11 +1778,20 @@ class NodeItem(QtWidgets.QGraphicsItem):
         h = self.textboxheight
         
         td = QTextDocument()
+        from PyQt5.QtGui import QTextOption
+
+        text_option = QTextOption()
+        text_option.setAlignment(Qt.AlignLeft)
+        text_option.setWrapMode(QTextOption.WordWrap)  # Add WordWrap
+        td.setDefaultTextOption(text_option)
+        
         textToDisplay = ''
         if new_display_text is not None:
             textToDisplay = new_display_text
         td.setHtml(textToDisplay)
-                
+        td.setTextWidth(self.boundingRect().width() - 2 * self.textboxborder)
+        #Fit the text to the textbox (i.e. line-wrapping)
+        
         #Change the textbox height so the text fits, capped at 300 px
         self.textboxheight = int(min(300,max(50,td.size().height())))
         self.update()
@@ -2449,6 +2458,14 @@ class NodeItem(QtWidgets.QGraphicsItem):
             textToDisplay = self.displayText
         
         td.setHtml(textToDisplay)
+        
+        from PyQt5.QtGui import QTextOption
+        text_option = QTextOption()
+        text_option.setAlignment(Qt.AlignLeft)
+        text_option.setWrapMode(QTextOption.WordWrap)  # Add WordWrap
+        td.setDefaultTextOption(text_option)
+        td.setTextWidth(self.boundingRect().width() - 2 * self.textboxborder)
+        
         ctx = QAbstractTextDocumentLayout.PaintContext()
         ctx.clip = QRectF(0,0, w, h)
         
