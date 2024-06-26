@@ -227,7 +227,7 @@ class MMConfigWidget(GladosWidget):
         self.setMinimumSize(200, 200)
         self.setBaseSize(200,200)
         
-        logging.info("dockWidget_MMConfig started")
+        logging.debug("dockWidget_MMConfig started")
 
     def resizeEvent(self, event):
         """"
@@ -260,7 +260,7 @@ class MDAWidget(GladosWidget):
         self.setMinimumSize(200, 200)
         self.setBaseSize(200,200)
         
-        logging.info("dockwidget_MDA started")
+        logging.debug("dockwidget_MDA started")
 
     def resizeEvent(self, event):
         """"
@@ -289,7 +289,7 @@ class AutonomousMicroscopyWidget(GladosWidget):
         self.dockWidget = autonomousMicroscopy_plugin(self) #type:ignore
         
         self.setLayout(self.dockWidget)
-        logging.info("dockWidget_AutonomousMicroscopy started")
+        logging.debug("dockWidget_AutonomousMicroscopy started")
     
     def resizeEvent(self, event):
         """"
@@ -314,7 +314,7 @@ class GladosSlidersWidget(GladosWidget):
         self.dockWidget = gladosSliders_plugin(self) #type:ignore
         
         self.setLayout(self.dockWidget)
-        logging.info("dockWidget_GladosSliders started")
+        logging.debug("dockWidget_GladosSliders started")
     
     def resizeEvent(self, event):
         """"

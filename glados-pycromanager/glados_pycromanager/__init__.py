@@ -76,7 +76,6 @@ class Worker(QObject):
 
 def run_glados_pycromanager():
     
-    print('INIT glados_pycromanager')
     cleanUpTemporaryFiles()
     
     #Set up logging at correct level
@@ -121,7 +120,7 @@ def run_glados_pycromanager():
     # worker.finished.connect(worker.deleteLater)
     # thread.finished.connect(thread.deleteLater)
     
-    print('INIT glados_pycromanager complete')
+    logging.info('INIT glados_pycromanager complete')
 
 #Import qwidget:
 from PyQt5.QtWidgets import QWidget
@@ -168,7 +167,6 @@ class AllNapariPycroManagerWidgets():
         # livestate = None
         # napariViewer = None
         # shared_data = None
-        # print('RUN NAPARI PYCROMANAGER PLUGIN')
         # logging.info("p1")
             
         # #Set up logging at correct level
@@ -242,4 +240,4 @@ class AllNapariPycroManagerWidgets():
         
         # # breakpoint
         # return returnInfo
-        print('END NAPARI PYCROMANAGER PLUGIN')
+        logging.info('END NAPARI PYCROMANAGER PLUGIN')

@@ -1,7 +1,7 @@
 import os
 import re
 import json
-
+import logging
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction, QGraphicsSceneMouseEvent, QCheckBox
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent
@@ -128,7 +128,7 @@ class Nodz(QtWidgets.QGraphicsView):
         context_menu.exec_(QMouseevent.globalPos())
         
     def createNewNode(self,event,name):
-        print(event)
+        logging.debug(event)
         NodeZ = self.createNode(name=name, preset='node_preset_1', position=self.mapToScene(event.pos()))
     
     def mousePressEvent(self, event):
@@ -565,8 +565,8 @@ class Nodz(QtWidgets.QGraphicsView):
         """
         # Check for name clashes
         if name in self.scene().nodes.keys(): #type:ignore
-            print('A node with the same name already exists : {0}'.format(name))
-            print('Node creation aborted !')
+            logging.error('A node with the same name already exists : {0}'.format(name))
+            logging.error('Node creation aborted !')
             return
         else:
             nodeItem = NodeItem(name=name, alternate=alternate, preset=preset,
@@ -605,8 +605,8 @@ class Nodz(QtWidgets.QGraphicsView):
 
         """
         if not node in self.scene().nodes.values(): #type:ignore
-            print('Node object does not exist !')
-            print('Node deletion aborted !')
+            logging.error('Node object does not exist !')
+            logging.error('Node deletion aborted !')
             return
 
         if node in self.scene().nodes.values(): #type:ignore
@@ -628,8 +628,8 @@ class Nodz(QtWidgets.QGraphicsView):
 
         """
         if not node in self.scene().nodes.values(): #type:ignore
-            print('Node object does not exist !')
-            print('Node edition aborted !')
+            logging.error('Node object does not exist !')
+            logging.error('Node edition aborted !')
             return
 
         oldName = node.name
@@ -637,8 +637,8 @@ class Nodz(QtWidgets.QGraphicsView):
         if newName != None:
             # Check for name clashes
             if newName in self.scene().nodes.keys(): #type:ignore
-                print('A node with the same name already exists : {0}'.format(newName))
-                print('Node edition aborted !')
+                logging.error('A node with the same name already exists : {0}'.format(newName))
+                logging.error('Node edition aborted !')
                 return
             else:
                 node.name = newName
@@ -718,13 +718,13 @@ class Nodz(QtWidgets.QGraphicsView):
 
         """
         if not node in self.scene().nodes.values(): #type:ignore
-            print('Node object does not exist !')
-            print('Attribute creation aborted !')
+            logging.error('Node object does not exist !')
+            logging.error('Attribute creation aborted !')
             return
 
         if name in node.attrs:
-            print('An attribute with the same name already exists : {0}'.format(name))
-            print('Attribute creation aborted !')
+            logging.error('An attribute with the same name already exists : {0}'.format(name))
+            logging.error('Attribute creation aborted !')
             return
 
         node._createAttribute(name=name, index=index, preset=preset, plug=plug, socket=socket, bottomAttr=bottomAttr, topAttr=topAttr, dataType=dataType, plugMaxConnections=plugMaxConnections, socketMaxConnections=socketMaxConnections)
@@ -744,8 +744,8 @@ class Nodz(QtWidgets.QGraphicsView):
 
         """
         if not node in self.scene().nodes.values(): #type:ignore
-            print('Node object does not exist !')
-            print('Attribute deletion aborted !')
+            logging.error('Node object does not exist !')
+            logging.error('Attribute deletion aborted !')
             return
 
         node._deleteAttribute(index)
@@ -771,14 +771,14 @@ class Nodz(QtWidgets.QGraphicsView):
 
         """
         if not node in self.scene().nodes.values(): #type:ignore
-            print('Node object does not exist !')
-            print('Attribute creation aborted !')
+            logging.error('Node object does not exist !')
+            logging.error('Attribute creation aborted !')
             return
 
         if newName != None:
             if newName in node.attrs:
-                print('An attribute with the same name already exists : {0}'.format(newName))
-                print('Attribute edition aborted !')
+                logging.error('An attribute with the same name already exists : {0}'.format(newName))
+                logging.error('Attribute edition aborted !')
                 return
             else:
                 oldName = node.attrs[index]
@@ -1083,9 +1083,9 @@ class Nodz(QtWidgets.QGraphicsView):
         try:
             utils._saveData(filePath=filePath, data=data)
         except Exception as e:
-            print(e)
-            print('Invalid path : {0}'.format(filePath))
-            print('Save aborted !')
+            logging.error(e)
+            logging.error('Invalid path : {0}'.format(filePath))
+            logging.error('Save aborted !')
             return False
 
         # Emit signal.
@@ -1104,8 +1104,8 @@ class Nodz(QtWidgets.QGraphicsView):
         if os.path.exists(filePath):
             data = utils._loadData(filePath=filePath)
         else:
-            print('Invalid path : {0}'.format(filePath))
-            print('Load aborted !')
+            logging.error('Invalid path : {0}'.format(filePath))
+            logging.error('Load aborted !')
             return False
 
         # Apply nodes data.
@@ -1375,8 +1375,8 @@ class Nodz(QtWidgets.QGraphicsView):
         if os.path.exists(filePath):
             data = utils._loadData(filePath=filePath)
         else:
-            print('Invalid path : {0}'.format(filePath))
-            print('Load aborted !')
+            logging.error('Invalid path : {0}'.format(filePath))
+            logging.error('Load aborted !')
             return False
 
         # Apply nodes data.
@@ -1843,7 +1843,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
                     else:
                         self.callAction(self)
         else:
-            logging.info(f"AND NODE now has {self.n_connect_at_start_finished} connections ouf of {self.n_connect_at_start}")
+            logging.debug(f"AND NODE now has {self.n_connect_at_start_finished} connections ouf of {self.n_connect_at_start}")
             #OLD, AND-based logic
             if self.n_connect_at_start_finished == self.n_connect_at_start:
                 self.n_connect_at_start_finished = 0 #to allow for looping :)
@@ -1860,12 +1860,12 @@ class NodeItem(QtWidgets.QGraphicsItem):
                         self.callAction(self)
 
     def finishedmda(self):
-        print('finishedmda ran')
+        logging.debug('finishedmda ran')
         self.status = 'finished'
         # self.update()
-        logging.info('MDA finished within node')
+        logging.debug('MDA finished within node')
         #MDA data is stored as self.mdaData.data
-        logging.info(self.name)
+        logging.debug(self.name)
 
     @property
     def height(self):
@@ -2006,8 +2006,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         """
         if name in self.attrs:
-            print('An attribute with the same name already exists on this node : {0}'.format(name))
-            print('Attribute creation aborted !')
+            logging.error('An attribute with the same name already exists on this node : {0}'.format(name))
+            logging.error('Attribute creation aborted !')
             return
 
         self.attrPreset = preset
@@ -2504,17 +2504,17 @@ class NodeItem(QtWidgets.QGraphicsItem):
         # if self.nodePreset == 'acquisition':
         #     dialog = nodz_openMDADialog(parentData=self.scene().views()[0])
         #     if dialog.exec_() == QDialog.Accepted:
-        #         print(dialog.getInputs())
-        #     print('hmm')
+        #         logging.info(dialog.getInputs())
+        #     logging.info('hmm')
         # else:
         #     #Open a Dialog on double click
         #     dialog = FoVFindImaging_singleCh_configs(parentData=self.scene().views()[0])
         #     #Get the outputs from the dialog
         #     if dialog.exec_() == QDialog.Accepted:
-        #         print(dialog.getInputs())
+        #         logging.info(dialog.getInputs())
         #     #     text, combo_value = dialog.getInputs()
-        #     #     print("Text:", text)
-        #     #     print("Combo Value:", combo_value)
+        #     #     logging.info("Text:", text)
+        #     #     logging.info("Combo Value:", combo_value)
         
         # # #Update the node text from this dialog output:
         # self.scene().parent().editNodeDisplayText(self, newDisplayText=str(dialog.getInputs())) #type:ignore
@@ -3084,7 +3084,7 @@ class SocketItem(SlotItem):
 class BottomAttrItem(PlugItem):
     def __init__(self, parent, attribute, index, preset, dataType, maxConnections):
         super(BottomAttrItem, self).__init__(parent, attribute, index, preset, dataType, maxConnections)
-        print('bottom attr created')
+        logging.debug('bottom attr created')
         self.attributte = attribute
         self.preset = preset
         self.slotType = 'bottomAttr'
@@ -3118,7 +3118,7 @@ class BottomAttrItem(PlugItem):
 class TopAttrItem(SocketItem):
     def __init__(self, parent, attribute, index, preset, dataType, maxConnections):
         super().__init__(parent, attribute, index, preset, dataType, maxConnections)
-        print('top attr created')
+        logging.debug('top attr created')
         self.slotType = 'topAttr'
         
     def boundingRect(self):

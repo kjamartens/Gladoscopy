@@ -127,7 +127,7 @@ def napariUpdateLive(DataStructure):
                             
                     #Remove the layer if the dimensions are wrong
                     if correctDimensions == False:
-                        logging.info('removing mdaZarrData - looping over layers')
+                        logging.debug('removing mdaZarrData - looping over layers')
                         #Remove the mdaZarrData array and ensure that we create a new layer
                         for tLayerIndex in range(0,len(napariViewer.layers)):
                             tLayer = napariViewer.layers[tLayerIndex]
@@ -143,9 +143,9 @@ def napariUpdateLive(DataStructure):
             #If it's the first layer
             if not liveImageLayer:
                 if layerName is not 'Live':
-                    logging.info(f'creating layer with name {layerName} via multiDstack method')
+                    logging.debug(f'creating layer with name {layerName} via multiDstack method')
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-                    logging.info(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
+                    logging.debug(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
                     
                     shape = n_entries_in_dims
                     shared_data.mdaZarrData[layerName] = zarr.open(
@@ -183,7 +183,7 @@ def napariUpdateLive(DataStructure):
             #Else if the layer already exists, replace it!
             else:
                 if layerName is not 'Live':
-                    # logging.info(f'updating layer with name {layerName} via multiDstack method')
+                    # logging.debug(f'updating layer with name {layerName} via multiDstack method')
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
                     
                     #Determine in which multi-D slice the image should be added:
@@ -254,11 +254,11 @@ def napariUpdateLive(DataStructure):
                             sliceTuple += (int(currentSliceID),)
                         #Put it in
                         shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage 
-                        logging.info(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
+                        logging.debug(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
                     except:
-                        logging.info(f'Entry {expectedEntry} tried, but not acquired')
+                        logging.debug(f'Entry {expectedEntry} tried, but not acquired')
             
-            logging.info('Finalised up visualisation...')
+            logging.debug('Finalised up visualisation...')
             #Move to the end
             # napariViewer.dims.set_point(0,timeslice)
             shared_data._busy = False
@@ -289,7 +289,7 @@ def napariUpdateAnalysisThreads(DataStructure):
         #Start all analysisthreads
         for analysisThread in analysisThreads:
             if not analysisThread.isRunning():
-                logging.info(f'starting analysis thread: {analysisThread}')
+                logging.debug(f'starting analysis thread: {analysisThread}')
                 analysisThread.start()
 
 
@@ -317,7 +317,7 @@ class napariHandler():
         self.layerName = 'newLayer'
 
     def mdaacqdonefunction(self):
-        logging.info('mdaacqdonefunction called in napariHandler')
+        logging.debug('mdaacqdonefunction called in napariHandler')
         self.shared_data.mdaacqdonefunction()
         
     def grab_image(self,image, metadata, event_queue):
@@ -344,9 +344,9 @@ class napariHandler():
             event_queue.put(None)
             try:
                 acq.abort()
-                logging.info('aborted acquisition')
+                logging.debug('aborted acquisition')
             except:
-                logging.info('attemped to abort acq')
+                logging.debug('attemped to abort acq')
         
         return image, metadata
 
@@ -390,26 +390,23 @@ class napariHandler():
                     time.sleep(1)
                     
                 #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-                logging.info('starting MDA acq - before JavaBackendAcquisition')
+                logging.debug('starting MDA acq - before JavaBackendAcquisition')
                 savefolder = './temp'
                 savename = 'MdaAcqShouldBeRemoved'
-                print('-------------------------------MDAACQ---------------------------------')
                 if shared_data._mdaModeSaveLoc[0] != '':
                     savefolder = shared_data._mdaModeSaveLoc[0]
                     
                     savefolderAdv = utils.nodz_evaluateAdv(savefolder,shared_data.nodzInstance)
                     if savefolderAdv != None:
                         savefolder = savefolderAdv
-                    print('----------------------------------------------------------------')
-                    print(savefolder)
+                    logging.debug(savefolder)
                     
                 if shared_data._mdaModeSaveLoc[1] != '':
                     savename = shared_data._mdaModeSaveLoc[1]
                     savenameAdv = utils.nodz_evaluateAdv(savename,shared_data.nodzInstance)
                     if savenameAdv != None:
                         savename = savenameAdv
-                    print('----------------------------------------------------------------')
-                    print(savename)
+                    logging.debug(savename)
                 if shared_data._mdaModeNapariViewer != None:
                     napariViewer = shared_data._mdaModeNapariViewer
                     showdisplay = True
@@ -429,7 +426,7 @@ class napariHandler():
                 self.acqstate = False #End the MDA acq state
                 self.shared_data.appendNewMDAdataset(acq.get_dataset())
 
-            logging.info('Stopping the acquisition from napariHandler')
+            logging.debug('Stopping the acquisition from napariHandler')
             #Now we're after the acquisition
             self.shared_data.core.stop_sequence_acquisition()
             self.shared_data.mdaMode = False
@@ -509,7 +506,7 @@ class napariHandler():
         #Do the final N images
         if self.shared_data.globalData['MDAVISMETHOD'] == 'multiDstack':
             if layerName == 'MDA':
-                logging.info('Finalising MDA visualisation...')
+                logging.debug('Finalising MDA visualisation...')
                 DataStructure = {}
                 DataStructure['data'] = None
                 DataStructure['napariViewer'] = self.shared_data.napariViewer
@@ -533,7 +530,7 @@ class napariHandler():
         
         Is called, and shared_data.liveMode should be changed seperately from running this funciton
         """
-        logging.info('acqModeChanged called from napariHandler')
+        logging.debug('acqModeChanged called from napariHandler')
         if newSharedData is not None:
             global napariViewer, shared_data, Core
             self.shared_data = newSharedData
@@ -700,7 +697,6 @@ class dockWidget_flowChart(dockWidgets):
         
         #Add the full micro manager controls UI
         self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
-        print('asdf')
 
 #--- below here not fully necessary---
 # class dockWidget_mdaAnalysisScoringTest(dockWidgets):
@@ -721,7 +717,7 @@ class dockWidget_flowChart(dockWidgets):
 
 class dockWidget_fullGladosUI(dockWidgets):
     def __init__(self): 
-        logging.info("dockWidget_fullGladosUI started")
+        logging.debug("dockWidget_fullGladosUI started")
         super().__init__()
         # #new QWidget:
         tempWidget = QMainWindow()
@@ -741,7 +737,7 @@ class dockWidget_fullGladosUI(dockWidgets):
             
         runlaserControllerUI(core,MM_JSON,ui,shared_data)
         #Run the laserController UI
-        print("dockWidget_fullGladosUI halfway")
+        logging.debug("dockWidget_fullGladosUI halfway")
         
         #
         #Create a Vertical+horizontal layout:
@@ -755,7 +751,6 @@ class dockWidget_fullGladosUI(dockWidgets):
         
         self.dockWidget = self.layout.addLayout(self.dockwidgetLayout,0,0)
 
-        print('adsf')
         
 
 def startLiveModeVisualisation(shared_data,layerName='Live'):
@@ -815,7 +810,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     # custom_widget_analysisThreads = dockWidget_analysisThreads()
     # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
     
-    print('In runNapariPycroManager')
+    logging.debug('In runNapariPycroManager')
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)

@@ -16,7 +16,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import time
 from PyQt5.QtCore import QTimer,QDateTime
-
+import logging
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # General switching functions - MM hooks
@@ -25,7 +25,7 @@ def timerloop(frameduration):
     getFrameTimeInfo(frameduration);
 
 def updateColorArming(Boolean):
-    #print('Updating Warning'+str(Boolean))
+    #logging.debug('Updating Warning'+str(Boolean))
     if Boolean == True:
         form.ARMlaserTriggerPushButton.setStyleSheet("color:red;")
     else:
@@ -40,7 +40,7 @@ def getFrameTimeInfo(frameduration):
         if frameduration_new != frameduration:
             drawplot(frameduration_new)
     except:
-        print('No plot drawn')
+        logging.warning('No plot drawn')
     return frameduration_new
 
 def SwitchOffLaser(laserID):
@@ -226,15 +226,15 @@ def addToVerboseBoxText(text):
 def TS_Response_verbose():
     core.get_property('TriggerScopeMM-Hub', 'Serial Receive');
     addToVerboseBoxText(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
-    print(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
+    logging.debug(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Laser trigger drawing functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def drawplot(frameduration):
-    #print('CallingDrawPlot')
+    #logging.debug('CallingDrawPlot')
     #We're changing something, so warning user that it's not yet armed
     updateColorArming(1);
-    #print(frameduration)
+    #logging.debug(frameduration)
     #Initialise graph widget
     form.graphWidget.clear()
     form.graphWidget.setBackground('k')
@@ -354,7 +354,7 @@ def initLaserTrigEditBoxes():
 
 #Arm the laser triggering based on boxes input
 def armLaserTriggering():
-    print('NEWARM')
+    logging.debug('NEWARM')
     for i in [0,1,2,3,4]:
         armLaser(i);
     #remove arming warning
@@ -374,22 +374,22 @@ def armLaser(i):
             if length>0: #type:ignore
                 power_level = 65535*0.01*GetIntensityLaser(MM_JSON,i)
                 if i == 2: #Exception for the 561 laser:
-                    print('Power level exception for 561 laser succes')
+                    logging.debug('Power level exception for 561 laser succes')
                     power_level = 65535*0.01*GetIntensityLaser(MM_JSON,i)*(8/100)
-                print('PAO'+str(i+1)+'-0-' + str(round(power_level)))
+                logging.debug('PAO'+str(i+1)+'-0-' + str(round(power_level)))
                 core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-' + str(round(power_level)))
                 TS_Response_verbose();
             else:
-                print('PAO'+str(i+1)+'-0' + str(round(0)))
+                logging.debug('PAO'+str(i+1)+'-0' + str(round(0)))
                 core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-0-' + str(round(0)))
                 TS_Response_verbose();
         else:
             time.sleep(0.1)
-            #print('PAO'+str(i+1)+'-'+str(k)+'-0')
+            #logging.debug('PAO'+str(i+1)+'-'+str(k)+'-0')
             core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(i+1)+'-'+str(k)+'-0')
             TS_Response_verbose();
 
-        #print('PAS'+str(i+1)+'-1-1');
+        #logging.debug('PAS'+str(i+1)+'-1-1');
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
         TS_Response_verbose();
 
@@ -397,8 +397,8 @@ def armLaser(i):
             #if k == nrframesrepeat:
             #    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(i+1)+'-1-1')
             #    TS_Response_verbose();
-            #print(writetgs('PAS2-1-1\r\n')) #Trigger transition at DAC 1 - starting (1 middle) on rising edge (1 end)
-            #print(writetgs('BAO2-1-0\n')) #Add the blanking mode - now it turns off when no high TTL is received
+            #logging.debug(writetgs('PAS2-1-1\r\n')) #Trigger transition at DAC 1 - starting (1 middle) on rising edge (1 end)
+            #logging.debug(writetgs('BAO2-1-0\n')) #Add the blanking mode - now it turns off when no high TTL is received
 
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(i+1)+'-'+str(delay)) #type:ignore
     TS_Response_verbose();
@@ -416,20 +416,20 @@ def blinkUV(duration):
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'SAO9-65535')
     TS_Response_verbose()
     addToVerboseBoxText('UV LED on for '+str(duration)+' microseconds');
-    print('UV LED on for '+str(duration)+' microseconds');
+    logging.info('UV LED on for '+str(duration)+' microseconds');
     time.sleep(duration/1000)
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'SAO9-0')
     TS_Response_verbose()
 
 
 def buttonPressliveStateToggle():
-    print('buttonPressliveStateToggle run')
+    logging.debug('buttonPressliveStateToggle run')
     global shared_data
     if shared_data.liveMode == False:
         shared_data.liveMode = True
     else:
         shared_data.liveMode = False
-    print('livestate now LaserControlScripts ', shared_data.liveMode)
+    logging.debug('livestate now LaserControlScripts ', shared_data.liveMode)
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #End of functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -449,7 +449,7 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         InitLaserSliders(MM_JSON)
         InitFilterWheelRadioCheckbox()
     except:
-        print('Error in InitLaserButtonLabels or InitLaserSliders')
+        logging.debug('Error in InitLaserButtonLabels or InitLaserSliders')
     #Get frametimeinfo
     InitBFRadioCheckbox()
     global frameduration;
@@ -495,7 +495,7 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
             exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
             exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
     except:
-        print("error in execing forms")
+        logging.error("error in execing forms")
     #Arm lasers button
     form.ARMlaserTriggerPushButton.clicked.connect(lambda: armLaserTriggering());
 
@@ -541,6 +541,6 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         #Initialise laser trigger edit buttons
         initLaserTrigEditBoxes();
     except:
-        print("error in resetting laser boxes")
+        logging.error("error in resetting laser boxes")
     
     return form

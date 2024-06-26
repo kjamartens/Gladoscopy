@@ -343,7 +343,7 @@ class AnalysisThread(QThread):
         """
         while not self.isInterruptionRequested():
             #Run analysis on the image from the queue
-            # print(self.image_queue_analysis.get())
+            # logging.debug(self.image_queue_analysis.get())
             self.analysis_result = self.runAnalysis(self.image_queue_analysis.get()) #type:ignore
             self.analysis_done_signal.emit(self.analysis_result)
             # self.finished.emit()
@@ -376,9 +376,9 @@ class AnalysisThread(QThread):
             None
         """
         try:
-            print('Destroying '+str(self.analysisInfo))
+            logging.debug('Destroying '+str(self.analysisInfo))
         except:
-            print('Destroying some analysis thread')
+            logging.debug('Destroying some analysis thread')
         #Wait for the thread to be finished
         self.stop()
         self.requestInterruption()
@@ -466,7 +466,7 @@ class AnalysisThread(QThread):
         if analysis_data is not None:
             analysis_result = analysis_data[0]
             metadata = analysis_data[1]
-            # print(analysis_result)
+            # logging.debug(analysis_result)
             if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
                 if self.visualisationInfo == 'AvgGrayValueText':
                     self.visualiseAvgGrayValueText(analysis_result=analysis_result,metadata=metadata)
@@ -503,15 +503,15 @@ class AnalysisThread(QThread):
     """
     
     def changeStageAtFrame(self,image,metadata=None,core=None,frame=100):
-        print(float(metadata['ImageNumber'])) #type:ignore
+        logging.debug(float(metadata['ImageNumber'])) #type:ignore
         
         if float(metadata['ImageNumber'])>frame and self.notyetchanged == True: #type:ignore
             core.set_relative_position('Z',100.0) #type:ignore
             self.notyetchanged = False
-            print('Z position changed!')
+            logging.debug('Z position changed!')
         
     def initChangeStageAtFrame(self):
-        print('Initted changestageatframe')
+        logging.debug('Initted changestageatframe')
         self.notyetchanged = True
     
     """
@@ -606,7 +606,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
             
     
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
-        # print('visualisation should be updated here :)')
+        # logging.debug('visualisation should be updated here :)')
         utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
         
 #This code gets some image and does some analysis on this
@@ -674,7 +674,7 @@ class AnalysisThread_customFunction(QThread):
         """
         while not self.isInterruptionRequested():
             #Run analysis on the image from the queue
-            # print(self.image_queue_analysis.get())
+            # logging.debug(self.image_queue_analysis.get())
             self.analysis_result = self.runAnalysis(self.image_queue_analysis.get()) #type:ignore
             self.analysis_done_signal.emit(self.analysis_result)
             # self.finished.emit()
@@ -718,9 +718,9 @@ class AnalysisThread_customFunction(QThread):
         """
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         try:
-            print('Destroying '+str(self.analysisInfo))
+            logging.debug('Destroying '+str(self.analysisInfo))
         except:
-            print('Destroying some analysis thread')
+            logging.debug('Destroying some analysis thread')
         #Wait for the thread to be finished
         self.stop()
         self.requestInterruption()
@@ -791,7 +791,7 @@ class AnalysisThread_customFunction(QThread):
     # #And here we perform the visualisation - can be fully separate from performing the analysis
     # #Initialisation is called upon creation
     # def initialise_napariLayer(self):
-    #     print('init_napariLayer')
+    #     logging.debug('init_napariLayer')
             
     # #Update ir called every time the analysis is done
     # def update_napariLayer(self,analysisInfo,image,metadata=None,core=None):
@@ -840,7 +840,7 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
         image_queue_analysis = throughputThread
     else:
         #Create a new analysis thread
-        print('starting new image queue analysis')
+        logging.debug('starting new image queue analysis')
         image_queue_analysis = queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
         if liveorMDA == 'live':
             shared_data.liveImageQueues.append(image_queue_analysis)

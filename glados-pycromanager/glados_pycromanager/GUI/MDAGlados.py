@@ -1255,7 +1255,7 @@ class MDAGlados(CustomMainWindow):
         
         #Set the status of the nodz-coupled vis and real-time to finished, and add nodz-based variables:
         if 'nodeInfo' in vars(self) and self.nodeInfo is not None:
-            logging.info('This MDA acq data was connected to node: ' + self.nodeInfo.name)
+            logging.debug('This MDA acq data was connected to node: ' + self.nodeInfo.name)
             self.updateNodzVariables()
             self.nodeInfo.status='finished'
             self.nodeInfo.flowChart.update()
@@ -1330,7 +1330,7 @@ class MDAGlados(CustomMainWindow):
                             visual_connected_node.status = 'running'
                             break
                 
-                    logging.info('Starting Nodz-MDA visualisation')
+                    logging.debug('Starting Nodz-MDA visualisation')
                     napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
         #And try to get real-time analysis attributes at bottom:
@@ -1440,7 +1440,7 @@ class MDAGlados(CustomMainWindow):
         It stops the MDA acquisition.
         """
         
-        logging.info('ATTEMPTING TO STOP AQCUISITION')
+        logging.info('Attempting to stop MDA')
         #Reset the button
         self.resetMDAbutton(mdaLayerName=mdaLayerName)
         #Abort the mda mode

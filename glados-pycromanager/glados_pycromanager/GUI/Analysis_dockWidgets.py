@@ -51,7 +51,7 @@ class analysisDockWidget:
         self.Button1.clicked.connect(lambda index, s=shared_data: napariGlados.startMDAVisualisation(s))
     
     def startThread(self,analysisInfo):
-        print('Starting analysis ' + analysisInfo)
+        logging.debug('Starting analysis ' + analysisInfo)
         create_analysis_thread(shared_data,analysisInfo=analysisInfo)
 
 def analysis_dockWidget_plugin(MM_JSON,main_layout,napariviewer,parent,sharedData2=None):
@@ -235,7 +235,7 @@ def gladosSliders_plugin(parent):
     MM_JSON = None
     core = shared_data.core
     
-    print("dockWidget_fullGladosUI started")
+    logging.debug("dockWidget_fullGladosUI started")
     
     #new QWidget:
     tempWidget = QMainWindow()
@@ -247,11 +247,11 @@ def gladosSliders_plugin(parent):
     with open("C:/Users/Koen Martens/Documents/GitHub\ScopeGUI/glados-pycromanager/glados_pycromanager/GUI/MM_PycroManager_JSON.json") as f:
         MM_JSON = json.load(f)
     #Run the laserController UI
-    print("dockWidget_fullGladosUI halfway")
+    logging.debug("dockWidget_fullGladosUI halfway")
     from LaserControlScripts import runlaserControllerUI
     runlaserControllerUI(core,MM_JSON,ui,shared_data)
     
-    print("dockWidget_fullGladosUI initted")
+    logging.debug("dockWidget_fullGladosUI initted")
     
     return ui
 

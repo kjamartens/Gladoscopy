@@ -4,7 +4,7 @@ import os
 import logging
 
 def cleanUpTemporaryFiles(mainFolder='./'):
-    logging.info('Cleaning up temporary files')
+    logging.debug('Cleaning up temporary files')
     if os.path.exists(os.path.join(mainFolder,'temp')):
         for folder in os.listdir(os.path.join(mainFolder,'temp')):
             if 'LiveAcqShouldBeRemoved' in folder or 'MdaAcqShouldBeRemoved' in folder:
@@ -657,12 +657,12 @@ def nodz_setVariableToValue(variable,value,nodzInfo):
         
         if type(value) in nodzInfo.globalVariables[variableName]['type']:
             nodzInfo.globalVariables[variableName]['data'] = value
-            logging.info(f"Set global variable {variableName} to {value}")
+            logging.debug(f"Set global variable {variableName} to {value}")
         else:
             try:
                 if type(eval(value)) in nodzInfo.globalVariables[variableName]['type']:
                     nodzInfo.globalVariables[variableName]['data'] = eval(value)
-                    logging.info(f"Set global variable {variableName} to {eval(value)}")
+                    logging.debug(f"Set global variable {variableName} to {eval(value)}")
             except:
                 logging.error(f'Type mismatch in variable setting! {variableName} and {value}')
     return
@@ -1190,8 +1190,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         
     #Hides everything except the current layout
     layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
-    
-    logging.info('done')
     # resetLayout(curr_layout)
 
 import sys
@@ -1350,31 +1348,31 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
         if len(child.objectName().split('#')) > 2:
             #Check if it's the same function and variable:
             if child.objectName().split('#')[1] == functionName and child.objectName().split('#')[2] == kwargName:
-                logging.info('Looking at ' + functionName + ' ' + kwargName)
+                logging.debug('Looking at ' + functionName + ' ' + kwargName)
                 normalVarAdvValue = child.objectName().split('#')[0]
                 if normalVarAdvValue != 'Label' and normalVarAdvValue != 'ComboBoxSwitch':
                     #Hide/show simple/advanced/onlyVar based on the comboBox value:
                     if comboboxvalue == 'Variable':
                         if normalVarAdvValue == 'LineEditVariable' or normalVarAdvValue == 'PushButtonVariable':
                             child.show()
-                            logging.info(f'1Showing {child.objectName()}')
+                            logging.debug(f'1Showing {child.objectName()}')
                         else:
                             child.hide()
-                            logging.info(f'1Hiding {child.objectName()}')
+                            logging.debug(f'1Hiding {child.objectName()}')
                     elif comboboxvalue == 'Advanced':
                         if normalVarAdvValue == 'LineEditAdv' or normalVarAdvValue == 'PushButtonAdv':
                             child.show()
-                            logging.info(f'2Showing {child.objectName()}')
+                            logging.debug(f'2Showing {child.objectName()}')
                         else:
                             child.hide()
-                            logging.info(f'2Hiding {child.objectName()}')
+                            logging.debug(f'2Hiding {child.objectName()}')
                     else:
                         if normalVarAdvValue == 'LineEdit':
                             child.show()
-                            logging.info(f'3Showing {child.objectName()}')
+                            logging.debug(f'3Showing {child.objectName()}')
                         else:
                             child.hide()
-                            logging.info(f'3Hiding {child.objectName()}')
+                            logging.debug(f'3Hiding {child.objectName()}')
     
     # resetLayout(parentObject.mainLayout,currentSelectedFunction)
                     
@@ -1460,7 +1458,7 @@ def checkAndShowWidget(layout, widgetName):
             if widget.objectName() == widgetName:
                 # Widget already exists, unhide it
                 widget.show()
-                logging.info('898 showing widget: '+widget.objectName())
+                logging.debug('898 showing widget: '+widget.objectName())
                 return
         else:
             for index2 in range(item.count()):
@@ -1472,7 +1470,7 @@ def checkAndShowWidget(layout, widgetName):
                     if widget.objectName() == widgetName:
                         # Widget already exists, unhide it
                         widget.show()
-                        logging.info('909 showing widget: '+widget.objectName())
+                        logging.debug('909 showing widget: '+widget.objectName())
                         return
     return False
 
@@ -1732,7 +1730,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
         else:
             methodKwargTypes_method.append('Value')
     
-    logging.info(f'RTeval: {methodKwargTypes_method}')
+    logging.debug(f'RTeval: {methodKwargTypes_method}')
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
@@ -2051,7 +2049,7 @@ def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3, nodzInfo=
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','v3')
-    logging.info(f'RTanalysistext:{evalText}')
+    logging.debug(f'RTanalysistext:{evalText}')
     
     if nodzInfo is not None:
         nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 

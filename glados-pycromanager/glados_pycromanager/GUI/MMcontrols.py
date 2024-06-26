@@ -381,7 +381,7 @@ class MMConfigUI(CustomMainWindow):
         """
         if self.autoSaveLoad:
             if self.fullyLoaded:
-                logging.info('Storing glados state.json')
+                logging.debug('Storing glados state.json')
                 
                 #Store in appdata
                 appdata_folder = os.getenv('APPDATA')

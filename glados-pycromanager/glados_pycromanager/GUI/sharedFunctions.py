@@ -46,13 +46,13 @@ class Shared_data(QObject):
         self.globalData['SLACK']['CHANNEL'] = "glados-bot"
         if self.globalData['SLACK']['TOKEN'] is not None and not len(self.globalData['SLACK']['TOKEN']) == 0:
             self.globalData['SLACK']['CLIENT'] = slack.WebClient(token=self.globalData['SLACK']['TOKEN'])
-            logging.info('Slack client initialised')
+            logging.debug('Slack client initialised')
         self.globalData['MDAVISMETHOD'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
     
     def mdaacqdonefunction(self):
-        logging.info('mda acq done in shared_data')
+        logging.debug('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)
         
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
@@ -80,7 +80,7 @@ class Shared_data(QObject):
             self._mdaMode = new_value
             self.on_mdaMode_value_change()
     def on_mdaMode_value_change(self):
-        logging.info('shared_data.mdaMode changed to '+str(self._mdaMode))
+        logging.debug('shared_data.mdaMode changed to '+str(self._mdaMode))
         time.sleep(0.1)
         self._mdamodeNapariHandler.acqModeChanged(newSharedData=self)
     
@@ -110,7 +110,7 @@ class Shared_data(QObject):
             removed_entry = [entry for entry in self.analysisThreads if entry not in self._analysisThreads][0]
         logging.debug('Analysis Threads now: ' + str(self._analysisThreads))
         if removed_entry is not None:
-            logging.info('Removed entry: ' + str(removed_entry))
+            logging.debug('Removed entry: ' + str(removed_entry))
         
     #core property        
     @property
@@ -152,7 +152,7 @@ class Shared_data(QObject):
             self._busy = new_value
             self.on_busy_value_change()
     def on_busy_value_change(self):
-        logging.info(f"shared_data.busy changed to {self._busy}")
+        logging.debug(f"shared_data.busy changed to {self._busy}")
     
     def appendNewMDAdataset(self,mdadataset):
         self.mdaDatasets.append(mdadataset)

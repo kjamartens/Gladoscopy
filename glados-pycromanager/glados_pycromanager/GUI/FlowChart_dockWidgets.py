@@ -591,7 +591,7 @@ class nodz_openMMConfigDialog(QDialog):
             self.newConfigUI = MMConfigUI(parentNode.MMconfigInfo.config_groups, showConfigs=parentNode.MMconfigInfo.showConfigs,showShutterOptions=parentNode.MMconfigInfo.showShutterOptions, showLiveSnapExposureButtons=parentNode.MMconfigInfo.showLiveSnapExposureButtons, showROIoptions =parentNode.MMconfigInfo.showROIoptions, showStages=parentNode.MMconfigInfo.showStages, showCheckboxes=parentNode.MMconfigInfo.showCheckboxes,changes_update_MM=parentNode.MMconfigInfo.changes_update_MM,showRelativeStages=parentNode.MMconfigInfo.showRelativeStages,autoSaveLoad=False)
             
             if parentNode.MMconfigInfo.changes_update_MM:
-                print('WARNING! Nodz is actually changing the configs real-time rather than only when they are ran!')
+                logging.warning('WARNING! Nodz is actually changing the configs real-time rather than only when they are ran!')
             
             #Change some configs that are stored from last time this node was openend:
             if storedConfigsStrings is not None and len(storedConfigsStrings)>0:
@@ -1376,7 +1376,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 # global core, napariViewer
                 napariViewer = shared_data.napariViewer
             except:
-                print('Line 1372 fails')
+                logging.warning('Line 1372 fails')
         
         self.parent = parent
         
@@ -1892,13 +1892,16 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'realTimeAnalysis':
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'visualisation':
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'changeProperties':
             #attach MMconfigUI to this:
             # Get all config groups
@@ -1915,7 +1918,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'changeStagePos':
             # Get all config group s
             allConfigGroups={}
@@ -1929,7 +1933,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callAction = lambda self, node=newNode: self.MMstageChangeRan(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within 
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'analysisGrayScaleTest':
             newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1943,7 +1948,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.scoring_analysis_currentData=dialog.currentData
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'analysisMeasurement':
             newNode.callAction = lambda self, node=newNode: self.AnalysisNode_started(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -1954,7 +1960,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.scoring_analysis_currentData=dialog.currentData
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'analysisMeasurementDEBUG':
             #This is a DEBUG type of analysis measurement which blocks the main thread, but allows for easier debugging.
             newNode.callAction = lambda self, node=newNode: self.AnalysisNode_DEBUG_started(node)
@@ -1966,49 +1973,57 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.scoring_analysis_currentData=dialog.currentData
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'timer':
             newNode.callAction = lambda self, node=newNode: self.timerCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'storeData':
             newNode.callAction = lambda self, node=newNode: self.storeDataCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'changeGlobalVar':
             newNode.callAction = lambda self, node=newNode: self.changeGlobalVarCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'newGlobalVar':
             newNode.callAction = lambda self, node=newNode: self.newGlobalVarCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'runInlineScript':
             newNode.callAction = lambda self, node=newNode: self.runInlineScriptCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'caseSwitch':
             newNode.callAction = lambda self, node=newNode: self.runCaseSwitchCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'slackReport':
             newNode.callAction = lambda self, node=newNode: self.runslackReportCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'scoringStart':
             newNode.callAction = lambda self, node=newNode: self.scoringStart(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -2036,7 +2051,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'caseSwitch':
             #Initialise text on the node with a 'double-click this to set the settings!' text:
-            self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         else:
             newNode.callAction = None
 
@@ -2131,7 +2147,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
                 except:
                     logging.warning('Failed to set text in analysisMeasurementDialog')
-                logging.info('Pressed OK on analysisMeasurementDialog')
+                logging.debug('Pressed OK on analysisMeasurementDialog')
         elif 'customFunction' in nodeName:
             currentNode = self.findNodeByName(nodeName)
             dialog = nodz_customFunctionDialog(currentNode = currentNode, parent = self)
@@ -2144,7 +2160,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'customFunction')
                 except:
                     logging.warning('Failed to set text in analysisMeasurementDialog')
-                logging.info('Pressed OK on customFunctionDialog')
+                logging.debug('Pressed OK on customFunctionDialog')
             
             
         elif 'realTimeAnalysis' in nodeName:
@@ -2158,7 +2174,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.real_time_analysis_currentData['__realTimeVisualisation__'] = dialog.visualisationBox.isChecked() #type:ignore 
                 currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'RTanalysisMeasurement')
-                logging.info('Pressed OK on RTanalysis')
+                logging.debug('Pressed OK on RTanalysis')
                 
         elif 'timer' in nodeName:
             dialog = nodz_openTimerDialog(parentNode=currentNode) #type:ignore
@@ -2220,7 +2236,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             dialog = nodz_slackReportDialog(parentNode=currentNode) #type:ignore
             if dialog.exec_() == QDialog.Accepted:
                 currentNode.slackReportInfo = dialog.slackReportInfo
-                logging.info('Pressed OK on caseSwitch')
+                logging.debug('Pressed OK on caseSwitch')
             # currentNode.callAction(self) #type:ignore
         
         elif 'scoringStart' in nodeName:
@@ -2230,7 +2246,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 #Update the decisionwidget:
                 self.decisionWidget.updateAllDecisions()
-                logging.info('Pressed OK on scoringEndVar')
+                logging.debug('Pressed OK on scoringEndVar')
         elif 'scoringEnd' in nodeName:
             dialog = nodz_openScoringEndDialog(parent=self,currentNode=currentNode)
             if dialog.exec_() == QDialog.Accepted:
@@ -2246,8 +2262,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 
                 #Update the decisionwidget:
                 self.decisionWidget.updateAllDecisions()
-                logging.info(dialogLineEdits)
-                logging.info('Pressed OK on scoringEnd')
+                logging.debug(dialogLineEdits)
+                logging.debug('Pressed OK on scoringEnd')
     
     def singleNodeTypeInit(self):
         """ 
@@ -2274,7 +2290,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         When one or more nodes are created in the flowchart, this function is called.
         It does some pre-processing of the node and then calls performPostNodeCreation_Start.
         """
-        logging.info('one or more nodes are created!')
+        logging.debug('one or more nodes are created!')
         nodeType = self.nodeLookupName_withoutCounter(node.name)
         self.performPostNodeCreation_Start(node,nodeType)
 
@@ -2305,7 +2321,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         When one or more nodes are removed from the flowchart, this function is called.
         It will update the node counters of the corresponding node types.
         """
-        logging.info('one or more nodes are removed!')
+        logging.debug('one or more nodes are removed!')
         for nodeName in nodeNames:
             for node_type, node_data in self.nodeInfo.items():
                 if node_data['name'] in nodeName:
@@ -2317,7 +2333,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             try:
                 self.nodes.remove(node)
             except:
-                print(f"failed to remove node: {nodeName}")
+                logging.warning(f"failed to remove node: {nodeName}")
     
     def finishedEmits(self,node):
         """
@@ -2353,14 +2369,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        print('--------')
-        print(node)
-        print(f"node name: {node.name}")
-        print(f"incoming connections: {node.n_connect_at_start}" )
-        if 'scoringEnd' in node.name:
-            print('hi')
-        # print(f"outgoing connections - finished: {node.connectedToFinish}")
-        # print(f"outgoing connections - data: {node.connectedToData}")
+        logging.info('--------')
+        logging.info(node)
+        logging.info(f"node name: {node.name}")
+        logging.info(f"incoming connections: {node.n_connect_at_start}" )
     #endregion
     
     #region NodzFlowChart Helpers
@@ -2496,9 +2508,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 if not attr_name.startswith('_'):
                     attr = getattr(obj, attr_name)
                     if not callable(attr):
-                        print(" " * indent + attr_name)
+                        logging.debug(" " * indent + attr_name)
                     else:
-                        print(" " * indent + attr_name + '()')
+                        logging.debug(" " * indent + attr_name + '()')
                     if hasattr(attr, '__dict__'):
                         self.explore_attributes(attr, indent + 2)
                 # except:
@@ -2841,7 +2853,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         When a plug or socket is connected, this function is called. It will check if the destination
         node should be marked as 'started' or 'finished' based on the attributes connected.
         """
-        logging.info(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        logging.debug(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
     
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -2850,7 +2862,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         When a plug or socket is disconnected, this function is called. It will disconnect
         the finished event of the source node from the 'we finished one of the prerequisites' at the destination node.
         """
-        logging.info('plugorsocketdisconnected')
+        logging.debug('plugorsocketdisconnected')
     
     def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -2860,7 +2872,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         node should be marked as 'started' based on the attributes connected.
         """
         #Check if all are non-Nones:
-        logging.info('plug connected')
+        logging.debug('plug connected')
 
     def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -2910,7 +2922,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         
         #Check if all are non-Nones:
-        logging.info('socket connected')
+        logging.debug('socket connected')
     
     def prepareGraph(self, methodName='Score'):
         """
@@ -2990,7 +3002,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     #And the finished event of the source node is connected to the 'we finished one of the prerequisites' at the destination node
                     srcNode.customFinishedEmits.signals[0].connect(dstNode.oneConnectionAtStartIsFinished) #type: ignore
                     
-                    logging.info(f"connected Finish {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+                    logging.debug(f"connected Finish {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
                 #Same for data
                 elif plugAttribute in typeOfDataAttributes_of_srcNode and socketAttribute in typeOfStartAttributes_of_dstNode:
                     srcNode = self.findNodeByName(srcNodeName)
@@ -3000,7 +3012,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     
                     #And the finished event of the source node is connected to the 'we gave data' at the destination node
                     srcNode.customDataEmits.signals[0].connect(dstNode.oneConnectionAtStartProvidesData) #type: ignore
-                    logging.info(f"connected Data {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
+                    logging.debug(f"connected Data {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
                 else:
                     logging.warning(f"not connected {srcNodeName} to {dstNodeName} via {plugAttribute} to {socketAttribute}")
     
@@ -3091,8 +3103,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 self.nodes = []
                 #Set all counters to 0:
                 for nodeType in self.nodeInfo:
-                    self.nodeInfo[nodeType]['NodeCounter'] = 0
-                    self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
+                    if nodeType[:2] != '__': #Ignore internal/special node info ('__init__' etc)
+                        self.nodeInfo[nodeType]['NodeCounter'] = 0
+                        self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
                 #Load the graph
                 with open(filename, 'rb') as f:
                     self.loadGraph_KM(filename)
@@ -3200,7 +3213,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     plug = currentNode.attrs[plug_id]
                     #We check if the plug is in dialogLineEdits:
                     if plug not in dialogLineEdits and plug in current_plugs:
-                        print(plug_id)
+                        logging.debug(plug_id)
                         #If it isn't, we just delete it:
                         self.deleteAttribute(currentNode,plug_id)
                         time.sleep(sleepTime)
@@ -3283,7 +3296,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     connectedNodeName = connection[0][:connection[0].rfind('.')]
                     connectedNode = self.findNodeByName(connectedNodeName)
         if connectedNode is None:
-            print('Error! No connected node found for scoring analysis')
+            logging.error('Error! No connected node found for scoring analysis')
             return
         
         #Dictionary of nodes to pass around variables.
@@ -3299,7 +3312,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         output = eval(evalText) #type:ignore
         
         #Display final output to the user for now
-        logging.info(f"FINAL OUTPUT FROM NODE {node.name}: {output}")
+        logging.info(f"Final output from node {node.name}: {output}")
         
         #Set the status of the nodz-coupled vis and real-time to finished:
         #Look at the 'Visual' bottom attribute and visualise if needed
@@ -3360,7 +3373,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                             colormap = cmap
                         )
                     elif chosenLayerType == 'image':
-                        logging.info('creating new image layer')
+                        logging.debug('creating new image layer')
                         viewer = self.shared_data.napariViewer #type:ignore
                         im = np.random.random((30, 30))
                         napariLayer = viewer.add_image(
@@ -3401,7 +3414,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     connectedNodeName = connection[0][:connection[0].rfind('.')]
                     connectedNode = self.findNodeByName(connectedNodeName)
         if connectedNode is None:
-            print('Error! No connected node found for scoring analysis')
+            logging.error('Error! No connected node found for scoring analysis')
             return
         
         #Dictionary of nodes to pass around variables.
@@ -3486,7 +3499,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                             colormap = cmap
                         )
                     elif chosenLayerType == 'image':
-                        logging.info('creating new image layer')
+                        logging.debug('creating new image layer')
                         viewer = self.shared_data.napariViewer #type:ignore
                         im = np.random.random((30, 30))
                         napariLayer = viewer.add_image(
@@ -3591,7 +3604,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Args:
             node (nodz.Node): The node that has triggered the event.
         """
-        logging.info('MMconfigChangeRan')
+        logging.debug('MMconfigChangeRan')
         
         
         #Create the worker
@@ -3618,7 +3631,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
         #First assess that it's a MDA node:
         if 'acquisition' not in connectedNode.name:
-            print('Error! Acquisition not connected to Grayscale test!')
+            logging.error('Error! Acquisition not connected to Grayscale test!')
         else:
             #And then find the mdaData object
             mdaDataobject = connectedNode.mdaData
@@ -3643,7 +3656,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         if self.preventAcq == False:
-            print('Starting the acquiring routine!')
+            logging.debug('Starting the acquiring routine!')
             
             #Set all connected nodes to idle
             connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
@@ -3673,7 +3686,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         #This finishedEmit needs to be at the start of this function :) 
         self.finishedEmits(node)
-        print("End Acquiring----------------------------------------------------------")
+        logging.debug("End Acquiring----------------------------------------------------------")
         if self.fullRunOngoing:
             #if there are more positions to look at...
             if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
@@ -3687,7 +3700,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 print('All done!')
         else:
             print("ACQUIRING FULL RUN IS NOT ONGOING--------------------------------------------")
-        print("End Acquiring2------------------------------------------------------------")
+        logging.debug("End Acquiring2------------------------------------------------------------")
         
     
     def initStart(self,node):
@@ -3703,7 +3716,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        print('Starting the initialisation routine!')
+        logging.debug('Starting the initialisation routine!')
         
         #Set all connected nodes to idle
         connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
@@ -3720,7 +3733,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     
     def initEnd(self,node):
     
-        print('Initialisation finished fully!')
+        logging.debug('Initialisation finished fully!')
         #Find the acqStart node:
         scoringStartNode = None
         flowChart = self
@@ -3756,7 +3769,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         
         if self.preventScoring == False:
-            print('Starting the score routine!')
+            logging.debug('Starting the score routine!')
             
             #Set all connected nodes to idle
             connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
@@ -3830,7 +3843,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
                         data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
                         attrs.append(attr)
-                        print(f"Data found for {attr}: {data[attr]}")
+                        logging.debug(f"Data found for {attr}: {data[attr]}")
         except:
             pass
         
@@ -3839,9 +3852,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             testPassedText = 'Test is Passed' if testPassed else 'Test is Not Passed'
             # readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
             
-            print('Scoring finished fully!')
+            logging.info('Scoring finished fully!')
             if testPassed:
-                print("Test is... Passed!")
+                logging.info("Test is... Passed!")
                 
                 #Find the acqStart node:
                 acqStartNode = None
@@ -3860,7 +3873,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     logging.error('Could not find acqStart node in flowchart')
                 
             elif not testPassed:
-                print("Test is... Not Passed!")
+                logging.info("Test is... Not Passed!")
                 #Go to next XY position
                 if self.fullRunOngoing:
                     if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
@@ -3870,7 +3883,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     else:
                         self.singleRunOngoing = False
                         print('All done!')
-            print('----------------------')
+            logging.info('----------------------')
 
         except:
             testPassed = False
@@ -3882,7 +3895,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Find the reporting node(s)
         connectedNodes = nodz_utils.getConnectedNodes(node, 'bottomAttr')
         for node in connectedNodes:
-            print(node.name)
+            logging.debug(node.name)
             if 'reporting_' in node.name:
                 node.status = 'running'
                 if 'SLACK' in self.shared_data.globalData: #type:ignore
@@ -3956,7 +3969,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if storeLoc[-4:] == '.tif' or storeLoc[-5:] == '.tiff':
                 import tifffile
                 tifffile.imsave(storeLoc,storeInfo)
-                logging.info(f'Stored TIF image at {storeLoc}')
+                logging.debug(f'Stored TIF image at {storeLoc}')
         
         self.finishedEmits(node)
 
@@ -4022,13 +4035,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 break
             try:
                 eval(line)
-                logging.info(f'Ran commdand succesfully: {line}')
+                logging.debug(f'Ran commdand succesfully: {line}')
             except Exception as e:
                 logging.error(f'Error with line {line}: {e}. Script broken off')
                 errored=True
         
         if errored==False:
-            logging.info('Fully ran custom script!')
+            logging.debug('Fully ran custom script!')
         
         self.finishedEmits(node)
     
@@ -4046,7 +4059,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         for graphConnection in graph:
             if correctPlugFound == False and graphConnection[0] == node.name+'.'+str(CurrentValueWantedVariable):
                 foundNodeName = graphConnection[1].split('.')[0]
-                logging.info(f"Node {node.name} found a case/switch with value {CurrentValueWantedVariable} connected to node {foundNodeName}")
+                logging.debug(f"Node {node.name} found a case/switch with value {CurrentValueWantedVariable} connected to node {foundNodeName}")
                 foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
                 foundNode.oneConnectionAtStartIsFinished()
                 correctPlugFound = True
@@ -4095,7 +4108,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        print('Starting a full run')
+        logging.info('Starting a full run')
         self.preventAcq = False
         self.preventScoring = False
         
@@ -4140,7 +4153,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         positions = self.fullRunPositions
         pos = self.fullRunCurrentPos
         
-        print(f'Starting new score acq at position {pos} -------------------------------------------------------------------------------')
+        logging.info(f'Starting new score acq at position {pos} -------------------------------------------------------------------------------')
         
         #Set all stages correct
         for stage in positions[pos]['STAGES']:
@@ -4149,11 +4162,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 #Check if this stage is an XY stage device...
                 #Since then we need to do something 2-dimensional
                 if stage in self.getDevicesOfDeviceType('XYStageDevice'):
-                    logging.info(f'Moving stage {stage} to position {stagepos}')
+                    logging.debug(f'Moving stage {stage} to position {stagepos}')
                     self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
                     self.shared_data.core.wait_for_system() #type:ignore
                 else:#else we can move a 1d stage:
-                    logging.info(f'Moving stage {stage} to position {stagepos}')
+                    logging.debug(f'Moving stage {stage} to position {stagepos}')
                     self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
                     self.shared_data.core.wait_for_system() #type:ignore
         
@@ -4255,7 +4268,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         Returns:
             None
         """
-        print("Run Acquiring")
+        logging.info("Run Acquiring")
         
         #Find the acqStart node:
         acqStartNode = None
@@ -4276,12 +4289,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         Function to get some debug information from the scoring function(s)
         """
-        print("Debug Scoring")
+        logging.debug("Debug Scoring")
         scoreGraph = self.prepareGraph(methodName = "Score")
         
         
-        print(self)
-        print(self.evaluateGraph())
+        logging.debug(self)
+        logging.debug(self.evaluateGraph())
     #endregion
     
     #region NodzFlowChart GraphArea functions
@@ -4415,7 +4428,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             nodz.Node: The created nodz node.
         """
         if self.nodeInfo[nodeType]['NodeCounter'] >= self.nodeInfo[nodeType]['MaxNodeCounter']:
-            print('Not allowed! Maximum number of nodes of this type reached')
+            logging.error('Not allowed! Maximum number of nodes of this type reached')
             return
         
         #Create the new node with correct name and preset
@@ -4583,7 +4596,7 @@ class advScanGridLayout(QGroupBox):
         Returns:
             None
         """
-        print('update')
+        logging.debug('update')
     
     def getPositionInfo(self):
         """
@@ -5050,7 +5063,7 @@ class advDecisionGridLayout(QGroupBox):
         for decision in self.decisionInfoGUIVAR:
             if self.decisionInfoGUIVAR[decision]['varName'].text() != '':
                 requiredTrueTests+=1
-                print(self.decisionInfoGUIVAR[decision]['varName'].text())
+                logging.debug(self.decisionInfoGUIVAR[decision]['varName'].text())
                 
                 #We get the value of the variable:
                 varCurrentValue = utils.nodz_evaluateVar(self.decisionInfoGUIVAR[decision]['varName'].text(),self.parent.nodzinstance)
@@ -5081,7 +5094,7 @@ class advDecisionGridLayout(QGroupBox):
                 else:
                     evalText = f"{varCurrentValue} {operator} {varTestValue}"
                 
-                print(evalText)
+                logging.debug(evalText)
                 
                 if eval(evalText):
                     totalTrueTests+=1
@@ -5208,7 +5221,7 @@ class VariablesBase(QWidget):
         """
         Create a QTableWidget GUI
         """
-        logging.info('Inside variableswidget-createGUi')
+        logging.debug('Inside variableswidget-createGUi')
         self.buttonTest = QPushButton("Update")
         self.buttonTest.clicked.connect(self.updateVariables)
         
@@ -5471,7 +5484,7 @@ class generalNodzCallActionWorker(QRunnable):
         Running of the different callActions belonging to all nodes.
         """
         import logging
-        logging.info(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
+        logging.debug(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
         #Timer
         if self.nodzType == 'Timer':
             import time
@@ -5490,7 +5503,7 @@ class generalNodzCallActionWorker(QRunnable):
             core = self.args['core']
             shared_data = self.args['shared_data']
             self.shared_data = shared_data
-            print(evalText)
+            logging.debug(evalText)
             #Finally do the analysis
             node.output = eval(evalText)
         
