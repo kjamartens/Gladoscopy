@@ -56,7 +56,7 @@ def set_strobo_lasers(core,**kwargs):
 
     printStatements = True
 
-    #Transform kwargs to integers
+    #Transform kwargs to integers/floats
     pulse_len_405 = int(kwargs['pulse_len_405'])
     pulse_len_488 = int(kwargs['pulse_len_488'])
     pulse_len_561 = int(kwargs['pulse_len_561'])

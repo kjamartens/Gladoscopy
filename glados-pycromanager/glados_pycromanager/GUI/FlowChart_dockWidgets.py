@@ -2117,7 +2117,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #initialise the scoring_analysis_currentData values:
             #Rather stupidly, but I create the double-click-dialog, but just never show it.
             dialog = nodz_customFunctionDialog(currentNode = newNode, parent = self)
-            newNode.scoring_analysis_currentData=dialog.currentData
+            newNode.customFunction_currentData=dialog.currentData
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
             if not newNode.createdFromLoading:
@@ -2311,9 +2311,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             dialog = nodz_analysisDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
                 
-                utils.analysis_outputs_to_variableNodz(currentNode)
                 #Update the results of this dialog into the nodz node
                 currentNode.scoring_analysis_currentData = dialog.currentData #type:ignore
+                utils.analysis_outputs_to_variableNodz(currentNode)
                 try:
                     currentNode.dialogInfo = dialog #type:ignore
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
@@ -2324,9 +2324,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             currentNode = self.findNodeByName(nodeName)
             dialog = nodz_customFunctionDialog(currentNode = currentNode, parent = self)
             if dialog.exec_() == QDialog.Accepted:
-                utils.analysis_outputs_to_variableNodz(currentNode)
                 #Update the results of this dialog into the nodz node
                 currentNode.customFunction_currentData = dialog.currentData #type:ignore
+                utils.customFunction_outputs_to_variableNodz(currentNode)
                 try:
                     currentNode.dialogInfo = dialog #type:ignore
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'customFunction')
@@ -2979,7 +2979,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             htmloutputadded=False
             
             for varName in currentNode.variablesNodz:
-                currData = currentNode.variablesNodz[varName]['data']
+                currData = str(currentNode.variablesNodz[varName]['data'])
+                if currData is not None:
+                    currData = self.limitTextLength(currData)
+                else:
+                    currData = 'None'
                 typing = currentNode.variablesNodz[varName]['type']
                 importance = currentNode.variablesNodz[varName]['importance']
                 displayHTMLtext += f"<br><b>{varName}</b>: {str(currData)}"
@@ -3753,10 +3757,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     def CustomFunctionNode_finished(self,node):
         
         output = node.output
-        node.scoring_analysis_currentData['__output__'] = node.output
+        node.customFunction_currentData['__output__'] = node.output
         
         #Store the output as NodzVariables #TODO
-        # utils.analysis_outputs_store_as_variableNodz(node)
+        utils.customFunction_outputs_store_as_variableNodz(node)
         
         #Finish up
         self.finishedEmits(node)
@@ -5754,7 +5758,7 @@ class generalNodzCallActionWorker(QRunnable):
             core = self.args['core']
             shared_data = self.args['shared_data']
             self.shared_data = shared_data
-            logging.debug(evalText)
+            logging.info(evalText)
             #Finally do the analysis
             node.output = eval(evalText)
         

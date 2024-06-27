@@ -146,23 +146,26 @@ def displayNameFromKwarg(functionname,name):
         #Perform a regex match on 'name'
         name_pattern = r"name:\s*(\S+)"
         
-        names = re.findall(name_pattern, allkwarginfo[optOrReq][0])
-        instances = re.split(r'(?=name: )', allkwarginfo[optOrReq][0])[1:]
+        if len(allkwarginfo[optOrReq]) > 0: #Check if we have at least one opt/req kwarg:
+            names = re.findall(name_pattern, allkwarginfo[optOrReq][0])
+            instances = re.split(r'(?=name: )', allkwarginfo[optOrReq][0])[1:]
 
-        #Find which instance this name belongs to:
-        name_id = -1
-        for i,namef in enumerate(names):
-            if namef == name:
-                name_id = i
-        
-        if name_id > -1:
-            curr_instance = instances[name_id]
-            displayText_pattern = r"display_text: (.*?)\n"
-            displaytext = re.findall(displayText_pattern, curr_instance)
-            if len(displaytext) > 0:
-                displayName = displaytext[0]
-            else:
-                displayName = name
+            #Find which instance this name belongs to:
+            name_id = -1
+            for i,namef in enumerate(names):
+                if namef == name:
+                    name_id = i
+            
+            if name_id > -1:
+                curr_instance = instances[name_id]
+                displayText_pattern = r"display_text: (.*?)\n"
+                displaytext = re.findall(displayText_pattern, curr_instance)
+                if len(displaytext) > 0:
+                    displayName = displaytext[0]
+                else:
+                    displayName = name
+        else:
+            displayName = 'Shouldnt be shown'
     
     return displayName
 
@@ -170,11 +173,14 @@ def displayNameFromKwarg(functionname,name):
 def optKwargsFromFunction(functionname):
     #Get all kwarg info
     allkwarginfo = kwargsFromFunction(functionname)
-    #Perform a regex match on 'name'
-    name_pattern = r"name:\s*(\S+)"
-    #Get the names of the optional kwargs (allkwarginfo[1])
-    names = re.findall(name_pattern, allkwarginfo[1][0])
-    return names
+    if allkwarginfo[1] != []: #Check if there are any opt kwargs at all
+        #Perform a regex match on 'name'
+        name_pattern = r"name:\s*(\S+)"
+        #Get the names of the optional kwargs (allkwarginfo[1])
+        names = re.findall(name_pattern, allkwarginfo[1][0])
+        return names
+    else:
+        return []
 
 def classKwargValuesFromFittingFunction(functionname, class_type):
     #Get all kwarg info
@@ -218,11 +224,12 @@ def kwargsFromFunction(functionname):
             #Get text for all the optional kwarrs
             txt = ""
             #Loop over the number of okwarrs
-            for k in range(0,len(functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"])):
-                zz = functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k]
-                for key, value in functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k].items():
-                    txt += f"{key}: {value}\n"
-            okwarr_arr.append(txt)
+            if "optional_kwargs" in functionMetadata[list(functionMetadata.keys())[i]]:
+                for k in range(0,len(functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"])):
+                    zz = functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k]
+                    for key, value in functionMetadata[list(functionMetadata.keys())[i]]["optional_kwargs"][k].items():
+                        txt += f"{key}: {value}\n"
+                okwarr_arr.append(txt)
     #Error handling if __function_metadata__ doesn't exist
     except AttributeError:
         rkwarr_arr = []
@@ -316,9 +323,10 @@ def infoFromMetadata(functionname,**kwargs):
                 #Find the help text of a single kwarg
                 helptext = 'No help text set'
                 #Look over optional kwargs
-                for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
-                    if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == specificKwarg:
-                        helptext = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['description']
+                if "optional_kwargs" in functionMetadata[functionname.split('.')[1]]:
+                    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
+                        if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == specificKwarg:
+                            helptext = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['description']
                 #look over required kwargs
                 for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
                     if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == specificKwarg:
@@ -430,11 +438,12 @@ def defaultValueFromKwarg(functionname,kwargname):
     functionparent = functionname.split('.')[0]
     #Get the full function metadata
     functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
-    for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
-        if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
-            #check if this has a default value:
-            if 'default' in functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]:
-                defaultEntry = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['default']
+    if 'optional_kwargs'  in functionMetadata[functionname.split('.')[1]]:
+        for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
+            if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
+                #check if this has a default value:
+                if 'default' in functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]:
+                    defaultEntry = functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['default']
     #look over required kwargs
     for k in range(0,len(functionMetadata[functionname.split('.')[1]]["required_kwargs"])):
         if functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['name'] == kwargname:
@@ -2459,6 +2468,21 @@ def analysis_outputs_store_as_variableNodz(currentNode):
             logging.error(f'Critical! Error with outputs of function {currentNode.scoring_analysis_currentData["__selectedDropdownEntryAnalysis__"]} and variable {outputtype}')
     #update the timing
     updateNodzVariablesTime(currentNode)
+    
+    
+def customFunction_outputs_store_as_variableNodz(currentNode):
+    """
+    Stores the analysis output as variables - ran just before the next node is ran.
+    """ 
+    output = currentNode.customFunction_currentData['__output__']
+    for outputtype in output:
+        if outputtype in currentNode.variablesNodz:
+            currentNode.variablesNodz[outputtype]['data'] = output[outputtype]
+        else:
+            logging.error(f'Critical! Error with outputs of function {currentNode.customFunction_currentData["__selectedDropdownEntryAnalysis__"]} and variable {outputtype}')
+    #update the timing
+    updateNodzVariablesTime(currentNode)
+
 
 def analysis_outputs_to_variableNodz(currentNode):
     """ 
@@ -2468,6 +2492,32 @@ def analysis_outputs_to_variableNodz(currentNode):
     if 'scoring_analysis_currentData' in vars(currentNode) and len(currentNode.scoring_analysis_currentData) > 0:
         selectedFunction = currentNode.scoring_analysis_currentData['__selectedDropdownEntryAnalysis__'] #type:ignore
         for dn in currentNode.scoring_analysis_currentData['__displayNameFunctionNameMap__']: #type:ignore
+            if dn[0] == selectedFunction:
+                selectedFunctionName = dn[1]
+                
+        #Get the outputs to put in nodz-variables
+        expectedoutputs = outputFromFunction(selectedFunctionName)
+        for output in expectedoutputs[0]:
+            currentNode.variablesNodz[output['name']] = {} #type:ignore
+            if 'type' in output:
+                currentNode.variablesNodz[output['name']]['type'] = output['type'] #type:ignore
+            else:
+                currentNode.variablesNodz[output['name']]['type'] = None #type:ignore
+            currentNode.variablesNodz[output['name']]['data'] = None #type:ignore
+            if 'importance' in output:
+                currentNode.variablesNodz[output['name']]['importance'] = output['importance'] #type:ignore
+            else:
+                currentNode.variablesNodz[output['name']]['importance'] = 'Informative' #type:ignore
+            currentNode.variablesNodz[output['name']]['lastUpdateTime'] = None
+            
+def customFunction_outputs_to_variableNodz(currentNode):
+    """ 
+    Get the expected outputs from an customFunction function, and store them as a node variableNodz. Called when a variableNode is updated or loaded. NOT when it's finished - look at customFunction_outputs_store_as_variableNodz(currentNode) instead
+    """
+    
+    if 'customFunction_currentData' in vars(currentNode) and len(currentNode.customFunction_currentData) > 0:
+        selectedFunction = currentNode.customFunction_currentData['__selectedDropdownEntryAnalysis__'] #type:ignore
+        for dn in currentNode.customFunction_currentData['__displayNameFunctionNameMap__']: #type:ignore
             if dn[0] == selectedFunction:
                 selectedFunctionName = dn[1]
                 
