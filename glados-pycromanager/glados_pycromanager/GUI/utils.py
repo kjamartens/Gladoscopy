@@ -950,7 +950,10 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                 
                 for k in range(len(inputData)):
                     #TODO: display name if wanted
-                    label = QLabel(f"<b><i>{inputData[0][k]['name']}</i></b>")
+                    if 'display_name' in inputData[0][k]:
+                        label = QLabel(f"<b><i>{inputData[0][k]['display_name']}</i></b>")
+                    else:
+                        label = QLabel(f"<b><i>{inputData[0][k]['name']}</i></b>")
                     label.setObjectName(f"Label#{current_selected_function}#{inputData[0][k]['name']}")
                     if checkAndShowWidget(curr_layout,label.objectName()) == False:
                         #TODO: actual tooltip
