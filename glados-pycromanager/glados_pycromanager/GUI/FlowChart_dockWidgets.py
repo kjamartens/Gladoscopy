@@ -226,7 +226,6 @@ class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
             self.comboBox_analysisFunctions.setCurrentText(correctFunction)
         except KeyError:
             pass
-        
 
 class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
     """
@@ -291,7 +290,6 @@ class nodz_analysisMeasurementDialog(nodz_analysisDialog):
         super().__init__(parent, currentNode)
         self.setWindowTitle("Analysis Measurement Options")
 
-
 class nodz_openInlineScriptDialog(QDialog):
     """
     A Dialog that is created for timer in the Nodz layout. 
@@ -331,6 +329,46 @@ class nodz_openInlineScriptDialog(QDialog):
         layout.addWidget(button_box)
         
         self.setLayout(layout)
+
+class nodz_stickyNoteDialog(QDialog):
+    """
+    A Dialog that is created for sticky notes in the Nodz layout. 
+    """
+    def __init__(self, parentNode=None):
+        """
+        Initializes the StickyNoteDialog.
+        
+        Args:
+            parentNode: The parent node of the StickyNoteDialog. If provided, the stickyNoteInfo will be set to the stickyNoteInfo of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(None)
+        self.setWindowTitle("Sticky Note Dialog")
+        self.stickyNoteInfo  = ''
+        if parentNode is not None:
+            self.stickyNoteInfo = parentNode.stickyNoteInfo
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        # Create the QVBoxLayout
+        layout = QVBoxLayout()
+
+        #add a big editable text box:
+        stickyNoteInfoTE = QTextEdit()
+        stickyNoteInfoTE.setPlainText(self.stickyNoteInfo)
+        stickyNoteInfoTE.textChanged.connect(lambda: setattr(self, 'stickyNoteInfo', stickyNoteInfoTE.toPlainText()))
+
+        # Add the QMainWindow to the QVBoxLayout
+        layout.addWidget(stickyNoteInfoTE)
+
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+
 
 class nodz_slackReportDialog(QDialog):
     """
@@ -1516,7 +1554,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             'analysisMeasurement','customFunction','storeData','timer','|',
             'realTimeAnalysis','visualisation','|',
             'newGlobalVar','changeGlobalVar','caseSwitch','ANDlogic','|',
-            'slackReport','|',
+            'slackReport','stickyNote','|',
             'initStart','initEnd','scoringStart','scoringEndVar','acqStart','acqEnd','|',
             'runInlineScript','analysisMeasurementDEBUG']
         #If we miss any in here, they'll be added at the bottom in later logic
@@ -1541,6 +1579,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['visualisation']['displayName'] = 'Visualisation'
         self.nodeInfo['visualisation']['topAttributes'] = ['Start']
         self.nodeInfo['visualisation']['NodeSize'] = 60
+        
+        self.nodeInfo['stickyNote'] = self.singleNodeTypeInit()
+        self.nodeInfo['stickyNote']['name'] = 'stickyNote'
+        self.nodeInfo['stickyNote']['displayName'] = 'Sticky Note'
+        self.nodeInfo['stickyNote']['NodeSize'] = 70
         
         self.nodeInfo['realTimeAnalysis'] = self.singleNodeTypeInit()
         self.nodeInfo['realTimeAnalysis']['name'] = 'realTimeAnalysis'
@@ -1846,6 +1889,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             "slackReport": {
                 "bg": [68, 129, 168, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "stickyNote": {
+                "bg": [230, 185, 5, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
@@ -2335,7 +2384,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.slackReportInfo = dialog.slackReportInfo
                 logging.debug('Pressed OK on caseSwitch')
             # currentNode.callAction(self) #type:ignore
-        
+        elif 'stickyNote' in nodeName:
+            dialog = nodz_stickyNoteDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.stickyNoteInfo = dialog.stickyNoteInfo
+                logging.debug('Pressed OK on stickyNote')
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'stickyNote')
+            # currentNode.callAction(self) #type:ignore
         elif 'scoringStart' in nodeName:
             currentNode.callAction(self) #type:ignore
         elif 'scoringEndVar' in nodeName:
@@ -2911,7 +2966,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == "caseSwitch":
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.caseSwitchInfo,currentNode.flowChart,dontEvaluate=True)
             displayHTMLtext = "Perform a case/switch logic based on variable <b>"+self.limitTextLength(values['Var'][1])+"</b>"
-        
+        elif nodeType == 'stickyNote':
+            displayHTMLtext = f"{currentNode.stickyNoteInfo}"
         elif nodeType == "__InitRequireUserDoubleClick__":
             displayHTMLtext = "<font color='#a00000'>Double-click this node to initialize it correctly.</font>"
         #And update the display
