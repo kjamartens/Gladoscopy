@@ -5006,7 +5006,7 @@ class DecisionWidget(QWidget):
             None
         """
         for mode in self.decisionLayouts:
-            if 'decisiontypes' in self.decisionLayouts[mode]:
+            if hasattr(self.decisionLayouts[mode], 'decisiontypes'):
                 for option in self.decisionLayouts[mode].decisiontypes:
                     self.decisionLayouts[mode].decisiontypes[option].update()
 
