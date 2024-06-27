@@ -1362,7 +1362,7 @@ class NodeSignalManager(QObject):
             None
         """
         for signal in self.signals:
-            print(signal)
+            logging.info(signal)
 
     def emit_all_signals(self):
         """
@@ -2464,7 +2464,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         if nodeType == 'scoringEnd':
             self.update_scoring_end(node,node.scoring_end_currentData['Variables'])
         if nodeType == 'caseSwitch':
-            self.update_plugs_fromDialog(node,node.caseSwitchInfo['Plugs'])
+            if 'Plugs' in node.caseSwitchInfo:
+                self.update_plugs_fromDialog(node,node.caseSwitchInfo['Plugs'])
 
     def NodeRemoved(self,nodeNames):
         """
@@ -2583,13 +2584,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         for attr in self.nodeInfo[nodeType]['topAttributes']:
             self.createAttribute(node=newNode, name=attr, index=-1, preset='attr_preset_1', plug=False, socket=False, topAttr=True)
             newNode.customTopEmits.add_signal(attr) #type: ignore
-        
-        if len(self.nodeInfo[nodeType]['startAttributes']) > 0:
-            newNode.customStartEmits.print_signals() #type: ignore
-        if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
-            newNode.customFinishedEmits.print_signals() #type: ignore
-        if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
-            newNode.customDataEmits.print_signals()  #type: ignore
         
         logging.debug("updated custom attributes")
     
@@ -2829,8 +2823,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             
             if not htmloutputadded:
                 displayHTMLtext += f"<br>None"
-            
-            
         elif nodeType == 'RTanalysisMeasurement':
             methodName = dialog.currentData['__selectedDropdownEntryRTAnalysis__']
             methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
@@ -2892,13 +2884,22 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
         elif nodeType == 'timer':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
-            displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
+            try:
+                displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
+            except:
+                displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'storeData':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.storeDataInfo,currentNode.flowChart,dontEvaluate=True)
-            displayHTMLtext = f"Store data <b>{self.limitTextLength(values['item_to_store'][1])}</b> at location <b>{self.limitTextLength(values['store_location'][1])}</b>"
+            try:
+                displayHTMLtext = f"Store data <b>{self.limitTextLength(values['item_to_store'][1])}</b> at location <b>{self.limitTextLength(values['store_location'][1])}</b>"
+            except:
+                displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'changeGlobalVar':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.changeGlobalVarInfo,currentNode.flowChart,dontEvaluate=True)
-            displayHTMLtext = f"Change global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> to <b>{self.limitTextLength(values['globalVarValue'][1],textLength = 60)}</b>"
+            try:
+                displayHTMLtext = f"Change global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> to <b>{self.limitTextLength(values['globalVarValue'][1],textLength = 60)}</b>"
+            except:
+                displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'runInlineScript':
             scriptInfo = currentNode.InlineScriptInfo
             n_lines = len(scriptInfo.split('\n'))
@@ -2908,7 +2909,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 displayHTMLtext = f"Run a pycromanager script with <b>{n_lines} lines</b>"
         elif nodeType == 'newGlobalVar':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.newGlobalVarInfo,currentNode.flowChart,dontEvaluate=True)
-            displayHTMLtext = f"Create new global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> with value <b>{self.limitTextLength(values['globalVarValue'][1])}</b>"
+            try:
+                displayHTMLtext = f"Create new global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> with value <b>{self.limitTextLength(values['globalVarValue'][1])}</b>"
+            except:
+                displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'customFunction':
             methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
             methodFunctionName = [i for i in dialog.currentData['__displayNameFunctionNameMap__'] if i[0] == methodName][0][1]
@@ -2962,10 +2966,16 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 if key[0] == chosenStage:
                     setMovement = key[1]
             #Set the displayHTML text:
-            displayHTMLtext = "<b>Relative</b> movement of stage <b>"+chosenStage+"</b> by <b>"+str(setMovement)+"</b> units"
+            try:
+                displayHTMLtext = "<b>Relative</b> movement of stage <b>"+chosenStage+"</b> by <b>"+str(setMovement)+"</b> units"
+            except:
+                displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == "caseSwitch":
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.caseSwitchInfo,currentNode.flowChart,dontEvaluate=True)
-            displayHTMLtext = "Perform a case/switch logic based on variable <b>"+self.limitTextLength(values['Var'][1])+"</b>"
+            try:
+                displayHTMLtext = "Perform a case/switch logic based on variable <b>"+self.limitTextLength(values['Var'][1])+"</b>"
+            except:
+                displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'stickyNote':
             displayHTMLtext = f"{currentNode.stickyNoteInfo}"
         elif nodeType == "__InitRequireUserDoubleClick__":
@@ -4996,8 +5006,9 @@ class DecisionWidget(QWidget):
             None
         """
         for mode in self.decisionLayouts:
-            for option in self.decisionLayouts[mode].decisiontypes:
-                self.decisionLayouts[mode].decisiontypes[option].update()
+            if 'decisiontypes' in self.decisionLayouts[mode]:
+                for option in self.decisionLayouts[mode].decisiontypes:
+                    self.decisionLayouts[mode].decisiontypes[option].update()
 
     def testCurrentDecision(self):
         """

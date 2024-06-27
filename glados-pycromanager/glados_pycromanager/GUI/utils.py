@@ -589,7 +589,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
                 if item.widget() is not None:
                     child = item.widget()
                     if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
-                        logging.warning(f"1Going to run hideAdvVariables with {child.objectName()}")
+                        logging.debug(f"1Going to run hideAdvVariables with {child.objectName()}")
                         curr_layout.update()
                         hideAdvVariables(child,current_selected_function=current_selected_function)
                 else:
@@ -597,7 +597,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
                         widget_sub_item = item.itemAt(index2)
                         child = widget_sub_item.widget()
                         if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
-                            logging.warning(f"2Going to run hideAdvVariables with {child.objectName()}")
+                            logging.debug(f"2Going to run hideAdvVariables with {child.objectName()}")
                             curr_layout.update()
                             hideAdvVariables(child,current_selected_function=current_selected_function)
                         

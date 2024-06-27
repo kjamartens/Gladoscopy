@@ -878,6 +878,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_CHANGE_GLOBAL_VAR'] = dict()
         data['NODES_NEW_GLOBAL_VAR'] = dict()
         data['NODES_RUN_INLINE_SCRIPT'] = dict()
+        data['NODES_STICKY_NOTE'] = dict()
         data['NODES_CASE_SWITCH'] = dict()
         data['NODES_SLACK_REPORT'] = dict()
         
@@ -1051,6 +1052,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'InlineScriptInfo' in vars(nodeInst):
                 if nodeInst.InlineScriptInfo is not None:
                     data['NODES_RUN_INLINE_SCRIPT'][node] = nodeInst.InlineScriptInfo  
+                    
+            data['NODES_STICKY_NOTE'][node] = {}
+            if 'stickyNoteInfo' in vars(nodeInst):
+                if nodeInst.stickyNoteInfo is not None:
+                    data['NODES_STICKY_NOTE'][node] = nodeInst.stickyNoteInfo
                     
             data['NODES_CASE_SWITCH'][node] = {}
             if 'caseSwitchInfo' in vars(nodeInst):
@@ -1261,6 +1267,12 @@ class Nodz(QtWidgets.QGraphicsView):
                         if data['NODES_RUN_INLINE_SCRIPT'] is not None:
                             node.InlineScriptInfo = data['NODES_RUN_INLINE_SCRIPT'][name] #type:ignore
                             
+            if 'NODES_STICKY_NOTE' in data:
+                if name in data['NODES_STICKY_NOTE']:
+                    if 'stickyNoteInfo' in vars(node):
+                        if data['NODES_STICKY_NOTE'] is not None:
+                            node.stickyNoteInfo = data['NODES_STICKY_NOTE'][name] #type:ignore
+                            
             if 'NODES_CASE_SWITCH' in data:
                 if name in data['NODES_CASE_SWITCH']:
                     if 'caseSwitchInfo' in vars(node):
@@ -1353,7 +1365,7 @@ class Nodz(QtWidgets.QGraphicsView):
                     for decisiontype in decisionLayoutFull.decisiontypes:
                         recursively_set_children(decisionLayoutFull.decisiontypes[decisiontype], decisionWidgetData['PYQTentries'])
         
-        
+         
         #Update the decisionwidget after loading the scoringEnd node:
         node.flowChart.decisionWidget.updateAllDecisions() #type:ignore
 
@@ -1738,6 +1750,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.changeGlobalVarInfo  = {}
         self.newGlobalVarInfo  = {}
         self.InlineScriptInfo  = ''
+        self.stickyNoteInfo = ''
         self.caseSwitchInfo = {}
         
         self.status = 'idle' #status should be 'idle','running','finished'
