@@ -771,7 +771,11 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
                 finalData = None
             return finalData
     else:
-        logging.error(f'Wrong syntax for advanced variable! Details: {varName} - interpreting as value')
+        try:
+            varName = nodz_evaluateVar(varName,nodzInfo)
+            logging.warning(f"Wrong syntax for advanced variable [but seems to be a variable instead]! Details: {varName} - interpreting as variable")
+        except:
+            logging.error(f'Wrong syntax for advanced variable! Details: {varName} - interpreting as value')
         return varName
 
 def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluate=False):
@@ -847,6 +851,8 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
             #Advanced - flow + var via maths
             self.line_edit_adv = CustomLineEdit()
             self.line_edit_Button_adv = QPushButton("Add Var")
+            #Add a click-callback:
+            self.line_edit_Button_adv.clicked.connect(lambda text,line_edit=self.line_edit_adv: PushButtonAddVariableCallBack(line_edit, nodzInfo=nodzInfo))
             #Only var
             self.line_edit_variable = CustomLineEdit()
             self.line_edit_variable.setEnabled(False)
@@ -1044,6 +1050,8 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             line_edit_adv = CustomLineEdit()
                             line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{reqKwargs[k]}")
                             line_edit_Button_adv = QPushButton("Add Var")
+                            #Add a click-callback:
+                            line_edit_Button_adv.clicked.connect(lambda text,line_edit=line_edit_adv: PushButtonAddVariableCallBack(line_edit, nodzInfo=nodzInfo))
                             line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{reqKwargs[k]}")
                             #Only var
                             line_edit_variable = CustomLineEdit()
@@ -1149,6 +1157,8 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         line_edit_adv.setObjectName(f"LineEditAdv#{current_selected_function}#{optKwargs[k]}")
                         line_edit_Button_adv = QPushButton("Add Var")
                         line_edit_Button_adv.setObjectName(f"PushButtonAdv#{current_selected_function}#{optKwargs[k]}")
+                        #Add a click-callback:
+                        line_edit_Button_adv.clicked.connect(lambda text,line_edit=line_edit_adv: PushButtonAddVariableCallBack(line_edit, nodzInfo=nodzInfo))
                         #Only var
                         line_edit_variable = QLineEdit()
                         line_edit_variable.setObjectName(f"LineEditVariable#{current_selected_function}#{optKwargs[k]}")
@@ -2241,6 +2251,28 @@ def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
         line_edit.setText(lineEditText)
     else:
         logging.warning("Dialog rejected (Cancel pressed or closed)")
+
+
+def PushButtonAddVariableCallBack(line_edit,nodzInfo):
+    from FlowChart_dockWidgets import VariablesDialog
+    
+    #Find the associated kwarg/function:
+    associatedFunction = line_edit.objectName().split('#')[1]
+    associatedKwarg = line_edit.objectName().split('#')[2]
+    associatedType = typeFromKwarg(associatedFunction,associatedKwarg)
+    
+    #open a variablesDialog:
+    variablesDialog = VariablesDialog(nodzinstance=nodzInfo,typeInfo=associatedType)
+    result = variablesDialog.exec()
+    if result == variablesDialog.Accepted:
+        if line_edit.text() != '':
+            lineEditText = line_edit.text()+' {'+variablesDialog.selected_entry[2]+'@'+variablesDialog.selected_entry[1]+'}'
+        else:
+            lineEditText = '{'+variablesDialog.selected_entry[2]+'@'+variablesDialog.selected_entry[1]+'}'
+        line_edit.setText(lineEditText)
+    else:
+        logging.warning("Dialog rejected (Cancel pressed or closed)")
+
 
 import json
 
