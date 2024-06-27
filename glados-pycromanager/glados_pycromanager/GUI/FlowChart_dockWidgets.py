@@ -2043,6 +2043,15 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Attach a MDA data to this node
             newNode.mdaData = MDAGlados(self.core,self.MM_JSON,None,self.shared_data,hasGUI=True,parent=parentV,node=newNode) # type: ignore
             
+            #Initialise with showing only time.
+            newNode.mdaData.GUI_show_channel = False
+            newNode.mdaData.GUI_show_exposure = True
+            newNode.mdaData.GUI_show_order = True
+            newNode.mdaData.GUI_show_storage = False
+            newNode.mdaData.GUI_show_time = True
+            newNode.mdaData.GUI_show_xy = False
+            newNode.mdaData.GUI_show_z = False
+            
             #Do the acquisition upon callAction
             newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_Node(node)
             
