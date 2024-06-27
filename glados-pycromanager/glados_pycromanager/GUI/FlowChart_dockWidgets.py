@@ -1468,6 +1468,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #import qgroupbox:
         from qtpy.QtWidgets import QGroupBox    
     
+        #Create a tab widget:
+        self.tabWidget = QTabWidget()
+        
         self.decision_groupbox = QGroupBox("Decision Widget")
         # self.buttonsArea.addWidget(self.decision_groupbox)
         self.decisionWidget = DecisionWidget(nodzinstance=self)
@@ -1485,6 +1488,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.variablesWidget = VariablesWidget(nodzinstance=self)
         newgridlayout.addWidget(self.variablesWidget)
         
+        
+    
+    
+        
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
@@ -1494,9 +1501,19 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         # Add the QGraphicsView to the mainLayout and allt he other layouts
         self.mainLayout.addWidget(self.graphics_view,0,0,2,1)
         self.mainLayout.addLayout(self.buttonsArea,0,1,2,1)
-        self.mainLayout.addWidget(self.decision_groupbox,0,2,1,1)
-        self.mainLayout.addWidget(self.scanwidget_groupbox,1,2,1,1)
-        self.mainLayout.addWidget(self.variablesWidgetGroupbox,0,3,2,1)
+        tabLayout = QVBoxLayout()
+        tabLayout.addWidget(self.tabWidget)
+        self.tabWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.mainLayout.addLayout(tabLayout,0,2,2,1)
+        
+        #Create a tab for the decision widget:
+        self.tabWidget.addTab(self.decision_groupbox, "Decision")
+        self.tabWidget.addTab(self.scanwidget_groupbox, "Scanning")
+        self.tabWidget.addTab(self.variablesWidgetGroupbox, "Variables")
+        
+        # self.mainLayout.addWidget(self.decision_groupbox,0,2,1,1)
+        # self.mainLayout.addWidget(self.scanwidget_groupbox,1,2,1,1)
+        # self.mainLayout.addWidget(self.variablesWidgetGroupbox,0,3,2,1)
         
         #Global variables for MM/napari
         self.core = core
@@ -2868,7 +2885,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'changeProperties':
             displayHTMLtext = f"Changing {len(dialog.ConfigsToBeChanged())} config(s):"
             for config in dialog.ConfigsToBeChanged():
-                displayHTMLtext += f"<br>{config[0]} to {config[1]}"
+                try:
+                    displayRounded = str(round(float(config[1]),3))
+                except:
+                    displayRounded = config[1]
+                displayHTMLtext += f"<br>{config[0]} to {displayRounded}"
         elif nodeType == 'scoreEnd':
             import time
             from datetime import datetime
@@ -3596,7 +3617,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #Star the worker
         self.thread_pool.start(worker)
         
-        
     def analysisNode_finished(self,node):
         #Set the status of the nodz-coupled vis and real-time to finished:
         #Look at the 'Visual' bottom attribute and visualise if needed
@@ -3771,7 +3791,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         
         #Create the worker
-        worker = generalNodzCallActionWorker(nodzType='MMconfigChangeRan',args={"config_string_storage":node.MMconfigInfo.config_string_storage, "core": self.core})
+        worker = generalNodzCallActionWorker(nodzType='MMconfigChangeRan',args={"config_string_storage":node.MMconfigInfo.config_string_storage, "MMconfig":node.MMconfigInfo, "core": self.core})
         #Add the finished emit
         worker.signals.finished.connect(lambda: self.finishedEmits(node))
         #Star the worker
@@ -4936,7 +4956,16 @@ class DecisionWidget(QWidget):
             self.decisionLayouts[mode_option[0]].layout.addLayout(self.decisionLayouts[mode_option[0]].mode_layout)
             
         self.layoutV = QVBoxLayout()
-        self.layoutV.addLayout(self.mode_layout)
+        # Create the QScrollArea
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollAreaWidgetContents.setLayout(self.mode_layout)
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+
+        # Add the QScrollArea to the QVBoxLayout
+        self.layoutV.addWidget(self.scrollArea)
+        # self.layoutV.addLayout(self.mode_layout)
         counter = 2
         for mode_option in self.decisionArray_modes:
             self.mode_layout.addWidget(self.decisionLayouts[mode_option[0]],counter,0,1,2)
@@ -5309,7 +5338,6 @@ class advDecisionGridLayout(QGroupBox):
 #endregion
 
 #region VariablesWidget
-
 from PyQt5.QtWidgets import QTableWidget
 
 class HoverTableWidget(QTableWidget):
@@ -5655,9 +5683,60 @@ class generalNodzCallActionWorker(QRunnable):
         elif self.nodzType == 'MMconfigChangeRan':
             #We need to change some configs (probably):
             for config_to_change in self.args['config_string_storage']:
-                #Change the config, and wait for the config to be changed
-                self.args['core'].set_config(config_to_change[0],config_to_change[1]) #type:ignore
-                self.args['core'].wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
+                
+                #Find the correct config_group in MMconfig:
+                for config_group_id_loop in self.args['MMconfig'].config_groups:
+                    config_group_name = self.args['MMconfig'].config_groups[config_group_id_loop].configGroupName()
+                    if config_group_name == config_to_change[0]:
+                        config_group_id = config_group_id_loop
+                        #Over-write the grouptype like this:
+                        config_group_type = 'InputField'
+                        if self.args['MMconfig'].config_groups[config_group_id].isInputField():
+                            config_group_type = 'InputField'
+                        if self.args['MMconfig'].config_groups[config_group_id].isDropDown():
+                            config_group_type = 'DropDown'
+                        if self.args['MMconfig'].config_groups[config_group_id].isSlider():
+                            config_group_type = 'Slider'
+                
+                if config_group_type == 'DropDown':
+                    logging.debug('Changing dropDown value from MMconfig-Nodz!')
+                    #Change the config, and wait for the config to be changed - this works for groups
+                    self.args['core'].set_config(config_to_change[0],config_to_change[1]) #type:ignore
+                    self.args['core'].wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
+                elif config_group_type == 'InputField':
+                    logging.info('Changing inputField value from MMconfig-Nodz!')
+                    CurrentText = config_to_change[1]
+                    #Get the config group name:
+                    configGroupName = self.args['MMconfig'].config_groups[config_group_id].configGroupName()
+
+                    #An Editfield config by definition (?) only has a single property underneath, so get that:
+                    underlyingProperty = self.args['MMconfig'].config_groups[config_group_id].core.get_available_configs(configGroupName).get(0)
+                    configdata = self.args['MMconfig'].config_groups[config_group_id].core.get_config_data(configGroupName,underlyingProperty)
+                    device_label = configdata.get_setting(0).get_device_label()
+                    property_name = configdata.get_setting(0).get_property_name()
+
+                    #Set this property:
+                    self.args['MMconfig'].config_groups[config_group_id].core.set_property(device_label,property_name,CurrentText)
+                    logging.info(f"Changed {device_label}.{property_name} to {CurrentText}")
+                elif config_group_type == 'Slider':
+                    logging.debug('Changing slider value from MMconfig-Nodz!')
+                    newValue = config_to_change[1]
+                    #Get the true value from the conversion - not required in MMconfig-nodz:
+                    trueValue = newValue
+                    
+                    #Get the config group name:
+                    configGroupName = self.args['MMconfig'].config_groups[config_group_id].configGroupName()
+                    #Set in MM:
+                    #A slider config by definition (?) only has a single property underneath, so get that:
+                    underlyingProperty = self.args['MMconfig'].config_groups[config_group_id].core.get_available_configs(configGroupName).get(0)
+                    configdata = self.args['MMconfig'].config_groups[config_group_id].core.get_config_data(configGroupName,underlyingProperty)
+                    device_label = configdata.get_setting(0).get_device_label()
+                    property_name = configdata.get_setting(0).get_property_name()
+
+                    #Set this property:
+                    self.args['MMconfig'].config_groups[config_group_id].core.set_property(device_label,property_name,trueValue)
+                    logging.info(f"Changed {device_label}.{property_name} to {trueValue}")
+                    
         elif self.nodzType == 'AnalysisNode' or self.nodzType == 'CustomFunctionNode':
             #Get all the necessary info
             evalText = self.args['evalText']

@@ -256,7 +256,7 @@ class MMConfigUI(CustomMainWindow):
         self.sliders = {}
         self.editFields = {}
         self.configCheckboxes = {}
-        self.sliderPrecision = 100
+        self.sliderPrecision = 1000
         self.config_string_storage = []
         self.relstage_string_storage = []
         #Create a Vertical+horizontal layout:
@@ -477,7 +477,7 @@ class MMConfigUI(CustomMainWindow):
             #Get the true value from the conversion:
             currentUIvalue = sliderValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
         elif self.config_groups[config_id].isInputField():
-            currentUIvalue = None
+            currentUIvalue = self.editFields[config_id].text()
         else:
             currentUIvalue = None
         return currentUIvalue
@@ -1350,19 +1350,21 @@ class MMConfigUI(CustomMainWindow):
         if self.showCheckboxes:
             #Check the corresponding checkbox:
             self.configCheckboxes[config_id].setChecked(True)
-        if self.changes_update_MM:
-            #Get the new value from the slider:
-            if fromSlider:
-                newValue = self.sliders[config_id].value()
-                #Get the true value from the conversion:
-                trueValue = newValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
-            elif fromText:
-                if self.editFields[config_id].text() != "":
-                    trueValue = float(self.editFields[config_id].text())
-                else:
-                    trueValue = ""
+            
+        #Get the new value from the slider:
+        if fromSlider:
+            newValue = self.sliders[config_id].value()
+            #Get the true value from the conversion:
+            trueValue = newValue/self.sliders[config_id].slider_conversion_array[2]*(self.sliders[config_id].slider_conversion_array[1]-self.sliders[config_id].slider_conversion_array[0])+self.sliders[config_id].slider_conversion_array[0]
+        elif fromText:
+            if self.editFields[config_id].text() != "":
+                trueValue = float(self.editFields[config_id].text())
             else:
-                trueValue = "" #error out later on purpose
+                trueValue = ""
+        else:
+            trueValue = "" #error out later on purpose
+            
+        if self.changes_update_MM:
             #Change the value if it's a true value
             if trueValue != "" and trueValue != " ":
                 #Get the config group name:
@@ -1377,12 +1379,14 @@ class MMConfigUI(CustomMainWindow):
                 #Set this property:
                 self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
                 
-                #Set the slider/text if the other is changed
-                if fromSlider:
-                    self.editFields[config_id].setText(str(trueValue))
-                elif fromText:
-                    newValue = self.sliders[config_id].slider_conversion_array[2] * (trueValue - self.sliders[config_id].slider_conversion_array[0]) / (self.sliders[config_id].slider_conversion_array[1] - self.sliders[config_id].slider_conversion_array[0])
-                    self.sliders[config_id].setValue(int(newValue))
+        if trueValue != "" and trueValue != " ":
+            trueValue = round(trueValue,3)
+            #Set the slider/text if the other is changed
+            if fromSlider:
+                self.editFields[config_id].setText(str(trueValue))
+            elif fromText:
+                newValue = self.sliders[config_id].slider_conversion_array[2] * (trueValue - self.sliders[config_id].slider_conversion_array[0]) / (self.sliders[config_id].slider_conversion_array[1] - self.sliders[config_id].slider_conversion_array[0])
+                self.sliders[config_id].setValue(int(newValue))
     
     def addInputField(self,rowLayout,config_id):
         """ 
