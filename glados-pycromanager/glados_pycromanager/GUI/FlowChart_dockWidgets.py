@@ -2,13 +2,15 @@
 #Add inclusion of this folder:
 import sys, os
 from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QTextCursor
 sys.path.append('glados-pycromanager\\glados_pycromanager\\GUI\\nodz')
 from PyQt5 import QtCore, QtWidgets
 import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
 from MMcontrols import MMConfigUI, ConfigInfo
 from MDAGlados import MDAGlados
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QDoubleSpinBox
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QPlainTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QDoubleSpinBox
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QGridLayout, QPushButton
@@ -1488,9 +1490,17 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.variablesWidget = VariablesWidget(nodzinstance=self)
         newgridlayout.addWidget(self.variablesWidget)
         
+        self.loggerINFOGroupBox = QGroupBox("Logger")
+        newgridlayout = QGridLayout()
+        self.loggerINFOGroupBox.setLayout(newgridlayout)
+        self.loggerINFOWidget = LoggerWidget(logLevel='INFO')
+        newgridlayout.addWidget(self.loggerINFOWidget)
         
-    
-    
+        self.loggerDEBUGGroupBox = QGroupBox("LoggerDEBUG")
+        newgridlayout = QGridLayout()
+        self.loggerDEBUGGroupBox.setLayout(newgridlayout)
+        self.loggerDEBUGWidget = LoggerWidget(logLevel='DEBUG')
+        newgridlayout.addWidget(self.loggerDEBUGWidget)
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
@@ -1498,22 +1508,35 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.defineNodeInfo()
         
-        # Add the QGraphicsView to the mainLayout and allt he other layouts
-        self.mainLayout.addWidget(self.graphics_view,0,0,2,1)
-        self.mainLayout.addLayout(self.buttonsArea,0,1,2,1)
-        tabLayout = QVBoxLayout()
-        tabLayout.addWidget(self.tabWidget)
-        self.tabWidget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        self.mainLayout.addLayout(tabLayout,0,2,2,1)
+        
+        #One widget/layout has the nodz info and the buttons, the other has the tabWidget:
+        self.NodzPlusButtonsWidget = QWidget()
+        self.NodzPlusButtonsLayout = QGridLayout()
+        self.NodzPlusButtonsWidget.setLayout(self.NodzPlusButtonsLayout)
+        self.NodzPlusButtonsLayout.addWidget(self.graphics_view,0,0)
+        self.NodzPlusButtonsLayout.addLayout(self.buttonsArea,0,1)
+        
+        from PyQt5.QtWidgets import  QSplitter
+
+        self.splitter = QSplitter()
+        self.splitter.addWidget(self.NodzPlusButtonsWidget)
+        self.splitter.addWidget(self.tabWidget)
+        # Set a style sheet for the splitter handle to make it more visible
+        self.splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #606060;
+            }
+        """)
+        
+        self.mainLayout.addWidget(self.splitter)
+        
         
         #Create a tab for the decision widget:
         self.tabWidget.addTab(self.decision_groupbox, "Decision")
         self.tabWidget.addTab(self.scanwidget_groupbox, "Scanning")
         self.tabWidget.addTab(self.variablesWidgetGroupbox, "Variables")
-        
-        # self.mainLayout.addWidget(self.decision_groupbox,0,2,1,1)
-        # self.mainLayout.addWidget(self.scanwidget_groupbox,1,2,1,1)
-        # self.mainLayout.addWidget(self.variablesWidgetGroupbox,0,3,2,1)
+        self.tabWidget.addTab(self.loggerINFOGroupBox, "Logger")
+        self.tabWidget.addTab(self.loggerDEBUGGroupBox, "Debug")
         
         #Global variables for MM/napari
         self.core = core
@@ -5657,6 +5680,58 @@ class VariablesDialog(QDialog, VariablesBase):
         
 #endregion
 
+#region LoggerWidget
+class LoggerWidget(QPlainTextEdit):
+    def __init__(self, logLevel='INFO'):
+        super().__init__()
+        
+        # Set the widget to read-only
+        self.setReadOnly(True)
+        
+        # Get the appdata folder
+        appdata_folder = os.getenv('APPDATA')
+        if appdata_folder is None:
+            raise EnvironmentError("APPDATA environment variable not found")
+        self.app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+    
+        #Find all log files
+        log_files = [f for f in os.listdir(self.app_specific_folder) if f.endswith(".log")]
+        if not log_files:
+            return None
+    
+        if logLevel == 'DEBUG':
+            correct_level_log_files = [f for f in log_files if 'DEBUG' in f]
+            self.most_recent_file = max(correct_level_log_files, key=lambda f: os.path.getmtime(os.path.join(self.app_specific_folder, f)))
+        else:
+            correct_level_log_files = [f for f in log_files if 'INFO' in f]
+            self.most_recent_file = max(correct_level_log_files, key=lambda f: os.path.getmtime(os.path.join(self.app_specific_folder, f)))
+        
+        self.update_log_content()
+        
+        # Set up a timer to periodically update the log content
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_log_content)
+        #random value between around 500: (desyncs multiple logger widgets)
+        import random
+        if logLevel == 'DEBUG':
+            self.timer.start(random.randint(4000, 6000))
+        else:
+            self.timer.start(random.randint(400, 600))
+            
+    def update_log_content(self):
+        """ 
+        Update the contents of the logger view by re-reading the log_file
+        """
+        if not self.most_recent_file:
+            return
+
+        with open(os.path.join(self.app_specific_folder,self.most_recent_file), 'r') as log_file:
+            self.setPlainText(log_file.read())
+            self.moveCursor(QTextCursor.End)  # Scroll to the bottom
+
+#endregion
+
+#region NodzWorkers
 from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QPushButton, QWidget
 from PyQt5.QtCore import QThreadPool, QRunnable, pyqtSlot
 # Define a WorkerSignals class to handle signals
@@ -5665,7 +5740,6 @@ class WorkerSignals(QObject):
     Signals belonging to generalNodzCallActionWorker
     """
     finished = pyqtSignal()
-
 
 class generalNodzCallActionWorker(QRunnable):
     
@@ -5764,6 +5838,8 @@ class generalNodzCallActionWorker(QRunnable):
         
         #Emit that the node is finished :) 
         self.signals.finished.emit()
+
+#endregion
 
 
 def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):

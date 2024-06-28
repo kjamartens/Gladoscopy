@@ -2556,3 +2556,49 @@ def getCoreDevicesOfDeviceType(core,devicetype):
     return devicesOfType
 
 
+import datetime
+def set_up_logger():
+    """
+    Set up a DEBUG and INFO logger, storing to LOG files in the APPDATA folder structure.
+    """
+    
+    # Set up logging at correct level
+    appdata_folder = os.getenv('APPDATA')
+    if appdata_folder is None:
+        raise EnvironmentError("APPDATA environment variable not found")
+    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+    
+    # Clear old log files older than a week
+    if os.path.exists(app_specific_folder):
+        one_week_ago = datetime.datetime.now() - datetime.timedelta(weeks=1)
+        for file in os.listdir(app_specific_folder):
+            if file.endswith(".log"):
+                file_path = os.path.join(app_specific_folder, file)
+                file_mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(file_path))
+                if file_mod_time < one_week_ago:
+                    os.remove(file_path)
+
+    # Get the current date and time to add to log file names
+    current_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Set up file-based INFO and DEBUG logging:
+    log_file_path_DEBUG = os.path.join(app_specific_folder, f'Glados_logpath_DEBUG_{current_datetime}.log')
+    log_file_path_INFO = os.path.join(app_specific_folder, f'Glados_logpath_INFO_{current_datetime}.log')
+
+    # Create the file handlers
+    file_handlerDEBUG = logging.FileHandler(log_file_path_DEBUG)
+    file_handlerDEBUG.setLevel(logging.DEBUG)
+    file_handlerINFO = logging.FileHandler(log_file_path_INFO)
+    file_handlerINFO.setLevel(logging.INFO)
+
+    # Get the root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  # Set the overall logging level to DEBUG
+
+    # Add the handlers to the logger
+    logger.addHandler(file_handlerINFO)
+    logger.addHandler(file_handlerDEBUG)
+
+    for handler in logger.handlers:
+        handler.formatter = logging.Formatter("%(asctime)s [%(levelname)s] \t %(message)s [%(filename)s:%(lineno)d]")
+
