@@ -94,39 +94,39 @@ def set_strobo_lasers(core,**kwargs):
         
         #Loop over number of frames after which it repeats
         if printStatements: print('PAC'+str(laser_id+1))
-        # core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(laser_id+1))
-        # TS_Response_verbose();
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(laser_id+1))
+        TS_Response_verbose();
 
         for k in range(0,pulse_frames): #type:ignore
             if k == 0:
                 if pulse_len>0: #type:ignore
                     power_level = 65535*0.01*power_pct
-                    # if i == 2: #Exception for the 561 laser:
-                    #     logging.debug('Power level exception for 561 laser succes')
-                    #     power_level = 65535*0.01*GetIntensityLaser(MM_JSON,i)*(8/100)
+                    if laser_id == 2: #Exception for the 561 laser:
+                        if printStatements: print('Power level exception for 561 laser succes')
+                        power_level = 65535*0.01*power_pct*(12/100)
                     if printStatements: print('PAO'+str(laser_id+1)+'-0-' + str(round(power_level)))
-                    # core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-0-' + str(round(power_level)))
-                    # TS_Response_verbose();
+                    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-0-' + str(round(power_level)))
+                    TS_Response_verbose();
                 else:
                     if printStatements: print('PAO'+str(laser_id+1)+'-0-' + str(round(0)))
-                    # core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-0-' + str(round(0)))
-                    # TS_Response_verbose();
+                    core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-0-' + str(round(0)))
+                    TS_Response_verbose();
             else:
                 time.sleep(0.1)
                 if printStatements: print('PAO'+str(laser_id+1)+'-0-' + str(round(0)))
-                # core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-'+str(k)+'-0')
-                # TS_Response_verbose();
+                core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-'+str(k)+'-0')
+                TS_Response_verbose();
 
             if printStatements: print('PAS'+str(laser_id+1)+'-1-1')
-            # core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(laser_id+1)+'-1-1')
-            # TS_Response_verbose();
+            core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(laser_id+1)+'-1-1')
+            TS_Response_verbose();
 
         if printStatements: print('BAD'+str(laser_id+1)+'-'+str(pulse_delay))
-        # core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(laser_id+1)+'-'+str(pulse_delay)) 
-        # TS_Response_verbose();
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(laser_id+1)+'-'+str(pulse_delay)) 
+        TS_Response_verbose();
         if printStatements: print('BAL'+str(laser_id+1)+'-'+str(pulse_len))
-        # core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(laser_id+1)+'-'+str(pulse_len)) 
-        # TS_Response_verbose();
+        core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(laser_id+1)+'-'+str(pulse_len)) 
+        TS_Response_verbose();
     
     
     
