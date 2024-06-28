@@ -1500,7 +1500,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         newgridlayout = QGridLayout()
         self.loggerDEBUGGroupBox.setLayout(newgridlayout)
         self.loggerDEBUGWidget = LoggerWidget(logLevel='DEBUG')
+        self.loggerDEBUGupdateButton = QPushButton('Update')
+        self.loggerDEBUGupdateButton.clicked.connect(lambda index: self.loggerDEBUGWidget.update_log_content())
         newgridlayout.addWidget(self.loggerDEBUGWidget)
+        newgridlayout.addWidget(self.loggerDEBUGupdateButton)
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
@@ -5708,14 +5711,12 @@ class LoggerWidget(QPlainTextEdit):
         
         self.update_log_content()
         
-        # Set up a timer to periodically update the log content
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_log_content)
         #random value between around 500: (desyncs multiple logger widgets)
         import random
-        if logLevel == 'DEBUG':
-            self.timer.start(random.randint(4000, 6000))
-        else:
+        if not logLevel == 'DEBUG':
+            # Set up a timer to periodically update the log content
+            self.timer = QTimer(self)
+            self.timer.timeout.connect(self.update_log_content)
             self.timer.start(random.randint(400, 600))
             
     def update_log_content(self):
