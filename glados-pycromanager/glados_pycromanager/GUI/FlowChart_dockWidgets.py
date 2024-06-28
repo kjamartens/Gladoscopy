@@ -1,6 +1,7 @@
 #region imports
 #Add inclusion of this folder:
 import sys, os
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QGroupBox
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QTextCursor
@@ -1425,36 +1426,55 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         self.fullRunOngoing = False
         
+        
+        #Find the iconPath folder
+        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+            self.iconFolder = './glados_pycromanager/GUI/Icons/'
+        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+        else:
+            self.iconFolder = ''
+        
         #Add a few buttons:
         self.buttonsArea = QVBoxLayout()
-        self.loadPickleButton = QPushButton('Load Graph')
+        self.loadPickleButton = QPushButton(' Load graph')
         self.buttonsArea.addWidget(self.loadPickleButton)
         self.loadPickleButton.clicked.connect(lambda index: self.loadGraphJSON())
-        self.fullRunButton = QPushButton('Start run!')
-        self.buttonsArea.addWidget(self.fullRunButton)
-        self.fullRunButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
+        # icon: Flaticon.com
+        self.loadPickleButton.setIcon(QIcon(self.iconFolder+os.sep+'Load.png'))
         
-        self.runInitButton = QPushButton('Run Init Only')
-        self.buttonsArea.addWidget(self.runInitButton)
-        self.runInitButton.clicked.connect(lambda index: self.runInitOnly())
-        
-        self.runScoringButton = QPushButton('Run Scoring Only')
-        self.buttonsArea.addWidget(self.runScoringButton)
-        self.runScoringButton.clicked.connect(lambda index: self.runScoringOnly())
-        
-        self.runScoringPlusAcqButton = QPushButton('Run Scoring + Acq')
-        self.buttonsArea.addWidget(self.runScoringPlusAcqButton)
-        self.runScoringPlusAcqButton.clicked.connect(lambda index: self.runScoring())
-        
-        self.storePickleButton = QPushButton('Store Graph')
+        self.storePickleButton = QPushButton(' Store graph')
         self.buttonsArea.addWidget(self.storePickleButton)
         self.storePickleButton.clicked.connect(lambda index: self.storeGraphJSON())
-        self.runAcquiringButton = QPushButton('Run Acquiring')
+        # icon: Flaticon.com
+        self.storePickleButton.setIcon(QIcon(self.iconFolder+os.sep+'Save.png'))
+        
+        self.fullRunButton = QPushButton(' Start run')
+        self.buttonsArea.addWidget(self.fullRunButton)
+        self.fullRunButton.clicked.connect(lambda index: self.fullAutonomousRunStart())
+        self.fullRunButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_all.png'))
+        
+        self.runInitButton = QPushButton(' Init Only')
+        self.buttonsArea.addWidget(self.runInitButton)
+        self.runInitButton.clicked.connect(lambda index: self.runInitOnly())
+        self.runInitButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_init.png'))
+        
+        self.runScoringButton = QPushButton(' Scoring Only')
+        self.buttonsArea.addWidget(self.runScoringButton)
+        self.runScoringButton.clicked.connect(lambda index: self.runScoringOnly())
+        self.runScoringButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_score.png'))
+        self.runAcquiringButton = QPushButton(' Acquiring Only')
         self.buttonsArea.addWidget(self.runAcquiringButton)
         self.runAcquiringButton.clicked.connect(lambda index: self.runAcquiring())
-        self.debugScoringButton = QPushButton('Debug Scoring')
-        self.buttonsArea.addWidget(self.debugScoringButton)
-        self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
+        self.runAcquiringButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_acq.png'))
+        
+        # self.runScoringPlusAcqButton = QPushButton('Run Scoring + Acq')
+        # self.buttonsArea.addWidget(self.runScoringPlusAcqButton)
+        # self.runScoringPlusAcqButton.clicked.connect(lambda index: self.runScoring())
+        
+        # self.debugScoringButton = QPushButton('Debug Scoring')
+        # self.buttonsArea.addWidget(self.debugScoringButton)
+        # self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
         
         self.globalVariables={}
         self.globalVariables['TrialGlobalVariable']={}
