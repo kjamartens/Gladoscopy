@@ -340,11 +340,11 @@ class MDAGlados(CustomMainWindow):
                 num_time_points: int | None = 10, 
                 time_interval_s: float | List[float] = 0, 
                 time_interval_s_or_ms: str = 'ms',
-                z_start: float | None = None, 
-                z_end: float | None = None, 
+                z_start: float | None = 0, 
+                z_end: float | None = 1, 
                 z_step: float | None = None, 
                 z_stage_sel : str | None = None,
-                z_nr_steps: float | None = None,
+                z_nr_steps: float | None = 2,
                 z_step_distance: float | None = None,
                 z_nrsteps_radio_sel: bool | None = None,
                 z_stepdistance_radio_sel: bool | None = None,
@@ -1564,7 +1564,11 @@ class MDAGlados(CustomMainWindow):
         
         #Do a small catch in case z_start, z_step or z_end is None:
         if self.z_start is None or self.z_step is None or self.z_end is None:
-            logging.warning("z_start, z_step or z_end is None. MDA will not be created.")
+            if self.zGroupBox.isEnabled() and self.GUI_show_z:
+                #Only a warning if we actually want Z, if we don't, it's just a debug info.
+                logging.info("z_start, z_step or z_end is None. These are adapted to 0/1/1.")
+            else:
+                logging.debug("z_start, z_step or z_end is None. These are adapted to 0/1/1.")
             self.z_start = 0
             self.z_step = 1
             self.z_end = 1
