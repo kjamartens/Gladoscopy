@@ -27,18 +27,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Analysis_Images import * #type: ignore
 from Analysis_Measurements import * #type: ignore
 from Analysis_Shapes import * #type: ignore
-from CustomFunctions import * #type: ignore
-from Scoring_Images import * #type: ignore
-from Scoring_Measurements import * #type: ignore
-from Scoring_Shapes import * #type: ignore
-from Scoring_Images_Measurements import * #type: ignore
-from Scoring_Measurements_Shapes import * #type: ignore
-from Scoring_Images_Measurements_Shapes import * #type: ignore
-from Visualisation_Images import * #type: ignore
-from Visualisation_Measurements import * #type: ignore
-from Visualisation_Shapes import * #type: ignore
 from Real_Time_Analysis import * #type: ignore
-import HelperFunctions #type: ignore
 import logging
 import utils
 from nodz import nodz_utils
@@ -2153,9 +2142,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Initialise text on the node with a 'double-click this to set the settings!' text:
             if not newNode.createdFromLoading:
                 self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
-        elif nodeType == 'analysisGrayScaleTest':
-            newNode.callAction = lambda self, node=newNode: self.GrayScaleTest(node)
-            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
         elif nodeType == 'customFunction':
             newNode.callAction = lambda self, node=newNode: self.CustomFunctionNode_started(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -3857,32 +3843,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.thread_pool.start(worker)
         
         # self.finishedEmits(node)
-    
-    def GrayScaleTest(self,node):
-        """
-        This function is the action function for the Grayscale Test node in the Flowchart.
-
-        This function takes the data from the MDA node, which should be connected
-        to the Grayscale Test node, and performs a grayscale analysis on the data.
-
-        Args:
-            node (nodz.Node): The node that has triggered the event.
-
-        """
-        #Find the node that is connected to this
-        connectedNode = node.sockets['Analysis start'].connected_slots[0].parentItem()
-        #First assess that it's a MDA node:
-        if 'acquisition' not in connectedNode.name:
-            logging.error('Error! Acquisition not connected to Grayscale test!')
-        else:
-            #And then find the mdaData object
-            mdaDataobject = connectedNode.mdaData
-            #Thow this into the analysis:
-            
-            avgGrayVal = eval(HelperFunctions.createFunctionWithKwargs("AverageIntensity.AvgGrayValue",NDTIFFStack="mdaDataobject.data",core="mdaDataobject.core"))
-            logging.info(f"found avg gray val: {avgGrayVal}")
-            
-        self.finishedEmits(node)
 
     def acquiringStart(self,node):
         """

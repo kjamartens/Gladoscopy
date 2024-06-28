@@ -13,6 +13,7 @@ import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from napari.layers import Shapes
 from typing import Union, Tuple, List
+import logging
 # from stardist.models import StarDist2D
 from PIL import Image, ImageDraw
 import utils
@@ -23,17 +24,7 @@ from Analysis_Images import * #type: ignore
 from Analysis_Measurements import * #type: ignore
 from Analysis_Shapes import * #type: ignore
 from CustomFunctions import * #type: ignore
-from Scoring_Images import * #type: ignore
-from Scoring_Measurements import * #type: ignore
-from Scoring_Shapes import * #type: ignore
-from Scoring_Images_Measurements import * #type: ignore
-from Scoring_Measurements_Shapes import * #type: ignore
-from Scoring_Images_Measurements_Shapes import * #type: ignore
-from Visualisation_Images import * #type: ignore
-from Visualisation_Measurements import * #type: ignore
-from Visualisation_Shapes import * #type: ignore
-#Obtain the helperfunctions
-import HelperFunctions  #type: ignore
+from Real_Time_Analysis import * #type: ignore
 
 #Class for overlays and their update and such
 class napariOverlay():
@@ -434,8 +425,6 @@ class AnalysisThread(QThread):
                     analysisResult = self.changeStageAtFrame(image,metadata=metadata,core=self.shared_data.core,frame=500)
                 elif self.analysisInfo == 'GrayValueOverlay':
                     analysisResult = self.calcGrayValueOverlay(image,metadata=metadata)
-                elif self.analysisInfo == 'CellSegmentOverlay':
-                    analysisResult = self.calcCellSegmentOverlay(image,metadata=metadata)
                 else:
                     analysisResult = None
                 return [analysisResult,metadata]
@@ -454,8 +443,6 @@ class AnalysisThread(QThread):
             self.initAvgGrayValueText()
         elif self.analysisInfo == 'GrayValueOverlay':
             self.initGrayScaleImageOverlay()
-        elif self.analysisInfo == 'CellSegmentOverlay':
-            self.initCellSegmentOverlay()
         elif self.analysisInfo == 'ChangeStageAtFrame':
             self.initChangeStageAtFrame()
         else:
@@ -472,8 +459,6 @@ class AnalysisThread(QThread):
                     self.visualiseAvgGrayValueText(analysis_result=analysis_result,metadata=metadata)
                 elif self.analysisInfo == 'GrayValueOverlay':
                     self.visualiseGrayScaleImageOverlay(analysis_result=analysis_result,metadata=metadata)
-                elif self.analysisInfo == 'CellSegmentOverlay':
-                    self.visualiseCellSegmentOverlay(analysis_result=analysis_result,metadata=metadata)
                 # else:
                 #     self.visualiseRandomOverlay()
     
@@ -554,24 +539,6 @@ class AnalysisThread(QThread):
     def initGrayScaleImageOverlay(self):
         self.napariOverlay.imageOverlay_init()
         self.napariOverlay.changeName('Grayscale Image Overlay')
-        
-    """
-    Testing cell segmentation
-    """
-    def calcCellSegmentOverlay(self,image,metadata=None):
-        coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment_preloadedModel",image_data="image",model="self.stardistModel"))
-        #Get image from this coords:
-        outimage = self.outlineCoordinatesToImage(coords)
-        return outimage
-        
-    def visualiseCellSegmentOverlay(self,analysis_result=None,metadata={}):
-        # self.napariOverlay.drawShapesOverlay(shapePosList=analysis_result,shapeCol=['red'])
-        self.napariOverlay.drawImageOverlay(im=analysis_result) #type:ignore
-        
-    def initCellSegmentOverlay(self):
-        # self.napariOverlay.shapesOverlay_init()
-        self.napariOverlay.imageOverlay_init(blending='additive',opacity=0.5,colormap='red')
-        self.napariOverlay.changeName('Cell Segment Overlay')
 
 
 

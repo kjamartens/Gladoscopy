@@ -17,12 +17,10 @@ import logging
 import os
 
 from LaserControlScripts import *
-from AutonomousMicroscopyScripts import *
 from MMcontrols import microManagerControlsUI
 from MDAGlados import MDAGlados
 from AnalysisClass import *
 from Analysis_dockWidgets import *
-from mdaAnalysisScoringVisualisation import *
 from FlowChart_dockWidgets import *
 from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 from utils import cleanUpTemporaryFiles

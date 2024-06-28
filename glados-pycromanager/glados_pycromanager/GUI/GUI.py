@@ -4,7 +4,6 @@ sys.path.append('GUI\\nodz')
 
 import os
 from LaserControlScripts import *
-# from AutonomousMicroscopyScripts import *
 # from MMcontrols import *
 from napariGlados import *
 from PyQt5.QtWidgets import QMainWindow,QApplication
