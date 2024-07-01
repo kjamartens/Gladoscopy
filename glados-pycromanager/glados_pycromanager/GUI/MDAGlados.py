@@ -666,11 +666,17 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
         self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
         self.xypositionListWidget_addButton = QPushButton('Add New Entry')
+        #Intialise a gridManager
+        self.xypositionListWidget_XYGridManager = utils.XYGridManager(core=self.core)
+        self.xypositionListWidget_createGridButton = QPushButton('Create Grid')
         #Adding callbacks to the xy position list buttons
         self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
         self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget.moveUp)
         self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
         self.xypositionListWidget_addButton.clicked.connect(lambda: self.xypositionListWidget.addNewEntry(textEntry="Your Text Entry"))
+        
+        #Open the GridManager GUI
+        self.xypositionListWidget_createGridButton.clicked.connect(lambda: self.xypositionListWidget_XYGridManager.openGUI())
 
         #Adding widgets to layout
         xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
@@ -680,6 +686,7 @@ class MDAGlados(CustomMainWindow):
         xyLayout.addWidget(self.xypositionListWidget_moveUpButton,3,1)
         xyLayout.addWidget(self.xypositionListWidget_moveDownButton,4,1)
         xyLayout.addWidget(self.xypositionListWidget_addButton,5,1)
+        xyLayout.addWidget(self.xypositionListWidget_createGridButton,6,1)
         
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:

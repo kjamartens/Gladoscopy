@@ -821,6 +821,119 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
 
     return allData
 
+#Idea of XY grid: have methods to create a pop-up dialog, where users can set up the grid (top), setting up top/bottom/left/right/center and specifiy overlap. This then also includes a grid-flow (bottom) with options betwen e.g. normal grid, diagonal grid, spiral grid, etc
+#The class both includes the settings, the positions, and the GUI
+
+class XYGridManager():
+    def __init__(self, core = None):
+        #Initialise with empty positions.
+        self.core = core
+        self.pos_top_left = []
+        self.pos_top_right = []
+        self.pos_bottom_left = []
+        self.pos_bottom_right = []
+        self.pos_center = []
+        self.pos_overlap = []
+        self.grid_flow_type = 'normal'
+    
+    def openGUI(self):
+        """ 
+        Create a GUI that allows for setting of the grid and flow
+        """
+        
+        #Create a QDialog with OK/Cancel button:
+        from PyQt5.QtWidgets import QDialog, QDialogButtonBox
+        from PyQt5.QtCore import Qt
+        
+        dialog = QDialog()
+        dialog.setWindowTitle("XY Grid Setup")
+        
+        #Create a QGridLayout:
+        layout = QGridLayout()
+        
+        self.groupBoxGridSetup = QGroupBox("Grid Setup")
+        #Initialise the GridSetup
+        self.gridlayoutGridSetup = QGridLayout()
+        self.groupBoxGridSetup.setLayout(self.gridlayoutGridSetup)
+        
+        #Add a bunch of buttons:
+        self.buttonTopLeft = QPushButton("Set Top Left")
+        self.buttonTopRight = QPushButton("Set Top Right")
+        self.buttonBottomLeft = QPushButton("Set Bottom Left")
+        self.buttonBottomRight = QPushButton("Set Bottom Right")
+        self.buttonCenter = QPushButton("Set Center")
+        
+        self.buttonNrGridsCenter = QPushButton("Set Grids")
+        
+        
+        #Add a bunch of uneditable text entries
+        self.setPosTopLeft = QLabel("NaN")
+        self.setPosTopLeft.setAlignment(Qt.AlignCenter)
+        self.setPosTopRight = QLabel("NaN")
+        self.setPosTopRight.setAlignment(Qt.AlignCenter)
+        self.setPosBottomLeft = QLabel("NaN")
+        self.setPosBottomLeft.setAlignment(Qt.AlignCenter)
+        self.setPosBottomRight = QLabel("NaN")
+        self.setPosBottomRight.setAlignment(Qt.AlignCenter)
+        self.setPosCenter = QLabel("NaN")
+        self.setPosCenter.setAlignment(Qt.AlignCenter)
+        
+        #Add callbacks:
+        
+        self.buttonCenter.clicked.connect(lambda: self.setPosition("pos_center"))
+        
+        #Add them:
+        self.gridlayoutGridSetup.addWidget(self.buttonTopLeft,0,0)
+        self.gridlayoutGridSetup.addWidget(self.buttonTopRight,0,2)
+        self.gridlayoutGridSetup.addWidget(self.buttonBottomLeft,3*2,0)
+        self.gridlayoutGridSetup.addWidget(self.buttonBottomRight,3*2,2)
+        self.gridlayoutGridSetup.addWidget(self.buttonCenter,3*1,1)
+        
+        self.gridlayoutGridSetup.addWidget(self.setPosTopLeft,0*3+1,0)
+        self.gridlayoutGridSetup.addWidget(self.setPosTopRight,0*3+1,2)
+        self.gridlayoutGridSetup.addWidget(self.setPosBottomLeft,3*2+1,0)
+        self.gridlayoutGridSetup.addWidget(self.setPosBottomRight,3*2+1,2)
+        self.gridlayoutGridSetup.addWidget(self.setPosCenter,3*1+1,1)
+        
+        self.gridlayoutGridSetup.addWidget(self.buttonNrGridsCenter,3*1+2,1)
+        
+    
+        
+        self.groupBoxGridFlow = QGroupBox("Grid Flow")
+        
+        #Add a group box to the layout:
+        layout.addWidget(self.groupBoxGridSetup,0,0)
+        layout.addWidget(self.groupBoxGridFlow,1,0)
+        #Add a button box
+        
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        
+        layout.addWidget(self.buttonBox,3,0)
+        dialog.setLayout(layout)
+        
+        dialog.exec_()
+        
+        pass
+
+    def setPosition(self,positionAttr):
+        xx = self.core.get_xy_stage_position().x
+        yy = self.core.get_xy_stage_position().y
+        text = f"{xx}, {yy}"
+        
+        if positionAttr == "pos_center":
+            self.setPosCenter.setText(text)
+        
+        
+        pass
+
+    def accept(self):
+        pass
+
+    def reject(self):
+        pass
+
 class multiLineEdit_valueVarAdv(QHBoxLayout):
     
     def __init__(self,current_selected_function,inputData,curr_layout,nodzInfo,ShowVariablesOptions=True,textChangeCallback=None,valueVarAdv='Value'):
