@@ -881,6 +881,10 @@ class XYGridManager():
         #Add callbacks:
         
         self.buttonCenter.clicked.connect(lambda: self.setPosition("pos_center"))
+        self.buttonTopLeft.clicked.connect(lambda: self.setPosition("pos_top_left"))
+        self.buttonTopRight.clicked.connect(lambda: self.setPosition("pos_top_right"))
+        self.buttonBottomLeft.clicked.connect(lambda: self.setPosition("pos_bot_left"))
+        self.buttonBottomRight.clicked.connect(lambda: self.setPosition("pos_bot_right"))
         
         #Add them:
         self.gridlayoutGridSetup.addWidget(self.buttonTopLeft,0,0)
@@ -918,12 +922,21 @@ class XYGridManager():
         pass
 
     def setPosition(self,positionAttr):
-        xx = self.core.get_xy_stage_position().x
-        yy = self.core.get_xy_stage_position().y
+        #Create text of these positions with 2 dec places:
+        xx = "{:.2f}".format(self.core.get_xy_stage_position().x)
+        yy = "{:.2f}".format(self.core.get_xy_stage_position().y)
         text = f"{xx}, {yy}"
         
         if positionAttr == "pos_center":
             self.setPosCenter.setText(text)
+        elif positionAttr == "pos_top_left":
+            self.setPosTopLeft.setText(text)
+        elif positionAttr == "pos_top_right":
+            self.setPosTopRight.setText(text)
+        elif positionAttr == "pos_bot_left":
+            self.setPosBottomLeft.setText(text)
+        elif positionAttr == "pos_bot_right":
+            self.setPosBottomRight.setText(text)
         
         
         pass
@@ -2395,7 +2408,7 @@ import json
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','data','config_groups','mainLayout']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','data','config_groups','mainLayout','xypositionListWidget_XYGridManager']
 
     def save_state_MMControls(self,filename):
         if os.path.exists(filename):
