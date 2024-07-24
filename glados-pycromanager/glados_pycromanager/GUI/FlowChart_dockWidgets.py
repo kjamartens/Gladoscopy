@@ -1452,10 +1452,17 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.buttonsArea.addWidget(self.runScoringButton)
         self.runScoringButton.clicked.connect(lambda index: self.runScoringOnly())
         self.runScoringButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_score.png'))
+        
         self.runAcquiringButton = QPushButton(' Acquiring Only')
         self.buttonsArea.addWidget(self.runAcquiringButton)
         self.runAcquiringButton.clicked.connect(lambda index: self.runAcquiring())
         self.runAcquiringButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_acq.png'))
+        
+        
+        self.interruptRunButton = QPushButton(' Interrupt run')
+        self.buttonsArea.addWidget(self.interruptRunButton)
+        self.interruptRunButton.clicked.connect(lambda index: self.interruptRun())
+        # self.runAcquiringButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_acq.png'))
         
         # self.runScoringPlusAcqButton = QPushButton('Run Scoring + Acq')
         # self.buttonsArea.addWidget(self.runScoringPlusAcqButton)
@@ -4525,6 +4532,16 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             self.acquiringStart(acqStartNode)
         else:
             logging.error('Could not find acqStart node in flowchart')
+    
+    def interruptRun(self):
+        """ 
+        Interrupt the run - stop the scoring/init/acq and stop ongoing acquisitions.
+        """
+        
+        #Trying this for now:
+        self.shared_data._mdaModeAcqData.abort()
+        
+        return
     
     def debugScoring(self):
         """

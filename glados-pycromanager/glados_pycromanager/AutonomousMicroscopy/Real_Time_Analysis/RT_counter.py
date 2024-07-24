@@ -20,7 +20,11 @@ def __function_metadata__():
             "help_string": "RT counter.",
             "display_name": "RT counter",
             "run_delay": 0,
-            "visualise_delay": 500
+            "visualise_delay": 500,
+            "input":[
+            ],
+            "output":[
+            ],
         }
     }
 
@@ -49,5 +53,36 @@ class RT_counterV():
         print('end of RTcounter')
         return
     
-    def visualise(self,image,metadata,core,**kwargs):
-        print('optional visualising every time this is called!')
+    def visualise_init(self): 
+        layerName = 'RT counter'
+        layerType = 'points' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
+        return layerName,layerType
+    
+    def visualise(self,image,metadata,core,napariLayer,**kwargs):
+        print('VISUALISING!')
+        print(metadata['ImageNumber'])
+        print(type(metadata['ImageNumber']))
+            
+        # create features for each point
+        features = {
+            'outputval': int(metadata['ImageNumber'])
+        }
+        textv = {
+            'string': 'Current Frame: {outputval:.2f}',
+            'size': 15,
+            'color': 'red',
+            'translation': np.array([0, 0]),
+            'anchor': 'upper_left',
+        }
+        napariLayer.data = [0,0]
+        napariLayer.features = features
+        napariLayer.text = textv
+        # napariLayer.size = 0
+        
+        # napariLayer.data = np.array([[100,100]])
+        # napariLayer.text = text
+        napariLayer.symbol = 'disc'
+        napariLayer.size = 10
+        napariLayer.edge_color='red'
+        napariLayer.face_color = 'blue'
+        napariLayer.selected_data = []

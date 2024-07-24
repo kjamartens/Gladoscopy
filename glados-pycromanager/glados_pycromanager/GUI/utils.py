@@ -861,10 +861,26 @@ class XYGridManager():
         self.buttonTopRight = QPushButton("Set Top Right")
         self.buttonBottomLeft = QPushButton("Set Bottom Left")
         self.buttonBottomRight = QPushButton("Set Bottom Right")
-        self.buttonCenter = QPushButton("Set Center")
+        self.buttonCenter = QPushButton("Grid from Center")
         
-        self.buttonNrGridsCenter = QPushButton("Set Grids")
+        self.overlapLabel = QLabel("Overlap: ")
+        self.overlapEditField = QLineEdit("0")
+        #Only accept numbers in this lineedit:
+        from PyQt5.QtGui import QDoubleValidator
+        self.overlapEditField.setValidator(QDoubleValidator())
+        self.overlapDropDown = QComboBox()
+        #Add choice of um, px, and %:
+        self.overlapDropDown.addItems(["um", "px", "%"])
+        self.overlapDropDown.setCurrentIndex(0)
         
+        #Add these overlapLabel/EditField/Dropdown in a QHBox:
+        self.overlapHBox = QHBoxLayout()
+        self.overlapHBox.addWidget(self.overlapLabel)
+        self.overlapHBox.addWidget(self.overlapEditField)
+        self.overlapHBox.addWidget(self.overlapDropDown)
+        
+        #Add a label which will hold info on the selected grid (i.e. number of FoVs, total size):
+        self.gridInfoLabel = QLabel("Total Grid: NaN")
         
         #Add a bunch of uneditable text entries
         self.setPosTopLeft = QLabel("NaN")
@@ -880,7 +896,7 @@ class XYGridManager():
         
         #Add callbacks:
         
-        self.buttonCenter.clicked.connect(lambda: self.setPosition("pos_center"))
+        self.buttonCenter.clicked.connect(lambda: self.createGridFromCenterRun())
         self.buttonTopLeft.clicked.connect(lambda: self.setPosition("pos_top_left"))
         self.buttonTopRight.clicked.connect(lambda: self.setPosition("pos_top_right"))
         self.buttonBottomLeft.clicked.connect(lambda: self.setPosition("pos_bot_left"))
@@ -899,9 +915,11 @@ class XYGridManager():
         self.gridlayoutGridSetup.addWidget(self.setPosBottomRight,3*2+1,2)
         self.gridlayoutGridSetup.addWidget(self.setPosCenter,3*1+1,1)
         
-        self.gridlayoutGridSetup.addWidget(self.buttonNrGridsCenter,3*1+2,1)
+        #Add the self.overlapHBox stretched below:
+        self.gridlayoutGridSetup.addLayout(self.overlapHBox,3*3+1,0,1,3)
+        #Add self.gridInfoLabel stretched below:
+        self.gridlayoutGridSetup.addWidget(self.gridInfoLabel,3*3+2,0,1,3)
         
-    
         
         self.groupBoxGridFlow = QGroupBox("Grid Flow")
         
@@ -920,6 +938,10 @@ class XYGridManager():
         dialog.exec_()
         
         pass
+
+    def createGridFromCenterRun(self):
+        popupbox = createGridFromCenterPopUpBox()
+        popupbox.getPopup().exec_()
 
     def setPosition(self,positionAttr):
         #Create text of these positions with 2 dec places:
@@ -947,6 +969,48 @@ class XYGridManager():
     def reject(self):
         pass
 
+class createGridFromCenterPopUpBox():
+    
+    def __init__(self):
+        #Idea: Create a quick pop-up box which asks the user for nr of rows, columns. Then use this to find the top/bottom left/right positions (given the overlap). Also flag the self.setFromCenter to True, and self.setFromCorners to False for good interactibility later.
+        
+        #The pop-up box should contain inputs for both rows and columns
+        from PyQt5.QtWidgets import QDialog
+        self.popupbox = QDialog()
+        self.popupbox.setWindowTitle("Grid from Center")
+        layout = QVBoxLayout()
+        #Add two of those rolling integer things to the layout:
+        
+        from PyQt5.QtWidgets import QLabel, QLineEdit, QHBoxLayout, QDialogButtonBox
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttonBox.accepted.connect(self.acceptPopup)
+        self.buttonBox.rejected.connect(self.rejectPopup)
+        
+        #Add the buttonbox:
+        layout.addWidget(self.buttonBox)
+        self.popupbox.setLayout(layout)
+        
+    def getPopup(self):
+        return self.popupbox
+
+    def acceptPopup(self):
+        #Get the values from the line edits:
+        # rows = int(self.rowsEditField.text())
+        # cols = int(self.colsEditField.text())
+        # #Get the overlap:
+        # overlap = float(self.overlapEditField.text())
+        # #Get the overlap unit:
+        # overlapUnit = self.overlapDropDown.currentText()
+        # #Get the current position:
+        # position = self.core.get_xy_stage_position()
+        #Close the popup box
+        self.popupbox.close()
+        logging.debug("ACCEPT")#f"Rows: {rows}, Cols: {cols}, Position: {position}")
+    
+    def rejectPopup(self):
+        #Just close:
+        self.popupbox.close()
+            
 class multiLineEdit_valueVarAdv(QHBoxLayout):
     
     def __init__(self,current_selected_function,inputData,curr_layout,nodzInfo,ShowVariablesOptions=True,textChangeCallback=None,valueVarAdv='Value'):
@@ -2231,6 +2295,7 @@ def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3','v4')
+    logging.debug('Attempting to visualise RT Analysis')
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText) #type:ignore
 

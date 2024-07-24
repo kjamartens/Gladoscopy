@@ -565,10 +565,12 @@ class AnalysisThread_customFunction_Visualisation(QThread):
     
     def run(self):
         while self.running:
+            logging.debug('Attempting to take from queue')
             time.sleep(self.sleepTimeMs/1000.0)
             if not self.visualisation_queue.empty():
                 data = self.visualisation_queue.get()
                 RT_analysis_object,analysisInfo,image,metadata,core = data
+                logging.debug('Ran updateVisualisation with RT analysis object')
                 self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
             
     
@@ -780,10 +782,12 @@ class AnalysisThread_customFunction(QThread):
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core,nodzInfo=self.nodzInfo)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
+            logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             if self.visualisationObject.visualisation_queue.empty():
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,core)
                 self.visualisationObject.visualisation_queue.put(data)
+                logging.debug('Put data in visualisation_queue!')
                 # self.visualisationObject.process_queue()
         
         return result

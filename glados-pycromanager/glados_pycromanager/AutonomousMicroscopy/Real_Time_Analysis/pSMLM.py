@@ -22,7 +22,11 @@ def __function_metadata__():
             "help_string": "Real-time localization via pSMLM (phasor-based localization microscopy).",
             "display_name": "pSMLM localization",
             "run_delay": 0,
-            "visualise_delay": 10
+            "visualise_delay": 10,
+            "input":[
+            ],
+            "output":[
+            ],
         }
     }
 
