@@ -13,7 +13,7 @@ def __function_metadata__():
     return {
         "SharpnessValue": {
             "required_kwargs": [
-                {"name": "FilterType", "description": "Filter Type (Only Redondo for now)", "default": 'Redondo', "type": str}
+                {"name": "FilterType", "description": "Filter Type ([Laplacian, Redondo])", "default": 'Laplacian', "type": str}
             ],
             "optional_kwargs": [
                 {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
@@ -47,6 +47,13 @@ def laplace_filter(image):
                     [0, -3, 0]])
     filtered_image = signal.convolve2d(image, kernel)
     return filtered_image
+
+def blur_laplace(image):
+    import cv2
+    blurrad = 3
+    blurim = cv2.GaussianBlur(image, (blurrad,blurrad), 1)
+    edgemap = cv2.Laplacian(blurim,  cv2.CV_64F)
+    return edgemap
 
 # def testArray_report_redondo(core,position_array_test,zmovestage):
 #     res_arr = []
@@ -85,6 +92,8 @@ class SharpnessValue():
     def run(self,image,metadata,core,**kwargs):
         if kwargs['FilterType'] == 'Redondo':
             self.currentValue = (np.mean(laplace_filter(image)**2))
+        elif kwargs['FilterType'] == 'Laplacian':
+            self.currentValue = (np.mean(blur_laplace(image)**2))
         else:
             print('FilterType not recognized')
             self.currentValue = 0
