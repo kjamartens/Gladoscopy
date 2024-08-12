@@ -9,7 +9,7 @@ colorama==0.4.6
 contourpy==1.1.0
 csbdeep==0.7.3
 cycler==0.11.0
-dask==2023.6.1
+dask
 docopt==0.6.2
 docstring-inheritance==2.0.0
 flatbuffers==23.5.26
