@@ -45,8 +45,11 @@ class Shared_data(QObject):
         self.globalData['SLACK']['SECRET'] = "e8cd04aa4cc9ec7c51729ec6ecf98c1c"
         self.globalData['SLACK']['CHANNEL'] = "glados-bot"
         if self.globalData['SLACK']['TOKEN'] is not None and not len(self.globalData['SLACK']['TOKEN']) == 0:
-            self.globalData['SLACK']['CLIENT'] = slack.WebClient(token=self.globalData['SLACK']['TOKEN'])
-            logging.debug('Slack client initialised')
+            try:
+                self.globalData['SLACK']['CLIENT'] = slack.WebClient(token=self.globalData['SLACK']['TOKEN'])
+                logging.debug('Slack client initialised')
+            except:
+                logging.error('Error with Slack!')
         self.globalData['MDAVISMETHOD'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)

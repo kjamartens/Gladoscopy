@@ -2763,23 +2763,27 @@ def set_up_logger():
     # Get the current date and time to add to log file names
     current_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Set up file-based INFO and DEBUG logging:
-    log_file_path_DEBUG = os.path.join(app_specific_folder, f'Glados_logpath_DEBUG_{current_datetime}.log')
-    log_file_path_INFO = os.path.join(app_specific_folder, f'Glados_logpath_INFO_{current_datetime}.log')
+    try:
+        # Set up file-based INFO and DEBUG logging:
+        log_file_path_DEBUG = os.path.join(app_specific_folder, f'Glados_logpath_DEBUG_{current_datetime}.log')
+        log_file_path_INFO = os.path.join(app_specific_folder, f'Glados_logpath_INFO_{current_datetime}.log')
 
-    # Create the file handlers
-    file_handlerDEBUG = logging.FileHandler(log_file_path_DEBUG)
-    file_handlerDEBUG.setLevel(logging.DEBUG)
-    file_handlerINFO = logging.FileHandler(log_file_path_INFO)
-    file_handlerINFO.setLevel(logging.INFO)
+        # Create the file handlers
+        file_handlerDEBUG = logging.FileHandler(log_file_path_DEBUG)
+        file_handlerDEBUG.setLevel(logging.DEBUG)
+        file_handlerINFO = logging.FileHandler(log_file_path_INFO)
+        file_handlerINFO.setLevel(logging.INFO)
 
-    # Get the root logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)  # Set the overall logging level to DEBUG
+        # Get the root logger
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)  # Set the overall logging level to DEBUG
 
-    # Add the handlers to the logger
-    logger.addHandler(file_handlerINFO)
-    logger.addHandler(file_handlerDEBUG)
+        # Add the handlers to the logger
+        logger.addHandler(file_handlerINFO)
+        logger.addHandler(file_handlerDEBUG)
+    except:
+        logging.error('Error in setting up loggers')
+
 
     for handler in logger.handlers:
         handler.formatter = logging.Formatter("%(asctime)s [%(levelname)s] \t %(message)s [%(filename)s:%(lineno)d]")

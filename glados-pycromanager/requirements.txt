@@ -86,3 +86,8 @@ zipp==3.15.0
 zarr
 napari
 magicgui
+opencv-python
+slack
+slackclient
+flask
+slackeventsapi

@@ -140,8 +140,8 @@ def main():
     # sys.exit(app.exec_())
 
 if __name__ == "__main__":
-    try:
-        main()
-    except:
-        print('Error!')
+    # try:
+    main()
+    # except:
+        # print('Error!')
 
