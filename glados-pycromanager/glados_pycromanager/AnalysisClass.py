@@ -772,6 +772,7 @@ class AnalysisThread_customFunction(QThread):
             metadata = data[1]
             if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
                 self.msleep(self.sleepTimeMs)
+                logging.debug('Do analysis here!')
                 #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
                 analysisResult = self.runAnalysisThisImage(self.analysisInfo,image,metadata=metadata,core=self.shared_data.core)
                 # if self.analysisInfo == 'ChangeStageAtFrame':
@@ -807,13 +808,16 @@ class AnalysisThread_customFunction(QThread):
             self.queue_visualisation = queue.Queue()
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
+            logging.debug('Started initAnalysis!')
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):
         self.msleep(self.sleepTimeMs)
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core)
+        logging.debug('RunAnalysisThisImage!!')
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
+            logging.debug('Putting info in queue for realtimevis!')
             if self.visualisationObject.visualisation_queue.empty():
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,core)
                 self.visualisationObject.visualisation_queue.put(data)

@@ -39,7 +39,7 @@ class InteractiveListWidget(QTableWidget):
     """
     Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
     """
-    def __init__(self,fontsize=6,columnCount=2):
+    def __init__(self,fontsize=6,columnCount=2,parent=None):
         """
         Initializes an InteractiveListWidget.
         
@@ -52,6 +52,7 @@ class InteractiveListWidget(QTableWidget):
         """
         
         logging.debug('init InteractiveListWidget')
+        self.parent = parent
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
         # self.horizontalHeader().setStretchLastSection(True)
         
@@ -139,6 +140,12 @@ class InteractiveListWidget(QTableWidget):
         row = self.currentRow()
         if row < self.rowCount() - 1 and row != -1:
             self.swapRows(row, row + 1)
+
+    def moveToPos(self):
+        """ 
+        Move to the position specified by the current selected entry grid
+        """
+        pass
 
     def getIDValues(self):
         """
@@ -258,7 +265,7 @@ class XYStageList(InteractiveListWidget):
     Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
     Extends InteractiveListWidget
     """
-    def __init__(self):
+    def __init__(self,parent=None):
         """
         Initializes the XY stage, only setting the name to empty
         
@@ -268,7 +275,7 @@ class XYStageList(InteractiveListWidget):
         Returns:
             None
         """
-        super().__init__()
+        super().__init__(parent=parent,columnCount=4)
         self.XYstageName = ''
         
     def setXYStageName(self, XYstageName):
@@ -301,7 +308,7 @@ class XYStageList(InteractiveListWidget):
             self.setItem(row2, col, item1)
         self.setCurrentCell(row2, 0)
         
-    def addNewEntry(self,textEntry="New Entry",id=None):
+    def addNewEntry(self,textEntry="New Entry",id=None,setxy="Pos"):
         """
         Add a new entry to the table.
         
@@ -326,6 +333,12 @@ class XYStageList(InteractiveListWidget):
         self.insertRow(rowPosition)
         self.setItem(rowPosition, 0, QTableWidgetItem(textEntry))
         self.setItem(rowPosition, 1, QTableWidgetItem(str(id)))
+        if setxy == "Pos":
+            self.setItem(rowPosition, 2, QTableWidgetItem(str(self.parent.core.get_xy_stage_position().x)))
+            self.setItem(rowPosition, 3, QTableWidgetItem(str(self.parent.core.get_xy_stage_position().y)))
+        elif len(setxy) == 2:
+            self.setItem(rowPosition, 2, QTableWidgetItem(str(setxy[0])))
+            self.setItem(rowPosition, 3, QTableWidgetItem(str(setxy[1])))
 #endregion
 
 class MDAGlados(CustomMainWindow):
@@ -647,8 +660,8 @@ class MDAGlados(CustomMainWindow):
         #First a dropdown to select the xy stage:
         
         #Adding a list widget to add a list of xy positions
-        self.xypositionListWidget = XYStageList()
-        self.xypositionListWidget.setColumNames(["Name", "ID"])
+        self.xypositionListWidget = XYStageList(parent=self)
+        self.xypositionListWidget.setColumNames(["Name", "ID","xPos","yPos"])
         
         self.xy_stagesDropdownLabel = QLabel("XY Stage:")
         self.xy_stagesDropdown = QComboBox()
@@ -665,14 +678,16 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
         self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
         self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
+        self.xypositionListWidget_moveToButton = QPushButton('Move to Pos')
         self.xypositionListWidget_addButton = QPushButton('Add New Entry')
         #Intialise a gridManager
-        self.xypositionListWidget_XYGridManager = utils.XYGridManager(core=self.core)
+        self.xypositionListWidget_XYGridManager = utils.XYGridManager(core=self.core,parent=self)
         self.xypositionListWidget_createGridButton = QPushButton('Create Grid')
         #Adding callbacks to the xy position list buttons
         self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
         self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget.moveUp)
         self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
+        self.xypositionListWidget_moveToButton.clicked.connect(self.xypositionListWidget.moveToPos)
         self.xypositionListWidget_addButton.clicked.connect(lambda: self.xypositionListWidget.addNewEntry(textEntry="Your Text Entry"))
         
         #Open the GridManager GUI
@@ -685,8 +700,9 @@ class MDAGlados(CustomMainWindow):
         xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
         xyLayout.addWidget(self.xypositionListWidget_moveUpButton,3,1)
         xyLayout.addWidget(self.xypositionListWidget_moveDownButton,4,1)
-        xyLayout.addWidget(self.xypositionListWidget_addButton,5,1)
-        xyLayout.addWidget(self.xypositionListWidget_createGridButton,6,1)
+        xyLayout.addWidget(self.xypositionListWidget_moveToButton,5,1)
+        xyLayout.addWidget(self.xypositionListWidget_addButton,6,1)
+        xyLayout.addWidget(self.xypositionListWidget_createGridButton,7,1)
         
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:

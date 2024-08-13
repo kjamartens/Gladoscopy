@@ -821,20 +821,43 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
 
     return allData
 
-#Idea of XY grid: have methods to create a pop-up dialog, where users can set up the grid (top), setting up top/bottom/left/right/center and specifiy overlap. This then also includes a grid-flow (bottom) with options betwen e.g. normal grid, diagonal grid, spiral grid, etc
-#The class both includes the settings, the positions, and the GUI
 
 class XYGridManager():
-    def __init__(self, core = None):
+    """  
+    #Idea of XY grid: have methods to create a pop-up dialog, where users can set up the grid (top), setting up top/bottom/left/right/center and specifiy overlap. This then also includes a grid-flow (bottom) with options betwen e.g. normal grid, diagonal grid, spiral grid, etc
+    #The class both includes the settings, the positions, and the GUI
+    """
+    def __init__(self, core = None, parent=None):
+        """ 
+        Initialisation of the grid manager
+        """
         #Initialise with empty positions.
+        self.parent=parent
         self.core = core
         self.pos_top_left = []
         self.pos_top_right = []
         self.pos_bottom_left = []
         self.pos_bottom_right = []
         self.pos_center = []
-        self.pos_overlap = []
-        self.grid_flow_type = 'normal'
+        self.pos_overlap_um = 0
+        self.pos_overlap_px = 0
+        self.pos_overlap_pct = 0
+        self.pos_overlap_choice = 'um' #'um' or 'px' or 'pct'
+        
+        self.pos_overlap = [0,0]
+        self.pos_choice = 'center' #'center' or 'corners', depends if grid is created from the center or from the corners
+        
+        self.grid_flow_type = 'hor_normal' #atm, 'hor_normal', 'hor_snake', 'ver_normal', 'ver_snake'
+        self.grid_n_rows = 1
+        self.grid_n_cols = 1
+        
+        self.gridEntries = np.array([[self.core.get_xy_stage_position().x,self.core.get_xy_stage_position().y]]) #Need to be e.g.np.array([
+                            #     [100.5, 200.3],
+                            #     [150.2, 250.7],
+                            #     [200.8, 300.1],
+                            #     [250.4, 350.9],
+                            #     [300.6, 400.2]
+                            # ])
     
     def openGUI(self):
         """ 
@@ -845,8 +868,8 @@ class XYGridManager():
         from PyQt5.QtWidgets import QDialog, QDialogButtonBox
         from PyQt5.QtCore import Qt
         
-        dialog = QDialog()
-        dialog.setWindowTitle("XY Grid Setup")
+        self.dialog = QDialog()
+        self.dialog.setWindowTitle("XY Grid Setup")
         
         #Create a QGridLayout:
         layout = QGridLayout()
@@ -865,12 +888,14 @@ class XYGridManager():
         
         self.overlapLabel = QLabel("Overlap: ")
         self.overlapEditField = QLineEdit("0")
+        self.overlapEditField.textChanged.connect(self.overlapTextChanged)
         #Only accept numbers in this lineedit:
         from PyQt5.QtGui import QDoubleValidator
         self.overlapEditField.setValidator(QDoubleValidator())
         self.overlapDropDown = QComboBox()
         #Add choice of um, px, and %:
         self.overlapDropDown.addItems(["um", "px", "%"])
+        self.overlapDropDown.currentIndexChanged.connect(self.overlapDropDownChanged)
         self.overlapDropDown.setCurrentIndex(0)
         
         #Add these overlapLabel/EditField/Dropdown in a QHBox:
@@ -897,10 +922,10 @@ class XYGridManager():
         #Add callbacks:
         
         self.buttonCenter.clicked.connect(lambda: self.createGridFromCenterRun())
-        self.buttonTopLeft.clicked.connect(lambda: self.setPosition("pos_top_left"))
-        self.buttonTopRight.clicked.connect(lambda: self.setPosition("pos_top_right"))
-        self.buttonBottomLeft.clicked.connect(lambda: self.setPosition("pos_bot_left"))
-        self.buttonBottomRight.clicked.connect(lambda: self.setPosition("pos_bot_right"))
+        self.buttonTopLeft.clicked.connect(lambda: self.setPositionText("pos_top_left"))
+        self.buttonTopRight.clicked.connect(lambda: self.setPositionText("pos_top_right"))
+        self.buttonBottomLeft.clicked.connect(lambda: self.setPositionText("pos_bot_left"))
+        self.buttonBottomRight.clicked.connect(lambda: self.setPositionText("pos_bot_right"))
         
         #Add them:
         self.gridlayoutGridSetup.addWidget(self.buttonTopLeft,0,0)
@@ -922,6 +947,49 @@ class XYGridManager():
         
         
         self.groupBoxGridFlow = QGroupBox("Grid Flow")
+        #Add a gridLayout to this groupbox:
+        self.gridlayoutGridFlow = QGridLayout()
+        self.groupBoxGridFlow.setLayout(self.gridlayoutGridFlow)
+        from PyQt5.QtWidgets import QRadioButton
+        from PyQt5.QtGui import QIcon
+        from PyQt5.QtCore import QSize
+        
+        #Find the iconPath folder
+        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+            self.iconFolder = './glados_pycromanager/GUI/Icons/'
+        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+        else:
+            self.iconFolder = ''
+        
+        iconSize = 64
+        self.rb_horNorm = QRadioButton("")
+        self.rb_horNorm.setIcon(QIcon(self.iconFolder+os.sep+"gridHorNorm.png"))
+        self.rb_horNorm.setIconSize(QSize(iconSize,iconSize))
+        self.rb_horNorm.setChecked(True)
+        self.rb_horNorm.toggled.connect(self.gridFlowChanged)
+
+        self.rb_horSnake = QRadioButton("")
+        self.rb_horSnake.setIcon(QIcon(self.iconFolder+os.sep+"gridHorSnake.png"))
+        self.rb_horSnake.setIconSize(QSize(iconSize,iconSize))
+        self.rb_horSnake.toggled.connect(self.gridFlowChanged)
+        
+        self.rb_verNorm = QRadioButton("")
+        self.rb_verNorm.setIcon(QIcon(self.iconFolder+os.sep+"gridVerNorm.png"))
+        self.rb_verNorm.setIconSize(QSize(iconSize,iconSize))
+        self.rb_verNorm.toggled.connect(self.gridFlowChanged)
+
+        self.rb_verSnake = QRadioButton("")
+        self.rb_verSnake.setIcon(QIcon(self.iconFolder+os.sep+"gridVerSnake.png"))
+        self.rb_verSnake.setIconSize(QSize(iconSize,iconSize))
+        self.rb_verSnake.toggled.connect(self.gridFlowChanged)
+
+        # Add these to your layout
+        self.gridlayoutGridFlow.addWidget(self.rb_horNorm,0,0)
+        self.gridlayoutGridFlow.addWidget(self.rb_horSnake,0,1)
+        self.gridlayoutGridFlow.addWidget(self.rb_verNorm,1,0)
+        self.gridlayoutGridFlow.addWidget(self.rb_verSnake,1,1)
+        
         
         #Add a group box to the layout:
         layout.addWidget(self.groupBoxGridSetup,0,0)
@@ -933,55 +1001,209 @@ class XYGridManager():
         self.buttonBox.rejected.connect(self.reject)
         
         layout.addWidget(self.buttonBox,3,0)
-        dialog.setLayout(layout)
+        self.dialog.setLayout(layout)
         
-        dialog.exec_()
+        self.dialog.exec_()
         
         pass
 
-    def createGridFromCenterRun(self):
-        popupbox = createGridFromCenterPopUpBox()
-        popupbox.getPopup().exec_()
+    def gridFlowChanged(self):
+        """
+        Callback if the radio button of grid flow is changed
+        """
+        if self.rb_horNorm.isChecked():
+            self.grid_flow_type = "hor_normal"
+        elif self.rb_horSnake.isChecked():
+            self.grid_flow_type = "hor_snake"
+        elif self.rb_verNorm.isChecked():
+            self.grid_flow_type = "ver_normal"
+        elif self.rb_verSnake.isChecked():
+            self.grid_flow_type = "ver_snake"
+        else:
+            #Default back to this
+            self.grid_flow_type = "horNorm"
+        self.updateGridInfo()
 
-    def setPosition(self,positionAttr):
+    def overlapTextChanged(self):
+        """
+        Function which runs if the overlap text is changed. Basically sets the correct pos_overlap_um, pos_overlap_px, pos_overlap_pct
+        """
+        #Get the text of the overlapEditField:
+        text = self.overlapEditField.text()
+        if self.overlapDropDown.currentText() == "um":
+            self.pos_overlap_um = float(text)
+        elif self.overlapDropDown.currentText() == "px":
+            self.pos_overlap_px = float(text)
+        elif self.overlapDropDown.currentText() == "%":
+            self.pos_overlap_pct = float(text)
+        
+        self.updateGridInfo()
+
+    def overlapDropDownChanged(self):
+        """
+        Function which runs if the overlap dropdown is changed. Sets the correct pos_overlap_um, pos_overlap_px, pos_overlap_pct
+        """
+        #Get the current text of the dropdown:
+        text = self.overlapDropDown.currentText()
+        #Set text back down to the edit field:
+        if text == "um":
+            self.overlapEditField.setText(str(self.pos_overlap_um))
+        elif text == "px":
+            self.overlapEditField.setText(str(self.pos_overlap_px))
+        elif text == "%":
+            self.overlapEditField.setText(str(self.pos_overlap_pct))
+            
+        self.updateGridInfo()
+
+    def createGridFromCenterRun(self):
+        """
+        Calldown to make a create-grid-from-center popup box.
+        """
+        popupbox = createGridFromCenterPopUpBox(parent=self)
+        popupbox.getPopup().exec_()
+        self.setPositionText("pos_center")
+
+    def updateGridInfo(self):
+        """
+        General function to update grid info - determines from the current class what the grid info should be, and stores this as self.gridEntries
+        """
+        #Update self.pos_overlap to contain the current value in um:
+        text = self.overlapEditField.text()
+        if self.overlapDropDown.currentText() == "um":
+            self.pos_overlap = [float(text),float(text)]
+        elif self.overlapDropDown.currentText() == "px":
+            self.pos_overlap = [float(text)*self.core.get_pixel_size_um(),float(text)*self.core.get_pixel_size_um()]
+        elif self.overlapDropDown.currentText() == "%":
+            self.pos_overlap = [float(text)/100 * self.core.get_image_width() * self.core.get_pixel_size_um(),float(text)/100 * self.core.get_image_height() * self.core.get_pixel_size_um()]
+            
+        #Get the grid info:
+        self.gridEntries = []
+        if self.pos_choice == 'center':
+            #If it's from center, we need to create a grid of self.grid_n_rows by self.grid_n_cols, centered around self.pos_center, taking self.pos_overlap (in um units) into account:
+            totXsize = (self.grid_n_cols)* self.core.get_image_width() * self.core.get_pixel_size_um() + (self.grid_n_cols - 1) * -self.pos_overlap[0]
+            totYsize = (self.grid_n_rows)* self.core.get_image_height() * self.core.get_pixel_size_um() + (self.grid_n_rows - 1) * -self.pos_overlap[1]
+            centerPos = self.pos_center
+            
+        if self.grid_flow_type == 'hor_normal': #row-by-row
+            for yy in range(self.grid_n_rows):
+                for xx in range(self.grid_n_cols):
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    self.gridEntries.append([xpoint,ypoint])
+        elif self.grid_flow_type == 'ver_normal': #row-by-row
+            for xx in range(self.grid_n_cols):
+                for yy in range(self.grid_n_rows):
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    self.gridEntries.append([xpoint,ypoint])
+        elif self.grid_flow_type == 'hor_snake':
+            for yy in range(self.grid_n_rows):
+                rangev = range(self.grid_n_cols)
+                if yy % 2 == 1:
+                    #reverse the range
+                    rangev = range(self.grid_n_cols-1,-1,-1)
+                for xx in rangev:
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    self.gridEntries.append([xpoint,ypoint])
+        elif self.grid_flow_type == 'ver_snake':
+            for xx in range(self.grid_n_cols):
+                
+                rangev = range(self.grid_n_rows)
+                if xx % 2 == 1:
+                    #reverse the range
+                    rangev = range(self.grid_n_rows-1,-1,-1)
+                for yy in rangev:
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    self.gridEntries.append([xpoint,ypoint])
+            
+        #Set the grid text
+        gridText = ""
+        if self.pos_choice == 'corner':
+            gridText += "Grid determined from corners - hover for info\n"
+        elif self.pos_choice == 'center':
+            gridText += "Grid determined from center - hover for info\n"
+        
+        gridHoverText = str(self.gridEntries)
+        self.gridInfoLabel.setText(gridText)
+        self.gridInfoLabel.setToolTip(gridHoverText)
+
+    def setPositionText(self,positionAttr):
+        """
+        Sets the text of the position text boxes to the current xy stage position.
+        """
         #Create text of these positions with 2 dec places:
         xx = "{:.2f}".format(self.core.get_xy_stage_position().x)
         yy = "{:.2f}".format(self.core.get_xy_stage_position().y)
         text = f"{xx}, {yy}"
         
+        
         if positionAttr == "pos_center":
             self.setPosCenter.setText(text)
+            self.pos_choice = 'center'
         elif positionAttr == "pos_top_left":
+            self.pos_choice = 'corner'
             self.setPosTopLeft.setText(text)
         elif positionAttr == "pos_top_right":
+            self.pos_choice = 'corner'
             self.setPosTopRight.setText(text)
         elif positionAttr == "pos_bot_left":
+            self.pos_choice = 'corner'
             self.setPosBottomLeft.setText(text)
         elif positionAttr == "pos_bot_right":
+            self.pos_choice = 'corner'
             self.setPosBottomRight.setText(text)
         
+        self.updateGridInfo()
         
         pass
 
     def accept(self):
-        pass
+        if self.gridEntries != []:
+            pass
+            for entry in self.gridEntries:
+                self.parent.xypositionListWidget.addNewEntry(textEntry="Grid",setxy = entry)
+            self.dialog.close()
+        else:
+            logging.error('No grid entries!')
+        
 
     def reject(self):
-        pass
+        self.dialog.close()
 
 class createGridFromCenterPopUpBox():
     
-    def __init__(self):
+    def __init__(self,parent):
         #Idea: Create a quick pop-up box which asks the user for nr of rows, columns. Then use this to find the top/bottom left/right positions (given the overlap). Also flag the self.setFromCenter to True, and self.setFromCorners to False for good interactibility later.
-        
+        self.parent=parent
         #The pop-up box should contain inputs for both rows and columns
         from PyQt5.QtWidgets import QDialog
         self.popupbox = QDialog()
         self.popupbox.setWindowTitle("Grid from Center")
         layout = QVBoxLayout()
         #Add two of those rolling integer things to the layout:
-        
+        # Create a QSpinBox
+        from PyQt5.QtWidgets import QSpinBox
         from PyQt5.QtWidgets import QLabel, QLineEdit, QHBoxLayout, QDialogButtonBox
+        self.SpinBoxRows = QSpinBox()
+        self.SpinBoxRows.setRange(1,1000)
+        self.SpinBoxRows.setValue(parent.grid_n_rows)
+        self.SpinBoxRows.setSingleStep(1)
+        self.SpinBoxCols = QSpinBox()
+        self.SpinBoxCols.setRange(1,1000)
+        self.SpinBoxCols.setValue(parent.grid_n_cols)
+        self.SpinBoxCols.setSingleStep(1)
+        
+        #Create a Hbox and add these in, together with labesl:
+        hbox = QHBoxLayout()
+        hbox.addWidget(QLabel("Rows:"))
+        hbox.addWidget(self.SpinBoxRows)
+        hbox.addWidget(QLabel("Cols:"))
+        hbox.addWidget(self.SpinBoxCols)
+        
+        layout.addLayout(hbox)
+        
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttonBox.accepted.connect(self.acceptPopup)
         self.buttonBox.rejected.connect(self.rejectPopup)
@@ -995,17 +1217,23 @@ class createGridFromCenterPopUpBox():
 
     def acceptPopup(self):
         #Get the values from the line edits:
-        # rows = int(self.rowsEditField.text())
-        # cols = int(self.colsEditField.text())
+        rows = int(self.SpinBoxRows.value())
+        self.parent.grid_n_rows = rows
+        cols = int(self.SpinBoxCols.value())
+        self.parent.grid_n_cols = cols
         # #Get the overlap:
         # overlap = float(self.overlapEditField.text())
         # #Get the overlap unit:
         # overlapUnit = self.overlapDropDown.currentText()
-        # #Get the current position:
-        # position = self.core.get_xy_stage_position()
+        #Get the current position:
+        position = self.parent.core.get_xy_stage_position()
+        self.parent.pos_center = [position.x, position.y]
+        
+        self.parent.pos_choice = 'center'
+        self.parent.updateGridInfo()
         #Close the popup box
         self.popupbox.close()
-        logging.debug("ACCEPT")#f"Rows: {rows}, Cols: {cols}, Position: {position}")
+        logging.debug(f"Rows: {rows}, Cols: {cols}, Position: {position.x},{position.y}")
     
     def rejectPopup(self):
         #Just close:
