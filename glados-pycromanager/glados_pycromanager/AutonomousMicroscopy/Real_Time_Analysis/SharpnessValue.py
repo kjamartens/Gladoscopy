@@ -91,7 +91,7 @@ class SharpnessValue():
 
     def run(self,image,metadata,core,**kwargs):
         if kwargs['FilterType'] == 'Redondo':
-            self.currentValue = (np.mean(laplace_filter(image)**2))
+            self.currentValue = (np.mean(laplace_filter(image)**2))*1e-6
         elif kwargs['FilterType'] == 'Laplacian':
             self.currentValue = (np.mean(blur_laplace(image)**2))
         else:

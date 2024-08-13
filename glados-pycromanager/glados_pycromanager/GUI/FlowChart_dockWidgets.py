@@ -28,6 +28,7 @@ from Analysis_Images import * #type: ignore
 from Analysis_Measurements import * #type: ignore
 from Analysis_Shapes import * #type: ignore
 from Real_Time_Analysis import * #type: ignore
+from CustomFunctions import * #type: ignore
 import logging
 import utils
 from nodz import nodz_utils
