@@ -10,12 +10,15 @@ def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
     if shared_data != None:
         if len(shared_data.mdaDatasets) > (3-1):
             for index,mdadataset in enumerate(shared_data.mdaDatasets):
-                if 'ShouldBeRemoved' in mdadataset.path:
-                    #pop it from the list:
-                    try:
-                        shared_data.mdaDatasets.pop(index)
-                    except:
-                        pass
+                try:
+                    if 'ShouldBeRemoved' in mdadataset.path:
+                        #pop it from the list:
+                        try:
+                            shared_data.mdaDatasets.pop(index)
+                        except:
+                            pass
+                except:
+                    pass #Nowadays in JavaRAMDataStorage, can be safely ignored.
     
     #Remove them from disk - keep in mind that the last three will be kept
     if os.path.exists(os.path.join(mainFolder,'temp')):

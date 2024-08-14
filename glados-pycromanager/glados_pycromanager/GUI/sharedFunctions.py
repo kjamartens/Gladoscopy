@@ -35,6 +35,7 @@ class Shared_data(QObject):
         self.activeMDAobject = None
         self.mdaZarrData = {}
         self.nodzInstance = None
+        self.last_display_update_time = 0
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')

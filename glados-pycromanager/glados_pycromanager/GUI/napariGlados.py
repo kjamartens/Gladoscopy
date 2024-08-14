@@ -51,6 +51,10 @@ def napariUpdateLive(DataStructure):
     core = DataStructure['core']
     image_queue_analysisA = DataStructure['image_queue_analysis']
     analysisThreads = DataStructure['analysisThreads']
+    #TODO: Make this an advanced variable or so. 
+    if time.time() - shared_data.last_display_update_time < 0.05: #less than a 50ms ago already update live mode? don't display live then.
+        return
+    shared_data.last_display_update_time = time.time()
     logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
     layerName = DataStructure['layer_name']
     
@@ -370,7 +374,7 @@ class napariHandler():
                     #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                     logging.debug('starting acq')
                     shared_data.allMDAslicesRendered = {}
-                    with Acquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
+                    with Acquisition(directory=None, name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
                         shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                         acq.acquire(events)
@@ -389,7 +393,7 @@ class napariHandler():
                     
                 #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                 logging.debug('starting MDA acq - before JavaBackendAcquisition')
-                savefolder = './temp'
+                savefolder = None
                 savename = 'MdaAcqShouldBeRemoved'
                 if shared_data._mdaModeSaveLoc[0] != '':
                     savefolder = shared_data._mdaModeSaveLoc[0]
