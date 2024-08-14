@@ -695,6 +695,8 @@ class MDAGlados(CustomMainWindow):
         #Adding a list widget to add a list of xy positions
         self.xypositionListWidget = XYStageList(parent=self)
         self.xypositionListWidget.setColumNames(["Name", "ID","xPos","yPos"])
+        self.xypositionListWidget.setColumnWidth(0, 60)
+        self.xypositionListWidget.setColumnWidth(1, 40)
         
         self.xy_stagesDropdownLabel = QLabel("XY Stage:")
         self.xy_stagesDropdown = QComboBox()
