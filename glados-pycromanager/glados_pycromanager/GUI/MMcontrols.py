@@ -1040,9 +1040,9 @@ class MMConfigUI(CustomMainWindow):
         for m in range(1,3):
             #Initialize buttons
             self.oneDmoveButtons[f'Left_{m}'] = QPushButton("⮝"*(3-m))
-            self.oneDmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(-m))
+            self.oneDmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(m))
             self.oneDmoveButtons[f'Right_{m}'] = QPushButton("⮟"*(3-m))
-            self.oneDmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(m))
+            self.oneDmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(-m))
             
             #Add buttons to layout
             self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],m-1+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
