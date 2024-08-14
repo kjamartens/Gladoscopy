@@ -36,7 +36,7 @@ def perform_post_closing_actions(shared_data):
         shared_data: shared_data class (Shared_data())
     """
     #Clean up temporary files
-    cleanUpTemporaryFiles()
+    cleanUpTemporaryFiles(shared_data=shared_data)
     
     # if shared_data._headless:
     #     stop_headless()
@@ -81,10 +81,10 @@ def main():
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
     args=parser.parse_args()
     
-    cleanUpTemporaryFiles()
     
     # Create an instance of the shared_data class
     shared_data = Shared_data()
+    cleanUpTemporaryFiles(shared_data=shared_data)
         
     # get object representing MMCore, used throughout
     #try to open a running instance:

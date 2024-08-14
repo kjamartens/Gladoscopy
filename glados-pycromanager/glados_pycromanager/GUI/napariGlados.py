@@ -380,7 +380,7 @@ class napariHandler():
             self.shared_data.core.stop_sequence_acquisition()
             self.shared_data.liveMode = False
             #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
-            cleanUpTemporaryFiles()
+            cleanUpTemporaryFiles(shared_data=self.shared_data)
         elif self.liveOrMda == 'mda':
             while self.acqstate:
                 if self.shared_data.liveMode:
@@ -433,7 +433,7 @@ class napariHandler():
             parent.mdaacqdonefunction()
             
             #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
-            cleanUpTemporaryFiles()
+            cleanUpTemporaryFiles(shared_data=self.shared_data)
     
     
     @thread_worker(connect={'yielded': napariUpdateAnalysisThreads})
