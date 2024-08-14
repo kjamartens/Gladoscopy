@@ -2739,6 +2739,8 @@ class CustomMainWindow(QWidget):
                     for m in range(1,3):
                         lineEdit = self.oneDMoveEditField[widget.objectName()][f'oneDStackedWidget_{widget.objectName()}_{m}']
                         iterable.append(("oneDStackedWidget_"+widget.objectName()+"_"+str(m),lineEdit))
+            if key == 'oneDstageDropdown':
+                iterable.append((key,value.currentText()))
         
         for key, value in iterable:
             saveState = None
@@ -2769,8 +2771,17 @@ class CustomMainWindow(QWidget):
                             pass
                     
                 if saveState is not None:
+                    try:
+                        if hasattr(value,'text'):
+                            textv = value.text()
+                        elif hasattr(value,'currentText'):
+                            textv = value.currentText()
+                        else:
+                            textv = None
+                    except:
+                        textv = None
                     state[saveState][key] = {
-                        'text': value.text() if hasattr(value, 'text') else None,
+                        'text': textv,
                         'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
                         # Add more properties as needed
                     }

@@ -323,8 +323,9 @@ class MMConfigUI(CustomMainWindow):
             self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
         
         #Update everything for good measure at the end of init
-        self.fullyLoaded = True
         self.updateAllMMinfo()
+        self.fullyLoaded = True
+        self.LoadAllMMFromJSON()
         
         #Inactivate all configs if this is wanted
         if checkboxStartInactive and showCheckboxes and showConfigs:
@@ -350,6 +351,7 @@ class MMConfigUI(CustomMainWindow):
         if self.showShutterOptions:
             self.updateShutterOptions()
         
+        #Then store it in JSON for good measure
         if self.autoSaveLoad:
             if self.fullyLoaded:
                 #Store in appdata
@@ -358,22 +360,63 @@ class MMConfigUI(CustomMainWindow):
                     raise EnvironmentError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
                 os.makedirs(app_specific_folder, exist_ok=True)
-                if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
-                    with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
-                        gladosInfo = json.load(file)
-                        MMControlsInfo = gladosInfo['MMControls']
+                self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
                 
-                    #Hand-set the values that I want:
-                    if 'exposureTimeInputField' in MMControlsInfo:
-                        self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
-                    for key, object in self.XYMoveEditField.items():
-                        if key in MMControlsInfo:
-                            object.setText(MMControlsInfo[key]['text'])
-                    for key,object in self.oneDMoveEditField.items():
-                        for objectLineEditKey in object:
-                            objectLineEdit = object[objectLineEditKey]
-                            if objectLineEditKey in MMControlsInfo:
-                                objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
+        #         #Store in appdata
+        #         appdata_folder = os.getenv('APPDATA')
+        #         if appdata_folder is None:
+        #             raise EnvironmentError("APPDATA environment variable not found")
+        #         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+        #         os.makedirs(app_specific_folder, exist_ok=True)
+                
+                
+        #         if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
+        #             with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+        #                 gladosInfo = json.load(file)
+        #                 MMControlsInfo = gladosInfo['MMControls']
+                
+        #             #Hand-set the values that I want:
+        #             if 'exposureTimeInputField' in MMControlsInfo:
+        #                 self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+        #             for key, object in self.XYMoveEditField.items():
+        #                 if key in MMControlsInfo:
+        #                     object.setText(MMControlsInfo[key]['text'])
+        #             for key,object in self.oneDMoveEditField.items():
+        #                 for objectLineEditKey in object:
+        #                     objectLineEdit = object[objectLineEditKey]
+        #                     if objectLineEditKey in MMControlsInfo:
+        #                         objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
+
+    def LoadAllMMFromJSON(self):
+        """
+        Update all the info that can be loaded from the JSON file.
+        """
+        #Load from APPData, if it exists
+        appdata_folder = os.getenv('APPDATA')
+        if appdata_folder is None:
+            raise EnvironmentError("APPDATA environment variable not found")
+        app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+        
+        if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
+            #Load the file
+            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+                gladosInfo = json.load(file)
+                MMControlsInfo = gladosInfo['MMControls']
+        
+            #Hand-set the values that I want:
+            if 'exposureTimeInputField' in MMControlsInfo:
+                self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+            if 'oneDstageDropdown' in MMControlsInfo:
+                self.oneDstageDropdown.setCurrentText(MMControlsInfo['oneDstageDropdown']['text'])
+            
+            for key, object in self.XYMoveEditField.items():
+                if key in MMControlsInfo:
+                    object.setText(MMControlsInfo[key]['text'])
+            for key,object in self.oneDMoveEditField.items():
+                for objectLineEditKey in object:
+                    objectLineEdit = object[objectLineEditKey]
+                    if objectLineEditKey in MMControlsInfo:
+                        objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
 
     def storeAllControlValues(self):
         """
@@ -1133,6 +1176,13 @@ class MMConfigUI(CustomMainWindow):
             self.oneDstageRelDropdown.addItem(stage)
         #If it changes, call the update routine
         self.oneDstageRelDropdown.currentTextChanged.connect(lambda index: self.updateOneDstageRelLayout())
+        #Also store the JSON if changed:
+        self.oneDstageRelDropdown.currentTextChanged.connect(lambda: self.storeAllControlValues())
+        #Set default value to default z stage of MM
+        try:
+            self.oneDstageRelDropdown.setCurrentText(self.core.get_focus_device()) #type:ignore
+        except:
+            pass
         #Add the dropdown to the layout:
         self.oneDStageRelLayout.addWidget(self.oneDstageRelDropdown,0,0)
         

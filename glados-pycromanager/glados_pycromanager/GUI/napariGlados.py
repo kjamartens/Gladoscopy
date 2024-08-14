@@ -797,7 +797,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     
     #Get some info from core to put in shared_data
     shared_data._defaultFocusDevice = core.get_focus_device()
-    logging.info(f"Default focus device set to {shared_data._defaultFocusDevice}")
+    logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
 
     #Napari start
     napariViewer = napari.Viewer()

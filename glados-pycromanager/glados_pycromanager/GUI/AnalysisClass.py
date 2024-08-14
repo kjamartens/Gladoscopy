@@ -575,7 +575,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
             
     
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
-        # logging.debug('visualisation should be updated here :)')
+        logging.info('visualisation should be updated here :)')
         utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
         
 #This code gets some image and does some analysis on this
