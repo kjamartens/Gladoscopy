@@ -2800,10 +2800,20 @@ class CustomMainWindow(QWidget):
                 for _ in range(maxParentInst):
                     if currentParent == None:
                         break
-                    currentParent = currentParent.parent()
-                    if isinstance(currentParent, napariGlados.dockWidget_MDA):
-                        saveState = 'MDA'
-                        break
+                    #Rather difficult method to figure out if we're in MDA or MMControls savestate
+                    try:
+                        currentParent = currentParent.parent()
+                        if isinstance(currentParent, napariGlados.dockWidget_MDA):
+                            saveState = 'MDA'
+                            break
+                    except:
+                        try:
+                            currentParent = currentParent.parent
+                            if isinstance(currentParent, napariGlados.dockWidget_MDA):
+                                saveState = 'MDA'
+                                break
+                        except:
+                            break
                     
                 if saveState is not None:
                     state[saveState][key] = {

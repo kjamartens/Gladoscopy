@@ -143,7 +143,7 @@ class InteractiveListWidget(QTableWidget):
 
     def moveToPos(self):
         """ 
-        Move to the position specified by the current selected entry grid
+        Move to the position specified by the current selected entry gridA
         """
         currRow = self.currentRow()
         #get the info of the curRow:
@@ -295,6 +295,18 @@ class XYStageList(InteractiveListWidget):
             None
         """
         self.XYstageName = XYstageName
+    
+    def getPositionsArray(self):
+        """
+        Return an array of the positions for pycromanager to work with
+        """
+        if self.rowCount() == 0:
+            return None
+        elif self.rowCount() > 0:
+            posArray = []
+            for row in range(self.rowCount()):
+                posArray.append([float(self.item(row, 2).text()),float(self.item(row, 3).text())])
+            return posArray
     
     def swapRows(self, row1, row2):
         """
@@ -710,6 +722,8 @@ class MDAGlados(CustomMainWindow):
         xyLayout.addWidget(self.xypositionListWidget_addButton,6,1)
         xyLayout.addWidget(self.xypositionListWidget_createGridButton,7,1)
         
+        self.xypositionListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:
         self.z_oneDstageDropdownLabel = QLabel("Z Stage:")
@@ -847,6 +861,10 @@ class MDAGlados(CustomMainWindow):
         if self.channels is not None and self.channel_exposures_ms is not None:
             for entry in range(len(self.channels)):
                 self.channelListWidget.addNewEntry(channelEntry=self.channels[entry],exposureEntry=str(self.channel_exposures_ms[entry]))
+                
+        #Change MDA events when adapted
+        self.channelListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
         self.GUI_show_exposure_chkbox = QCheckBox("Exposure") #Note: created but never rendered
@@ -1431,6 +1449,7 @@ class MDAGlados(CustomMainWindow):
         #Set whether the napariviewer should (also) try to connect to the mda
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
+        
         self.shared_data._mdaModeParams = self.mda
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
@@ -1564,6 +1583,13 @@ class MDAGlados(CustomMainWindow):
             self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
         else:
             self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
+        
+        #Get the xy positions
+        if self.xyGroupBox.isEnabled():
+            try:
+                self.xy_positions = self.xypositionListWidget.getPositionsArray()
+            except:
+                self.xy_positions = None
         
         if self.channelGroupBox.isEnabled():
             try:
