@@ -733,7 +733,7 @@ class MDAGlados(CustomMainWindow):
         #Adding widgets to layout
         xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
         xyLayout.addWidget(self.xy_stagesDropdown,0,1)
-        xyLayout.addWidget(self.xypositionListWidget,1,0,6,1)
+        xyLayout.addWidget(self.xypositionListWidget,1,0,12,1)
         xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
         xyLayout.addWidget(self.xypositionListWidget_deleteAllButton,3,1)
         xyLayout.addWidget(self.xypositionListWidget_moveUpButton,4,1)
