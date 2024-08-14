@@ -1075,6 +1075,13 @@ class MMConfigUI(CustomMainWindow):
             self.oneDstageDropdown.addItem(stage)
         #If it changes, call the update routine
         self.oneDstageDropdown.currentTextChanged.connect(lambda index: self.updateOneDstageLayout())
+        #Also store the JSON if changed:
+        self.oneDstageDropdown.currentTextChanged.connect(lambda: self.storeAllControlValues())
+        #Set default value to default z stage of MM
+        try:
+            self.oneDstageDropdown.setCurrentText(self.core.get_focus_device()) #type:ignore
+        except:
+            pass
         #Add the dropdown to the layout:
         self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0)
         
@@ -1222,6 +1229,7 @@ class MMConfigUI(CustomMainWindow):
         """
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
+        logging.debug("Updating OneD stage layout")
         self.oneDinfoRelWidget.setText(f"{self.oneDstageRelDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageRelDropdown.currentText()):.1f}") #type:ignore
         
         for widget_id in range(0,self.oneDRelStackedWidget.count()):
