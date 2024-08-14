@@ -103,6 +103,7 @@ matplotlib.use('Qt5Agg')
 
 from MMcontrols import *
 from MDAGlados import *
+from FlowChart_dockWidgets import * 
 
 def microManagerControlsUI_plugin(parent):
     """
@@ -138,6 +139,19 @@ def microManagerControlsUI_plugin(parent):
 
 
 def MDAGlados_plugin(parent):
+    """
+    Initializes and returns a custom dock widget for the GladOS GUI's MDA (Multi-Dimensional Acquisition) functionality.
+    
+    This function sets up a custom dock widget that includes the full Micro Manager controls UI. It loads the necessary configuration from a JSON file and passes it to the `MDAGlados` class.
+    
+    The dock widget is returned as the main layout, which can be added to the parent layout.
+    
+    Args:
+        parent (QWidget): The parent widget for the dock widget.
+    
+    Returns:
+        QWidget: The main layout of the custom dock widget.
+    """
     appdata_folder = os.getenv('APPDATA')
     if appdata_folder is None:
         raise EnvironmentError("APPDATA environment variable not found")
@@ -211,10 +225,20 @@ def MDAGlados_plugin(parent):
     
     return dockWidget.mainLayout
 
-
-from FlowChart_dockWidgets import * 
-
 def autonomousMicroscopy_plugin(parent):
+    """
+    Initializes and returns a custom dock widget for the GladOS GUI's autonomous microscopy functionality.
+    
+    This function sets up a custom dock widget that includes a flowchart testing UI. It loads the necessary configuration from a JSON file and passes it to the `GladosNodzFlowChart_dockWidget` class.
+    
+    The dock widget is returned as the main layout, which can be added to the parent layout.
+    
+    Args:
+        parent (QWidget): The parent widget for the dock widget.
+    
+    Returns:
+        QWidget: The main layout of the custom dock widget.
+    """
     global shared_data, napariViewer
     shared_data = parent.shared_data
     napariViewer = shared_data.napariViewer
@@ -230,6 +254,19 @@ def autonomousMicroscopy_plugin(parent):
     return flowChart_dockWidget.mainLayout
 
 def gladosSliders_plugin(parent):
+    """
+    Initializes and returns a custom dock widget for the GladOS GUI.
+    
+    This function sets up a custom dock widget that includes a laser controller UI. It loads the necessary configuration from a JSON file and passes it to the `runlaserControllerUI` function from the `LaserControlScripts` module.
+    
+    The dock widget is returned as the main layout, which can be added to the parent layout.
+    
+    Args:
+        parent (QWidget): The parent widget for the dock widget.
+    
+    Returns:
+        QWidget: The main layout of the custom dock widget.
+    """
     global shared_data, napariViewer
     shared_data = parent.shared_data
     napariViewer = shared_data.napariViewer
@@ -245,7 +282,7 @@ def gladosSliders_plugin(parent):
     ui.setupUi(tempWidget)
     #Open JSON file with MM settings
     # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
-    with open("C:/Users/Koen Martens/Documents/GitHub\ScopeGUI/glados-pycromanager/glados_pycromanager/GUI/MM_PycroManager_JSON.json") as f:
+    with open("C:/Users/Koen Martens/Documents/GitHub/ScopeGUI/glados-pycromanager/glados_pycromanager/GUI/MM_PycroManager_JSON.json") as f:
         MM_JSON = json.load(f)
     #Run the laserController UI
     logging.debug("dockWidget_fullGladosUI halfway")

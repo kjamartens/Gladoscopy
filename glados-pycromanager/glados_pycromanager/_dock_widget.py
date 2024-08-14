@@ -295,13 +295,17 @@ class GladosSlidersWidget(GladosWidget):
         """
         Initialize the GladosSlidersWidget plugin
         """
-        super().__init__(viewer = viewer, parent=parent)
+
+        super().__init__(viewer=viewer, parent=parent)
         
         #Add the full micro manager controls UI
         from Analysis_dockWidgets import gladosSliders_plugin
         self.dockWidget = gladosSliders_plugin(self) #type:ignore
         
-        self.setLayout(self.dockWidget)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.dockWidget) # type: ignore
+        self.setLayout(layout)
         logging.debug("dockWidget_GladosSliders started")
     
     def resizeEvent(self, event):

@@ -2,6 +2,7 @@
     "python.analysis.typeCheckingMode": "basic",
     "editor.wordWrap": "on",
     "python.analysis.extraPaths": [
-        "./GUI"
+        "./GUI",
+        "./glados-pycromanager/glados_pycromanager/GUI"
     ]
 }
