@@ -3,6 +3,7 @@
     "editor.wordWrap": "on",
     "python.analysis.extraPaths": [
         "./GUI",
-        "./glados-pycromanager/glados_pycromanager/GUI"
+        "./glados-pycromanager/glados_pycromanager/GUI",
+        "./glados-pycromanager/glados_pycromanager/GUI/nodz"
     ]
 }

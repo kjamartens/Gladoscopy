@@ -646,7 +646,7 @@ class nodz_openMMConfigDialog(QDialog):
                     if objName != '':
                         for storedrelstage in storedrelStagesString:
                             if objName == storedrelstage[0]:
-                                relstage.children()[2].setText(str(storedrelstage[1]))
+                                relstage.children()[2].setText(str(storedrelstage[1])) # type: ignore
                 
                 #Set the currently-selected stage:
                 for storedrelstage in storedrelStagesString:
@@ -696,7 +696,7 @@ class nodz_openMMConfigDialog(QDialog):
         for relstage in allRelStages:
             objName = relstage.objectName()
             if objName != '':
-                relStageInfo.append([objName,float(relstage.children()[2].text())])
+                relStageInfo.append([objName,float(relstage.children()[2].text())]) # type: ignore
         relStageInfo.append(['__chosenRelStage__',self.newConfigUI.oneDstageRelDropdown.currentText()])
 
         return relStageInfo
@@ -1016,6 +1016,9 @@ class nodz_caseSwitchDialog(QDialog):
             None
         """
         super().__init__()
+        if currentNode == None:
+            logging.error(f"Error in nodz_caseSwitchDialog: currentNode is None")
+            return
         self.caseSwitchInfo = currentNode.caseSwitchInfo
         self.setWindowTitle("CaseSwitch")
         #Add an OK/Cancel box
