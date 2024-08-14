@@ -52,7 +52,7 @@ class InteractiveListWidget(QTableWidget):
         """
         
         logging.debug('init InteractiveListWidget')
-        self.parent = parent
+        self.parent = parent #type: ignore
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
         # self.horizontalHeader().setStretchLastSection(True)
         
@@ -145,7 +145,13 @@ class InteractiveListWidget(QTableWidget):
         """ 
         Move to the position specified by the current selected entry grid
         """
-        pass
+        currRow = self.currentRow()
+        #get the info of the curRow:
+        xpos_goto = float(self.item(currRow,2).text())
+        ypos_goto = float(self.item(currRow,3).text())
+        #Move the stage to this position
+        logging.debug(f"Moving stage {self.XYstageName()} to pos {xpos_goto},{ypos_goto}")
+        self.parent.core.set_xy_position(self.XYstageName(),xpos_goto,ypos_goto)
 
     def getIDValues(self):
         """
@@ -1672,10 +1678,10 @@ class MDAGlados(CustomMainWindow):
             self.nodeInfo.variablesNodz['order']['data'] = self.order
             self.nodeInfo.variablesNodz['exposure_ms']['data'] = self.exposure_ms
             self.nodeInfo.variablesNodz['n_timepoints']['data'] = self.num_time_points
-            self.nodeInfo.variablesNodz['time_interval_ms']['data'] = self.time_interval_s*1000
+            self.nodeInfo.variablesNodz['time_interval_ms']['data'] = self.time_interval_s*1000 #type: ignore
             if self.GUI_show_xy == True and self.xy_positions is not None:
                 self.nodeInfo.variablesNodz['xy_positions']['data'] = self.xy_positions
-                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = len(self.xy_positions)
+                self.nodeInfo.variablesNodz['n_xy_positions']['data'] = len(self.xy_positions) #type: ignore
             else:
                 self.nodeInfo.variablesNodz['xy_positions']['data'] = None
                 self.nodeInfo.variablesNodz['n_xy_positions']['data'] = None
@@ -1688,7 +1694,7 @@ class MDAGlados(CustomMainWindow):
             if self.GUI_show_channel == True:
                 self.nodeInfo.variablesNodz['channel_group']['data'] = self.channel_group
                 self.nodeInfo.variablesNodz['channels']['data'] = self.channels
-                self.nodeInfo.variablesNodz['n_channels']['data'] = len(self.channels)
+                self.nodeInfo.variablesNodz['n_channels']['data'] = len(self.channels) #type: ignore
             else:
                 self.nodeInfo.variablesNodz['channel_group']['data'] = None
                 self.nodeInfo.variablesNodz['channels']['data'] = None
@@ -1696,10 +1702,10 @@ class MDAGlados(CustomMainWindow):
             if self.GUI_storage_enabled == True:
                 try:
                     #Update to the actually-stored-path.
-                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.data.path
+                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.data.path #type: ignore
                 except AttributeError:
                     #Update to the expectedpath.
-                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name+'_1//'
+                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name+'_1//' #type: ignore
             else:
                 self.nodeInfo.variablesNodz['storage_path']['data'] = None
     #endregion
