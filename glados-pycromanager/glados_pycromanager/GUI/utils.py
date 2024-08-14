@@ -3,8 +3,21 @@ import shutil
 import os
 import logging
 
-def cleanUpTemporaryFiles(mainFolder='./'):
+def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
     logging.debug('Cleaning up temporary files')
+    
+    #Remove all the datasets from the internal mdadatasets info, so they are freed up
+    if shared_data != None:
+        if len(shared_data.mdaDatasets) > (3-1):
+            for index,mdadataset in enumerate(shared_data.mdaDatasets):
+                if 'ShouldBeRemoved' in mdadataset.path:
+                    #pop it from the list:
+                    try:
+                        shared_data.mdaDatasets.pop(index)
+                    except:
+                        pass
+    
+    #Remove them from disk - keep in mind that the last three will be kept
     if os.path.exists(os.path.join(mainFolder,'temp')):
         for folder in os.listdir(os.path.join(mainFolder,'temp')):
             if 'LiveAcqShouldBeRemoved' in folder or 'MdaAcqShouldBeRemoved' in folder:
