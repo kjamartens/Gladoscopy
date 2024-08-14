@@ -709,6 +709,7 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText)
         #Buttons for the xy position list
         self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
+        self.xypositionListWidget_deleteAllButton = QPushButton('Delete All')
         self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
         self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
         self.xypositionListWidget_moveToButton = QPushButton('Move to Pos')
@@ -718,6 +719,7 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget_createGridButton = QPushButton('Create Grid')
         #Adding callbacks to the xy position list buttons
         self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
+        self.xypositionListWidget_deleteAllButton.clicked.connect(self.xypositionListWidget.deleteAll)
         self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget.moveUp)
         self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
         self.xypositionListWidget_moveToButton.clicked.connect(self.xypositionListWidget.moveToPos)
@@ -731,11 +733,12 @@ class MDAGlados(CustomMainWindow):
         xyLayout.addWidget(self.xy_stagesDropdown,0,1)
         xyLayout.addWidget(self.xypositionListWidget,1,0,6,1)
         xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveUpButton,3,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveDownButton,4,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveToButton,5,1)
-        xyLayout.addWidget(self.xypositionListWidget_addButton,6,1)
-        xyLayout.addWidget(self.xypositionListWidget_createGridButton,7,1)
+        xyLayout.addWidget(self.xypositionListWidget_deleteAllButton,3,1)
+        xyLayout.addWidget(self.xypositionListWidget_moveUpButton,4,1)
+        xyLayout.addWidget(self.xypositionListWidget_moveDownButton,5,1)
+        xyLayout.addWidget(self.xypositionListWidget_moveToButton,6,1)
+        xyLayout.addWidget(self.xypositionListWidget_addButton,7,1)
+        xyLayout.addWidget(self.xypositionListWidget_createGridButton,8,1)
         
         #Pre-load entries if they exist:
         if self.GUI_xy_pos_fullInfo != None:
