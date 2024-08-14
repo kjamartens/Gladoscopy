@@ -1161,9 +1161,13 @@ class XYGridManager():
 
     def accept(self):
         if self.gridEntries != []:
-            pass
+            #For speedup, right now un-link the update GUI function:
+            self.parent.xypositionListWidget.disconnectFunGUIConnection()
             for entry in self.gridEntries:
                 self.parent.xypositionListWidget.addNewEntry(textEntry="Grid",setxy = entry)
+            
+            #And relink the update GUI function
+            self.parent.xypositionListWidget.reconnectFunGUIConnection(runOnce=True)
             self.dialog.close()
         else:
             logging.error('No grid entries!')
@@ -2800,10 +2804,20 @@ class CustomMainWindow(QWidget):
                 for _ in range(maxParentInst):
                     if currentParent == None:
                         break
-                    currentParent = currentParent.parent()
-                    if isinstance(currentParent, napariGlados.dockWidget_MDA):
-                        saveState = 'MDA'
-                        break
+                    #Rather difficult method to figure out if we're in MDA or MMControls savestate
+                    try:
+                        currentParent = currentParent.parent()
+                        if isinstance(currentParent, napariGlados.dockWidget_MDA):
+                            saveState = 'MDA'
+                            break
+                    except:
+                        try:
+                            currentParent = currentParent.parent
+                            if isinstance(currentParent, napariGlados.dockWidget_MDA):
+                                saveState = 'MDA'
+                                break
+                        except:
+                            break
                     
                 if saveState is not None:
                     state[saveState][key] = {

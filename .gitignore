@@ -4,3 +4,7 @@
 *.pyc
 *.h5
 *.json
+CellSegment.ipyb
+logpath.txt
+slackImage.png
+testingFocus.ipynb

@@ -678,6 +678,7 @@ class dockWidget_MDA(dockWidgets):
                             GUI_show_time = mdaInfo['GUI_show_time'], 
                             GUI_show_order = mdaInfo['GUI_show_order'], 
                             GUI_show_storage = mdaInfo['GUI_show_storage'], 
+                            GUI_xy_pos_fullInfo = mdaInfo['xy_positions_saveInfo'],
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
             except KeyError:

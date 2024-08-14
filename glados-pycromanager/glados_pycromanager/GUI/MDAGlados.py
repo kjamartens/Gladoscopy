@@ -143,7 +143,7 @@ class InteractiveListWidget(QTableWidget):
 
     def moveToPos(self):
         """ 
-        Move to the position specified by the current selected entry grid
+        Move to the position specified by the current selected entry gridA
         """
         currRow = self.currentRow()
         #get the info of the curRow:
@@ -169,6 +169,14 @@ class InteractiveListWidget(QTableWidget):
             if item_id:
                 id_values.append(float(item_id.text()))
         return id_values
+
+    def disconnectFunGUIConnection(self):
+        self.itemChanged.disconnect()
+    
+    def reconnectFunGUIConnection(self,runOnce=True):
+        self.itemChanged.connect(lambda: self.parent.get_MDA_events_from_GUI())
+        if runOnce:
+            self.parent.get_MDA_events_from_GUI()
 
 class ChannelList(InteractiveListWidget):
     """
@@ -296,6 +304,30 @@ class XYStageList(InteractiveListWidget):
         """
         self.XYstageName = XYstageName
     
+    def getPositionsArray(self):
+        """
+        Return an array of the positions for pycromanager to work with
+        """
+        if self.rowCount() == 0:
+            return None
+        elif self.rowCount() > 0:
+            posArray = []
+            for row in range(self.rowCount()):
+                posArray.append([float(self.item(row, 2).text()),float(self.item(row, 3).text())])
+            return posArray
+    
+    def getSaveInfoPositionsArray(self):
+        """
+        Return an array of the positions for pycromanager to work with, with all info (i.e. name, id)
+        """
+        if self.rowCount() == 0:
+            return None
+        elif self.rowCount() > 0:
+            infoArray = []
+            for row in range(self.rowCount()):
+                infoArray.append([self.item(row, 0).text(),self.item(row, 1).text(),self.item(row, 2).text(),self.item(row, 3).text()])
+            return infoArray
+    
     def swapRows(self, row1, row2):
         """
         Swap rows in the table widget.
@@ -314,7 +346,7 @@ class XYStageList(InteractiveListWidget):
             self.setItem(row2, col, item1)
         self.setCurrentCell(row2, 0)
         
-    def addNewEntry(self,textEntry="New Entry",id=None,setxy="Pos"):
+    def addNewEntry(self,textEntry="New Entry",id=None,setxy:str|Iterable="Pos"):
         """
         Add a new entry to the table.
         
@@ -386,6 +418,7 @@ class MDAGlados(CustomMainWindow):
                 GUI_show_order = True, 
                 GUI_show_storage = True, 
                 GUI_acquire_button = True,
+                GUI_xy_pos_fullInfo: Iterable | None = None,
                 autoSaveLoad = False,
                 parent=None,
                 node = None):
@@ -426,6 +459,7 @@ class MDAGlados(CustomMainWindow):
             GUI_show_order: Boolean indicating whether to show order settings in GUI (default is True).
             GUI_show_storage: Boolean indicating whether to show storage settings in GUI (default is True).
             GUI_acquire_button: Boolean indicating whether to show the acquisition button in GUI (default is True).
+            GUI_xy_pos_fullInfo: Full info (including naming, id) of the XY position list
             autoSaveLoad: Boolean indicating whether to automatically save and load settings (default is False).
         
         Returns:
@@ -470,6 +504,7 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_time = GUI_show_time
         self.GUI_show_order = GUI_show_order
         self.GUI_show_storage = GUI_show_storage
+        self.GUI_xy_pos_fullInfo = GUI_xy_pos_fullInfo
         self.autoSaveLoad = autoSaveLoad
         
         self.GUI_exposure_enabled = GUI_show_exposure
@@ -668,6 +703,8 @@ class MDAGlados(CustomMainWindow):
         #Adding a list widget to add a list of xy positions
         self.xypositionListWidget = XYStageList(parent=self)
         self.xypositionListWidget.setColumNames(["Name", "ID","xPos","yPos"])
+        self.xypositionListWidget.setColumnWidth(0, 60)
+        self.xypositionListWidget.setColumnWidth(1, 40)
         
         self.xy_stagesDropdownLabel = QLabel("XY Stage:")
         self.xy_stagesDropdown = QComboBox()
@@ -682,6 +719,7 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText)
         #Buttons for the xy position list
         self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
+        self.xypositionListWidget_deleteAllButton = QPushButton('Delete All')
         self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
         self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
         self.xypositionListWidget_moveToButton = QPushButton('Move to Pos')
@@ -691,6 +729,7 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget_createGridButton = QPushButton('Create Grid')
         #Adding callbacks to the xy position list buttons
         self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
+        self.xypositionListWidget_deleteAllButton.clicked.connect(self.xypositionListWidget.deleteAll)
         self.xypositionListWidget_moveUpButton.clicked.connect(self.xypositionListWidget.moveUp)
         self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
         self.xypositionListWidget_moveToButton.clicked.connect(self.xypositionListWidget.moveToPos)
@@ -702,13 +741,22 @@ class MDAGlados(CustomMainWindow):
         #Adding widgets to layout
         xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
         xyLayout.addWidget(self.xy_stagesDropdown,0,1)
-        xyLayout.addWidget(self.xypositionListWidget,1,0,6,1)
+        xyLayout.addWidget(self.xypositionListWidget,1,0,12,1)
         xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveUpButton,3,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveDownButton,4,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveToButton,5,1)
-        xyLayout.addWidget(self.xypositionListWidget_addButton,6,1)
-        xyLayout.addWidget(self.xypositionListWidget_createGridButton,7,1)
+        xyLayout.addWidget(self.xypositionListWidget_deleteAllButton,3,1)
+        xyLayout.addWidget(self.xypositionListWidget_moveUpButton,4,1)
+        xyLayout.addWidget(self.xypositionListWidget_moveDownButton,5,1)
+        xyLayout.addWidget(self.xypositionListWidget_moveToButton,6,1)
+        xyLayout.addWidget(self.xypositionListWidget_addButton,7,1)
+        xyLayout.addWidget(self.xypositionListWidget_createGridButton,8,1)
+        
+        #Pre-load entries if they exist:
+        if self.GUI_xy_pos_fullInfo != None:
+            for entry in self.GUI_xy_pos_fullInfo:
+                self.xypositionListWidget.addNewEntry(textEntry=entry[0],id=int(entry[1]),setxy=[float(entry[2]),float(entry[3])])
+        
+        #Add a callback lambda
+        self.xypositionListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:
@@ -847,6 +895,10 @@ class MDAGlados(CustomMainWindow):
         if self.channels is not None and self.channel_exposures_ms is not None:
             for entry in range(len(self.channels)):
                 self.channelListWidget.addNewEntry(channelEntry=self.channels[entry],exposureEntry=str(self.channel_exposures_ms[entry]))
+                
+        #Change MDA events when adapted
+        self.channelListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
         self.GUI_show_exposure_chkbox = QCheckBox("Exposure") #Note: created but never rendered
@@ -1431,6 +1483,7 @@ class MDAGlados(CustomMainWindow):
         #Set whether the napariviewer should (also) try to connect to the mda
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
+        
         self.shared_data._mdaModeParams = self.mda
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
@@ -1564,6 +1617,15 @@ class MDAGlados(CustomMainWindow):
             self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
         else:
             self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
+        
+        #Get the xy positions
+        if self.xyGroupBox.isEnabled():
+            try:
+                self.xy_positions = self.xypositionListWidget.getPositionsArray()
+                self.xy_positions_saveInfo = self.xypositionListWidget.getSaveInfoPositionsArray()
+            except:
+                self.xy_positions = None
+                self.xy_positions_saveInfo = None
         
         if self.channelGroupBox.isEnabled():
             try:

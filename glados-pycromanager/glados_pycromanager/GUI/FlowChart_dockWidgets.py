@@ -826,6 +826,7 @@ class nodz_openMDADialog(QDialog):
                     exposure_ms=currentNode.mdaData.exposure_ms,
                     storage_folder=currentNode.mdaData.storage_folder,
                     storage_file_name=currentNode.mdaData.storage_file_name,
+                    GUI_xy_pos_fullInfo=currentNode.mdaData.xy_positions_saveInfo,
                     node = currentNode)
             else: #This should never happen, but otherwise just open a new mdaglados instance
                 self.mdaconfig = MDAGlados(parentData.core,None,None,parentData.shared_data,hasGUI=True)
