@@ -190,6 +190,7 @@ def MDAGlados_plugin(parent):
                     GUI_show_order = mdaInfo['GUI_show_order'], 
                     GUI_show_storage = mdaInfo['GUI_show_storage'], 
                     GUI_acquire_button = True,
+                    GUI_xy_pos_fullInfo = mdaInfo['xy_positions_saveInfo'],
                     autoSaveLoad=True).getGui()
     else: #If no MDA state is yet saved, open a new MDAGlados from scratch
         #Add the full micro manager controls UI

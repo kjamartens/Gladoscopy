@@ -308,6 +308,18 @@ class XYStageList(InteractiveListWidget):
                 posArray.append([float(self.item(row, 2).text()),float(self.item(row, 3).text())])
             return posArray
     
+    def getSaveInfoPositionsArray(self):
+        """
+        Return an array of the positions for pycromanager to work with, with all info (i.e. name, id)
+        """
+        if self.rowCount() == 0:
+            return None
+        elif self.rowCount() > 0:
+            infoArray = []
+            for row in range(self.rowCount()):
+                infoArray.append([self.item(row, 0).text(),self.item(row, 1).text(),self.item(row, 2).text(),self.item(row, 3).text()])
+            return infoArray
+    
     def swapRows(self, row1, row2):
         """
         Swap rows in the table widget.
@@ -326,7 +338,7 @@ class XYStageList(InteractiveListWidget):
             self.setItem(row2, col, item1)
         self.setCurrentCell(row2, 0)
         
-    def addNewEntry(self,textEntry="New Entry",id=None,setxy="Pos"):
+    def addNewEntry(self,textEntry="New Entry",id=None,setxy:str|Iterable="Pos"):
         """
         Add a new entry to the table.
         
@@ -398,6 +410,7 @@ class MDAGlados(CustomMainWindow):
                 GUI_show_order = True, 
                 GUI_show_storage = True, 
                 GUI_acquire_button = True,
+                GUI_xy_pos_fullInfo: Iterable | None = None,
                 autoSaveLoad = False,
                 parent=None,
                 node = None):
@@ -438,6 +451,7 @@ class MDAGlados(CustomMainWindow):
             GUI_show_order: Boolean indicating whether to show order settings in GUI (default is True).
             GUI_show_storage: Boolean indicating whether to show storage settings in GUI (default is True).
             GUI_acquire_button: Boolean indicating whether to show the acquisition button in GUI (default is True).
+            GUI_xy_pos_fullInfo: Full info (including naming, id) of the XY position list
             autoSaveLoad: Boolean indicating whether to automatically save and load settings (default is False).
         
         Returns:
@@ -482,6 +496,7 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_time = GUI_show_time
         self.GUI_show_order = GUI_show_order
         self.GUI_show_storage = GUI_show_storage
+        self.GUI_xy_pos_fullInfo = GUI_xy_pos_fullInfo
         self.autoSaveLoad = autoSaveLoad
         
         self.GUI_exposure_enabled = GUI_show_exposure
@@ -722,6 +737,12 @@ class MDAGlados(CustomMainWindow):
         xyLayout.addWidget(self.xypositionListWidget_addButton,6,1)
         xyLayout.addWidget(self.xypositionListWidget_createGridButton,7,1)
         
+        #Pre-load entries if they exist:
+        if self.GUI_xy_pos_fullInfo != None:
+            for entry in self.GUI_xy_pos_fullInfo:
+                self.xypositionListWidget.addNewEntry(textEntry=entry[0],id=int(entry[1]),setxy=[float(entry[2]),float(entry[3])])
+        
+        #Add a callback lambda
         self.xypositionListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
         
         #--------------- Z widget widget -----------------------------------------------
@@ -1588,8 +1609,10 @@ class MDAGlados(CustomMainWindow):
         if self.xyGroupBox.isEnabled():
             try:
                 self.xy_positions = self.xypositionListWidget.getPositionsArray()
+                self.xy_positions_saveInfo = self.xypositionListWidget.getSaveInfoPositionsArray()
             except:
                 self.xy_positions = None
+                self.xy_positions_saveInfo = None
         
         if self.channelGroupBox.isEnabled():
             try:
