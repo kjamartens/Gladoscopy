@@ -1161,9 +1161,13 @@ class XYGridManager():
 
     def accept(self):
         if self.gridEntries != []:
-            pass
+            #For speedup, right now un-link the update GUI function:
+            self.parent.xypositionListWidget.disconnectFunGUIConnection()
             for entry in self.gridEntries:
                 self.parent.xypositionListWidget.addNewEntry(textEntry="Grid",setxy = entry)
+            
+            #And relink the update GUI function
+            self.parent.xypositionListWidget.reconnectFunGUIConnection(runOnce=True)
             self.dialog.close()
         else:
             logging.error('No grid entries!')

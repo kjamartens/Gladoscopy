@@ -170,6 +170,14 @@ class InteractiveListWidget(QTableWidget):
                 id_values.append(float(item_id.text()))
         return id_values
 
+    def disconnectFunGUIConnection(self):
+        self.itemChanged.disconnect()
+    
+    def reconnectFunGUIConnection(self,runOnce=True):
+        self.itemChanged.connect(lambda: self.parent.get_MDA_events_from_GUI())
+        if runOnce:
+            self.parent.get_MDA_events_from_GUI()
+
 class ChannelList(InteractiveListWidget):
     """
     Creation of an interactive list widget, initially created for a nice channel list
