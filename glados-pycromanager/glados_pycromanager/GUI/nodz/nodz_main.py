@@ -1873,12 +1873,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
                         self.callAction(self)
 
     def finishedmda(self):
-        logging.debug('finishedmda ran')
+        logging.debug(f'finishedmda ran from node {self.name}')
         self.status = 'finished'
-        # self.update()
-        logging.debug('MDA finished within node')
         #MDA data is stored as self.mdaData.data
-        logging.debug(self.name)
 
     @property
     def height(self):

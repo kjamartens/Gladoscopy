@@ -2103,12 +2103,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callAction = lambda self, node=newNode: node.mdaData.MDA_acq_from_Node(node)
             
             #Add the node emits of 'finishing' upon MDA completion.
+            #Also connect the node's finishedMDA
+            #This order is important!
+            newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
             newNode.mdaData.MDA_completed.connect(lambda self, node = newNode: node.customFinishedEmits.emit_all_signals())
             #Note: the recorded MDA data is stored in node.mdaData.data - any analysis method should find/read this.
             #The core is at node.mdaData.core
-            
-            #Also connect the node's finishedMDA
-            newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
             
             #Initialise text on the node with a 'double-click this to set the settings!' text:
             if not newNode.createdFromLoading:
