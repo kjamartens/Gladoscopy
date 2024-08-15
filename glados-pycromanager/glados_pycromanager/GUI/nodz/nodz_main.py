@@ -1638,7 +1638,7 @@ class NodeScene(QtWidgets.QGraphicsScene):
             
         NodeListConnectionsAcq = utils.findConnectedToNode(self.parent().evaluateGraph(),'initStart',[]) #type:ignore
         if len(NodeListConnectionsAcq) > 0:
-            self.drawBoundingBox(painter,NodeListConnectionsAcq,boundingBorder=35,solidPaint=[150,30,150,75],linePaint=[150,150,0,200])
+            self.drawBoundingBox(painter,NodeListConnectionsAcq,boundingBorder=35,solidPaint=[150,30,150,75],linePaint=[180, 36, 180, 200])
         
     def drawBoundingBox(self,painter,NodeListConnections,boundingBorder=25,solidPaint=[50,150,50,75],linePaint=[0,200,0,200]):
         
