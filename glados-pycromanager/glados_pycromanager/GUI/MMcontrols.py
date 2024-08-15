@@ -619,6 +619,8 @@ class MMConfigUI(CustomMainWindow):
         newImage = shared_data.core.get_tagged_image()
         snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.tags["Height"],newImage.tags["Width"]))
         snapLayer.data = np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
+        #Move the layer to top
+        moveLayerToTop(napariViewer,'Snap')
         return
     
     def addImageToAlbum(self):
