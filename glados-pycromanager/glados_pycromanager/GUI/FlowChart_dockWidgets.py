@@ -3950,6 +3950,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     def initEnd(self,node):
     
         logging.debug('Initialisation finished fully!')
+        node.status = 'finished'
         #Find the acqStart node:
         scoringStartNode = None
         flowChart = self
