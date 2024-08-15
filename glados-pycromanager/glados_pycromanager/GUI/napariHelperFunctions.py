@@ -61,6 +61,9 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
         layer.data = np.append(layer.data,image_data,axis=0)
         current_slice = layer.data.shape[0]
         napariViewer.dims.set_current_step(0,current_slice)
+        
+        #Move the layer to top
+        moveLayerToTop(napariViewer,layer_name)
             
     else: #create the layer
         logging.debug('creating layer')
@@ -69,7 +72,35 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
         layer.scale = [shared_dataF.core.get_pixel_size_um(),shared_dataF.core.get_pixel_size_um()] #type:ignore
         layer._keep_auto_contrast = True #type:ignore
         napariViewer.reset_view()
+        
     
+def moveLayerToTop(napariViewer,layerName,selectLayer=True):
+    """
+    Move a layer to the top of the layer stack in the napari viewer.
+    
+    Args:
+        napariViewer (napari.Viewer): The napari viewer object.
+        layerName (str): The name of the layer to move to the top.
+        selectLayer (bool, optional): Whether to select the layer after moving it to the top. Defaults to True.
+    
+    Returns:
+        None
+    """
+    #check if the layer exist:
+    layerExists = False
+    if len(napariViewer.layers) > 0:
+        for layer in napariViewer.layers:
+            if layer.name == layerName:
+                layerExists = True
+                #Layers are ordered bottom-to-top:
+                layerPosition = napariViewer.layers.index(layer)
+                break
+    if layerExists:
+        #Moving to top is moving to the last position in the layer list
+        napariViewer.layers.move(layerPosition,len(napariViewer.layers))
+        if selectLayer:
+            napariViewer.layers.selection.select_only(layer)
+
 
 # @thread_worker
 def InitateNapariUI(napariViewer):

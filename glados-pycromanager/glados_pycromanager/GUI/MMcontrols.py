@@ -25,7 +25,7 @@ import logging
 from typing import List, Iterable
 import itertools
 import queue
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer
+from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 #For drawing
 matplotlib.use('Qt5Agg')
 
@@ -619,6 +619,8 @@ class MMConfigUI(CustomMainWindow):
         newImage = shared_data.core.get_tagged_image()
         snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.tags["Height"],newImage.tags["Width"]))
         snapLayer.data = np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
+        #Move the layer to top
+        moveLayerToTop(napariViewer,'Snap')
         return
     
     def addImageToAlbum(self):
@@ -631,6 +633,7 @@ class MMConfigUI(CustomMainWindow):
         shared_data.core.snap_image()
         #Get the just-snapped image
         newImage = shared_data.core.get_tagged_image()
+        
         #And add to the 'Album' layer
         addToExistingOrNewLayer(napariViewer,'Album',np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]]),shared_data_throughput = shared_data)
         return

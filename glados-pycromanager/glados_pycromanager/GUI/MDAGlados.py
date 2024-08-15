@@ -1412,6 +1412,8 @@ class MDAGlados(CustomMainWindow):
                             break
                 
                     logging.debug('Starting Nodz-MDA visualisation')
+                    #Prepare layerName for shared_data to order the layers later.
+                    self.shared_data.newestLayerName = layerName
                     napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
         #And try to get real-time analysis attributes at bottom:
