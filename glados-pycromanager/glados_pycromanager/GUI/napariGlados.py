@@ -46,14 +46,16 @@ def napariUpdateLive(DataStructure):
     
     Basically the core visualisation method
     """
+    
+    #TODO: Make this an advanced variable or so. 
+    if time.time() - shared_data.last_display_update_time < 0.05: #less than a 50ms ago already update live mode? don't display live then.
+        return
+    
     napariViewer = DataStructure['napariViewer']
     acqstate = DataStructure['acqState']
     core = DataStructure['core']
     image_queue_analysisA = DataStructure['image_queue_analysis']
     analysisThreads = DataStructure['analysisThreads']
-    #TODO: Make this an advanced variable or so. 
-    if time.time() - shared_data.last_display_update_time < 0.05: #less than a 50ms ago already update live mode? don't display live then.
-        return
     shared_data.last_display_update_time = time.time()
     logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
     layerName = DataStructure['layer_name']
@@ -374,6 +376,8 @@ class napariHandler():
                     #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                     logging.debug('starting acq')
                     shared_data.allMDAslicesRendered = {}
+                    #Already move the live layer to top
+                    moveLayerToTop(self.shared_data.napariViewer,"Live")
                     with Acquisition(directory=None, name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
                         shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
@@ -419,6 +423,9 @@ class napariHandler():
                 napariViewer = None
                 showdisplay = False
                 shared_data.allMDAslicesRendered = {}
+                #Already move the layer to top
+                if shared_data.newestLayerName != '':
+                    moveLayerToTop(self.shared_data.napariViewer,shared_data.newestLayerName)
                 with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
                     shared_data._mdaModeAcqData = acq
                     events = shared_data._mdaModeParams
@@ -768,7 +775,8 @@ def startLiveModeVisualisation(shared_data,layerName='Live'):
     shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
 
 def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
-    
+    #Set the latest layer name to be the layer name
+    shared_data.newestLayerName = layerName
     #Create an analysis thread which runs this MDA visualisation
     create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
