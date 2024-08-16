@@ -1323,62 +1323,59 @@ class Nodz(QtWidgets.QGraphicsView):
         self._focus()
         
         
-        # #Update the decisionwidget after loading all nodes:
-        # if 'DECISION_WIDGET_INFO' in data:
-        #     decisionWidgetData = data['DECISION_WIDGET_INFO']
+        #Update the decisionwidget after loading all nodes:
+        if 'DECISION_WIDGET_INFO' in data:
+            decisionWidgetData = data['DECISION_WIDGET_INFO']
             
             
-        #     #First set the two main dropdowns:
-        #     readable_currentMode = decisionWidgetData['currentMode']
-        #     true_currentMode = ''
-        #     for match in self.decisionWidget.decisionArray_modes:
-        #         if match[0] == readable_currentMode:
-        #             true_currentMode = match[1]
-        #     self.decisionWidget.mode_dropdown.setCurrentText(true_currentMode)
+            #First set the two main dropdowns:
+            readable_currentMode = decisionWidgetData['currentMode']
+            true_currentMode = ''
+            for match in self.decisionWidget.decisionArray_modes:
+                if match[0] == readable_currentMode:
+                    true_currentMode = match[1]
+            self.decisionWidget.mode_dropdown.setCurrentText(true_currentMode)
             
-        #     #First set the two main dropdowns:
-        #     readable_currentDecision = decisionWidgetData['currentDecision']
-        #     true_currentDecision = ''
-        #     for match in self.decisionWidget.decisionArray_decisionTypes[readable_currentMode]:
-        #         if match[0] == readable_currentDecision:
-        #             true_currentDecision = match[1]
+            #First set the two main dropdowns:
+            readable_currentDecision = decisionWidgetData['currentDecision']
+            true_currentDecision = ''
+            for match in self.decisionWidget.decisionArray_decisionTypes[readable_currentMode]:
+                if match[0] == readable_currentDecision:
+                    true_currentDecision = match[1]
                     
-        #     self.decisionWidget.decisionLayouts[readable_currentMode].mode_dropdown.setCurrentText(true_currentDecision)
+            self.decisionWidget.decisionLayouts[readable_currentMode].mode_dropdown.setCurrentText(true_currentDecision)
             
-        #     #Then fill all info
+            #Then fill all info
         
-        #     #recusively loop over allc hildren of the decisionWidget, and if they have an object name, store it:
-        #     def recursively_set_children(child, dataloc):
-        #         """
-        #         Recursively store children of a pyqt child, if it has an objectname
-        #         """
-        #         for childN in child.children():
-        #             if hasattr(childN, 'objectName'):
-        #                 if isinstance(childN, QLineEdit):
-        #                     childN.setText(dataloc[childN.objectName()])
-        #                 elif isinstance(childN, QComboBox):
-        #                     childN.setCurrentText(dataloc[childN.objectName()])
-        #                 elif isinstance(childN, QCheckBox):
-        #                     childN.setChecked(dataloc[childN.objectName()])
-        #                 # else:
-        #                 #     try:
-        #                 #         childN.setText(dataloc[childN.objectName()])
-        #                 #     except:
-        #                 #         pass
-        #             #Check if it has more children:
-        #             if len(childN.children()) > 0:
-        #                 for childNN in childN.children():
-        #                     recursively_set_children(childNN, dataloc)
+            #recusively loop over allc hildren of the decisionWidget, and if they have an object name, store it:
+            def recursively_set_children(child, dataloc):
+                """
+                Recursively store children of a pyqt child, if it has an objectname
+                """
+                for childN in child.children():
+                    if hasattr(childN, 'objectName'):
+                        if isinstance(childN, QLineEdit):
+                            childN.setText(dataloc[childN.objectName()])
+                        elif isinstance(childN, QComboBox):
+                            childN.setCurrentText(dataloc[childN.objectName()])
+                        elif isinstance(childN, QCheckBox):
+                            childN.setChecked(dataloc[childN.objectName()])
+                        # else:
+                        #     try:
+                        #         childN.setText(dataloc[childN.objectName()])
+                        #     except:
+                        #         pass
+                    #Check if it has more children:
+                    if len(childN.children()) > 0:
+                        for childNN in childN.children():
+                            recursively_set_children(childNN, dataloc)
             
-        #     for decisionlayout in self.decisionWidget.decisionLayouts:
-        #         decisionLayoutFull = self.decisionWidget.decisionLayouts[decisionlayout]
-        #         if len(decisionLayoutFull.decisiontypes) > 0:
-        #             for decisiontype in decisionLayoutFull.decisiontypes:
-        #                 recursively_set_children(decisionLayoutFull.decisiontypes[decisiontype], decisionWidgetData['PYQTentries'])
+            for decisionlayout in self.decisionWidget.decisionLayouts:
+                decisionLayoutFull = self.decisionWidget.decisionLayouts[decisionlayout]
+                if len(decisionLayoutFull.decisiontypes) > 0:
+                    for decisiontype in decisionLayoutFull.decisiontypes:
+                        recursively_set_children(decisionLayoutFull.decisiontypes[decisiontype], decisionWidgetData['PYQTentries'])
         
-         
-        # #Update the decisionwidget after loading the scoringEnd node:
-        # node.flowChart.decisionWidget.updateAllDecisions() #type:ignore
 
         #Load the scanning widget:
         if 'SCANNING_WIDGET_INFO' in data:
@@ -1389,16 +1386,6 @@ class Nodz(QtWidgets.QGraphicsView):
                 for key, value in data['SCANNING_WIDGET_INFO'][scanMode].items():
                     self.scanningWidget.scanLayouts[scanMode].scanningInfoGUI[scanMode][key] = value
                 
-        # data['SCANNING_WIDGET_INFO'] = dict()
-        # data['SCANNING_WIDGET_INFO']['currentMode'] = self.scanningWidget.currentMode
-        # data['SCANNING_WIDGET_INFO']['scanMode'] = self.scanningWidget.scanMode
-        # for scanModeID in range(len(self.scanningWidget.scanArray_modes)):
-        #     scanMode = self.scanningWidget.scanArray_modes[scanModeID][0]
-        #     data['SCANNING_WIDGET_INFO'][scanMode] = dict()
-        #     for key, value in self.scanningWidget.scanLayouts[scanMode].scanningInfoGUI[scanMode].items():
-        #         data['SCANNING_WIDGET_INFO'][scanMode][key] = value
-        
-        #End loading scanning widget
             self.scanningWidget.updateAllScans()
 
         # Emit signal.
