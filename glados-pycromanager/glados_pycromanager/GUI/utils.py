@@ -1100,7 +1100,15 @@ class XYGridManager():
             totYsize = (self.grid_n_rows)* self.core.get_image_height() * self.core.get_pixel_size_um() + (self.grid_n_rows - 1) * -self.pos_overlap[1]
             centerPos = self.pos_center
         elif self.pos_choice == 'corner':
-            #If it's from the corner(s), we need to check that (a) we have enough enough, and (b) determine the total x/y size and the center position:
+            #Check if any NaNs in the corner entries:
+            if not np.isnan(any([any(self.pos_top_left),any(self.pos_top_right),any(self.pos_bottom_left),any(self.pos_bottom_right)])):
+            #     Use the corner positions to determine the center position and the total size:
+                centerPos = [(self.pos_top_left[0]+self.pos_bottom_right[0])/2,(self.pos_top_left[1]+self.pos_bottom_right[1])/2]
+                totXsize = abs(self.pos_bottom_right[0]-self.pos_top_left[0])
+                totYsize = abs(self.pos_bottom_right[1]-self.pos_top_left[1])
+                #Using this and the overlap, determine the grid n rows/cols:
+                self.grid_n_rows = int(totYsize / (self.core.get_image_height() * self.core.get_pixel_size_um() + self.pos_overlap[1]))+1
+                self.grid_n_cols = int(totXsize / (self.core.get_image_width() * self.core.get_pixel_size_um() + self.pos_overlap[0]))+1
             
             
         if self.grid_flow_type == 'hor_normal': #row-by-row
@@ -1148,44 +1156,66 @@ class XYGridManager():
         self.gridInfoLabel.setText(gridText)
         self.gridInfoLabel.setToolTip(gridHoverText)
 
-    def setPositionText(self,positionAttr):
+    def setPositionText(self,positionAttr,recursiveUpdate = True,updateFromStage = True):
         """
         Sets the text of the position text boxes to the current xy stage position.
         """
         #Create text of these positions with 2 dec places:
-        xx = "{:.2f}".format(self.core.get_xy_stage_position().x)
-        yy = "{:.2f}".format(self.core.get_xy_stage_position().y)
-        text = f"{xx}, {yy}"
+        if updateFromStage:
+            xx = "{:.2f}".format(self.core.get_xy_stage_position().x)
+            yy = "{:.2f}".format(self.core.get_xy_stage_position().y)
+            text = f"{xx}, {yy}"
+            
+            if positionAttr == "pos_center":
+                self.setPosCenter.setText(text)
+                self.pos_choice = 'center'
+                #set corners to nans:
+                self.pos_top_right = [np.nan,np.nan]
+                self.pos_bottom_left = [np.nan,np.nan]
+                self.pos_bottom_right = [np.nan,np.nan]
+                self.pos_top_left = [np.nan,np.nan]
+            elif positionAttr == "pos_top_left":
+                self.pos_choice = 'corner'
+                self.setPosTopLeft.setText(text)
+                self.pos_top_left = [float(xx),float(yy)]
+                #Also update the top and left pos of the pos_top_right and pos_bot_left:
+                self.pos_top_right[1] = self.pos_top_left[1]
+                self.pos_bottom_left[0] = self.pos_top_left[0]
+            elif positionAttr == "pos_top_right":
+                self.pos_choice = 'corner'
+                self.setPosTopRight.setText(text)
+                self.pos_top_right = [float(xx),float(yy)]
+                self.pos_top_left[1] = self.pos_top_right[1]
+                self.pos_bottom_right[0] = self.pos_top_right[0]
+            elif positionAttr == "pos_bot_left":
+                self.pos_choice = 'corner'
+                self.setPosBottomLeft.setText(text)
+                self.pos_bottom_left = [float(xx),float(yy)]
+                self.pos_bottom_right[1] = self.pos_bottom_left[1]
+                self.pos_top_left[0] = self.pos_bottom_left[0]
+            elif positionAttr == "pos_bot_right":
+                self.pos_choice = 'corner'
+                self.setPosBottomRight.setText(text)
+                self.pos_bottom_right = [float(xx),float(yy)]
+                self.pos_bottom_left[1] = self.pos_bottom_right[1]
+                self.pos_top_right[0] = self.pos_bottom_right[0]
+                
+        else: #Not from stage pos, but from memory
+            if positionAttr == "pos_top_left":
+                self.setPosTopLeft.setText(f"{self.pos_top_left[0]}, {self.pos_top_left[1]}")
+            elif positionAttr == "pos_top_right":
+                self.setPosTopRight.setText(f"{self.pos_top_right[0]}, {self.pos_top_right[1]}")
+            elif positionAttr == "pos_bot_left":
+                self.setPosBottomLeft.setText(f"{self.pos_bottom_left[0]}, {self.pos_bottom_left[1]}")
+            elif positionAttr == "pos_bot_right":
+                self.setPosBottomRight.setText(f"{self.pos_bottom_right[0]}, {self.pos_bottom_right[1]}")
         
-        
-        if positionAttr == "pos_center":
-            self.setPosCenter.setText(text)
-            self.pos_choice = 'center'
-        elif positionAttr == "pos_top_left":
-            self.pos_choice = 'corner'
-            self.setPosTopLeft.setText(text)
-            self.pos_top_left = [float(xx),float(yy)]
-            #Also update the top and left pos of the pos_top_right and pos_bot_left:
-            self.pos_top_right[1] = self.pos_top_left[1]
-            self.pos_bottom_left[0] = self.pos_top_left[0]
-        elif positionAttr == "pos_top_right":
-            self.pos_choice = 'corner'
-            self.setPosTopRight.setText(text)
-            self.pos_top_right = [float(xx),float(yy)]
-            self.pos_top_left[1] = self.pos_top_right[1]
-            self.pos_bottom_right[0] = self.pos_top_right[0]
-        elif positionAttr == "pos_bot_left":
-            self.pos_choice = 'corner'
-            self.setPosBottomLeft.setText(text)
-            self.pos_bottom_left = [float(xx),float(yy)]
-            self.pos_bottom_right[1] = self.pos_bottom_left[1]
-            self.pos_top_left[0] = self.pos_bottom_left[0]
-        elif positionAttr == "pos_bot_right":
-            self.pos_choice = 'corner'
-            self.setPosBottomRight.setText(text)
-            self.pos_bottom_right = [float(xx),float(yy)]
-            self.pos_bottom_left[1] = self.pos_bottom_right[1]
-            self.pos_top_right[0] = self.pos_bottom_right[0]
+        #And update the others/all w/o recursiveness
+        if recursiveUpdate == True:
+            self.setPositionText("pos_top_left",recursiveUpdate = False,updateFromStage = False)
+            self.setPositionText("pos_top_right",recursiveUpdate = False,updateFromStage = False)
+            self.setPositionText("pos_bot_left",recursiveUpdate = False,updateFromStage = False)
+            self.setPositionText("pos_bot_right",recursiveUpdate = False,updateFromStage = False)
         
         self.updateGridInfo()
         
