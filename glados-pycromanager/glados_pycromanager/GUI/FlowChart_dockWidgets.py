@@ -4819,6 +4819,22 @@ class ScanningWidget(QWidget):
             The position information.
         """
         return self.scanLayouts[self.scanArray_modes[self.mode_dropdown.currentIndex()][0]].getPositionInfo()
+    
+    
+    def updateAllScans(self):
+        """
+        Update all scannings in the scan layouts based on the internal stored data.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        for scanMode in self.scanLayouts:
+            if scanMode == "LoadPos":
+                self.scanLayouts[scanMode].lineEdit_posFilename.setText(self.scanLayouts[scanMode].scanningInfoGUI['LoadPos']['fileName'])
+        logging.debug('Updated all scan layouts')
 
 class advScanGridLayout(QGroupBox):
     """ 
