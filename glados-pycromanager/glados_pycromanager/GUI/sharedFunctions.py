@@ -37,6 +37,10 @@ class Shared_data(QObject):
         self.nodzInstance = None
         self.last_display_update_time = 0
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
+        self.warningErrorInfoInfo = {}
+        self.warningErrorInfoInfo['Errors'] = []
+        self.warningErrorInfoInfo['Warnings'] = []
+        self.warningErrorInfoInfo['Info'] = []
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')

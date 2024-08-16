@@ -838,6 +838,81 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
     return allData
 
 
+def updateWarningErrorInfoIcons(shared_data):
+    
+    
+    #Find the iconPath folder
+    if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+        iconFolder = './glados_pycromanager/GUI/Icons/'
+    elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+        iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+    else:
+        iconFolder = ''
+    
+    #Info should be stored as follows:
+    # shared_data.warningErrorInfoInfo['Errors']
+    # shared_data.warningErrorInfoInfo['Warnings']
+    # shared_data.warningErrorInfoInfo['Info']
+    
+    #Icons Qlabels stored here:
+    # shared_data.nodzInstance.errorIcon (warningIcon, infoIcon)
+    # if len(shared_data.warningErrorInfoInfo['Errors']) > 0:
+    shared_data.nodzInstance.errorIcon = setWarningErrorInfoIcon(shared_data.nodzInstance.errorIcon,'error',iconFolder,alteration='none')
+    
+    logging.debug('Updated setWarningErrorInfoIcon')
+
+def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',iconSize = 16):
+    """
+    Sets the warning, error, or info icon for the given widget. The icon is loaded from the specified iconFolder and can be optionally altered to grayscale.
+
+    Args:
+        widget (QWidget): The widget to set the icon for.
+        type (str): The type of icon to set, either 'warning', 'error', or 'info'.
+        iconFolder (str): The folder path containing the icon files.
+        alteration (str, optional): The alteration to apply to the icon, either 'grayscale' or None. Defaults to 'grayscale'.
+        iconSize (int, optional): Size of the icon. Defaults to 16.
+
+    Returns:
+        QWidget: The widget with the icon set.
+    """
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
+    
+    if type == 'warning':
+        iconLoc = iconFolder+'WarningIcon.png'
+    elif type == 'error':
+        iconLoc = iconFolder+'ErrorIcon.png'
+    else:
+        iconLoc = iconFolder+'InfoIcon.png'
+    
+    
+    # Load the original pixmap
+    pixmap = QPixmap(iconLoc)
+
+    if alteration == 'grayscale':
+        # Convert to QImage
+        image = pixmap.toImage()
+
+        #No clue what it's doing here, but Cody proposed it, and its way faster than looping
+        # Convert QImage to NumPy array
+        ptr = image.bits()
+        ptr.setsize(image.byteCount())
+        image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
+        # Perform grayscale conversion
+        gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
+        image_array[:, :, :3] = gray_array[:, :, np.newaxis]
+        # Convert back to QImage
+        grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
+
+        # Convert back to QPixmap
+        pixmap = QPixmap.fromImage(grayscale_image)
+    scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+    widget.setPixmap(scaled_pixmap)
+    
+    return widget
+    
+
 class XYGridManager():
     """  
     #Idea of XY grid: have methods to create a pop-up dialog, where users can set up the grid (top), setting up top/bottom/left/right/center and specifiy overlap. This then also includes a grid-flow (bottom) with options betwen e.g. normal grid, diagonal grid, spiral grid, etc

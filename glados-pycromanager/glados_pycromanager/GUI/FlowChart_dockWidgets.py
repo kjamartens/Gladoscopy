@@ -1428,9 +1428,33 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
         else:
             self.iconFolder = ''
+            
+            
+        self.buttonsArea = QVBoxLayout()
+        
+        #Add a hbox with warning icons, and set them to be grayscale/inactive:
+        self.warningArea = QHBoxLayout()
+        #add a stretch before:
+        self.warningArea.addStretch()
+        self.errorIcon = QLabel()
+        self.errorIcon = utils.setWarningErrorInfoIcon(self.errorIcon,'error',self.iconFolder,alteration = 'grayscale')
+        self.warningArea.addWidget(self.errorIcon)
+        self.warningIcon = QLabel()
+        self.warningIcon = utils.setWarningErrorInfoIcon(self.warningIcon,'warning',self.iconFolder,alteration = 'grayscale')
+        self.warningArea.addWidget(self.warningIcon)
+        self.infoIcon = QLabel()
+        self.infoIcon = utils.setWarningErrorInfoIcon(self.infoIcon,'info',self.iconFolder,alteration = 'grayscale')
+        self.warningArea.addWidget(self.infoIcon)
+        
+        #add a stretch after the icons:
+        self.warningArea.addStretch()
+        
+        
+        #Add the area:
+        self.buttonsArea.addLayout(self.warningArea)
+        
         
         #Add a few buttons:
-        self.buttonsArea = QVBoxLayout()
         self.loadPickleButton = QPushButton(' Load graph')
         self.buttonsArea.addWidget(self.loadPickleButton)
         self.loadPickleButton.clicked.connect(lambda index: self.loadGraphJSON())
@@ -1476,6 +1500,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         # self.debugScoringButton = QPushButton('Debug Scoring')
         # self.buttonsArea.addWidget(self.debugScoringButton)
         # self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
+        
+        #Push buttons to top
+        self.buttonsArea.addStretch()
         
         self.globalVariables={}
         self.globalVariables['TrialGlobalVariable']={}
@@ -1539,6 +1566,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.NodzPlusButtonsWidget.setLayout(self.NodzPlusButtonsLayout)
         self.NodzPlusButtonsLayout.addWidget(self.graphics_view,0,0)
         self.NodzPlusButtonsLayout.addLayout(self.buttonsArea,0,1)
+        self.NodzPlusButtonsLayout.setColumnStretch(0, 10)  # Give more stretch to graphics_view
+        self.NodzPlusButtonsLayout.setColumnStretch(1, 1)   # Give less stretch to buttonsArea
+
         
         from PyQt5.QtWidgets import  QSplitter
 
