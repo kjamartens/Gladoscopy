@@ -859,8 +859,6 @@ class Nodz(QtWidgets.QGraphicsView):
         :param filePath: The path where you want to save your graph at.
 
         """
-        #here hook into warning icon update:
-        full_utils.updateWarningErrorInfoIcons(self.shared_data)
         
         data = dict()
 

@@ -2601,6 +2601,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         self.updateCoreVariables()
         node.status='finished'
+        self.shared_data.warningErrorInfoInfo['Info']['LastNodeRan'] = node.name
         
         self.update()
         if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
@@ -3128,6 +3129,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         node should be marked as 'started' or 'finished' based on the attributes connected.
         """
         logging.debug(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
+        self.checkNodesOnErrors()
     
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -3137,6 +3139,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         the finished event of the source node from the 'we finished one of the prerequisites' at the destination node.
         """
         logging.debug('plugorsocketdisconnected')
+        self.checkNodesOnErrors()
     
     def PlugConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -3347,6 +3350,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.coreVariables[name]['data'] = data 
         self.coreVariables[name]['importance'] = importance 
     
+    def checkNodesOnErrors(self):
+        #Idea: check all nodes for errors, alongside unconnected nodes. If so, update the warning. If not, reset the warning to none.
+        #Start: only check for connections.
+        print('asdf')
+    
     #endregion
     
     #region NodzFlowChart Saving Loading
@@ -3383,6 +3391,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 #Load the graph
                 with open(filename, 'rb') as f:
                     self.loadGraph_KM(filename)
+                
+                #Update warnings/info/errors:
+                self.shared_data.warningErrorInfoInfo["Info"]['Other'] = ["Loaded "+filename]
+                # utils.updateAutonousErrorWarningInfo(self.shared_data)
             except:
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Warning)
@@ -4440,6 +4452,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         positions = self.fullRunPositions
         pos = self.fullRunCurrentPos
         
+        self.shared_data.warningErrorInfoInfo['Info']['Other'] = [f"Autonomous run is ongoing! Currently at pos {str(pos+1)}/{str(positions['nrPositions'])}  ({str(round(pos/positions['nrPositions']*100,2))}%)"]
+        
         logging.info(f'Starting new score acq at position {pos} -------------------------------------------------------------------------------')
         
         #Set all stages correct
@@ -4527,7 +4541,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             None
         """
         self.preventAcq = False
-        self.preventScoring=False
+        self.preventScoring = False
         #Find the scoring_start node:
         scoreStartNode = None
         flowChart = self

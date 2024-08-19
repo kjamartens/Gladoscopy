@@ -838,28 +838,14 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
     return allData
 
 
-def updateWarningErrorInfoIcons(shared_data):
-    
-    
-    #Find the iconPath folder
+def findIconFolder():
     if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
         iconFolder = './glados_pycromanager/GUI/Icons/'
     elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
         iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
     else:
         iconFolder = ''
-    
-    #Info should be stored as follows:
-    # shared_data.warningErrorInfoInfo['Errors']
-    # shared_data.warningErrorInfoInfo['Warnings']
-    # shared_data.warningErrorInfoInfo['Info']
-    
-    #Icons Qlabels stored here:
-    # shared_data.nodzInstance.errorIcon (warningIcon, infoIcon)
-    # if len(shared_data.warningErrorInfoInfo['Errors']) > 0:
-    shared_data.nodzInstance.errorIcon = setWarningErrorInfoIcon(shared_data.nodzInstance.errorIcon,'error',iconFolder,alteration='none')
-    
-    logging.debug('Updated setWarningErrorInfoIcon')
+    return iconFolder
 
 def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',iconSize = 16):
     """
@@ -3127,7 +3113,31 @@ def getCoreDevicesOfDeviceType(core,devicetype):
             devicesOfType.append(device)
     return devicesOfType
 
+def updateAutonousErrorWarningInfo(shared_data,updateInfo=['Error','Warning','Info']):
+    
+    from sharedFunctions import Shared_data
+    if isinstance(shared_data,Shared_data):
+        sharedData = shared_data
+    elif isinstance(shared_data.parent, Shared_data):
+        sharedData = shared_data.parent
+    errorIcon = sharedData.nodzInstance.errorIcon
+    warningIcon = sharedData.nodzInstance.warningIcon
+    infoIcon = sharedData.nodzInstance.infoIcon
 
+    if len(updateInfo) == 1 and updateInfo[0] == 'Info':
+        #Showcase on how to activate/set tooltip:
+        setWarningErrorInfoIcon(infoIcon,'info',findIconFolder(),alteration='none')
+        tooltip = ''
+        if shared_data['Info']['LastNodeRan'] != None:
+            tooltip+= "Last Node Ran: " + shared_data['Info']['LastNodeRan']+"\n"
+        if shared_data['Info']['Other'] != None:
+            tooltip += shared_data['Info']['Other'][0]
+            
+        infoIcon.setToolTip(tooltip)
+        
+    elif len(updateInfo) == 1 and updateInfo[0] == 'Error':
+        infoIcon.setToolTip('tooltip')
+        
 import datetime
 def set_up_logger():
     """

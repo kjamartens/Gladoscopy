@@ -37,10 +37,7 @@ class Shared_data(QObject):
         self.nodzInstance = None
         self.last_display_update_time = 0
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
-        self.warningErrorInfoInfo = {}
-        self.warningErrorInfoInfo['Errors'] = []
-        self.warningErrorInfoInfo['Warnings'] = []
-        self.warningErrorInfoInfo['Info'] = []
+        self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
         
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
@@ -166,6 +163,61 @@ class Shared_data(QObject):
     def appendNewMDAdataset(self,mdadataset):
         self.mdaDatasets.append(mdadataset)
     
+    
+    @property
+    def warningErrorInfoInfo(self):
+        return self._warningErrorInfoInfo
+
+    def on_warningErrorInfoInfo_changed(self,oldValue=None,errorType=None):
+        try:
+            logging.debug(f"shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}")
+            if self._warningErrorInfoInfo['Errors'] != oldValue['Errors']:
+                from utils import updateAutonousErrorWarningInfo
+                updateAutonousErrorWarningInfo(self,updateInfo=['Error'])
+            if self._warningErrorInfoInfo['Warnings'] != oldValue['Warnings']:
+                from utils import updateAutonousErrorWarningInfo
+                updateAutonousErrorWarningInfo(self,updateInfo=['Warning'])
+            if self._warningErrorInfoInfo['Info'] != oldValue['Info']:
+                from utils import updateAutonousErrorWarningInfo
+                updateAutonousErrorWarningInfo(self,updateInfo=['Info'])
+        except:
+            pass
+    
+
+class Dict_Specific_WarningErrorInfo(dict):
+    def __init__(self, *args, **kwargs):
+        self.parent = kwargs.pop('parent', None)
+        self.errorType = kwargs.pop('errorType', None)
+        super().__init__(*args, **kwargs)
+        self._convert_nested()
+
+    def _convert_nested(self):
+        for key, value in self.items():
+            if isinstance(value, dict):
+                self[key] = Dict_Specific_WarningErrorInfo(value, parent=self, errorType=key)
+            elif isinstance(value, list):
+                self[key] = [Dict_Specific_WarningErrorInfo(item, parent=self, errorType=key) if isinstance(item, dict) else item for item in value]
+
+    def __setitem__(self, key, value):
+        self.oldValue = self.copy()
+        if isinstance(value, dict):
+            value = Dict_Specific_WarningErrorInfo(value, parent=self, errorType=key)
+        elif isinstance(value, list):
+            value = [Dict_Specific_WarningErrorInfo(item, parent=self, errorType=key) if isinstance(item, dict) else item for item in value]
+        super().__setitem__(key, value)
+        self._notify_change()
+
+    def _notify_change(self):
+        if self.parent:
+            self.parent.on_warningErrorInfoInfo_changed(oldValue=self.oldValue,errorType=self.errorType)
+        else:
+            self.on_warningErrorInfoInfo_changed(oldValue=self.oldValue,errorType=self.errorType)
+            
+    def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
+        # This method will be overridden in the Shared_data class
+        from utils import updateAutonousErrorWarningInfo
+        updateAutonousErrorWarningInfo(self,updateInfo=[errorType])
+        pass
 
 class periodicallyUpdate:
     def __init__(self,updateFunction,timing = 10000):
