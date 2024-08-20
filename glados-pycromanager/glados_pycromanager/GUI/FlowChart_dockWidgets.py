@@ -525,7 +525,26 @@ class nodz_openNewGlobalVarDialog(nodz_generalAdvancedLineEditDialog):
                         internalName='newVarChange',
                         advLineEdits=[{'Variable Name:':['globalVarName','Value']},{'Initial Value:':['globalVarValue','Value']}],
                         storeVarName='newGlobalVarInfo')
+
+class nodz_openIfStatementDialog(nodz_generalAdvancedLineEditDialog):
+    """
+    A Dialog that is created for ifStatement in the Nodz layout. 
+    """
+    def __init__(self, parentNode=None):
+        """
+        Initializes the ifStatementDialog.
         
+        Args:
+            parentNode: The parent node of the ifStatementDialog. If provided, the ifStatementDialog will be set to the ifStatementDialog of the parentNode.
+        
+        Returns:
+            None
+        """
+        super().__init__(parentNode=parentNode,
+                        title="ifStatement Dialog",
+                        internalName='ifStatementDialog',
+                        advLineEdits=[{'Value to check:':['valueToCheck','Variable']},{'Comparator:':['comparator','Value']},{'Check against:':['valueCheckAgainst','Value']}],
+                        storeVarName='ifStatementInfo')
 
 class nodz_openStoreDataDialog(nodz_generalAdvancedLineEditDialog):
     def __init__(self, parentNode=None):
@@ -1193,7 +1212,7 @@ class FoVFindImaging_singleCh_configs(QDialog):
                 allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
             
             #Create the MM config via all config groups
-            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveMode=False,number_config_columns=5,changes_update_MM = False, showCheckboxes=True,autoSaveLoad=False)
+            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveSnapExposureButtons=False,number_config_columns=5,changes_update_MM = False, showCheckboxes=True,autoSaveLoad=False)
             
             button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             button_box.accepted.connect(self.accept)
@@ -1383,7 +1402,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     
     Main class of all Nodz-based Glados automisation.
     """
-    def __init__(self,core=None,shared_data=None,MM_JSON=None,parent=None):
+    def __init__(self,core=None,shared_data=None,MM_JSON=None,parent:CustomGraphicsView|None=None):
         """
         Initializes the GladosNodzFlowChart_dockWidget in napari-Glados. 
         Inherits from Nodz, which is a graph drawing tool.
@@ -1658,7 +1677,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             'acquisition','changeProperties','changeStagePos','|',
             'analysisMeasurement','customFunction','storeData','timer','|',
             'realTimeAnalysis','visualisation','|',
-            'newGlobalVar','changeGlobalVar','caseSwitch','ANDlogic','|',
+            'newGlobalVar','changeGlobalVar','caseSwitch','ifStatement','ANDlogic','|',
             'slackReport','stickyNote','|',
             'initStart','initEnd','scoringStart','scoringEndVar','acqStart','acqEnd','|',
             'runInlineScript','analysisMeasurementDEBUG']
@@ -1815,6 +1834,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.nodeInfo['changeGlobalVar']['startAttributes'] = ['Start']
         self.nodeInfo['changeGlobalVar']['finishedAttributes'] = ['Finished']
         self.nodeInfo['changeGlobalVar']['NodeSize'] = 60
+        
+        self.nodeInfo['ifStatement'] = self.singleNodeTypeInit()
+        self.nodeInfo['ifStatement']['name'] = 'ifStatement'
+        self.nodeInfo['ifStatement']['displayName'] = 'If-statement'
+        self.nodeInfo['ifStatement']['startAttributes'] = ['Start']
+        self.nodeInfo['ifStatement']['finishedAttributes'] = ['Succeed','Fail']
+        self.nodeInfo['ifStatement']['NodeSize'] = 60
         
         self.nodeInfo['runInlineScript'] = self.singleNodeTypeInit()
         self.nodeInfo['runInlineScript']['name'] = 'runInlineScript'
@@ -1980,6 +2006,12 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             },
             "caseSwitch": {
                 "bg": [112, 194, 134, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            "ifStatement": {
+                "bg": [143, 184, 155, 255],
                 "border": [50, 50, 50, 255],
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
@@ -2253,6 +2285,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             #Initialise text on the node with a 'double-click this to set the settings!' text:
             if not newNode.createdFromLoading:
                 self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
+        elif nodeType == 'ifStatement':
+            newNode.callAction = lambda self, node=newNode: self.ifStatementCallAction(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            
+            #Initialise text on the node with a 'double-click this to set the settings!' text:
+            if not newNode.createdFromLoading:
+                self.set_readable_text_after_dialogChange(newNode,'','__InitRequireUserDoubleClick__')
         elif nodeType == 'newGlobalVar':
             newNode.callAction = lambda self, node=newNode: self.newGlobalVarCallAction(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -2452,6 +2491,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 currentNode.changeGlobalVarInfo = dialog.changeGlobalVarInfo #type:ignore
                 currentNode.dialogInfo = dialog #type:ignore
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'changeGlobalVar')
+            # currentNode.callAction(self) #type:ignore
+        elif 'ifStatement' in nodeName:
+            dialog = nodz_openIfStatementDialog(parentNode=currentNode) #type:ignore
+            if dialog.exec_() == QDialog.Accepted:
+                currentNode.ifStatementInfo = dialog.ifStatementInfo #type:ignore
+                currentNode.dialogInfo = dialog #type:ignore
+                self.set_readable_text_after_dialogChange(currentNode,dialog,'ifStatement')
             # currentNode.callAction(self) #type:ignore
         elif 'newGlobalVar' in nodeName:
             dialog = nodz_openNewGlobalVarDialog(parentNode=currentNode) #type:ignore
@@ -3021,6 +3067,14 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 displayHTMLtext = f"Change global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> to <b>{self.limitTextLength(values['globalVarValue'][1],textLength = 60)}</b>"
             except:
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
+        
+        elif nodeType == 'ifStatement':
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.ifStatementInfo,currentNode.flowChart,dontEvaluate=True)
+            try:
+                displayHTMLtext = f"Assess the statement <b>{values['valueToCheck'][1]} {values['comparator'][1]} {values['valueCheckAgainst'][1]}</b>"
+            except:
+                displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
+            
         elif nodeType == 'runInlineScript':
             scriptInfo = currentNode.InlineScriptInfo
             n_lines = len(scriptInfo.split('\n'))
@@ -4325,6 +4379,38 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         
         self.finishedEmits(node)
+    
+    def ifStatementCallAction(self,node):
+        """
+        The changeGlobalVarCallAction function is the action function for the change global var Call node in the Flowchart.
+        
+        Args:
+            self: Refer to the class itself
+            node: Identify which node triggered the event
+        """
+        
+        varInfo = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.ifStatementInfo,node.flowChart)
+        
+        result = eval(str(varInfo['valueToCheck'][0])+varInfo['comparator'][0]+str(varInfo['valueCheckAgainst'][0]))
+        
+        if result == True:
+            graph = node.flowChart.evaluateGraph()
+            for graphConnection in graph:
+                if graphConnection[0] == node.name+'.Succeed':
+                    foundNodeName = graphConnection[1].split('.')[0]
+                    foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
+                    node.status='finished'
+                    foundNode.oneConnectionAtStartIsFinished()
+                    break    
+        elif result == False:
+            graph = node.flowChart.evaluateGraph()
+            for graphConnection in graph:
+                if graphConnection[0] == node.name+'.Fail':
+                    foundNodeName = graphConnection[1].split('.')[0]
+                    foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
+                    node.status='finished'
+                    foundNode.oneConnectionAtStartIsFinished()
+                    break    
     
     def runInlineScriptCallAction(self,node):
         scriptText = node.InlineScriptInfo

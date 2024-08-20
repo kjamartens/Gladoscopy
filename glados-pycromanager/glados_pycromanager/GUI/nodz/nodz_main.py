@@ -890,6 +890,7 @@ class Nodz(QtWidgets.QGraphicsView):
         data['NODES_STICKY_NOTE'] = dict()
         data['NODES_CASE_SWITCH'] = dict()
         data['NODES_SLACK_REPORT'] = dict()
+        data['IF_STATEMENT'] = dict()
         
         #Attempt to store the decision widget data
         data['DECISION_WIDGET_INFO'] = dict()
@@ -1067,6 +1068,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'newGlobalVarInfo' in vars(nodeInst):
                 if nodeInst.newGlobalVarInfo is not None:
                     data['NODES_NEW_GLOBAL_VAR'][node] = nodeInst.newGlobalVarInfo 
+            
+            data['IF_STATEMENT'][node] = {}
+            if 'ifStatementInfo' in vars(nodeInst):
+                if nodeInst.ifStatementInfo is not None:
+                    data['IF_STATEMENT'][node] = nodeInst.ifStatementInfo 
             
             data['NODES_RUN_INLINE_SCRIPT'][node] = {}
             if 'InlineScriptInfo' in vars(nodeInst):
@@ -1281,6 +1287,14 @@ class Nodz(QtWidgets.QGraphicsView):
                         if data['NODES_NEW_GLOBAL_VAR'] is not None:
                             node.newGlobalVarInfo  = data['NODES_NEW_GLOBAL_VAR'][name] #type:ignore
                             
+            
+                        
+            if 'IF_STATEMENT' in data:
+                if name in data['IF_STATEMENT']:
+                    if 'ifStatementInfo' in vars(node):
+                        if data['IF_STATEMENT'] is not None:
+                            node.ifStatementInfo  = data['IF_STATEMENT'][name] #type:ignore
+            
             if 'NODES_RUN_INLINE_SCRIPT' in data:
                 if name in data['NODES_RUN_INLINE_SCRIPT']:
                     if 'InlineScriptInfo' in vars(node):
@@ -1776,6 +1790,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.storeDataInfo = {}
         self.changeGlobalVarInfo  = {}
         self.newGlobalVarInfo  = {}
+        self.ifStatementInfo = {}
         self.InlineScriptInfo  = ''
         self.stickyNoteInfo = ''
         self.caseSwitchInfo = {}
