@@ -3113,30 +3113,67 @@ def getCoreDevicesOfDeviceType(core,devicetype):
             devicesOfType.append(device)
     return devicesOfType
 
-def updateAutonousErrorWarningInfo(shared_data,updateInfo=['Error','Warning','Info']):
+def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
     
-    from sharedFunctions import Shared_data
-    if isinstance(shared_data,Shared_data):
-        sharedData = shared_data
-    elif isinstance(shared_data.parent, Shared_data):
-        sharedData = shared_data.parent
-    errorIcon = sharedData.nodzInstance.errorIcon
-    warningIcon = sharedData.nodzInstance.warningIcon
-    infoIcon = sharedData.nodzInstance.infoIcon
+    """
+    Update the autonomous error, warning, and info icons and tooltips in the GUI based on the shared data.
 
-    if len(updateInfo) == 1 and updateInfo[0] == 'Info':
-        #Showcase on how to activate/set tooltip:
-        setWarningErrorInfoIcon(infoIcon,'info',findIconFolder(),alteration='none')
-        tooltip = ''
-        if shared_data['Info']['LastNodeRan'] != None:
-            tooltip+= "Last Node Ran: " + shared_data['Info']['LastNodeRan']+"\n"
-        if shared_data['Info']['Other'] != None:
-            tooltip += shared_data['Info']['Other'][0]
-            
-        infoIcon.setToolTip(tooltip)
+    This function is responsible for updating the appearance and tooltips of the error, warning, and info icons in the GUI based on the information stored in the `shared_data` object. It sets the icons to grayscale if there are no errors, warnings, or info messages to display, and activates the icons and sets the tooltips accordingly if there are messages to display.
+
+    Args:
+        shared_data (Shared_data): The shared data object containing the information about errors, warnings, and info messages.
+        updateInfo (str, optional): Specifies which information to update. Defaults to 'All', which updates all error, warning, and info messages.
+    """
+    if updateInfo == 'All': #Willa lways be the case, deprecated is ['Error','Warning','Info']
+        from sharedFunctions import Shared_data
+        if isinstance(shared_data,Shared_data):
+            sharedData = shared_data
+        elif isinstance(shared_data.parent, Shared_data):
+            sharedData = shared_data.parent
+        errorIcon = sharedData.nodzInstance.errorIcon
+        warningIcon = sharedData.nodzInstance.warningIcon
+        infoIcon = sharedData.nodzInstance.infoIcon
         
-    elif len(updateInfo) == 1 and updateInfo[0] == 'Error':
-        infoIcon.setToolTip('tooltip')
+        #Set all to inactive icons/grayscale:
+        setWarningErrorInfoIcon(warningIcon,'warning',findIconFolder(),alteration='grayscale')
+
+        infoToolTip = ''
+        #Showcase on how to activate/set infoToolTip:
+        if sharedData.warningErrorInfoInfo['Info']['LastNodeRan'] != None:
+            infoToolTip+= "Last Node Ran: " + sharedData.warningErrorInfoInfo['Info']['LastNodeRan']+"\n"
+        if sharedData.warningErrorInfoInfo['Info']['Other'] != None:
+            infoToolTip += sharedData.warningErrorInfoInfo['Info']['Other'][0]
+        
+        if infoToolTip != '':
+            setWarningErrorInfoIcon(infoIcon,'info',findIconFolder(),alteration='none')
+            infoIcon.setToolTip(infoToolTip)
+        else:
+            infoIcon.setToolTip(infoToolTip)
+            setWarningErrorInfoIcon(infoIcon,'info',findIconFolder(),alteration='grayscale')
+        
+        
+        #For warning/error, all nodes have a .warning or .error, which contain the info.
+        #We find this info and display it if necessary
+        errorToolTip = ''
+        for node in sharedData.nodzInstance.nodes:
+            if node.errorInfo != None:
+                if node.errorInfo != '':
+                    errorToolTip += f"Error in node {node.name}: {node.errorInfo}\n"
+        
+        errorIcon.setToolTip(errorToolTip)
+        if errorToolTip == '':
+            setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='grayscale')
+        else:
+            setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='none')
+        
+        # errorToolTip = ''
+        # errorToolTip = sharedData.warningErrorInfoInfo['Errors']
+        # if errorToolTip != '':
+        #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='none')
+        #     errorIcon.setToolTip(errorToolTip)
+        # else:
+        #     errorIcon.setToolTip(errorToolTip)
+        #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='grayscale')
         
 import datetime
 def set_up_logger():

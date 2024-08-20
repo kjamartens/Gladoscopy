@@ -10,6 +10,7 @@ import nodz_utils as utils
 import utils as full_utils
 from nodz_custom import *
 import logging
+import time
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
 
@@ -83,6 +84,7 @@ class Nodz(QtWidgets.QGraphicsView):
         self.currentState = 'DEFAULT'
         self.pressedKeys = list()
         
+        self.lastNodeCheckTime = 0
         return self
 
     def wheelEvent(self, event):
@@ -267,6 +269,11 @@ class Nodz(QtWidgets.QGraphicsView):
             self.rubberband.setGeometry(QtCore.QRect(self.origin, event.pos()).normalized())
 
         super(Nodz, self).mouseMoveEvent(event)
+        
+        #Every five seconds, check for nodes that have errors
+        if time.time() - self.lastNodeCheckTime > 5:
+            self.lastNodeCheckTime = time.time()
+            full_utils.updateAutonousErrorWarningInfo(self.shared_data)
 
     def mouseReleaseEvent(self, event):
         """
@@ -570,7 +577,7 @@ class Nodz(QtWidgets.QGraphicsView):
             return
         else:
             nodeItem = NodeItem(name=name, alternate=alternate, preset=preset,
-                                config=self.config, displayText = displayText, displayName=displayName,nodeInfo=nodeInfo)
+                                config=self.config, displayText = displayText, displayName=displayName,nodeInfo=nodeInfo,parent=self)
 
             # Store node in scene.
             self.scene().nodes[name] = nodeItem #type:ignore
@@ -659,6 +666,7 @@ class Nodz(QtWidgets.QGraphicsView):
                     connection.plugNode = newName
 
         node.update()
+        full_utils.updateAutonousErrorWarningInfo(self.shared_data)
 
         # Emit signal.
         self.signal_NodeEdited.emit(oldName, newName)
@@ -1715,7 +1723,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
     """
 
-    def __init__(self, name, alternate, preset, config, displayName = None, displayText = None, textbox=True, alternateFillColor = None, nodeInfo=None):
+    def __init__(self, name, alternate, preset, config, displayName = None, displayText = None, textbox=True, alternateFillColor = None, nodeInfo=None,parent=None):
         """
         Initialize the class.
 
@@ -1745,6 +1753,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         #Added by KM
         self.displayText = displayText
         self.displayName = displayName
+        self.parent = parent
         self.callAction = None
         self.callActionRelatedObject = None
         self.n_connect_at_start = 0 #number of others connected at start (which should all be finished!)        
@@ -1770,6 +1779,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.InlineScriptInfo  = ''
         self.stickyNoteInfo = ''
         self.caseSwitchInfo = {}
+        
+        self.warningInfo = ''
+        self.errorInfo = ''
         
         self.status = 'idle' #status should be 'idle','running','finished'
 
@@ -1946,6 +1958,24 @@ class NodeItem(QtWidgets.QGraphicsItem):
             return self._penSel
         else:
             return self._pen
+
+    @property
+    def warningInfo(self):
+        return self._warningInfo
+
+    @warningInfo.setter
+    def warningInfo(self, value):
+        self._warningInfo = value
+        # full_utils.updateAutonousErrorWarningInfo(self.parent.shared_data)
+
+    @property
+    def errorInfo(self):
+        return self._errorInfo
+
+    @errorInfo.setter
+    def errorInfo(self, value):
+        self._errorInfo = value
+        full_utils.updateAutonousErrorWarningInfo(self.parent.shared_data)
 
     def _createStyle(self, config):
         """
@@ -2983,13 +3013,15 @@ class PlugItem(SlotItem):
         """
         # Emit signal.
         nodzInst = self.scene().views()[0]
-        nodzInst.signal_PlugDisconnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
         # Remove connected socket from plug
         if connection.socketItem in self.connected_slots:
             self.connected_slots.remove(connection.socketItem)
         # Remove connection
         self.connections.remove(connection)
+        
+        #emit signal after removal
+        nodzInst.signal_PlugDisconnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
 class SocketItem(SlotItem):
 
@@ -3101,13 +3133,13 @@ class SocketItem(SlotItem):
         """
         # Emit signal.
         nodzInst = self.scene().views()[0]
-        nodzInst.signal_SocketDisconnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
         # Remove connected plugs
         if connection.plugItem in self.connected_slots:
             self.connected_slots.remove(connection.plugItem)
         # Remove connections
         self.connections.remove(connection)
+        nodzInst.signal_SocketDisconnected.emit(connection.plugNode, connection.plugAttr, connection.socketNode, connection.socketAttr)
 
 class BottomAttrItem(PlugItem):
     def __init__(self, parent, attribute, index, preset, dataType, maxConnections):

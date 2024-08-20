@@ -171,15 +171,8 @@ class Shared_data(QObject):
     def on_warningErrorInfoInfo_changed(self,oldValue=None,errorType=None):
         try:
             logging.debug(f"shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}")
-            if self._warningErrorInfoInfo['Errors'] != oldValue['Errors']:
-                from utils import updateAutonousErrorWarningInfo
-                updateAutonousErrorWarningInfo(self,updateInfo=['Error'])
-            if self._warningErrorInfoInfo['Warnings'] != oldValue['Warnings']:
-                from utils import updateAutonousErrorWarningInfo
-                updateAutonousErrorWarningInfo(self,updateInfo=['Warning'])
-            if self._warningErrorInfoInfo['Info'] != oldValue['Info']:
-                from utils import updateAutonousErrorWarningInfo
-                updateAutonousErrorWarningInfo(self,updateInfo=['Info'])
+            from utils import updateAutonousErrorWarningInfo
+            updateAutonousErrorWarningInfo(self,updateInfo='All')
         except:
             pass
     
@@ -216,7 +209,7 @@ class Dict_Specific_WarningErrorInfo(dict):
     def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
         # This method will be overridden in the Shared_data class
         from utils import updateAutonousErrorWarningInfo
-        updateAutonousErrorWarningInfo(self,updateInfo=[errorType])
+        updateAutonousErrorWarningInfo(self,updateInfo='All')
         pass
 
 class periodicallyUpdate:

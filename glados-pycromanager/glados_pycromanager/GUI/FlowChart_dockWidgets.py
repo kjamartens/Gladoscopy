@@ -1618,6 +1618,17 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.signal_PlugDisconnected.connect(self.PlugOrSocketDisconnected)
         self.signal_SocketConnected.connect(self.SocketConnected)
         
+        
+        self.signal_NodeMoved.connect(self.checkNodesOnErrors)
+        self.signal_NodeEdited.connect(self.checkNodesOnErrors)
+        self.signal_PlugConnectedStartConnection.connect(self.checkNodesOnErrors)
+        self.signal_SocketConnectedStartConnection.connect(self.checkNodesOnErrors)
+        self.signal_AttrEdited.connect(self.checkNodesOnErrors)
+        self.signal_NodeFullyInitialisedNodeItself.connect(self.checkNodesOnErrors)
+        self.signal_PlugDisconnected.connect(self.checkNodesOnErrors)
+        self.signal_SocketDisconnected.connect(self.checkNodesOnErrors)
+        
+        
         #Handling of the CallAction threads belonging to nodes is done via a QThreadPool
         from PyQt5.QtCore import QThreadPool
         self.thread_pool = QThreadPool.globalInstance()
@@ -2546,6 +2557,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         logging.debug('one or more nodes are created!')
         nodeType = self.nodeLookupName_withoutCounter(node.name)
         self.performPostNodeCreation_Start(node,nodeType)
+        self.checkNodesOnErrors()
 
     def NodeFullyInitialised(self,node):
         """
@@ -2567,6 +2579,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         if nodeType == 'caseSwitch':
             if 'Plugs' in node.caseSwitchInfo:
                 self.update_plugs_fromDialog(node,node.caseSwitchInfo['Plugs'])
+                
+        self.checkNodesOnErrors()
 
     def NodeRemoved(self,nodeNames):
         """
@@ -2588,6 +2602,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 self.nodes.remove(node)
             except:
                 logging.warning(f"failed to remove node: {nodeName}")
+        self.checkNodesOnErrors()
     
     def finishedEmits(self,node):
         """
@@ -3129,7 +3144,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         node should be marked as 'started' or 'finished' based on the attributes connected.
         """
         logging.debug(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
-        self.checkNodesOnErrors()
     
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -3150,7 +3164,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         #Check if all are non-Nones:
         logging.debug('plug connected')
-
+        self.checkNodesOnErrors()
+        
     def SocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
         Handle when a socket is connected.
@@ -3161,7 +3176,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         """
         #Only one specific use-case at the moment:
         #If a connection is made between any node N to an analysisMeasurement node, and if there is at least one acquisition node linked at or downstream of N, and if the input of the analysisMeasurement is not already defined, and if the input is actually an image, fill the input data of the analysisMeasurement node to be the data of this acquisition node.
-         
+        
         
         #Possibly later, for any other nodes, set the 'input' of the right node to the 'default' of the left node, if typing accomodates.
         
@@ -3200,6 +3215,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         #Check if all are non-Nones:
         logging.debug('socket connected')
+        self.checkNodesOnErrors()
     
     def prepareGraph(self, methodName='Score'):
         """
@@ -3350,10 +3366,44 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.coreVariables[name]['data'] = data 
         self.coreVariables[name]['importance'] = importance 
     
+    def cleanupNodeList(self):
+        #Ensure that self.nodes accurately reflects the nodes on the screen.
+        nodeNamesOnScreen = []
+        for node in self.scene().nodes:
+            nodeNamesOnScreen = nodeNamesOnScreen +[node]
+        
+        for node in self.nodes:
+            if node.name not in nodeNamesOnScreen:
+                self.nodes.remove(node)
+    
     def checkNodesOnErrors(self):
         #Idea: check all nodes for errors, alongside unconnected nodes. If so, update the warning. If not, reset the warning to none.
-        #Start: only check for connections.
-        print('asdf')
+        
+        
+        #Check that all nodes have connections where required.
+        #Effectively, this means that all nodes should have a downstream connector
+        self.cleanupNodeList()
+        
+        for node in self.nodes:
+            print(node.name)
+            if node.name == 'changeProperties_0':
+                nodeint = node
+            elif node.name == 'acqEnd_0':
+                nodeint2 = node
+            
+            #Init all nodes with no error:
+            node.errorInfo = ''
+            
+            #check fo downstream connections
+            downstreamNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[],upstream=False,downstream=True)
+            if len(downstreamNodes) == 0:
+                #Check if it requires one...
+                if len(node.sockets) > 0:
+                    node.errorInfo = 'No downstream connections found.'
+        
+        utils.updateAutonousErrorWarningInfo(shared_data)
+        
+        # self.shared_data.warningErrorInfoInfo['Errors'] = totalNodeErrorMessage
     
     #endregion
     
