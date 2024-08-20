@@ -3385,12 +3385,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.cleanupNodeList()
         
         for node in self.nodes:
-            print(node.name)
-            if node.name == 'changeProperties_0':
-                nodeint = node
-            elif node.name == 'acqEnd_0':
-                nodeint2 = node
-            
             #Init all nodes with no error:
             node.errorInfo = ''
             
