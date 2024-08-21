@@ -3071,7 +3071,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         elif nodeType == 'ifStatement':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.ifStatementInfo,currentNode.flowChart,dontEvaluate=True)
             try:
-                displayHTMLtext = f"Assess the statement <b>{values['valueToCheck'][1]} {values['comparator'][1]} {values['valueCheckAgainst'][1]}</b>"
+                comparatorValue = values['comparator'][1]
+                #Replace < inside the value:
+                comparatorValue = comparatorValue.replace('<','&lt;')
+                
+                displayHTMLtext = f"Assess the statement <b>{values['valueToCheck'][1]} {comparatorValue} {values['valueCheckAgainst'][1]}</b>"
             except:
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
             
