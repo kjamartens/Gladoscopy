@@ -1679,7 +1679,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             'realTimeAnalysis','visualisation','|',
             'newGlobalVar','changeGlobalVar','caseSwitch','ifStatement','ANDlogic','|',
             'slackReport','stickyNote','|',
-            'initStart','initEnd','scoringStart','scoringEndVar','acqStart','acqEnd','|',
+            'initStart','initEnd','scoringStart','scoringEndVar','earlyScoreFail','acqStart','acqEnd','|',
             'runInlineScript','analysisMeasurementDEBUG']
         #If we miss any in here, they'll be added at the bottom in later logic
         #  
@@ -1773,11 +1773,17 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         self.nodeInfo['scoringEndVar'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringEndVar']['name'] = 'scoringEndVar'
-        self.nodeInfo['scoringEndVar']['displayName'] = 'Scoring end w/ VAR'
+        self.nodeInfo['scoringEndVar']['displayName'] = 'Scoring end'
         self.nodeInfo['scoringEndVar']['startAttributes'] = ['End']
-        self.nodeInfo['scoringEndVar']['bottomAttributes'] = ['Report']
         self.nodeInfo['scoringEndVar']['MaxNodeCounter'] = 1
         self.nodeInfo['scoringEndVar']['NodeSize'] = 60
+        
+        self.nodeInfo['earlyScoreFail'] = self.singleNodeTypeInit()
+        self.nodeInfo['earlyScoreFail']['name'] = 'earlyScoreFail'
+        self.nodeInfo['earlyScoreFail']['displayName'] = 'Early score end'
+        self.nodeInfo['earlyScoreFail']['startAttributes'] = ['End']
+        self.nodeInfo['earlyScoreFail']['MaxNodeCounter'] = 1
+        self.nodeInfo['earlyScoreFail']['NodeSize'] = 40
         
         self.nodeInfo['acqStart'] = self.singleNodeTypeInit()
         self.nodeInfo['acqStart']['name'] = 'acqStart'
@@ -1899,6 +1905,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
+            "earlyScoreFail": {
+                "bg": [220, 180, 120, 255],
+                "border": [50, 50, 50, 255],
+                "border_sel": [170, 80, 80, 255],
+                "text": [180, 180, 240, 255]
+            },
+            
             "acqStart": {
                 "bg": [224, 195, 69, 255],
                 "border": [50, 50, 50, 255],
@@ -2333,6 +2346,10 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
             #Update the decisionwidget after loading the scoringEnd node:
             self.decisionWidget.updateAllDecisions()
+        elif nodeType == 'earlyScoreFail':
+            newNode.callAction = lambda self, node=newNode: self.earlyScoringFail(node)
+            newNode.callActionRelatedObject = self #this line is required to run a function from within this class
+            self.set_readable_text_after_dialogChange(newNode,'','earlyScoringFail')
         elif nodeType == 'acqEnd':
             newNode.callAction = lambda self, node=newNode: self.acquiringEnd(node)
             newNode.callActionRelatedObject = self #this line is required to run a function from within this class
@@ -3049,6 +3066,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             from datetime import datetime
             displayHTMLtext = "<b>Scoring started at:</b>"
             displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
+        
+        elif nodeType == 'earlyScoringFail':
+            displayHTMLtext = f"This node will fail this score and go to the next position!"
         elif nodeType == 'timer':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
             try:
@@ -4276,6 +4296,22 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     node.status = 'error'
         
         self.preventAcq = False
+    
+    def earlyScoringFail(self,node):
+        #Sob asically it's the Scoring node, but hard-coded to fail.
+        logging.info("Scoring early abandoned!")
+        self.finishedEmits(node)
+        node.status='finished'
+        #Go to next XY position
+        if self.fullRunOngoing:
+            if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
+                self.fullRunCurrentPos +=1
+                #And start a new score/acq at a new pos:
+                self.startNewScoreAcqAtPos()
+            else:
+                self.singleRunOngoing = False
+                logging.info('All done!')
+        
     
     def and_logicCallAction(self,node):
         """ 
