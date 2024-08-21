@@ -326,6 +326,7 @@ class MainWidget(QWidget):
         Initialize the GladosPycroManager plugin call
         """
         super().__init__()
+                
         self._viewer = viewer
         global shared_data
         

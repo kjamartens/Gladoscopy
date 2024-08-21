@@ -377,7 +377,8 @@ class napariHandler():
                     logging.debug('starting acq')
                     self.shared_data.allMDAslicesRendered = {}
                     #Already move the live layer to top
-                    moveLayerToTop(self.shared_data.napariViewer,"Live")
+                    logging.debug('BMoved layer to top')
+                    # moveLayerToTop(self.shared_data.napariViewer,"Live")
                     with Acquisition(directory=None, name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
@@ -399,22 +400,22 @@ class napariHandler():
                 logging.debug('starting MDA acq - before JavaBackendAcquisition')
                 savefolder = None
                 savename = 'MdaAcqShouldBeRemoved'
-                if shared_data._mdaModeSaveLoc[0] != '':
-                    savefolder = shared_data._mdaModeSaveLoc[0]
+                if self.shared_data._mdaModeSaveLoc[0] != '':
+                    savefolder = self.shared_data._mdaModeSaveLoc[0]
                     
-                    savefolderAdv = utils.nodz_evaluateAdv(savefolder,shared_data.nodzInstance)
+                    savefolderAdv = utils.nodz_evaluateAdv(savefolder,self.shared_data.nodzInstance)
                     if savefolderAdv != None:
                         savefolder = savefolderAdv
                     logging.debug(savefolder)
                     
-                if shared_data._mdaModeSaveLoc[1] != '':
-                    savename = shared_data._mdaModeSaveLoc[1]
-                    savenameAdv = utils.nodz_evaluateAdv(savename,shared_data.nodzInstance)
+                if self.shared_data._mdaModeSaveLoc[1] != '':
+                    savename = self.shared_data._mdaModeSaveLoc[1]
+                    savenameAdv = utils.nodz_evaluateAdv(savename,self.shared_data.nodzInstance)
                     if savenameAdv != None:
                         savename = savenameAdv
                     logging.debug(savename)
-                if shared_data._mdaModeNapariViewer != None:
-                    napariViewer = shared_data._mdaModeNapariViewer
+                if self.shared_data._mdaModeNapariViewer != None:
+                    napariViewer = self.shared_data._mdaModeNapariViewer
                     showdisplay = True
                 else:
                     napariViewer = None
@@ -422,13 +423,13 @@ class napariHandler():
                     
                 napariViewer = None
                 showdisplay = False
-                shared_data.allMDAslicesRendered = {}
+                self.shared_data.allMDAslicesRendered = {}
                 #Already move the layer to top
-                if shared_data.newestLayerName != '':
-                    moveLayerToTop(self.shared_data.napariViewer,shared_data.newestLayerName)
+                # if self.shared_data.newestLayerName != '':
+                #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
-                    shared_data._mdaModeAcqData = acq
-                    events = shared_data._mdaModeParams
+                    self.shared_data._mdaModeAcqData = acq
+                    events = self.shared_data._mdaModeParams
                     acq.acquire(events)
                 
                 self.shared_data.mdaMode = False
@@ -561,6 +562,8 @@ class napariHandler():
                 self.stop_continuous_task = False
                 #Always start live-mode visualisation:
                 napariGlados.startLiveModeVisualisation(self.shared_data)
+                #Move layer to top - if it isn't created yet, it will fail
+                moveLayerToTop(self.shared_data.napariViewer,"Live")
                 
                 #Start the worker to run the pycromanager acquisition
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
@@ -581,6 +584,9 @@ class napariHandler():
                 logging.debug('mdaMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
+                #Move layer to top - if it isn't created yet, it will fail
+                if self.shared_data.newestLayerName != '':
+                    moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 #Start the two workers, one to run it, one to visualise it.
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
                 # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
