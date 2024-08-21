@@ -1091,7 +1091,7 @@ class Nodz(QtWidgets.QGraphicsView):
             
             data['NODES_RT_ANALYSIS'][node] = {}
             if 'RTanalysisInfo' in vars(nodeInst):
-                if nodeInst.caseSwiRTanalysisInfotchInfo is not None:
+                if nodeInst.RTanalysisInfo is not None:
                     data['NODES_RT_ANALYSIS'][node] = nodeInst.RTanalysisInfo  
                     
             data['NODES_SLACK_REPORT'][node] = {}
