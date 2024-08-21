@@ -3457,23 +3457,23 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     def checkNodesOnErrors(self):
         #Idea: check all nodes for errors, alongside unconnected nodes. If so, update the warning. If not, reset the warning to none.
         
-        
-        #Check that all nodes have connections where required.
-        #Effectively, this means that all nodes should have a downstream connector
-        self.cleanupNodeList()
-        
-        for node in self.nodes:
-            #Init all nodes with no error:
-            node.errorInfo = ''
+        if not self.shared_data.loadingOngoing:
+            #Check that all nodes have connections where required.
+            #Effectively, this means that all nodes should have a downstream connector
+            self.cleanupNodeList()
             
-            #check fo downstream connections
-            downstreamNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[],upstream=False,downstream=True)
-            if len(downstreamNodes) == 0:
-                #Check if it requires one...
-                if len(node.sockets) > 0:
-                    node.errorInfo = 'No downstream connections found.'
-        
-        utils.updateAutonousErrorWarningInfo(self.shared_data)
+            for node in self.nodes:
+                #Init all nodes with no error:
+                node.errorInfo = ''
+                
+                #check fo downstream connections
+                downstreamNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[],upstream=False,downstream=True)
+                if len(downstreamNodes) == 0:
+                    #Check if it requires one...
+                    if len(node.sockets) > 0:
+                        node.errorInfo = 'No downstream connections found.'
+            
+            utils.updateAutonousErrorWarningInfo(self.shared_data)
         
         # self.shared_data.warningErrorInfoInfo['Errors'] = totalNodeErrorMessage
     

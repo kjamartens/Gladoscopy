@@ -1140,12 +1140,13 @@ class Nodz(QtWidgets.QGraphicsView):
             logging.error('Load aborted !')
             return False
 
+        
         # Apply nodes data.
         nodesData = data['NODES']
         nodesName = nodesData.keys()
         allNodes = []
         
-        
+        self.shared_data.loadingOngoing = True
         
         def convert_to_correct_type(obj):
             if isinstance(obj, str):
@@ -1341,6 +1342,8 @@ class Nodz(QtWidgets.QGraphicsView):
             self.createConnection(sourceNode, sourceAttr,
                                   targetNode, targetAttr, plugSkipSignalEmit=True, socketSkipSignalEmit=False)
 
+        self.shared_data.loadingOngoing = False
+        
         self.scene().update()
         
         self._focus()
