@@ -3473,7 +3473,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                 if len(node.sockets) > 0:
                     node.errorInfo = 'No downstream connections found.'
         
-        utils.updateAutonousErrorWarningInfo(shared_data)
+        utils.updateAutonousErrorWarningInfo(self.shared_data)
         
         # self.shared_data.warningErrorInfoInfo['Errors'] = totalNodeErrorMessage
     

@@ -375,11 +375,11 @@ class napariHandler():
                 else:        
                     #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                     logging.debug('starting acq')
-                    shared_data.allMDAslicesRendered = {}
+                    self.shared_data.allMDAslicesRendered = {}
                     #Already move the live layer to top
                     moveLayerToTop(self.shared_data.napariViewer,"Live")
                     with Acquisition(directory=None, name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
-                        shared_data._mdaModeAcqData = acq
+                        self.shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                         acq.acquire(events)
 

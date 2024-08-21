@@ -365,7 +365,7 @@ class MainWidget(QWidget):
         logger = logging.getLogger()
 
         # Set the logging level
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
 
         # Remove existing streamhandlers
         for handler in logger.handlers:
@@ -385,8 +385,11 @@ class MainWidget(QWidget):
         #Add the individual widgets
         
         #GladosLasers
-        GladosLaserWidget = GladosSlidersWidget(viewer, parent=self)
-        self._viewer.window.add_dock_widget(GladosLaserWidget, area='right',tabify=True,name='Lasers')
+        try:
+            GladosLaserWidget = GladosSlidersWidget(viewer, parent=self)
+            self._viewer.window.add_dock_widget(GladosLaserWidget, area='right',tabify=True,name='Lasers')
+        except Exception as e:
+            logging.error(f"Error loading GladosLaserWidget: {e}")
         
         #Full MM control
         MMconfigWidget = MMConfigWidget(viewer, parent=self)
