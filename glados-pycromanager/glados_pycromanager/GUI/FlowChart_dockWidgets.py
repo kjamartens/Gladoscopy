@@ -2655,10 +2655,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         logging.debug('one or more nodes are removed!')
         for nodeName in nodeNames:
             for node_type, node_data in self.nodeInfo.items():
-                if node_data['name'] in nodeName:
-                    # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
-                    self.nodeInfo[node_type]['NodeCounter'] -= 1
-            
+                if node_type != '__RightClickMenuNodeOrder__':
+                    try:
+                        if node_data['name'] in nodeName:
+                            # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
+                            self.nodeInfo[node_type]['NodeCounter'] -= 1
+                    except:
+                        pass
             #Also remove from self.nodes:
             node = self.findNodeByName(nodeName)
             try:
