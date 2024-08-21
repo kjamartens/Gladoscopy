@@ -3303,7 +3303,7 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
             if isinstance(item, ConnectionItem):
                 item.setZValue(0)
         
-        if hasattr('judstDoubleClicked',nodzInst) and nodzInst.justDoubleClicked:
+        if hasattr('justDoubleClicked',nodzInst) and nodzInst.justDoubleClicked:
             nodzInst.justDoubleClicked = False
             return
         nodzInst.drawingConnection = True

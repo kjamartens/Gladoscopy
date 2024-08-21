@@ -787,12 +787,20 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
                 finalData = None
             return finalData
     else:
+        #If not a true advanced, try, in turn, if it's int, if it's float, and if it can be evaluated as a var.
         try:
-            varName = nodz_evaluateVar(varName,nodzInfo)
-            logging.warning(f"Wrong syntax for advanced variable [but seems to be a variable instead]! Details: {varName} - interpreting as variable")
+            varNameN = int(varName)
         except:
-            logging.error(f'Wrong syntax for advanced variable! Details: {varName} - interpreting as value')
-        return varName
+            try:
+                varNameN = float(varName)
+            except:
+                try:
+                    varNameN = nodz_evaluateVar(varName,nodzInfo)
+                    logging.warning(f"Wrong syntax for advanced variable [but seems to be a variable instead]! Details: {varName} - interpreting as variable")
+                except:
+                    logging.error(f'Wrong syntax for advanced variable! Details: {varName} - interpreting as value')
+                    varNameN = varName
+        return varNameN
 
 def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluate=False):
     allData = {}
@@ -3105,18 +3113,17 @@ def getCoreDevicesOfDeviceType(core,devicetype):
     """
     #Get devices
     devices = core.get_loaded_devices() #type:ignore
-    if devices is None:
-        logging.debug("No devices found!")
+    try:
+        devices = [devices.get(i) for i in range(devices.size())]
+        devicesOfType = []
+        #Loop over devices
+        for device in devices:
+            if core.get_device_type(device).to_string() == devicetype: #type:ignore
+                logging.debug("found " + device + " of type " + devicetype)
+                devicesOfType.append(device)
+        return devicesOfType
+    except:
         return []
-    devices = [devices.get(i) for i in range(devices.size())]
-    devicesOfType = []
-    #Loop over devices
-    for device in devices:
-        if core.get_device_type(device).to_string() == devicetype: #type:ignore
-            logging.debug("found " + device + " of type " + devicetype)
-            devicesOfType.append(device)
-    return devicesOfType
-
 def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
     
     """
