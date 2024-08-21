@@ -605,7 +605,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
                 if item.widget() is not None:
                     child = item.widget()
                     if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
-                        logging.debug(f"1Going to run hideAdvVariables with {child.objectName()}")
+                        # logging.debug(f"1Going to run hideAdvVariables with {child.objectName()}")
                         curr_layout.update()
                         hideAdvVariables(child,current_selected_function=current_selected_function)
                 else:
@@ -613,7 +613,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
                         widget_sub_item = item.itemAt(index2)
                         child = widget_sub_item.widget()
                         if 'ComboBoxSwitch#'+current_selected_function in child.objectName():
-                            logging.debug(f"2Going to run hideAdvVariables with {child.objectName()}")
+                            # logging.debug(f"2Going to run hideAdvVariables with {child.objectName()}")
                             curr_layout.update()
                             hideAdvVariables(child,current_selected_function=current_selected_function)
                         
@@ -1853,7 +1853,7 @@ def preLoadOptions_analysis(curr_layout,currentData,functionName='comboBox_analy
                     widget_sub_item = item.itemAt(index2)
                     child = widget_sub_item.widget()
                     if child.objectName() in currentData:
-                        logging.debug(f"2Preloading {child.objectName()} with {currentData[child.objectName()]}")
+                        # logging.debug(f"2Preloading {child.objectName()} with {currentData[child.objectName()]}")
                         if isinstance(child,QComboBox):
                             child.setCurrentText(currentData[child.objectName()])
                             # if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
@@ -1908,7 +1908,7 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
     
     #Loop over all widgets in parent:
     for child in parentChildren:
-        logging.debug(child.objectName())
+        # logging.debug(child.objectName())
         if len(child.objectName().split('#')) > 2:
             #Check if it's the same function and variable:
             if child.objectName().split('#')[1] == functionName and child.objectName().split('#')[2] == kwargName:
@@ -1919,21 +1919,21 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
                     if comboboxvalue == 'Variable':
                         if normalVarAdvValue == 'LineEditVariable' or normalVarAdvValue == 'PushButtonVariable':
                             child.show()
-                            logging.debug(f'1Showing {child.objectName()}')
+                            # logging.debug(f'1Showing {child.objectName()}')
                         else:
                             child.hide()
                             logging.debug(f'1Hiding {child.objectName()}')
                     elif comboboxvalue == 'Advanced':
                         if normalVarAdvValue == 'LineEditAdv' or normalVarAdvValue == 'PushButtonAdv':
                             child.show()
-                            logging.debug(f'2Showing {child.objectName()}')
+                            # logging.debug(f'2Showing {child.objectName()}')
                         else:
                             child.hide()
                             logging.debug(f'2Hiding {child.objectName()}')
                     else:
                         if normalVarAdvValue == 'LineEdit':
                             child.show()
-                            logging.debug(f'3Showing {child.objectName()}')
+                            # logging.debug(f'3Showing {child.objectName()}')
                         else:
                             child.hide()
                             logging.debug(f'3Hiding {child.objectName()}')
@@ -2022,7 +2022,7 @@ def checkAndShowWidget(layout, widgetName):
             if widget.objectName() == widgetName:
                 # Widget already exists, unhide it
                 widget.show()
-                logging.debug('898 showing widget: '+widget.objectName())
+                # logging.debug('898 showing widget: '+widget.objectName())
                 return
         else:
             for index2 in range(item.count()):
@@ -2048,10 +2048,10 @@ def resetLayout(curr_layout,className):
                 widget = widget_item.widget()
                 #If it's the dropdown segment, label it as such
                 if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
-                    logging.debug(f"1Hiding {widget.objectName()}")
+                    # logging.debug(f"1Hiding {widget.objectName()}")
                     widget.hide()
                 else:
-                    logging.debug(f"1Showing {widget.objectName()}")
+                    # logging.debug(f"1Showing {widget.objectName()}")
                     widget.show()
             else:
                 for index2 in range(widget_item.count()):
@@ -2061,10 +2061,10 @@ def resetLayout(curr_layout,className):
                         widget = widget_sub_item.widget()
                         #If it's the dropdown segment, label it as such
                         if not ("KEEP" in widget.objectName()) and not ('#'+className+'#' in widget.objectName()):
-                            logging.debug(f"2Hiding {widget.objectName()}")
+                            # logging.debug(f"2Hiding {widget.objectName()}")
                             widget.hide()
                         else:
-                            logging.debug(f"2Showing {widget.objectName()}")
+                            # logging.debug(f"2Showing {widget.objectName()}")
                             widget.show()
                     else:
                         for index3 in range(widget_sub_item.count()):
