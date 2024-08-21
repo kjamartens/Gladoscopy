@@ -1271,7 +1271,6 @@ class MDAGlados(CustomMainWindow):
 
         """
         
-        logging.debug('in set_font_and_margins_recursive')
         if isinstance(widget, (QPushButton)):
             widget.setFont(font)
             # widget.setContentsMargins(0, 0, 0, 0)
