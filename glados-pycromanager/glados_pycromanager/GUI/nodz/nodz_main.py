@@ -996,25 +996,23 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES_SCORING_ANALYSIS'][node] = {}
             if 'scoring_analysis_currentData' in vars(nodeInst):
                 if nodeInst.scoring_analysis_currentData is not None:
-                    if len(nodeInst.scoring_analysis_currentData) is not 0:
+                    if len(nodeInst.scoring_analysis_currentData) != 0:
                         #Skip some attributes in nodes_mda:
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.scoring_analysis_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] is not '__':
-                                    data['NODES_SCORING_ANALYSIS'][node][attr] = nodeInst.scoring_analysis_currentData[attr]
+                                data['NODES_SCORING_ANALYSIS'][node][attr] = nodeInst.scoring_analysis_currentData[attr]
                                     
                                     
             data['NODES_CUSTOMFUNCTION'][node] = {}
             if 'scoring_analysis_currentData' in vars(nodeInst):
                 if nodeInst.customFunction_currentData is not None:
-                    if len(nodeInst.customFunction_currentData) is not 0:
+                    if len(nodeInst.customFunction_currentData) != 0:
                         #Skip some attributes in nodes_mda:
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.customFunction_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] is not '__':
-                                    data['NODES_CUSTOMFUNCTION'][node][attr] = nodeInst.customFunction_currentData[attr]
+                                data['NODES_CUSTOMFUNCTION'][node][attr] = nodeInst.customFunction_currentData[attr]
                                     
                     
             data['NODES_SCORING_VISUALISATION'][node] = {}
@@ -1040,13 +1038,12 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES_RT_ANALYSIS'][node] = {}
             if 'real_time_analysis_currentData' in vars(nodeInst):
                 if nodeInst.real_time_analysis_currentData is not None:
-                    if len(nodeInst.real_time_analysis_currentData) is not 0:
+                    if len(nodeInst.real_time_analysis_currentData) != 0:
                         #Skip some attributes in nodes_mda:
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.real_time_analysis_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] is not '__':
-                                    data['NODES_RT_ANALYSIS'][node][attr] = nodeInst.real_time_analysis_currentData[attr]
+                                data['NODES_RT_ANALYSIS'][node][attr] = nodeInst.real_time_analysis_currentData[attr]
 
             
             data['NODES_TIMER'][node] = {}
@@ -1088,7 +1085,7 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'caseSwitchInfo' in vars(nodeInst):
                 if nodeInst.caseSwitchInfo is not None:
                     data['NODES_CASE_SWITCH'][node] = nodeInst.caseSwitchInfo  
-                    
+
             data['NODES_SLACK_REPORT'][node] = {}
             if 'slackReportInfo' in vars(nodeInst):
                 if nodeInst.slackReportInfo is not None:
@@ -1140,12 +1137,13 @@ class Nodz(QtWidgets.QGraphicsView):
             logging.error('Load aborted !')
             return False
 
+        
         # Apply nodes data.
         nodesData = data['NODES']
         nodesName = nodesData.keys()
         allNodes = []
         
-        
+        self.shared_data.loadingOngoing = True
         
         def convert_to_correct_type(obj):
             if isinstance(obj, str):
@@ -1312,7 +1310,7 @@ class Nodz(QtWidgets.QGraphicsView):
                     if 'caseSwitchInfo' in vars(node):
                         if data['NODES_CASE_SWITCH'] is not None:
                             node.caseSwitchInfo = data['NODES_CASE_SWITCH'][name] #type:ignore
-                            
+
             if 'NODES_SLACK_REPORT' in data:
                 if name in data['NODES_SLACK_REPORT']:
                     if 'slackReportInfo' in vars(node):
@@ -1341,6 +1339,8 @@ class Nodz(QtWidgets.QGraphicsView):
             self.createConnection(sourceNode, sourceAttr,
                                   targetNode, targetAttr, plugSkipSignalEmit=True, socketSkipSignalEmit=False)
 
+        self.shared_data.loadingOngoing = False
+        
         self.scene().update()
         
         self._focus()
@@ -1794,6 +1794,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.InlineScriptInfo  = ''
         self.stickyNoteInfo = ''
         self.caseSwitchInfo = {}
+        self.RTanalysisInfo = {}
         
         self.warningInfo = ''
         self.errorInfo = ''
@@ -3301,7 +3302,8 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
         for item in nodzInst.scene().items():
             if isinstance(item, ConnectionItem):
                 item.setZValue(0)
-        if nodzInst.justDoubleClicked:
+        
+        if hasattr('justDoubleClicked',nodzInst) and nodzInst.justDoubleClicked:
             nodzInst.justDoubleClicked = False
             return
         nodzInst.drawingConnection = True

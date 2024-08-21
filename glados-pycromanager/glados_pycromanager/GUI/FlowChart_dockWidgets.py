@@ -157,7 +157,6 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         
         #Pre-load the options if they're in the current node info
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
-        
 
 class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
     def __init__(self, parent=None, currentNode=None):
@@ -2655,10 +2654,13 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         logging.debug('one or more nodes are removed!')
         for nodeName in nodeNames:
             for node_type, node_data in self.nodeInfo.items():
-                if node_data['name'] in nodeName:
-                    # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
-                    self.nodeInfo[node_type]['NodeCounter'] -= 1
-            
+                if node_type != '__RightClickMenuNodeOrder__':
+                    try:
+                        if node_data['name'] in nodeName:
+                            # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
+                            self.nodeInfo[node_type]['NodeCounter'] -= 1
+                    except:
+                        pass
             #Also remove from self.nodes:
             node = self.findNodeByName(nodeName)
             try:
@@ -3021,10 +3023,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         optKwValues.append(dialog.currentData[key])
             
             displayHTMLtext = f"<b>{methodName}</b>"
-            for i in range(len(reqKwValues)):
+            for i in range(len(reqKwargs)):
                 displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
-            for i in range(len(optKwValues)):
+            for i in range(len(optKwargs)):
                 displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+                
         elif nodeType == 'visualisation':
             displayHTMLtext = f"<b>Layer name: {dialog.layerNameEdit.text()}</b>"
             if dialog.colormapComboBox.currentText() != 'None':
@@ -3326,7 +3329,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     signal.disconnect()
                 except:
                     #Otherwise we FULLY reset the signal?
-                    logging.warning('attempted to disconnect a disconnected signal')
+                    logging.debug('attempted to disconnect a disconnected signal')
                     # nodeType = self.nodeLookupName_withoutCounter(node.name)
                     # if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
                     #     node.customFinishedEmits = NodeSignalManager()
@@ -3457,23 +3460,23 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
     def checkNodesOnErrors(self):
         #Idea: check all nodes for errors, alongside unconnected nodes. If so, update the warning. If not, reset the warning to none.
         
-        
-        #Check that all nodes have connections where required.
-        #Effectively, this means that all nodes should have a downstream connector
-        self.cleanupNodeList()
-        
-        for node in self.nodes:
-            #Init all nodes with no error:
-            node.errorInfo = ''
+        if not self.shared_data.loadingOngoing:
+            #Check that all nodes have connections where required.
+            #Effectively, this means that all nodes should have a downstream connector
+            self.cleanupNodeList()
             
-            #check fo downstream connections
-            downstreamNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[],upstream=False,downstream=True)
-            if len(downstreamNodes) == 0:
-                #Check if it requires one...
-                if len(node.sockets) > 0:
-                    node.errorInfo = 'No downstream connections found.'
-        
-        utils.updateAutonousErrorWarningInfo(shared_data)
+            for node in self.nodes:
+                #Init all nodes with no error:
+                node.errorInfo = ''
+                
+                #check fo downstream connections
+                downstreamNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[],upstream=False,downstream=True)
+                if len(downstreamNodes) == 0:
+                    #Check if it requires one...
+                    if len(node.sockets) > 0:
+                        node.errorInfo = 'No downstream connections found.'
+            
+            utils.updateAutonousErrorWarningInfo(self.shared_data)
         
         # self.shared_data.warningErrorInfoInfo['Errors'] = totalNodeErrorMessage
     
@@ -5047,7 +5050,10 @@ class ScanningWidget(QWidget):
         """
         for scanMode in self.scanLayouts:
             if scanMode == "LoadPos":
-                self.scanLayouts[scanMode].lineEdit_posFilename.setText(self.scanLayouts[scanMode].scanningInfoGUI['LoadPos']['fileName'])
+                try:
+                    self.scanLayouts[scanMode].lineEdit_posFilename.setText(self.scanLayouts[scanMode].scanningInfoGUI['LoadPos']['fileName'])
+                except:
+                    logging.debug('No fileName specified in scanMode loading')
         logging.debug('Updated all scan layouts')
 
 class advScanGridLayout(QGroupBox):

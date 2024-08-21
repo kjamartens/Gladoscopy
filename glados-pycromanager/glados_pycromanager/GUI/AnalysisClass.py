@@ -59,27 +59,36 @@ class napariOverlay():
         #Get info from a RT analysis object (i.e. outside-based-analysis)
         if self.RT_analysisObject is not None:
             self.layer_name, self.layerType = self.RT_analysisObject.visualise_init()
+            logging.debug(f"Initialised napariOverlay with layer_name: {self.layer_name}, layerType: {self.layerType}")
             
         #Create the layer if layer_name is not none
         #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
         if self.layer_name is not None:
             if self.layerType is not None:
-                if self.layerType == 'image':
-                    self.layer = napariViewer.add_image(name=self.layer_name,scale=self.layer_scale)
-                elif self.layerType == 'labels':
-                    self.layer = napariViewer.add_labels([],name=self.layer_name,scale=self.layer_scale)
-                elif self.layerType == 'points':
-                    self.layer = napariViewer.add_points(name=self.layer_name,scale=self.layer_scale)
-                elif self.layerType == 'shapes':
-                    self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
-                elif self.layerType == 'surface':
-                    self.layer = napariViewer.add_surface([],name=self.layer_name,scale=self.layer_scale)
-                elif self.layerType == 'tracks':
-                    self.layer = napariViewer.add_tracks([],name=self.layer_name,scale=self.layer_scale)
-                elif self.layerType == 'vectors':
-                    self.layer = napariViewer.add_vectors(name=self.layer_name,scale=self.layer_scale)
-            else:
+                
+                #check if a layer with this name already exists:
+                if self.layer_name in napariViewer.layers:
+                    self.layer = napariViewer.layers[self.layer_name]
+                        
+                else: #else create the layer
+                    if self.layerType == 'image':
+                        self.layer = napariViewer.add_image(name=self.layer_name,scale=self.layer_scale)
+                    elif self.layerType == 'labels':
+                        self.layer = napariViewer.add_labels([],name=self.layer_name,scale=self.layer_scale)
+                    elif self.layerType == 'points':
+                        self.layer = napariViewer.add_points(name=self.layer_name,scale=self.layer_scale)
+                    elif self.layerType == 'shapes':
+                        self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+                    elif self.layerType == 'surface':
+                        self.layer = napariViewer.add_surface([],name=self.layer_name,scale=self.layer_scale)
+                    elif self.layerType == 'tracks':
+                        self.layer = napariViewer.add_tracks([],name=self.layer_name,scale=self.layer_scale)
+                    elif self.layerType == 'vectors':
+                        self.layer = napariViewer.add_vectors(name=self.layer_name,scale=self.layer_scale)
+            else: #Fallback if no layer type is specified at all
                 self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+        
+            logging.debug(f"Using layer {self.layer}")
         
     #Update the name of the overlay
     def changeName(self,new_name):
@@ -575,7 +584,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
             
     
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
-        logging.info('visualisation should be updated here :)')
+        # logging.info('visualisation should be updated here :)')
         utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
         
 #This code gets some image and does some analysis on this

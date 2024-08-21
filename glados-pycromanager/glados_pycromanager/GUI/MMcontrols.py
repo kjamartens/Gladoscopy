@@ -405,18 +405,22 @@ class MMConfigUI(CustomMainWindow):
         
             #Hand-set the values that I want:
             if 'exposureTimeInputField' in MMControlsInfo:
-                self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+                if hasattr(self, 'exposureTimeInputField'):
+                    self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
             if 'oneDstageDropdown' in MMControlsInfo:
-                self.oneDstageDropdown.setCurrentText(MMControlsInfo['oneDstageDropdown']['text'])
+                if hasattr(self, 'oneDstageDropdown'):
+                    self.oneDstageDropdown.setCurrentText(MMControlsInfo['oneDstageDropdown']['text'])
             
-            for key, object in self.XYMoveEditField.items():
-                if key in MMControlsInfo:
-                    object.setText(MMControlsInfo[key]['text'])
-            for key,object in self.oneDMoveEditField.items():
-                for objectLineEditKey in object:
-                    objectLineEdit = object[objectLineEditKey]
-                    if objectLineEditKey in MMControlsInfo:
-                        objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
+            if hasattr(self, 'XYMoveEditField'):
+                for key, object in self.XYMoveEditField.items():
+                    if key in MMControlsInfo:
+                        object.setText(MMControlsInfo[key]['text'])
+            if hasattr(self, 'oneDMoveEditField'):
+                for key,object in self.oneDMoveEditField.items():
+                    for objectLineEditKey in object:
+                        objectLineEdit = object[objectLineEditKey]
+                        if objectLineEditKey in MMControlsInfo:
+                            objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
 
     def storeAllControlValues(self):
         """

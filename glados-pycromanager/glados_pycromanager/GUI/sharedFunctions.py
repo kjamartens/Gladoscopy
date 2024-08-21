@@ -35,6 +35,7 @@ class Shared_data(QObject):
         self.activeMDAobject = None
         self.mdaZarrData = {}
         self.nodzInstance = None
+        self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.
         self.last_display_update_time = 0
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
@@ -171,8 +172,9 @@ class Shared_data(QObject):
     def on_warningErrorInfoInfo_changed(self,oldValue=None,errorType=None):
         try:
             logging.debug(f"shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}")
-            from utils import updateAutonousErrorWarningInfo
-            updateAutonousErrorWarningInfo(self,updateInfo='All')
+            if self.loadingOngoing == False:
+                from utils import updateAutonousErrorWarningInfo
+                updateAutonousErrorWarningInfo(self,updateInfo='All')
         except:
             pass
     
@@ -208,8 +210,9 @@ class Dict_Specific_WarningErrorInfo(dict):
             
     def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
         # This method will be overridden in the Shared_data class
-        from utils import updateAutonousErrorWarningInfo
-        updateAutonousErrorWarningInfo(self,updateInfo='All')
+        if self.parent.loadingOngoing == False:
+            from utils import updateAutonousErrorWarningInfo
+            updateAutonousErrorWarningInfo(self,updateInfo='All')
         pass
 
 class periodicallyUpdate:
