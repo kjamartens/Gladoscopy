@@ -1912,7 +1912,7 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
         if len(child.objectName().split('#')) > 2:
             #Check if it's the same function and variable:
             if child.objectName().split('#')[1] == functionName and child.objectName().split('#')[2] == kwargName:
-                logging.debug('Looking at ' + functionName + ' ' + kwargName)
+                # logging.debug('Looking at ' + functionName + ' ' + kwargName)
                 normalVarAdvValue = child.objectName().split('#')[0]
                 if normalVarAdvValue != 'Label' and normalVarAdvValue != 'ComboBoxSwitch':
                     #Hide/show simple/advanced/onlyVar based on the comboBox value:
@@ -1936,7 +1936,7 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
                             # logging.debug(f'3Showing {child.objectName()}')
                         else:
                             child.hide()
-                            logging.debug(f'3Hiding {child.objectName()}')
+                            # logging.debug(f'3Hiding {child.objectName()}')
     
     # resetLayout(parentObject.mainLayout,currentSelectedFunction)
                     
