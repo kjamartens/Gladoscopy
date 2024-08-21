@@ -3024,10 +3024,11 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         optKwValues.append(dialog.currentData[key])
             
             displayHTMLtext = f"<b>{methodName}</b>"
-            for i in range(len(reqKwValues)):
+            for i in range(len(reqKwargs)):
                 displayHTMLtext += f"<br><b>{reqKwargs[i]}</b>: {reqKwValues[i]}"
-            for i in range(len(optKwValues)):
+            for i in range(len(optKwargs)):
                 displayHTMLtext += f"<br><i>{optKwargs[i]}</i>: {optKwValues[i]}"
+                
         elif nodeType == 'visualisation':
             displayHTMLtext = f"<b>Layer name: {dialog.layerNameEdit.text()}</b>"
             if dialog.colormapComboBox.currentText() != 'None':

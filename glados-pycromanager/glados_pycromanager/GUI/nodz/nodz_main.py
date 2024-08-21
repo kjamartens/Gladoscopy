@@ -1088,6 +1088,11 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'caseSwitchInfo' in vars(nodeInst):
                 if nodeInst.caseSwitchInfo is not None:
                     data['NODES_CASE_SWITCH'][node] = nodeInst.caseSwitchInfo  
+            
+            data['NODES_RT_ANALYSIS'][node] = {}
+            if 'RTanalysisInfo' in vars(nodeInst):
+                if nodeInst.caseSwiRTanalysisInfotchInfo is not None:
+                    data['NODES_RT_ANALYSIS'][node] = nodeInst.RTanalysisInfo  
                     
             data['NODES_SLACK_REPORT'][node] = {}
             if 'slackReportInfo' in vars(nodeInst):
@@ -1313,7 +1318,13 @@ class Nodz(QtWidgets.QGraphicsView):
                     if 'caseSwitchInfo' in vars(node):
                         if data['NODES_CASE_SWITCH'] is not None:
                             node.caseSwitchInfo = data['NODES_CASE_SWITCH'][name] #type:ignore
-                            
+
+            if 'NODES_RT_ANALYSIS' in data:
+                if name in data['NODES_RT_ANALYSIS']:
+                    if 'RTanalysisInfo' in vars(node):
+                        if data['NODES_RT_ANALYSIS'] is not None:
+                            node.RTanalysisInfo = data['NODES_RT_ANALYSIS'][name] #type:ignore            
+            
             if 'NODES_SLACK_REPORT' in data:
                 if name in data['NODES_SLACK_REPORT']:
                     if 'slackReportInfo' in vars(node):
@@ -1797,6 +1808,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.InlineScriptInfo  = ''
         self.stickyNoteInfo = ''
         self.caseSwitchInfo = {}
+        self.RTanalysisInfo = {}
         
         self.warningInfo = ''
         self.errorInfo = ''
