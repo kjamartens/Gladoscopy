@@ -3326,7 +3326,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                     signal.disconnect()
                 except:
                     #Otherwise we FULLY reset the signal?
-                    logging.warning('attempted to disconnect a disconnected signal')
+                    logging.debug('attempted to disconnect a disconnected signal')
                     # nodeType = self.nodeLookupName_withoutCounter(node.name)
                     # if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
                     #     node.customFinishedEmits = NodeSignalManager()

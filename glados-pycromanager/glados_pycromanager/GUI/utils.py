@@ -3104,6 +3104,9 @@ def getCoreDevicesOfDeviceType(core,devicetype):
     """
     #Get devices
     devices = core.get_loaded_devices() #type:ignore
+    if devices is None:
+        logging.debug("No devices found!")
+        return []
     devices = [devices.get(i) for i in range(devices.size())]
     devicesOfType = []
     #Loop over devices

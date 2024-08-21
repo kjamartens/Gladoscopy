@@ -996,24 +996,24 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES_SCORING_ANALYSIS'][node] = {}
             if 'scoring_analysis_currentData' in vars(nodeInst):
                 if nodeInst.scoring_analysis_currentData is not None:
-                    if len(nodeInst.scoring_analysis_currentData) is not 0:
+                    if len(nodeInst.scoring_analysis_currentData) != 0:
                         #Skip some attributes in nodes_mda:
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.scoring_analysis_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] is not '__':
+                                if attr[:2] != '__':
                                     data['NODES_SCORING_ANALYSIS'][node][attr] = nodeInst.scoring_analysis_currentData[attr]
                                     
                                     
             data['NODES_CUSTOMFUNCTION'][node] = {}
             if 'scoring_analysis_currentData' in vars(nodeInst):
                 if nodeInst.customFunction_currentData is not None:
-                    if len(nodeInst.customFunction_currentData) is not 0:
+                    if len(nodeInst.customFunction_currentData) != 0:
                         #Skip some attributes in nodes_mda:
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.customFunction_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] is not '__':
+                                if attr[:2] != '__':
                                     data['NODES_CUSTOMFUNCTION'][node][attr] = nodeInst.customFunction_currentData[attr]
                                     
                     
@@ -1040,12 +1040,12 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES_RT_ANALYSIS'][node] = {}
             if 'real_time_analysis_currentData' in vars(nodeInst):
                 if nodeInst.real_time_analysis_currentData is not None:
-                    if len(nodeInst.real_time_analysis_currentData) is not 0:
+                    if len(nodeInst.real_time_analysis_currentData) != 0:
                         #Skip some attributes in nodes_mda:
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.real_time_analysis_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] is not '__':
+                                if attr[:2] != '__':
                                     data['NODES_RT_ANALYSIS'][node][attr] = nodeInst.real_time_analysis_currentData[attr]
 
             
@@ -3301,7 +3301,8 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
         for item in nodzInst.scene().items():
             if isinstance(item, ConnectionItem):
                 item.setZValue(0)
-        if nodzInst.justDoubleClicked:
+        
+        if hasattr('judstDoubleClicked',nodzInst) and nodzInst.justDoubleClicked:
             nodzInst.justDoubleClicked = False
             return
         nodzInst.drawingConnection = True
