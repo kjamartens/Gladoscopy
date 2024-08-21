@@ -157,7 +157,6 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         
         #Pre-load the options if they're in the current node info
         utils.preLoadOptions_analysis(self.mainLayout,currentNode.scoring_analysis_currentData) #type:ignore
-        
 
 class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
     def __init__(self, parent=None, currentNode=None):
@@ -5051,7 +5050,10 @@ class ScanningWidget(QWidget):
         """
         for scanMode in self.scanLayouts:
             if scanMode == "LoadPos":
-                self.scanLayouts[scanMode].lineEdit_posFilename.setText(self.scanLayouts[scanMode].scanningInfoGUI['LoadPos']['fileName'])
+                try:
+                    self.scanLayouts[scanMode].lineEdit_posFilename.setText(self.scanLayouts[scanMode].scanningInfoGUI['LoadPos']['fileName'])
+                except:
+                    logging.debug('No fileName specified in scanMode loading')
         logging.debug('Updated all scan layouts')
 
 class advScanGridLayout(QGroupBox):

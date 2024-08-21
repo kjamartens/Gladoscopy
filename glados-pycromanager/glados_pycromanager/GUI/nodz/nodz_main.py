@@ -1001,8 +1001,7 @@ class Nodz(QtWidgets.QGraphicsView):
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.scoring_analysis_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] != '__':
-                                    data['NODES_SCORING_ANALYSIS'][node][attr] = nodeInst.scoring_analysis_currentData[attr]
+                                data['NODES_SCORING_ANALYSIS'][node][attr] = nodeInst.scoring_analysis_currentData[attr]
                                     
                                     
             data['NODES_CUSTOMFUNCTION'][node] = {}
@@ -1013,8 +1012,7 @@ class Nodz(QtWidgets.QGraphicsView):
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.customFunction_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] != '__':
-                                    data['NODES_CUSTOMFUNCTION'][node][attr] = nodeInst.customFunction_currentData[attr]
+                                data['NODES_CUSTOMFUNCTION'][node][attr] = nodeInst.customFunction_currentData[attr]
                                     
                     
             data['NODES_SCORING_VISUALISATION'][node] = {}
@@ -1045,8 +1043,7 @@ class Nodz(QtWidgets.QGraphicsView):
                         analysisattr_skip = ['__output__']
                         for attr in nodeInst.real_time_analysis_currentData:
                             if attr not in analysisattr_skip:
-                                if attr[:2] != '__':
-                                    data['NODES_RT_ANALYSIS'][node][attr] = nodeInst.real_time_analysis_currentData[attr]
+                                data['NODES_RT_ANALYSIS'][node][attr] = nodeInst.real_time_analysis_currentData[attr]
 
             
             data['NODES_TIMER'][node] = {}
@@ -1088,12 +1085,7 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'caseSwitchInfo' in vars(nodeInst):
                 if nodeInst.caseSwitchInfo is not None:
                     data['NODES_CASE_SWITCH'][node] = nodeInst.caseSwitchInfo  
-            
-            data['NODES_RT_ANALYSIS'][node] = {}
-            if 'RTanalysisInfo' in vars(nodeInst):
-                if nodeInst.RTanalysisInfo is not None:
-                    data['NODES_RT_ANALYSIS'][node] = nodeInst.RTanalysisInfo  
-                    
+
             data['NODES_SLACK_REPORT'][node] = {}
             if 'slackReportInfo' in vars(nodeInst):
                 if nodeInst.slackReportInfo is not None:
@@ -1319,12 +1311,6 @@ class Nodz(QtWidgets.QGraphicsView):
                         if data['NODES_CASE_SWITCH'] is not None:
                             node.caseSwitchInfo = data['NODES_CASE_SWITCH'][name] #type:ignore
 
-            if 'NODES_RT_ANALYSIS' in data:
-                if name in data['NODES_RT_ANALYSIS']:
-                    if 'RTanalysisInfo' in vars(node):
-                        if data['NODES_RT_ANALYSIS'] is not None:
-                            node.RTanalysisInfo = data['NODES_RT_ANALYSIS'][name] #type:ignore            
-            
             if 'NODES_SLACK_REPORT' in data:
                 if name in data['NODES_SLACK_REPORT']:
                     if 'slackReportInfo' in vars(node):
