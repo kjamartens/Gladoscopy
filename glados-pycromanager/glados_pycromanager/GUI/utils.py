@@ -2653,6 +2653,7 @@ def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,
     logging.debug('Attempting to visualise RT Analysis')
     #And run the .run function:
     result = eval("RT_analysis_object" + evalText) #type:ignore
+    logging.debug(result)
 
     return result
 
