@@ -3063,7 +3063,7 @@ def getDimensionsFromAcqData(acqData):
         dimOrder.append(dim)
         uniqueEntriesAllDims.update({dim:uniqueEntries})
     logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
-    logging.debug(f"uniqueEntriesAllDims: {uniqueEntriesAllDims}")
+    # logging.debug(f"uniqueEntriesAllDims: {uniqueEntriesAllDims}")
     return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
 
 def updateNodzVariablesTime(node):

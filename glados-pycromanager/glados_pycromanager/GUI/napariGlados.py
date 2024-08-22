@@ -322,7 +322,7 @@ class napariHandler():
         self.mda_acq_done_signal = pyqtSignal(bool)
 
         #Sleep time to keep responsiveness
-        self.sleep_time = 0.1
+        self.sleep_time = 0.05
         self.layerName = 'newLayer'
 
     def mdaacqdonefunction(self):
