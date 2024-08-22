@@ -477,7 +477,7 @@ class napariHandler():
                 #Already move the layer to top
                 # if self.shared_data.newestLayerName != '':
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
-                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_savedfn,napari_viewer=napariViewer) as acq: #type:ignore
+                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
                     self.shared_data._mdaModeAcqData = acq
                     events = self.shared_data._mdaModeParams
                     acq.acquire(events)
