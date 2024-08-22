@@ -350,33 +350,9 @@ class MainWidget(QWidget):
         includecustomUI = False
         include_flowChart_automatedMicroscopy = True
         
-        #Set up logging at correct level        
-        # Create handlers
-        file_handler = logging.FileHandler('Glados_logpath.log')
-        stream_handler = logging.StreamHandler()
+        #Set up logging in the AppData folder, INFO and DEBUG
+        utils.set_up_logger()
 
-        # Create a formatter
-        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s [%(filename)s:%(funcName)s:%(lineno)d]")
-
-        # Set the formatter for both handlers
-        file_handler.setFormatter(formatter)
-        stream_handler.setFormatter(formatter)
-
-        # Get the root logger
-        logger = logging.getLogger()
-
-        # Set the logging level
-        logger.setLevel(logging.DEBUG)
-
-        # Remove existing streamhandlers
-        for handler in logger.handlers:
-            if isinstance(handler, logging.StreamHandler):
-                logger.removeHandler(handler)
-        # Add handlers to the root logger
-        logger.addHandler(file_handler)
-        logger.addHandler(stream_handler)
-
-        # logging.basicConfig(handlers=[file_handler, stream_handler], level=logging.INFO,format="%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
         logging.info("Main napari Glados-pycromanager plugin started")
         
         #Initialise napari-scalebar
