@@ -367,7 +367,6 @@ class napariHandler():
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.debug('grab_image_savedfn called in napariHandler')
         if self.acqstate:
             #Check if there is any reason to read the image:
             reasonToReadImage = False
@@ -380,18 +379,20 @@ class napariHandler():
                 reasonToReadImage = True
             
             if reasonToReadImage:
-                logging.debug(f'grab_image_savedfn called in napariHandler attempting to read image: {dataset}, axes: {axes}')
                 image = dataset.read_image(**axes)
+                metadata = {}
+                metadata['Axes']=axes
+                logging.debug(f'grab_image_savedfn called in napariHandler read image: {dataset}, axes: {axes}, metadata: {metadata}')
                 if self.img_queue.qsize() < 3:
-                    self.img_queue.put([image,''])
+                    self.img_queue.put([image,metadata])
                     
                 #Loop over all queues in shared_data.liveImageQueues and also append the image there:
                 for queue in self.shared_data.liveImageQueues:
                     if queue.qsize() < 2:
-                        queue.put([image,''])
+                        queue.put([image,metadata])
                             
                 if self.image_queue_analysis.qsize() < 3:
-                    self.image_queue_analysis.put([image,''])
+                    self.image_queue_analysis.put([image,metadata])
             
         else:
             logging.info('Broke off live mode')
@@ -477,10 +478,11 @@ class napariHandler():
                 #Already move the layer to top
                 # if self.shared_data.newestLayerName != '':
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
-                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
+                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_savedfn,napari_viewer=napariViewer) as acq: #type:ignore
                     self.shared_data._mdaModeAcqData = acq
                     events = self.shared_data._mdaModeParams
                     acq.acquire(events)
+                # with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
                 
                 self.shared_data.mdaMode = False
                 self.acqstate = False #End the MDA acq state
