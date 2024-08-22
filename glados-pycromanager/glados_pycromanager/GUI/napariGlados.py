@@ -250,7 +250,10 @@ def napariUpdateLive(DataStructure):
                             readColumn = value
                     #Read this slice from the NDDataset:
                     try:
+                        # logging.debug(shared_data._mdaModeAcqData._dataset)
+                        # logging.debug(f"Attempting reading slice at: {readChannel}, {readZ}, {readTime}, {readPosition}, {readRow}, {readColumn}")
                         sliceImage = shared_data._mdaModeAcqData._dataset.read_image(channel=readChannel,z=readZ,time=readTime,position=readPosition,row=readRow,column=readColumn)
+                        # logging.debug(f"sliceImage: {sliceImage}")
                         
                         #Find the correct slice to slot it in
                         sliceTuple = ()
@@ -355,6 +358,38 @@ class napariHandler():
                 logging.debug('attemped to abort acq')
         
         return image, metadata
+    
+    
+    def grab_image_savedfn(self,axes,dataset, event_queue):
+        """ 
+        Function that runs on every frame obtained in live mode and putis in the image queue
+        
+        Inputs: array image: image from micromanager
+                metadata: metadata from micromanager
+        """
+        if self.acqstate:
+            if self.img_queue.qsize() < 3:
+                image = dataset.read_image(**axes)
+                self.img_queue.put([image,''])
+                
+            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() < 2:
+                    queue.put([image,''])
+                        
+            if self.image_queue_analysis.qsize() < 3:
+                self.image_queue_analysis.put([image,''])
+            
+        else:
+            logging.info('Broke off live mode')
+            event_queue.put(None)
+            try:
+                acq.abort()
+                logging.debug('aborted acquisition')
+            except:
+                logging.debug('attemped to abort acq')
+        
+        # return image, metadata
 
     @thread_worker
     def run_pycroManagerAcquisition_worker(self,parent):
@@ -381,7 +416,7 @@ class napariHandler():
                     #Already move the live layer to top
                     logging.debug('BMoved layer to top')
                     # moveLayerToTop(self.shared_data.napariViewer,"Live")
-                    with Acquisition(directory=None, name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
+                    with Acquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                         acq.acquire(events)
@@ -400,7 +435,7 @@ class napariHandler():
                     
                 #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                 logging.debug('starting MDA acq - before JavaBackendAcquisition')
-                savefolder = None
+                savefolder = './temp'
                 savename = 'MdaAcqShouldBeRemoved'
                 if self.shared_data._mdaModeSaveLoc[0] != '':
                     savefolder = self.shared_data._mdaModeSaveLoc[0]

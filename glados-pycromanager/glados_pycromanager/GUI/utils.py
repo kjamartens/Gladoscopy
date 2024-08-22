@@ -26,6 +26,7 @@ def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
             if 'LiveAcqShouldBeRemoved' in folder or 'MdaAcqShouldBeRemoved' in folder:
                 try:
                     shutil.rmtree(os.path.join(mainFolder,os.path.join('temp',folder)))
+                    logging.debug(f"Deleted {os.path.join(mainFolder,os.path.join('temp',folder))}")
                 except:
                     pass
 
@@ -2996,30 +2997,15 @@ def closeAllLayers(shared_data):
         shared_data.napariViewer.layers.remove(layer)
 
 
-def forceReset(shared_data):
+def forceReset_actual(shared_data):
     """
     attempt to do whatever is necessary to reset pycromanager to a clean/functioning slate
     """
-    print('Attempting force-reset!')
-    
+    logging.debug('Attempting force-reset!')
+    import time
     core=shared_data.core
     
     #Trying a bunch of different things:
-    try:
-        core.clear_circular_buffer()
-        logging.debug("Attempted: core.clear_circular_buffer()")
-    except:
-        logging.debug("Attempted but failed: core.clear_circular_buffer()")
-    try:
-        core.stop_sequence_acquisition()
-        logging.debug("Attempted: core.stop_sequence_acquisition()")
-    except:
-        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
-    try:
-        core.stop_exposure_sequence(core.get_camera_device())
-        logging.debug("Attempted: core.stop_sequence_acquisition()")
-    except:
-        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
     try:
         shared_data.liveMode = False
         logging.debug("Attempted: shared_data.liveMode=False")
@@ -3030,19 +3016,36 @@ def forceReset(shared_data):
         logging.debug("Attempted: shared_data.liveMode=False")
     except:
         logging.debug("Attempted but failed: shared_data.mdaMode=False")
-    # try:
-        
-    # except:
-    #     logging.debug("Attempted but failed: ")
-    # try:
-        
-    # except:
-    #     logging.debug("Attempted but failed: ")
-    # try:
-        
-    # except:
-    #     logging.debug("Attempted but failed: ")
+    time.sleep(0.1)
+    try:
+        core.stop_sequence_acquisition()
+        logging.debug("Attempted: core.stop_sequence_acquisition()")
+    except:
+        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
+    try:
+        core.stop_exposure_sequence(core.get_camera_device())
+        logging.debug("Attempted: core.stop_sequence_acquisition()")
+    except:
+        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
+    time.sleep(0.1)
+    try:
+        core.clear_circular_buffer()
+        logging.debug("Attempted: core.clear_circular_buffer()")
+    except:
+        logging.debug("Attempted but failed: core.clear_circular_buffer()")
 
+def forceReset(shared_data):
+    """
+    attempt to do whatever is necessary to reset pycromanager to a clean/functioning slate
+    """
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(forceReset_actual,shared_data)
+        try:
+            result = future.result(timeout=5)  # Attempt for 5 seconds
+        except concurrent.futures.TimeoutError:
+            logging.warning("Function did not complete within 5 seconds and thus quitted")
 
 def getDimensionsFromAcqData(acqData):
     alldims = acqData[0]['axes']
