@@ -48,7 +48,9 @@ def napariUpdateLive(DataStructure):
     """
     
     #TODO: Make this an advanced variable or so. 
-    if time.time() - shared_data.last_display_update_time < 0.05: #less than a 50ms ago already update live mode? don't display live then.
+    display_update_time = 0.1 #0.05
+    
+    if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50ms ago already update live mode? don't display live then.
         return
     
     napariViewer = DataStructure['napariViewer']
@@ -101,7 +103,7 @@ def napariUpdateLive(DataStructure):
             liveImageLayer = getLayerIdFromName(layerName,napariViewer)
         
         
-            if layerName is not 'Live':
+            if layerName != 'Live':
                 #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
                 if liveImageLayer:
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
@@ -146,7 +148,7 @@ def napariUpdateLive(DataStructure):
         
             #If it's the first layer
             if not liveImageLayer:
-                if layerName is not 'Live':
+                if layerName != 'Live':
                     logging.debug(f'creating layer with name {layerName} via multiDstack method')
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
                     logging.debug(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
@@ -186,7 +188,7 @@ def napariUpdateLive(DataStructure):
                     napariViewer.reset_view()
             #Else if the layer already exists, replace it!
             else:
-                if layerName is not 'Live':
+                if layerName != 'Live':
                     # logging.debug(f'updating layer with name {layerName} via multiDstack method')
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
                     

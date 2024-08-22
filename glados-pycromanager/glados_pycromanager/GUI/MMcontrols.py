@@ -598,15 +598,25 @@ class MMConfigUI(CustomMainWindow):
         liveModeLayout.addItem(verticalSpacer)
         
         #Add a button to update all MM info
+        
+        #Create a 'debug-ish' button list:
+        debugHbox = QHBoxLayout()
         self.updateAllMMinfoButton = QPushButton("Update all MM info")
         self.updateAllMMinfoButton.clicked.connect(self.updateAllMMinfo)
         #all the way at the bottom of the layout
-        liveModeLayout.addWidget(self.updateAllMMinfoButton,99,0,1,1)
+        debugHbox.addWidget(self.updateAllMMinfoButton)
         #Add a button to close all layers
         self.closeAllLayersButton = QPushButton("Close all Layers")
         self.closeAllLayersButton.clicked.connect(lambda index, shared_data=shared_data: utils.closeAllLayers(shared_data))
+        
         #all the way at the bottom of the layout
-        liveModeLayout.addWidget(self.closeAllLayersButton,99,1,1,1)
+        debugHbox.addWidget(self.closeAllLayersButton)
+        
+        self.forceResetButton = QPushButton("Force-reset")
+        self.forceResetButton.clicked.connect(lambda index, shared_data=shared_data: utils.forceReset(shared_data))
+        debugHbox.addWidget(self.forceResetButton)
+        
+        liveModeLayout.addLayout(debugHbox,99,0,1,2)
         
         #Return the layout
         return liveModeLayout

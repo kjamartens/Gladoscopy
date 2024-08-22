@@ -2996,6 +2996,54 @@ def closeAllLayers(shared_data):
         shared_data.napariViewer.layers.remove(layer)
 
 
+def forceReset(shared_data):
+    """
+    attempt to do whatever is necessary to reset pycromanager to a clean/functioning slate
+    """
+    print('Attempting force-reset!')
+    
+    core=shared_data.core
+    
+    #Trying a bunch of different things:
+    try:
+        core.clear_circular_buffer()
+        logging.debug("Attempted: core.clear_circular_buffer()")
+    except:
+        logging.debug("Attempted but failed: core.clear_circular_buffer()")
+    try:
+        core.stop_sequence_acquisition()
+        logging.debug("Attempted: core.stop_sequence_acquisition()")
+    except:
+        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
+    try:
+        core.stop_exposure_sequence(core.get_camera_device())
+        logging.debug("Attempted: core.stop_sequence_acquisition()")
+    except:
+        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
+    try:
+        shared_data.liveMode = False
+        logging.debug("Attempted: shared_data.liveMode=False")
+    except:
+        logging.debug("Attempted but failed: shared_data.liveMode=False")
+    try:
+        shared_data.mdaMode = False
+        logging.debug("Attempted: shared_data.liveMode=False")
+    except:
+        logging.debug("Attempted but failed: shared_data.mdaMode=False")
+    # try:
+        
+    # except:
+    #     logging.debug("Attempted but failed: ")
+    # try:
+        
+    # except:
+    #     logging.debug("Attempted but failed: ")
+    # try:
+        
+    # except:
+    #     logging.debug("Attempted but failed: ")
+
+
 def getDimensionsFromAcqData(acqData):
     alldims = acqData[0]['axes']
     n_dims = len(alldims)
