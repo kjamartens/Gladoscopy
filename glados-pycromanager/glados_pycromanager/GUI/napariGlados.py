@@ -358,38 +358,6 @@ class napariHandler():
                 logging.debug('attemped to abort acq')
         
         return image, metadata
-    
-    
-    def grab_image_savedfn(self,axes,dataset, event_queue):
-        """ 
-        Function that runs on every frame obtained in live mode and putis in the image queue
-        
-        Inputs: array image: image from micromanager
-                metadata: metadata from micromanager
-        """
-        if self.acqstate:
-            if self.img_queue.qsize() < 3:
-                image = dataset.read_image(**axes)
-                self.img_queue.put([image,''])
-                
-            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-            for queue in self.shared_data.liveImageQueues:
-                if queue.qsize() < 2:
-                    queue.put([image,''])
-                        
-            if self.image_queue_analysis.qsize() < 3:
-                self.image_queue_analysis.put([image,''])
-            
-        else:
-            logging.info('Broke off live mode')
-            event_queue.put(None)
-            try:
-                acq.abort()
-                logging.debug('aborted acquisition')
-            except:
-                logging.debug('attemped to abort acq')
-        
-        # return image, metadata
 
     @thread_worker
     def run_pycroManagerAcquisition_worker(self,parent):
