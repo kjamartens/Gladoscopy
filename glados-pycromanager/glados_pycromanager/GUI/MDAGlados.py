@@ -1627,6 +1627,9 @@ class MDAGlados(CustomMainWindow):
             except:
                 self.xy_positions = None
                 self.xy_positions_saveInfo = None
+        else:
+            self.xy_positions = None
+            self.xy_positions_saveInfo = None
         
         if self.channelGroupBox.isEnabled():
             try:
@@ -1668,7 +1671,6 @@ class MDAGlados(CustomMainWindow):
         #Also update the nodz variables info:
         self.updateNodzVariables()
         
-        #initiate with an empty mda:
         self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
         
         logging.debug(f"mda: {self.mda}")
