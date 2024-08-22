@@ -358,6 +358,51 @@ class napariHandler():
                 logging.debug('attemped to abort acq')
         
         return image, metadata
+    
+    
+    def grab_image_savedfn(self,axes,dataset, event_queue):
+        """ 
+        Function that runs on every frame obtained in live mode and putis in the image queue
+        
+        Inputs: array image: image from micromanager
+                metadata: metadata from micromanager
+        """
+        logging.debug('grab_image_savedfn called in napariHandler')
+        if self.acqstate:
+            #Check if there is any reason to read the image:
+            reasonToReadImage = False
+            if self.img_queue.qsize() < 3:
+                reasonToReadImage = True
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() < 2:
+                    reasonToReadImage = True
+            if self.image_queue_analysis.qsize() < 3:
+                reasonToReadImage = True
+            
+            if reasonToReadImage:
+                logging.debug(f'grab_image_savedfn called in napariHandler attempting to read image: {dataset}, axes: {axes}')
+                image = dataset.read_image(**axes)
+                if self.img_queue.qsize() < 3:
+                    self.img_queue.put([image,''])
+                    
+                #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+                for queue in self.shared_data.liveImageQueues:
+                    if queue.qsize() < 2:
+                        queue.put([image,''])
+                            
+                if self.image_queue_analysis.qsize() < 3:
+                    self.image_queue_analysis.put([image,''])
+            
+        else:
+            logging.info('Broke off live mode')
+            event_queue.put(None)
+            try:
+                acq.abort()
+                logging.debug('aborted acquisition')
+            except:
+                logging.debug('attemped to abort acq')
+        
+        # return image, metadata
 
     @thread_worker
     def run_pycroManagerAcquisition_worker(self,parent):
@@ -384,7 +429,7 @@ class napariHandler():
                     #Already move the live layer to top
                     logging.debug('BMoved layer to top')
                     # moveLayerToTop(self.shared_data.napariViewer,"Live")
-                    with Acquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_process_fn = self.grab_image) as acq: #type:ignore
+                    with Acquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_saved_fn = self.grab_image_savedfn) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                         acq.acquire(events)
@@ -432,7 +477,7 @@ class napariHandler():
                 #Already move the layer to top
                 # if self.shared_data.newestLayerName != '':
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
-                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
+                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_savedfn,napari_viewer=napariViewer) as acq: #type:ignore
                     self.shared_data._mdaModeAcqData = acq
                     events = self.shared_data._mdaModeParams
                     acq.acquire(events)
