@@ -1,3 +1,11 @@
+"""
+Main functions belonging to the 'Autonomous Microscopy' part of Glados-pycromanager.
+
+Handles the analysis microscopy flowchart.
+Contains all information on creating/displaying/deleting/handling nodes.
+Contains the Scanning/Decision/Variables/Logger widgets encapsulated in the autonomous microscopy
+"""
+
 #region imports
 #Add inclusion of this folder:
 import sys, os
@@ -393,8 +401,6 @@ class nodz_slackReportDialog(QDialog):
         
         self.setLayout(layout)
 
-
-
 #General class for dialogs with simple line-edits only:
 # class nodz_generalAdvancedLineEditDialog(QDialog):
 
@@ -561,8 +567,6 @@ class nodz_openStoreDataDialog(nodz_generalAdvancedLineEditDialog):
                         internalName='storeDataDialog',
                         advLineEdits=[{'Data:':['item_to_store','Variable']},{'Location:':['store_location','Advanced']}],
                         storeVarName='storeDataInfo')
-
-
 
 class nodz_openTimerDialog(nodz_generalAdvancedLineEditDialog):
     """

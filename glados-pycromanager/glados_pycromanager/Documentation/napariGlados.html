@@ -27,239 +27,847 @@
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">import numpy as np
-from PyQt5.QtCore import pyqtSignal
+import tempfile
+import zarr
+from PyQt5.QtCore import pyqtSignal, QObject
 import napari
+import math
 from napari.qt import thread_worker
 import time
 import queue
 from PyQt5.QtWidgets import QMainWindow
 from pycromanager import Core
 from magicgui import magicgui
-from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QScrollArea
 import sys
 from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 import logging
+import os
 
 from LaserControlScripts import *
-from AutonomousMicroscopyScripts import *
-from MMcontrols import *
+from MMcontrols import microManagerControlsUI
 from AnalysisClass import *
 from Analysis_dockWidgets import *
-
-# Define a flag to control the continuous task
-stop_continuous_task = False
-# empty queue for (live) image data
-img_queue = queue.Queue()
-# Create a queue to pass image data between threads
-image_queue_analysis = queue.Queue()
-# Create a signal to communicate between threads
-analysis_done_signal = pyqtSignal(object)
-
-#Sleep time to keep responsiveness
-sleep_time = 0.05
+from FlowChart_dockWidgets import *
+from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+from utils import cleanUpTemporaryFiles
 
 
-&#34;&#34;&#34;
-Live update definitions for napari
-&#34;&#34;&#34;
+# # Define a flag to control the continuous task
+# stop_continuous_task = False
+# # empty queue for (live) image data
+# img_queue = queue.Queue()
+# # Create a queue to pass image data between threads
+# image_queue_analysis = queue.Queue()
+# # Create a signal to communicate between threads
+# analysis_done_signal = pyqtSignal(object)
 
-def napariUpdateLive(liveImage):
+# #Sleep time to keep responsiveness
+# sleep_time = 0.05
+
+
+#This needs to be a function outside of any class due to Yield-calling
+def napariUpdateLive(DataStructure):
+    &#34;&#34;&#34; 
+    Function that finally shows the  image in napari
+    
+    Basically the core visualisation method
+    &#34;&#34;&#34;
+    
+    #TODO: Make this an advanced variable or so. 
+    display_update_time = 0.1 #0.05
+    
+    if time.time() - shared_data.last_display_update_time &lt; display_update_time: #less than a 50ms ago already update live mode? don&#39;t display live then.
+        return
+    
+    napariViewer = DataStructure[&#39;napariViewer&#39;]
+    acqstate = DataStructure[&#39;acqState&#39;]
+    core = DataStructure[&#39;core&#39;]
+    image_queue_analysisA = DataStructure[&#39;image_queue_analysis&#39;]
+    analysisThreads = DataStructure[&#39;analysisThreads&#39;]
+    shared_data.last_display_update_time = time.time()
+    logging.debug(&#39;NapariUpdateLive Ran at time {}&#39;.format(time.time()))
+    layerName = DataStructure[&#39;layer_name&#39;]
+    
+    #Visualise the MDA data on a frame-by-frame method - i.e. not a &#39;stack&#39;, but simply a single image which is replaced every frame update
+    if shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;frameByFrame&#39; or DataStructure[&#39;layer_name&#39;]==&#39;Live&#39;:
+        liveImage = DataStructure[&#39;data&#39;][0]
+        metadata = DataStructure[&#39;data&#39;][1]
+        if liveImage is None:
+            return
+        if acqstate == False:
+            return
+        liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+
+        #If it&#39;s the first liveImageLayer
+        if not liveImageLayer:
+            nrLayersBefore = len(napariViewer.layers)
+            layer = napariViewer.add_image(liveImage, rendering=&#39;attenuated_mip&#39;, colormap=DataStructure[&#39;layer_color_map&#39;],name = layerName)
+            #Set correct scale - in nm
+            layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+            layer._keep_auto_contrast = True #type:ignore
+            #Move to the front of the layers
+            # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+            napariViewer.reset_view()
+        #Else if the layer already exists, replace it!
+        else:
+            # layer is present, replace its data
+            layer = napariViewer.layers[liveImageLayer[0]]
+            #Also move to top
+            # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+            layer.data = liveImage
+    #Visualise the MDA data via a &#39;stack&#39; - i.e. a multiD method where the user can (later) scroll through the frames
+    elif shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+        if DataStructure[&#39;finalisationProcedure&#39;] == False:
+            liveImage = DataStructure[&#39;data&#39;][0]
+            metadata = DataStructure[&#39;data&#39;][1]
+            latestImage = DataStructure[&#39;data&#39;][0]
+            metadata = DataStructure[&#39;data&#39;][1]
+            if latestImage is None:
+                return
+            if acqstate == False:
+                return
+            liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+        
+        
+            if layerName != &#39;Live&#39;:
+                #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
+                if liveImageLayer:
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    
+                    #Assume the dimensions are correct
+                    correctDimensions = True
+                    
+                    #Then check if anywhere the dimensions of the layer are wrong
+                    #Check if we have the correct nr of dimensions
+                    CurrentLayer = napariViewer.layers[liveImageLayer[0]]
+                    if CurrentLayer.ndim != len(uniqueEntriesAllDims)+2: #Note: +2 for image xy
+                        correctDimensions = False
+                    else:
+                        layerData = CurrentLayer.data
+                        #Check each dimension as follows:
+                        for dim_id in range(0,len(uniqueEntriesAllDims)):
+                            #Check if it has the correct label
+                            # logging.debug(f&#39;axis_labels: {napariViewer.dims.axis_labels[dim_id]} vs {dimensionOrder[dim_id]}&#39;)
+                            # if napariViewer.dims.axis_labels[dim_id] != dimensionOrder[dim_id]:
+                            #     correctDimensions = False
+                            #     break
+                            #Check it has the correct length:
+                            logging.debug(f&#39;range: {layerData.shape[dim_id]} vs {n_entries_in_dims[dim_id]}&#39;)
+                            if int(layerData.shape[dim_id]) != n_entries_in_dims[dim_id]:
+                                correctDimensions = False
+                                break
+                            
+                    #Remove the layer if the dimensions are wrong
+                    if correctDimensions == False:
+                        logging.debug(&#39;removing mdaZarrData - looping over layers&#39;)
+                        #Remove the mdaZarrData array and ensure that we create a new layer
+                        for tLayerIndex in range(0,len(napariViewer.layers)):
+                            tLayer = napariViewer.layers[tLayerIndex]
+                            logging.debug(f&#39;layer: {tLayer}, comparing with {napariViewer.layers[liveImageLayer[0]].name}, boolTest {str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name)}&#39;)
+                            if str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name):
+                                #If we found the layer, delete it, and ensure we create a new one
+                                logging.debug(f&#39;found layer to remove: {tLayer} at {tLayerIndex}&#39;)
+                                napariViewer.layers.pop(tLayerIndex)
+                                shared_data.mdaZarrData[layerName] = None
+                                liveImageLayer = False
+                                break
+        
+            #If it&#39;s the first layer
+            if not liveImageLayer:
+                if layerName != &#39;Live&#39;:
+                    logging.debug(f&#39;creating layer with name {layerName} via multiDstack method&#39;)
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    logging.debug(f&#34;obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}&#34;)
+                    
+                    shape = n_entries_in_dims
+                    shared_data.mdaZarrData[layerName] = zarr.open(
+                            str(tempfile.TemporaryDirectory().name),
+                            shape = shape+[latestImage.shape[0],latestImage.shape[1]],
+                            chunks = tuple([1] * len(shape) + [latestImage.shape[0],liveImage.shape[1]]),
+                            )
+                    #Changing the first image to the latest acquired image
+                    shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
+                    shared_data.allMDAslicesRendered = {}
+                    
+                    layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure[&#39;layer_color_map&#39;],name = layerName)
+                    #Set correct scale - in nm
+                    layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    layer._keep_auto_contrast = True #type:ignore
+                    
+                    for dim_id in range(len(n_entries_in_dims)):
+                        napariViewer.dims.set_axis_label(dim_id, dimensionOrder[dim_id])
+                    #Move to the front of the layers
+                    # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+                    napariViewer.reset_view()
+                    
+                    #set the napariViewer to the correct slices:
+                    for dim_id in range(len(n_entries_in_dims)):
+                        napariViewer.dims.set_current_step(dim_id,0)
+                else:
+                    nrLayersBefore = len(napariViewer.layers)
+                    layer = napariViewer.add_image(latestImage, colormap=DataStructure[&#39;layer_color_map&#39;],name = layerName)
+                    #Set correct scale - in nm
+                    layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    layer._keep_auto_contrast = True #type:ignore
+                    #Move to the front of the layers
+                    # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+                    napariViewer.reset_view()
+            #Else if the layer already exists, replace it!
+            else:
+                if layerName != &#39;Live&#39;:
+                    # logging.debug(f&#39;updating layer with name {layerName} via multiDstack method&#39;)
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    
+                    #Determine in which multi-D slice the image should be added:
+                    sliceTuple = ()
+                    for dim_id in range(len(n_entries_in_dims)):
+                        currentSlice = metadata[&#39;Axes&#39;][dimensionOrder[dim_id]]
+                        currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                        logging.debug(f&#34;currentSlice[{dim_id}]: {currentSliceID}&#34;)
+                        sliceTuple += (int(currentSliceID),)
+                        
+                    shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = liveImage #type:ignore
+                    
+                    #set the napariViewer to the correct slice:
+                    for dim_id in range(len(n_entries_in_dims)):
+                        currentSlice = metadata[&#39;Axes&#39;][dimensionOrder[dim_id]]
+                        currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                        napariViewer.dims.set_current_step(dim_id,int(currentSliceID))
+                    
+                    #Store exactly which axes is rendered
+                    shared_data.allMDAslicesRendered[len(shared_data.allMDAslicesRendered)] = metadata[&#39;Axes&#39;]
+                else:
+                    # layer is present, replace its data
+                    layer = napariViewer.layers[liveImageLayer[0]]
+                    #Also move to top
+                    napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+                    layer.data = liveImage
+                    
+        elif DataStructure[&#39;finalisationProcedure&#39;] == True:
+            #Render the missing images in the MDA acquisition
+            shared_data._busy = True
+            renderedSlices = shared_data.allMDAslicesRendered
+            dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+            for expectedEntry in shared_data._mdaModeParams:
+                #check in the rendered sclies if this is in there:
+                entry_found = any(expectedEntry[&#39;axes&#39;].items() &lt;= item.items() for item in renderedSlices.values())
+                if not entry_found:
+                    time.sleep(0.001) #Can&#39;t explain why, but a sleep of 1 ms is super important for stability
+                    
+                    #Figure out which slice to read
+                    readChannel = None
+                    readZ = None
+                    readTime = None
+                    readPosition = None
+                    readRow = None
+                    readColumn = None
+                    for key, value in expectedEntry[&#39;axes&#39;].items():
+                        if key == &#39;channel&#39;:
+                            readChannel = value
+                        if key == &#39;z&#39;:
+                            readZ = value
+                        if key == &#39;time&#39;:
+                            readTime = value
+                        if key == &#39;position&#39;:
+                            readPosition = value
+                        if key == &#39;row&#39;:
+                            readRow = value
+                        if key == &#39;column&#39;:
+                            readColumn = value
+                    #Read this slice from the NDDataset:
+                    try:
+                        # logging.debug(shared_data._mdaModeAcqData._dataset)
+                        # logging.debug(f&#34;Attempting reading slice at: {readChannel}, {readZ}, {readTime}, {readPosition}, {readRow}, {readColumn}&#34;)
+                        sliceImage = shared_data._mdaModeAcqData._dataset.read_image(channel=readChannel,z=readZ,time=readTime,position=readPosition,row=readRow,column=readColumn)
+                        # logging.debug(f&#34;sliceImage: {sliceImage}&#34;)
+                        
+                        #Find the correct slice to slot it in
+                        sliceTuple = ()
+                        for dim_id in range(len(n_entries_in_dims)):
+                            currentSlice = expectedEntry[&#39;axes&#39;][dimensionOrder[dim_id]]
+                            currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                            sliceTuple += (int(currentSliceID),)
+                        #Put it in
+                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage 
+                        logging.debug(f&#34;Added entry {expectedEntry} not rendered in the MDA acquisition&#34;)
+                    except:
+                        logging.debug(f&#39;Entry {expectedEntry} tried, but not acquired&#39;)
+            
+            logging.debug(&#39;Finalised up visualisation...&#39;)
+            #Move to the end
+            # napariViewer.dims.set_point(0,timeslice)
+            shared_data._busy = False
+    
+    
+def napariUpdateAnalysisThreads(DataStructure):
+    &#34;&#34;&#34; 
+    Function that finally shows the  image in napari
+    &#34;&#34;&#34;
+    napariViewer = DataStructure[&#39;napariViewer&#39;]
+    acqstate = DataStructure[&#39;acqState&#39;]
+    core = DataStructure[&#39;core&#39;]
+    image_queue_analysisA = DataStructure[&#39;image_queue_analysis&#39;]
+    analysisThreads = DataStructure[&#39;analysisThreads&#39;]
+    logging.debug(&#39;NapariUpdateLive Ran at time {}&#39;.format(time.time()))
+    liveImage = DataStructure[&#39;data&#39;][0]
+    metadata = DataStructure[&#39;data&#39;][1]
+    layerName = DataStructure[&#39;layer_name&#39;]
     if liveImage is None:
         return
-    global livestate
-    if livestate == False:
+    if acqstate == False:
         return
-    logging.debug(&#39;NapariUpdateLive Ran at time {}&#39;.format(time.time()))
-    liveImageLayer = getLayerIdFromName(&#39;liveImage&#39;)
+    liveImageLayer = getLayerIdFromName(layerName,napariViewer)
 
-    #If it&#39;s the first liveImageLayer
-    if not liveImageLayer:
-        nrLayersBefore = len(napariViewer.layers)
-        layer = napariViewer.add_image(liveImage, rendering=&#39;attenuated_mip&#39;)
-        #Set correct scale - in nm
-        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
-        layer._keep_auto_contrast = True #type:ignore
-        napariViewer.layers.move_multiple([nrLayersBefore,0])
-        napariViewer.reset_view()
-    #Else if the layer already exists, replace it!
-    else:
-        # layer is present, replace its data
-        layer = napariViewer.layers[liveImageLayer[0]]
-        layer.data = liveImage
-    
-    # Do analysis on this live image
     # Check if the queue is empty
-    if image_queue_analysis.empty():
-        image_queue_analysis.put(liveImage)
+    if image_queue_analysisA.empty():
+        image_queue_analysisA.put_nowait([liveImage,metadata])
         #Start all analysisthreads
-        for analysisThread in shared_data.analysisThreads:
+        for analysisThread in analysisThreads:
             if not analysisThread.isRunning():
+                logging.debug(f&#39;starting analysis thread: {analysisThread}&#39;)
                 analysisThread.start()
-        # # Start the analysis thread if it&#39;s not already running
-        # if not analysis_thread.isRunning():
-        #     analysis_thread.start()
-        # # Start the analysis thread if it&#39;s not already running
-        # if not analysis_thread2.isRunning():
-        #     analysis_thread2.start()
-            
+
+
+class napariHandler():
+    def __init__(self, shared_data,liveOrMda=&#39;live&#39;) -&gt; None:
+        self.shared_data = shared_data
+        self.napariViewer = shared_data.napariViewer
+        if liveOrMda == &#39;live&#39;:
+            self.liveOrMda = &#39;live&#39;
+            self.acqstate = shared_data.liveMode
+        elif liveOrMda == &#39;mda&#39;:
+            self.liveOrMda = &#39;mda&#39;
+            self.acqstate = shared_data.mdaMode
+        # Define a flag to control the continuous task
+        self.stop_continuous_task = False
+        # empty queue for (live) image data
+        self.img_queue = queue.Queue()
+        # Create a queue to pass image data between threads
+        self.image_queue_analysis = queue.Queue()
+        # Create a signal to communicate between threads
+        self.mda_acq_done_signal = pyqtSignal(bool)
+
+        #Sleep time to keep responsiveness
+        self.sleep_time = 0.05
+        self.layerName = &#39;newLayer&#39;
+
+    def mdaacqdonefunction(self):
+        logging.debug(&#39;mdaacqdonefunction called in napariHandler&#39;)
+        self.shared_data.mdaacqdonefunction()
         
-def grab_image(image, metadata,event_queue):
-    &#34;&#34;&#34; 
+    def grab_image(self,image, metadata, event_queue):
+        &#34;&#34;&#34; 
+        Function that runs on every frame obtained in live mode and putis in the image queue
+        
         Inputs: array image: image from micromanager
-                metadata from micromanager
+                metadata: metadata from micromanager
         &#34;&#34;&#34;
-    global livestate
-    if livestate:
-        # print(event_queue.qsize())
-        # event_queue.put(multi_d_acquisition_events(num_time_points = 1))
-        if img_queue.qsize() &lt; 3:
-            img_queue.put((image))
+        if self.acqstate:
+            if self.img_queue.qsize() &lt; 3:
+                self.img_queue.put([image,metadata])
+                
+            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() &lt; 2:
+                    queue.put([image,metadata])
+                        
+            if self.image_queue_analysis.qsize() &lt; 3:
+                self.image_queue_analysis.put([image,metadata])
+            
+        else:
+            logging.info(&#39;Broke off live mode&#39;)
+            event_queue.put(None)
+            try:
+                acq.abort()
+                logging.debug(&#39;aborted acquisition&#39;)
+            except:
+                logging.debug(&#39;attemped to abort acq&#39;)
         
-        #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-        for queue in shared_data.liveImageQueues:
-            if queue.qsize() &lt; 2:
-                queue.put((image))
-    return image, metadata
-
-@thread_worker
-def append_img(img_queue):
-    &#34;&#34;&#34; Worker thread that adds images to a list.
-        Calls either micro-manager data acquisition or functions for simulating data.
-        Inputs: img_queue &#34;&#34;&#34;
-    # start microscope data acquisition
-    global livestate
-    # acq = Acquisition(directory=&#39;&#39;, name=None, show_display=False, image_process_fn = grab_image) #type:ignore
-    # events = multi_d_acquisition_events(num_time_points=2, time_interval_s=0)
-    while livestate:
-        #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-        with JavaBackendAcquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-        # with Acquisition(directory=&#39;TempAcq_removeFolder&#39;, name=&#39;&#39;, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-            events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0)
-            acq.acquire(events) #type:ignore
-        # # time.sleep(sleep_time)
-        
-        #Other live mode, based on snapping images at all times
-        # Works if no shutter has to be switched
-        # core.snap_image()
-        # tagged_image = core.get_tagged_image()
-        # image_array = np.reshape(
-        #     tagged_image.pix,
-        #     newshape=[-1, tagged_image.tags[&#34;Height&#34;], tagged_image.tags[&#34;Width&#34;]],
-        # )
-        # grab_image(image_array,None,None)
-        # time.sleep(sleep_time)
-        
-        #Better live mode
-        # acq.acquire(events) #type:ignore
-        # print(&#39;Acq done, to following&#39;)
-
-@thread_worker(connect={&#39;yielded&#39;: napariUpdateLive})
-def yield_img(img_queue):
-    &#34;&#34;&#34; Worker thread that checks whether there are elements in the
-        queue, reads them out.
-        Connected to display_napari function to update display &#34;&#34;&#34;
-    global livestate
-
-    while livestate:
-        time.sleep(sleep_time)
-        # get elements from queue while there is more than one element
-        # playing it safe: I&#39;m always leaving one element in the queue
-        while img_queue.qsize() &gt; 1:
-            yield img_queue.get(block = False)
-
-    # read out last remaining elements after end of acquisition
-    while img_queue.qsize() &gt; 0:
-        yield img_queue.get(block = False)
-    logging.debug(&#34;acquisition done&#34;)
-
-
-def liveModeChanged():
-    global livestate, stop_continuous_task
-    #Hook the live mode into the scripts here
-    if shared_data.liveMode == False:
-        livestate = False
-        stop_continuous_task = True
-        #Clear the image queue
-        img_queue.queue.clear()
-        logging.debug(&#34;Live mode stopped&#34;)
-    else:
-        livestate = True
-        stop_continuous_task = False
-        worker1 = append_img(img_queue)
-        worker2 = yield_img(img_queue) #type:ignore
-        worker1.start() #type:ignore
-        logging.debug(&#34;Live mode started&#34;)
-
-
-&#34;&#34;&#34; 
-General napari functions
-&#34;&#34;&#34;
-
-def getLayerIdFromName(layer_name):
-    ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, &#39;_name&#39;) and layer._name == layer_name]
-    return ImageLayer
-
-def InitateNapariUI(napariViewer):
-    logging.debug(&#34;Napari UI initiated&#34;)
-    #Set title, icon
-    napariViewer.title=&#34;GladOS - napari&#34;
-    # Set the window icon
-    icon_path = &#39;./GUI/Icons/GladosIcon.ico&#39;
-    icon = QIcon(icon_path)
-    napariViewer.window._qt_window.setWindowIcon(icon)
+        return image, metadata
     
-    #Turn on scalebar
-    napariViewer.scale_bar.visible = True
-    napariViewer.scale_bar.unit = &#34;um&#34;
     
+    def grab_image_savedfn(self,axes,dataset, event_queue):
+        &#34;&#34;&#34; 
+        Function that runs on every frame obtained in live mode and putis in the image queue
+        
+        Inputs: array image: image from micromanager
+                metadata: metadata from micromanager
+        &#34;&#34;&#34;
+        if self.acqstate:
+            #Check if there is any reason to read the image:
+            reasonToReadImage = False
+            if self.img_queue.qsize() &lt; 3:
+                reasonToReadImage = True
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() &lt; 2:
+                    reasonToReadImage = True
+            if self.image_queue_analysis.qsize() &lt; 3:
+                reasonToReadImage = True
+            
+            if reasonToReadImage:
+                image = dataset.read_image(**axes)
+                metadata = {}
+                metadata[&#39;Axes&#39;]=axes
+                logging.debug(f&#39;grab_image_savedfn called in napariHandler read image: {dataset}, axes: {axes}, metadata: {metadata}&#39;)
+                if self.img_queue.qsize() &lt; 3:
+                    self.img_queue.put([image,metadata])
+                    
+                #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+                for queue in self.shared_data.liveImageQueues:
+                    if queue.qsize() &lt; 2:
+                        queue.put([image,metadata])
+                            
+                if self.image_queue_analysis.qsize() &lt; 3:
+                    self.image_queue_analysis.put([image,metadata])
+            
+        else:
+            logging.info(&#39;Broke off live mode&#39;)
+            event_queue.put(None)
+            try:
+                acq.abort()
+                logging.debug(&#39;aborted acquisition&#39;)
+            except:
+                logging.debug(&#39;attemped to abort acq&#39;)
+        
+        # return image, metadata
+
+    @thread_worker
+    def run_pycroManagerAcquisition_worker(self,parent):
+        &#34;&#34;&#34; 
+        Worker which handles live mode on/off turning etc
+        
+        Inputs: img_queue (unused, but required)
+        &#34;&#34;&#34;
+        img_queue = parent.img_queue
+        global acq
+        # shared_data = self.shared_data
+        logging.debug(&#39;in run_pycroManagerAcquisition_worker&#39;)
+        #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
+        #The abortion is handled in grab_image_livemode
+        if self.liveOrMda == &#39;live&#39;:
+            while self.acqstate:
+                if self.shared_data.mdaMode:
+                    logging.error(&#39;LIVE NOT STARTED! MDA IS RUNNING&#39;)
+                    self.shared_data.liveMode = False
+                else:        
+                    #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+                    logging.debug(&#39;starting acq&#39;)
+                    self.shared_data.allMDAslicesRendered = {}
+                    #Already move the live layer to top
+                    logging.debug(&#39;BMoved layer to top&#39;)
+                    # moveLayerToTop(self.shared_data.napariViewer,&#34;Live&#34;)
+                    with Acquisition(directory=&#39;./temp&#39;, name=&#39;LiveAcqShouldBeRemoved&#39;, show_display=False, image_saved_fn = self.grab_image_savedfn) as acq: #type:ignore
+                        self.shared_data._mdaModeAcqData = acq
+                        events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                        acq.acquire(events)
+
+                    logging.debug(&#39;After Acq Live&#39;)
+            #Now we&#39;re after the livestate
+            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.liveMode = False
+            #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+            cleanUpTemporaryFiles(shared_data=self.shared_data)
+        elif self.liveOrMda == &#39;mda&#39;:
+            while self.acqstate:
+                if self.shared_data.liveMode:
+                    self.shared_data.liveMode = False
+                    time.sleep(1)
+                    
+                #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+                logging.debug(&#39;starting MDA acq - before JavaBackendAcquisition&#39;)
+                savefolder = &#39;./temp&#39;
+                savename = &#39;MdaAcqShouldBeRemoved&#39;
+                if self.shared_data._mdaModeSaveLoc[0] != &#39;&#39;:
+                    savefolder = self.shared_data._mdaModeSaveLoc[0]
+                    
+                    savefolderAdv = utils.nodz_evaluateAdv(savefolder,self.shared_data.nodzInstance)
+                    if savefolderAdv != None:
+                        savefolder = savefolderAdv
+                    logging.debug(savefolder)
+                    
+                if self.shared_data._mdaModeSaveLoc[1] != &#39;&#39;:
+                    savename = self.shared_data._mdaModeSaveLoc[1]
+                    savenameAdv = utils.nodz_evaluateAdv(savename,self.shared_data.nodzInstance)
+                    if savenameAdv != None:
+                        savename = savenameAdv
+                    logging.debug(savename)
+                if self.shared_data._mdaModeNapariViewer != None:
+                    napariViewer = self.shared_data._mdaModeNapariViewer
+                    showdisplay = True
+                else:
+                    napariViewer = None
+                    showdisplay = False
+                    
+                napariViewer = None
+                showdisplay = False
+                self.shared_data.allMDAslicesRendered = {}
+                #Already move the layer to top
+                # if self.shared_data.newestLayerName != &#39;&#39;:
+                #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
+                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_savedfn,napari_viewer=napariViewer) as acq: #type:ignore
+                    self.shared_data._mdaModeAcqData = acq
+                    events = self.shared_data._mdaModeParams
+                    acq.acquire(events)
+                # with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
+                
+                self.shared_data.mdaMode = False
+                self.acqstate = False #End the MDA acq state
+                self.shared_data.appendNewMDAdataset(acq.get_dataset())
+
+            logging.debug(&#39;Stopping the acquisition from napariHandler&#39;)
+            #Now we&#39;re after the acquisition
+            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.mdaMode = False
+            
+            #Signal to all parents that the MDA acquisition is done - in the Nodz MDA, now we would trigger the MDA-based analysis for scoring or so
+            parent.mdaacqdonefunction()
+            
+            #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+            cleanUpTemporaryFiles(shared_data=self.shared_data)
+    
+    
+    @thread_worker(connect={&#39;yielded&#39;: napariUpdateAnalysisThreads})
+    def run_analysis_worker(self,parent,layerName=&#39;Layer&#39;,layerColorMap=&#39;gray&#39;):
+        &#34;&#34;&#34;
+        Worker which handles the visualisation of the live mode queue
+        Connected to display_napari function to update display 
+        &#34;&#34;&#34;
+        img_queue = parent.image_queue_analysis
+        while self.acqstate:
+            time.sleep(0)
+            # get elements from queue while there is more than one element
+            # playing it safe: I&#39;m always leaving one element in the queue
+            while img_queue.qsize() &gt; 1:
+                DataStructure = {}
+                DataStructure[&#39;data&#39;] = img_queue.get(block = False)
+                DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+                DataStructure[&#39;acqState&#39;] = self.acqstate
+                DataStructure[&#39;core&#39;] = self.shared_data.core
+                DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+                DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+                DataStructure[&#39;layer_name&#39;] = layerName
+                DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+                DataStructure[&#39;finalisationProcedure&#39;] = False
+                yield DataStructure
+
+    
+    @thread_worker(connect={&#39;yielded&#39;: napariUpdateLive})
+    def run_napariVisualisation_worker(self,parent,layerName=&#39;Layer&#39;,layerColorMap=&#39;gray&#39;):
+        &#34;&#34;&#34;
+        Worker which handles the visualisation of the live mode queue
+        Connected to display_napari function to update display 
+        &#34;&#34;&#34;
+        img_queue = parent.img_queue
+        while self.acqstate:
+            time.sleep(self.sleep_time)
+            logging.debug(&#39;in while-loop in visualise_live_mode_worker, len of img_queue: &#39;+str(img_queue.qsize()))
+            # get elements from queue while there is more than one element
+            # playing it safe: I&#39;m always leaving one element in the queue
+            while img_queue.qsize() &gt; 0:
+                DataStructure = {}
+                DataStructure[&#39;data&#39;] = img_queue.get()
+                DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+                DataStructure[&#39;acqState&#39;] = self.acqstate
+                DataStructure[&#39;core&#39;] = self.shared_data.core
+                DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+                DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+                DataStructure[&#39;layer_name&#39;] = layerName
+                DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+                DataStructure[&#39;finalisationProcedure&#39;] = False
+                yield DataStructure
+                # self.napariUpdateLive(img_queue.get(block=False))
+
+        # read out last remaining element(s) after end of acquisition
+        while img_queue.qsize() &gt; 0:
+            DataStructure = {}
+            DataStructure[&#39;data&#39;] = img_queue.get()
+            DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+            DataStructure[&#39;acqState&#39;] = self.acqstate
+            DataStructure[&#39;core&#39;] = self.shared_data.core
+            DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+            DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+            DataStructure[&#39;layer_name&#39;] = layerName
+            DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+            DataStructure[&#39;finalisationProcedure&#39;] = False
+            yield DataStructure#img_queue.get(block = False)
+            
+        #Do the final N images
+        if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+            if layerName == &#39;MDA&#39;:
+                logging.debug(&#39;Finalising MDA visualisation...&#39;)
+                DataStructure = {}
+                DataStructure[&#39;data&#39;] = None
+                DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+                DataStructure[&#39;acqState&#39;] = self.acqstate
+                DataStructure[&#39;core&#39;] = self.shared_data.core
+                DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+                DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+                DataStructure[&#39;layer_name&#39;] = layerName
+                DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+                DataStructure[&#39;finalisationProcedure&#39;] = True
+                napariUpdateLive(DataStructure)
+        
+        # shared_data.analysisThreads.remove(shared_data.lastMDAThread)
+        # shared_data.lastMDAThread.destroy()
+        # shared_data.lastMDAThread = None
+        logging.debug(&#34;acquisition done&#34;)
+
+    def acqModeChanged(self, newSharedData = None):
+        &#34;&#34;&#34;
+        General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered
+        
+        Is called, and shared_data.liveMode should be changed seperately from running this funciton
+        &#34;&#34;&#34;
+        logging.debug(&#39;acqModeChanged called from napariHandler&#39;)
+        if newSharedData is not None:
+            global napariViewer, shared_data, Core
+            self.shared_data = newSharedData
+            shared_data = self.shared_data
+            napariViewer = self.shared_data.napariViewer
+            core = self.shared_data.core
+            
+        if self.liveOrMda == &#39;live&#39;:
+            #Hook the live mode into the scripts here
+            if self.shared_data.liveMode == False:
+                self.acqstate = False
+                self.stop_continuous_task = True
+                #Clear the image queue
+                self.img_queue.queue.clear()
+                logging.info(&#34;Live mode stopped&#34;)
+            else:
+                logging.debug(&#39;liveMode changed to TRUE&#39;)
+                self.acqstate = True
+                self.stop_continuous_task = False
+                #Always start live-mode visualisation:
+                napariGlados.startLiveModeVisualisation(self.shared_data)
+                #Move layer to top - if it isn&#39;t created yet, it will fail
+                moveLayerToTop(self.shared_data.napariViewer,&#34;Live&#34;)
+                
+                #Start the worker to run the pycromanager acquisition
+                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                worker1.start() #type:ignore
+                worker2 = self.run_analysis_worker(self) #type:ignore
+                
+                logging.info(&#34;Live mode started&#34;)
+        elif self.liveOrMda == &#39;mda&#39;:
+            #Hook the live mode into the scripts here
+            if self.shared_data.mdaMode == False:
+                self.acqstate = False
+                self.stop_continuous_task = True
+                #Clear the image queue
+                self.img_queue.queue.clear()
+                logging.info(&#34;MDA mode stopped from acqModeChanged&#34;)
+                # self.mdaacqdonefunction()
+            else:
+                logging.debug(&#39;mdaMode changed to TRUE&#39;)
+                self.acqstate = True
+                self.stop_continuous_task = False
+                #Move layer to top - if it isn&#39;t created yet, it will fail
+                if self.shared_data.newestLayerName != &#39;&#39;:
+                    moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
+                #Start the two workers, one to run it, one to visualise it.
+                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
+                worker1.start() #type:ignore
+                # worker2.start()
+                logging.debug(&#34;MDA mode started from acqModeChanged&#34;)
+
+
+class napariHandler_liveMode(napariHandler):
+    def __init__(self, shared_data) -&gt; None:
+        super().__init__(shared_data, liveOrMda=&#39;live&#39;)
+
+class napariHandler_mdaMode(napariHandler):
+    def __init__(self, shared_data) -&gt; None:
+        super().__init__(shared_data, liveOrMda=&#39;mda&#39;)
 &#34;&#34;&#34; 
 Napari widgets
 &#34;&#34;&#34;
-   
-class dockWidget_fullGladosUI(QMainWindow):
-    def __init__(self): 
-        logging.debug(&#34;dockWidget_fullGladosUI started&#34;)
-        super().__init__()
-        self.ui = Ui_CustomDockWidget()
-        self.ui.setupUi(self)
-        #Open JSON file with MM settings
-        with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
-            MM_JSON = json.load(f)
-        #Run the laserController UI
-        runlaserControllerUI(core,MM_JSON,self.ui,shared_data)
-        # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)
+
+class dockWidgets(QMainWindow):
+    sizeChanged = pyqtSignal(QSize)
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.sizeChanged.emit(event.size())
         
-class dockWidget_MMcontrol(QMainWindow):
+    def __init__(self):
+        logging.debug(&#39;dockwidget started&#39;)
+        super().__init__()
+        #Create all the widgets/layouts:
+        self.central_widget = QWidget(self)
+        self.central_layout = QVBoxLayout()
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.content_widget = QWidget()
+        self.layout = QGridLayout() #type:ignore
+        
+        #Order them logically:
+        self.content_widget.setLayout(self.layout)
+        self.scroll_area.setWidget(self.content_widget)
+        self.central_layout.addWidget(self.scroll_area)
+        self.central_widget.setLayout(self.central_layout)
+        self.setCentralWidget(self.central_widget)
+        
+        self.dockWidget = None
+
+        #we end up with self.layout() that&#39;s changed by every indiv dockwidget
+        
+    def getDockWidget(self):
+        return self.dockWidget
+
+class dockWidget_MMcontrol(dockWidgets):
     def __init__(self): 
         logging.debug(&#34;dockWidget_MMcontrol started&#34;)
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
-        
         #Add the full micro manager controls UI
         self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)
-    
-    def getDockWidget(self):
-        return self.dockWidget
-    
-class dockWidget_analysisThreads(QMainWindow):
+
+class dockWidget_MDA(dockWidgets):
     def __init__(self): 
-        logging.debug(&#34;dockWidget_analysisThreads started&#34;)
+        logging.debug(&#34;dockWidget_MDA started&#34;)
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
+        
+        #load from appdata
+        appdata_folder = os.getenv(&#39;APPDATA&#39;)
+        if appdata_folder is None:
+            raise EnvironmentError(&#34;APPDATA environment variable not found&#34;)
+        app_specific_folder = os.path.join(appdata_folder, &#39;Glados-PycroManager&#39;)
+        os.makedirs(app_specific_folder, exist_ok=True)
+        if os.path.exists(os.path.join(app_specific_folder, &#39;glados_state.json&#39;)):
+            #Load the mda state
+            with open(os.path.join(app_specific_folder, &#39;glados_state.json&#39;), &#39;r&#39;) as file:
+                gladosInfo = json.load(file)
+                mdaInfo = gladosInfo[&#39;MDA&#39;]
+            
+            try:
+                from MDAGlados import MDAGlados
+                #Add the full micro manager controls UI
+                self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                            hasGUI=True,
+                            num_time_points = mdaInfo[&#39;num_time_points&#39;], 
+                            time_interval_s = mdaInfo[&#39;time_interval_s&#39;], 
+                            time_interval_s_or_ms = mdaInfo[&#39;time_interval_s_or_ms&#39;],
+                            z_start = mdaInfo[&#39;z_start&#39;],
+                            z_end = mdaInfo[&#39;z_end&#39;],
+                            z_step = mdaInfo[&#39;z_step&#39;],
+                            z_stage_sel = mdaInfo[&#39;z_stage_sel&#39;],
+                            z_nr_steps = mdaInfo[&#39;z_nr_steps&#39;],
+                            z_step_distance = mdaInfo[&#39;z_step_distance&#39;],
+                            z_nrsteps_radio_sel = mdaInfo[&#39;z_nrsteps_radio_sel&#39;],
+                            z_stepdistance_radio_sel = mdaInfo[&#39;z_stepdistance_radio_sel&#39;],
+                            channel_group = mdaInfo[&#39;channel_group&#39;],
+                            channels = mdaInfo[&#39;channels&#39;],
+                            channel_exposures_ms = mdaInfo[&#39;channel_exposures_ms&#39;],
+                            xy_positions = mdaInfo[&#39;xy_positions&#39;],
+                            xyz_positions = mdaInfo[&#39;xyz_positions&#39;],
+                            position_labels = mdaInfo[&#39;position_labels&#39;],
+                            exposure_ms = mdaInfo[&#39;exposure_ms&#39;],
+                            exposure_s_or_ms = mdaInfo[&#39;exposure_s_or_ms&#39;],
+                            storage_folder = mdaInfo[&#39;storage_folder&#39;],
+                            storage_file_name = mdaInfo[&#39;storage_file_name&#39;],
+                            order = mdaInfo[&#39;order&#39;],
+                            GUI_show_exposure = mdaInfo[&#39;GUI_show_exposure&#39;], 
+                            GUI_show_xy = mdaInfo[&#39;GUI_show_xy&#39;], 
+                            GUI_show_z = mdaInfo[&#39;GUI_show_z&#39;], 
+                            GUI_show_channel = mdaInfo[&#39;GUI_show_channel&#39;], 
+                            GUI_show_time = mdaInfo[&#39;GUI_show_time&#39;], 
+                            GUI_show_order = mdaInfo[&#39;GUI_show_order&#39;], 
+                            GUI_show_storage = mdaInfo[&#39;GUI_show_storage&#39;], 
+                            GUI_xy_pos_fullInfo = mdaInfo[&#39;xy_positions_saveInfo&#39;],
+                            GUI_acquire_button = True,
+                            autoSaveLoad=True).getGui()
+            except KeyError:
+                from MDAGlados import MDAGlados
+                #Add the full micro manager controls UI
+                self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                            hasGUI=True,
+                            GUI_acquire_button = True,
+                            autoSaveLoad=True).getGui()
+        else: #If no MDA state is yet saved, open a new MDAGlados from scratch
+            from MDAGlados import MDAGlados
+            #Add the full micro manager controls UI
+            self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                        hasGUI=True,
+                        GUI_acquire_button = True,
+                        autoSaveLoad=True).getGui()
+            
+        self.sizeChanged.connect(self.dockWidget.handleSizeChange)
+
+class dockWidget_flowChart(dockWidgets):
+    def __init__(self): 
+        logging.debug(&#34;dockWidget_flowchart started&#34;)
+        super().__init__()
         
         #Add the full micro manager controls UI
-        self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
+        self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
+
+#--- below here not fully necessary---
+# class dockWidget_mdaAnalysisScoringTest(dockWidgets):
+#     def __init__(self): 
+#         logging.debug(&#34;dockwidgetMDAANALYSISSCORINGTEST started&#34;)
+#         super().__init__()
+        
+#         #Add the full micro manager controls UI
+#         self.dockWidget = mdaAnalysisScoringTest_dockWidget(core,MM_JSON,self.layout,shared_data)
+
+# class dockWidget_analysisThreads(dockWidgets):
+#     def __init__(self): 
+#         logging.debug(&#34;dockWidget_analysisThreads started&#34;)
+#         super().__init__()
+        
+#         #Add the full micro manager controls UI
+#         self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
+
+class dockWidget_fullGladosUI(dockWidgets):
+    def __init__(self): 
+        logging.debug(&#34;dockWidget_fullGladosUI started&#34;)
+        super().__init__()
+        # #new QWidget:
+        tempWidget = QMainWindow()
+        
+        
+        
     
-    def getDockWidget(self):
-        return self.dockWidget
+    
+        
+        ui = Ui_CustomDockWidget()
+        ui.setupUi(tempWidget)
+        #Open JSON file with MM settings
+        MM_JSON_path = os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;)
+        # with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
+        with open(MM_JSON_path) as f:
+            MM_JSON = json.load(f)
+            
+        runlaserControllerUI(core,MM_JSON,ui,shared_data)
+        #Run the laserController UI
+        logging.debug(&#34;dockWidget_fullGladosUI halfway&#34;)
+        
+        #
+        #Create a Vertical+horizontal layout:
+        self.dockwidgetLayout = QGridLayout()
+        #Create a layout for the configs:
+        self.analysisLayout = QGridLayout()
+        #Add this to the mainLayout:
+        self.dockwidgetLayout.addLayout(self.analysisLayout,0,0)
+        
+        self.analysisLayout.addWidget(ui.centralwidget.children()[1].children()[0],1,1)
+        
+        self.dockWidget = self.layout.addLayout(self.dockwidgetLayout,0,0)
+
+        
+
+def startLiveModeVisualisation(shared_data,layerName=&#39;Live&#39;):
+    create_analysis_thread(shared_data,analysisInfo=&#39;LiveModeVisualisation&#39;,createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
+
+def startMDAVisualisation(shared_data,layerName=&#39;MDA&#39;,layerColorMap=&#39;gray&#39;):
+    #Set the latest layer name to be the layer name
+    shared_data.newestLayerName = layerName
+    #Create an analysis thread which runs this MDA visualisation
+    create_analysis_thread(shared_data,analysisInfo=&#39;mdaVisualisation&#39;,createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
+    shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
@@ -269,16 +877,27 @@ def layer_removed_event_callback(event, shared_data):
         if l.getLayer() is not None:
             if l.getLayer().name == layerRemoved:
                 #Destroy the analysis thread
-                l.destroy()
                 shared_data.analysisThreads.remove(l)
+                
+                if &#39;skipAnalysisThreadDeletion&#39; in vars(shared_data):
+                    if not shared_data.skipAnalysisThreadDeletion:
+                        l.destroy()
+                    else:
+                        shared_data.skipAnalysisThreadDeletion = False
+                else:
+                    l.destroy()
 
-def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
+def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
     core = score
     MM_JSON = sMM_JSON
     livestate = False
     shared_data = sshared_data
+    
+    #Get some info from core to put in shared_data
+    shared_data._defaultFocusDevice = core.get_focus_device()
+    logging.debug(f&#34;Default focus device set to {shared_data._defaultFocusDevice}&#34;)
 
     #Napari start
     napariViewer = napari.Viewer()
@@ -286,161 +905,49 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
     
-    create_analysis_thread(shared_data,analysisInfo=&#39;LiveModeVisualisation&#39;,createNewThread=False,throughputThread=image_queue_analysis)
+    # create_analysis_thread(shared_data,analysisInfo=&#39;LiveModeVisualisation&#39;,createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    # create_analysis_thread(shared_data,analysisInfo=&#39;mdaVisualisation&#39;,createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     logging.debug(&#34;Live mode pseudo-analysis thread created&#34;)
     
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
     
-    # Start separate analysis threads
-    # create_analysis_thread(image_queue_analysis,shared_data,analysisInfo=&#39;AvgGrayValueText&#39;)
-    
     #Add widgets as wanted
-    custom_widget_analysisThreads = dockWidget_analysisThreads()
-    napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area=&#34;top&#34;, name=&#34;analysisThreads&#34;,tabify=True)
+    # custom_widget_analysisThreads = dockWidget_analysisThreads()
+    # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area=&#34;top&#34;, name=&#34;Real-time analysis&#34;,tabify=True)
+    
+    logging.debug(&#39;In runNapariPycroManager&#39;)
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
-    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area=&#34;top&#34;, name=&#34;MMcontrols&#34;,tabify=True)
+    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area=&#34;top&#34;, name=&#34;Controls&#34;,tabify=True)
+    
+    custom_widget_MDA = dockWidget_MDA()
+    napariViewer.window.add_dock_widget(custom_widget_MDA, area=&#34;top&#34;, name=&#34;Multi-D acquisition&#34;,tabify=True)
+    
+    if include_flowChart_automatedMicroscopy:
+        custom_widget_flowChart = dockWidget_flowChart()
+        napariViewer.window.add_dock_widget(custom_widget_flowChart, area=&#34;top&#34;, name=&#34;Autonomous microscopy&#34;,tabify=True)
+        custom_widget_flowChart.dockWidget.focus()
     
     if includecustomUI:
-        custom_widget_gladosUI = dockWidget_fullGladosUI()
-        napariViewer.window.add_dock_widget(custom_widget_gladosUI, area=&#34;right&#34;, name=&#34;GladosUI&#34;)
+        gladosLaserInfo = dockWidget_fullGladosUI()
+        napariViewer.window.add_dock_widget(gladosLaserInfo, area=&#34;right&#34;, name=&#34;GladosUI&#34;)
 
     returnInfo = {}
     returnInfo[&#39;napariViewer&#39;] = napariViewer
     returnInfo[&#39;MMcontrolWidget&#39;] = custom_widget_MMcontrols.getDockWidget()
+    
     # breakpoint
-    return returnInfo
-
-def obtain_imageQueueAnalysis():
-    global image_queue_analysis
-    return image_queue_analysis</code></pre>
+    return returnInfo</code></pre>
 </details>
 </section>
 <section>
 </section>
 <section>
-<h2 class="section-title" id="header-variables">Global variables</h2>
-<dl>
-<dt id="napariGlados.sleep_time"><code class="name">var <span class="ident">sleep_time</span></code></dt>
-<dd>
-<div class="desc"><p>Live update definitions for napari</p></div>
-</dd>
-</dl>
 </section>
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
-<dt id="napariGlados.InitateNapariUI"><code class="name flex">
-<span>def <span class="ident">InitateNapariUI</span></span>(<span>napariViewer)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def InitateNapariUI(napariViewer):
-    logging.debug(&#34;Napari UI initiated&#34;)
-    #Set title, icon
-    napariViewer.title=&#34;GladOS - napari&#34;
-    # Set the window icon
-    icon_path = &#39;./GUI/Icons/GladosIcon.ico&#39;
-    icon = QIcon(icon_path)
-    napariViewer.window._qt_window.setWindowIcon(icon)
-    
-    #Turn on scalebar
-    napariViewer.scale_bar.visible = True
-    napariViewer.scale_bar.unit = &#34;um&#34;</code></pre>
-</details>
-</dd>
-<dt id="napariGlados.append_img"><code class="name flex">
-<span>def <span class="ident">append_img</span></span>(<span>img_queue)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Worker thread that adds images to a list.
-Calls either micro-manager data acquisition or functions for simulating data.
-Inputs: img_queue</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@thread_worker
-def append_img(img_queue):
-    &#34;&#34;&#34; Worker thread that adds images to a list.
-        Calls either micro-manager data acquisition or functions for simulating data.
-        Inputs: img_queue &#34;&#34;&#34;
-    # start microscope data acquisition
-    global livestate
-    # acq = Acquisition(directory=&#39;&#39;, name=None, show_display=False, image_process_fn = grab_image) #type:ignore
-    # events = multi_d_acquisition_events(num_time_points=2, time_interval_s=0)
-    while livestate:
-        #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
-        with JavaBackendAcquisition(directory=None, name=None, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-        # with Acquisition(directory=&#39;TempAcq_removeFolder&#39;, name=&#39;&#39;, show_display=False, image_process_fn = grab_image) as acq: #type:ignore
-            events = multi_d_acquisition_events(num_time_points=99, time_interval_s=0)
-            acq.acquire(events) #type:ignore
-        # # time.sleep(sleep_time)
-        
-        #Other live mode, based on snapping images at all times
-        # Works if no shutter has to be switched
-        # core.snap_image()
-        # tagged_image = core.get_tagged_image()
-        # image_array = np.reshape(
-        #     tagged_image.pix,
-        #     newshape=[-1, tagged_image.tags[&#34;Height&#34;], tagged_image.tags[&#34;Width&#34;]],
-        # )
-        # grab_image(image_array,None,None)
-        # time.sleep(sleep_time)
-        
-        #Better live mode
-        # acq.acquire(events) #type:ignore
-        # print(&#39;Acq done, to following&#39;)</code></pre>
-</details>
-</dd>
-<dt id="napariGlados.getLayerIdFromName"><code class="name flex">
-<span>def <span class="ident">getLayerIdFromName</span></span>(<span>layer_name)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def getLayerIdFromName(layer_name):
-    ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, &#39;_name&#39;) and layer._name == layer_name]
-    return ImageLayer</code></pre>
-</details>
-</dd>
-<dt id="napariGlados.grab_image"><code class="name flex">
-<span>def <span class="ident">grab_image</span></span>(<span>image, metadata, event_queue)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Inputs: array image: image from micromanager
-metadata from micromanager</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def grab_image(image, metadata,event_queue):
-    &#34;&#34;&#34; 
-        Inputs: array image: image from micromanager
-                metadata from micromanager
-        &#34;&#34;&#34;
-    global livestate
-    if livestate:
-        # print(event_queue.qsize())
-        # event_queue.put(multi_d_acquisition_events(num_time_points = 1))
-        if img_queue.qsize() &lt; 3:
-            img_queue.put((image))
-        
-        #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-        for queue in shared_data.liveImageQueues:
-            if queue.qsize() &lt; 2:
-                queue.put((image))
-    return image, metadata</code></pre>
-</details>
-</dd>
 <dt id="napariGlados.layer_removed_event_callback"><code class="name flex">
 <span>def <span class="ident">layer_removed_event_callback</span></span>(<span>event, shared_data)</span>
 </code></dt>
@@ -458,102 +965,302 @@ metadata from micromanager</p></div>
         if l.getLayer() is not None:
             if l.getLayer().name == layerRemoved:
                 #Destroy the analysis thread
-                l.destroy()
-                shared_data.analysisThreads.remove(l)</code></pre>
+                shared_data.analysisThreads.remove(l)
+                
+                if &#39;skipAnalysisThreadDeletion&#39; in vars(shared_data):
+                    if not shared_data.skipAnalysisThreadDeletion:
+                        l.destroy()
+                    else:
+                        shared_data.skipAnalysisThreadDeletion = False
+                else:
+                    l.destroy()</code></pre>
 </details>
 </dd>
-<dt id="napariGlados.liveModeChanged"><code class="name flex">
-<span>def <span class="ident">liveModeChanged</span></span>(<span>)</span>
+<dt id="napariGlados.napariUpdateAnalysisThreads"><code class="name flex">
+<span>def <span class="ident">napariUpdateAnalysisThreads</span></span>(<span>DataStructure)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Function that finally shows the
+image in napari</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def liveModeChanged():
-    global livestate, stop_continuous_task
-    #Hook the live mode into the scripts here
-    if shared_data.liveMode == False:
-        livestate = False
-        stop_continuous_task = True
-        #Clear the image queue
-        img_queue.queue.clear()
-        logging.debug(&#34;Live mode stopped&#34;)
-    else:
-        livestate = True
-        stop_continuous_task = False
-        worker1 = append_img(img_queue)
-        worker2 = yield_img(img_queue) #type:ignore
-        worker1.start() #type:ignore
-        logging.debug(&#34;Live mode started&#34;)</code></pre>
+<pre><code class="python">def napariUpdateAnalysisThreads(DataStructure):
+    &#34;&#34;&#34; 
+    Function that finally shows the  image in napari
+    &#34;&#34;&#34;
+    napariViewer = DataStructure[&#39;napariViewer&#39;]
+    acqstate = DataStructure[&#39;acqState&#39;]
+    core = DataStructure[&#39;core&#39;]
+    image_queue_analysisA = DataStructure[&#39;image_queue_analysis&#39;]
+    analysisThreads = DataStructure[&#39;analysisThreads&#39;]
+    logging.debug(&#39;NapariUpdateLive Ran at time {}&#39;.format(time.time()))
+    liveImage = DataStructure[&#39;data&#39;][0]
+    metadata = DataStructure[&#39;data&#39;][1]
+    layerName = DataStructure[&#39;layer_name&#39;]
+    if liveImage is None:
+        return
+    if acqstate == False:
+        return
+    liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+
+    # Check if the queue is empty
+    if image_queue_analysisA.empty():
+        image_queue_analysisA.put_nowait([liveImage,metadata])
+        #Start all analysisthreads
+        for analysisThread in analysisThreads:
+            if not analysisThread.isRunning():
+                logging.debug(f&#39;starting analysis thread: {analysisThread}&#39;)
+                analysisThread.start()</code></pre>
 </details>
 </dd>
 <dt id="napariGlados.napariUpdateLive"><code class="name flex">
-<span>def <span class="ident">napariUpdateLive</span></span>(<span>liveImage)</span>
+<span>def <span class="ident">napariUpdateLive</span></span>(<span>DataStructure)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Function that finally shows the
+image in napari</p>
+<p>Basically the core visualisation method</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def napariUpdateLive(liveImage):
-    if liveImage is None:
-        return
-    global livestate
-    if livestate == False:
-        return
-    logging.debug(&#39;NapariUpdateLive Ran at time {}&#39;.format(time.time()))
-    liveImageLayer = getLayerIdFromName(&#39;liveImage&#39;)
-
-    #If it&#39;s the first liveImageLayer
-    if not liveImageLayer:
-        nrLayersBefore = len(napariViewer.layers)
-        layer = napariViewer.add_image(liveImage, rendering=&#39;attenuated_mip&#39;)
-        #Set correct scale - in nm
-        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
-        layer._keep_auto_contrast = True #type:ignore
-        napariViewer.layers.move_multiple([nrLayersBefore,0])
-        napariViewer.reset_view()
-    #Else if the layer already exists, replace it!
-    else:
-        # layer is present, replace its data
-        layer = napariViewer.layers[liveImageLayer[0]]
-        layer.data = liveImage
+<pre><code class="python">def napariUpdateLive(DataStructure):
+    &#34;&#34;&#34; 
+    Function that finally shows the  image in napari
     
-    # Do analysis on this live image
-    # Check if the queue is empty
-    if image_queue_analysis.empty():
-        image_queue_analysis.put(liveImage)
-        #Start all analysisthreads
-        for analysisThread in shared_data.analysisThreads:
-            if not analysisThread.isRunning():
-                analysisThread.start()
-        # # Start the analysis thread if it&#39;s not already running
-        # if not analysis_thread.isRunning():
-        #     analysis_thread.start()
-        # # Start the analysis thread if it&#39;s not already running
-        # if not analysis_thread2.isRunning():
-        #     analysis_thread2.start()</code></pre>
-</details>
-</dd>
-<dt id="napariGlados.obtain_imageQueueAnalysis"><code class="name flex">
-<span>def <span class="ident">obtain_imageQueueAnalysis</span></span>(<span>)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def obtain_imageQueueAnalysis():
-    global image_queue_analysis
-    return image_queue_analysis</code></pre>
+    Basically the core visualisation method
+    &#34;&#34;&#34;
+    
+    #TODO: Make this an advanced variable or so. 
+    display_update_time = 0.1 #0.05
+    
+    if time.time() - shared_data.last_display_update_time &lt; display_update_time: #less than a 50ms ago already update live mode? don&#39;t display live then.
+        return
+    
+    napariViewer = DataStructure[&#39;napariViewer&#39;]
+    acqstate = DataStructure[&#39;acqState&#39;]
+    core = DataStructure[&#39;core&#39;]
+    image_queue_analysisA = DataStructure[&#39;image_queue_analysis&#39;]
+    analysisThreads = DataStructure[&#39;analysisThreads&#39;]
+    shared_data.last_display_update_time = time.time()
+    logging.debug(&#39;NapariUpdateLive Ran at time {}&#39;.format(time.time()))
+    layerName = DataStructure[&#39;layer_name&#39;]
+    
+    #Visualise the MDA data on a frame-by-frame method - i.e. not a &#39;stack&#39;, but simply a single image which is replaced every frame update
+    if shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;frameByFrame&#39; or DataStructure[&#39;layer_name&#39;]==&#39;Live&#39;:
+        liveImage = DataStructure[&#39;data&#39;][0]
+        metadata = DataStructure[&#39;data&#39;][1]
+        if liveImage is None:
+            return
+        if acqstate == False:
+            return
+        liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+
+        #If it&#39;s the first liveImageLayer
+        if not liveImageLayer:
+            nrLayersBefore = len(napariViewer.layers)
+            layer = napariViewer.add_image(liveImage, rendering=&#39;attenuated_mip&#39;, colormap=DataStructure[&#39;layer_color_map&#39;],name = layerName)
+            #Set correct scale - in nm
+            layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+            layer._keep_auto_contrast = True #type:ignore
+            #Move to the front of the layers
+            # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+            napariViewer.reset_view()
+        #Else if the layer already exists, replace it!
+        else:
+            # layer is present, replace its data
+            layer = napariViewer.layers[liveImageLayer[0]]
+            #Also move to top
+            # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+            layer.data = liveImage
+    #Visualise the MDA data via a &#39;stack&#39; - i.e. a multiD method where the user can (later) scroll through the frames
+    elif shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+        if DataStructure[&#39;finalisationProcedure&#39;] == False:
+            liveImage = DataStructure[&#39;data&#39;][0]
+            metadata = DataStructure[&#39;data&#39;][1]
+            latestImage = DataStructure[&#39;data&#39;][0]
+            metadata = DataStructure[&#39;data&#39;][1]
+            if latestImage is None:
+                return
+            if acqstate == False:
+                return
+            liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+        
+        
+            if layerName != &#39;Live&#39;:
+                #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
+                if liveImageLayer:
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    
+                    #Assume the dimensions are correct
+                    correctDimensions = True
+                    
+                    #Then check if anywhere the dimensions of the layer are wrong
+                    #Check if we have the correct nr of dimensions
+                    CurrentLayer = napariViewer.layers[liveImageLayer[0]]
+                    if CurrentLayer.ndim != len(uniqueEntriesAllDims)+2: #Note: +2 for image xy
+                        correctDimensions = False
+                    else:
+                        layerData = CurrentLayer.data
+                        #Check each dimension as follows:
+                        for dim_id in range(0,len(uniqueEntriesAllDims)):
+                            #Check if it has the correct label
+                            # logging.debug(f&#39;axis_labels: {napariViewer.dims.axis_labels[dim_id]} vs {dimensionOrder[dim_id]}&#39;)
+                            # if napariViewer.dims.axis_labels[dim_id] != dimensionOrder[dim_id]:
+                            #     correctDimensions = False
+                            #     break
+                            #Check it has the correct length:
+                            logging.debug(f&#39;range: {layerData.shape[dim_id]} vs {n_entries_in_dims[dim_id]}&#39;)
+                            if int(layerData.shape[dim_id]) != n_entries_in_dims[dim_id]:
+                                correctDimensions = False
+                                break
+                            
+                    #Remove the layer if the dimensions are wrong
+                    if correctDimensions == False:
+                        logging.debug(&#39;removing mdaZarrData - looping over layers&#39;)
+                        #Remove the mdaZarrData array and ensure that we create a new layer
+                        for tLayerIndex in range(0,len(napariViewer.layers)):
+                            tLayer = napariViewer.layers[tLayerIndex]
+                            logging.debug(f&#39;layer: {tLayer}, comparing with {napariViewer.layers[liveImageLayer[0]].name}, boolTest {str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name)}&#39;)
+                            if str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name):
+                                #If we found the layer, delete it, and ensure we create a new one
+                                logging.debug(f&#39;found layer to remove: {tLayer} at {tLayerIndex}&#39;)
+                                napariViewer.layers.pop(tLayerIndex)
+                                shared_data.mdaZarrData[layerName] = None
+                                liveImageLayer = False
+                                break
+        
+            #If it&#39;s the first layer
+            if not liveImageLayer:
+                if layerName != &#39;Live&#39;:
+                    logging.debug(f&#39;creating layer with name {layerName} via multiDstack method&#39;)
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    logging.debug(f&#34;obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}&#34;)
+                    
+                    shape = n_entries_in_dims
+                    shared_data.mdaZarrData[layerName] = zarr.open(
+                            str(tempfile.TemporaryDirectory().name),
+                            shape = shape+[latestImage.shape[0],latestImage.shape[1]],
+                            chunks = tuple([1] * len(shape) + [latestImage.shape[0],liveImage.shape[1]]),
+                            )
+                    #Changing the first image to the latest acquired image
+                    shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
+                    shared_data.allMDAslicesRendered = {}
+                    
+                    layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure[&#39;layer_color_map&#39;],name = layerName)
+                    #Set correct scale - in nm
+                    layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    layer._keep_auto_contrast = True #type:ignore
+                    
+                    for dim_id in range(len(n_entries_in_dims)):
+                        napariViewer.dims.set_axis_label(dim_id, dimensionOrder[dim_id])
+                    #Move to the front of the layers
+                    # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+                    napariViewer.reset_view()
+                    
+                    #set the napariViewer to the correct slices:
+                    for dim_id in range(len(n_entries_in_dims)):
+                        napariViewer.dims.set_current_step(dim_id,0)
+                else:
+                    nrLayersBefore = len(napariViewer.layers)
+                    layer = napariViewer.add_image(latestImage, colormap=DataStructure[&#39;layer_color_map&#39;],name = layerName)
+                    #Set correct scale - in nm
+                    layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    layer._keep_auto_contrast = True #type:ignore
+                    #Move to the front of the layers
+                    # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+                    napariViewer.reset_view()
+            #Else if the layer already exists, replace it!
+            else:
+                if layerName != &#39;Live&#39;:
+                    # logging.debug(f&#39;updating layer with name {layerName} via multiDstack method&#39;)
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    
+                    #Determine in which multi-D slice the image should be added:
+                    sliceTuple = ()
+                    for dim_id in range(len(n_entries_in_dims)):
+                        currentSlice = metadata[&#39;Axes&#39;][dimensionOrder[dim_id]]
+                        currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                        logging.debug(f&#34;currentSlice[{dim_id}]: {currentSliceID}&#34;)
+                        sliceTuple += (int(currentSliceID),)
+                        
+                    shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = liveImage #type:ignore
+                    
+                    #set the napariViewer to the correct slice:
+                    for dim_id in range(len(n_entries_in_dims)):
+                        currentSlice = metadata[&#39;Axes&#39;][dimensionOrder[dim_id]]
+                        currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                        napariViewer.dims.set_current_step(dim_id,int(currentSliceID))
+                    
+                    #Store exactly which axes is rendered
+                    shared_data.allMDAslicesRendered[len(shared_data.allMDAslicesRendered)] = metadata[&#39;Axes&#39;]
+                else:
+                    # layer is present, replace its data
+                    layer = napariViewer.layers[liveImageLayer[0]]
+                    #Also move to top
+                    napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+                    layer.data = liveImage
+                    
+        elif DataStructure[&#39;finalisationProcedure&#39;] == True:
+            #Render the missing images in the MDA acquisition
+            shared_data._busy = True
+            renderedSlices = shared_data.allMDAslicesRendered
+            dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+            for expectedEntry in shared_data._mdaModeParams:
+                #check in the rendered sclies if this is in there:
+                entry_found = any(expectedEntry[&#39;axes&#39;].items() &lt;= item.items() for item in renderedSlices.values())
+                if not entry_found:
+                    time.sleep(0.001) #Can&#39;t explain why, but a sleep of 1 ms is super important for stability
+                    
+                    #Figure out which slice to read
+                    readChannel = None
+                    readZ = None
+                    readTime = None
+                    readPosition = None
+                    readRow = None
+                    readColumn = None
+                    for key, value in expectedEntry[&#39;axes&#39;].items():
+                        if key == &#39;channel&#39;:
+                            readChannel = value
+                        if key == &#39;z&#39;:
+                            readZ = value
+                        if key == &#39;time&#39;:
+                            readTime = value
+                        if key == &#39;position&#39;:
+                            readPosition = value
+                        if key == &#39;row&#39;:
+                            readRow = value
+                        if key == &#39;column&#39;:
+                            readColumn = value
+                    #Read this slice from the NDDataset:
+                    try:
+                        # logging.debug(shared_data._mdaModeAcqData._dataset)
+                        # logging.debug(f&#34;Attempting reading slice at: {readChannel}, {readZ}, {readTime}, {readPosition}, {readRow}, {readColumn}&#34;)
+                        sliceImage = shared_data._mdaModeAcqData._dataset.read_image(channel=readChannel,z=readZ,time=readTime,position=readPosition,row=readRow,column=readColumn)
+                        # logging.debug(f&#34;sliceImage: {sliceImage}&#34;)
+                        
+                        #Find the correct slice to slot it in
+                        sliceTuple = ()
+                        for dim_id in range(len(n_entries_in_dims)):
+                            currentSlice = expectedEntry[&#39;axes&#39;][dimensionOrder[dim_id]]
+                            currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                            sliceTuple += (int(currentSliceID),)
+                        #Put it in
+                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage 
+                        logging.debug(f&#34;Added entry {expectedEntry} not rendered in the MDA acquisition&#34;)
+                    except:
+                        logging.debug(f&#39;Entry {expectedEntry} tried, but not acquired&#39;)
+            
+            logging.debug(&#39;Finalised up visualisation...&#39;)
+            #Move to the end
+            # napariViewer.dims.set_point(0,timeslice)
+            shared_data._busy = False</code></pre>
 </details>
 </dd>
 <dt id="napariGlados.runNapariPycroManager"><code class="name flex">
-<span>def <span class="ident">runNapariPycroManager</span></span>(<span>score, sMM_JSON, sshared_data, includecustomUI=False)</span>
+<span>def <span class="ident">runNapariPycroManager</span></span>(<span>score, sMM_JSON, sshared_data, includecustomUI=False, include_flowChart_automatedMicroscopy=True)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -561,13 +1268,17 @@ metadata from micromanager</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False):
+<pre><code class="python">def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
     core = score
     MM_JSON = sMM_JSON
     livestate = False
     shared_data = sshared_data
+    
+    #Get some info from core to put in shared_data
+    shared_data._defaultFocusDevice = core.get_focus_device()
+    logging.debug(f&#34;Default focus device set to {shared_data._defaultFocusDevice}&#34;)
 
     #Napari start
     napariViewer = napari.Viewer()
@@ -575,62 +1286,71 @@ metadata from micromanager</p></div>
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
     
-    create_analysis_thread(shared_data,analysisInfo=&#39;LiveModeVisualisation&#39;,createNewThread=False,throughputThread=image_queue_analysis)
+    # create_analysis_thread(shared_data,analysisInfo=&#39;LiveModeVisualisation&#39;,createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    # create_analysis_thread(shared_data,analysisInfo=&#39;mdaVisualisation&#39;,createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     logging.debug(&#34;Live mode pseudo-analysis thread created&#34;)
     
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
     
-    # Start separate analysis threads
-    # create_analysis_thread(image_queue_analysis,shared_data,analysisInfo=&#39;AvgGrayValueText&#39;)
-    
     #Add widgets as wanted
-    custom_widget_analysisThreads = dockWidget_analysisThreads()
-    napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area=&#34;top&#34;, name=&#34;analysisThreads&#34;,tabify=True)
+    # custom_widget_analysisThreads = dockWidget_analysisThreads()
+    # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area=&#34;top&#34;, name=&#34;Real-time analysis&#34;,tabify=True)
+    
+    logging.debug(&#39;In runNapariPycroManager&#39;)
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
-    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area=&#34;top&#34;, name=&#34;MMcontrols&#34;,tabify=True)
+    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area=&#34;top&#34;, name=&#34;Controls&#34;,tabify=True)
+    
+    custom_widget_MDA = dockWidget_MDA()
+    napariViewer.window.add_dock_widget(custom_widget_MDA, area=&#34;top&#34;, name=&#34;Multi-D acquisition&#34;,tabify=True)
+    
+    if include_flowChart_automatedMicroscopy:
+        custom_widget_flowChart = dockWidget_flowChart()
+        napariViewer.window.add_dock_widget(custom_widget_flowChart, area=&#34;top&#34;, name=&#34;Autonomous microscopy&#34;,tabify=True)
+        custom_widget_flowChart.dockWidget.focus()
     
     if includecustomUI:
-        custom_widget_gladosUI = dockWidget_fullGladosUI()
-        napariViewer.window.add_dock_widget(custom_widget_gladosUI, area=&#34;right&#34;, name=&#34;GladosUI&#34;)
+        gladosLaserInfo = dockWidget_fullGladosUI()
+        napariViewer.window.add_dock_widget(gladosLaserInfo, area=&#34;right&#34;, name=&#34;GladosUI&#34;)
 
     returnInfo = {}
     returnInfo[&#39;napariViewer&#39;] = napariViewer
     returnInfo[&#39;MMcontrolWidget&#39;] = custom_widget_MMcontrols.getDockWidget()
+    
     # breakpoint
     return returnInfo</code></pre>
 </details>
 </dd>
-<dt id="napariGlados.yield_img"><code class="name flex">
-<span>def <span class="ident">yield_img</span></span>(<span>img_queue)</span>
+<dt id="napariGlados.startLiveModeVisualisation"><code class="name flex">
+<span>def <span class="ident">startLiveModeVisualisation</span></span>(<span>shared_data, layerName='Live')</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Worker thread that checks whether there are elements in the
-queue, reads them out.
-Connected to display_napari function to update display</p></div>
+<div class="desc"></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@thread_worker(connect={&#39;yielded&#39;: napariUpdateLive})
-def yield_img(img_queue):
-    &#34;&#34;&#34; Worker thread that checks whether there are elements in the
-        queue, reads them out.
-        Connected to display_napari function to update display &#34;&#34;&#34;
-    global livestate
-
-    while livestate:
-        time.sleep(sleep_time)
-        # get elements from queue while there is more than one element
-        # playing it safe: I&#39;m always leaving one element in the queue
-        while img_queue.qsize() &gt; 1:
-            yield img_queue.get(block = False)
-
-    # read out last remaining elements after end of acquisition
-    while img_queue.qsize() &gt; 0:
-        yield img_queue.get(block = False)
-    logging.debug(&#34;acquisition done&#34;)</code></pre>
+<pre><code class="python">def startLiveModeVisualisation(shared_data,layerName=&#39;Live&#39;):
+    create_analysis_thread(shared_data,analysisInfo=&#39;LiveModeVisualisation&#39;,createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.startMDAVisualisation"><code class="name flex">
+<span>def <span class="ident">startMDAVisualisation</span></span>(<span>shared_data, layerName='MDA', layerColorMap='gray')</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def startMDAVisualisation(shared_data,layerName=&#39;MDA&#39;,layerColorMap=&#39;gray&#39;):
+    #Set the latest layer name to be the layer name
+    shared_data.newestLayerName = layerName
+    #Create an analysis thread which runs this MDA visualisation
+    create_analysis_thread(shared_data,analysisInfo=&#39;mdaVisualisation&#39;,createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
+    shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)</code></pre>
 </details>
 </dd>
 </dl>
@@ -638,6 +1358,106 @@ def yield_img(img_queue):
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="napariGlados.dockWidget_MDA"><code class="flex name class">
+<span>class <span class="ident">dockWidget_MDA</span></span>
+</code></dt>
+<dd>
+<div class="desc"><p>QMainWindow(parent: typing.Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowFlags())</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class dockWidget_MDA(dockWidgets):
+    def __init__(self): 
+        logging.debug(&#34;dockWidget_MDA started&#34;)
+        super().__init__()
+        
+        #load from appdata
+        appdata_folder = os.getenv(&#39;APPDATA&#39;)
+        if appdata_folder is None:
+            raise EnvironmentError(&#34;APPDATA environment variable not found&#34;)
+        app_specific_folder = os.path.join(appdata_folder, &#39;Glados-PycroManager&#39;)
+        os.makedirs(app_specific_folder, exist_ok=True)
+        if os.path.exists(os.path.join(app_specific_folder, &#39;glados_state.json&#39;)):
+            #Load the mda state
+            with open(os.path.join(app_specific_folder, &#39;glados_state.json&#39;), &#39;r&#39;) as file:
+                gladosInfo = json.load(file)
+                mdaInfo = gladosInfo[&#39;MDA&#39;]
+            
+            try:
+                from MDAGlados import MDAGlados
+                #Add the full micro manager controls UI
+                self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                            hasGUI=True,
+                            num_time_points = mdaInfo[&#39;num_time_points&#39;], 
+                            time_interval_s = mdaInfo[&#39;time_interval_s&#39;], 
+                            time_interval_s_or_ms = mdaInfo[&#39;time_interval_s_or_ms&#39;],
+                            z_start = mdaInfo[&#39;z_start&#39;],
+                            z_end = mdaInfo[&#39;z_end&#39;],
+                            z_step = mdaInfo[&#39;z_step&#39;],
+                            z_stage_sel = mdaInfo[&#39;z_stage_sel&#39;],
+                            z_nr_steps = mdaInfo[&#39;z_nr_steps&#39;],
+                            z_step_distance = mdaInfo[&#39;z_step_distance&#39;],
+                            z_nrsteps_radio_sel = mdaInfo[&#39;z_nrsteps_radio_sel&#39;],
+                            z_stepdistance_radio_sel = mdaInfo[&#39;z_stepdistance_radio_sel&#39;],
+                            channel_group = mdaInfo[&#39;channel_group&#39;],
+                            channels = mdaInfo[&#39;channels&#39;],
+                            channel_exposures_ms = mdaInfo[&#39;channel_exposures_ms&#39;],
+                            xy_positions = mdaInfo[&#39;xy_positions&#39;],
+                            xyz_positions = mdaInfo[&#39;xyz_positions&#39;],
+                            position_labels = mdaInfo[&#39;position_labels&#39;],
+                            exposure_ms = mdaInfo[&#39;exposure_ms&#39;],
+                            exposure_s_or_ms = mdaInfo[&#39;exposure_s_or_ms&#39;],
+                            storage_folder = mdaInfo[&#39;storage_folder&#39;],
+                            storage_file_name = mdaInfo[&#39;storage_file_name&#39;],
+                            order = mdaInfo[&#39;order&#39;],
+                            GUI_show_exposure = mdaInfo[&#39;GUI_show_exposure&#39;], 
+                            GUI_show_xy = mdaInfo[&#39;GUI_show_xy&#39;], 
+                            GUI_show_z = mdaInfo[&#39;GUI_show_z&#39;], 
+                            GUI_show_channel = mdaInfo[&#39;GUI_show_channel&#39;], 
+                            GUI_show_time = mdaInfo[&#39;GUI_show_time&#39;], 
+                            GUI_show_order = mdaInfo[&#39;GUI_show_order&#39;], 
+                            GUI_show_storage = mdaInfo[&#39;GUI_show_storage&#39;], 
+                            GUI_xy_pos_fullInfo = mdaInfo[&#39;xy_positions_saveInfo&#39;],
+                            GUI_acquire_button = True,
+                            autoSaveLoad=True).getGui()
+            except KeyError:
+                from MDAGlados import MDAGlados
+                #Add the full micro manager controls UI
+                self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                            hasGUI=True,
+                            GUI_acquire_button = True,
+                            autoSaveLoad=True).getGui()
+        else: #If no MDA state is yet saved, open a new MDAGlados from scratch
+            from MDAGlados import MDAGlados
+            #Add the full micro manager controls UI
+            self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                        hasGUI=True,
+                        GUI_acquire_button = True,
+                        autoSaveLoad=True).getGui()
+            
+        self.sizeChanged.connect(self.dockWidget.handleSizeChange)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></li>
+<li>PyQt5.QtWidgets.QMainWindow</li>
+<li>PyQt5.QtWidgets.QWidget</li>
+<li>PyQt5.QtCore.QObject</li>
+<li>sip.wrapper</li>
+<li>PyQt5.QtGui.QPaintDevice</li>
+<li>sip.simplewrapper</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></b></code>:
+<ul class="hlist">
+<li><code><a title="napariGlados.dockWidgets.resizeEvent" href="#napariGlados.dockWidgets.resizeEvent">resizeEvent</a></code></li>
+<li><code><a title="napariGlados.dockWidgets.sizeChanged" href="#napariGlados.dockWidgets.sizeChanged">sizeChanged</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
 <dt id="napariGlados.dockWidget_MMcontrol"><code class="flex name class">
 <span>class <span class="ident">dockWidget_MMcontrol</span></span>
 </code></dt>
@@ -647,24 +1467,16 @@ def yield_img(img_queue):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class dockWidget_MMcontrol(QMainWindow):
+<pre><code class="python">class dockWidget_MMcontrol(dockWidgets):
     def __init__(self): 
         logging.debug(&#34;dockWidget_MMcontrol started&#34;)
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
-        
         #Add the full micro manager controls UI
-        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)
-    
-    def getDockWidget(self):
-        return self.dockWidget</code></pre>
+        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
+<li><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></li>
 <li>PyQt5.QtWidgets.QMainWindow</li>
 <li>PyQt5.QtWidgets.QWidget</li>
 <li>PyQt5.QtCore.QObject</li>
@@ -672,25 +1484,18 @@ def yield_img(img_queue):
 <li>PyQt5.QtGui.QPaintDevice</li>
 <li>sip.simplewrapper</li>
 </ul>
-<h3>Methods</h3>
-<dl>
-<dt id="napariGlados.dockWidget_MMcontrol.getDockWidget"><code class="name flex">
-<span>def <span class="ident">getDockWidget</span></span>(<span>self)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def getDockWidget(self):
-    return self.dockWidget</code></pre>
-</details>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></b></code>:
+<ul class="hlist">
+<li><code><a title="napariGlados.dockWidgets.resizeEvent" href="#napariGlados.dockWidgets.resizeEvent">resizeEvent</a></code></li>
+<li><code><a title="napariGlados.dockWidgets.sizeChanged" href="#napariGlados.dockWidgets.sizeChanged">sizeChanged</a></code></li>
+</ul>
+</li>
+</ul>
 </dd>
-</dl>
-</dd>
-<dt id="napariGlados.dockWidget_analysisThreads"><code class="flex name class">
-<span>class <span class="ident">dockWidget_analysisThreads</span></span>
+<dt id="napariGlados.dockWidget_flowChart"><code class="flex name class">
+<span>class <span class="ident">dockWidget_flowChart</span></span>
 </code></dt>
 <dd>
 <div class="desc"><p>QMainWindow(parent: typing.Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowFlags())</p></div>
@@ -698,24 +1503,17 @@ def yield_img(img_queue):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class dockWidget_analysisThreads(QMainWindow):
+<pre><code class="python">class dockWidget_flowChart(dockWidgets):
     def __init__(self): 
-        logging.debug(&#34;dockWidget_analysisThreads started&#34;)
+        logging.debug(&#34;dockWidget_flowchart started&#34;)
         super().__init__()
-        #Add a central widget in napari
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        #add a layout in this central widget
-        self.layout = QVBoxLayout(self.central_widget) #type:ignore
         
         #Add the full micro manager controls UI
-        self.dockWidget = analysis_dockWidget(MM_JSON,self.layout,shared_data)
-    
-    def getDockWidget(self):
-        return self.dockWidget</code></pre>
+        self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
+<li><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></li>
 <li>PyQt5.QtWidgets.QMainWindow</li>
 <li>PyQt5.QtWidgets.QWidget</li>
 <li>PyQt5.QtCore.QObject</li>
@@ -723,22 +1521,15 @@ def yield_img(img_queue):
 <li>PyQt5.QtGui.QPaintDevice</li>
 <li>sip.simplewrapper</li>
 </ul>
-<h3>Methods</h3>
-<dl>
-<dt id="napariGlados.dockWidget_analysisThreads.getDockWidget"><code class="name flex">
-<span>def <span class="ident">getDockWidget</span></span>(<span>self)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def getDockWidget(self):
-    return self.dockWidget</code></pre>
-</details>
-</dd>
-</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></b></code>:
+<ul class="hlist">
+<li><code><a title="napariGlados.dockWidgets.resizeEvent" href="#napariGlados.dockWidgets.resizeEvent">resizeEvent</a></code></li>
+<li><code><a title="napariGlados.dockWidgets.sizeChanged" href="#napariGlados.dockWidgets.sizeChanged">sizeChanged</a></code></li>
+</ul>
+</li>
+</ul>
 </dd>
 <dt id="napariGlados.dockWidget_fullGladosUI"><code class="flex name class">
 <span>class <span class="ident">dockWidget_fullGladosUI</span></span>
@@ -749,18 +1540,102 @@ def yield_img(img_queue):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class dockWidget_fullGladosUI(QMainWindow):
+<pre><code class="python">class dockWidget_fullGladosUI(dockWidgets):
     def __init__(self): 
         logging.debug(&#34;dockWidget_fullGladosUI started&#34;)
         super().__init__()
-        self.ui = Ui_CustomDockWidget()
-        self.ui.setupUi(self)
+        # #new QWidget:
+        tempWidget = QMainWindow()
+        
+        
+        
+    
+    
+        
+        ui = Ui_CustomDockWidget()
+        ui.setupUi(tempWidget)
         #Open JSON file with MM settings
-        with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
+        MM_JSON_path = os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;)
+        # with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
+        with open(MM_JSON_path) as f:
             MM_JSON = json.load(f)
+            
+        runlaserControllerUI(core,MM_JSON,ui,shared_data)
         #Run the laserController UI
-        runlaserControllerUI(core,MM_JSON,self.ui,shared_data)
-        # runAutonomousMicroscopyUI(core,MM_JSON,self.ui)</code></pre>
+        logging.debug(&#34;dockWidget_fullGladosUI halfway&#34;)
+        
+        #
+        #Create a Vertical+horizontal layout:
+        self.dockwidgetLayout = QGridLayout()
+        #Create a layout for the configs:
+        self.analysisLayout = QGridLayout()
+        #Add this to the mainLayout:
+        self.dockwidgetLayout.addLayout(self.analysisLayout,0,0)
+        
+        self.analysisLayout.addWidget(ui.centralwidget.children()[1].children()[0],1,1)
+        
+        self.dockWidget = self.layout.addLayout(self.dockwidgetLayout,0,0)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></li>
+<li>PyQt5.QtWidgets.QMainWindow</li>
+<li>PyQt5.QtWidgets.QWidget</li>
+<li>PyQt5.QtCore.QObject</li>
+<li>sip.wrapper</li>
+<li>PyQt5.QtGui.QPaintDevice</li>
+<li>sip.simplewrapper</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></b></code>:
+<ul class="hlist">
+<li><code><a title="napariGlados.dockWidgets.resizeEvent" href="#napariGlados.dockWidgets.resizeEvent">resizeEvent</a></code></li>
+<li><code><a title="napariGlados.dockWidgets.sizeChanged" href="#napariGlados.dockWidgets.sizeChanged">sizeChanged</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="napariGlados.dockWidgets"><code class="flex name class">
+<span>class <span class="ident">dockWidgets</span></span>
+</code></dt>
+<dd>
+<div class="desc"><p>QMainWindow(parent: typing.Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowFlags())</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class dockWidgets(QMainWindow):
+    sizeChanged = pyqtSignal(QSize)
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.sizeChanged.emit(event.size())
+        
+    def __init__(self):
+        logging.debug(&#39;dockwidget started&#39;)
+        super().__init__()
+        #Create all the widgets/layouts:
+        self.central_widget = QWidget(self)
+        self.central_layout = QVBoxLayout()
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.content_widget = QWidget()
+        self.layout = QGridLayout() #type:ignore
+        
+        #Order them logically:
+        self.content_widget.setLayout(self.layout)
+        self.scroll_area.setWidget(self.content_widget)
+        self.central_layout.addWidget(self.scroll_area)
+        self.central_widget.setLayout(self.central_layout)
+        self.setCentralWidget(self.central_widget)
+        
+        self.dockWidget = None
+
+        #we end up with self.layout() that&#39;s changed by every indiv dockwidget
+        
+    def getDockWidget(self):
+        return self.dockWidget</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -770,6 +1645,884 @@ def yield_img(img_queue):
 <li>sip.wrapper</li>
 <li>PyQt5.QtGui.QPaintDevice</li>
 <li>sip.simplewrapper</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="napariGlados.dockWidget_MDA" href="#napariGlados.dockWidget_MDA">dockWidget_MDA</a></li>
+<li><a title="napariGlados.dockWidget_MMcontrol" href="#napariGlados.dockWidget_MMcontrol">dockWidget_MMcontrol</a></li>
+<li><a title="napariGlados.dockWidget_flowChart" href="#napariGlados.dockWidget_flowChart">dockWidget_flowChart</a></li>
+<li><a title="napariGlados.dockWidget_fullGladosUI" href="#napariGlados.dockWidget_fullGladosUI">dockWidget_fullGladosUI</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="napariGlados.dockWidgets.getDockWidget"><code class="name flex">
+<span>def <span class="ident">getDockWidget</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def getDockWidget(self):
+    return self.dockWidget</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.dockWidgets.resizeEvent"><code class="name flex">
+<span>def <span class="ident">resizeEvent</span></span>(<span>self, event)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>resizeEvent(self, a0: QResizeEvent)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def resizeEvent(self, event):
+    super().resizeEvent(event)
+    self.sizeChanged.emit(event.size())</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.dockWidgets.sizeChanged"><code class="name flex">
+<span>def <span class="ident">sizeChanged</span></span>(<span>...)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>pyqtSignal(*types, name: str = &hellip;, revision: int = &hellip;, arguments: Sequence = &hellip;) -&gt; PYQT_SIGNAL</p>
+<p>types is normally a sequence of individual types.
+Each type is either a
+type object or a string that is the name of a C++ type.
+Alternatively
+each type could itself be a sequence of types each describing a different
+overloaded signal.
+name is the optional C++ name of the signal.
+If it is not specified then
+the name of the class attribute that is bound to the signal is used.
+revision is the optional revision of the signal that is exported to QML.
+If it is not specified then 0 is used.
+arguments is the optional sequence of the names of the signal's arguments.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="napariGlados.napariHandler"><code class="flex name class">
+<span>class <span class="ident">napariHandler</span></span>
+<span>(</span><span>shared_data, liveOrMda='live')</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class napariHandler():
+    def __init__(self, shared_data,liveOrMda=&#39;live&#39;) -&gt; None:
+        self.shared_data = shared_data
+        self.napariViewer = shared_data.napariViewer
+        if liveOrMda == &#39;live&#39;:
+            self.liveOrMda = &#39;live&#39;
+            self.acqstate = shared_data.liveMode
+        elif liveOrMda == &#39;mda&#39;:
+            self.liveOrMda = &#39;mda&#39;
+            self.acqstate = shared_data.mdaMode
+        # Define a flag to control the continuous task
+        self.stop_continuous_task = False
+        # empty queue for (live) image data
+        self.img_queue = queue.Queue()
+        # Create a queue to pass image data between threads
+        self.image_queue_analysis = queue.Queue()
+        # Create a signal to communicate between threads
+        self.mda_acq_done_signal = pyqtSignal(bool)
+
+        #Sleep time to keep responsiveness
+        self.sleep_time = 0.05
+        self.layerName = &#39;newLayer&#39;
+
+    def mdaacqdonefunction(self):
+        logging.debug(&#39;mdaacqdonefunction called in napariHandler&#39;)
+        self.shared_data.mdaacqdonefunction()
+        
+    def grab_image(self,image, metadata, event_queue):
+        &#34;&#34;&#34; 
+        Function that runs on every frame obtained in live mode and putis in the image queue
+        
+        Inputs: array image: image from micromanager
+                metadata: metadata from micromanager
+        &#34;&#34;&#34;
+        if self.acqstate:
+            if self.img_queue.qsize() &lt; 3:
+                self.img_queue.put([image,metadata])
+                
+            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() &lt; 2:
+                    queue.put([image,metadata])
+                        
+            if self.image_queue_analysis.qsize() &lt; 3:
+                self.image_queue_analysis.put([image,metadata])
+            
+        else:
+            logging.info(&#39;Broke off live mode&#39;)
+            event_queue.put(None)
+            try:
+                acq.abort()
+                logging.debug(&#39;aborted acquisition&#39;)
+            except:
+                logging.debug(&#39;attemped to abort acq&#39;)
+        
+        return image, metadata
+    
+    
+    def grab_image_savedfn(self,axes,dataset, event_queue):
+        &#34;&#34;&#34; 
+        Function that runs on every frame obtained in live mode and putis in the image queue
+        
+        Inputs: array image: image from micromanager
+                metadata: metadata from micromanager
+        &#34;&#34;&#34;
+        if self.acqstate:
+            #Check if there is any reason to read the image:
+            reasonToReadImage = False
+            if self.img_queue.qsize() &lt; 3:
+                reasonToReadImage = True
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() &lt; 2:
+                    reasonToReadImage = True
+            if self.image_queue_analysis.qsize() &lt; 3:
+                reasonToReadImage = True
+            
+            if reasonToReadImage:
+                image = dataset.read_image(**axes)
+                metadata = {}
+                metadata[&#39;Axes&#39;]=axes
+                logging.debug(f&#39;grab_image_savedfn called in napariHandler read image: {dataset}, axes: {axes}, metadata: {metadata}&#39;)
+                if self.img_queue.qsize() &lt; 3:
+                    self.img_queue.put([image,metadata])
+                    
+                #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+                for queue in self.shared_data.liveImageQueues:
+                    if queue.qsize() &lt; 2:
+                        queue.put([image,metadata])
+                            
+                if self.image_queue_analysis.qsize() &lt; 3:
+                    self.image_queue_analysis.put([image,metadata])
+            
+        else:
+            logging.info(&#39;Broke off live mode&#39;)
+            event_queue.put(None)
+            try:
+                acq.abort()
+                logging.debug(&#39;aborted acquisition&#39;)
+            except:
+                logging.debug(&#39;attemped to abort acq&#39;)
+        
+        # return image, metadata
+
+    @thread_worker
+    def run_pycroManagerAcquisition_worker(self,parent):
+        &#34;&#34;&#34; 
+        Worker which handles live mode on/off turning etc
+        
+        Inputs: img_queue (unused, but required)
+        &#34;&#34;&#34;
+        img_queue = parent.img_queue
+        global acq
+        # shared_data = self.shared_data
+        logging.debug(&#39;in run_pycroManagerAcquisition_worker&#39;)
+        #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
+        #The abortion is handled in grab_image_livemode
+        if self.liveOrMda == &#39;live&#39;:
+            while self.acqstate:
+                if self.shared_data.mdaMode:
+                    logging.error(&#39;LIVE NOT STARTED! MDA IS RUNNING&#39;)
+                    self.shared_data.liveMode = False
+                else:        
+                    #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+                    logging.debug(&#39;starting acq&#39;)
+                    self.shared_data.allMDAslicesRendered = {}
+                    #Already move the live layer to top
+                    logging.debug(&#39;BMoved layer to top&#39;)
+                    # moveLayerToTop(self.shared_data.napariViewer,&#34;Live&#34;)
+                    with Acquisition(directory=&#39;./temp&#39;, name=&#39;LiveAcqShouldBeRemoved&#39;, show_display=False, image_saved_fn = self.grab_image_savedfn) as acq: #type:ignore
+                        self.shared_data._mdaModeAcqData = acq
+                        events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                        acq.acquire(events)
+
+                    logging.debug(&#39;After Acq Live&#39;)
+            #Now we&#39;re after the livestate
+            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.liveMode = False
+            #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+            cleanUpTemporaryFiles(shared_data=self.shared_data)
+        elif self.liveOrMda == &#39;mda&#39;:
+            while self.acqstate:
+                if self.shared_data.liveMode:
+                    self.shared_data.liveMode = False
+                    time.sleep(1)
+                    
+                #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+                logging.debug(&#39;starting MDA acq - before JavaBackendAcquisition&#39;)
+                savefolder = &#39;./temp&#39;
+                savename = &#39;MdaAcqShouldBeRemoved&#39;
+                if self.shared_data._mdaModeSaveLoc[0] != &#39;&#39;:
+                    savefolder = self.shared_data._mdaModeSaveLoc[0]
+                    
+                    savefolderAdv = utils.nodz_evaluateAdv(savefolder,self.shared_data.nodzInstance)
+                    if savefolderAdv != None:
+                        savefolder = savefolderAdv
+                    logging.debug(savefolder)
+                    
+                if self.shared_data._mdaModeSaveLoc[1] != &#39;&#39;:
+                    savename = self.shared_data._mdaModeSaveLoc[1]
+                    savenameAdv = utils.nodz_evaluateAdv(savename,self.shared_data.nodzInstance)
+                    if savenameAdv != None:
+                        savename = savenameAdv
+                    logging.debug(savename)
+                if self.shared_data._mdaModeNapariViewer != None:
+                    napariViewer = self.shared_data._mdaModeNapariViewer
+                    showdisplay = True
+                else:
+                    napariViewer = None
+                    showdisplay = False
+                    
+                napariViewer = None
+                showdisplay = False
+                self.shared_data.allMDAslicesRendered = {}
+                #Already move the layer to top
+                # if self.shared_data.newestLayerName != &#39;&#39;:
+                #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
+                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_savedfn,napari_viewer=napariViewer) as acq: #type:ignore
+                    self.shared_data._mdaModeAcqData = acq
+                    events = self.shared_data._mdaModeParams
+                    acq.acquire(events)
+                # with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
+                
+                self.shared_data.mdaMode = False
+                self.acqstate = False #End the MDA acq state
+                self.shared_data.appendNewMDAdataset(acq.get_dataset())
+
+            logging.debug(&#39;Stopping the acquisition from napariHandler&#39;)
+            #Now we&#39;re after the acquisition
+            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.mdaMode = False
+            
+            #Signal to all parents that the MDA acquisition is done - in the Nodz MDA, now we would trigger the MDA-based analysis for scoring or so
+            parent.mdaacqdonefunction()
+            
+            #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+            cleanUpTemporaryFiles(shared_data=self.shared_data)
+    
+    
+    @thread_worker(connect={&#39;yielded&#39;: napariUpdateAnalysisThreads})
+    def run_analysis_worker(self,parent,layerName=&#39;Layer&#39;,layerColorMap=&#39;gray&#39;):
+        &#34;&#34;&#34;
+        Worker which handles the visualisation of the live mode queue
+        Connected to display_napari function to update display 
+        &#34;&#34;&#34;
+        img_queue = parent.image_queue_analysis
+        while self.acqstate:
+            time.sleep(0)
+            # get elements from queue while there is more than one element
+            # playing it safe: I&#39;m always leaving one element in the queue
+            while img_queue.qsize() &gt; 1:
+                DataStructure = {}
+                DataStructure[&#39;data&#39;] = img_queue.get(block = False)
+                DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+                DataStructure[&#39;acqState&#39;] = self.acqstate
+                DataStructure[&#39;core&#39;] = self.shared_data.core
+                DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+                DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+                DataStructure[&#39;layer_name&#39;] = layerName
+                DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+                DataStructure[&#39;finalisationProcedure&#39;] = False
+                yield DataStructure
+
+    
+    @thread_worker(connect={&#39;yielded&#39;: napariUpdateLive})
+    def run_napariVisualisation_worker(self,parent,layerName=&#39;Layer&#39;,layerColorMap=&#39;gray&#39;):
+        &#34;&#34;&#34;
+        Worker which handles the visualisation of the live mode queue
+        Connected to display_napari function to update display 
+        &#34;&#34;&#34;
+        img_queue = parent.img_queue
+        while self.acqstate:
+            time.sleep(self.sleep_time)
+            logging.debug(&#39;in while-loop in visualise_live_mode_worker, len of img_queue: &#39;+str(img_queue.qsize()))
+            # get elements from queue while there is more than one element
+            # playing it safe: I&#39;m always leaving one element in the queue
+            while img_queue.qsize() &gt; 0:
+                DataStructure = {}
+                DataStructure[&#39;data&#39;] = img_queue.get()
+                DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+                DataStructure[&#39;acqState&#39;] = self.acqstate
+                DataStructure[&#39;core&#39;] = self.shared_data.core
+                DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+                DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+                DataStructure[&#39;layer_name&#39;] = layerName
+                DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+                DataStructure[&#39;finalisationProcedure&#39;] = False
+                yield DataStructure
+                # self.napariUpdateLive(img_queue.get(block=False))
+
+        # read out last remaining element(s) after end of acquisition
+        while img_queue.qsize() &gt; 0:
+            DataStructure = {}
+            DataStructure[&#39;data&#39;] = img_queue.get()
+            DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+            DataStructure[&#39;acqState&#39;] = self.acqstate
+            DataStructure[&#39;core&#39;] = self.shared_data.core
+            DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+            DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+            DataStructure[&#39;layer_name&#39;] = layerName
+            DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+            DataStructure[&#39;finalisationProcedure&#39;] = False
+            yield DataStructure#img_queue.get(block = False)
+            
+        #Do the final N images
+        if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+            if layerName == &#39;MDA&#39;:
+                logging.debug(&#39;Finalising MDA visualisation...&#39;)
+                DataStructure = {}
+                DataStructure[&#39;data&#39;] = None
+                DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+                DataStructure[&#39;acqState&#39;] = self.acqstate
+                DataStructure[&#39;core&#39;] = self.shared_data.core
+                DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+                DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+                DataStructure[&#39;layer_name&#39;] = layerName
+                DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+                DataStructure[&#39;finalisationProcedure&#39;] = True
+                napariUpdateLive(DataStructure)
+        
+        # shared_data.analysisThreads.remove(shared_data.lastMDAThread)
+        # shared_data.lastMDAThread.destroy()
+        # shared_data.lastMDAThread = None
+        logging.debug(&#34;acquisition done&#34;)
+
+    def acqModeChanged(self, newSharedData = None):
+        &#34;&#34;&#34;
+        General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered
+        
+        Is called, and shared_data.liveMode should be changed seperately from running this funciton
+        &#34;&#34;&#34;
+        logging.debug(&#39;acqModeChanged called from napariHandler&#39;)
+        if newSharedData is not None:
+            global napariViewer, shared_data, Core
+            self.shared_data = newSharedData
+            shared_data = self.shared_data
+            napariViewer = self.shared_data.napariViewer
+            core = self.shared_data.core
+            
+        if self.liveOrMda == &#39;live&#39;:
+            #Hook the live mode into the scripts here
+            if self.shared_data.liveMode == False:
+                self.acqstate = False
+                self.stop_continuous_task = True
+                #Clear the image queue
+                self.img_queue.queue.clear()
+                logging.info(&#34;Live mode stopped&#34;)
+            else:
+                logging.debug(&#39;liveMode changed to TRUE&#39;)
+                self.acqstate = True
+                self.stop_continuous_task = False
+                #Always start live-mode visualisation:
+                napariGlados.startLiveModeVisualisation(self.shared_data)
+                #Move layer to top - if it isn&#39;t created yet, it will fail
+                moveLayerToTop(self.shared_data.napariViewer,&#34;Live&#34;)
+                
+                #Start the worker to run the pycromanager acquisition
+                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                worker1.start() #type:ignore
+                worker2 = self.run_analysis_worker(self) #type:ignore
+                
+                logging.info(&#34;Live mode started&#34;)
+        elif self.liveOrMda == &#39;mda&#39;:
+            #Hook the live mode into the scripts here
+            if self.shared_data.mdaMode == False:
+                self.acqstate = False
+                self.stop_continuous_task = True
+                #Clear the image queue
+                self.img_queue.queue.clear()
+                logging.info(&#34;MDA mode stopped from acqModeChanged&#34;)
+                # self.mdaacqdonefunction()
+            else:
+                logging.debug(&#39;mdaMode changed to TRUE&#39;)
+                self.acqstate = True
+                self.stop_continuous_task = False
+                #Move layer to top - if it isn&#39;t created yet, it will fail
+                if self.shared_data.newestLayerName != &#39;&#39;:
+                    moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
+                #Start the two workers, one to run it, one to visualise it.
+                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
+                worker1.start() #type:ignore
+                # worker2.start()
+                logging.debug(&#34;MDA mode started from acqModeChanged&#34;)</code></pre>
+</details>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="napariGlados.napariHandler_liveMode" href="#napariGlados.napariHandler_liveMode">napariHandler_liveMode</a></li>
+<li><a title="napariGlados.napariHandler_mdaMode" href="#napariGlados.napariHandler_mdaMode">napariHandler_mdaMode</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="napariGlados.napariHandler.acqModeChanged"><code class="name flex">
+<span>def <span class="ident">acqModeChanged</span></span>(<span>self, newSharedData=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered</p>
+<p>Is called, and shared_data.liveMode should be changed seperately from running this funciton</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def acqModeChanged(self, newSharedData = None):
+    &#34;&#34;&#34;
+    General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered
+    
+    Is called, and shared_data.liveMode should be changed seperately from running this funciton
+    &#34;&#34;&#34;
+    logging.debug(&#39;acqModeChanged called from napariHandler&#39;)
+    if newSharedData is not None:
+        global napariViewer, shared_data, Core
+        self.shared_data = newSharedData
+        shared_data = self.shared_data
+        napariViewer = self.shared_data.napariViewer
+        core = self.shared_data.core
+        
+    if self.liveOrMda == &#39;live&#39;:
+        #Hook the live mode into the scripts here
+        if self.shared_data.liveMode == False:
+            self.acqstate = False
+            self.stop_continuous_task = True
+            #Clear the image queue
+            self.img_queue.queue.clear()
+            logging.info(&#34;Live mode stopped&#34;)
+        else:
+            logging.debug(&#39;liveMode changed to TRUE&#39;)
+            self.acqstate = True
+            self.stop_continuous_task = False
+            #Always start live-mode visualisation:
+            napariGlados.startLiveModeVisualisation(self.shared_data)
+            #Move layer to top - if it isn&#39;t created yet, it will fail
+            moveLayerToTop(self.shared_data.napariViewer,&#34;Live&#34;)
+            
+            #Start the worker to run the pycromanager acquisition
+            worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+            worker1.start() #type:ignore
+            worker2 = self.run_analysis_worker(self) #type:ignore
+            
+            logging.info(&#34;Live mode started&#34;)
+    elif self.liveOrMda == &#39;mda&#39;:
+        #Hook the live mode into the scripts here
+        if self.shared_data.mdaMode == False:
+            self.acqstate = False
+            self.stop_continuous_task = True
+            #Clear the image queue
+            self.img_queue.queue.clear()
+            logging.info(&#34;MDA mode stopped from acqModeChanged&#34;)
+            # self.mdaacqdonefunction()
+        else:
+            logging.debug(&#39;mdaMode changed to TRUE&#39;)
+            self.acqstate = True
+            self.stop_continuous_task = False
+            #Move layer to top - if it isn&#39;t created yet, it will fail
+            if self.shared_data.newestLayerName != &#39;&#39;:
+                moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
+            #Start the two workers, one to run it, one to visualise it.
+            worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+            # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
+            worker1.start() #type:ignore
+            # worker2.start()
+            logging.debug(&#34;MDA mode started from acqModeChanged&#34;)</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.napariHandler.grab_image"><code class="name flex">
+<span>def <span class="ident">grab_image</span></span>(<span>self, image, metadata, event_queue)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Function that runs on every frame obtained in live mode and putis in the image queue</p>
+<p>Inputs: array image: image from micromanager
+metadata: metadata from micromanager</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def grab_image(self,image, metadata, event_queue):
+    &#34;&#34;&#34; 
+    Function that runs on every frame obtained in live mode and putis in the image queue
+    
+    Inputs: array image: image from micromanager
+            metadata: metadata from micromanager
+    &#34;&#34;&#34;
+    if self.acqstate:
+        if self.img_queue.qsize() &lt; 3:
+            self.img_queue.put([image,metadata])
+            
+        #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+        for queue in self.shared_data.liveImageQueues:
+            if queue.qsize() &lt; 2:
+                queue.put([image,metadata])
+                    
+        if self.image_queue_analysis.qsize() &lt; 3:
+            self.image_queue_analysis.put([image,metadata])
+        
+    else:
+        logging.info(&#39;Broke off live mode&#39;)
+        event_queue.put(None)
+        try:
+            acq.abort()
+            logging.debug(&#39;aborted acquisition&#39;)
+        except:
+            logging.debug(&#39;attemped to abort acq&#39;)
+    
+    return image, metadata</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.napariHandler.grab_image_savedfn"><code class="name flex">
+<span>def <span class="ident">grab_image_savedfn</span></span>(<span>self, axes, dataset, event_queue)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Function that runs on every frame obtained in live mode and putis in the image queue</p>
+<p>Inputs: array image: image from micromanager
+metadata: metadata from micromanager</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def grab_image_savedfn(self,axes,dataset, event_queue):
+    &#34;&#34;&#34; 
+    Function that runs on every frame obtained in live mode and putis in the image queue
+    
+    Inputs: array image: image from micromanager
+            metadata: metadata from micromanager
+    &#34;&#34;&#34;
+    if self.acqstate:
+        #Check if there is any reason to read the image:
+        reasonToReadImage = False
+        if self.img_queue.qsize() &lt; 3:
+            reasonToReadImage = True
+        for queue in self.shared_data.liveImageQueues:
+            if queue.qsize() &lt; 2:
+                reasonToReadImage = True
+        if self.image_queue_analysis.qsize() &lt; 3:
+            reasonToReadImage = True
+        
+        if reasonToReadImage:
+            image = dataset.read_image(**axes)
+            metadata = {}
+            metadata[&#39;Axes&#39;]=axes
+            logging.debug(f&#39;grab_image_savedfn called in napariHandler read image: {dataset}, axes: {axes}, metadata: {metadata}&#39;)
+            if self.img_queue.qsize() &lt; 3:
+                self.img_queue.put([image,metadata])
+                
+            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() &lt; 2:
+                    queue.put([image,metadata])
+                        
+            if self.image_queue_analysis.qsize() &lt; 3:
+                self.image_queue_analysis.put([image,metadata])
+        
+    else:
+        logging.info(&#39;Broke off live mode&#39;)
+        event_queue.put(None)
+        try:
+            acq.abort()
+            logging.debug(&#39;aborted acquisition&#39;)
+        except:
+            logging.debug(&#39;attemped to abort acq&#39;)
+    
+    # return image, metadata</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.napariHandler.mdaacqdonefunction"><code class="name flex">
+<span>def <span class="ident">mdaacqdonefunction</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def mdaacqdonefunction(self):
+    logging.debug(&#39;mdaacqdonefunction called in napariHandler&#39;)
+    self.shared_data.mdaacqdonefunction()</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.napariHandler.run_analysis_worker"><code class="name flex">
+<span>def <span class="ident">run_analysis_worker</span></span>(<span>self, parent, layerName='Layer', layerColorMap='gray')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Worker which handles the visualisation of the live mode queue
+Connected to display_napari function to update display</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@thread_worker(connect={&#39;yielded&#39;: napariUpdateAnalysisThreads})
+def run_analysis_worker(self,parent,layerName=&#39;Layer&#39;,layerColorMap=&#39;gray&#39;):
+    &#34;&#34;&#34;
+    Worker which handles the visualisation of the live mode queue
+    Connected to display_napari function to update display 
+    &#34;&#34;&#34;
+    img_queue = parent.image_queue_analysis
+    while self.acqstate:
+        time.sleep(0)
+        # get elements from queue while there is more than one element
+        # playing it safe: I&#39;m always leaving one element in the queue
+        while img_queue.qsize() &gt; 1:
+            DataStructure = {}
+            DataStructure[&#39;data&#39;] = img_queue.get(block = False)
+            DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+            DataStructure[&#39;acqState&#39;] = self.acqstate
+            DataStructure[&#39;core&#39;] = self.shared_data.core
+            DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+            DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+            DataStructure[&#39;layer_name&#39;] = layerName
+            DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+            DataStructure[&#39;finalisationProcedure&#39;] = False
+            yield DataStructure</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.napariHandler.run_napariVisualisation_worker"><code class="name flex">
+<span>def <span class="ident">run_napariVisualisation_worker</span></span>(<span>self, parent, layerName='Layer', layerColorMap='gray')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Worker which handles the visualisation of the live mode queue
+Connected to display_napari function to update display</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@thread_worker(connect={&#39;yielded&#39;: napariUpdateLive})
+def run_napariVisualisation_worker(self,parent,layerName=&#39;Layer&#39;,layerColorMap=&#39;gray&#39;):
+    &#34;&#34;&#34;
+    Worker which handles the visualisation of the live mode queue
+    Connected to display_napari function to update display 
+    &#34;&#34;&#34;
+    img_queue = parent.img_queue
+    while self.acqstate:
+        time.sleep(self.sleep_time)
+        logging.debug(&#39;in while-loop in visualise_live_mode_worker, len of img_queue: &#39;+str(img_queue.qsize()))
+        # get elements from queue while there is more than one element
+        # playing it safe: I&#39;m always leaving one element in the queue
+        while img_queue.qsize() &gt; 0:
+            DataStructure = {}
+            DataStructure[&#39;data&#39;] = img_queue.get()
+            DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+            DataStructure[&#39;acqState&#39;] = self.acqstate
+            DataStructure[&#39;core&#39;] = self.shared_data.core
+            DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+            DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+            DataStructure[&#39;layer_name&#39;] = layerName
+            DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+            DataStructure[&#39;finalisationProcedure&#39;] = False
+            yield DataStructure
+            # self.napariUpdateLive(img_queue.get(block=False))
+
+    # read out last remaining element(s) after end of acquisition
+    while img_queue.qsize() &gt; 0:
+        DataStructure = {}
+        DataStructure[&#39;data&#39;] = img_queue.get()
+        DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+        DataStructure[&#39;acqState&#39;] = self.acqstate
+        DataStructure[&#39;core&#39;] = self.shared_data.core
+        DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+        DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+        DataStructure[&#39;layer_name&#39;] = layerName
+        DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+        DataStructure[&#39;finalisationProcedure&#39;] = False
+        yield DataStructure#img_queue.get(block = False)
+        
+    #Do the final N images
+    if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+        if layerName == &#39;MDA&#39;:
+            logging.debug(&#39;Finalising MDA visualisation...&#39;)
+            DataStructure = {}
+            DataStructure[&#39;data&#39;] = None
+            DataStructure[&#39;napariViewer&#39;] = self.shared_data.napariViewer
+            DataStructure[&#39;acqState&#39;] = self.acqstate
+            DataStructure[&#39;core&#39;] = self.shared_data.core
+            DataStructure[&#39;image_queue_analysis&#39;] = self.image_queue_analysis
+            DataStructure[&#39;analysisThreads&#39;] = self.shared_data.analysisThreads
+            DataStructure[&#39;layer_name&#39;] = layerName
+            DataStructure[&#39;layer_color_map&#39;] = layerColorMap
+            DataStructure[&#39;finalisationProcedure&#39;] = True
+            napariUpdateLive(DataStructure)
+    
+    # shared_data.analysisThreads.remove(shared_data.lastMDAThread)
+    # shared_data.lastMDAThread.destroy()
+    # shared_data.lastMDAThread = None
+    logging.debug(&#34;acquisition done&#34;)</code></pre>
+</details>
+</dd>
+<dt id="napariGlados.napariHandler.run_pycroManagerAcquisition_worker"><code class="name flex">
+<span>def <span class="ident">run_pycroManagerAcquisition_worker</span></span>(<span>self, parent)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Worker which handles live mode on/off turning etc</p>
+<p>Inputs: img_queue (unused, but required)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@thread_worker
+def run_pycroManagerAcquisition_worker(self,parent):
+    &#34;&#34;&#34; 
+    Worker which handles live mode on/off turning etc
+    
+    Inputs: img_queue (unused, but required)
+    &#34;&#34;&#34;
+    img_queue = parent.img_queue
+    global acq
+    # shared_data = self.shared_data
+    logging.debug(&#39;in run_pycroManagerAcquisition_worker&#39;)
+    #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
+    #The abortion is handled in grab_image_livemode
+    if self.liveOrMda == &#39;live&#39;:
+        while self.acqstate:
+            if self.shared_data.mdaMode:
+                logging.error(&#39;LIVE NOT STARTED! MDA IS RUNNING&#39;)
+                self.shared_data.liveMode = False
+            else:        
+                #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+                logging.debug(&#39;starting acq&#39;)
+                self.shared_data.allMDAslicesRendered = {}
+                #Already move the live layer to top
+                logging.debug(&#39;BMoved layer to top&#39;)
+                # moveLayerToTop(self.shared_data.napariViewer,&#34;Live&#34;)
+                with Acquisition(directory=&#39;./temp&#39;, name=&#39;LiveAcqShouldBeRemoved&#39;, show_display=False, image_saved_fn = self.grab_image_savedfn) as acq: #type:ignore
+                    self.shared_data._mdaModeAcqData = acq
+                    events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                    acq.acquire(events)
+
+                logging.debug(&#39;After Acq Live&#39;)
+        #Now we&#39;re after the livestate
+        self.shared_data.core.stop_sequence_acquisition()
+        self.shared_data.liveMode = False
+        #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+        cleanUpTemporaryFiles(shared_data=self.shared_data)
+    elif self.liveOrMda == &#39;mda&#39;:
+        while self.acqstate:
+            if self.shared_data.liveMode:
+                self.shared_data.liveMode = False
+                time.sleep(1)
+                
+            #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
+            logging.debug(&#39;starting MDA acq - before JavaBackendAcquisition&#39;)
+            savefolder = &#39;./temp&#39;
+            savename = &#39;MdaAcqShouldBeRemoved&#39;
+            if self.shared_data._mdaModeSaveLoc[0] != &#39;&#39;:
+                savefolder = self.shared_data._mdaModeSaveLoc[0]
+                
+                savefolderAdv = utils.nodz_evaluateAdv(savefolder,self.shared_data.nodzInstance)
+                if savefolderAdv != None:
+                    savefolder = savefolderAdv
+                logging.debug(savefolder)
+                
+            if self.shared_data._mdaModeSaveLoc[1] != &#39;&#39;:
+                savename = self.shared_data._mdaModeSaveLoc[1]
+                savenameAdv = utils.nodz_evaluateAdv(savename,self.shared_data.nodzInstance)
+                if savenameAdv != None:
+                    savename = savenameAdv
+                logging.debug(savename)
+            if self.shared_data._mdaModeNapariViewer != None:
+                napariViewer = self.shared_data._mdaModeNapariViewer
+                showdisplay = True
+            else:
+                napariViewer = None
+                showdisplay = False
+                
+            napariViewer = None
+            showdisplay = False
+            self.shared_data.allMDAslicesRendered = {}
+            #Already move the layer to top
+            # if self.shared_data.newestLayerName != &#39;&#39;:
+            #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
+            with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_savedfn,napari_viewer=napariViewer) as acq: #type:ignore
+                self.shared_data._mdaModeAcqData = acq
+                events = self.shared_data._mdaModeParams
+                acq.acquire(events)
+            # with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image,napari_viewer=napariViewer) as acq: #type:ignore
+            
+            self.shared_data.mdaMode = False
+            self.acqstate = False #End the MDA acq state
+            self.shared_data.appendNewMDAdataset(acq.get_dataset())
+
+        logging.debug(&#39;Stopping the acquisition from napariHandler&#39;)
+        #Now we&#39;re after the acquisition
+        self.shared_data.core.stop_sequence_acquisition()
+        self.shared_data.mdaMode = False
+        
+        #Signal to all parents that the MDA acquisition is done - in the Nodz MDA, now we would trigger the MDA-based analysis for scoring or so
+        parent.mdaacqdonefunction()
+        
+        #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
+        cleanUpTemporaryFiles(shared_data=self.shared_data)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="napariGlados.napariHandler_liveMode"><code class="flex name class">
+<span>class <span class="ident">napariHandler_liveMode</span></span>
+<span>(</span><span>shared_data)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class napariHandler_liveMode(napariHandler):
+    def __init__(self, shared_data) -&gt; None:
+        super().__init__(shared_data, liveOrMda=&#39;live&#39;)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="napariGlados.napariHandler" href="#napariGlados.napariHandler">napariHandler</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="napariGlados.napariHandler" href="#napariGlados.napariHandler">napariHandler</a></b></code>:
+<ul class="hlist">
+<li><code><a title="napariGlados.napariHandler.acqModeChanged" href="#napariGlados.napariHandler.acqModeChanged">acqModeChanged</a></code></li>
+<li><code><a title="napariGlados.napariHandler.grab_image" href="#napariGlados.napariHandler.grab_image">grab_image</a></code></li>
+<li><code><a title="napariGlados.napariHandler.grab_image_savedfn" href="#napariGlados.napariHandler.grab_image_savedfn">grab_image_savedfn</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_analysis_worker" href="#napariGlados.napariHandler.run_analysis_worker">run_analysis_worker</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_napariVisualisation_worker" href="#napariGlados.napariHandler.run_napariVisualisation_worker">run_napariVisualisation_worker</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_pycroManagerAcquisition_worker" href="#napariGlados.napariHandler.run_pycroManagerAcquisition_worker">run_pycroManagerAcquisition_worker</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="napariGlados.napariHandler_mdaMode"><code class="flex name class">
+<span>class <span class="ident">napariHandler_mdaMode</span></span>
+<span>(</span><span>shared_data)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class napariHandler_mdaMode(napariHandler):
+    def __init__(self, shared_data) -&gt; None:
+        super().__init__(shared_data, liveOrMda=&#39;mda&#39;)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="napariGlados.napariHandler" href="#napariGlados.napariHandler">napariHandler</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="napariGlados.napariHandler" href="#napariGlados.napariHandler">napariHandler</a></b></code>:
+<ul class="hlist">
+<li><code><a title="napariGlados.napariHandler.acqModeChanged" href="#napariGlados.napariHandler.acqModeChanged">acqModeChanged</a></code></li>
+<li><code><a title="napariGlados.napariHandler.grab_image" href="#napariGlados.napariHandler.grab_image">grab_image</a></code></li>
+<li><code><a title="napariGlados.napariHandler.grab_image_savedfn" href="#napariGlados.napariHandler.grab_image_savedfn">grab_image_savedfn</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_analysis_worker" href="#napariGlados.napariHandler.run_analysis_worker">run_analysis_worker</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_napariVisualisation_worker" href="#napariGlados.napariHandler.run_napariVisualisation_worker">run_napariVisualisation_worker</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_pycroManagerAcquisition_worker" href="#napariGlados.napariHandler.run_pycroManagerAcquisition_worker">run_pycroManagerAcquisition_worker</a></code></li>
+</ul>
+</li>
 </ul>
 </dd>
 </dl>
@@ -781,41 +2534,55 @@ def yield_img(img_queue):
 <ul></ul>
 </div>
 <ul id="index">
-<li><h3><a href="#header-variables">Global variables</a></h3>
-<ul class="">
-<li><code><a title="napariGlados.sleep_time" href="#napariGlados.sleep_time">sleep_time</a></code></li>
-</ul>
-</li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
-<li><code><a title="napariGlados.InitateNapariUI" href="#napariGlados.InitateNapariUI">InitateNapariUI</a></code></li>
-<li><code><a title="napariGlados.append_img" href="#napariGlados.append_img">append_img</a></code></li>
-<li><code><a title="napariGlados.getLayerIdFromName" href="#napariGlados.getLayerIdFromName">getLayerIdFromName</a></code></li>
-<li><code><a title="napariGlados.grab_image" href="#napariGlados.grab_image">grab_image</a></code></li>
 <li><code><a title="napariGlados.layer_removed_event_callback" href="#napariGlados.layer_removed_event_callback">layer_removed_event_callback</a></code></li>
-<li><code><a title="napariGlados.liveModeChanged" href="#napariGlados.liveModeChanged">liveModeChanged</a></code></li>
+<li><code><a title="napariGlados.napariUpdateAnalysisThreads" href="#napariGlados.napariUpdateAnalysisThreads">napariUpdateAnalysisThreads</a></code></li>
 <li><code><a title="napariGlados.napariUpdateLive" href="#napariGlados.napariUpdateLive">napariUpdateLive</a></code></li>
-<li><code><a title="napariGlados.obtain_imageQueueAnalysis" href="#napariGlados.obtain_imageQueueAnalysis">obtain_imageQueueAnalysis</a></code></li>
 <li><code><a title="napariGlados.runNapariPycroManager" href="#napariGlados.runNapariPycroManager">runNapariPycroManager</a></code></li>
-<li><code><a title="napariGlados.yield_img" href="#napariGlados.yield_img">yield_img</a></code></li>
+<li><code><a title="napariGlados.startLiveModeVisualisation" href="#napariGlados.startLiveModeVisualisation">startLiveModeVisualisation</a></code></li>
+<li><code><a title="napariGlados.startMDAVisualisation" href="#napariGlados.startMDAVisualisation">startMDAVisualisation</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
-<h4><code><a title="napariGlados.dockWidget_MMcontrol" href="#napariGlados.dockWidget_MMcontrol">dockWidget_MMcontrol</a></code></h4>
-<ul class="">
-<li><code><a title="napariGlados.dockWidget_MMcontrol.getDockWidget" href="#napariGlados.dockWidget_MMcontrol.getDockWidget">getDockWidget</a></code></li>
-</ul>
+<h4><code><a title="napariGlados.dockWidget_MDA" href="#napariGlados.dockWidget_MDA">dockWidget_MDA</a></code></h4>
 </li>
 <li>
-<h4><code><a title="napariGlados.dockWidget_analysisThreads" href="#napariGlados.dockWidget_analysisThreads">dockWidget_analysisThreads</a></code></h4>
-<ul class="">
-<li><code><a title="napariGlados.dockWidget_analysisThreads.getDockWidget" href="#napariGlados.dockWidget_analysisThreads.getDockWidget">getDockWidget</a></code></li>
-</ul>
+<h4><code><a title="napariGlados.dockWidget_MMcontrol" href="#napariGlados.dockWidget_MMcontrol">dockWidget_MMcontrol</a></code></h4>
+</li>
+<li>
+<h4><code><a title="napariGlados.dockWidget_flowChart" href="#napariGlados.dockWidget_flowChart">dockWidget_flowChart</a></code></h4>
 </li>
 <li>
 <h4><code><a title="napariGlados.dockWidget_fullGladosUI" href="#napariGlados.dockWidget_fullGladosUI">dockWidget_fullGladosUI</a></code></h4>
+</li>
+<li>
+<h4><code><a title="napariGlados.dockWidgets" href="#napariGlados.dockWidgets">dockWidgets</a></code></h4>
+<ul class="">
+<li><code><a title="napariGlados.dockWidgets.getDockWidget" href="#napariGlados.dockWidgets.getDockWidget">getDockWidget</a></code></li>
+<li><code><a title="napariGlados.dockWidgets.resizeEvent" href="#napariGlados.dockWidgets.resizeEvent">resizeEvent</a></code></li>
+<li><code><a title="napariGlados.dockWidgets.sizeChanged" href="#napariGlados.dockWidgets.sizeChanged">sizeChanged</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="napariGlados.napariHandler" href="#napariGlados.napariHandler">napariHandler</a></code></h4>
+<ul class="">
+<li><code><a title="napariGlados.napariHandler.acqModeChanged" href="#napariGlados.napariHandler.acqModeChanged">acqModeChanged</a></code></li>
+<li><code><a title="napariGlados.napariHandler.grab_image" href="#napariGlados.napariHandler.grab_image">grab_image</a></code></li>
+<li><code><a title="napariGlados.napariHandler.grab_image_savedfn" href="#napariGlados.napariHandler.grab_image_savedfn">grab_image_savedfn</a></code></li>
+<li><code><a title="napariGlados.napariHandler.mdaacqdonefunction" href="#napariGlados.napariHandler.mdaacqdonefunction">mdaacqdonefunction</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_analysis_worker" href="#napariGlados.napariHandler.run_analysis_worker">run_analysis_worker</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_napariVisualisation_worker" href="#napariGlados.napariHandler.run_napariVisualisation_worker">run_napariVisualisation_worker</a></code></li>
+<li><code><a title="napariGlados.napariHandler.run_pycroManagerAcquisition_worker" href="#napariGlados.napariHandler.run_pycroManagerAcquisition_worker">run_pycroManagerAcquisition_worker</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="napariGlados.napariHandler_liveMode" href="#napariGlados.napariHandler_liveMode">napariHandler_liveMode</a></code></h4>
+</li>
+<li>
+<h4><code><a title="napariGlados.napariHandler_mdaMode" href="#napariGlados.napariHandler_mdaMode">napariHandler_mdaMode</a></code></h4>
 </li>
 </ul>
 </li>

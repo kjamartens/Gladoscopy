@@ -1,3 +1,7 @@
+"""
+Handles the GUI display of Glados-pycromanager, as well as the structure for analysis (normal and real-time) to run on secondary threads.
+"""
+
 import numpy as np
 from PyQt5.QtCore import pyqtSignal, QThread
 import random
@@ -284,7 +288,7 @@ class napariOverlay():
         Deletes the instance of the class.
         """
         del self
-        
+
 #This code gets some image and does some analysis on this
 class AnalysisThread(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
@@ -549,8 +553,6 @@ class AnalysisThread(QThread):
         self.napariOverlay.imageOverlay_init()
         self.napariOverlay.changeName('Grayscale Image Overlay')
 
-
-
 class AnalysisThread_customFunction_Visualisation(QThread):
     finished = pyqtSignal()# signal to indicate that the thread has finished
     def __init__(self,analysisObject,shared_data,analysisInfo: Union[str, None] = 'Random',delay=None):
@@ -586,7 +588,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
         utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
-        
+
 #This code gets some image and does some analysis on this
 class AnalysisThread_customFunction(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
@@ -809,8 +811,6 @@ class AnalysisThread_customFunction(QThread):
             #End the visualisation
             self.visualisationObject.running=False
         return result
-
-
 
 #This function probably gets deprecated soon
 def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = None,createNewThread = True,throughputThread=None,liveorMDA='live'):

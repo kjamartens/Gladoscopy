@@ -1,3 +1,10 @@
+"""
+Main function of the multi-dimensional acquisitions in glados-pycromanager.
+
+Handles the GUI as well as the logic of the multi-dimensional acquisitions.
+Includes classes for Interactive Lists such as the Channels, XY positions.
+"""
+
 import sys
 import time
 from AnalysisClass import *
@@ -14,7 +21,6 @@ import asyncio
 import pyqtgraph as pg
 import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
-import napariGlados
 #For drawing
 import matplotlib
 import utils
@@ -374,9 +380,9 @@ class XYStageList(InteractiveListWidget):
         if setxy == "Pos":
             self.setItem(rowPosition, 2, QTableWidgetItem(str(self.parent.core.get_xy_stage_position().x)))
             self.setItem(rowPosition, 3, QTableWidgetItem(str(self.parent.core.get_xy_stage_position().y)))
-        elif len(setxy) == 2:
-            self.setItem(rowPosition, 2, QTableWidgetItem(str(setxy[0])))
-            self.setItem(rowPosition, 3, QTableWidgetItem(str(setxy[1])))
+        elif len(setxy) == 2: #type:ignore
+            self.setItem(rowPosition, 2, QTableWidgetItem(str(setxy[0]))) #type:ignore
+            self.setItem(rowPosition, 3, QTableWidgetItem(str(setxy[1]))) #type:ignore
 #endregion
 
 class MDAGlados(CustomMainWindow):
@@ -1412,8 +1418,9 @@ class MDAGlados(CustomMainWindow):
                 
                     logging.debug('Starting Nodz-MDA visualisation')
                     #Prepare layerName for shared_data to order the layers later.
+                    from napariGlados import startMDAVisualisation
                     self.shared_data.newestLayerName = layerName
-                    napariGlados.startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
+                    startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
         #And try to get real-time analysis attributes at bottom:
         
@@ -1493,7 +1500,8 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mdaMode = True
         #And start visualization
         if mdaLayerName is not None:
-            napariGlados.startMDAVisualisation(self.shared_data,layerName=mdaLayerName)
+            from napariGlados import startMDAVisualisation
+            startMDAVisualisation(self.shared_data,layerName=mdaLayerName)
         logging.debug('ended setting mdamode params')
         
         #Set the Acquire button to say 'stop'

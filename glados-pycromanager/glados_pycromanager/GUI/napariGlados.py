@@ -18,7 +18,6 @@ import os
 
 from LaserControlScripts import *
 from MMcontrols import microManagerControlsUI
-from MDAGlados import MDAGlados
 from AnalysisClass import *
 from Analysis_dockWidgets import *
 from FlowChart_dockWidgets import *
@@ -715,6 +714,7 @@ class dockWidget_MDA(dockWidgets):
                 mdaInfo = gladosInfo['MDA']
             
             try:
+                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
@@ -751,12 +751,14 @@ class dockWidget_MDA(dockWidgets):
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
             except KeyError:
+                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
         else: #If no MDA state is yet saved, open a new MDAGlados from scratch
+            from MDAGlados import MDAGlados
             #Add the full micro manager controls UI
             self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                         hasGUI=True,

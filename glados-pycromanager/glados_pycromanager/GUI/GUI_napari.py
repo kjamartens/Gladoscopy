@@ -1,3 +1,7 @@
+"""
+The main function to call if running glados-napari from the python interface.
+"""
+
 #region imports
 from pycromanager import Core
 from pycromanager import start_headless
