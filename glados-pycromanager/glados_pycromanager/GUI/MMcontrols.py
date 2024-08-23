@@ -873,21 +873,80 @@ class MMConfigUI(CustomMainWindow):
         except:
             logging.error('ZOOMING DIDN\'T WORK!')
     
+    def shape_drawn_callback(self, event):
+        if len(self.drawROIlayer.data) > 0:
+            if not event.source._is_moving and not event.source._is_selecting and not event.source._is_creating and len(event.source._mouse_drag_gen) > 0 and event.source.name != 'Draw ROI_':
+                logging.debug('Finished drawing an area for the ROI size!')
+                
+                def acceptFun(dialogV):
+                    self.setROItoDrawn()
+                    #Close the dialog:
+                    dialogV.done(QDialog.Accepted)
+                
+                
+                
+                def reDoFun(dialogV,layer):
+                    #Remove the layer
+                    shared_data.napariViewer.layers.remove(layer)
+                    #Restart the drawROI:
+                    self.drawROI()
+                    #Close the dialog:
+                    dialogV.done(QDialog.Rejected)
+                
+                def cancelFun(dialogV,layer):
+                    #Remove the layer
+                    shared_data.napariViewer.layers.remove(layer)
+                    #Close the dialog:
+                    dialogV.done(QDialog.Rejected)
+                
+                #Change the layer name so this won't pop up again after dialog is closed.
+                event.source.name = 'Draw ROI_'
+                #Pop up a dialog box to ask if they like it or not:
+                #Create a dialog box
+                from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
+                dialog =  QDialog()
+                dialog.setWindowTitle('Draw ROI')
+                #Add 3 buttons: 
+                QButtonOk = QPushButton('OK')
+                QButtonRedraw = QPushButton('Redraw')
+                QButtonCancel = QPushButton('Cancel')
+                #add the box to dialog:
+                layout = QVBoxLayout()
+                layout.addWidget(
+                    QLabel('ROI drawn correctly?')
+                )
+                buttonBox = QHBoxLayout()
+                buttonBox.addWidget(QButtonOk)
+                buttonBox.addWidget(QButtonRedraw)
+                buttonBox.addWidget(QButtonCancel)
+                layout.addLayout(buttonBox)
+                dialog.setLayout(layout)
+                #Connect the buttons to the dialog:
+                QButtonOk.clicked.connect(lambda: acceptFun(dialog))
+                QButtonRedraw.clicked.connect(lambda: reDoFun(dialog,event.source))
+                QButtonCancel.clicked.connect(lambda: cancelFun(dialog,event.source))
+                #Show the dialog:
+                dialog.exec_()
+            
+            
     def drawROI(self):
         """
         Draw a ROI. Idea is to create a new layer, let the user draw a rectangle, and ask if they like it or not. Then a small popup window with 'OK', 'Let me draw again', 'Stop this futile attempt'
         """
         
+            
         # Create a shapes layer
-        self.drawROIlayer = shared_data.napariViewer.add_shapes(name='drawROI')
+        self.drawROIlayer = shared_data.napariViewer.add_shapes(name='Draw ROI')
+        self.drawROIlayer.events.set_data.connect(self.shape_drawn_callback)
+
 
         # Set the shapes layer mode to 'add_rectangle'
         self.drawROIlayer.mode = 'add_rectangle'
         
         #Changes the button to a different method, which should be pressed once the rectangle is drawn:
-        self.ROIoptionsButtons['drawROI'].setText('ROI drawn')
-        self.ROIoptionsButtons['drawROI'].clicked.disconnect()
-        self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.setROItoDrawn())
+        # self.ROIoptionsButtons['drawROI'].setText('ROI drawn')
+        # self.ROIoptionsButtons['drawROI'].clicked.disconnect()
+        # self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.setROItoDrawn())
     
     def setROItoDrawn(self):
         """
@@ -901,8 +960,8 @@ class MMConfigUI(CustomMainWindow):
             if shape_type == 'rectangle':
                 vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
                 #Get the topleft, bottomright position from the drawn rectangle
-                topleftxy = np.floor(vertices[0])
-                bottomrightxy = np.ceil(vertices[2])
+                topleftxy = np.floor(vertices[0][::-1])
+                bottomrightxy = np.ceil(vertices[2][::-1])
                 #Set the boundaries based on the camera
                 mintopleft = [0,0]
                 maxbottomright = [shared_data.core.get_roi().width, shared_data.core.get_roi().height]
