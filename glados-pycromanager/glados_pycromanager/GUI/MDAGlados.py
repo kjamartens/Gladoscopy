@@ -1215,8 +1215,8 @@ class MDAGlados(CustomMainWindow):
             # QCoreApplication.processEvents()
         
         
-        # self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
-        # self.gui.setRowStretch(99,gridWidth+1) # type: ignore
+        self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
+        self.gui.setRowStretch(99,gridWidth+1) # type: ignore
         
         #try to trigger a dock widget resize event at this point.
         mdawidget_object = self.gui.parent() #type:ignore

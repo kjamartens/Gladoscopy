@@ -5062,6 +5062,17 @@ class ScanningWidget(QWidget):
                     logging.debug('No fileName specified in scanMode loading')
         logging.debug('Updated all scan layouts')
 
+    def assessScan(self):
+        """
+        Return true or false whether or not the current scan will run normally or not
+        """
+        assessment=False
+        
+        if self.scanMode == 'LoadPos':
+            if self.scanLayouts['LoadPos'].lineEdit_posFilename.text()[-4:] == '.pos':
+                assessment = True
+        return assessment
+
 class advScanGridLayout(QGroupBox):
     """ 
     advScanGridLayouts each individually handle a single method of xy(z) scanning. Easiest example is 'loading a POS file'.
@@ -5378,6 +5389,29 @@ class DecisionWidget(QWidget):
         """
         testPassed = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision].test_decision()
         return testPassed
+
+
+    def assessDecision(self):
+        """
+        Return true or false whether or not the current decision will run normally or not
+        """
+        assessment=False
+        # If AND-score, check if all required inputs have text
+        if self.currentMode == 'DirectDecision' and self.currentDecision == 'AND_Score':
+            layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+            if 'Start' in layout.decisionInfoGUI:
+                if layout.decisionInfoGUI['Start']['dropdown'].currentText() != None and layout.decisionInfoGUI['Start']['dropdown'].currentText() != '' and layout.decisionInfoGUI['Start']['lineedit'].text() != None and layout.decisionInfoGUI['Start']['lineedit'].text() != '':
+                    assessment = True
+        #If AND-score-VAR, check if all required inputs have text
+        elif self.currentMode == 'DirectDecision' and self.currentDecision == 'AND_Score_VAR':
+            layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+            for input in layout.decisionInfoGUIVAR:
+                vv = layout.decisionInfoGUIVAR[input]
+                if vv['varName'].text() != None and vv['varName'].text() != '' and vv['lineedit'].text() != None and vv['lineedit'].text() != '':
+                    assessment = True
+                    break
+            
+        return assessment
 
 class advDecisionGridLayout(QGroupBox):
     """ 

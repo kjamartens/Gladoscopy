@@ -322,6 +322,12 @@ class MMConfigUI(CustomMainWindow):
             # self.relativeStagesGroupBox.setLayout(QLayout())
             self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
         
+        #Add a horizontal auto-widening object to mainlayout:
+        from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
+        from PyQt5 import QtWidgets
+        spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.mainLayout.addItem(spacer,0,99)
+        
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
         self.fullyLoaded = True

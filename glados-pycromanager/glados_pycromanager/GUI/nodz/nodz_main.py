@@ -1611,8 +1611,6 @@ class NodeScene(QtWidgets.QGraphicsScene):
 
     def regular_callAction(self):
         # This function will be called every second
-        # logging.debug("regular_callAction running")
-        # Add your desired functionality here
         self.parent().shared_data.warningErrorInfoInfo['Warnings'] = []
         #Check whether we have init, score, acq start,end:
         allInitScoreAcqStartEndMissing = ['initStart','initEnd','scoringStart','scoringEnd','acqStart','acqEnd']
@@ -1636,7 +1634,14 @@ class NodeScene(QtWidgets.QGraphicsScene):
             self.parent().shared_data.warningErrorInfoInfo['Warnings'] += [singleTextLine]
         
         #Check if we have a functioning decision widget:
+        decisionRunnable = self.parent().decisionWidget.assessDecision()
+        if decisionRunnable == False:
+            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Decision widget is missing information.']
         
+        #Check if we have a functioning scanning widget
+        scanRunnable = self.parent().scanningWidget.assessScan()
+        if scanRunnable == False:
+            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Scanning widget is missing information.']
         
     def dragEnterEvent(self, event):
         """
