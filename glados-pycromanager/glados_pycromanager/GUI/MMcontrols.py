@@ -558,6 +558,8 @@ class MMConfigUI(CustomMainWindow):
         self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
         liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
+        self.livesnapalbumbuttons = QHBoxLayout()
+        
         self.LiveModeButton = QPushButton("Start Live Mode")
         icon = QIcon(self.iconFolder+os.sep+'General_Start.png')
         # icon: Flaticon.com
@@ -566,7 +568,7 @@ class MMConfigUI(CustomMainWindow):
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.LiveModeButton)
         
         self.SnapButton = QPushButton("Snap")
         icon = QIcon(self.iconFolder+os.sep+'General_Snap.png')
@@ -575,7 +577,7 @@ class MMConfigUI(CustomMainWindow):
         #add a connection to the button:
         self.SnapButton.clicked.connect(lambda index: self.snapImage())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.SnapButton,2,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.SnapButton)
         
         self.AlbumButton = QPushButton("Add to Album")
         #add a connection to the button:
@@ -584,8 +586,9 @@ class MMConfigUI(CustomMainWindow):
         # icon: Flaticon.com
         self.AlbumButton.setIcon(icon)
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.AlbumButton,3,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.AlbumButton)
         
+        liveModeLayout.addLayout(self.livesnapalbumbuttons,1,0,1,2)
         
         if self.showShutterOptions:
             self.shutterOptionsGroupBox = QGroupBox("Shutter")
