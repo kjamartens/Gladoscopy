@@ -44,17 +44,22 @@ class Shared_data(QObject):
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
         
         self.globalData = {}
-        self.globalData['SLACK'] = {}
-        self.globalData['SLACK']['TOKEN'] = "xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf"
-        self.globalData['SLACK']['SECRET'] = "e8cd04aa4cc9ec7c51729ec6ecf98c1c"
-        self.globalData['SLACK']['CHANNEL'] = "glados-bot"
-        if self.globalData['SLACK']['TOKEN'] is not None and not len(self.globalData['SLACK']['TOKEN']) == 0:
+        self.globalData['SLACK-TOKEN']={}
+        self.globalData['SLACK-TOKEN']['value'] = "xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf"
+        self.globalData['SLACK-SECRET']={}
+        self.globalData['SLACK-SECRET']['value'] = "e8cd04aa4cc9ec7c51729ec6ecf98c1c"
+        self.globalData['SLACK-CHANNEL']={}
+        self.globalData['SLACK-CHANNEL']['value'] = "glados-bot"
+        if self.globalData['SLACK-TOKEN']['value'] is not None and not len(self.globalData['SLACK-TOKEN']['value']) == 0:
             try:
-                self.globalData['SLACK']['CLIENT'] = slack.WebClient(token=self.globalData['SLACK']['TOKEN'])
+                self.globalData['SLACK-CLIENT'] = {}
+                self.globalData['SLACK-CLIENT']['value'] = slack.WebClient(token=self.globalData['SLACK-TOKEN']['value'])
                 logging.debug('Slack client initialised')
             except:
                 logging.error('Error with Slack!')
-        self.globalData['MDAVISMETHOD'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
+        self.globalData['MDAVISMETHOD']={}
+        self.globalData['MDAVISMETHOD']['value'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
+        
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
     

@@ -62,7 +62,7 @@ def napariUpdateLive(DataStructure):
     layerName = DataStructure['layer_name']
     
     #Visualise the MDA data on a frame-by-frame method - i.e. not a 'stack', but simply a single image which is replaced every frame update
-    if shared_data.globalData['MDAVISMETHOD'] == 'frameByFrame' or DataStructure['layer_name']=='Live':
+    if shared_data.globalData['MDAVISMETHOD']['value'] == 'frameByFrame' or DataStructure['layer_name']=='Live':
         liveImage = DataStructure['data'][0]
         metadata = DataStructure['data'][1]
         if liveImage is None:
@@ -89,7 +89,7 @@ def napariUpdateLive(DataStructure):
             # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
             layer.data = liveImage
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames
-    elif shared_data.globalData['MDAVISMETHOD'] == 'multiDstack':
+    elif shared_data.globalData['MDAVISMETHOD']['value'] == 'multiDstack':
         if DataStructure['finalisationProcedure'] == False:
             liveImage = DataStructure['data'][0]
             metadata = DataStructure['data'][1]
@@ -565,7 +565,7 @@ class napariHandler():
             yield DataStructure#img_queue.get(block = False)
             
         #Do the final N images
-        if self.shared_data.globalData['MDAVISMETHOD'] == 'multiDstack':
+        if self.shared_data.globalData['MDAVISMETHOD']['value'] == 'multiDstack':
             if layerName == 'MDA':
                 logging.debug('Finalising MDA visualisation...')
                 DataStructure = {}

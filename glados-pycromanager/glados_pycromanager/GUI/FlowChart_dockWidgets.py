@@ -4289,7 +4289,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if 'reporting_' in node.name:
                 node.status = 'running'
                 if 'SLACK' in self.shared_data.globalData: #type:ignore
-                    if self.shared_data.globalData['SLACK']['TOKEN'] is not None and not len(self.shared_data.globalData['SLACK']['TOKEN']) == 0: #type:ignore
+                    if self.shared_data.globalData['SLACK-TOKEN']['value'] is not None and not len(self.shared_data.globalData['SLACK-TOKEN']['value']) == 0: #type:ignore
                         slackReadableText = readableText
                         slackReadableText = slackReadableText.replace('<br>','\r\n')
                         slackReadableText = slackReadableText.replace('<i>','_')
@@ -4297,7 +4297,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         slackReadableText = slackReadableText.replace('<b>','*')
                         slackReadableText = slackReadableText.replace('</b>','*')
                         slackReadableText = "New Score: \n" + slackReadableText
-                        self.shared_data.globalData['SLACK']['CLIENT'].chat_postMessage(channel=self.shared_data.globalData['SLACK']['CHANNEL'],text=slackReadableText) #type:ignore
+                        self.shared_data.globalData['SLACK-CLIENT']['value'].chat_postMessage(channel=self.shared_data.globalData['SLACK-CHANNEL']['value'],text=slackReadableText) #type:ignore
                         node.status = 'finished'
                     else:
                         node.status = 'error'
@@ -4523,8 +4523,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
             if readableText == None:
                 readableText = node.slackReportInfo
-            if 'SLACK' in self.shared_data.globalData: #type:ignore
-                if self.shared_data.globalData['SLACK']['TOKEN'] is not None and not len(self.shared_data.globalData['SLACK']['TOKEN']) == 0: #type:ignore
+            if 'SLACK-CLIENT' in self.shared_data.globalData: #type:ignore
+                if self.shared_data.globalData['SLACK-TOKEN']['value'] is not None and not len(self.shared_data.globalData['SLACK-TOKEN']['value']) == 0: #type:ignore
                     slackReadableText = readableText
                     if not ("<img>" in node.slackReportInfo and "</img>" in node.slackReportInfo):
                         slackReadableText = slackReadableText.replace('<br>','\r\n')
@@ -4532,7 +4532,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         slackReadableText = slackReadableText.replace('</i>','_')
                         slackReadableText = slackReadableText.replace('<b>','*')
                         slackReadableText = slackReadableText.replace('</b>','*')
-                        self.shared_data.globalData['SLACK']['CLIENT'].chat_postMessage(channel=self.shared_data.globalData['SLACK']['CHANNEL'],text=slackReadableText) 
+                        self.shared_data.globalData['SLACK-CLIENT']['value'].chat_postMessage(channel=self.shared_data.globalData['SLACK-CHANNEL']['value'],text=slackReadableText) 
                     else: #we have an image!
                         import re
                         #Extract the text between img tags:
@@ -4563,9 +4563,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         # Save the image as a PNG file
                         image.save(tempFile, "PNG")
                         #Send the message with the read-tempFile
-                        slack_image = self.shared_data.globalData['SLACK']['CLIENT'].files_upload(
+                        slack_image = self.shared_data.globalData['SLACK-CLIENT']['value'].files_upload(
                             title="Glados Image",
-                            channels=self.shared_data.globalData['SLACK']['CHANNEL'],
+                            channels=self.shared_data.globalData['SLACK-CHANNEL']['value'],
                             content=open(tempFile, 'rb').read(),
                             initial_comment = restText,
                         )
