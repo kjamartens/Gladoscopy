@@ -3228,6 +3228,15 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         else:
             setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='none')
         
+        #Set the warningToolTip
+        warningToolTip = ''
+        for entry in sharedData.warningErrorInfoInfo['Warnings']:
+            warningToolTip+=entry+'\n'
+        warningIcon.setToolTip(warningToolTip)
+        if warningToolTip == '':
+            setWarningErrorInfoIcon(warningIcon,'warning',findIconFolder(),alteration='grayscale')
+        else:
+            setWarningErrorInfoIcon(warningIcon,'warning',findIconFolder(),alteration='none')
         # errorToolTip = ''
         # errorToolTip = sharedData.warningErrorInfoInfo['Errors']
         # if errorToolTip != '':

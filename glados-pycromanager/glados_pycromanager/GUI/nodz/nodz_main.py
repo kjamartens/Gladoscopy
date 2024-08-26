@@ -11,6 +11,7 @@ import utils as full_utils
 from nodz_custom import *
 import logging
 import time
+from PyQt5.QtCore import QTimer
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
 
@@ -1600,7 +1601,43 @@ class NodeScene(QtWidgets.QGraphicsScene):
 
         # Nodes storage.
         self.nodes = dict()
+        # Regular checking for errors/warnings/etc
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.regular_callAction)
+        self.timer.start(1000) #in ms
+        #Also call once at start
+        self.regular_callAction()
 
+
+    def regular_callAction(self):
+        # This function will be called every second
+        # logging.debug("regular_callAction running")
+        # Add your desired functionality here
+        self.parent().shared_data.warningErrorInfoInfo['Warnings'] = []
+        #Check whether we have init, score, acq start,end:
+        allInitScoreAcqStartEndMissing = ['initStart','initEnd','scoringStart','scoringEnd','acqStart','acqEnd']
+        for node in self.nodes:
+            if 'initStart' in node:
+                allInitScoreAcqStartEndMissing.remove('initStart')
+            if 'initEnd' in node:
+                allInitScoreAcqStartEndMissing.remove('initEnd')
+            if 'scoringStart' in node:
+                allInitScoreAcqStartEndMissing.remove('scoringStart')
+            if 'scoringEnd' in node:
+                allInitScoreAcqStartEndMissing.remove('scoringEnd')
+            if 'acqStart' in node:
+                allInitScoreAcqStartEndMissing.remove('acqStart')
+            if 'acqEnd' in node:
+                allInitScoreAcqStartEndMissing.remove('acqEnd')
+        if len(allInitScoreAcqStartEndMissing) > 0:
+            singleTextLine = 'Missing the following required nodes: '
+            for node in allInitScoreAcqStartEndMissing:
+                singleTextLine += node + ', '
+            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += [singleTextLine]
+        
+        #Check if we have a functioning decision widget:
+        
+        
     def dragEnterEvent(self, event):
         """
         Make the dragging of nodes into the scene possible.

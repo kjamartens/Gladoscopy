@@ -171,7 +171,7 @@ class Shared_data(QObject):
 
     def on_warningErrorInfoInfo_changed(self,oldValue=None,errorType=None):
         try:
-            logging.debug(f"shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}")
+            # logging.debug(f"shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}")
             if self.loadingOngoing == False:
                 from utils import updateAutonousErrorWarningInfo
                 updateAutonousErrorWarningInfo(self,updateInfo='All')
