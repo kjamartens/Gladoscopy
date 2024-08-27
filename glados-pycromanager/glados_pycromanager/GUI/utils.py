@@ -3132,8 +3132,8 @@ def openAdvancedSettings(shared_data):
     dialog.setWindowTitle("Advanced settings")
 
     layout = QGridLayout()
-    
-    currentRow = 0
+    layout.addWidget(QLabel("Please restart glados-pycromanager after changing any of these settings!"),0,0,1,2)
+    currentRow = 1
     #Loop over all globalData entries:
     for entry in shared_data.globalData:
         if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
