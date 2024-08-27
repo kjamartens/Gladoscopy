@@ -321,7 +321,7 @@ class napariHandler():
         self.mda_acq_done_signal = pyqtSignal(bool)
 
         #Sleep time to keep responsiveness
-        self.sleep_time = 0.05
+        self.sleep_time = 1/shared_data.globalData['VISUALISATION-FPS']['value'] #in sec
         self.layerName = 'newLayer'
 
     def mdaacqdonefunction(self):

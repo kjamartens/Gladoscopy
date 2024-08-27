@@ -40,9 +40,6 @@ class Shared_data(QObject):
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
         
-        self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
-        self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
-        
         self.globalData = {}
         self.globalData['SLACK-TOKEN']={}
         self.globalData['SLACK-TOKEN']['value'] = "xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf"
@@ -101,6 +98,9 @@ class Shared_data(QObject):
                 logging.error('Error with Slack!')
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
+        self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
+        self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
+        
     
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')
