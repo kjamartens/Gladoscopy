@@ -1,0 +1,7 @@
+include glados_pycromanager/GUI/Icons/*
+include glados_pycromanager/GUI/nodz/*
+include glados_pycromanager/GUI/nodz/default_config.json
+include glados_pycromanager/*
+include glados_pycromanager/GUI/*
+include glados_pycromanager/Documentation/*
+include glados_pycromanager/Documentation/Images/*

@@ -14,23 +14,35 @@ from PyQt5.QtWidgets import QApplication
 import shutil
 import logging
 import argparse
-
-from napariGlados import runNapariPycroManager
-from sharedFunctions import Shared_data, periodicallyUpdate
-from utils import *
-
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QMainWindow
 import sys
-# Add the folder 2 folders up to the system path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
-#Obtain the helperfunctions
-import utils
+
+try:
+    from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
+    from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
+    from glados_pycromanager.GUI.utils import *
+
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+    #Obtain the helperfunctions
+    import glados_pycromanager.GUI.utils
+except:
+    from napariGlados import runNapariPycroManager
+    from sharedFunctions import Shared_data, periodicallyUpdate
+    from utils import *
+
+    # Add the folder 2 folders up to the system path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    #Import all scripts in the custom script folders
+    from Analysis_Images import * #type: ignore
+    from Analysis_Measurements import * #type: ignore
+    from Analysis_Shapes import * #type: ignore
+    from Real_Time_Analysis import * #type: ignore
+    #Obtain the helperfunctions
+    import utils
 #endregion
 
 def perform_post_closing_actions(shared_data):
@@ -106,8 +118,11 @@ def main():
         shared_data.core = core
 
     #Open JSON file with MM settings
-    with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
-        MM_JSON = json.load(f)
+    try:
+        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+            MM_JSON = json.load(f)
+    except:
+        MM_JSON = None
 
     #Run the UI on a second thread (hopefully robustly)
     app = QApplication(sys.argv)
@@ -123,7 +138,7 @@ def main():
     thread.finished.connect(thread.deleteLater)
 
     #Set up logging to files in appData folder - INFO and DEBUG
-    utils.set_up_logger()
+    set_up_logger()
     
     #Run the app until closed
     sys.exit(app.exec_())

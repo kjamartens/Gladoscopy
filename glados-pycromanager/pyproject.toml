@@ -3,8 +3,19 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "glados-pycromanager"
+name = "glados_pycromanager"
 version = "0.0.1"
+authors = [
+  { name="Koen J.A. Martens", email="koenjamartens@gmail.com" }
+]
+description = "Glados-pycromanager: Napari interface for Pycromanager and autonomous microscopy"
+readme = "README_PIP.md"
+requires-python = ">=3.10,<3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+]
+keywords = ["SMLM", "molecule", "pycromanager", "micromanager"]
 dependencies = [
 "absl-py==1.4.0",
 "astunparse==1.6.3",
@@ -14,16 +25,19 @@ dependencies = [
 "click==8.1.3",
 "cloudpickle==2.2.1",
 "colorama==0.4.6",
+"contourpy==1.1.0",
 "csbdeep==0.7.3",
 "cycler==0.11.0",
 "dask==2023.6.1",
 "docopt==0.6.2",
-"docstring-inheritance",
-"flatbuffers",
+"docstring-inheritance==2.0.0",
+"flask==3.0.3",
+"flatbuffers==23.5.26",
 "fonttools==4.40.0",
 "fsspec==2023.6.0",
 "gast==0.4.0",
-"google-auth",
+"google-auth==2.21.0",
+"google-auth-oauthlib==1.0.0",
 "google-pasta==0.2.0",
 "grpcio==1.56.0",
 "h5py==3.9.0",
@@ -32,7 +46,7 @@ dependencies = [
 "importlib-metadata==6.7.0",
 "importlib-resources==5.12.0",
 "jax==0.4.13",
-"keras",
+"keras==2.12.0",
 "kiwisolver==1.4.4",
 "lazy_loader==0.3",
 "libclang==16.0.0",
@@ -41,41 +55,59 @@ dependencies = [
 "Markdown==3.4.3",
 "MarkupSafe==2.1.3",
 "matplotlib==3.7.1",
+"ml-dtypes==0.2.0",
+"napari==0.5.2",
 "ndtiff==2.1.0",
 "networkx==3.1",
-"numba",
-"numpy<=1.24",
+"numba==0.57.1",
+"numpy==1.23.5",
 "oauthlib==3.2.2",
+"opencv-python==4.10.0.84",
 "opt-einsum==3.3.0",
 "packaging==23.1",
 "partd==1.4.0",
 "Pillow==10.0.0",
 "pipreqs==0.4.13",
-"protobuf",
+"protobuf==4.23.3",
 "pyasn1==0.5.0",
 "pyasn1-modules==0.3.0",
 "pycromanager",
 "pyparsing==3.1.0",
+"PyQt5==5.15.9",
+"PyQt5-Qt5==5.15.2",
+"PyQt5-sip==12.12.1",
 "pyqtgraph==0.13.3",
 "python-dateutil==2.8.2",
-"PyYAML",
+"PyWavelets==1.4.1",
+"PyYAML==6.0",
 "pyzmq==25.1.0",
 "requests==2.31.0",
 "requests-oauthlib==1.3.1",
 "rsa==4.9",
-"scikit-image",
-"scipy",
+"scikit-image==0.21.0",
+"scipy==1.10.1",
+"slack",
+"slackeventsapi",
+"slack-client",
 "shapely==2.0.1",
 "six==1.16.0",
+"tensorboard==2.12.3",
+"tensorboard-data-server==0.7.1",
+"tensorflow==2.12.0",
+"tensorflow-estimator==2.12.0",
+"tensorflow-intel==2.12.0",
+"tensorflow-io-gcs-filesystem==0.31.0",
 "termcolor==2.3.0",
 "tifffile==2023.4.12",
 "toolz==0.12.0",
 "tqdm==4.65.0",
 "typing_extensions==4.7.1",
 "urllib3==1.26.16",
-"Werkzeug",
 "wrapt==1.14.1",
 "yarg==0.1.9",
-"zipp==3.15.0" 
+"zarr==2.18.2",
+"zipp==3.15.0"
 ]
-requires-python = ">=3.10"
+
+[project.scripts]
+"glados-pycromanager" = "glados_pycromanager.GUI.GUI_napari:main"

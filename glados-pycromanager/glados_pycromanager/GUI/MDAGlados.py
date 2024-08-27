@@ -23,8 +23,6 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
 #For drawing
 import matplotlib
-import utils
-from utils import CustomMainWindow
 matplotlib.use('Qt5Agg')
 # from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -36,8 +34,16 @@ import logging
 from typing import List, Iterable
 import itertools
 import queue
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 from PyQt5.QtWidgets import QTableWidget, QWidget, QInputDialog, QTableWidgetItem
+
+try:
+    import glados_pycromanager.GUI.utils
+    from glados_pycromanager.GUI.utils import CustomMainWindow
+    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+except:
+    import utils
+    from utils import CustomMainWindow
+    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
 
 
 #region List Widgets

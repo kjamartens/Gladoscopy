@@ -117,7 +117,23 @@ def InitateNapariUI(napariViewer):
     #Set title, icon
     napariViewer.title="GladOS - napari"
     # Set the window icon
-    icon_path = 'glados-pycromanager/glados_pycromanager/GUI/Icons/GladosIcon.ico'
+    
+    import glados_pycromanager, os
+    # Get the installation path of the package
+    package_path = os.path.dirname(glados_pycromanager.__file__)
+    # Construct the path to the Icons folder
+    iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+
+    if not os.path.exists(iconFolder):
+        #Find the iconPath folder
+        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+            iconFolder = './glados_pycromanager/GUI/Icons/'
+        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+            iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+        else:
+            iconFolder = ''
+            
+    icon_path = iconFolder+os.sep+'GladosIcon.ico'
     icon = QIcon(icon_path)
     napariViewer.window._qt_window.setWindowIcon(icon)
     

@@ -1,6 +1,51 @@
 from PyQt5.QtWidgets import QGridLayout, QPushButton
-from AnalysisClass import *
-import napariGlados
+from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget, QTableWidget, QWidget, QInputDialog, QTableWidgetItem
+from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
+from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
+from PyQt5 import uic
+
+import sys
+import os
+import json
+from pycromanager import Core, multi_d_acquisition_events, Acquisition
+import numpy as np
+import time
+import asyncio
+import pyqtgraph as pg
+import matplotlib.pyplot as plt
+from matplotlib import colormaps # type: ignore
+import matplotlib
+import pickle
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+import tifffile
+import time
+from PyQt5.QtCore import QTimer,QDateTime
+import logging
+from typing import List, Iterable
+import itertools
+import queue
+
+try:
+    from glados_pycromanager.GUI.AnalysisClass import *
+    import glados_pycromanager.GUI.napariGlados
+    from glados_pycromanager.GUI.utils import CustomMainWindow
+    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+    from glados_pycromanager.GUI.MMcontrols import *
+    from glados_pycromanager.GUI.MDAGlados import *
+    from glados_pycromanager.GUI.FlowChart_dockWidgets import * 
+except:
+    from AnalysisClass import *
+    import napariGlados
+    from utils import CustomMainWindow
+    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+    from MMcontrols import *
+    from MDAGlados import *
+    from FlowChart_dockWidgets import * 
+
+#For drawing
+matplotlib.use('Qt5Agg')
+
 
 class analysisDockWidget:
     def __init__(self,napariViewer,sharedData2=None):
@@ -68,43 +113,6 @@ def analysis_dockWidget_plugin(MM_JSON,main_layout,napariviewer,parent,sharedDat
     
     return MMconfig.mainLayout
 
-
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget, QTableWidget, QWidget, QInputDialog, QTableWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
-from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
-from PyQt5 import uic
-from AnalysisClass import *
-import sys
-import os
-import json
-from pycromanager import Core, multi_d_acquisition_events, Acquisition
-import numpy as np
-import time
-import asyncio
-import pyqtgraph as pg
-import matplotlib.pyplot as plt
-from matplotlib import colormaps # type: ignore
-import matplotlib
-import pickle
-from utils import CustomMainWindow
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-import tifffile
-import time
-from PyQt5.QtCore import QTimer,QDateTime
-import logging
-from typing import List, Iterable
-import itertools
-import queue
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-#For drawing
-matplotlib.use('Qt5Agg')
-
-
-from MMcontrols import *
-from MDAGlados import *
-from FlowChart_dockWidgets import * 
-
 def microManagerControlsUI_plugin(parent):
     """
     Controls the Micro Manager UI.
@@ -136,7 +144,6 @@ def microManagerControlsUI_plugin(parent):
     parent.layoutInfo = MMconfig
     
     return MMconfig.mainLayout
-
 
 def MDAGlados_plugin(parent):
     """

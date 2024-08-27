@@ -15,7 +15,6 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QTextCursor
 sys.path.append('glados-pycromanager\\glados_pycromanager\\GUI\\nodz')
 from PyQt5 import QtCore, QtWidgets
-import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
 from MMcontrols import MMConfigUI, ConfigInfo
 from MDAGlados import MDAGlados
@@ -31,17 +30,31 @@ from qtpy.QtWidgets import QFileDialog
 import numpy as np
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
-from CustomFunctions import * #type: ignore
-import logging
-import utils
-from nodz import nodz_utils
+
 from PyQt5.QtWidgets import QApplication, QComboBox
 from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
+import logging
+
+try:
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * 
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
+    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
+    import glados_pycromanager.GUI.utils as utils
+    from glados_pycromanager.GUI.nodz import nodz_utils
+    import glados_pycromanager.GUI.nodz.nodz_main as nodz_main
+    from glados_pycromanager.GUI.nodz.nodz_main import Nodz as NodzMain
+except:
+    #Import all scripts in the custom script folders
+    from Analysis_Images import * #type: ignore
+    from Analysis_Measurements import * #type: ignore
+    from Analysis_Shapes import * #type: ignore
+    from Real_Time_Analysis import * #type: ignore
+    from CustomFunctions import * #type: ignore
+    import utils
+    from nodz import nodz_utils
+    import nodz_main #type: ignore
 #endregion
 
 #region Dialogs_Nodz
@@ -1398,7 +1411,7 @@ class NodeSignalManager(QObject):
             logging.debug(f"emitting signal {signal}")
 #endregion
 
-class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
+class GladosNodzFlowChart_dockWidget(NodzMain):
     """
     Class that represents a Flowchart dock widget in napari-Glados. 
     Inherits from Nodz, which is a graph drawing tool.
@@ -1443,13 +1456,20 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.fullRunOngoing = False
         
         
-        #Find the iconPath folder
-        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-            self.iconFolder = './glados_pycromanager/GUI/Icons/'
-        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-        else:
-            self.iconFolder = ''
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados_pycromanager/GUI/Icons/'
+            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+            else:
+                self.iconFolder = ''
             
             
         self.buttonsArea = QVBoxLayout()

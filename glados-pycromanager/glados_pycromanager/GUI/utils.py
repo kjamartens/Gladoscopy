@@ -3,6 +3,43 @@ import shutil
 import os
 import logging
 
+#Below here, copy from Eve's util functions:
+import os
+import warnings
+import inspect
+import importlib
+import re
+import warnings, logging
+import numpy as np
+import itertools
+import time
+import h5py
+
+#Imports for PyQt5 (GUI)
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
+import sys
+
+try:
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+except:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'AutonomousMicroscopy')
+    #Import all scripts in the custom script folders
+    from Analysis_Images import * #type: ignore
+    from Analysis_Measurements import * #type: ignore
+    from Analysis_Shapes import * #type: ignore
+    from CustomFunctions import * #type: ignore
+    from Real_Time_Analysis import * #type: ignore
+
+
 def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
     logging.debug('Cleaning up temporary files')
     
@@ -30,33 +67,6 @@ def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
                 except:
                     pass
 
-#Below here, copy from Eve's util functions:
-import os
-import warnings
-import inspect
-import importlib
-import re
-import warnings, logging
-import numpy as np
-import itertools
-import time
-import h5py
-
-#Imports for PyQt5 (GUI)
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
-from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'AutonomousMicroscopy')
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from CustomFunctions import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -848,12 +858,21 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
 
 
 def findIconFolder():
-    if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-        iconFolder = './glados_pycromanager/GUI/Icons/'
-    elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-        iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-    else:
-        iconFolder = ''
+    import glados_pycromanager
+    # Get the installation path of the package
+    package_path = os.path.dirname(glados_pycromanager.__file__)
+    # Construct the path to the Icons folder
+    iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+
+    if not os.path.exists(iconFolder):
+        #Find the iconPath folder
+        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+            iconFolder = './glados_pycromanager/GUI/Icons/'
+        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+            iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+        else:
+            iconFolder = ''
+            
     return iconFolder
 
 def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',iconSize = 16):
@@ -870,43 +889,45 @@ def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',icon
     Returns:
         QWidget: The widget with the icon set.
     """
-    from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
-    
-    if type == 'warning':
-        iconLoc = iconFolder+'WarningIcon.png'
-    elif type == 'error':
-        iconLoc = iconFolder+'ErrorIcon.png'
-    else:
-        iconLoc = iconFolder+'InfoIcon.png'
-    
-    
-    # Load the original pixmap
-    pixmap = QPixmap(iconLoc)
+    try:
+        from PyQt5.QtCore import Qt
+        from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
+        
+        if type == 'warning':
+            iconLoc = iconFolder+os.sep+'WarningIcon.png'
+        elif type == 'error':
+            iconLoc = iconFolder+os.sep+'ErrorIcon.png'
+        else:
+            iconLoc = iconFolder+os.sep+'InfoIcon.png'
+        
+        
+        # Load the original pixmap
+        pixmap = QPixmap(iconLoc)
 
-    if alteration == 'grayscale':
-        # Convert to QImage
-        image = pixmap.toImage()
+        if alteration == 'grayscale':
+            # Convert to QImage
+            image = pixmap.toImage()
 
-        #No clue what it's doing here, but Cody proposed it, and its way faster than looping
-        # Convert QImage to NumPy array
-        ptr = image.bits()
-        ptr.setsize(image.byteCount())
-        image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
-        # Perform grayscale conversion
-        gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
-        image_array[:, :, :3] = gray_array[:, :, np.newaxis]
-        # Convert back to QImage
-        grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
+            #No clue what it's doing here, but Cody proposed it, and its way faster than looping
+            # Convert QImage to NumPy array
+            ptr = image.bits()
+            ptr.setsize(image.byteCount())
+            image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
+            # Perform grayscale conversion
+            gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
+            image_array[:, :, :3] = gray_array[:, :, np.newaxis]
+            # Convert back to QImage
+            grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
 
-        # Convert back to QPixmap
-        pixmap = QPixmap.fromImage(grayscale_image)
-    scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # Convert back to QPixmap
+            pixmap = QPixmap.fromImage(grayscale_image)
+        scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-    widget.setPixmap(scaled_pixmap)
-    
-    return widget
-    
+        widget.setPixmap(scaled_pixmap)
+        
+        return widget
+    except:
+        return None
 
 class XYGridManager():
     """  
@@ -1040,14 +1061,21 @@ class XYGridManager():
         from PyQt5.QtGui import QIcon
         from PyQt5.QtCore import QSize
         
-        #Find the iconPath folder
-        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-            self.iconFolder = './glados_pycromanager/GUI/Icons/'
-        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-        else:
-            self.iconFolder = ''
-        
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados_pycromanager/GUI/Icons/'
+            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+            else:
+                self.iconFolder = ''
+                
         iconSize = 64
         self.rb_horNorm = QRadioButton("")
         self.rb_horNorm.setIcon(QIcon(self.iconFolder+os.sep+"gridHorNorm.png"))
@@ -3313,7 +3341,7 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         updateInfo (str, optional): Specifies which information to update. Defaults to 'All', which updates all error, warning, and info messages.
     """
     if updateInfo == 'All': #Willa lways be the case, deprecated is ['Error','Warning','Info']
-        from sharedFunctions import Shared_data
+        from glados_pycromanager.GUI.sharedFunctions import Shared_data
         if isinstance(shared_data,Shared_data):
             sharedData = shared_data
         elif isinstance(shared_data.parent, Shared_data):

@@ -27,7 +27,39 @@ Glados-pycromanager is an attempt to (1) create a usable, user-friendly user-int
 
 ## Installation instructions
 
-PIP install
+Create a new conda environment, python version 3.10:
+
+```conda
+conda create -p C:\CondaEnvironments\GladosPycromanagerEnv python=3.10
+```
+
+Activate it:
+
+```conda
+conda activate C:\CondaEnvironments\GladosPycromanagerEnv
+```
+
+Install glados-pycromanager:
+
+```conda
+pip install "../glados_pycromanager-0.0.1-py3-none-any.whl"
+```
+
+Update micromanager to the latest nightly build:
+https://micro-manager.org/Micro-Manager_Nightly_Builds
+
+(Possibly) update pycro-manager to the latest pip version:
+
+```conda
+pip install --upgrade pycromanager
+```
+
+Start micro-manager and ensure it is working as expected.  
+Run the glados-pycromanager software:
+
+```conda
+glados-pycromanager
+```
 
 ## Running instructions
 

@@ -1,12 +1,18 @@
 from pycromanager import core
 import sys
 sys.path.append('GUI\\nodz')
+from PyQt5.QtWidgets import QMainWindow,QApplication
 
 import os
-from LaserControlScripts import *
-# from MMcontrols import *
-from napariGlados import *
-from PyQt5.QtWidgets import QMainWindow,QApplication
+
+try:
+    from glados_pycromanager.GUI.LaserControlScripts import *
+    # from MMcontrols import *
+    from glados_pycromanager.GUI.napariGlados import *
+except:
+    from LaserControlScripts import *
+    # from MMcontrols import *
+    from napariGlados import *
 # from MDAGlados import MDAGlados
 
 class Shared_data:

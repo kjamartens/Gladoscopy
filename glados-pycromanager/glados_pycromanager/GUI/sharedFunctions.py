@@ -1,4 +1,4 @@
-from napariGlados import napariHandler
+
 from PyQt5.QtCore import QTimer
 import logging
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -7,6 +7,11 @@ import slack
 from flask import Flask
 import time
 from slackeventsapi import SlackEventAdapter
+
+try:
+    from glados_pycromanager.GUI.napariGlados import napariHandler
+except:
+    from napariGlados import napariHandler
 
 """Shared data summary
 

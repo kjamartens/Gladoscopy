@@ -1,2 +1,2 @@
-[napari.manifest]
-glados-pycromanager = glados_pycromanager:napari.yaml
+[console_scripts]
+glados-pycromanager = glados_pycromanager.GUI.GUI_napari:main

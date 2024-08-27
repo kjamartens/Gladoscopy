@@ -4,9 +4,6 @@ import napari
 from qtpy.QtWidgets import QWidget
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtWidgets import QScrollArea
-from AnalysisClass import * #type:ignore
-from utils import CustomMainWindow #type:ignore
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
 import sys
 import os
 from pycromanager import Core
@@ -15,23 +12,42 @@ from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QGroupBox, QLabe
 
 from typing import List
 os.environ['NAPARI_ASYNC'] = '1'
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI")
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy")
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy\\MainScripts")
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI\\nodz")
-from napariGlados import * #type: ignore
-from sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
-from utils import * #type: ignore
-# Add the folder 2 folders up to the system path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
-# Obtain the helperfunctions
-import HelperFunctions #type: ignore
-from napariHelperFunctions import showScaleBar #type: ignore
+try:
+    from glados_pycromanager.GUI.AnalysisClass import * #type:ignore
+    from glados_pycromanager.GUI.utils import CustomMainWindow #type:ignore
+    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
+    from glados_pycromanager.GUI.napariGlados import * #type: ignore
+    from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
+    from glados_pycromanager.GUI.utils import * #type: ignore
+    #Import all scripts in the custom script folders
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopyAnalysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopyAnalysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopyReal_Time_Analysis import * #type: ignore
+    # Obtain the helperfunctions
+    # import glados_pycromanager.GUI.HelperFunctions #type: ignore
+    from glados_pycromanager.GUI.napariHelperFunctions import showScaleBar #type: ignore
+except:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI")
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy")
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy\\MainScripts")
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI\\nodz")
+    from AnalysisClass import * #type:ignore
+    from utils import CustomMainWindow #type:ignore
+    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
+    from napariGlados import * #type: ignore
+    from sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
+    from utils import * #type: ignore
+    # Add the folder 2 folders up to the system path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    #Import all scripts in the custom script folders
+    from Analysis_Images import * #type: ignore
+    from Analysis_Measurements import * #type: ignore
+    from Analysis_Shapes import * #type: ignore
+    from Real_Time_Analysis import * #type: ignore
+    # Obtain the helperfunctions
+    import HelperFunctions #type: ignore
+    from napariHelperFunctions import showScaleBar #type: ignore
 #endregion
 
 #region Widget Definition

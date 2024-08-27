@@ -6,12 +6,18 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction, QGraphicsSceneMouseEvent, QCheckBox
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent
 from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt
-import nodz_utils as utils
-import utils as full_utils
-from nodz_custom import *
 import logging
 import time
 from PyQt5.QtCore import QTimer
+
+try:
+    import glados_pycromanager.GUI.nodz.nodz_utils as utils
+    import glados_pycromanager.GUI.utils as full_utils
+    from glados_pycromanager.GUI.nodz.nodz_custom import *
+except:
+    import nodz_utils as utils
+    import utils as full_utils
+    from nodz_custom import *
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
 
@@ -1855,14 +1861,21 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.topAttrs = dict()
 
 
-        #Find the iconPath folder
-        if os.path.exists('./glados_pycromanager/GUI/Icons/node_pending.png'):
-            self.iconFolder = './glados_pycromanager/GUI/Icons/'
-        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/node_pending.png'):
-            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-        else:
-            self.iconFolder = ''
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
 
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados_pycromanager/GUI/Icons/'
+            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+            else:
+                self.iconFolder = ''
+                
         # Methods.
         import copy
         self.config = config.copy()

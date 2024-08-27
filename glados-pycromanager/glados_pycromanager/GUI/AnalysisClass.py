@@ -14,21 +14,30 @@ from pycromanager import Core
 from magicgui import magicgui
 from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
-from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from napari.layers import Shapes
 from typing import Union, Tuple, List
 import logging
 # from stardist.models import StarDist2D
 from PIL import Image, ImageDraw
-import utils
-sys.path.append('AutonomousMicroscopy')
-sys.path.append('AutonomousMicroscopy/MainScripts')
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from CustomFunctions import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
+try:
+    from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+    import glados_pycromanager.GUI.utils
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopyAnalysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopyAnalysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopyCustomFunctions import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopyReal_Time_Analysis import * #type: ignore
+except:
+    from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+    import utils
+    sys.path.append('AutonomousMicroscopy')
+    sys.path.append('AutonomousMicroscopy/MainScripts')
+    #Import all scripts in the custom script folders
+    from Analysis_Images import * #type: ignore
+    from Analysis_Measurements import * #type: ignore
+    from Analysis_Shapes import * #type: ignore
+    from CustomFunctions import * #type: ignore
+    from Real_Time_Analysis import * #type: ignore
 
 #Class for overlays and their update and such
 class napariOverlay():

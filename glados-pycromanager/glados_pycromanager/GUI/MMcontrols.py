@@ -2,7 +2,6 @@ from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplicatio
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
-from AnalysisClass import *
 import sys
 import os
 import json
@@ -15,7 +14,6 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
 import matplotlib
 import pickle
-from utils import CustomMainWindow
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import tifffile
@@ -25,10 +23,19 @@ import logging
 from typing import List, Iterable
 import itertools
 import queue
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
+
 #For drawing
 matplotlib.use('Qt5Agg')
 
+try:
+    from glados_pycromanager.GUI.utils import CustomMainWindow
+    from glados_pycromanager.GUI.AnalysisClass import *
+    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
+
+except:
+    from utils import CustomMainWindow
+    from AnalysisClass import *
+    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 class ConfigInfo:
     """
     This class contains information about a pycromanager config group
@@ -263,14 +270,20 @@ class MMConfigUI(CustomMainWindow):
         self.mainLayout = QGridLayout()
         self.configEntries = {}
         
-        #Find the iconPath folder
-        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-            self.iconFolder = './glados_pycromanager/GUI/Icons/'
-        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-            self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-        else:
-            self.iconFolder = ''
-        
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados_pycromanager/GUI/Icons/'
+            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+                self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+            else:
+                self.iconFolder = ''
         
         
         if showLiveSnapExposureButtons:
