@@ -1,7 +1,8 @@
-# User manual for Glados-pycromanager
+# Glados-pycromanager
 
 Author: Koen J.A. Martens  
-2023-2024
+koenjamartens@gmail.com  
+Created 2023-2024
 
 <!-- TOC -->
 - [General overview](#general-overview)
@@ -23,6 +24,7 @@ Author: Koen J.A. Martens
 ## General overview
 
 Glados-pycromanager is an attempt to (1) create a usable, user-friendly user-interface for Pycromanager (i.e. python-Micromanager) with Napari, and (2) to create easy, user-friendly autonomous microscopy via Pycromanager.
+
 ## Installation instructions
 
 PIP install
@@ -40,7 +42,7 @@ For the time being, occasionally a 'GladosUI' laser-GUI will open on the left, w
 ## First use instructions
 
 After opening, an interface similar to this figure should pop up:
-![](Images/Overview1.png)
+![First use overview](Images/Overview1.png)
 There are 4 main parts:
 
 1. Contains the Glados-pycromanager interface, and can be switched between 'Controls' (i.e. controlling the microscope directly, live mode, configuration change, stage movement, etc), 'Multi-D acquisition' (i.e. perform multi-D acquisition similar as you would do in Micro-Manager), and 'Autonomous microscopy' (i.e. running smart/autonomous microscopy, more detail later)
@@ -65,7 +67,7 @@ The controls tab contains most important and basic information for microscope co
 
 ### Multi-D acquisition
 
-![alt text](Images/MDA_1.png)
+![MDA info](Images/MDA_1.png)
 The multi-D acquisition basically encompasses and expands on the regular micromanager Multi-D acquisition:
 
 - In the **Options**, you can decide which options to use or not. Note that if Storage is not checked, the acquisition will only be saved temporarily and will be destroyed after.
@@ -84,7 +86,7 @@ Glados autonomous microscopy can best be explained via exemplary use cases. For 
 
 This example covers the most basic use of autonomous glados-pycromanager. In glados-pycromanager, go to 'Autonomous Microscopy', press 'Load graph', and load the 'Showcase_Basic1.json' example. This should load a 'recipe' as follows:
 
-![](Images/Autonomous_simple_1.png)
+![Simple autonomous microscopy recipe](Images/Autonomous_simple_1.png)
 
 We use this example recipe to explain the principles of Glados-pycromanager.
 
@@ -127,10 +129,10 @@ In addition to this recipe, we need to more important definitions:
 
 1. A 'Decision' needs to be defined - This is the criteria that should be fulfilled to judge a field-of-view to be 'good enough', and the full acquisition routine will be run. The decision can be set in the 'Decision widget', to the right of the graph area. Currently, the only working decision mode is 'Direct Decision', 'All VAR scoring conditions met'.  
 In our example, we have the following decision (see below as well): we want the 'average intensity' determined via the Analysis [Measurement] node during the scoring to be at least 1000. As you see, a variable should be entered here. These variables can be accessed in the 'Variables' tab (explained below).  
-![](Images/Autonomous_simple_2.png)
+![Decision widget for autonomous microscopy](Images/Autonomous_simple_2.png)
 
 2. 'Scanning' needs to be defined. This will be the list of fields-of-view that are assessed during the Scoring methodology. Currently, the only way to define this is by loading a .pos list (i.e. created via the 'Position list' in micromanager). Please, here, find the 'DemoCamPosList.pos' file attached to the Github folder (or create your own - the demo list contains 3 positions).  
-![](Images/Autonomous_simple_3.png)
+![Scanning widget for autonomous microscopy](Images/Autonomous_simple_3.png)
 
 ### Glados-pycromanager variables
 
@@ -142,7 +144,7 @@ The variables widget contains all the variables. These are broadly separated in 
 
 The highlighted variable here is the 'overall average intensity' belonging to the 'analysisMeasurement_0' node, and the last known value is 1637. This is simply the output of the 'average gray value' node specified earlier.
 This value is used for the decision widget, and to easily get this information in the other widget, if you press once on the variable, the exact variable nomenclature will be copied to the clipboard, and can be pasted in the decision area.  
-![](Images/Autonomous_simple_4.png)
+![Variables widget for autonomous microscopy](Images/Autonomous_simple_4.png)
 
 ### Testing and running Glados-pycromanager autonomous microscopy
 
@@ -163,12 +165,12 @@ Additionally, you can load/store the graph (with attached decision/scanning widg
 A more advanced example of autonomous microscopy can be assessed by opening the 'Showcase_Advanced1.json' graph.
 
 Here is a high-level overview of what is going on:  
-![alt text](Images/Autonomous_adv_1.png)
+![Advanced autonomous microscopy - init](Images/Autonomous_adv_1.png)
 In the initialisation phase, two variables are created: WaitTime and ScoringWillPass, both set to 1.
 
-![alt text](Images/Autonomous_adv_2.png)
+![Advanced autonomous microscopy - scoring](Images/Autonomous_adv_2.png)
 In the scoring phase, first a Slack Message is created (change Slack API settings in Controls - Advanced Settings), telling the user(s) how long the microscope willw ait. Then the microscope will actually wait this time. Then, an acquisition is performed and visualised, and a real-time analysis is performed. Real-time analysis is heavily work-in-progress, but this should show the current frame as a number on top of the frame - logically, real-time analysis can be used to change variables/settings/etc on the fly (e.g. increase UV laser power for PALM). After this acquisition, we perform an IF-statement based on the current value of WaitTime. If it's lower than 2, we increase the value by 1 (via 'Change Global Variable'). If it's not lower than 2, we will change the ScoringWillPass variable to 0. Logically, this entails that in this case, the ScoringWillPass will be 1 for the first scoring, but will change to 0 during the second scoring, preventing the acquisition after the first field-of-view.
 
-![alt text](Images/Autonomous_adv_3.png)
+![Advanced autonomous microscopy - acquisition](Images/Autonomous_adv_3.png)
 Finally, in the acquisition section, in addition to the acquisition itself, some settings of the microscope are altered before/after acquisition: We set some configuration (in this case the 'Channel') to some value, and we change a stage position (the Z-position). Note that if you do not change this back, it will stay changed for the next scoring.
 
