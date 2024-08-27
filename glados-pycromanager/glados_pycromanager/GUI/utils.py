@@ -2838,7 +2838,33 @@ import json
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','data','config_groups','mainLayout','xypositionListWidget_XYGridManager']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','SLACK-CLIENT']
+
+    def save_state_globalData(self,filename):
+        if os.path.exists(filename):
+            #Load the mda state
+            with open(filename, 'r') as file:
+                state = json.load(file)
+        else:
+            state = {}
+            state['MDA'] = {}
+            state['MMControls'] = {}
+            state['GlobalData'] = {}
+        
+        if 'MMControls' not in state:
+            state['MMControls'] = {}
+        if 'MDA' not in state:
+            state['MDA'] = {}
+        if 'GlobalData' not in state:
+            state['GlobalData'] = {}
+            
+        #Loop over everything in self.shared_data.globalData dict and store the ['value']s:
+        for key, value in self.shared_data.globalData.items():
+            if key not in self.storingExceptions:
+                state['GlobalData'][key] = value['value']
+            
+        with open(filename, 'w') as file:
+            json.dump(state, file, indent=4)
 
     def save_state_MMControls(self,filename):
         if os.path.exists(filename):
@@ -2849,11 +2875,14 @@ class CustomMainWindow(QWidget):
             state = {}
             state['MDA'] = {}
             state['MMControls'] = {}
+            state['GlobalData'] = {}
         
         if 'MMControls' not in state:
             state['MMControls'] = {}
         if 'MDA' not in state:
             state['MDA'] = {}
+        if 'GlobalData' not in state:
+            state['GlobalData'] = {}
         
         import MMcontrols
         import napariGlados
@@ -2921,6 +2950,9 @@ class CustomMainWindow(QWidget):
 
         with open(filename, 'w') as file:
             json.dump(state, file, indent=4)
+        
+        #Also save global data:
+        self.save_state_globalData(filename)
             
     def save_state_MDA(self, filename):
         import napariGlados
@@ -2934,11 +2966,14 @@ class CustomMainWindow(QWidget):
             state = {}
             state['MDA'] = {}
             state['MMControls'] = {}
+            state['GlobalData'] = {}
             
         if 'MMControls' not in state:
             state['MMControls'] = {}
         if 'MDA' not in state:
             state['MDA'] = {}
+        if 'GlobalData' not in state:
+            state['GlobalData'] = {}
             
         for key, value in vars(self).items():
             saveState = None
@@ -2979,6 +3014,8 @@ class CustomMainWindow(QWidget):
         with open(filename, 'w') as file:
             json.dump(state, file, indent=4)
 
+        #Also save global data:
+        self.save_state_globalData(filename)
 
 def createNodeDictFromNodes(nodes):
     #Idea: create a dictionary where dict[nodeName] = Node.
@@ -3046,6 +3083,95 @@ def forceReset(shared_data):
             result = future.result(timeout=5)  # Attempt for 5 seconds
         except concurrent.futures.TimeoutError:
             logging.warning("Function did not complete within 5 seconds and thus quitted")
+
+def openAdvancedSettings(shared_data):
+    """
+    Allow the user to change the global/advanced settings via some GUI
+    """
+    def acceptS(dialog,shared_data):
+        #Set the current values in shared_data.globalData:
+        for entry in shared_data.globalData:
+            if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
+                try:
+                    if shared_data.globalData[entry]['inputType'] == 'lineEdit':
+                        shared_data.globalData[entry]['value'] = dialog.findChild(QLineEdit, entry).text()
+                    elif shared_data.globalData[entry]['inputType'] == 'dropdown':
+                        shared_data.globalData[entry]['value'] = dialog.findChild(QComboBox, entry).currentText()
+                    #Try to make integer/float:
+                    try:
+                        shared_data.globalData[entry]['value'] = float(shared_data.globalData[entry]['value'])
+                    except:
+                        pass
+                    try:
+                        shared_data.globalData[entry]['value'] = int(shared_data.globalData[entry]['value'])
+                    except:
+                        pass
+                except:
+                    logging.warning(f"Couldn't save global data of entry {entry}")
+        
+        #Store in appdata
+        appdata_folder = os.getenv('APPDATA')
+        if appdata_folder is None:
+            raise EnvironmentError("APPDATA environment variable not found")
+        app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+        os.makedirs(app_specific_folder, exist_ok=True)
+        tempCustomWindow = CustomMainWindow()
+        tempCustomWindow.shared_data = shared_data
+        tempCustomWindow.save_state_globalData(os.path.join(app_specific_folder, 'glados_state.json'))
+        
+        logging.info('advanced settings stored!')
+        dialog.close()
+        pass
+    
+    def rejectS(dialog):
+        dialog.close()
+    
+    from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QComboBox,  QDialogButtonBox
+    #Create a QDialog with OK/Cancel button:
+    dialog = QDialog()
+    dialog.setWindowTitle("Advanced settings")
+
+    layout = QGridLayout()
+    
+    currentRow = 0
+    #Loop over all globalData entries:
+    for entry in shared_data.globalData:
+        if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
+            currentRow+=1
+            try:
+                label = QLabel(shared_data.globalData[entry]['displayName'])
+                hoverInfo = shared_data.globalData[entry]['description']
+                layout.addWidget(label,currentRow,0)
+                label.setToolTip(hoverInfo)
+                
+                typeV = shared_data.globalData[entry]['inputType']
+                currentValue = shared_data.globalData[entry]['value']
+                if typeV == 'lineEdit':
+                    editField = QLineEdit()
+                    editField.setText(str(currentValue))
+                    editField.setObjectName(entry)
+                    layout.addWidget(editField,currentRow,1)
+                    label.setToolTip(editField)
+                elif typeV == 'dropdown':
+                    editField = QComboBox()
+                    editField.addItems(shared_data.globalData[entry]['dropDownOptions'])
+                    editField.setObjectName(entry)
+                    editField.setCurrentText(str(currentValue))
+                    layout.addWidget(editField,currentRow,1)
+                    label.setToolTip(editField)
+            except:
+                pass
+
+
+    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    button_box.accepted.connect(lambda: acceptS(dialog,shared_data))
+    button_box.rejected.connect(lambda: rejectS(dialog))
+    layout.addWidget(button_box,99,0,1,2)
+
+    dialog.setLayout(layout)
+    
+    dialog.exec_()
+    pass
 
 def getDimensionsFromAcqData(acqData):
     alldims = acqData[0]['axes']

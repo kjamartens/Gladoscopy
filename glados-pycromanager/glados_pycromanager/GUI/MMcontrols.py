@@ -625,6 +625,11 @@ class MMConfigUI(CustomMainWindow):
         self.forceResetButton.clicked.connect(lambda index, shared_data=shared_data: utils.forceReset(shared_data))
         debugHbox.addWidget(self.forceResetButton)
         
+        
+        self.advSettingsButton = QPushButton("Adv. settings")
+        self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
+        debugHbox.addWidget(self.advSettingsButton)
+        
         liveModeLayout.addLayout(debugHbox,99,0,1,2)
         
         #Return the layout

@@ -46,20 +46,59 @@ class Shared_data(QObject):
         self.globalData = {}
         self.globalData['SLACK-TOKEN']={}
         self.globalData['SLACK-TOKEN']['value'] = "xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf"
+        self.globalData['SLACK-TOKEN']['displayName'] = "Slack Token"
+        self.globalData['SLACK-TOKEN']['description'] = "The token for Slack messaging (Slack-token)"
+        self.globalData['SLACK-TOKEN']['inputType'] = "lineEdit"
         self.globalData['SLACK-SECRET']={}
         self.globalData['SLACK-SECRET']['value'] = "e8cd04aa4cc9ec7c51729ec6ecf98c1c"
+        self.globalData['SLACK-SECRET']['displayName'] = "Slack Secret"
+        self.globalData['SLACK-SECRET']['description'] = "The secret ID for Slack messaging (Slack-secret)"
+        self.globalData['SLACK-SECRET']['inputType'] = "lineEdit"
         self.globalData['SLACK-CHANNEL']={}
         self.globalData['SLACK-CHANNEL']['value'] = "glados-bot"
+        self.globalData['SLACK-CHANNEL']['displayName'] = "Slack Channel"
+        self.globalData['SLACK-CHANNEL']['description'] = "Channel for the Slack node to send messages to (Slack-channel)"
+        self.globalData['SLACK-CHANNEL']['inputType'] = "lineEdit"
+        self.globalData['MDAVISMETHOD']={}
+        self.globalData['MDAVISMETHOD']['value'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
+        self.globalData['MDAVISMETHOD']['displayName'] = 'MDA Visualisation method' #'multiDstack' or 'frameByFrame'
+        self.globalData['MDAVISMETHOD']['description'] = 'Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.' #'multiDstack' or 'frameByFrame'
+        self.globalData['MDAVISMETHOD']['inputType'] = 'dropdown' #'multiDstack' or 'frameByFrame'
+        self.globalData['MDAVISMETHOD']['dropDownOptions'] = ['multiDstack','frameByFrame'] #'multiDstack' or 'frameByFrame'
+        self.globalData['VISUALISATION-FPS'] = {}
+        self.globalData['VISUALISATION-FPS']['value'] = 60
+        self.globalData['VISUALISATION-FPS']['displayName'] = 'Visualisation FPS'
+        self.globalData['VISUALISATION-FPS']['description'] = 'Update speed of napari visualisation (in frames per second)'
+        self.globalData['VISUALISATION-FPS']['inputType'] = 'lineEdit'
+        
+        #Overwrite all values that can be found from the .JSON:
+        import os, json
+        #load from appdata
+        appdata_folder = os.getenv('APPDATA')
+        if appdata_folder is None:
+            raise EnvironmentError("APPDATA environment variable not found")
+        app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+        os.makedirs(app_specific_folder, exist_ok=True)
+        if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
+            #Load the mda state
+            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+                gladosInfo = json.load(file)
+                globalDataInfo = gladosInfo['GlobalData']
+        
+        for key in globalDataInfo:
+            try:
+                self.globalData[key]['value'] = globalDataInfo[key]
+            except:
+                pass
+        
         if self.globalData['SLACK-TOKEN']['value'] is not None and not len(self.globalData['SLACK-TOKEN']['value']) == 0:
             try:
                 self.globalData['SLACK-CLIENT'] = {}
-                self.globalData['SLACK-CLIENT']['value'] = slack.WebClient(token=self.globalData['SLACK-TOKEN']['value'])
+                self.globalData['SLACK-CLIENT']['value'] = slack.WebClient(token=self.globalData['SLACK-TOKEN']['value' ])
+                self.globalData['SLACK-CLIENT']['hidden'] = True
                 logging.debug('Slack client initialised')
             except:
                 logging.error('Error with Slack!')
-        self.globalData['MDAVISMETHOD']={}
-        self.globalData['MDAVISMETHOD']['value'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
-        
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
     
