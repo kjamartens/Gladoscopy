@@ -32,7 +32,7 @@ if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     #Obtain the helperfunctions
-    import glados_pycromanager.GUI.utils
+    import glados_pycromanager.GUI.utils as utils
 else:
     from napariGlados import runNapariPycroManager
     from sharedFunctions import Shared_data, periodicallyUpdate
