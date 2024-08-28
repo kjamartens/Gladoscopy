@@ -56,7 +56,7 @@ def perform_post_closing_actions(shared_data):
         shared_data: shared_data class (Shared_data())
     """
     #Clean up temporary files
-    cleanUpTemporaryFiles(shared_data=shared_data)
+    utils.cleanUpTemporaryFiles(shared_data=shared_data)
     
     # if shared_data._headless:
     #     stop_headless()
@@ -104,7 +104,7 @@ def main():
     
     # Create an instance of the shared_data class
     shared_data = Shared_data()
-    cleanUpTemporaryFiles(shared_data=shared_data)
+    utils.cleanUpTemporaryFiles(shared_data=shared_data)
         
     # get object representing MMCore, used throughout
     #try to open a running instance:
@@ -131,7 +131,7 @@ def main():
         
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtCore import Qt
-    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts) #type:ignore
 
     #Run the UI on a second thread (hopefully robustly)
     app = QApplication(sys.argv)
@@ -147,7 +147,7 @@ def main():
     thread.finished.connect(thread.deleteLater)
 
     #Set up logging to files in appData folder - INFO and DEBUG
-    set_up_logger()
+    utils.set_up_logger()
     
     #Run the app until closed
     sys.exit(app.exec_())

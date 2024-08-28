@@ -27,6 +27,7 @@ if is_pip_installed():
     from glados_pycromanager.GUI.FlowChart_dockWidgets import *
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
     from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
+    import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
     from glados_pycromanager.GUI.MDAGlados import MDAGlados
 else:
@@ -38,6 +39,7 @@ else:
     from FlowChart_dockWidgets import *
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
     from utils import cleanUpTemporaryFiles
+    import utils as utils
     from MDAGlados import MDAGlados
 
 
