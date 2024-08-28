@@ -85,6 +85,7 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type=&#39;i
             layer.data = np.expand_dims(layer.data, axis=0)
         if image_data.ndim == 2:
             image_data = np.expand_dims(image_data, axis=0)
+        logging.debug(&#39;NP-expanded layer&#39;)
         layer.data = np.append(layer.data,image_data,axis=0)
         current_slice = layer.data.shape[0]
         napariViewer.dims.set_current_step(0,current_slice)
@@ -144,7 +145,23 @@ def InitateNapariUI(napariViewer):
     #Set title, icon
     napariViewer.title=&#34;GladOS - napari&#34;
     # Set the window icon
-    icon_path = &#39;glados-pycromanager/glados_pycromanager/GUI/Icons/GladosIcon.ico&#39;
+    
+    import glados_pycromanager, os
+    # Get the installation path of the package
+    package_path = os.path.dirname(glados_pycromanager.__file__)
+    # Construct the path to the Icons folder
+    iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+    if not os.path.exists(iconFolder):
+        #Find the iconPath folder
+        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+        else:
+            iconFolder = &#39;&#39;
+            
+    icon_path = iconFolder+os.sep+&#39;GladosIcon.ico&#39;
     icon = QIcon(icon_path)
     napariViewer.window._qt_window.setWindowIcon(icon)
     
@@ -189,7 +206,23 @@ def InitateNapariUI(napariViewer):
     #Set title, icon
     napariViewer.title=&#34;GladOS - napari&#34;
     # Set the window icon
-    icon_path = &#39;glados-pycromanager/glados_pycromanager/GUI/Icons/GladosIcon.ico&#39;
+    
+    import glados_pycromanager, os
+    # Get the installation path of the package
+    package_path = os.path.dirname(glados_pycromanager.__file__)
+    # Construct the path to the Icons folder
+    iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+    if not os.path.exists(iconFolder):
+        #Find the iconPath folder
+        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+        else:
+            iconFolder = &#39;&#39;
+            
+    icon_path = iconFolder+os.sep+&#39;GladosIcon.ico&#39;
     icon = QIcon(icon_path)
     napariViewer.window._qt_window.setWindowIcon(icon)
     
@@ -222,6 +255,7 @@ def InitateNapariUI(napariViewer):
             layer.data = np.expand_dims(layer.data, axis=0)
         if image_data.ndim == 2:
             image_data = np.expand_dims(image_data, axis=0)
+        logging.debug(&#39;NP-expanded layer&#39;)
         layer.data = np.append(layer.data,image_data,axis=0)
         current_slice = layer.data.shape[0]
         napariViewer.dims.set_current_step(0,current_slice)

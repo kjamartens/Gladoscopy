@@ -1624,6 +1624,22 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             except Exception as e:
                 logging.error(f'Could not open quick start window. {e}')
         
+        def DeveloperAdvMenu(self):
+            """
+            Shows the Documentation .html files file
+            """
+            try:
+                import webbrowser
+                if is_pip_installed():
+                    package_path = os.path.dirname(glados_pycromanager.__file__)
+                    htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
+                else:
+                    htmlPath = 'glados-pycromanager/glados_pycromanager/Documentation/index.html'
+                
+                webbrowser.open('file://' + os.path.realpath(htmlPath))
+            except Exception as e:
+                logging.error(f'Could not open the developer advancedi nfo. {e}')
+                
         self.helpGroupBox = QGroupBox("Logger")
         newgridlayout = QGridLayout()
         self.helpGroupBox.setLayout(newgridlayout)
@@ -1635,6 +1651,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         button2 = QPushButton('Developer Manual')
         newgridlayout.addWidget(button2)
         button3 = QPushButton('Complete software info')
+        button3.clicked.connect(lambda index: DeveloperAdvMenu(self))
         newgridlayout.addWidget(button3)
         
         # Create a QGraphicsView 

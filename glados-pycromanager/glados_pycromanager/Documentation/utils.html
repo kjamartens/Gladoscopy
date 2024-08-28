@@ -30,6 +30,48 @@
 import os
 import logging
 
+#Below here, copy from Eve&#39;s util functions:
+import os
+import warnings
+import inspect
+import importlib
+import re
+import warnings, logging
+import numpy as np
+import itertools
+import time
+import h5py
+
+#Imports for PyQt5 (GUI)
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
+from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
+import sys
+
+def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+else:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + &#39;AutonomousMicroscopy&#39;)
+    #Import all scripts in the custom script folders
+    from AutonomousMicroscopy.Analysis_Images import *
+    from AutonomousMicroscopy.Analysis_Measurements import *
+    from AutonomousMicroscopy.Analysis_Shapes import *
+    from AutonomousMicroscopy.CustomFunctions import *
+    from AutonomousMicroscopy.Real_Time_Analysis import * 
+    import AutonomousMicroscopy.MainScripts.HelperFunctions 
+
+
 def cleanUpTemporaryFiles(mainFolder=&#39;./&#39;,shared_data=None):
     logging.debug(&#39;Cleaning up temporary files&#39;)
     
@@ -57,33 +99,6 @@ def cleanUpTemporaryFiles(mainFolder=&#39;./&#39;,shared_data=None):
                 except:
                     pass
 
-#Below here, copy from Eve&#39;s util functions:
-import os
-import warnings
-import inspect
-import importlib
-import re
-import warnings, logging
-import numpy as np
-import itertools
-import time
-import h5py
-
-#Imports for PyQt5 (GUI)
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
-from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + &#39;AutonomousMicroscopy&#39;)
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from CustomFunctions import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -875,12 +890,21 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
 
 
 def findIconFolder():
-    if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-        iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-    elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-        iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-    else:
-        iconFolder = &#39;&#39;
+    import glados_pycromanager
+    # Get the installation path of the package
+    package_path = os.path.dirname(glados_pycromanager.__file__)
+    # Construct the path to the Icons folder
+    iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+    if not os.path.exists(iconFolder):
+        #Find the iconPath folder
+        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+        else:
+            iconFolder = &#39;&#39;
+            
     return iconFolder
 
 def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = &#39;grayscale&#39;,iconSize = 16):
@@ -897,43 +921,45 @@ def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = &#39;grayscale&#
     Returns:
         QWidget: The widget with the icon set.
     &#34;&#34;&#34;
-    from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
-    
-    if type == &#39;warning&#39;:
-        iconLoc = iconFolder+&#39;WarningIcon.png&#39;
-    elif type == &#39;error&#39;:
-        iconLoc = iconFolder+&#39;ErrorIcon.png&#39;
-    else:
-        iconLoc = iconFolder+&#39;InfoIcon.png&#39;
-    
-    
-    # Load the original pixmap
-    pixmap = QPixmap(iconLoc)
+    try:
+        from PyQt5.QtCore import Qt
+        from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
+        
+        if type == &#39;warning&#39;:
+            iconLoc = iconFolder+os.sep+&#39;WarningIcon.png&#39;
+        elif type == &#39;error&#39;:
+            iconLoc = iconFolder+os.sep+&#39;ErrorIcon.png&#39;
+        else:
+            iconLoc = iconFolder+os.sep+&#39;InfoIcon.png&#39;
+        
+        
+        # Load the original pixmap
+        pixmap = QPixmap(iconLoc)
 
-    if alteration == &#39;grayscale&#39;:
-        # Convert to QImage
-        image = pixmap.toImage()
+        if alteration == &#39;grayscale&#39;:
+            # Convert to QImage
+            image = pixmap.toImage()
 
-        #No clue what it&#39;s doing here, but Cody proposed it, and its way faster than looping
-        # Convert QImage to NumPy array
-        ptr = image.bits()
-        ptr.setsize(image.byteCount())
-        image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
-        # Perform grayscale conversion
-        gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
-        image_array[:, :, :3] = gray_array[:, :, np.newaxis]
-        # Convert back to QImage
-        grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
+            #No clue what it&#39;s doing here, but Cody proposed it, and its way faster than looping
+            # Convert QImage to NumPy array
+            ptr = image.bits()
+            ptr.setsize(image.byteCount())
+            image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
+            # Perform grayscale conversion
+            gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
+            image_array[:, :, :3] = gray_array[:, :, np.newaxis]
+            # Convert back to QImage
+            grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
 
-        # Convert back to QPixmap
-        pixmap = QPixmap.fromImage(grayscale_image)
-    scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # Convert back to QPixmap
+            pixmap = QPixmap.fromImage(grayscale_image)
+        scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-    widget.setPixmap(scaled_pixmap)
-    
-    return widget
-    
+        widget.setPixmap(scaled_pixmap)
+        
+        return widget
+    except:
+        return None
 
 class XYGridManager():
     &#34;&#34;&#34;  
@@ -1067,14 +1093,21 @@ class XYGridManager():
         from PyQt5.QtGui import QIcon
         from PyQt5.QtCore import QSize
         
-        #Find the iconPath folder
-        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-        else:
-            self.iconFolder = &#39;&#39;
-        
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+            elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+            else:
+                self.iconFolder = &#39;&#39;
+                
         iconSize = 64
         self.rb_horNorm = QRadioButton(&#34;&#34;)
         self.rb_horNorm.setIcon(QIcon(self.iconFolder+os.sep+&#34;gridHorNorm.png&#34;))
@@ -1494,7 +1527,6 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
                     self.comboBox_switch.currentIndexChanged.connect(textChangeCallback)
                     # self.comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=self.comboBox_switch: hideAdvVariables(comboBox))
             
-
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
     logging.debug(&#39;Changing layout &#39;+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
@@ -2819,6 +2851,53 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.fileLocationLineEdit
 
+    def addMarkdown(self,mdfile,width=700,height=800):
+        from PyQt5.QtWebEngineWidgets import QWebEngineView
+        import markdown
+        
+        newlayout = QVBoxLayout()
+        markdownViewer = QWebEngineView()
+        markdownViewer.setFixedHeight(height)
+        markdownViewer.setFixedWidth(width)
+        md_file = mdfile
+        with open(md_file, &#39;r&#39;, encoding=&#39;utf-8&#39;) as file:
+            md_content = file.read()
+        # Convert Markdown to HTML
+        html_content = markdown.markdown(md_content, extensions=[&#39;markdown_captions&#39;,&#39;fenced_code&#39;, &#39;codehilite&#39;, &#39;toc&#39;, &#39;attr_list&#39;, &#39;meta&#39;])
+        # Get the directory of the Markdown file
+        base_dir = os.path.dirname(os.path.abspath(md_file))
+        # Create a complete HTML document with MathJax support
+        full_html = f&#34;&#34;&#34;
+        &lt;!DOCTYPE html&gt;
+        &lt;html&gt;
+        &lt;head&gt;
+            &lt;script type=&#34;text/javascript&#34; async
+                src=&#34;https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML&#34;&gt;
+            &lt;/script&gt;
+            &lt;script type=&#34;text/x-mathjax-config&#34;&gt;
+                MathJax.Hub.Config({{
+                    tex2jax: {{
+                        inlineMath: [[&#39;$&#39;,&#39;$&#39;]],
+                        processEscapes: true
+                    }} 
+                }});
+            &lt;/script&gt;
+            &lt;style&gt;
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+                img {{ max-width: 100%; height: auto; }}
+            &lt;/style&gt;
+        &lt;/head&gt;
+        &lt;body&gt;
+            {html_content}
+        &lt;/body&gt;
+        &lt;/html&gt;
+        &#34;&#34;&#34;
+        from PyQt5.QtCore import QUrl
+        # Load the HTML content into the web view
+        markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + &#34;/&#34;))
+        newlayout.addWidget(markdownViewer)
+        self.centralWidget().layout().addLayout(newlayout)
+    
 
 
 def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
@@ -2865,7 +2944,33 @@ import json
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = [&#39;core&#39;,&#39;layout&#39;,&#39;shared_data&#39;,&#39;gui&#39;,&#39;mda&#39;,&#39;data&#39;,&#39;config_groups&#39;,&#39;mainLayout&#39;,&#39;xypositionListWidget_XYGridManager&#39;]
+        self.storingExceptions = [&#39;core&#39;,&#39;layout&#39;,&#39;shared_data&#39;,&#39;gui&#39;,&#39;mda&#39;,&#39;data&#39;,&#39;config_groups&#39;,&#39;mainLayout&#39;,&#39;xypositionListWidget_XYGridManager&#39;,&#39;SLACK-CLIENT&#39;]
+
+    def save_state_globalData(self,filename):
+        if os.path.exists(filename):
+            #Load the mda state
+            with open(filename, &#39;r&#39;) as file:
+                state = json.load(file)
+        else:
+            state = {}
+            state[&#39;MDA&#39;] = {}
+            state[&#39;MMControls&#39;] = {}
+            state[&#39;GlobalData&#39;] = {}
+        
+        if &#39;MMControls&#39; not in state:
+            state[&#39;MMControls&#39;] = {}
+        if &#39;MDA&#39; not in state:
+            state[&#39;MDA&#39;] = {}
+        if &#39;GlobalData&#39; not in state:
+            state[&#39;GlobalData&#39;] = {}
+            
+        #Loop over everything in self.shared_data.globalData dict and store the [&#39;value&#39;]s:
+        for key, value in self.shared_data.globalData.items():
+            if key not in self.storingExceptions:
+                state[&#39;GlobalData&#39;][key] = value[&#39;value&#39;]
+            
+        with open(filename, &#39;w&#39;) as file:
+            json.dump(state, file, indent=4)
 
     def save_state_MMControls(self,filename):
         if os.path.exists(filename):
@@ -2876,11 +2981,14 @@ class CustomMainWindow(QWidget):
             state = {}
             state[&#39;MDA&#39;] = {}
             state[&#39;MMControls&#39;] = {}
+            state[&#39;GlobalData&#39;] = {}
         
         if &#39;MMControls&#39; not in state:
             state[&#39;MMControls&#39;] = {}
         if &#39;MDA&#39; not in state:
             state[&#39;MDA&#39;] = {}
+        if &#39;GlobalData&#39; not in state:
+            state[&#39;GlobalData&#39;] = {}
         
         import MMcontrols
         import napariGlados
@@ -2948,6 +3056,9 @@ class CustomMainWindow(QWidget):
 
         with open(filename, &#39;w&#39;) as file:
             json.dump(state, file, indent=4)
+        
+        #Also save global data:
+        self.save_state_globalData(filename)
             
     def save_state_MDA(self, filename):
         import napariGlados
@@ -2961,11 +3072,14 @@ class CustomMainWindow(QWidget):
             state = {}
             state[&#39;MDA&#39;] = {}
             state[&#39;MMControls&#39;] = {}
+            state[&#39;GlobalData&#39;] = {}
             
         if &#39;MMControls&#39; not in state:
             state[&#39;MMControls&#39;] = {}
         if &#39;MDA&#39; not in state:
             state[&#39;MDA&#39;] = {}
+        if &#39;GlobalData&#39; not in state:
+            state[&#39;GlobalData&#39;] = {}
             
         for key, value in vars(self).items():
             saveState = None
@@ -3006,6 +3120,8 @@ class CustomMainWindow(QWidget):
         with open(filename, &#39;w&#39;) as file:
             json.dump(state, file, indent=4)
 
+        #Also save global data:
+        self.save_state_globalData(filename)
 
 def createNodeDictFromNodes(nodes):
     #Idea: create a dictionary where dict[nodeName] = Node.
@@ -3040,7 +3156,7 @@ def forceReset_actual(shared_data):
         logging.debug(&#34;Attempted but failed: shared_data.liveMode=False&#34;)
     try:
         shared_data.mdaMode = False
-        logging.debug(&#34;Attempted: shared_data.liveMode=False&#34;)
+        logging.debug(&#34;Attempted: shared_data.mdaMode=False&#34;)
     except:
         logging.debug(&#34;Attempted but failed: shared_data.mdaMode=False&#34;)
     time.sleep(0.1)
@@ -3073,6 +3189,95 @@ def forceReset(shared_data):
             result = future.result(timeout=5)  # Attempt for 5 seconds
         except concurrent.futures.TimeoutError:
             logging.warning(&#34;Function did not complete within 5 seconds and thus quitted&#34;)
+
+def openAdvancedSettings(shared_data):
+    &#34;&#34;&#34;
+    Allow the user to change the global/advanced settings via some GUI
+    &#34;&#34;&#34;
+    def acceptS(dialog,shared_data):
+        #Set the current values in shared_data.globalData:
+        for entry in shared_data.globalData:
+            if not &#39;hidden&#39; in shared_data.globalData[entry] or shared_data.globalData[entry][&#39;hidden&#39;] == False:
+                try:
+                    if shared_data.globalData[entry][&#39;inputType&#39;] == &#39;lineEdit&#39;:
+                        shared_data.globalData[entry][&#39;value&#39;] = dialog.findChild(QLineEdit, entry).text()
+                    elif shared_data.globalData[entry][&#39;inputType&#39;] == &#39;dropdown&#39;:
+                        shared_data.globalData[entry][&#39;value&#39;] = dialog.findChild(QComboBox, entry).currentText()
+                    #Try to make integer/float:
+                    try:
+                        shared_data.globalData[entry][&#39;value&#39;] = float(shared_data.globalData[entry][&#39;value&#39;])
+                    except:
+                        pass
+                    try:
+                        shared_data.globalData[entry][&#39;value&#39;] = int(shared_data.globalData[entry][&#39;value&#39;])
+                    except:
+                        pass
+                except:
+                    logging.warning(f&#34;Couldn&#39;t save global data of entry {entry}&#34;)
+        
+        #Store in appdata
+        appdata_folder = os.getenv(&#39;APPDATA&#39;)
+        if appdata_folder is None:
+            raise EnvironmentError(&#34;APPDATA environment variable not found&#34;)
+        app_specific_folder = os.path.join(appdata_folder, &#39;Glados-PycroManager&#39;)
+        os.makedirs(app_specific_folder, exist_ok=True)
+        tempCustomWindow = CustomMainWindow()
+        tempCustomWindow.shared_data = shared_data
+        tempCustomWindow.save_state_globalData(os.path.join(app_specific_folder, &#39;glados_state.json&#39;))
+        
+        logging.info(&#39;advanced settings stored!&#39;)
+        dialog.close()
+        pass
+    
+    def rejectS(dialog):
+        dialog.close()
+    
+    from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QComboBox,  QDialogButtonBox
+    #Create a QDialog with OK/Cancel button:
+    dialog = QDialog()
+    dialog.setWindowTitle(&#34;Advanced settings&#34;)
+
+    layout = QGridLayout()
+    layout.addWidget(QLabel(&#34;Please restart glados-pycromanager after changing any of these settings!&#34;),0,0,1,2)
+    currentRow = 1
+    #Loop over all globalData entries:
+    for entry in shared_data.globalData:
+        if not &#39;hidden&#39; in shared_data.globalData[entry] or shared_data.globalData[entry][&#39;hidden&#39;] == False:
+            currentRow+=1
+            try:
+                label = QLabel(shared_data.globalData[entry][&#39;displayName&#39;])
+                hoverInfo = shared_data.globalData[entry][&#39;description&#39;]
+                layout.addWidget(label,currentRow,0)
+                label.setToolTip(hoverInfo)
+                
+                typeV = shared_data.globalData[entry][&#39;inputType&#39;]
+                currentValue = shared_data.globalData[entry][&#39;value&#39;]
+                if typeV == &#39;lineEdit&#39;:
+                    editField = QLineEdit()
+                    editField.setText(str(currentValue))
+                    editField.setObjectName(entry)
+                    layout.addWidget(editField,currentRow,1)
+                    label.setToolTip(editField)
+                elif typeV == &#39;dropdown&#39;:
+                    editField = QComboBox()
+                    editField.addItems(shared_data.globalData[entry][&#39;dropDownOptions&#39;])
+                    editField.setObjectName(entry)
+                    editField.setCurrentText(str(currentValue))
+                    layout.addWidget(editField,currentRow,1)
+                    label.setToolTip(editField)
+            except:
+                pass
+
+
+    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    button_box.accepted.connect(lambda: acceptS(dialog,shared_data))
+    button_box.rejected.connect(lambda: rejectS(dialog))
+    layout.addWidget(button_box,99,0,1,2)
+
+    dialog.setLayout(layout)
+    
+    dialog.exec_()
+    pass
 
 def getDimensionsFromAcqData(acqData):
     alldims = acqData[0][&#39;axes&#39;]
@@ -3214,7 +3419,11 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo=&#39;All&#39;):
         updateInfo (str, optional): Specifies which information to update. Defaults to &#39;All&#39;, which updates all error, warning, and info messages.
     &#34;&#34;&#34;
     if updateInfo == &#39;All&#39;: #Willa lways be the case, deprecated is [&#39;Error&#39;,&#39;Warning&#39;,&#39;Info&#39;]
-        from sharedFunctions import Shared_data
+        
+        if is_pip_installed():
+            from glados_pycromanager.GUI.sharedFunctions import Shared_data
+        else:
+            from sharedFunctions import Shared_data
         if isinstance(shared_data,Shared_data):
             sharedData = shared_data
         elif isinstance(shared_data.parent, Shared_data):
@@ -3255,6 +3464,15 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo=&#39;All&#39;):
         else:
             setWarningErrorInfoIcon(errorIcon,&#39;error&#39;,findIconFolder(),alteration=&#39;none&#39;)
         
+        #Set the warningToolTip
+        warningToolTip = &#39;&#39;
+        for entry in sharedData.warningErrorInfoInfo[&#39;Warnings&#39;]:
+            warningToolTip+=entry+&#39;\n&#39;
+        warningIcon.setToolTip(warningToolTip)
+        if warningToolTip == &#39;&#39;:
+            setWarningErrorInfoIcon(warningIcon,&#39;warning&#39;,findIconFolder(),alteration=&#39;grayscale&#39;)
+        else:
+            setWarningErrorInfoIcon(warningIcon,&#39;warning&#39;,findIconFolder(),alteration=&#39;none&#39;)
         # errorToolTip = &#39;&#39;
         # errorToolTip = sharedData.warningErrorInfoInfo[&#39;Errors&#39;]
         # if errorToolTip != &#39;&#39;:
@@ -3931,12 +4149,21 @@ def set_up_logger():
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def findIconFolder():
-    if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-        iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-    elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-        iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-    else:
-        iconFolder = &#39;&#39;
+    import glados_pycromanager
+    # Get the installation path of the package
+    package_path = os.path.dirname(glados_pycromanager.__file__)
+    # Construct the path to the Icons folder
+    iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+    if not os.path.exists(iconFolder):
+        #Find the iconPath folder
+        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+        else:
+            iconFolder = &#39;&#39;
+            
     return iconFolder</code></pre>
 </details>
 </dd>
@@ -3988,7 +4215,7 @@ def set_up_logger():
         logging.debug(&#34;Attempted but failed: shared_data.liveMode=False&#34;)
     try:
         shared_data.mdaMode = False
-        logging.debug(&#34;Attempted: shared_data.liveMode=False&#34;)
+        logging.debug(&#34;Attempted: shared_data.mdaMode=False&#34;)
     except:
         logging.debug(&#34;Attempted but failed: shared_data.mdaMode=False&#34;)
     time.sleep(0.1)
@@ -4964,6 +5191,19 @@ def set_up_logger():
     return input_arr</code></pre>
 </details>
 </dd>
+<dt id="utils.is_pip_installed"><code class="name flex">
+<span>def <span class="ident">is_pip_installed</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__</code></pre>
+</details>
+</dd>
 <dt id="utils.kwargValueInputChanged"><code class="name flex">
 <span>def <span class="ident">kwargValueInputChanged</span></span>(<span>line_edit)</span>
 </code></dt>
@@ -5714,6 +5954,105 @@ def set_up_logger():
     return</code></pre>
 </details>
 </dd>
+<dt id="utils.openAdvancedSettings"><code class="name flex">
+<span>def <span class="ident">openAdvancedSettings</span></span>(<span>shared_data)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Allow the user to change the global/advanced settings via some GUI</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def openAdvancedSettings(shared_data):
+    &#34;&#34;&#34;
+    Allow the user to change the global/advanced settings via some GUI
+    &#34;&#34;&#34;
+    def acceptS(dialog,shared_data):
+        #Set the current values in shared_data.globalData:
+        for entry in shared_data.globalData:
+            if not &#39;hidden&#39; in shared_data.globalData[entry] or shared_data.globalData[entry][&#39;hidden&#39;] == False:
+                try:
+                    if shared_data.globalData[entry][&#39;inputType&#39;] == &#39;lineEdit&#39;:
+                        shared_data.globalData[entry][&#39;value&#39;] = dialog.findChild(QLineEdit, entry).text()
+                    elif shared_data.globalData[entry][&#39;inputType&#39;] == &#39;dropdown&#39;:
+                        shared_data.globalData[entry][&#39;value&#39;] = dialog.findChild(QComboBox, entry).currentText()
+                    #Try to make integer/float:
+                    try:
+                        shared_data.globalData[entry][&#39;value&#39;] = float(shared_data.globalData[entry][&#39;value&#39;])
+                    except:
+                        pass
+                    try:
+                        shared_data.globalData[entry][&#39;value&#39;] = int(shared_data.globalData[entry][&#39;value&#39;])
+                    except:
+                        pass
+                except:
+                    logging.warning(f&#34;Couldn&#39;t save global data of entry {entry}&#34;)
+        
+        #Store in appdata
+        appdata_folder = os.getenv(&#39;APPDATA&#39;)
+        if appdata_folder is None:
+            raise EnvironmentError(&#34;APPDATA environment variable not found&#34;)
+        app_specific_folder = os.path.join(appdata_folder, &#39;Glados-PycroManager&#39;)
+        os.makedirs(app_specific_folder, exist_ok=True)
+        tempCustomWindow = CustomMainWindow()
+        tempCustomWindow.shared_data = shared_data
+        tempCustomWindow.save_state_globalData(os.path.join(app_specific_folder, &#39;glados_state.json&#39;))
+        
+        logging.info(&#39;advanced settings stored!&#39;)
+        dialog.close()
+        pass
+    
+    def rejectS(dialog):
+        dialog.close()
+    
+    from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QComboBox,  QDialogButtonBox
+    #Create a QDialog with OK/Cancel button:
+    dialog = QDialog()
+    dialog.setWindowTitle(&#34;Advanced settings&#34;)
+
+    layout = QGridLayout()
+    layout.addWidget(QLabel(&#34;Please restart glados-pycromanager after changing any of these settings!&#34;),0,0,1,2)
+    currentRow = 1
+    #Loop over all globalData entries:
+    for entry in shared_data.globalData:
+        if not &#39;hidden&#39; in shared_data.globalData[entry] or shared_data.globalData[entry][&#39;hidden&#39;] == False:
+            currentRow+=1
+            try:
+                label = QLabel(shared_data.globalData[entry][&#39;displayName&#39;])
+                hoverInfo = shared_data.globalData[entry][&#39;description&#39;]
+                layout.addWidget(label,currentRow,0)
+                label.setToolTip(hoverInfo)
+                
+                typeV = shared_data.globalData[entry][&#39;inputType&#39;]
+                currentValue = shared_data.globalData[entry][&#39;value&#39;]
+                if typeV == &#39;lineEdit&#39;:
+                    editField = QLineEdit()
+                    editField.setText(str(currentValue))
+                    editField.setObjectName(entry)
+                    layout.addWidget(editField,currentRow,1)
+                    label.setToolTip(editField)
+                elif typeV == &#39;dropdown&#39;:
+                    editField = QComboBox()
+                    editField.addItems(shared_data.globalData[entry][&#39;dropDownOptions&#39;])
+                    editField.setObjectName(entry)
+                    editField.setCurrentText(str(currentValue))
+                    layout.addWidget(editField,currentRow,1)
+                    label.setToolTip(editField)
+            except:
+                pass
+
+
+    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    button_box.accepted.connect(lambda: acceptS(dialog,shared_data))
+    button_box.rejected.connect(lambda: rejectS(dialog))
+    layout.addWidget(button_box,99,0,1,2)
+
+    dialog.setLayout(layout)
+    
+    dialog.exec_()
+    pass</code></pre>
+</details>
+</dd>
 <dt id="utils.optKwargsFromFunction"><code class="name flex">
 <span>def <span class="ident">optKwargsFromFunction</span></span>(<span>functionname)</span>
 </code></dt>
@@ -6114,42 +6453,45 @@ def set_up_logger():
     Returns:
         QWidget: The widget with the icon set.
     &#34;&#34;&#34;
-    from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
-    
-    if type == &#39;warning&#39;:
-        iconLoc = iconFolder+&#39;WarningIcon.png&#39;
-    elif type == &#39;error&#39;:
-        iconLoc = iconFolder+&#39;ErrorIcon.png&#39;
-    else:
-        iconLoc = iconFolder+&#39;InfoIcon.png&#39;
-    
-    
-    # Load the original pixmap
-    pixmap = QPixmap(iconLoc)
+    try:
+        from PyQt5.QtCore import Qt
+        from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
+        
+        if type == &#39;warning&#39;:
+            iconLoc = iconFolder+os.sep+&#39;WarningIcon.png&#39;
+        elif type == &#39;error&#39;:
+            iconLoc = iconFolder+os.sep+&#39;ErrorIcon.png&#39;
+        else:
+            iconLoc = iconFolder+os.sep+&#39;InfoIcon.png&#39;
+        
+        
+        # Load the original pixmap
+        pixmap = QPixmap(iconLoc)
 
-    if alteration == &#39;grayscale&#39;:
-        # Convert to QImage
-        image = pixmap.toImage()
+        if alteration == &#39;grayscale&#39;:
+            # Convert to QImage
+            image = pixmap.toImage()
 
-        #No clue what it&#39;s doing here, but Cody proposed it, and its way faster than looping
-        # Convert QImage to NumPy array
-        ptr = image.bits()
-        ptr.setsize(image.byteCount())
-        image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
-        # Perform grayscale conversion
-        gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
-        image_array[:, :, :3] = gray_array[:, :, np.newaxis]
-        # Convert back to QImage
-        grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
+            #No clue what it&#39;s doing here, but Cody proposed it, and its way faster than looping
+            # Convert QImage to NumPy array
+            ptr = image.bits()
+            ptr.setsize(image.byteCount())
+            image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
+            # Perform grayscale conversion
+            gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
+            image_array[:, :, :3] = gray_array[:, :, np.newaxis]
+            # Convert back to QImage
+            grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
 
-        # Convert back to QPixmap
-        pixmap = QPixmap.fromImage(grayscale_image)
-    scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # Convert back to QPixmap
+            pixmap = QPixmap.fromImage(grayscale_image)
+        scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-    widget.setPixmap(scaled_pixmap)
-    
-    return widget</code></pre>
+        widget.setPixmap(scaled_pixmap)
+        
+        return widget
+    except:
+        return None</code></pre>
 </details>
 </dd>
 <dt id="utils.set_up_logger"><code class="name flex">
@@ -6297,7 +6639,11 @@ def set_up_logger():
         updateInfo (str, optional): Specifies which information to update. Defaults to &#39;All&#39;, which updates all error, warning, and info messages.
     &#34;&#34;&#34;
     if updateInfo == &#39;All&#39;: #Willa lways be the case, deprecated is [&#39;Error&#39;,&#39;Warning&#39;,&#39;Info&#39;]
-        from sharedFunctions import Shared_data
+        
+        if is_pip_installed():
+            from glados_pycromanager.GUI.sharedFunctions import Shared_data
+        else:
+            from sharedFunctions import Shared_data
         if isinstance(shared_data,Shared_data):
             sharedData = shared_data
         elif isinstance(shared_data.parent, Shared_data):
@@ -6338,6 +6684,15 @@ def set_up_logger():
         else:
             setWarningErrorInfoIcon(errorIcon,&#39;error&#39;,findIconFolder(),alteration=&#39;none&#39;)
         
+        #Set the warningToolTip
+        warningToolTip = &#39;&#39;
+        for entry in sharedData.warningErrorInfoInfo[&#39;Warnings&#39;]:
+            warningToolTip+=entry+&#39;\n&#39;
+        warningIcon.setToolTip(warningToolTip)
+        if warningToolTip == &#39;&#39;:
+            setWarningErrorInfoIcon(warningIcon,&#39;warning&#39;,findIconFolder(),alteration=&#39;grayscale&#39;)
+        else:
+            setWarningErrorInfoIcon(warningIcon,&#39;warning&#39;,findIconFolder(),alteration=&#39;none&#39;)
         # errorToolTip = &#39;&#39;
         # errorToolTip = sharedData.warningErrorInfoInfo[&#39;Errors&#39;]
         # if errorToolTip != &#39;&#39;:
@@ -6552,7 +6907,33 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
 <pre><code class="python">class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = [&#39;core&#39;,&#39;layout&#39;,&#39;shared_data&#39;,&#39;gui&#39;,&#39;mda&#39;,&#39;data&#39;,&#39;config_groups&#39;,&#39;mainLayout&#39;,&#39;xypositionListWidget_XYGridManager&#39;]
+        self.storingExceptions = [&#39;core&#39;,&#39;layout&#39;,&#39;shared_data&#39;,&#39;gui&#39;,&#39;mda&#39;,&#39;data&#39;,&#39;config_groups&#39;,&#39;mainLayout&#39;,&#39;xypositionListWidget_XYGridManager&#39;,&#39;SLACK-CLIENT&#39;]
+
+    def save_state_globalData(self,filename):
+        if os.path.exists(filename):
+            #Load the mda state
+            with open(filename, &#39;r&#39;) as file:
+                state = json.load(file)
+        else:
+            state = {}
+            state[&#39;MDA&#39;] = {}
+            state[&#39;MMControls&#39;] = {}
+            state[&#39;GlobalData&#39;] = {}
+        
+        if &#39;MMControls&#39; not in state:
+            state[&#39;MMControls&#39;] = {}
+        if &#39;MDA&#39; not in state:
+            state[&#39;MDA&#39;] = {}
+        if &#39;GlobalData&#39; not in state:
+            state[&#39;GlobalData&#39;] = {}
+            
+        #Loop over everything in self.shared_data.globalData dict and store the [&#39;value&#39;]s:
+        for key, value in self.shared_data.globalData.items():
+            if key not in self.storingExceptions:
+                state[&#39;GlobalData&#39;][key] = value[&#39;value&#39;]
+            
+        with open(filename, &#39;w&#39;) as file:
+            json.dump(state, file, indent=4)
 
     def save_state_MMControls(self,filename):
         if os.path.exists(filename):
@@ -6563,11 +6944,14 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
             state = {}
             state[&#39;MDA&#39;] = {}
             state[&#39;MMControls&#39;] = {}
+            state[&#39;GlobalData&#39;] = {}
         
         if &#39;MMControls&#39; not in state:
             state[&#39;MMControls&#39;] = {}
         if &#39;MDA&#39; not in state:
             state[&#39;MDA&#39;] = {}
+        if &#39;GlobalData&#39; not in state:
+            state[&#39;GlobalData&#39;] = {}
         
         import MMcontrols
         import napariGlados
@@ -6635,6 +7019,9 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
 
         with open(filename, &#39;w&#39;) as file:
             json.dump(state, file, indent=4)
+        
+        #Also save global data:
+        self.save_state_globalData(filename)
             
     def save_state_MDA(self, filename):
         import napariGlados
@@ -6648,11 +7035,14 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
             state = {}
             state[&#39;MDA&#39;] = {}
             state[&#39;MMControls&#39;] = {}
+            state[&#39;GlobalData&#39;] = {}
             
         if &#39;MMControls&#39; not in state:
             state[&#39;MMControls&#39;] = {}
         if &#39;MDA&#39; not in state:
             state[&#39;MDA&#39;] = {}
+        if &#39;GlobalData&#39; not in state:
+            state[&#39;GlobalData&#39;] = {}
             
         for key, value in vars(self).items():
             saveState = None
@@ -6691,7 +7081,10 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
                         state[saveState][key] = value
 
         with open(filename, &#39;w&#39;) as file:
-            json.dump(state, file, indent=4)</code></pre>
+            json.dump(state, file, indent=4)
+
+        #Also save global data:
+        self.save_state_globalData(filename)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -6729,11 +7122,14 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
         state = {}
         state[&#39;MDA&#39;] = {}
         state[&#39;MMControls&#39;] = {}
+        state[&#39;GlobalData&#39;] = {}
         
     if &#39;MMControls&#39; not in state:
         state[&#39;MMControls&#39;] = {}
     if &#39;MDA&#39; not in state:
         state[&#39;MDA&#39;] = {}
+    if &#39;GlobalData&#39; not in state:
+        state[&#39;GlobalData&#39;] = {}
         
     for key, value in vars(self).items():
         saveState = None
@@ -6772,7 +7168,10 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
                     state[saveState][key] = value
 
     with open(filename, &#39;w&#39;) as file:
-        json.dump(state, file, indent=4)</code></pre>
+        json.dump(state, file, indent=4)
+
+    #Also save global data:
+    self.save_state_globalData(filename)</code></pre>
 </details>
 </dd>
 <dt id="utils.CustomMainWindow.save_state_MMControls"><code class="name flex">
@@ -6793,11 +7192,14 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
         state = {}
         state[&#39;MDA&#39;] = {}
         state[&#39;MMControls&#39;] = {}
+        state[&#39;GlobalData&#39;] = {}
     
     if &#39;MMControls&#39; not in state:
         state[&#39;MMControls&#39;] = {}
     if &#39;MDA&#39; not in state:
         state[&#39;MDA&#39;] = {}
+    if &#39;GlobalData&#39; not in state:
+        state[&#39;GlobalData&#39;] = {}
     
     import MMcontrols
     import napariGlados
@@ -6863,6 +7265,45 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
                     # Add more properties as needed
                 }
 
+    with open(filename, &#39;w&#39;) as file:
+        json.dump(state, file, indent=4)
+    
+    #Also save global data:
+    self.save_state_globalData(filename)</code></pre>
+</details>
+</dd>
+<dt id="utils.CustomMainWindow.save_state_globalData"><code class="name flex">
+<span>def <span class="ident">save_state_globalData</span></span>(<span>self, filename)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save_state_globalData(self,filename):
+    if os.path.exists(filename):
+        #Load the mda state
+        with open(filename, &#39;r&#39;) as file:
+            state = json.load(file)
+    else:
+        state = {}
+        state[&#39;MDA&#39;] = {}
+        state[&#39;MMControls&#39;] = {}
+        state[&#39;GlobalData&#39;] = {}
+    
+    if &#39;MMControls&#39; not in state:
+        state[&#39;MMControls&#39;] = {}
+    if &#39;MDA&#39; not in state:
+        state[&#39;MDA&#39;] = {}
+    if &#39;GlobalData&#39; not in state:
+        state[&#39;GlobalData&#39;] = {}
+        
+    #Loop over everything in self.shared_data.globalData dict and store the [&#39;value&#39;]s:
+    for key, value in self.shared_data.globalData.items():
+        if key not in self.storingExceptions:
+            state[&#39;GlobalData&#39;][key] = value[&#39;value&#39;]
+        
     with open(filename, &#39;w&#39;) as file:
         json.dump(state, file, indent=4)</code></pre>
 </details>
@@ -6986,7 +7427,54 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
         layout.addWidget(self.fileLocationButton)
         #Add the layout to the central widget:
         self.centralWidget().layout().addLayout(layout) #type:ignore
-        return self.fileLocationLineEdit</code></pre>
+        return self.fileLocationLineEdit
+
+    def addMarkdown(self,mdfile,width=700,height=800):
+        from PyQt5.QtWebEngineWidgets import QWebEngineView
+        import markdown
+        
+        newlayout = QVBoxLayout()
+        markdownViewer = QWebEngineView()
+        markdownViewer.setFixedHeight(height)
+        markdownViewer.setFixedWidth(width)
+        md_file = mdfile
+        with open(md_file, &#39;r&#39;, encoding=&#39;utf-8&#39;) as file:
+            md_content = file.read()
+        # Convert Markdown to HTML
+        html_content = markdown.markdown(md_content, extensions=[&#39;markdown_captions&#39;,&#39;fenced_code&#39;, &#39;codehilite&#39;, &#39;toc&#39;, &#39;attr_list&#39;, &#39;meta&#39;])
+        # Get the directory of the Markdown file
+        base_dir = os.path.dirname(os.path.abspath(md_file))
+        # Create a complete HTML document with MathJax support
+        full_html = f&#34;&#34;&#34;
+        &lt;!DOCTYPE html&gt;
+        &lt;html&gt;
+        &lt;head&gt;
+            &lt;script type=&#34;text/javascript&#34; async
+                src=&#34;https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML&#34;&gt;
+            &lt;/script&gt;
+            &lt;script type=&#34;text/x-mathjax-config&#34;&gt;
+                MathJax.Hub.Config({{
+                    tex2jax: {{
+                        inlineMath: [[&#39;$&#39;,&#39;$&#39;]],
+                        processEscapes: true
+                    }} 
+                }});
+            &lt;/script&gt;
+            &lt;style&gt;
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+                img {{ max-width: 100%; height: auto; }}
+            &lt;/style&gt;
+        &lt;/head&gt;
+        &lt;body&gt;
+            {html_content}
+        &lt;/body&gt;
+        &lt;/html&gt;
+        &#34;&#34;&#34;
+        from PyQt5.QtCore import QUrl
+        # Load the HTML content into the web view
+        markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + &#34;/&#34;))
+        newlayout.addWidget(markdownViewer)
+        self.centralWidget().layout().addLayout(newlayout)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -7071,6 +7559,63 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
     #Add the layout to the central widget:
     self.centralWidget().layout().addLayout(layout) #type:ignore
     return self.fileLocationLineEdit</code></pre>
+</details>
+</dd>
+<dt id="utils.SmallWindow.addMarkdown"><code class="name flex">
+<span>def <span class="ident">addMarkdown</span></span>(<span>self, mdfile, width=700, height=800)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def addMarkdown(self,mdfile,width=700,height=800):
+    from PyQt5.QtWebEngineWidgets import QWebEngineView
+    import markdown
+    
+    newlayout = QVBoxLayout()
+    markdownViewer = QWebEngineView()
+    markdownViewer.setFixedHeight(height)
+    markdownViewer.setFixedWidth(width)
+    md_file = mdfile
+    with open(md_file, &#39;r&#39;, encoding=&#39;utf-8&#39;) as file:
+        md_content = file.read()
+    # Convert Markdown to HTML
+    html_content = markdown.markdown(md_content, extensions=[&#39;markdown_captions&#39;,&#39;fenced_code&#39;, &#39;codehilite&#39;, &#39;toc&#39;, &#39;attr_list&#39;, &#39;meta&#39;])
+    # Get the directory of the Markdown file
+    base_dir = os.path.dirname(os.path.abspath(md_file))
+    # Create a complete HTML document with MathJax support
+    full_html = f&#34;&#34;&#34;
+    &lt;!DOCTYPE html&gt;
+    &lt;html&gt;
+    &lt;head&gt;
+        &lt;script type=&#34;text/javascript&#34; async
+            src=&#34;https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML&#34;&gt;
+        &lt;/script&gt;
+        &lt;script type=&#34;text/x-mathjax-config&#34;&gt;
+            MathJax.Hub.Config({{
+                tex2jax: {{
+                    inlineMath: [[&#39;$&#39;,&#39;$&#39;]],
+                    processEscapes: true
+                }} 
+            }});
+        &lt;/script&gt;
+        &lt;style&gt;
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+            img {{ max-width: 100%; height: auto; }}
+        &lt;/style&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        {html_content}
+    &lt;/body&gt;
+    &lt;/html&gt;
+    &#34;&#34;&#34;
+    from PyQt5.QtCore import QUrl
+    # Load the HTML content into the web view
+    markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + &#34;/&#34;))
+    newlayout.addWidget(markdownViewer)
+    self.centralWidget().layout().addLayout(newlayout)</code></pre>
 </details>
 </dd>
 <dt id="utils.SmallWindow.addTextEdit"><code class="name flex">
@@ -7291,14 +7836,21 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
         from PyQt5.QtGui import QIcon
         from PyQt5.QtCore import QSize
         
-        #Find the iconPath folder
-        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-        else:
-            self.iconFolder = &#39;&#39;
-        
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+            elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+            else:
+                self.iconFolder = &#39;&#39;
+                
         iconSize = 64
         self.rb_horNorm = QRadioButton(&#34;&#34;)
         self.rb_horNorm.setIcon(QIcon(self.iconFolder+os.sep+&#34;gridHorNorm.png&#34;))
@@ -7733,14 +8285,21 @@ QLineEdit(contents: str, parent: typing.Optional[QWidget] = None)</p></div>
     from PyQt5.QtGui import QIcon
     from PyQt5.QtCore import QSize
     
-    #Find the iconPath folder
-    if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-        self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-    elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-        self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-    else:
-        self.iconFolder = &#39;&#39;
-    
+    import glados_pycromanager
+    # Get the installation path of the package
+    package_path = os.path.dirname(glados_pycromanager.__file__)
+    # Construct the path to the Icons folder
+    self.iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+    if not os.path.exists(self.iconFolder):
+        #Find the iconPath folder
+        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+            self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+        else:
+            self.iconFolder = &#39;&#39;
+            
     iconSize = 64
     self.rb_horNorm = QRadioButton(&#34;&#34;)
     self.rb_horNorm.setIcon(QIcon(self.iconFolder+os.sep+&#34;gridHorNorm.png&#34;))
@@ -8318,6 +8877,7 @@ QHBoxLayout(parent: QWidget)</p></div>
 <li><code><a title="utils.hideAdvVariables" href="#utils.hideAdvVariables">hideAdvVariables</a></code></li>
 <li><code><a title="utils.infoFromMetadata" href="#utils.infoFromMetadata">infoFromMetadata</a></code></li>
 <li><code><a title="utils.inputFromFunction" href="#utils.inputFromFunction">inputFromFunction</a></code></li>
+<li><code><a title="utils.is_pip_installed" href="#utils.is_pip_installed">is_pip_installed</a></code></li>
 <li><code><a title="utils.kwargValueInputChanged" href="#utils.kwargValueInputChanged">kwargValueInputChanged</a></code></li>
 <li><code><a title="utils.kwargsFromFunction" href="#utils.kwargsFromFunction">kwargsFromFunction</a></code></li>
 <li><code><a title="utils.layout_changedDropdown" href="#utils.layout_changedDropdown">layout_changedDropdown</a></code></li>
@@ -8328,6 +8888,7 @@ QHBoxLayout(parent: QWidget)</p></div>
 <li><code><a title="utils.nodz_evaluateAdv" href="#utils.nodz_evaluateAdv">nodz_evaluateAdv</a></code></li>
 <li><code><a title="utils.nodz_evaluateVar" href="#utils.nodz_evaluateVar">nodz_evaluateVar</a></code></li>
 <li><code><a title="utils.nodz_setVariableToValue" href="#utils.nodz_setVariableToValue">nodz_setVariableToValue</a></code></li>
+<li><code><a title="utils.openAdvancedSettings" href="#utils.openAdvancedSettings">openAdvancedSettings</a></code></li>
 <li><code><a title="utils.optKwargsFromFunction" href="#utils.optKwargsFromFunction">optKwargsFromFunction</a></code></li>
 <li><code><a title="utils.outputFromFunction" href="#utils.outputFromFunction">outputFromFunction</a></code></li>
 <li><code><a title="utils.preLoadOptions_analysis" href="#utils.preLoadOptions_analysis">preLoadOptions_analysis</a></code></li>
@@ -8363,6 +8924,7 @@ QHBoxLayout(parent: QWidget)</p></div>
 <ul class="">
 <li><code><a title="utils.CustomMainWindow.save_state_MDA" href="#utils.CustomMainWindow.save_state_MDA">save_state_MDA</a></code></li>
 <li><code><a title="utils.CustomMainWindow.save_state_MMControls" href="#utils.CustomMainWindow.save_state_MMControls">save_state_MMControls</a></code></li>
+<li><code><a title="utils.CustomMainWindow.save_state_globalData" href="#utils.CustomMainWindow.save_state_globalData">save_state_globalData</a></code></li>
 </ul>
 </li>
 <li>
@@ -8371,6 +8933,7 @@ QHBoxLayout(parent: QWidget)</p></div>
 <li><code><a title="utils.SmallWindow.addButton" href="#utils.SmallWindow.addButton">addButton</a></code></li>
 <li><code><a title="utils.SmallWindow.addDescription" href="#utils.SmallWindow.addDescription">addDescription</a></code></li>
 <li><code><a title="utils.SmallWindow.addFileLocation" href="#utils.SmallWindow.addFileLocation">addFileLocation</a></code></li>
+<li><code><a title="utils.SmallWindow.addMarkdown" href="#utils.SmallWindow.addMarkdown">addMarkdown</a></code></li>
 <li><code><a title="utils.SmallWindow.addTextEdit" href="#utils.SmallWindow.addTextEdit">addTextEdit</a></code></li>
 <li><code><a title="utils.SmallWindow.addTextPrePriod" href="#utils.SmallWindow.addTextPrePriod">addTextPrePriod</a></code></li>
 <li><code><a title="utils.SmallWindow.openFileDialog" href="#utils.SmallWindow.openFileDialog">openFileDialog</a></code></li>

@@ -30,7 +30,6 @@
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
-from AnalysisClass import *
 import sys
 import os
 import json
@@ -43,7 +42,6 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
 import matplotlib
 import pickle
-from utils import CustomMainWindow
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import tifffile
@@ -53,10 +51,22 @@ import logging
 from typing import List, Iterable
 import itertools
 import queue
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
+
 #For drawing
 matplotlib.use(&#39;Qt5Agg&#39;)
 
+def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.GUI.utils import CustomMainWindow
+    from glados_pycromanager.GUI.AnalysisClass import *
+    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
+
+else:
+    from utils import CustomMainWindow
+    from AnalysisClass import *
+    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 class ConfigInfo:
     &#34;&#34;&#34;
     This class contains information about a pycromanager config group
@@ -291,14 +301,20 @@ class MMConfigUI(CustomMainWindow):
         self.mainLayout = QGridLayout()
         self.configEntries = {}
         
-        #Find the iconPath folder
-        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-        else:
-            self.iconFolder = &#39;&#39;
-        
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+            elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+            else:
+                self.iconFolder = &#39;&#39;
         
         
         if showLiveSnapExposureButtons:
@@ -349,6 +365,12 @@ class MMConfigUI(CustomMainWindow):
             self.relativeStagesGroupBox.setLayout(self.relativeStagesLayout())
             # self.relativeStagesGroupBox.setLayout(QLayout())
             self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
+        
+        #Add a horizontal auto-widening object to mainlayout:
+        from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
+        from PyQt5 import QtWidgets
+        spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.mainLayout.addItem(spacer,0,99)
         
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
@@ -580,6 +602,8 @@ class MMConfigUI(CustomMainWindow):
         self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
         liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
+        self.livesnapalbumbuttons = QHBoxLayout()
+        
         self.LiveModeButton = QPushButton(&#34;Start Live Mode&#34;)
         icon = QIcon(self.iconFolder+os.sep+&#39;General_Start.png&#39;)
         # icon: Flaticon.com
@@ -588,7 +612,7 @@ class MMConfigUI(CustomMainWindow):
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.LiveModeButton)
         
         self.SnapButton = QPushButton(&#34;Snap&#34;)
         icon = QIcon(self.iconFolder+os.sep+&#39;General_Snap.png&#39;)
@@ -597,7 +621,7 @@ class MMConfigUI(CustomMainWindow):
         #add a connection to the button:
         self.SnapButton.clicked.connect(lambda index: self.snapImage())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.SnapButton,2,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.SnapButton)
         
         self.AlbumButton = QPushButton(&#34;Add to Album&#34;)
         #add a connection to the button:
@@ -606,8 +630,9 @@ class MMConfigUI(CustomMainWindow):
         # icon: Flaticon.com
         self.AlbumButton.setIcon(icon)
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.AlbumButton,3,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.AlbumButton)
         
+        liveModeLayout.addLayout(self.livesnapalbumbuttons,1,0,1,2)
         
         if self.showShutterOptions:
             self.shutterOptionsGroupBox = QGroupBox(&#34;Shutter&#34;)
@@ -643,6 +668,11 @@ class MMConfigUI(CustomMainWindow):
         self.forceResetButton = QPushButton(&#34;Force-reset&#34;)
         self.forceResetButton.clicked.connect(lambda index, shared_data=shared_data: utils.forceReset(shared_data))
         debugHbox.addWidget(self.forceResetButton)
+        
+        
+        self.advSettingsButton = QPushButton(&#34;Adv. settings&#34;)
+        self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
+        debugHbox.addWidget(self.advSettingsButton)
         
         liveModeLayout.addLayout(debugHbox,99,0,1,2)
         
@@ -901,21 +931,80 @@ class MMConfigUI(CustomMainWindow):
         except:
             logging.error(&#39;ZOOMING DIDN\&#39;T WORK!&#39;)
     
+    def shape_drawn_callback(self, event):
+        if len(self.drawROIlayer.data) &gt; 0:
+            if not event.source._is_moving and not event.source._is_selecting and not event.source._is_creating and len(event.source._mouse_drag_gen) &gt; 0 and event.source.name != &#39;Draw ROI_&#39;:
+                logging.debug(&#39;Finished drawing an area for the ROI size!&#39;)
+                
+                def acceptFun(dialogV):
+                    self.setROItoDrawn()
+                    #Close the dialog:
+                    dialogV.done(QDialog.Accepted)
+                
+                
+                
+                def reDoFun(dialogV,layer):
+                    #Remove the layer
+                    shared_data.napariViewer.layers.remove(layer)
+                    #Restart the drawROI:
+                    self.drawROI()
+                    #Close the dialog:
+                    dialogV.done(QDialog.Rejected)
+                
+                def cancelFun(dialogV,layer):
+                    #Remove the layer
+                    shared_data.napariViewer.layers.remove(layer)
+                    #Close the dialog:
+                    dialogV.done(QDialog.Rejected)
+                
+                #Change the layer name so this won&#39;t pop up again after dialog is closed.
+                event.source.name = &#39;Draw ROI_&#39;
+                #Pop up a dialog box to ask if they like it or not:
+                #Create a dialog box
+                from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
+                dialog =  QDialog()
+                dialog.setWindowTitle(&#39;Draw ROI&#39;)
+                #Add 3 buttons: 
+                QButtonOk = QPushButton(&#39;OK&#39;)
+                QButtonRedraw = QPushButton(&#39;Redraw&#39;)
+                QButtonCancel = QPushButton(&#39;Cancel&#39;)
+                #add the box to dialog:
+                layout = QVBoxLayout()
+                layout.addWidget(
+                    QLabel(&#39;ROI drawn correctly?&#39;)
+                )
+                buttonBox = QHBoxLayout()
+                buttonBox.addWidget(QButtonOk)
+                buttonBox.addWidget(QButtonRedraw)
+                buttonBox.addWidget(QButtonCancel)
+                layout.addLayout(buttonBox)
+                dialog.setLayout(layout)
+                #Connect the buttons to the dialog:
+                QButtonOk.clicked.connect(lambda: acceptFun(dialog))
+                QButtonRedraw.clicked.connect(lambda: reDoFun(dialog,event.source))
+                QButtonCancel.clicked.connect(lambda: cancelFun(dialog,event.source))
+                #Show the dialog:
+                dialog.exec_()
+            
+            
     def drawROI(self):
         &#34;&#34;&#34;
         Draw a ROI. Idea is to create a new layer, let the user draw a rectangle, and ask if they like it or not. Then a small popup window with &#39;OK&#39;, &#39;Let me draw again&#39;, &#39;Stop this futile attempt&#39;
         &#34;&#34;&#34;
         
+            
         # Create a shapes layer
-        self.drawROIlayer = shared_data.napariViewer.add_shapes(name=&#39;drawROI&#39;)
+        self.drawROIlayer = shared_data.napariViewer.add_shapes(name=&#39;Draw ROI&#39;)
+        self.drawROIlayer.events.set_data.connect(self.shape_drawn_callback)
+
 
         # Set the shapes layer mode to &#39;add_rectangle&#39;
         self.drawROIlayer.mode = &#39;add_rectangle&#39;
         
         #Changes the button to a different method, which should be pressed once the rectangle is drawn:
-        self.ROIoptionsButtons[&#39;drawROI&#39;].setText(&#39;ROI drawn&#39;)
-        self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.disconnect()
-        self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.connect(lambda index: self.setROItoDrawn())
+        # self.ROIoptionsButtons[&#39;drawROI&#39;].setText(&#39;ROI drawn&#39;)
+        # self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.disconnect()
+        # self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.connect(lambda index: self.setROItoDrawn())
     
     def setROItoDrawn(self):
         &#34;&#34;&#34;
@@ -929,8 +1018,8 @@ class MMConfigUI(CustomMainWindow):
             if shape_type == &#39;rectangle&#39;:
                 vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
                 #Get the topleft, bottomright position from the drawn rectangle
-                topleftxy = np.floor(vertices[0])
-                bottomrightxy = np.ceil(vertices[2])
+                topleftxy = np.floor(vertices[0][::-1])
+                bottomrightxy = np.ceil(vertices[2][::-1])
                 #Set the boundaries based on the camera
                 mintopleft = [0,0]
                 maxbottomright = [shared_data.core.get_roi().width, shared_data.core.get_roi().height]
@@ -2396,14 +2485,20 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
         self.mainLayout = QGridLayout()
         self.configEntries = {}
         
-        #Find the iconPath folder
-        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-        else:
-            self.iconFolder = &#39;&#39;
-        
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        self.iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+
+        if not os.path.exists(self.iconFolder):
+            #Find the iconPath folder
+            if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+            elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+            else:
+                self.iconFolder = &#39;&#39;
         
         
         if showLiveSnapExposureButtons:
@@ -2454,6 +2549,12 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
             self.relativeStagesGroupBox.setLayout(self.relativeStagesLayout())
             # self.relativeStagesGroupBox.setLayout(QLayout())
             self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
+        
+        #Add a horizontal auto-widening object to mainlayout:
+        from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
+        from PyQt5 import QtWidgets
+        spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.mainLayout.addItem(spacer,0,99)
         
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
@@ -2685,6 +2786,8 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
         self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
         liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
+        self.livesnapalbumbuttons = QHBoxLayout()
+        
         self.LiveModeButton = QPushButton(&#34;Start Live Mode&#34;)
         icon = QIcon(self.iconFolder+os.sep+&#39;General_Start.png&#39;)
         # icon: Flaticon.com
@@ -2693,7 +2796,7 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.LiveModeButton)
         
         self.SnapButton = QPushButton(&#34;Snap&#34;)
         icon = QIcon(self.iconFolder+os.sep+&#39;General_Snap.png&#39;)
@@ -2702,7 +2805,7 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
         #add a connection to the button:
         self.SnapButton.clicked.connect(lambda index: self.snapImage())
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.SnapButton,2,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.SnapButton)
         
         self.AlbumButton = QPushButton(&#34;Add to Album&#34;)
         #add a connection to the button:
@@ -2711,8 +2814,9 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
         # icon: Flaticon.com
         self.AlbumButton.setIcon(icon)
         #Add the button to the layout:
-        liveModeLayout.addWidget(self.AlbumButton,3,0,1,2)
+        self.livesnapalbumbuttons.addWidget(self.AlbumButton)
         
+        liveModeLayout.addLayout(self.livesnapalbumbuttons,1,0,1,2)
         
         if self.showShutterOptions:
             self.shutterOptionsGroupBox = QGroupBox(&#34;Shutter&#34;)
@@ -2748,6 +2852,11 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
         self.forceResetButton = QPushButton(&#34;Force-reset&#34;)
         self.forceResetButton.clicked.connect(lambda index, shared_data=shared_data: utils.forceReset(shared_data))
         debugHbox.addWidget(self.forceResetButton)
+        
+        
+        self.advSettingsButton = QPushButton(&#34;Adv. settings&#34;)
+        self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
+        debugHbox.addWidget(self.advSettingsButton)
         
         liveModeLayout.addLayout(debugHbox,99,0,1,2)
         
@@ -3006,21 +3115,80 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
         except:
             logging.error(&#39;ZOOMING DIDN\&#39;T WORK!&#39;)
     
+    def shape_drawn_callback(self, event):
+        if len(self.drawROIlayer.data) &gt; 0:
+            if not event.source._is_moving and not event.source._is_selecting and not event.source._is_creating and len(event.source._mouse_drag_gen) &gt; 0 and event.source.name != &#39;Draw ROI_&#39;:
+                logging.debug(&#39;Finished drawing an area for the ROI size!&#39;)
+                
+                def acceptFun(dialogV):
+                    self.setROItoDrawn()
+                    #Close the dialog:
+                    dialogV.done(QDialog.Accepted)
+                
+                
+                
+                def reDoFun(dialogV,layer):
+                    #Remove the layer
+                    shared_data.napariViewer.layers.remove(layer)
+                    #Restart the drawROI:
+                    self.drawROI()
+                    #Close the dialog:
+                    dialogV.done(QDialog.Rejected)
+                
+                def cancelFun(dialogV,layer):
+                    #Remove the layer
+                    shared_data.napariViewer.layers.remove(layer)
+                    #Close the dialog:
+                    dialogV.done(QDialog.Rejected)
+                
+                #Change the layer name so this won&#39;t pop up again after dialog is closed.
+                event.source.name = &#39;Draw ROI_&#39;
+                #Pop up a dialog box to ask if they like it or not:
+                #Create a dialog box
+                from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
+                dialog =  QDialog()
+                dialog.setWindowTitle(&#39;Draw ROI&#39;)
+                #Add 3 buttons: 
+                QButtonOk = QPushButton(&#39;OK&#39;)
+                QButtonRedraw = QPushButton(&#39;Redraw&#39;)
+                QButtonCancel = QPushButton(&#39;Cancel&#39;)
+                #add the box to dialog:
+                layout = QVBoxLayout()
+                layout.addWidget(
+                    QLabel(&#39;ROI drawn correctly?&#39;)
+                )
+                buttonBox = QHBoxLayout()
+                buttonBox.addWidget(QButtonOk)
+                buttonBox.addWidget(QButtonRedraw)
+                buttonBox.addWidget(QButtonCancel)
+                layout.addLayout(buttonBox)
+                dialog.setLayout(layout)
+                #Connect the buttons to the dialog:
+                QButtonOk.clicked.connect(lambda: acceptFun(dialog))
+                QButtonRedraw.clicked.connect(lambda: reDoFun(dialog,event.source))
+                QButtonCancel.clicked.connect(lambda: cancelFun(dialog,event.source))
+                #Show the dialog:
+                dialog.exec_()
+            
+            
     def drawROI(self):
         &#34;&#34;&#34;
         Draw a ROI. Idea is to create a new layer, let the user draw a rectangle, and ask if they like it or not. Then a small popup window with &#39;OK&#39;, &#39;Let me draw again&#39;, &#39;Stop this futile attempt&#39;
         &#34;&#34;&#34;
         
+            
         # Create a shapes layer
-        self.drawROIlayer = shared_data.napariViewer.add_shapes(name=&#39;drawROI&#39;)
+        self.drawROIlayer = shared_data.napariViewer.add_shapes(name=&#39;Draw ROI&#39;)
+        self.drawROIlayer.events.set_data.connect(self.shape_drawn_callback)
+
 
         # Set the shapes layer mode to &#39;add_rectangle&#39;
         self.drawROIlayer.mode = &#39;add_rectangle&#39;
         
         #Changes the button to a different method, which should be pressed once the rectangle is drawn:
-        self.ROIoptionsButtons[&#39;drawROI&#39;].setText(&#39;ROI drawn&#39;)
-        self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.disconnect()
-        self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.connect(lambda index: self.setROItoDrawn())
+        # self.ROIoptionsButtons[&#39;drawROI&#39;].setText(&#39;ROI drawn&#39;)
+        # self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.disconnect()
+        # self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.connect(lambda index: self.setROItoDrawn())
     
     def setROItoDrawn(self):
         &#34;&#34;&#34;
@@ -3034,8 +3202,8 @@ autoSaveLoad (bool, optional): Whether to automatically save and load the config
             if shape_type == &#39;rectangle&#39;:
                 vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
                 #Get the topleft, bottomright position from the drawn rectangle
-                topleftxy = np.floor(vertices[0])
-                bottomrightxy = np.ceil(vertices[2])
+                topleftxy = np.floor(vertices[0][::-1])
+                bottomrightxy = np.ceil(vertices[2][::-1])
                 #Set the boundaries based on the camera
                 mintopleft = [0,0]
                 maxbottomright = [shared_data.core.get_roi().width, shared_data.core.get_roi().height]
@@ -4416,16 +4584,19 @@ with the options provided in the MM config.</p></div>
     Draw a ROI. Idea is to create a new layer, let the user draw a rectangle, and ask if they like it or not. Then a small popup window with &#39;OK&#39;, &#39;Let me draw again&#39;, &#39;Stop this futile attempt&#39;
     &#34;&#34;&#34;
     
+        
     # Create a shapes layer
-    self.drawROIlayer = shared_data.napariViewer.add_shapes(name=&#39;drawROI&#39;)
+    self.drawROIlayer = shared_data.napariViewer.add_shapes(name=&#39;Draw ROI&#39;)
+    self.drawROIlayer.events.set_data.connect(self.shape_drawn_callback)
+
 
     # Set the shapes layer mode to &#39;add_rectangle&#39;
     self.drawROIlayer.mode = &#39;add_rectangle&#39;
     
     #Changes the button to a different method, which should be pressed once the rectangle is drawn:
-    self.ROIoptionsButtons[&#39;drawROI&#39;].setText(&#39;ROI drawn&#39;)
-    self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.disconnect()
-    self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.connect(lambda index: self.setROItoDrawn())</code></pre>
+    # self.ROIoptionsButtons[&#39;drawROI&#39;].setText(&#39;ROI drawn&#39;)
+    # self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.disconnect()
+    # self.ROIoptionsButtons[&#39;drawROI&#39;].clicked.connect(lambda index: self.setROItoDrawn())</code></pre>
 </details>
 </dd>
 <dt id="MMcontrols.MMConfigUI.generalImagingLayout"><code class="name flex">
@@ -4465,6 +4636,8 @@ Basically, should be exposure time (ms), snap, addToAlbum, live start/stop</p>
     self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
     liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
     
+    self.livesnapalbumbuttons = QHBoxLayout()
+    
     self.LiveModeButton = QPushButton(&#34;Start Live Mode&#34;)
     icon = QIcon(self.iconFolder+os.sep+&#39;General_Start.png&#39;)
     # icon: Flaticon.com
@@ -4473,7 +4646,7 @@ Basically, should be exposure time (ms), snap, addToAlbum, live start/stop</p>
     #add a connection to the button:
     self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
     #Add the button to the layout:
-    liveModeLayout.addWidget(self.LiveModeButton,1,0,1,2)
+    self.livesnapalbumbuttons.addWidget(self.LiveModeButton)
     
     self.SnapButton = QPushButton(&#34;Snap&#34;)
     icon = QIcon(self.iconFolder+os.sep+&#39;General_Snap.png&#39;)
@@ -4482,7 +4655,7 @@ Basically, should be exposure time (ms), snap, addToAlbum, live start/stop</p>
     #add a connection to the button:
     self.SnapButton.clicked.connect(lambda index: self.snapImage())
     #Add the button to the layout:
-    liveModeLayout.addWidget(self.SnapButton,2,0,1,2)
+    self.livesnapalbumbuttons.addWidget(self.SnapButton)
     
     self.AlbumButton = QPushButton(&#34;Add to Album&#34;)
     #add a connection to the button:
@@ -4491,8 +4664,9 @@ Basically, should be exposure time (ms), snap, addToAlbum, live start/stop</p>
     # icon: Flaticon.com
     self.AlbumButton.setIcon(icon)
     #Add the button to the layout:
-    liveModeLayout.addWidget(self.AlbumButton,3,0,1,2)
+    self.livesnapalbumbuttons.addWidget(self.AlbumButton)
     
+    liveModeLayout.addLayout(self.livesnapalbumbuttons,1,0,1,2)
     
     if self.showShutterOptions:
         self.shutterOptionsGroupBox = QGroupBox(&#34;Shutter&#34;)
@@ -4528,6 +4702,11 @@ Basically, should be exposure time (ms), snap, addToAlbum, live start/stop</p>
     self.forceResetButton = QPushButton(&#34;Force-reset&#34;)
     self.forceResetButton.clicked.connect(lambda index, shared_data=shared_data: utils.forceReset(shared_data))
     debugHbox.addWidget(self.forceResetButton)
+    
+    
+    self.advSettingsButton = QPushButton(&#34;Adv. settings&#34;)
+    self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
+    debugHbox.addWidget(self.advSettingsButton)
     
     liveModeLayout.addLayout(debugHbox,99,0,1,2)
     
@@ -5177,8 +5356,8 @@ It also removes self.drawROIlayer from shared_data.napariViewer</p></div>
         if shape_type == &#39;rectangle&#39;:
             vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
             #Get the topleft, bottomright position from the drawn rectangle
-            topleftxy = np.floor(vertices[0])
-            bottomrightxy = np.ceil(vertices[2])
+            topleftxy = np.floor(vertices[0][::-1])
+            bottomrightxy = np.ceil(vertices[2][::-1])
             #Set the boundaries based on the camera
             mintopleft = [0,0]
             maxbottomright = [shared_data.core.get_roi().width, shared_data.core.get_roi().height]
@@ -5295,6 +5474,71 @@ Also sets the size policy of the widget to minimum, so it will only take up as m
                     self.set_font_and_margins_recursive(item.widget(), font=font)
                 if hasattr(item, &#39;layout&#39;):
                     self.set_font_and_margins_recursive(item.layout(), font=font)</code></pre>
+</details>
+</dd>
+<dt id="MMcontrols.MMConfigUI.shape_drawn_callback"><code class="name flex">
+<span>def <span class="ident">shape_drawn_callback</span></span>(<span>self, event)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def shape_drawn_callback(self, event):
+    if len(self.drawROIlayer.data) &gt; 0:
+        if not event.source._is_moving and not event.source._is_selecting and not event.source._is_creating and len(event.source._mouse_drag_gen) &gt; 0 and event.source.name != &#39;Draw ROI_&#39;:
+            logging.debug(&#39;Finished drawing an area for the ROI size!&#39;)
+            
+            def acceptFun(dialogV):
+                self.setROItoDrawn()
+                #Close the dialog:
+                dialogV.done(QDialog.Accepted)
+            
+            
+            
+            def reDoFun(dialogV,layer):
+                #Remove the layer
+                shared_data.napariViewer.layers.remove(layer)
+                #Restart the drawROI:
+                self.drawROI()
+                #Close the dialog:
+                dialogV.done(QDialog.Rejected)
+            
+            def cancelFun(dialogV,layer):
+                #Remove the layer
+                shared_data.napariViewer.layers.remove(layer)
+                #Close the dialog:
+                dialogV.done(QDialog.Rejected)
+            
+            #Change the layer name so this won&#39;t pop up again after dialog is closed.
+            event.source.name = &#39;Draw ROI_&#39;
+            #Pop up a dialog box to ask if they like it or not:
+            #Create a dialog box
+            from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
+            dialog =  QDialog()
+            dialog.setWindowTitle(&#39;Draw ROI&#39;)
+            #Add 3 buttons: 
+            QButtonOk = QPushButton(&#39;OK&#39;)
+            QButtonRedraw = QPushButton(&#39;Redraw&#39;)
+            QButtonCancel = QPushButton(&#39;Cancel&#39;)
+            #add the box to dialog:
+            layout = QVBoxLayout()
+            layout.addWidget(
+                QLabel(&#39;ROI drawn correctly?&#39;)
+            )
+            buttonBox = QHBoxLayout()
+            buttonBox.addWidget(QButtonOk)
+            buttonBox.addWidget(QButtonRedraw)
+            buttonBox.addWidget(QButtonCancel)
+            layout.addLayout(buttonBox)
+            dialog.setLayout(layout)
+            #Connect the buttons to the dialog:
+            QButtonOk.clicked.connect(lambda: acceptFun(dialog))
+            QButtonRedraw.clicked.connect(lambda: reDoFun(dialog,event.source))
+            QButtonCancel.clicked.connect(lambda: cancelFun(dialog,event.source))
+            #Show the dialog:
+            dialog.exec_()</code></pre>
 </details>
 </dd>
 <dt id="MMcontrols.MMConfigUI.shutterOptionsLayout"><code class="name flex">
@@ -5868,6 +6112,7 @@ If the option is "ZoomOut", the ROI is zoomed out twice</p></div>
 <li><code><a title="MMcontrols.MMConfigUI.setROItoDrawn" href="#MMcontrols.MMConfigUI.setROItoDrawn">setROItoDrawn</a></code></li>
 <li><code><a title="MMcontrols.MMConfigUI.setXYStageMovementValue" href="#MMcontrols.MMConfigUI.setXYStageMovementValue">setXYStageMovementValue</a></code></li>
 <li><code><a title="MMcontrols.MMConfigUI.set_font_and_margins_recursive" href="#MMcontrols.MMConfigUI.set_font_and_margins_recursive">set_font_and_margins_recursive</a></code></li>
+<li><code><a title="MMcontrols.MMConfigUI.shape_drawn_callback" href="#MMcontrols.MMConfigUI.shape_drawn_callback">shape_drawn_callback</a></code></li>
 <li><code><a title="MMcontrols.MMConfigUI.shutterOptionsLayout" href="#MMcontrols.MMConfigUI.shutterOptionsLayout">shutterOptionsLayout</a></code></li>
 <li><code><a title="MMcontrols.MMConfigUI.snapImage" href="#MMcontrols.MMConfigUI.snapImage">snapImage</a></code></li>
 <li><code><a title="MMcontrols.MMConfigUI.stagesLayout" href="#MMcontrols.MMConfigUI.stagesLayout">stagesLayout</a></code></li>

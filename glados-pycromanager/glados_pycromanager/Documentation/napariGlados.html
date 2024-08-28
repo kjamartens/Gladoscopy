@@ -40,17 +40,35 @@ from pycromanager import Core
 from magicgui import magicgui
 from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QScrollArea
 import sys
-from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 import logging
 import os
 
-from LaserControlScripts import *
-from MMcontrols import microManagerControlsUI
-from AnalysisClass import *
-from Analysis_dockWidgets import *
-from FlowChart_dockWidgets import *
-from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-from utils import cleanUpTemporaryFiles
+def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.GUI.LaserControlScripts import *
+    import glados_pycromanager.GUI.napariGlados as napariGlados
+    from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
+    from glados_pycromanager.GUI.AnalysisClass import *
+    from glados_pycromanager.GUI.Analysis_dockWidgets import *
+    from glados_pycromanager.GUI.FlowChart_dockWidgets import *
+    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+    from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
+    import glados_pycromanager.GUI.utils as utils
+    from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+    from glados_pycromanager.GUI.MDAGlados import MDAGlados
+else:
+    from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+    from LaserControlScripts import *
+    from MMcontrols import microManagerControlsUI
+    from AnalysisClass import *
+    from Analysis_dockWidgets import *
+    from FlowChart_dockWidgets import *
+    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+    from utils import cleanUpTemporaryFiles
+    import utils as utils
+    from MDAGlados import MDAGlados
 
 
 # # Define a flag to control the continuous task
@@ -90,7 +108,7 @@ def napariUpdateLive(DataStructure):
     layerName = DataStructure[&#39;layer_name&#39;]
     
     #Visualise the MDA data on a frame-by-frame method - i.e. not a &#39;stack&#39;, but simply a single image which is replaced every frame update
-    if shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;frameByFrame&#39; or DataStructure[&#39;layer_name&#39;]==&#39;Live&#39;:
+    if shared_data.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] == &#39;frameByFrame&#39; or DataStructure[&#39;layer_name&#39;]==&#39;Live&#39;:
         liveImage = DataStructure[&#39;data&#39;][0]
         metadata = DataStructure[&#39;data&#39;][1]
         if liveImage is None:
@@ -117,7 +135,7 @@ def napariUpdateLive(DataStructure):
             # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
             layer.data = liveImage
     #Visualise the MDA data via a &#39;stack&#39; - i.e. a multiD method where the user can (later) scroll through the frames
-    elif shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+    elif shared_data.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] == &#39;multiDstack&#39;:
         if DataStructure[&#39;finalisationProcedure&#39;] == False:
             liveImage = DataStructure[&#39;data&#39;][0]
             metadata = DataStructure[&#39;data&#39;][1]
@@ -349,7 +367,7 @@ class napariHandler():
         self.mda_acq_done_signal = pyqtSignal(bool)
 
         #Sleep time to keep responsiveness
-        self.sleep_time = 0.05
+        self.sleep_time = 1/shared_data.globalData[&#39;VISUALISATION-FPS&#39;][&#39;value&#39;] #in sec
         self.layerName = &#39;newLayer&#39;
 
     def mdaacqdonefunction(self):
@@ -593,7 +611,7 @@ class napariHandler():
             yield DataStructure#img_queue.get(block = False)
             
         #Do the final N images
-        if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+        if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] == &#39;multiDstack&#39;:
             if layerName == &#39;MDA&#39;:
                 logging.debug(&#39;Finalising MDA visualisation...&#39;)
                 DataStructure = {}
@@ -742,7 +760,6 @@ class dockWidget_MDA(dockWidgets):
                 mdaInfo = gladosInfo[&#39;MDA&#39;]
             
             try:
-                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
@@ -779,14 +796,12 @@ class dockWidget_MDA(dockWidgets):
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
             except KeyError:
-                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
         else: #If no MDA state is yet saved, open a new MDAGlados from scratch
-            from MDAGlados import MDAGlados
             #Add the full micro manager controls UI
             self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                         hasGUI=True,
@@ -1049,7 +1064,7 @@ image in napari</p>
     layerName = DataStructure[&#39;layer_name&#39;]
     
     #Visualise the MDA data on a frame-by-frame method - i.e. not a &#39;stack&#39;, but simply a single image which is replaced every frame update
-    if shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;frameByFrame&#39; or DataStructure[&#39;layer_name&#39;]==&#39;Live&#39;:
+    if shared_data.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] == &#39;frameByFrame&#39; or DataStructure[&#39;layer_name&#39;]==&#39;Live&#39;:
         liveImage = DataStructure[&#39;data&#39;][0]
         metadata = DataStructure[&#39;data&#39;][1]
         if liveImage is None:
@@ -1076,7 +1091,7 @@ image in napari</p>
             # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
             layer.data = liveImage
     #Visualise the MDA data via a &#39;stack&#39; - i.e. a multiD method where the user can (later) scroll through the frames
-    elif shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+    elif shared_data.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] == &#39;multiDstack&#39;:
         if DataStructure[&#39;finalisationProcedure&#39;] == False:
             liveImage = DataStructure[&#39;data&#39;][0]
             metadata = DataStructure[&#39;data&#39;][1]
@@ -1385,7 +1400,6 @@ image in napari</p>
                 mdaInfo = gladosInfo[&#39;MDA&#39;]
             
             try:
-                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
@@ -1422,14 +1436,12 @@ image in napari</p>
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
             except KeyError:
-                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
         else: #If no MDA state is yet saved, open a new MDAGlados from scratch
-            from MDAGlados import MDAGlados
             #Add the full micro manager controls UI
             self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                         hasGUI=True,
@@ -1732,7 +1744,7 @@ arguments is the optional sequence of the names of the signal's arguments.</p></
         self.mda_acq_done_signal = pyqtSignal(bool)
 
         #Sleep time to keep responsiveness
-        self.sleep_time = 0.05
+        self.sleep_time = 1/shared_data.globalData[&#39;VISUALISATION-FPS&#39;][&#39;value&#39;] #in sec
         self.layerName = &#39;newLayer&#39;
 
     def mdaacqdonefunction(self):
@@ -1976,7 +1988,7 @@ arguments is the optional sequence of the names of the signal's arguments.</p></
             yield DataStructure#img_queue.get(block = False)
             
         #Do the final N images
-        if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+        if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] == &#39;multiDstack&#39;:
             if layerName == &#39;MDA&#39;:
                 logging.debug(&#39;Finalising MDA visualisation...&#39;)
                 DataStructure = {}
@@ -2333,7 +2345,7 @@ def run_napariVisualisation_worker(self,parent,layerName=&#39;Layer&#39;,layerCo
         yield DataStructure#img_queue.get(block = False)
         
     #Do the final N images
-    if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;] == &#39;multiDstack&#39;:
+    if self.shared_data.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] == &#39;multiDstack&#39;:
         if layerName == &#39;MDA&#39;:
             logging.debug(&#39;Finalising MDA visualisation...&#39;)
             DataStructure = {}

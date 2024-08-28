@@ -43,21 +43,34 @@ from pycromanager import Core
 from magicgui import magicgui
 from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
-from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from napari.layers import Shapes
 from typing import Union, Tuple, List
 import logging
 # from stardist.models import StarDist2D
 from PIL import Image, ImageDraw
-import utils
-sys.path.append(&#39;AutonomousMicroscopy&#39;)
-sys.path.append(&#39;AutonomousMicroscopy/MainScripts&#39;)
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from CustomFunctions import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
+
+def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+    import glados_pycromanager.GUI.utils
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+else:
+    from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+    import utils
+    sys.path.append(&#39;AutonomousMicroscopy&#39;)
+    sys.path.append(&#39;AutonomousMicroscopy/MainScripts&#39;)
+    #Import all scripts in the custom script folders
+    from Analysis_Images import * #type: ignore
+    from Analysis_Measurements import * #type: ignore
+    from Analysis_Shapes import * #type: ignore
+    from CustomFunctions import * #type: ignore
+    from Real_Time_Analysis import * #type: ignore
 
 #Class for overlays and their update and such
 class napariOverlay():
@@ -987,6 +1000,19 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     shared_data.analysisThreads.append(analysis_thread)
     
     return analysis_thread</code></pre>
+</details>
+</dd>
+<dt id="AnalysisClass.is_pip_installed"><code class="name flex">
+<span>def <span class="ident">is_pip_installed</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__</code></pre>
 </details>
 </dd>
 </dl>
@@ -3067,6 +3093,7 @@ Default is ['black'].</dd>
 <ul class="">
 <li><code><a title="AnalysisClass.create_analysis_thread" href="#AnalysisClass.create_analysis_thread">create_analysis_thread</a></code></li>
 <li><code><a title="AnalysisClass.create_real_time_analysis_thread" href="#AnalysisClass.create_real_time_analysis_thread">create_real_time_analysis_thread</a></code></li>
+<li><code><a title="AnalysisClass.is_pip_installed" href="#AnalysisClass.is_pip_installed">is_pip_installed</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

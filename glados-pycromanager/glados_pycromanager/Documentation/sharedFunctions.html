@@ -26,8 +26,7 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">from napariGlados import napariHandler
-from PyQt5.QtCore import QTimer
+<pre><code class="python">from PyQt5.QtCore import QTimer
 import logging
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -35,6 +34,16 @@ import slack
 from flask import Flask
 import time
 from slackeventsapi import SlackEventAdapter
+
+def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.GUI.napariGlados import napariHandler
+    from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
+else:
+    from napariGlados import napariHandler
+    from utils import updateAutonousErrorWarningInfo
 
 &#34;&#34;&#34;Shared data summary
 
@@ -68,23 +77,74 @@ class Shared_data(QObject):
         self.newestLayerName = &#39;&#39; #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({&#39;Errors&#39;: [], &#39;Warnings&#39;: [], &#39;Info&#39;: {&#39;LastNodeRan&#39;: None, &#39;Other&#39;: None}},parent=self)
         
-        self._livemodeNapariHandler = napariHandler(self,liveOrMda=&#39;live&#39;)
-        self._mdamodeNapariHandler = napariHandler(self,liveOrMda=&#39;mda&#39;)
-        
         self.globalData = {}
-        self.globalData[&#39;SLACK&#39;] = {}
-        self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] = &#34;xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf&#34;
-        self.globalData[&#39;SLACK&#39;][&#39;SECRET&#39;] = &#34;e8cd04aa4cc9ec7c51729ec6ecf98c1c&#34;
-        self.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;] = &#34;glados-bot&#34;
-        if self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0:
+        self.globalData[&#39;SLACK-TOKEN&#39;]={}
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] = &#34;xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf&#34;
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;displayName&#39;] = &#34;Slack Token&#34;
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;description&#39;] = &#34;The token for Slack messaging (Slack-token)&#34;
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;inputType&#39;] = &#34;lineEdit&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;]={}
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;value&#39;] = &#34;e8cd04aa4cc9ec7c51729ec6ecf98c1c&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;displayName&#39;] = &#34;Slack Secret&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;description&#39;] = &#34;The secret ID for Slack messaging (Slack-secret)&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;inputType&#39;] = &#34;lineEdit&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;]={}
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;] = &#34;glados-bot&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;displayName&#39;] = &#34;Slack Channel&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;description&#39;] = &#34;Channel for the Slack node to send messages to (Slack-channel)&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;inputType&#39;] = &#34;lineEdit&#34;
+        self.globalData[&#39;MDAVISMETHOD&#39;]={}
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] = &#39;multiDstack&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;displayName&#39;] = &#39;MDA Visualisation method&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;description&#39;] = &#39;Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;inputType&#39;] = &#39;dropdown&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;dropDownOptions&#39;] = [&#39;multiDstack&#39;,&#39;frameByFrame&#39;] #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;VISUALISATION-FPS&#39;] = {}
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;value&#39;] = 60
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;displayName&#39;] = &#39;Visualisation FPS&#39;
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;description&#39;] = &#39;Update speed of napari visualisation (in frames per second)&#39;
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;inputType&#39;] = &#39;lineEdit&#39;
+        
+        #Overwrite all values that can be found from the .JSON:
+        import os, json
+        #load from appdata
+        appdata_folder = os.getenv(&#39;APPDATA&#39;)
+        if appdata_folder is None:
+            raise EnvironmentError(&#34;APPDATA environment variable not found&#34;)
+        app_specific_folder = os.path.join(appdata_folder, &#39;Glados-PycroManager&#39;)
+        os.makedirs(app_specific_folder, exist_ok=True)
+        if os.path.exists(os.path.join(app_specific_folder, &#39;glados_state.json&#39;)):
+            #Load the mda state
+            with open(os.path.join(app_specific_folder, &#39;glados_state.json&#39;), &#39;r&#39;) as file:
+                gladosInfo = json.load(file)
+                if &#39;GlobalData&#39; in gladosInfo:
+                    globalDataInfo = gladosInfo[&#39;GlobalData&#39;]
+                else:
+                    globalDataInfo = {}
+        
+        for key in globalDataInfo:
             try:
-                self.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;] = slack.WebClient(token=self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;])
+                self.globalData[key][&#39;value&#39;] = globalDataInfo[key]
+            except:
+                pass
+        
+        if self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0:
+            try:
+                self.globalData[&#39;SLACK-CLIENT&#39;] = {}
+                self.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;] = slack.WebClient(token=self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39; ])
+                self.globalData[&#39;SLACK-CLIENT&#39;][&#39;hidden&#39;] = True
                 logging.debug(&#39;Slack client initialised&#39;)
             except:
                 logging.error(&#39;Error with Slack!&#39;)
-        self.globalData[&#39;MDAVISMETHOD&#39;] = &#39;multiDstack&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
+        self._livemodeNapariHandler = napariHandler(self,liveOrMda=&#39;live&#39;)
+        self._mdamodeNapariHandler = napariHandler(self,liveOrMda=&#39;mda&#39;)
+        
+        #Store whether we&#39;re running via PIP or via a local install
+        
+        self._RunningViaPIP = &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+        self._RunningLocally = not self._RunningViaPIP
     
     def mdaacqdonefunction(self):
         logging.debug(&#39;mda acq done in shared_data&#39;)
@@ -199,7 +259,7 @@ class Shared_data(QObject):
 
     def on_warningErrorInfoInfo_changed(self,oldValue=None,errorType=None):
         try:
-            logging.debug(f&#34;shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}&#34;)
+            # logging.debug(f&#34;shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}&#34;)
             if self.loadingOngoing == False:
                 from utils import updateAutonousErrorWarningInfo
                 updateAutonousErrorWarningInfo(self,updateInfo=&#39;All&#39;)
@@ -239,7 +299,6 @@ class Dict_Specific_WarningErrorInfo(dict):
     def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
         # This method will be overridden in the Shared_data class
         if self.parent.loadingOngoing == False:
-            from utils import updateAutonousErrorWarningInfo
             updateAutonousErrorWarningInfo(self,updateInfo=&#39;All&#39;)
         pass
 
@@ -258,6 +317,22 @@ class periodicallyUpdate:
 <section>
 </section>
 <section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="sharedFunctions.is_pip_installed"><code class="name flex">
+<span>def <span class="ident">is_pip_installed</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__</code></pre>
+</details>
+</dd>
+</dl>
 </section>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
@@ -314,7 +389,6 @@ dict(one=1, two=2)</p></div>
     def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
         # This method will be overridden in the Shared_data class
         if self.parent.loadingOngoing == False:
-            from utils import updateAutonousErrorWarningInfo
             updateAutonousErrorWarningInfo(self,updateInfo=&#39;All&#39;)
         pass</code></pre>
 </details>
@@ -336,7 +410,6 @@ dict(one=1, two=2)</p></div>
 <pre><code class="python">def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
     # This method will be overridden in the Shared_data class
     if self.parent.loadingOngoing == False:
-        from utils import updateAutonousErrorWarningInfo
         updateAutonousErrorWarningInfo(self,updateInfo=&#39;All&#39;)
     pass</code></pre>
 </details>
@@ -380,23 +453,74 @@ dict(one=1, two=2)</p></div>
         self.newestLayerName = &#39;&#39; #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({&#39;Errors&#39;: [], &#39;Warnings&#39;: [], &#39;Info&#39;: {&#39;LastNodeRan&#39;: None, &#39;Other&#39;: None}},parent=self)
         
-        self._livemodeNapariHandler = napariHandler(self,liveOrMda=&#39;live&#39;)
-        self._mdamodeNapariHandler = napariHandler(self,liveOrMda=&#39;mda&#39;)
-        
         self.globalData = {}
-        self.globalData[&#39;SLACK&#39;] = {}
-        self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] = &#34;xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf&#34;
-        self.globalData[&#39;SLACK&#39;][&#39;SECRET&#39;] = &#34;e8cd04aa4cc9ec7c51729ec6ecf98c1c&#34;
-        self.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;] = &#34;glados-bot&#34;
-        if self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0:
+        self.globalData[&#39;SLACK-TOKEN&#39;]={}
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] = &#34;xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf&#34;
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;displayName&#39;] = &#34;Slack Token&#34;
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;description&#39;] = &#34;The token for Slack messaging (Slack-token)&#34;
+        self.globalData[&#39;SLACK-TOKEN&#39;][&#39;inputType&#39;] = &#34;lineEdit&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;]={}
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;value&#39;] = &#34;e8cd04aa4cc9ec7c51729ec6ecf98c1c&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;displayName&#39;] = &#34;Slack Secret&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;description&#39;] = &#34;The secret ID for Slack messaging (Slack-secret)&#34;
+        self.globalData[&#39;SLACK-SECRET&#39;][&#39;inputType&#39;] = &#34;lineEdit&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;]={}
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;] = &#34;glados-bot&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;displayName&#39;] = &#34;Slack Channel&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;description&#39;] = &#34;Channel for the Slack node to send messages to (Slack-channel)&#34;
+        self.globalData[&#39;SLACK-CHANNEL&#39;][&#39;inputType&#39;] = &#34;lineEdit&#34;
+        self.globalData[&#39;MDAVISMETHOD&#39;]={}
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;value&#39;] = &#39;multiDstack&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;displayName&#39;] = &#39;MDA Visualisation method&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;description&#39;] = &#39;Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;inputType&#39;] = &#39;dropdown&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;MDAVISMETHOD&#39;][&#39;dropDownOptions&#39;] = [&#39;multiDstack&#39;,&#39;frameByFrame&#39;] #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
+        self.globalData[&#39;VISUALISATION-FPS&#39;] = {}
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;value&#39;] = 60
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;displayName&#39;] = &#39;Visualisation FPS&#39;
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;description&#39;] = &#39;Update speed of napari visualisation (in frames per second)&#39;
+        self.globalData[&#39;VISUALISATION-FPS&#39;][&#39;inputType&#39;] = &#39;lineEdit&#39;
+        
+        #Overwrite all values that can be found from the .JSON:
+        import os, json
+        #load from appdata
+        appdata_folder = os.getenv(&#39;APPDATA&#39;)
+        if appdata_folder is None:
+            raise EnvironmentError(&#34;APPDATA environment variable not found&#34;)
+        app_specific_folder = os.path.join(appdata_folder, &#39;Glados-PycroManager&#39;)
+        os.makedirs(app_specific_folder, exist_ok=True)
+        if os.path.exists(os.path.join(app_specific_folder, &#39;glados_state.json&#39;)):
+            #Load the mda state
+            with open(os.path.join(app_specific_folder, &#39;glados_state.json&#39;), &#39;r&#39;) as file:
+                gladosInfo = json.load(file)
+                if &#39;GlobalData&#39; in gladosInfo:
+                    globalDataInfo = gladosInfo[&#39;GlobalData&#39;]
+                else:
+                    globalDataInfo = {}
+        
+        for key in globalDataInfo:
             try:
-                self.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;] = slack.WebClient(token=self.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;])
+                self.globalData[key][&#39;value&#39;] = globalDataInfo[key]
+            except:
+                pass
+        
+        if self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0:
+            try:
+                self.globalData[&#39;SLACK-CLIENT&#39;] = {}
+                self.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;] = slack.WebClient(token=self.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39; ])
+                self.globalData[&#39;SLACK-CLIENT&#39;][&#39;hidden&#39;] = True
                 logging.debug(&#39;Slack client initialised&#39;)
             except:
                 logging.error(&#39;Error with Slack!&#39;)
-        self.globalData[&#39;MDAVISMETHOD&#39;] = &#39;multiDstack&#39; #&#39;multiDstack&#39; or &#39;frameByFrame&#39;
         
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
+        self._livemodeNapariHandler = napariHandler(self,liveOrMda=&#39;live&#39;)
+        self._mdamodeNapariHandler = napariHandler(self,liveOrMda=&#39;mda&#39;)
+        
+        #Store whether we&#39;re running via PIP or via a local install
+        
+        self._RunningViaPIP = &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+        self._RunningLocally = not self._RunningViaPIP
     
     def mdaacqdonefunction(self):
         logging.debug(&#39;mda acq done in shared_data&#39;)
@@ -511,7 +635,7 @@ dict(one=1, two=2)</p></div>
 
     def on_warningErrorInfoInfo_changed(self,oldValue=None,errorType=None):
         try:
-            logging.debug(f&#34;shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}&#34;)
+            # logging.debug(f&#34;shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}&#34;)
             if self.loadingOngoing == False:
                 from utils import updateAutonousErrorWarningInfo
                 updateAutonousErrorWarningInfo(self,updateInfo=&#39;All&#39;)
@@ -780,7 +904,7 @@ arguments is the optional sequence of the names of the signal's arguments.</p></
 </summary>
 <pre><code class="python">def on_warningErrorInfoInfo_changed(self,oldValue=None,errorType=None):
     try:
-        logging.debug(f&#34;shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}&#34;)
+        # logging.debug(f&#34;shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}&#34;)
         if self.loadingOngoing == False:
             from utils import updateAutonousErrorWarningInfo
             updateAutonousErrorWarningInfo(self,updateInfo=&#39;All&#39;)
@@ -819,6 +943,11 @@ arguments is the optional sequence of the names of the signal's arguments.</p></
 <ul></ul>
 </div>
 <ul id="index">
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="sharedFunctions.is_pip_installed" href="#sharedFunctions.is_pip_installed">is_pip_installed</a></code></li>
+</ul>
+</li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>

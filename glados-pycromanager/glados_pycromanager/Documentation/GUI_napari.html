@@ -43,23 +43,39 @@ from PyQt5.QtWidgets import QApplication
 import shutil
 import logging
 import argparse
-
-from napariGlados import runNapariPycroManager
-from sharedFunctions import Shared_data, periodicallyUpdate
-from utils import *
-
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QMainWindow
 import sys
-# Add the folder 2 folders up to the system path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
-#Obtain the helperfunctions
-import utils
+
+
+def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
+    from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
+    from glados_pycromanager.GUI.utils import *
+
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+    #Obtain the helperfunctions
+    import glados_pycromanager.GUI.utils as utils
+else:
+    from napariGlados import runNapariPycroManager
+    from sharedFunctions import Shared_data, periodicallyUpdate
+    from utils import *
+
+    # Add the folder 2 folders up to the system path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    #Import all scripts in the custom script folders
+    from Analysis_Images import * #type: ignore
+    from Analysis_Measurements import * #type: ignore
+    from Analysis_Shapes import * #type: ignore
+    from Real_Time_Analysis import * #type: ignore
+    #Obtain the helperfunctions
+    import utils
 #endregion
 
 def perform_post_closing_actions(shared_data):
@@ -69,7 +85,7 @@ def perform_post_closing_actions(shared_data):
         shared_data: shared_data class (Shared_data())
     &#34;&#34;&#34;
     #Clean up temporary files
-    cleanUpTemporaryFiles(shared_data=shared_data)
+    utils.cleanUpTemporaryFiles(shared_data=shared_data)
     
     # if shared_data._headless:
     #     stop_headless()
@@ -117,7 +133,7 @@ def main():
     
     # Create an instance of the shared_data class
     shared_data = Shared_data()
-    cleanUpTemporaryFiles(shared_data=shared_data)
+    utils.cleanUpTemporaryFiles(shared_data=shared_data)
         
     # get object representing MMCore, used throughout
     #try to open a running instance:
@@ -135,8 +151,16 @@ def main():
         shared_data.core = core
 
     #Open JSON file with MM settings
-    with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
-        MM_JSON = json.load(f)
+    try:
+        with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
+            MM_JSON = json.load(f)
+    except:
+        MM_JSON = None
+        
+        
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts) #type:ignore
 
     #Run the UI on a second thread (hopefully robustly)
     app = QApplication(sys.argv)
@@ -218,7 +242,7 @@ if __name__ == &#34;__main__&#34;:
     
     # Create an instance of the shared_data class
     shared_data = Shared_data()
-    cleanUpTemporaryFiles(shared_data=shared_data)
+    utils.cleanUpTemporaryFiles(shared_data=shared_data)
         
     # get object representing MMCore, used throughout
     #try to open a running instance:
@@ -236,8 +260,16 @@ if __name__ == &#34;__main__&#34;:
         shared_data.core = core
 
     #Open JSON file with MM settings
-    with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
-        MM_JSON = json.load(f)
+    try:
+        with open(os.path.join(sys.path[0], &#39;MM_PycroManager_JSON.json&#39;), &#39;r&#39;) as f:
+            MM_JSON = json.load(f)
+    except:
+        MM_JSON = None
+        
+        
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts) #type:ignore
 
     #Run the UI on a second thread (hopefully robustly)
     app = QApplication(sys.argv)
@@ -295,7 +327,7 @@ if __name__ == &#34;__main__&#34;:
         shared_data: shared_data class (Shared_data())
     &#34;&#34;&#34;
     #Clean up temporary files
-    cleanUpTemporaryFiles(shared_data=shared_data)
+    utils.cleanUpTemporaryFiles(shared_data=shared_data)
     
     # if shared_data._headless:
     #     stop_headless()</code></pre>

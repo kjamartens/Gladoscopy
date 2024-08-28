@@ -47,10 +47,7 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QTextCursor
 sys.path.append(&#39;glados-pycromanager\\glados_pycromanager\\GUI\\nodz&#39;)
 from PyQt5 import QtCore, QtWidgets
-import nodz_main #type: ignore
 from PyQt5.QtCore import QObject, pyqtSignal
-from MMcontrols import MMConfigUI, ConfigInfo
-from MDAGlados import MDAGlados
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QPlainTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QDoubleSpinBox
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
@@ -63,17 +60,39 @@ from qtpy.QtWidgets import QFileDialog
 import numpy as np
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#Import all scripts in the custom script folders
-from Analysis_Images import * #type: ignore
-from Analysis_Measurements import * #type: ignore
-from Analysis_Shapes import * #type: ignore
-from Real_Time_Analysis import * #type: ignore
-from CustomFunctions import * #type: ignore
-import logging
-import utils
-from nodz import nodz_utils
+
 from PyQt5.QtWidgets import QApplication, QComboBox
 from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
+import logging
+
+def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * 
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
+    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
+    import glados_pycromanager.GUI.utils as utils
+    from glados_pycromanager.GUI.nodz import nodz_utils
+    import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
+    from glados_pycromanager.GUI.MDAGlados import MDAGlados
+    import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
+else:
+    #Import all scripts in the custom script folders
+    from AutonomousMicroscopy.Analysis_Images import *
+    from AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+    from AutonomousMicroscopy.CustomFunctions import * #type: ignore
+    import utils
+    from nodz import nodz_utils
+    import nodz_main as NodzMain
+    from MMcontrols import MMConfigUI, ConfigInfo
+    from MDAGlados import MDAGlados
+    import nodz.nodz_utils as nodz_utils
 #endregion
 
 #region Dialogs_Nodz
@@ -1430,7 +1449,7 @@ class NodeSignalManager(QObject):
             logging.debug(f&#34;emitting signal {signal}&#34;)
 #endregion
 
-class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
+class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
     &#34;&#34;&#34;
     Class that represents a Flowchart dock widget in napari-Glados. 
     Inherits from Nodz, which is a graph drawing tool.
@@ -1474,14 +1493,22 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         
         self.fullRunOngoing = False
         
-        
-        #Find the iconPath folder
-        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-        else:
+        try:
+            import glados_pycromanager
+            # Get the installation path of the package
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            # Construct the path to the Icons folder
+            self.iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+        except:
             self.iconFolder = &#39;&#39;
+        if not os.path.exists(self.iconFolder) or self.iconFolder == &#39;&#39;:
+            #Find the iconPath folder
+            if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+            elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+            else:
+                self.iconFolder = &#39;&#39;
             
             
         self.buttonsArea = QVBoxLayout()
@@ -1607,6 +1634,41 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         newgridlayout.addWidget(self.loggerDEBUGWidget)
         newgridlayout.addWidget(self.loggerDEBUGupdateButton)
         
+        
+        
+        def quickStartMenu(self):
+            &#34;&#34;&#34;
+            Shows the UserManual.md file
+            &#34;&#34;&#34;
+            try:
+                quickStartWindow = utils.SmallWindow(self)
+                QApplication.processEvents()
+                quickStartWindow.setWindowTitle(&#39;Quick start / User Manual&#39;)
+                QApplication.processEvents()
+                
+                if is_pip_installed():
+                    package_path = os.path.dirname(glados_pycromanager.__file__)
+                    quickStartWindow.addMarkdown(os.path.join(package_path, &#39;Documentation&#39;, &#39;UserManual.md&#39;))
+                else:
+                    quickStartWindow.addMarkdown(&#39;glados-pycromanager/glados_pycromanager/Documentation/UserManual.md&#39;)
+                QApplication.processEvents()
+                quickStartWindow.show()
+            except Exception as e:
+                logging.error(f&#39;Could not open quick start window. {e}&#39;)
+        
+        self.helpGroupBox = QGroupBox(&#34;Logger&#34;)
+        newgridlayout = QGridLayout()
+        self.helpGroupBox.setLayout(newgridlayout)
+        #Add a User Manual Button:
+        newgridlayout.addWidget(QLabel(&#39;Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!&#39;))
+        button1 = QPushButton(&#39;User Manual&#39;)
+        button1.clicked.connect(lambda index: quickStartMenu(self))
+        newgridlayout.addWidget(button1)
+        button2 = QPushButton(&#39;Developer Manual&#39;)
+        newgridlayout.addWidget(button2)
+        button3 = QPushButton(&#39;Complete software info&#39;)
+        newgridlayout.addWidget(button3)
+        
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
@@ -1645,6 +1707,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         self.tabWidget.addTab(self.variablesWidgetGroupbox, &#34;Variables&#34;)
         self.tabWidget.addTab(self.loggerINFOGroupBox, &#34;Logger&#34;)
         self.tabWidget.addTab(self.loggerDEBUGGroupBox, &#34;Debug&#34;)
+        self.tabWidget.addTab(self.helpGroupBox, &#34;Help&#34;)
         
         #Global variables for MM/napari
         self.core = core
@@ -3301,7 +3364,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
         #First, we need to create some function to look at the downstream-connected nodes of some node - this needs to be a rather proper function.
         
         if &#39;analysisMeasurement_&#39; in dstNodeName or &#39;analysisMeasurementDEBUG_&#39; in dstNodeName:
-            import nodz.nodz_utils
             srcNode = nodz_utils.findNodeByName(self,srcNodeName)
             dstNode = nodz_utils.findNodeByName(self,dstNodeName)
             
@@ -3461,7 +3523,6 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             self.createSingleCoreVar(stage+&#39;_current_pos&#39;,[pos],[list,np.ndarray]) #type:ignore
         
         #Config values, all configs
-        from MMcontrols import ConfigInfo
         allConfigs = self.core.get_available_config_groups()
         if allConfigs != None:
             nrconfiggroups = allConfigs.size()
@@ -4321,7 +4382,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             if &#39;reporting_&#39; in node.name:
                 node.status = &#39;running&#39;
                 if &#39;SLACK&#39; in self.shared_data.globalData: #type:ignore
-                    if self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0: #type:ignore
+                    if self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0: #type:ignore
                         slackReadableText = readableText
                         slackReadableText = slackReadableText.replace(&#39;&lt;br&gt;&#39;,&#39;\r\n&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;i&gt;&#39;,&#39;_&#39;)
@@ -4329,7 +4390,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         slackReadableText = slackReadableText.replace(&#39;&lt;b&gt;&#39;,&#39;*&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;/b&gt;&#39;,&#39;*&#39;)
                         slackReadableText = &#34;New Score: \n&#34; + slackReadableText
-                        self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],text=slackReadableText) #type:ignore
+                        self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],text=slackReadableText) #type:ignore
                         node.status = &#39;finished&#39;
                     else:
                         node.status = &#39;error&#39;
@@ -4555,8 +4616,8 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
             readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
             if readableText == None:
                 readableText = node.slackReportInfo
-            if &#39;SLACK&#39; in self.shared_data.globalData: #type:ignore
-                if self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0: #type:ignore
+            if &#39;SLACK-CLIENT&#39; in self.shared_data.globalData: #type:ignore
+                if self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0: #type:ignore
                     slackReadableText = readableText
                     if not (&#34;&lt;img&gt;&#34; in node.slackReportInfo and &#34;&lt;/img&gt;&#34; in node.slackReportInfo):
                         slackReadableText = slackReadableText.replace(&#39;&lt;br&gt;&#39;,&#39;\r\n&#39;)
@@ -4564,7 +4625,7 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         slackReadableText = slackReadableText.replace(&#39;&lt;/i&gt;&#39;,&#39;_&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;b&gt;&#39;,&#39;*&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;/b&gt;&#39;,&#39;*&#39;)
-                        self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],text=slackReadableText) 
+                        self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],text=slackReadableText) 
                     else: #we have an image!
                         import re
                         #Extract the text between img tags:
@@ -4595,9 +4656,9 @@ class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
                         # Save the image as a PNG file
                         image.save(tempFile, &#34;PNG&#34;)
                         #Send the message with the read-tempFile
-                        slack_image = self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].files_upload(
+                        slack_image = self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].files_upload(
                             title=&#34;Glados Image&#34;,
-                            channels=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],
+                            channels=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],
                             content=open(tempFile, &#39;rb&#39;).read(),
                             initial_comment = restText,
                         )
@@ -5094,6 +5155,17 @@ class ScanningWidget(QWidget):
                     logging.debug(&#39;No fileName specified in scanMode loading&#39;)
         logging.debug(&#39;Updated all scan layouts&#39;)
 
+    def assessScan(self):
+        &#34;&#34;&#34;
+        Return true or false whether or not the current scan will run normally or not
+        &#34;&#34;&#34;
+        assessment=False
+        
+        if self.scanMode == &#39;LoadPos&#39;:
+            if self.scanLayouts[&#39;LoadPos&#39;].lineEdit_posFilename.text()[-4:] == &#39;.pos&#39;:
+                assessment = True
+        return assessment
+
 class advScanGridLayout(QGroupBox):
     &#34;&#34;&#34; 
     advScanGridLayouts each individually handle a single method of xy(z) scanning. Easiest example is &#39;loading a POS file&#39;.
@@ -5410,6 +5482,29 @@ class DecisionWidget(QWidget):
         &#34;&#34;&#34;
         testPassed = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision].test_decision()
         return testPassed
+
+
+    def assessDecision(self):
+        &#34;&#34;&#34;
+        Return true or false whether or not the current decision will run normally or not
+        &#34;&#34;&#34;
+        assessment=False
+        # If AND-score, check if all required inputs have text
+        if self.currentMode == &#39;DirectDecision&#39; and self.currentDecision == &#39;AND_Score&#39;:
+            layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+            if &#39;Start&#39; in layout.decisionInfoGUI:
+                if layout.decisionInfoGUI[&#39;Start&#39;][&#39;dropdown&#39;].currentText() != None and layout.decisionInfoGUI[&#39;Start&#39;][&#39;dropdown&#39;].currentText() != &#39;&#39; and layout.decisionInfoGUI[&#39;Start&#39;][&#39;lineedit&#39;].text() != None and layout.decisionInfoGUI[&#39;Start&#39;][&#39;lineedit&#39;].text() != &#39;&#39;:
+                    assessment = True
+        #If AND-score-VAR, check if all required inputs have text
+        elif self.currentMode == &#39;DirectDecision&#39; and self.currentDecision == &#39;AND_Score_VAR&#39;:
+            layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+            for input in layout.decisionInfoGUIVAR:
+                vv = layout.decisionInfoGUIVAR[input]
+                if vv[&#39;varName&#39;].text() != None and vv[&#39;varName&#39;].text() != &#39;&#39; and vv[&#39;lineedit&#39;].text() != None and vv[&#39;lineedit&#39;].text() != &#39;&#39;:
+                    assessment = True
+                    break
+            
+        return assessment
 
 class advDecisionGridLayout(QGroupBox):
     &#34;&#34;&#34; 
@@ -6256,6 +6351,19 @@ def flowChart_dockWidgets(core,MM_JSON,main_layout,sshared_data):
     return flowChart_dockWidget</code></pre>
 </details>
 </dd>
+<dt id="FlowChart_dockWidgets.is_pip_installed"><code class="name flex">
+<span>def <span class="ident">is_pip_installed</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_pip_installed():
+    return &#39;site-packages&#39; in __file__ or &#39;dist-packages&#39; in __file__</code></pre>
+</details>
+</dd>
 </dl>
 </section>
 <section>
@@ -6664,7 +6772,30 @@ Importantly defines the individual modes of the advDecisionLayout.</p>
             bool: True if the test for the current decision passed, False otherwise.
         &#34;&#34;&#34;
         testPassed = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision].test_decision()
-        return testPassed</code></pre>
+        return testPassed
+
+
+    def assessDecision(self):
+        &#34;&#34;&#34;
+        Return true or false whether or not the current decision will run normally or not
+        &#34;&#34;&#34;
+        assessment=False
+        # If AND-score, check if all required inputs have text
+        if self.currentMode == &#39;DirectDecision&#39; and self.currentDecision == &#39;AND_Score&#39;:
+            layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+            if &#39;Start&#39; in layout.decisionInfoGUI:
+                if layout.decisionInfoGUI[&#39;Start&#39;][&#39;dropdown&#39;].currentText() != None and layout.decisionInfoGUI[&#39;Start&#39;][&#39;dropdown&#39;].currentText() != &#39;&#39; and layout.decisionInfoGUI[&#39;Start&#39;][&#39;lineedit&#39;].text() != None and layout.decisionInfoGUI[&#39;Start&#39;][&#39;lineedit&#39;].text() != &#39;&#39;:
+                    assessment = True
+        #If AND-score-VAR, check if all required inputs have text
+        elif self.currentMode == &#39;DirectDecision&#39; and self.currentDecision == &#39;AND_Score_VAR&#39;:
+            layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+            for input in layout.decisionInfoGUIVAR:
+                vv = layout.decisionInfoGUIVAR[input]
+                if vv[&#39;varName&#39;].text() != None and vv[&#39;varName&#39;].text() != &#39;&#39; and vv[&#39;lineedit&#39;].text() != None and vv[&#39;lineedit&#39;].text() != &#39;&#39;:
+                    assessment = True
+                    break
+            
+        return assessment</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -6676,6 +6807,38 @@ Importantly defines the individual modes of the advDecisionLayout.</p>
 </ul>
 <h3>Methods</h3>
 <dl>
+<dt id="FlowChart_dockWidgets.DecisionWidget.assessDecision"><code class="name flex">
+<span>def <span class="ident">assessDecision</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Return true or false whether or not the current decision will run normally or not</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def assessDecision(self):
+    &#34;&#34;&#34;
+    Return true or false whether or not the current decision will run normally or not
+    &#34;&#34;&#34;
+    assessment=False
+    # If AND-score, check if all required inputs have text
+    if self.currentMode == &#39;DirectDecision&#39; and self.currentDecision == &#39;AND_Score&#39;:
+        layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+        if &#39;Start&#39; in layout.decisionInfoGUI:
+            if layout.decisionInfoGUI[&#39;Start&#39;][&#39;dropdown&#39;].currentText() != None and layout.decisionInfoGUI[&#39;Start&#39;][&#39;dropdown&#39;].currentText() != &#39;&#39; and layout.decisionInfoGUI[&#39;Start&#39;][&#39;lineedit&#39;].text() != None and layout.decisionInfoGUI[&#39;Start&#39;][&#39;lineedit&#39;].text() != &#39;&#39;:
+                assessment = True
+    #If AND-score-VAR, check if all required inputs have text
+    elif self.currentMode == &#39;DirectDecision&#39; and self.currentDecision == &#39;AND_Score_VAR&#39;:
+        layout = self.decisionLayouts[self.currentMode].decisiontypes[self.currentDecision]
+        for input in layout.decisionInfoGUIVAR:
+            vv = layout.decisionInfoGUIVAR[input]
+            if vv[&#39;varName&#39;].text() != None and vv[&#39;varName&#39;].text() != &#39;&#39; and vv[&#39;lineedit&#39;].text() != None and vv[&#39;lineedit&#39;].text() != &#39;&#39;:
+                assessment = True
+                break
+        
+    return assessment</code></pre>
+</details>
+</dd>
 <dt id="FlowChart_dockWidgets.DecisionWidget.changeDecisionMode"><code class="name flex">
 <span>def <span class="ident">changeDecisionMode</span></span>(<span>self)</span>
 </code></dt>
@@ -7173,7 +7336,7 @@ Inherits from Nodz, which is a graph drawing tool.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class GladosNodzFlowChart_dockWidget(nodz_main.Nodz):
+<pre><code class="python">class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
     &#34;&#34;&#34;
     Class that represents a Flowchart dock widget in napari-Glados. 
     Inherits from Nodz, which is a graph drawing tool.
@@ -7217,14 +7380,22 @@ Inherits from Nodz, which is a graph drawing tool.</p>
         
         self.fullRunOngoing = False
         
-        
-        #Find the iconPath folder
-        if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
-        elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
-            self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
-        else:
+        try:
+            import glados_pycromanager
+            # Get the installation path of the package
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            # Construct the path to the Icons folder
+            self.iconFolder = os.path.join(package_path, &#39;GUI&#39;, &#39;Icons&#39;)
+        except:
             self.iconFolder = &#39;&#39;
+        if not os.path.exists(self.iconFolder) or self.iconFolder == &#39;&#39;:
+            #Find the iconPath folder
+            if os.path.exists(&#39;./glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados_pycromanager/GUI/Icons/&#39;
+            elif os.path.exists(&#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png&#39;):
+                self.iconFolder = &#39;./glados-pycromanager/glados_pycromanager/GUI/Icons/&#39;
+            else:
+                self.iconFolder = &#39;&#39;
             
             
         self.buttonsArea = QVBoxLayout()
@@ -7350,6 +7521,41 @@ Inherits from Nodz, which is a graph drawing tool.</p>
         newgridlayout.addWidget(self.loggerDEBUGWidget)
         newgridlayout.addWidget(self.loggerDEBUGupdateButton)
         
+        
+        
+        def quickStartMenu(self):
+            &#34;&#34;&#34;
+            Shows the UserManual.md file
+            &#34;&#34;&#34;
+            try:
+                quickStartWindow = utils.SmallWindow(self)
+                QApplication.processEvents()
+                quickStartWindow.setWindowTitle(&#39;Quick start / User Manual&#39;)
+                QApplication.processEvents()
+                
+                if is_pip_installed():
+                    package_path = os.path.dirname(glados_pycromanager.__file__)
+                    quickStartWindow.addMarkdown(os.path.join(package_path, &#39;Documentation&#39;, &#39;UserManual.md&#39;))
+                else:
+                    quickStartWindow.addMarkdown(&#39;glados-pycromanager/glados_pycromanager/Documentation/UserManual.md&#39;)
+                QApplication.processEvents()
+                quickStartWindow.show()
+            except Exception as e:
+                logging.error(f&#39;Could not open quick start window. {e}&#39;)
+        
+        self.helpGroupBox = QGroupBox(&#34;Logger&#34;)
+        newgridlayout = QGridLayout()
+        self.helpGroupBox.setLayout(newgridlayout)
+        #Add a User Manual Button:
+        newgridlayout.addWidget(QLabel(&#39;Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!&#39;))
+        button1 = QPushButton(&#39;User Manual&#39;)
+        button1.clicked.connect(lambda index: quickStartMenu(self))
+        newgridlayout.addWidget(button1)
+        button2 = QPushButton(&#39;Developer Manual&#39;)
+        newgridlayout.addWidget(button2)
+        button3 = QPushButton(&#39;Complete software info&#39;)
+        newgridlayout.addWidget(button3)
+        
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
@@ -7388,6 +7594,7 @@ Inherits from Nodz, which is a graph drawing tool.</p>
         self.tabWidget.addTab(self.variablesWidgetGroupbox, &#34;Variables&#34;)
         self.tabWidget.addTab(self.loggerINFOGroupBox, &#34;Logger&#34;)
         self.tabWidget.addTab(self.loggerDEBUGGroupBox, &#34;Debug&#34;)
+        self.tabWidget.addTab(self.helpGroupBox, &#34;Help&#34;)
         
         #Global variables for MM/napari
         self.core = core
@@ -9044,7 +9251,6 @@ Inherits from Nodz, which is a graph drawing tool.</p>
         #First, we need to create some function to look at the downstream-connected nodes of some node - this needs to be a rather proper function.
         
         if &#39;analysisMeasurement_&#39; in dstNodeName or &#39;analysisMeasurementDEBUG_&#39; in dstNodeName:
-            import nodz.nodz_utils
             srcNode = nodz_utils.findNodeByName(self,srcNodeName)
             dstNode = nodz_utils.findNodeByName(self,dstNodeName)
             
@@ -9204,7 +9410,6 @@ Inherits from Nodz, which is a graph drawing tool.</p>
             self.createSingleCoreVar(stage+&#39;_current_pos&#39;,[pos],[list,np.ndarray]) #type:ignore
         
         #Config values, all configs
-        from MMcontrols import ConfigInfo
         allConfigs = self.core.get_available_config_groups()
         if allConfigs != None:
             nrconfiggroups = allConfigs.size()
@@ -10064,7 +10269,7 @@ Inherits from Nodz, which is a graph drawing tool.</p>
             if &#39;reporting_&#39; in node.name:
                 node.status = &#39;running&#39;
                 if &#39;SLACK&#39; in self.shared_data.globalData: #type:ignore
-                    if self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0: #type:ignore
+                    if self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0: #type:ignore
                         slackReadableText = readableText
                         slackReadableText = slackReadableText.replace(&#39;&lt;br&gt;&#39;,&#39;\r\n&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;i&gt;&#39;,&#39;_&#39;)
@@ -10072,7 +10277,7 @@ Inherits from Nodz, which is a graph drawing tool.</p>
                         slackReadableText = slackReadableText.replace(&#39;&lt;b&gt;&#39;,&#39;*&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;/b&gt;&#39;,&#39;*&#39;)
                         slackReadableText = &#34;New Score: \n&#34; + slackReadableText
-                        self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],text=slackReadableText) #type:ignore
+                        self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],text=slackReadableText) #type:ignore
                         node.status = &#39;finished&#39;
                     else:
                         node.status = &#39;error&#39;
@@ -10298,8 +10503,8 @@ Inherits from Nodz, which is a graph drawing tool.</p>
             readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
             if readableText == None:
                 readableText = node.slackReportInfo
-            if &#39;SLACK&#39; in self.shared_data.globalData: #type:ignore
-                if self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0: #type:ignore
+            if &#39;SLACK-CLIENT&#39; in self.shared_data.globalData: #type:ignore
+                if self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0: #type:ignore
                     slackReadableText = readableText
                     if not (&#34;&lt;img&gt;&#34; in node.slackReportInfo and &#34;&lt;/img&gt;&#34; in node.slackReportInfo):
                         slackReadableText = slackReadableText.replace(&#39;&lt;br&gt;&#39;,&#39;\r\n&#39;)
@@ -10307,7 +10512,7 @@ Inherits from Nodz, which is a graph drawing tool.</p>
                         slackReadableText = slackReadableText.replace(&#39;&lt;/i&gt;&#39;,&#39;_&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;b&gt;&#39;,&#39;*&#39;)
                         slackReadableText = slackReadableText.replace(&#39;&lt;/b&gt;&#39;,&#39;*&#39;)
-                        self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],text=slackReadableText) 
+                        self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],text=slackReadableText) 
                     else: #we have an image!
                         import re
                         #Extract the text between img tags:
@@ -10338,9 +10543,9 @@ Inherits from Nodz, which is a graph drawing tool.</p>
                         # Save the image as a PNG file
                         image.save(tempFile, &#34;PNG&#34;)
                         #Send the message with the read-tempFile
-                        slack_image = self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].files_upload(
+                        slack_image = self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].files_upload(
                             title=&#34;Glados Image&#34;,
-                            channels=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],
+                            channels=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],
                             content=open(tempFile, &#39;rb&#39;).read(),
                             initial_comment = restText,
                         )
@@ -11591,7 +11796,6 @@ corresponds to the 'SocketConnected' signal from the FlowChart.</p></div>
     #First, we need to create some function to look at the downstream-connected nodes of some node - this needs to be a rather proper function.
     
     if &#39;analysisMeasurement_&#39; in dstNodeName or &#39;analysisMeasurementDEBUG_&#39; in dstNodeName:
-        import nodz.nodz_utils
         srcNode = nodz_utils.findNodeByName(self,srcNodeName)
         dstNode = nodz_utils.findNodeByName(self,dstNodeName)
         
@@ -14097,8 +14301,8 @@ case/switch statement.</p></div>
         readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
         if readableText == None:
             readableText = node.slackReportInfo
-        if &#39;SLACK&#39; in self.shared_data.globalData: #type:ignore
-            if self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0: #type:ignore
+        if &#39;SLACK-CLIENT&#39; in self.shared_data.globalData: #type:ignore
+            if self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0: #type:ignore
                 slackReadableText = readableText
                 if not (&#34;&lt;img&gt;&#34; in node.slackReportInfo and &#34;&lt;/img&gt;&#34; in node.slackReportInfo):
                     slackReadableText = slackReadableText.replace(&#39;&lt;br&gt;&#39;,&#39;\r\n&#39;)
@@ -14106,7 +14310,7 @@ case/switch statement.</p></div>
                     slackReadableText = slackReadableText.replace(&#39;&lt;/i&gt;&#39;,&#39;_&#39;)
                     slackReadableText = slackReadableText.replace(&#39;&lt;b&gt;&#39;,&#39;*&#39;)
                     slackReadableText = slackReadableText.replace(&#39;&lt;/b&gt;&#39;,&#39;*&#39;)
-                    self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],text=slackReadableText) 
+                    self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],text=slackReadableText) 
                 else: #we have an image!
                     import re
                     #Extract the text between img tags:
@@ -14137,9 +14341,9 @@ case/switch statement.</p></div>
                     # Save the image as a PNG file
                     image.save(tempFile, &#34;PNG&#34;)
                     #Send the message with the read-tempFile
-                    slack_image = self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].files_upload(
+                    slack_image = self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].files_upload(
                         title=&#34;Glados Image&#34;,
-                        channels=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],
+                        channels=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],
                         content=open(tempFile, &#39;rb&#39;).read(),
                         initial_comment = restText,
                     )
@@ -14249,7 +14453,7 @@ case/switch statement.</p></div>
         if &#39;reporting_&#39; in node.name:
             node.status = &#39;running&#39;
             if &#39;SLACK&#39; in self.shared_data.globalData: #type:ignore
-                if self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK&#39;][&#39;TOKEN&#39;]) == 0: #type:ignore
+                if self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;] is not None and not len(self.shared_data.globalData[&#39;SLACK-TOKEN&#39;][&#39;value&#39;]) == 0: #type:ignore
                     slackReadableText = readableText
                     slackReadableText = slackReadableText.replace(&#39;&lt;br&gt;&#39;,&#39;\r\n&#39;)
                     slackReadableText = slackReadableText.replace(&#39;&lt;i&gt;&#39;,&#39;_&#39;)
@@ -14257,7 +14461,7 @@ case/switch statement.</p></div>
                     slackReadableText = slackReadableText.replace(&#39;&lt;b&gt;&#39;,&#39;*&#39;)
                     slackReadableText = slackReadableText.replace(&#39;&lt;/b&gt;&#39;,&#39;*&#39;)
                     slackReadableText = &#34;New Score: \n&#34; + slackReadableText
-                    self.shared_data.globalData[&#39;SLACK&#39;][&#39;CLIENT&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK&#39;][&#39;CHANNEL&#39;],text=slackReadableText) #type:ignore
+                    self.shared_data.globalData[&#39;SLACK-CLIENT&#39;][&#39;value&#39;].chat_postMessage(channel=self.shared_data.globalData[&#39;SLACK-CHANNEL&#39;][&#39;value&#39;],text=slackReadableText) #type:ignore
                     node.status = &#39;finished&#39;
                 else:
                     node.status = &#39;error&#39;
@@ -14834,7 +15038,6 @@ self.coreVariables['TrialGlobalVariable']['importance'] = 'Informative'</p></div
         self.createSingleCoreVar(stage+&#39;_current_pos&#39;,[pos],[list,np.ndarray]) #type:ignore
     
     #Config values, all configs
-    from MMcontrols import ConfigInfo
     allConfigs = self.core.get_available_config_groups()
     if allConfigs != None:
         nrconfiggroups = allConfigs.size()
@@ -15621,7 +15824,18 @@ arguments is the optional sequence of the names of the signal's arguments.</p></
                     self.scanLayouts[scanMode].lineEdit_posFilename.setText(self.scanLayouts[scanMode].scanningInfoGUI[&#39;LoadPos&#39;][&#39;fileName&#39;])
                 except:
                     logging.debug(&#39;No fileName specified in scanMode loading&#39;)
-        logging.debug(&#39;Updated all scan layouts&#39;)</code></pre>
+        logging.debug(&#39;Updated all scan layouts&#39;)
+
+    def assessScan(self):
+        &#34;&#34;&#34;
+        Return true or false whether or not the current scan will run normally or not
+        &#34;&#34;&#34;
+        assessment=False
+        
+        if self.scanMode == &#39;LoadPos&#39;:
+            if self.scanLayouts[&#39;LoadPos&#39;].lineEdit_posFilename.text()[-4:] == &#39;.pos&#39;:
+                assessment = True
+        return assessment</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -15633,6 +15847,27 @@ arguments is the optional sequence of the names of the signal's arguments.</p></
 </ul>
 <h3>Methods</h3>
 <dl>
+<dt id="FlowChart_dockWidgets.ScanningWidget.assessScan"><code class="name flex">
+<span>def <span class="ident">assessScan</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Return true or false whether or not the current scan will run normally or not</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def assessScan(self):
+    &#34;&#34;&#34;
+    Return true or false whether or not the current scan will run normally or not
+    &#34;&#34;&#34;
+    assessment=False
+    
+    if self.scanMode == &#39;LoadPos&#39;:
+        if self.scanLayouts[&#39;LoadPos&#39;].lineEdit_posFilename.text()[-4:] == &#39;.pos&#39;:
+            assessment = True
+    return assessment</code></pre>
+</details>
+</dd>
 <dt id="FlowChart_dockWidgets.ScanningWidget.changeScanMode"><code class="name flex">
 <span>def <span class="ident">changeScanMode</span></span>(<span>self)</span>
 </code></dt>
@@ -19596,6 +19831,7 @@ Returns:
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="FlowChart_dockWidgets.flowChart_dockWidgets" href="#FlowChart_dockWidgets.flowChart_dockWidgets">flowChart_dockWidgets</a></code></li>
+<li><code><a title="FlowChart_dockWidgets.is_pip_installed" href="#FlowChart_dockWidgets.is_pip_installed">is_pip_installed</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -19612,7 +19848,8 @@ Returns:
 </li>
 <li>
 <h4><code><a title="FlowChart_dockWidgets.DecisionWidget" href="#FlowChart_dockWidgets.DecisionWidget">DecisionWidget</a></code></h4>
-<ul class="">
+<ul class="two-column">
+<li><code><a title="FlowChart_dockWidgets.DecisionWidget.assessDecision" href="#FlowChart_dockWidgets.DecisionWidget.assessDecision">assessDecision</a></code></li>
 <li><code><a title="FlowChart_dockWidgets.DecisionWidget.changeDecisionMode" href="#FlowChart_dockWidgets.DecisionWidget.changeDecisionMode">changeDecisionMode</a></code></li>
 <li><code><a title="FlowChart_dockWidgets.DecisionWidget.changeMode" href="#FlowChart_dockWidgets.DecisionWidget.changeMode">changeMode</a></code></li>
 <li><code><a title="FlowChart_dockWidgets.DecisionWidget.create_GUI" href="#FlowChart_dockWidgets.DecisionWidget.create_GUI">create_GUI</a></code></li>
@@ -19736,6 +19973,7 @@ Returns:
 <li>
 <h4><code><a title="FlowChart_dockWidgets.ScanningWidget" href="#FlowChart_dockWidgets.ScanningWidget">ScanningWidget</a></code></h4>
 <ul class="">
+<li><code><a title="FlowChart_dockWidgets.ScanningWidget.assessScan" href="#FlowChart_dockWidgets.ScanningWidget.assessScan">assessScan</a></code></li>
 <li><code><a title="FlowChart_dockWidgets.ScanningWidget.changeScanMode" href="#FlowChart_dockWidgets.ScanningWidget.changeScanMode">changeScanMode</a></code></li>
 <li><code><a title="FlowChart_dockWidgets.ScanningWidget.create_GUI" href="#FlowChart_dockWidgets.ScanningWidget.create_GUI">create_GUI</a></code></li>
 <li><code><a title="FlowChart_dockWidgets.ScanningWidget.getPositionInfo" href="#FlowChart_dockWidgets.ScanningWidget.getPositionInfo">getPositionInfo</a></code></li>

@@ -2824,6 +2824,18 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.fileLocationLineEdit
 
+    def addHtml(self,htmlfile,width=700,height=800):
+        from PyQt5.QtWebEngineWidgets import QWebEngineView
+        htmlViewer = QWebEngineView()
+        htmlViewer.setFixedHeight(height)
+        htmlViewer.setFixedWidth(width)
+        html_file = htmlfile
+        with open(html_file, 'r', encoding='utf-8') as file:
+            html_content = file.read()
+        htmlViewer.setHtml(html_content)
+        #Add the html viewer to the central widget:
+        self.centralWidget().layout().addWidget(htmlViewer) #type:ignore
+
     def addMarkdown(self,mdfile,width=700,height=800):
         from PyQt5.QtWebEngineWidgets import QWebEngineView
         import markdown
