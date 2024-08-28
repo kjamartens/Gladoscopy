@@ -54,7 +54,7 @@ except:
     from CustomFunctions import * #type: ignore
     import utils
     from nodz import nodz_utils
-    import nodz_main #type: ignore
+    import nodz_main as NodzMain
 #endregion
 
 #region Dialogs_Nodz
