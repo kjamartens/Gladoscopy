@@ -123,6 +123,11 @@ def main():
             MM_JSON = json.load(f)
     except:
         MM_JSON = None
+        
+        
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
 
     #Run the UI on a second thread (hopefully robustly)
     app = QApplication(sys.argv)

@@ -1495,7 +1495,6 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
                     self.comboBox_switch.currentIndexChanged.connect(textChangeCallback)
                     # self.comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=self.comboBox_switch: hideAdvVariables(comboBox))
             
-
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
     logging.debug('Changing layout '+curr_layout.parent().objectName())
     #This removes everything except the first entry (i.e. the drop-down menu)
@@ -2820,6 +2819,53 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.fileLocationLineEdit
 
+    def addMarkdown(self,mdfile,width=700,height=800):
+        from PyQt5.QtWebEngineWidgets import QWebEngineView
+        import markdown
+        
+        newlayout = QVBoxLayout()
+        markdownViewer = QWebEngineView()
+        markdownViewer.setFixedHeight(height)
+        markdownViewer.setFixedWidth(width)
+        md_file = mdfile
+        with open(md_file, 'r', encoding='utf-8') as file:
+            md_content = file.read()
+        # Convert Markdown to HTML
+        html_content = markdown.markdown(md_content, extensions=['markdown_captions','fenced_code', 'codehilite', 'toc', 'attr_list', 'meta'])
+        # Get the directory of the Markdown file
+        base_dir = os.path.dirname(os.path.abspath(md_file))
+        # Create a complete HTML document with MathJax support
+        full_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script type="text/javascript" async
+                src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
+            </script>
+            <script type="text/x-mathjax-config">
+                MathJax.Hub.Config({{
+                    tex2jax: {{
+                        inlineMath: [['$','$']],
+                        processEscapes: true
+                    }} 
+                }});
+            </script>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+                img {{ max-width: 100%; height: auto; }}
+            </style>
+        </head>
+        <body>
+            {html_content}
+        </body>
+        </html>
+        """
+        from PyQt5.QtCore import QUrl
+        # Load the HTML content into the web view
+        markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + "/"))
+        newlayout.addWidget(markdownViewer)
+        self.centralWidget().layout().addLayout(newlayout)
+    
 
 
 def PushButtonChooseVariableCallBack(line_edit,nodzInfo):

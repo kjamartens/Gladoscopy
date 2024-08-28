@@ -83,3 +83,4 @@ Werkzeug==2.3.6
 wrapt==1.14.1
 yarg==0.1.9
 zipp==3.15.0
+PyQtWebEngine

@@ -58,6 +58,7 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
             layer.data = np.expand_dims(layer.data, axis=0)
         if image_data.ndim == 2:
             image_data = np.expand_dims(image_data, axis=0)
+        logging.debug('NP-expanded layer')
         layer.data = np.append(layer.data,image_data,axis=0)
         current_slice = layer.data.shape[0]
         napariViewer.dims.set_current_step(0,current_slice)

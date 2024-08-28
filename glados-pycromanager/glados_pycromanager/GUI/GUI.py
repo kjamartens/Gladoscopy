@@ -44,6 +44,10 @@ if __name__ == "__main__":
 
         #Setup UI
         
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import Qt
+        QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    
         app = QApplication(sys.argv)
         window = MainWindow()
         window.show()
@@ -77,6 +81,10 @@ if __name__ == "__main__":
         with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
             MM_JSON = json.load(f)
 
+
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import Qt
+        QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
         #Setup UI
         app = QApplication(sys.argv)
         window = MainWindow()

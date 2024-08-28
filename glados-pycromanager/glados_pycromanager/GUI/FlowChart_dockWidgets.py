@@ -1596,6 +1596,36 @@ class GladosNodzFlowChart_dockWidget(NodzMain):
         newgridlayout.addWidget(self.loggerDEBUGWidget)
         newgridlayout.addWidget(self.loggerDEBUGupdateButton)
         
+        
+        
+        def quickStartMenu(self):
+            """
+            Shows the UserManual.md file
+            """
+            try:
+                quickStartWindow = utils.SmallWindow(self)
+                QApplication.processEvents()
+                quickStartWindow.setWindowTitle('Quick start / User Manual')
+                QApplication.processEvents()
+                quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
+                QApplication.processEvents()
+                quickStartWindow.show()
+            except Exception as e:
+                logging.error(f'Could not open quick start window. {e}')
+        
+        self.helpGroupBox = QGroupBox("Logger")
+        newgridlayout = QGridLayout()
+        self.helpGroupBox.setLayout(newgridlayout)
+        #Add a User Manual Button:
+        newgridlayout.addWidget(QLabel('Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!'))
+        button1 = QPushButton('User Manual')
+        button1.clicked.connect(lambda index: quickStartMenu(self))
+        newgridlayout.addWidget(button1)
+        button2 = QPushButton('Developer Manual')
+        newgridlayout.addWidget(button2)
+        button3 = QPushButton('Complete software info')
+        newgridlayout.addWidget(button3)
+        
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
@@ -1634,6 +1664,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain):
         self.tabWidget.addTab(self.variablesWidgetGroupbox, "Variables")
         self.tabWidget.addTab(self.loggerINFOGroupBox, "Logger")
         self.tabWidget.addTab(self.loggerDEBUGGroupBox, "Debug")
+        self.tabWidget.addTab(self.helpGroupBox, "Help")
         
         #Global variables for MM/napari
         self.core = core
