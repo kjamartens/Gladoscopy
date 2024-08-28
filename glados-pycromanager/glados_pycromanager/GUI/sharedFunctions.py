@@ -85,7 +85,10 @@ class Shared_data(QObject):
             #Load the mda state
             with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
                 gladosInfo = json.load(file)
-                globalDataInfo = gladosInfo['GlobalData']
+                if 'GlobalData' in gladosInfo:
+                    globalDataInfo = gladosInfo['GlobalData']
+                else:
+                    globalDataInfo = {}
         
         for key in globalDataInfo:
             try:

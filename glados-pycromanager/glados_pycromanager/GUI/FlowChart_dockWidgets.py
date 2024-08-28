@@ -1455,14 +1455,15 @@ class GladosNodzFlowChart_dockWidget(NodzMain):
         
         self.fullRunOngoing = False
         
-        
-        import glados_pycromanager
-        # Get the installation path of the package
-        package_path = os.path.dirname(glados_pycromanager.__file__)
-        # Construct the path to the Icons folder
-        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
-
-        if not os.path.exists(self.iconFolder):
+        try:
+            import glados_pycromanager
+            # Get the installation path of the package
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            # Construct the path to the Icons folder
+            self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+        except:
+            self.iconFolder = ''
+        if not os.path.exists(self.iconFolder) or self.iconFolder == '':
             #Find the iconPath folder
             if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
                 self.iconFolder = './glados_pycromanager/GUI/Icons/'
