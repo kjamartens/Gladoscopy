@@ -18,14 +18,12 @@ if is_pip_installed():
     import glados_pycromanager.GUI.utils as full_utils
     from glados_pycromanager.GUI.nodz.nodz_custom import *
     import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
-    import glados_pycromanager.GUI.MDAGlados as MDAGlados
 else:
     import nodz_utils as utils
     import utils as full_utils
     from nodz_custom import *
     import sys
     import AutonomousMicroscopy.MainScripts.HelperFunctions
-    import GUI.MDAGlados as MDAGlados
     
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
@@ -1626,7 +1624,7 @@ class NodeScene(QtWidgets.QGraphicsScene):
 
     def regular_callAction(self):
         # This function will be called every second
-        self.parent().shared_data.warningErrorInfoInfo['Warnings'] = [] # type: ignore
+        self.parent().shared_data.warningErrorInfoInfo['Warnings'] = []
         #Check whether we have init, score, acq start,end:
         allInitScoreAcqStartEndMissing = ['initStart','initEnd','scoringStart','scoringEnd','acqStart','acqEnd']
         for node in self.nodes:
@@ -1646,17 +1644,17 @@ class NodeScene(QtWidgets.QGraphicsScene):
             singleTextLine = 'Missing the following required nodes: '
             for node in allInitScoreAcqStartEndMissing:
                 singleTextLine += node + ', '
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += [singleTextLine] # type: ignore
+            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += [singleTextLine]
         
         #Check if we have a functioning decision widget:
-        decisionRunnable = self.parent().decisionWidget.assessDecision() # type: ignore
+        decisionRunnable = self.parent().decisionWidget.assessDecision()
         if decisionRunnable == False:
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Decision widget is missing information.'] # type: ignore
+            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Decision widget is missing information.']
         
         #Check if we have a functioning scanning widget
-        scanRunnable = self.parent().scanningWidget.assessScan() # type: ignore
+        scanRunnable = self.parent().scanningWidget.assessScan()
         if scanRunnable == False:
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Scanning widget is missing information.'] # type: ignore
+            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Scanning widget is missing information.']
         
     def dragEnterEvent(self, event):
         """
@@ -1904,7 +1902,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         from PyQt5.QtGui import QTextOption
 
         text_option = QTextOption()
-        text_option.setAlignment(Qt.AlignLeft) # type: ignore
+        text_option.setAlignment(Qt.AlignLeft)
         text_option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)  # Add WordWrap
         td.setDefaultTextOption(text_option)
         
@@ -2599,7 +2597,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         from PyQt5.QtGui import QTextOption
         text_option = QTextOption()
-        text_option.setAlignment(Qt.AlignLeft) # type: ignore
+        text_option.setAlignment(Qt.AlignLeft)
         text_option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)  # Add WordWrap
         td.setDefaultTextOption(text_option)
         td.setTextWidth(self.boundingRect().width() - 2 * self.textboxborder)

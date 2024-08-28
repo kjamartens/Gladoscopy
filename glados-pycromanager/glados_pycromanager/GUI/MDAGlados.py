@@ -43,7 +43,6 @@ if is_pip_installed():
     from glados_pycromanager.GUI.utils import CustomMainWindow
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
     from glados_pycromanager.GUI.AnalysisClass import *
-    from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
     import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.MMcontrols import ConfigInfo
 else:
@@ -51,7 +50,6 @@ else:
     from utils import CustomMainWindow
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
     from AnalysisClass import *
-    from AnalysisClass import create_real_time_analysis_thread
     from MMcontrols import ConfigInfo
 
 

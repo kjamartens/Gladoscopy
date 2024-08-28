@@ -23,7 +23,6 @@ if is_pip_installed():
     from glados_pycromanager.GUI.napariGlados import *
     from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
     from glados_pycromanager.GUI.utils import *
-    from glados_pycromanager.GUI import runNapariPycroManager
     import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import *
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
@@ -41,7 +40,6 @@ else:
     from AutonomousMicroscopy.Analysis_Measurements import *
     from AutonomousMicroscopy.Analysis_Shapes import *
     from AutonomousMicroscopy.Real_Time_Analysis import *
-    from GUI import runNapariPycroManager
 
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QMainWindow
