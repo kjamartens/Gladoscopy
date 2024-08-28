@@ -16,27 +16,30 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicrosco
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy\\MainScripts")
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI\\nodz")
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.napariGlados import *
     from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
     from glados_pycromanager.GUI.utils import *
-    # import glados_pycromanager.HelperFunctions #type: ignore
+    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import *
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
-except:
+else:
     from napariGlados import *
     from sharedFunctions import Shared_data, periodicallyUpdate
     from utils import *
-    import HelperFunctions #type: ignore
     # Add the folder 2 folders up to the system path
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import AutonomousMicroscopy.MainScripts.HelperFunctions
     #Import all scripts in the custom script folders
-    from Analysis_Images import * #type: ignore
-    from Analysis_Measurements import * #type: ignore
-    from Analysis_Shapes import * #type: ignore
-    from Real_Time_Analysis import * #type: ignore
+    from AutonomousMicroscopy.Analysis_Images import *
+    from AutonomousMicroscopy.Analysis_Measurements import *
+    from AutonomousMicroscopy.Analysis_Shapes import *
+    from AutonomousMicroscopy.Real_Time_Analysis import *
 
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QMainWindow

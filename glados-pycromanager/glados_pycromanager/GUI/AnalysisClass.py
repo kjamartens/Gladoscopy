@@ -19,15 +19,19 @@ from typing import Union, Tuple, List
 import logging
 # from stardist.models import StarDist2D
 from PIL import Image, ImageDraw
-try:
+
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
     import glados_pycromanager.GUI.utils
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopyAnalysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopyAnalysis_Shapes import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopyCustomFunctions import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopyReal_Time_Analysis import * #type: ignore
-except:
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+else:
     from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
     import utils
     sys.path.append('AutonomousMicroscopy')

@@ -7,7 +7,6 @@ Includes classes for Interactive Lists such as the Channels, XY positions.
 
 import sys
 import time
-from AnalysisClass import *
 from PyQt5.QtWidgets import QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
@@ -36,14 +35,22 @@ import itertools
 import queue
 from PyQt5.QtWidgets import QTableWidget, QWidget, QInputDialog, QTableWidgetItem
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     import glados_pycromanager.GUI.utils
     from glados_pycromanager.GUI.utils import CustomMainWindow
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-except:
-    import utils
+    from glados_pycromanager.GUI.AnalysisClass import *
+    import glados_pycromanager.GUI.utils as utils
+    from glados_pycromanager.GUI.MMcontrols import ConfigInfo
+else:
+    import utils as utils
     from utils import CustomMainWindow
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+    from AnalysisClass import *
+    from MMcontrols import ConfigInfo
 
 
 #region List Widgets
@@ -855,7 +862,6 @@ class MDAGlados(CustomMainWindow):
         #Figure out from all config groups which ones are "dropdown"
         nrconfiggroups = self.core.get_available_config_groups().size()
         allConfigGroups={}
-        from MMcontrols import ConfigInfo
         for config_group_id in range(nrconfiggroups):
             allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         comboboxindexes = []
@@ -1424,7 +1430,11 @@ class MDAGlados(CustomMainWindow):
                 
                     logging.debug('Starting Nodz-MDA visualisation')
                     #Prepare layerName for shared_data to order the layers later.
-                    from napariGlados import startMDAVisualisation
+                    #Import here to prevent circular import
+                    if is_pip_installed():
+                        from glados_pycromanager.GUI.napariGlados import startMDAVisualisation
+                    else:
+                        from napariGlados import startMDAVisualisation
                     self.shared_data.newestLayerName = layerName
                     startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
@@ -1506,7 +1516,11 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mdaMode = True
         #And start visualization
         if mdaLayerName is not None:
-            from napariGlados import startMDAVisualisation
+            #Import here to prevent circular import
+            if is_pip_installed():
+                from glados_pycromanager.GUI.napariGlados import startMDAVisualisation
+            else:
+                from napariGlados import startMDAVisualisation
             startMDAVisualisation(self.shared_data,layerName=mdaLayerName)
         logging.debug('ended setting mdamode params')
         

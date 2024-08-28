@@ -18,7 +18,11 @@ from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QMainWindow
 import sys
 
-try:
+
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
     from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
     from glados_pycromanager.GUI.utils import *
@@ -29,7 +33,7 @@ try:
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     #Obtain the helperfunctions
     import glados_pycromanager.GUI.utils
-except:
+else:
     from napariGlados import runNapariPycroManager
     from sharedFunctions import Shared_data, periodicallyUpdate
     from utils import *

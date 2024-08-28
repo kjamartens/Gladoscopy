@@ -8,11 +8,14 @@ from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayou
 from PyQt5.QtCore import QRectF
 
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     import glados_pycromanager.GUI.nodz.nodz_utils as utils
     from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
     from glados_pycromanager.GUI.MDAGlados import MDAGlados
-except:
+else:
     import nodz_utils as utils
     from MMcontrols import MMConfigUI, ConfigInfo
     from MDAGlados import MDAGlados

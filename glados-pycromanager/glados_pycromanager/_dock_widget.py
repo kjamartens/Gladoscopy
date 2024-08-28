@@ -12,7 +12,11 @@ from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QGroupBox, QLabe
 
 from typing import List
 os.environ['NAPARI_ASYNC'] = '1'
-try:
+
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.AnalysisClass import * #type:ignore
     from glados_pycromanager.GUI.utils import CustomMainWindow #type:ignore
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
@@ -21,13 +25,13 @@ try:
     from glados_pycromanager.GUI.utils import * #type: ignore
     #Import all scripts in the custom script folders
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopyAnalysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopyAnalysis_Shapes import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopyReal_Time_Analysis import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     # Obtain the helperfunctions
     # import glados_pycromanager.GUI.HelperFunctions #type: ignore
     from glados_pycromanager.GUI.napariHelperFunctions import showScaleBar #type: ignore
-except:
+else:
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI")
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy")
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy\\MainScripts")

@@ -5,11 +5,14 @@ from PyQt5.QtWidgets import QMainWindow,QApplication
 
 import os
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.LaserControlScripts import *
     # from MMcontrols import *
     from glados_pycromanager.GUI.napariGlados import *
-except:
+else:
     from LaserControlScripts import *
     # from MMcontrols import *
     from napariGlados import *

@@ -26,7 +26,10 @@ from typing import List, Iterable
 import itertools
 import queue
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.AnalysisClass import *
     import glados_pycromanager.GUI.napariGlados
     from glados_pycromanager.GUI.utils import CustomMainWindow
@@ -34,7 +37,7 @@ try:
     from glados_pycromanager.GUI.MMcontrols import *
     from glados_pycromanager.GUI.MDAGlados import *
     from glados_pycromanager.GUI.FlowChart_dockWidgets import * 
-except:
+else:
     from AnalysisClass import *
     import napariGlados
     from utils import CustomMainWindow

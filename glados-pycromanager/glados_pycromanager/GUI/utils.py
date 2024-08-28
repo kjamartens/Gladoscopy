@@ -22,22 +22,27 @@ from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget
 from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
 import sys
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
-except:
+    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+else:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'AutonomousMicroscopy')
     #Import all scripts in the custom script folders
-    from Analysis_Images import * #type: ignore
-    from Analysis_Measurements import * #type: ignore
-    from Analysis_Shapes import * #type: ignore
-    from CustomFunctions import * #type: ignore
-    from Real_Time_Analysis import * #type: ignore
+    from AutonomousMicroscopy.Analysis_Images import *
+    from AutonomousMicroscopy.Analysis_Measurements import *
+    from AutonomousMicroscopy.Analysis_Shapes import *
+    from AutonomousMicroscopy.CustomFunctions import *
+    from AutonomousMicroscopy.Real_Time_Analysis import * 
+    import AutonomousMicroscopy.MainScripts.HelperFunctions 
 
 
 def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
@@ -3387,7 +3392,11 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         updateInfo (str, optional): Specifies which information to update. Defaults to 'All', which updates all error, warning, and info messages.
     """
     if updateInfo == 'All': #Willa lways be the case, deprecated is ['Error','Warning','Info']
-        from glados_pycromanager.GUI.sharedFunctions import Shared_data
+        
+        if is_pip_installed():
+            from glados_pycromanager.GUI.sharedFunctions import Shared_data
+        else:
+            from sharedFunctions import Shared_data
         if isinstance(shared_data,Shared_data):
             sharedData = shared_data
         elif isinstance(shared_data.parent, Shared_data):

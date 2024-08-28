@@ -8,10 +8,15 @@ from flask import Flask
 import time
 from slackeventsapi import SlackEventAdapter
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.napariGlados import napariHandler
-except:
+    from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
+else:
     from napariGlados import napariHandler
+    from utils import updateAutonousErrorWarningInfo
 
 """Shared data summary
 
@@ -109,6 +114,10 @@ class Shared_data(QObject):
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
         
+        #Store whether we're running via PIP or via a local install
+        
+        self._RunningViaPIP = 'site-packages' in __file__ or 'dist-packages' in __file__
+        self._RunningLocally = not self._RunningViaPIP
     
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')
@@ -263,7 +272,6 @@ class Dict_Specific_WarningErrorInfo(dict):
     def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
         # This method will be overridden in the Shared_data class
         if self.parent.loadingOngoing == False:
-            from utils import updateAutonousErrorWarningInfo
             updateAutonousErrorWarningInfo(self,updateInfo='All')
         pass
 

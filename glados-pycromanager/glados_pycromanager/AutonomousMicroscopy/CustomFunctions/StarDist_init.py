@@ -1,4 +1,11 @@
-from MainScripts import FunctionHandling
+
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+else:
+    from MainScripts import FunctionHandling
 # from stardist.models import StarDist2D
 from csbdeep.utils import normalize
 import inspect

@@ -10,14 +10,21 @@ import logging
 import time
 from PyQt5.QtCore import QTimer
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     import glados_pycromanager.GUI.nodz.nodz_utils as utils
     import glados_pycromanager.GUI.utils as full_utils
     from glados_pycromanager.GUI.nodz.nodz_custom import *
-except:
+    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+else:
     import nodz_utils as utils
     import utils as full_utils
     from nodz_custom import *
+    import sys
+    import AutonomousMicroscopy.MainScripts.HelperFunctions
+    
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
 

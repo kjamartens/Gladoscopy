@@ -15,7 +15,10 @@ import sys
 import logging
 import os
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.LaserControlScripts import *
     import glados_pycromanager.GUI.napariGlados as napariGlados
     from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
@@ -25,7 +28,8 @@ try:
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
     from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
     from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
-except:
+    from glados_pycromanager.GUI.MDAGlados import MDAGlados
+else:
     from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
     from LaserControlScripts import *
     from MMcontrols import microManagerControlsUI
@@ -34,6 +38,7 @@ except:
     from FlowChart_dockWidgets import *
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
     from utils import cleanUpTemporaryFiles
+    from MDAGlados import MDAGlados
 
 
 # # Define a flag to control the continuous task
@@ -725,7 +730,6 @@ class dockWidget_MDA(dockWidgets):
                 mdaInfo = gladosInfo['MDA']
             
             try:
-                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
@@ -762,14 +766,12 @@ class dockWidget_MDA(dockWidgets):
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
             except KeyError:
-                from MDAGlados import MDAGlados
                 #Add the full micro manager controls UI
                 self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
         else: #If no MDA state is yet saved, open a new MDAGlados from scratch
-            from MDAGlados import MDAGlados
             #Add the full micro manager controls UI
             self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
                         hasGUI=True,

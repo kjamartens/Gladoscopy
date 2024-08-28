@@ -27,12 +27,15 @@ import queue
 #For drawing
 matplotlib.use('Qt5Agg')
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.GUI.utils import CustomMainWindow
     from glados_pycromanager.GUI.AnalysisClass import *
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 
-except:
+else:
     from utils import CustomMainWindow
     from AnalysisClass import *
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop

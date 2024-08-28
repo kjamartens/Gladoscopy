@@ -11,13 +11,27 @@ import tifffile
 import matplotlib.pyplot as plt
 from matplotlib import colormaps # type: ignore
 
-#Import all scripts in the custom script folders
-from AutonomousMicroscopy.Analysis_Shapes import *
-from AutonomousMicroscopy.Scoring_Shapes import *
-from ROICalcScripts import *
-from ScoringMetrics import *
-#Obtain the helperfunctions
-import HelperFunctions
+
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
+    from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+    #Import all scripts in the custom script folders
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import *
+    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
+    
+    #Obtain the helperfunctions
+    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+else:
+    #Import all scripts in the custom script folders
+    from AutonomousMicroscopy.Analysis_Shapes import *
+    from AutonomousMicroscopy.Analysis_Images import *
+    from AutonomousMicroscopy.Analysis_Measurements import *
+    
+    #Obtain the helperfunctions
+    import HelperFunctions
 
 #Created Conda environment (Python 3.10.11)
 #Required PIPs: in requirements.txt

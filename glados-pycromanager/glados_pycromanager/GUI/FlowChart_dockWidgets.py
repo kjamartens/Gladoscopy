@@ -16,8 +16,6 @@ from PyQt5.QtGui import QTextCursor
 sys.path.append('glados-pycromanager\\glados_pycromanager\\GUI\\nodz')
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QObject, pyqtSignal
-from MMcontrols import MMConfigUI, ConfigInfo
-from MDAGlados import MDAGlados
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QPlainTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QDoubleSpinBox
 from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtGui
@@ -35,7 +33,10 @@ from PyQt5.QtWidgets import QApplication, QComboBox
 from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
 import logging
 
-try:
+def is_pip_installed():
+    return 'site-packages' in __file__ or 'dist-packages' in __file__
+
+if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * 
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
@@ -43,18 +44,23 @@ try:
     from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
     import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.nodz import nodz_utils
-    import glados_pycromanager.GUI.nodz.nodz_main as nodz_main
-    from glados_pycromanager.GUI.nodz.nodz_main import Nodz as NodzMain
-except:
+    import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
+    from glados_pycromanager.GUI.MDAGlados import MDAGlados
+    import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
+else:
     #Import all scripts in the custom script folders
-    from Analysis_Images import * #type: ignore
-    from Analysis_Measurements import * #type: ignore
-    from Analysis_Shapes import * #type: ignore
-    from Real_Time_Analysis import * #type: ignore
-    from CustomFunctions import * #type: ignore
+    from AutonomousMicroscopy.Analysis_Images import *
+    from AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+    from AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
+    from AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+    from AutonomousMicroscopy.CustomFunctions import * #type: ignore
     import utils
     from nodz import nodz_utils
     import nodz_main as NodzMain
+    from MMcontrols import MMConfigUI, ConfigInfo
+    from MDAGlados import MDAGlados
+    import nodz.nodz_utils as nodz_utils
 #endregion
 
 #region Dialogs_Nodz
@@ -1411,7 +1417,7 @@ class NodeSignalManager(QObject):
             logging.debug(f"emitting signal {signal}")
 #endregion
 
-class GladosNodzFlowChart_dockWidget(NodzMain):
+class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
     """
     Class that represents a Flowchart dock widget in napari-Glados. 
     Inherits from Nodz, which is a graph drawing tool.
@@ -1607,7 +1613,12 @@ class GladosNodzFlowChart_dockWidget(NodzMain):
                 QApplication.processEvents()
                 quickStartWindow.setWindowTitle('Quick start / User Manual')
                 QApplication.processEvents()
-                quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
+                
+                if is_pip_installed():
+                    package_path = os.path.dirname(glados_pycromanager.__file__)
+                    quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
+                else:
+                    quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
                 QApplication.processEvents()
                 quickStartWindow.show()
             except Exception as e:
@@ -3321,7 +3332,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain):
         #First, we need to create some function to look at the downstream-connected nodes of some node - this needs to be a rather proper function.
         
         if 'analysisMeasurement_' in dstNodeName or 'analysisMeasurementDEBUG_' in dstNodeName:
-            import nodz.nodz_utils
             srcNode = nodz_utils.findNodeByName(self,srcNodeName)
             dstNode = nodz_utils.findNodeByName(self,dstNodeName)
             
@@ -3481,7 +3491,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain):
             self.createSingleCoreVar(stage+'_current_pos',[pos],[list,np.ndarray]) #type:ignore
         
         #Config values, all configs
-        from MMcontrols import ConfigInfo
         allConfigs = self.core.get_available_config_groups()
         if allConfigs != None:
             nrconfiggroups = allConfigs.size()
