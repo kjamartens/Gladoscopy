@@ -3129,7 +3129,7 @@ def forceReset_actual(shared_data):
         logging.debug("Attempted but failed: shared_data.liveMode=False")
     try:
         shared_data.mdaMode = False
-        logging.debug("Attempted: shared_data.liveMode=False")
+        logging.debug("Attempted: shared_data.mdaMode=False")
     except:
         logging.debug("Attempted but failed: shared_data.mdaMode=False")
     time.sleep(0.1)
