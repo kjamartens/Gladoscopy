@@ -25,7 +25,7 @@ else:
     from nodz_custom import *
     import sys
     import AutonomousMicroscopy.MainScripts.HelperFunctions
-    import GUI.MDAGlados as MDAGlados
+    import MDAGlados as MDAGlados
     
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')

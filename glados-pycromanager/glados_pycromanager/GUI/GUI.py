@@ -1,4 +1,4 @@
-from pycromanager import core
+from pycromanager import Core
 import sys
 sys.path.append('GUI\\nodz')
 from PyQt5.QtWidgets import QMainWindow,QApplication
