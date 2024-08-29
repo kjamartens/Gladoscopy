@@ -293,7 +293,10 @@ class AutonomousMicroscopyWidget(GladosWidget):
         super().__init__(viewer = viewer, parent=parent)
         
         #Add the full micro manager controls UI
-        from Analysis_dockWidgets import autonomousMicroscopy_plugin
+        if is_pip_installed():
+            from glados_pycromanager.GUI.Analysis_dockWidgets import autonomousMicroscopy_plugin
+        else:
+            from Analysis_dockWidgets import autonomousMicroscopy_plugin
         self.dockWidget = autonomousMicroscopy_plugin(self) #type:ignore
         
         self.setLayout(self.dockWidget)
@@ -319,7 +322,10 @@ class GladosSlidersWidget(GladosWidget):
         super().__init__(viewer=viewer, parent=parent)
         
         #Add the full micro manager controls UI
-        from Analysis_dockWidgets import gladosSliders_plugin
+        if is_pip_installed():
+            from glados_pycromanager.GUI.Analysis_dockWidgets import gladosSliders_plugin
+        else:
+            from Analysis_dockWidgets import gladosSliders_plugin
         self.dockWidget = gladosSliders_plugin(self) #type:ignore
         
 

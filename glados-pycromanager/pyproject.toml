@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "glados_pycromanager"
+name = "glados-pycromanager"
 version = "0.0.1"
 authors = [
   { name="Koen J.A. Martens", email="koenjamartens@gmail.com" }
@@ -112,4 +112,10 @@ dependencies = [
 ]
 
 [project.scripts]
+"glados" = "glados_pycromanager.GUI.GUI_napari:main"
 "glados-pycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
+"gladospycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
+"glados-pycro-manager" = "glados_pycromanager.GUI.GUI_napari:main"
+
+[project.entry-points."napari.manifest"]
+glados-pycromanager = "glados_pycromanager:napari.yaml"

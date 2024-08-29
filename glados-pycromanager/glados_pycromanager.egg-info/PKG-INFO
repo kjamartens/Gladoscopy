@@ -1,5 +1,5 @@
 Metadata-Version: 2.1
-Name: glados_pycromanager
+Name: glados-pycromanager
 Version: 0.0.1
 Summary: Glados-pycromanager: Napari interface for Pycromanager and autonomous microscopy
 Author-email: "Koen J.A. Martens" <koenjamartens@gmail.com>

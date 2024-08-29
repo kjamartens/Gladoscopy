@@ -29,19 +29,19 @@ Glados-pycromanager is an attempt to (1) create a usable, user-friendly user-int
 
 Create a new conda environment, python version 3.10:
 
-```conda
+```batch
 conda create -p C:\CondaEnvironments\GladosPycromanagerEnv python=3.10
 ```
 
 Activate it:
 
-```conda
+```batch
 conda activate C:\CondaEnvironments\GladosPycromanagerEnv
 ```
 
 Install glados-pycromanager:
 
-```conda
+```batch
 pip install "../glados_pycromanager-0.0.1-py3-none-any.whl"
 ```
 
@@ -50,26 +50,50 @@ https://micro-manager.org/Micro-Manager_Nightly_Builds
 
 (Possibly) update pycro-manager to the latest pip version:
 
-```conda
+```batch
 pip install --upgrade pycromanager
-```
-
-Start micro-manager and ensure it is working as expected.  
-Run the glados-pycromanager software:
-
-```conda
-glados-pycromanager
 ```
 
 ## Running instructions
 
-First, run micromanager as normal, and ensure it is working as expected. Stop all live/acquisition, and then run napari in the environment you installed it in (i.e. 'napari' in the miniconda command line).
+First, run micromanager as normal, and ensure it is working as expected. Stop all live/acquisition, and follow one of these instructions:
 
-Within napari, use Plugins --> Glados (glados-pycromanager) to open the software suite.
+There are a bunch of ways to run Glados-PycroManager. They are listed in order of user-friendliness:
 
-Alternatively, you can run 'GUI_napari.py' from the python enviroment, and it will open Napari with the glados-pycromanager plugin opened.
+##### Run glados-pycromanager directly from conda
 
-For the time being, occasionally a 'GladosUI' laser-GUI will open on the left, which can be immediately closed - this GUI functions only on the Endesfelder-Glados setup.
+Open the miniconda prompt, and run pycro-manager as follows:
+
+```batch
+conda activate C:\CondaEnvironments\GladosPycromanagerEnv
+glados-pycromanager
+```
+
+This simply activates the correct environment and starts glados-pycromanager. You can create a .bat file as follows which will have a shortcut to do this: 
+
+Please note that this assumes normal miniconda installation, otherwise you have to find your own miniconda installation path:
+
+```batch
+@echo off
+call C:\ProgramData\miniconda3\Scripts\activate.bat C:\CondaEnvironments\GladosPycromanagerEnv
+glados-pycromanager
+```
+
+##### Run napari from conda and open glados-pycromanager
+
+
+Open the miniconda prompt, and run napari as follows:
+
+```batch
+conda activate C:\CondaEnvironments\GladosPycromanagerEnv
+napari
+```
+
+An empty napari viewer will pop up. Within napari, use Plugins --> Glados (glados-pycromanager) to open the software suite.
+
+##### Full debugging access via the python interface
+
+Finally, you can fully clone glados-pycromanager from GitHub, and run 'GUI_napari.py' from the python enviroment, and it will open Napari with the glados-pycromanager plugin opened. This will allow you for full debugging accesss to the code, especially usefull when developing.
 
 ## First use instructions
 
