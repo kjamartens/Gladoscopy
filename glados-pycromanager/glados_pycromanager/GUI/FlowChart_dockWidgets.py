@@ -6135,7 +6135,7 @@ class LoggerWidget(QPlainTextEdit):
         self.setReadOnly(True)
         
         # Get the appdata folder
-        appdata_folder = os.getenv('APPDATA')
+        appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
             raise EnvironmentError("APPDATA environment variable not found")
         self.app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')

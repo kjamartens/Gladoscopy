@@ -5,7 +5,7 @@ Handles the GUI as well as the logic of the multi-dimensional acquisitions.
 Includes classes for Interactive Lists such as the Channels, XY positions.
 """
 
-import sys
+import sys, appdirs
 import time
 from PyQt5.QtWidgets import QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
@@ -1707,7 +1707,7 @@ class MDAGlados(CustomMainWindow):
         if self.fully_started:
             if self.autoSaveLoad:
                 #Store in appdata
-                appdata_folder = os.getenv('APPDATA')
+                appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
                     raise EnvironmentError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')

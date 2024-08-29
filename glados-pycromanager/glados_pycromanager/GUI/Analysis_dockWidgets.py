@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSi
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
 
-import sys
+import sys, appdirs
 import os
 import json
 from pycromanager import Core, multi_d_acquisition_events, Acquisition
@@ -162,7 +162,7 @@ def MDAGlados_plugin(parent):
     Returns:
         QWidget: The main layout of the custom dock widget.
     """
-    appdata_folder = os.getenv('APPDATA')
+    appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
     if appdata_folder is None:
         raise EnvironmentError("APPDATA environment variable not found")
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')

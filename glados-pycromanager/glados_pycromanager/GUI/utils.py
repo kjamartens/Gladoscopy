@@ -1,6 +1,6 @@
 
 import shutil
-import os
+import os, appdirs
 import logging
 
 #Below here, copy from Eve's util functions:
@@ -3201,7 +3201,7 @@ def openAdvancedSettings(shared_data):
                     logging.warning(f"Couldn't save global data of entry {entry}")
         
         #Store in appdata
-        appdata_folder = os.getenv('APPDATA')
+        appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
             raise EnvironmentError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
@@ -3474,7 +3474,7 @@ def set_up_logger():
     """
     
     # Set up logging at correct level
-    appdata_folder = os.getenv('APPDATA')
+    appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
     if appdata_folder is None:
         raise EnvironmentError("APPDATA environment variable not found")
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')

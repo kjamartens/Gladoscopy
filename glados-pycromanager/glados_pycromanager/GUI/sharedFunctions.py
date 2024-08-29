@@ -7,6 +7,7 @@ import slack
 from flask import Flask
 import time
 from slackeventsapi import SlackEventAdapter
+import appdirs
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -81,7 +82,7 @@ class Shared_data(QObject):
         #Overwrite all values that can be found from the .JSON:
         import os, json
         #load from appdata
-        appdata_folder = os.getenv('APPDATA')
+        appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
             raise EnvironmentError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
@@ -95,11 +96,11 @@ class Shared_data(QObject):
                 else:
                     globalDataInfo = {}
         
-        for key in globalDataInfo:
-            try:
-                self.globalData[key]['value'] = globalDataInfo[key]
-            except:
-                pass
+            for key in globalDataInfo:
+                try:
+                    self.globalData[key]['value'] = globalDataInfo[key]
+                except:
+                    pass
         
         if self.globalData['SLACK-TOKEN']['value'] is not None and not len(self.globalData['SLACK-TOKEN']['value']) == 0:
             try:

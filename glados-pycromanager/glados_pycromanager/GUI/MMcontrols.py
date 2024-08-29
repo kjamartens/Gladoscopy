@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplicatio
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
-import sys
+import sys, appdirs
 import os
 import json
 from pycromanager import Core, multi_d_acquisition_events, Acquisition
@@ -377,7 +377,7 @@ class MMConfigUI(CustomMainWindow):
         if self.autoSaveLoad:
             if self.fullyLoaded:
                 #Store in appdata
-                appdata_folder = os.getenv('APPDATA')
+                appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
                     raise EnvironmentError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
@@ -414,7 +414,7 @@ class MMConfigUI(CustomMainWindow):
         Update all the info that can be loaded from the JSON file.
         """
         #Load from APPData, if it exists
-        appdata_folder = os.getenv('APPDATA')
+        appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
             raise EnvironmentError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
@@ -453,7 +453,7 @@ class MMConfigUI(CustomMainWindow):
                 logging.debug('Storing glados state.json')
                 
                 #Store in appdata
-                appdata_folder = os.getenv('APPDATA')
+                appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
                     raise EnvironmentError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
