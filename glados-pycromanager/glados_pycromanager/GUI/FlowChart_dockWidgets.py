@@ -8,7 +8,7 @@ Contains the Scanning/Decision/Variables/Logger widgets encapsulated in the auto
 
 #region imports
 #Add inclusion of this folder:
-import sys, os
+import sys, os, appdirs
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QGroupBox
 from PyQt5.QtCore import QTimer
@@ -133,10 +133,22 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         
         #Let's try to get all possible analysis options
         analysisFunctions_Images = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Images')
+        analysisFunctions_ImagesAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Analysis_Images')
+        #Remove duplicates - not sure why they're here:
+        analysisFunctions_ImagesAppData = list(set(analysisFunctions_ImagesAppData))
+        
         analysisFunctions_Measurements = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Measurements')
+        analysisFunctions_MeasurementsAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Analysis_Measurements')
+        #Remove duplicates - not sure why they're here:
+        analysisFunctions_MeasurementsAppData = list(set(analysisFunctions_MeasurementsAppData))
+        
         analysisFunctions_Shapes = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Shapes')
+        analysisFunctions_ShapesAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Analysis_Shapes')
+        #Remove duplicates - not sure why they're here:
+        analysisFunctions_ShapesAppData = list(set(analysisFunctions_ShapesAppData))
+        
         #Also add them back to back
-        all_analysisFunctions = analysisFunctions_Images + analysisFunctions_Measurements + analysisFunctions_Shapes
+        all_analysisFunctions = analysisFunctions_Images + analysisFunctions_ImagesAppData + analysisFunctions_Measurements + analysisFunctions_MeasurementsAppData + analysisFunctions_Shapes + analysisFunctions_ShapesAppData
         
         allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
         #Store this mapping also in the node
@@ -148,17 +160,31 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
             for item in analysisFunctions_Images:
                 displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
                 self.comboBox_analysisFunctions.addItem(displayNameI[0])
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)-1)  
+        if len(analysisFunctions_ImagesAppData) > 0:
+            for item in analysisFunctions_ImagesAppData:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_ImagesAppData)-1) 
+            
         if len(analysisFunctions_Measurements) > 0:
             for item in analysisFunctions_Measurements:
                 displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
                 self.comboBox_analysisFunctions.addItem(displayNameI[0])
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_Measurements)-1)
+        if len(analysisFunctions_MeasurementsAppData) > 0:
+            for item in analysisFunctions_MeasurementsAppData:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_ImagesAppData)+len(analysisFunctions_Measurements)+len(analysisFunctions_MeasurementsAppData)-1)
+            
         if len(analysisFunctions_Shapes) > 0:
             for item in analysisFunctions_Shapes:
                 displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
                 self.comboBox_analysisFunctions.addItem(displayNameI[0])
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_Measurements)+len(analysisFunctions_Shapes)-1)          
+        if len(analysisFunctions_ShapesAppData) > 0:
+            for item in analysisFunctions_ShapesAppData:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_ImagesAppData)+len(analysisFunctions_Measurements)+len(analysisFunctions_MeasurementsAppData)+len(analysisFunctions_Shapes)+len(analysisFunctions_ShapesAppData)-1)          
 
         self.mainLayout.addWidget(self.comboBox_analysisFunctions, 0, 1)
         #give it an objectName:
@@ -204,8 +230,11 @@ class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
         
         #Let's try to get all possible analysis options
         customFunctions = utils.functionNamesFromDir('AutonomousMicroscopy\\CustomFunctions')
+        customFunctionsAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\CustomFunctions')
+        #Remove duplicates - not sure why they're here:
+        customFunctionsAppData = list(set(customFunctionsAppData))
         #Also add them back to back
-        all_analysisFunctions = customFunctions
+        all_analysisFunctions = customFunctions + customFunctionsAppData
         
         allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
         #Store this mapping also in the node
@@ -215,6 +244,10 @@ class nodz_customFunctionDialog(AnalysisScoringVisualisationDialog):
         self.comboBox_analysisFunctions = QComboBox(self)
         if len(customFunctions) > 0:
             for item in customFunctions:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_analysisFunctions.addItem(displayNameI[0])
+        if len(customFunctionsAppData) > 0:
+            for item in customFunctionsAppData:
                 displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
                 self.comboBox_analysisFunctions.addItem(displayNameI[0])
                 
@@ -268,8 +301,14 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         
         #Let's try to get all possible RT analysis options
         realTimeAnalysisFunctions = utils.functionNamesFromDir('AutonomousMicroscopy\\Real_Time_Analysis')
+        realTimeAnalysisFunctionsAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Real_Time_Analysis')
+        #Remove duplicates - not sure why they're here:
+        realTimeAnalysisFunctionsAppData = list(set(realTimeAnalysisFunctionsAppData))
         
-        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(realTimeAnalysisFunctions,'')
+        realTimeAnalysisFunctionsAll = realTimeAnalysisFunctions + realTimeAnalysisFunctionsAppData
+        
+        
+        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(realTimeAnalysisFunctionsAll,'')
         #Store this mapping also in the node
         self.currentData['__displayNameFunctionNameMap__'] = displaynameMapping
         
@@ -277,6 +316,10 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         self.comboBox_RTanalysisFunctions = QComboBox(self)
         if len(realTimeAnalysisFunctions) > 0:
             for item in realTimeAnalysisFunctions:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
+        if len(realTimeAnalysisFunctionsAppData) > 0:
+            for item in realTimeAnalysisFunctionsAppData:
                 displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
                 self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
         
