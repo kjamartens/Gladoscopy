@@ -17,17 +17,16 @@ import time
 # Should have an entry for every function in this file
 def __function_metadata__():
     return { 
-        "RealTimeCounter": {
+        "EndAtFrame": {
             "required_kwargs": [
-                {"name": "ReqKwarg1", "description": "First required kwarg", "default": 'DefaultKwarg', "type": str}
+                {"name": "LastFrame", "description": "Last frame after which it should be cut off", "default": 50, "type": int}
             ],
             "optional_kwargs": [
-                {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
             ],
-            "help_string": "RT counter.",
-            "display_name": "RT counter",
+            "help_string": "Examplary method to influence the run",
+            "display_name": "Example - influence the run by stopping it at a set frame",
             "run_delay": 0,
-            "visualise_delay": 100,
+            "visualise_delay": 1000,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
@@ -40,51 +39,38 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class RealTimeCounter():
+class EndAtFrame():
     def __init__(self,core,**kwargs):
-        print('INITIALISING COUNTER REAL-TIME ANALYSIS')
         print(core)
+        self.initDone = 'Yea'
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
 
-        print('in RT_counter at time '+str(time.time()))
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):
-        print('RUNNING COUNTER REAL-TIME ANALYSIS')
-        if 'ImageNumber' in metadata:
-            self.currentValue = metadata['ImageNumber']
-            print("At frame: "+metadata['ImageNumber'])
-        else:
-            self.currentValue = metadata['Axes']['time']
-            print("At axis-time: "+str(metadata['Axes']['time']))
+        self.image = image
+        self.metadata = metadata
+        self.shared_data = shared_data
+        self.kwargs = kwargs
+        if self.metadata['Axes']['time'] >= int(self.kwargs['LastFrame']):
+            #Abort and mark-finished the pycromanager acquisition
+            shared_data._mdaModeAcqData.abort()
+            shared_data._mdaModeAcqData.mark_finished()
+            #Print a statement
+            print(f"Ended at frame {self.metadata['Axes']['time']}")
     
     def end(self,core,**kwargs):
-        print('ENDING COUNTER REAL-TIME ANALYSIS')
         return
     
     def visualise_init(self): 
-        print('INITIALISING VISUALISATION COUNTER REAL-TIME ANALYSIS')
-        layerName = 'RT counter'
+        #No visualisation implemented
+        layerName = 'None'
         layerType = 'points' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
         return layerName,layerType
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        print('RUNNING VISUALISATION COUNTER REAL-TIME ANALYSIS')
-        features = {
-            'outputval': self.currentValue
-        }
-        textv = {
-            'string': 'Current frame: {outputval:.0f}',
-            'size': 10,
-            'color': 'cyan',
-            'translation': np.array([0, 0]),
-            'anchor': 'upper_left',
-        }
-        napariLayer.data = [0, 256]
-        napariLayer.features = features
-        napariLayer.text = textv
-        napariLayer.symbol = 'disc'
-        napariLayer.size = 0
-        napariLayer.selected_data = []
+        #No visualisation implemented
+        return
+    

@@ -35,7 +35,8 @@ def __function_metadata__():
                 {"name": "nms_thresh", "description": "Overlapping threshold of the model, if unused, it uses the build-in value of the stored model"}
             ],
             "help_string": "StarDist segmentation based via a stored model. This is a rather slow implementation (look at StarDistSegment_preloadedModel for a faster implementation that requires pre-loading the stardist model).",
-            "display_name": "StarDist Image Segmentation"
+            "display_name": "StarDist Image Segmentation",
+            "visualisation_type" : "image" #'Image', 'points', 'value', or 'shapes'
         },
         "StarDistSegment_preLoadedModel_use": {
             "input":[
@@ -54,7 +55,8 @@ def __function_metadata__():
                 {"name": "nms_thresh", "description": "Overlapping threshold of the model, if unused, it uses the build-in value of the stored model"}
             ],
             "help_string": "StarDist segmentation based via a pre-loaded model. Requires using the 'load preloaded model' function",
-            "display_name": "StarDist Image Segmentation - via preloaded model"
+            "display_name": "StarDist Image Segmentation - via preloaded model",
+            "visualisation_type" : "image" #'Image', 'points', 'value', or 'shapes'
         }
     }
 

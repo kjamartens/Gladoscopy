@@ -29,7 +29,8 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Create an average image over time-axis.",
-            "display_name": "Average image (time)"
+            "display_name": "Average image (time)",
+            "visualisation_type" : "image" #'image', 'points', 'value', or 'shapes'
         }
     }
 
@@ -59,24 +60,11 @@ def AvgImage(core,**kwargs):
     return output
 
 
-def AvgGrayValue_visualise(datastruct,core,**kwargs):
-    #This is how datastruct is organised...
-    output,pointsLayer,mdaDataobject = datastruct
-    
-    
-    # create features for each point
-    features = {
-        'outputval': output
-    }
-    # textv = {'string': 'Hi!','size':20,'color':'green','translation':np.array([-30,0])}
-    textv = {
-        'string': 'GrayValue {outputval:.2f}',
-        'size': 15,
-        'color': 'red',
-        'translation': np.array([0, 0]),
-        'anchor': 'upper_left',
-    }
-    pointsLayer.data = [0,0]
-    pointsLayer.features = features
-    pointsLayer.text = textv
-    pointsLayer.size = 0
+def AvgImage_visualise(datastruct,core,**kwargs):
+    # This is how datastruct is organised...
+    output,imageLayer = datastruct
+    # Set the layer data
+    imageLayer.data = output['average_image']
+    # Reset the contrast limits so we can nicely view
+    imageLayer.reset_contrast_limits()
+    imageLayer.reset_contrast_limits_range()

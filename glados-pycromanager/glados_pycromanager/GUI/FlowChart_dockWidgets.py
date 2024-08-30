@@ -37,9 +37,7 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * 
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
     from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
     import glados_pycromanager.GUI.utils as utils
@@ -50,9 +48,7 @@ if is_pip_installed():
     import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
 else:
     #Import all scripts in the custom script folders
-    from AutonomousMicroscopy.Analysis_Images import *
     from AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
     from AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     from AutonomousMicroscopy.CustomFunctions import * #type: ignore
     import utils
@@ -131,24 +127,13 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         self.setMinimumSize(400,100)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
-        #Let's try to get all possible analysis options
-        analysisFunctions_Images = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Images')
-        analysisFunctions_ImagesAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Analysis_Images')
-        #Remove duplicates - not sure why they're here:
-        analysisFunctions_ImagesAppData = list(set(analysisFunctions_ImagesAppData))
-        
         analysisFunctions_Measurements = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Measurements')
         analysisFunctions_MeasurementsAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Analysis_Measurements')
         #Remove duplicates - not sure why they're here:
         analysisFunctions_MeasurementsAppData = list(set(analysisFunctions_MeasurementsAppData))
         
-        analysisFunctions_Shapes = utils.functionNamesFromDir('AutonomousMicroscopy\\Analysis_Shapes')
-        analysisFunctions_ShapesAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Analysis_Shapes')
-        #Remove duplicates - not sure why they're here:
-        analysisFunctions_ShapesAppData = list(set(analysisFunctions_ShapesAppData))
-        
         #Also add them back to back
-        all_analysisFunctions = analysisFunctions_Images + analysisFunctions_ImagesAppData + analysisFunctions_Measurements + analysisFunctions_MeasurementsAppData + analysisFunctions_Shapes + analysisFunctions_ShapesAppData
+        all_analysisFunctions = analysisFunctions_Measurements + analysisFunctions_MeasurementsAppData
         
         allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(all_analysisFunctions,'')
         #Store this mapping also in the node
@@ -156,36 +141,18 @@ class nodz_analysisDialog(AnalysisScoringVisualisationDialog):
         
         #Add a dropbox with all the options
         self.comboBox_analysisFunctions = QComboBox(self)
-        if len(analysisFunctions_Images) > 0:
-            for item in analysisFunctions_Images:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_analysisFunctions.addItem(displayNameI[0])
-        if len(analysisFunctions_ImagesAppData) > 0:
-            for item in analysisFunctions_ImagesAppData:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_analysisFunctions.addItem(displayNameI[0])
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_ImagesAppData)-1) 
+        
             
         if len(analysisFunctions_Measurements) > 0:
             for item in analysisFunctions_Measurements:
                 displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
                 self.comboBox_analysisFunctions.addItem(displayNameI[0])
+            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Measurements))
         if len(analysisFunctions_MeasurementsAppData) > 0:
             for item in analysisFunctions_MeasurementsAppData:
                 displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
                 self.comboBox_analysisFunctions.addItem(displayNameI[0])
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_ImagesAppData)+len(analysisFunctions_Measurements)+len(analysisFunctions_MeasurementsAppData)-1)
             
-        if len(analysisFunctions_Shapes) > 0:
-            for item in analysisFunctions_Shapes:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_analysisFunctions.addItem(displayNameI[0])
-        if len(analysisFunctions_ShapesAppData) > 0:
-            for item in analysisFunctions_ShapesAppData:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_analysisFunctions.addItem(displayNameI[0])
-            self.comboBox_analysisFunctions.insertSeparator(len(analysisFunctions_Images)+len(analysisFunctions_ImagesAppData)+len(analysisFunctions_Measurements)+len(analysisFunctions_MeasurementsAppData)+len(analysisFunctions_Shapes)+len(analysisFunctions_ShapesAppData)-1)          
-
         self.mainLayout.addWidget(self.comboBox_analysisFunctions, 0, 1)
         #give it an objectName:
         self.comboBox_analysisFunctions.setObjectName('comboBox_analysisFunctions_KEEP')
@@ -1667,6 +1634,27 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             except Exception as e:
                 logging.error(f'Could not open quick start window. {e}')
         
+        
+        def developerMenu(self):
+            """
+            Shows the DeveloperManual.md file
+            """
+            try:
+                quickStartWindow = utils.SmallWindow(self)
+                QApplication.processEvents()
+                quickStartWindow.setWindowTitle('Developer manual')
+                QApplication.processEvents()
+                
+                if is_pip_installed():
+                    package_path = os.path.dirname(glados_pycromanager.__file__)
+                    quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
+                else:
+                    quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/DeveloperManual.md')
+                QApplication.processEvents()
+                quickStartWindow.show()
+            except Exception as e:
+                logging.error(f'Could not open developer menu. {e}')
+        
         def DeveloperAdvMenu(self):
             """
             Shows the Documentation .html files file
@@ -1692,6 +1680,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         button1.clicked.connect(lambda index: quickStartMenu(self))
         newgridlayout.addWidget(button1)
         button2 = QPushButton('Developer Manual')
+        button2.clicked.connect(lambda index: developerMenu(self))
         newgridlayout.addWidget(button2)
         button3 = QPushButton('Complete software info')
         button3.clicked.connect(lambda index: DeveloperAdvMenu(self))
@@ -3865,65 +3854,61 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer)','self.shared_data.core',nodzInfo=self)
                     visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
                     
-                    chosenLayerType = 'points'
+                    #Figure out which visualisation we want to do
+                    chosenLayerType = None
+                    try:
+                        fnctmetadata = eval(f"{selectedFunction.split('.')[0]}.__function_metadata__()")
+                        visType = fnctmetadata[selectedFunction.split('.')[1]]['visualisation_type']
+                        
+                        if visType == 'value' or visType == 'points' or visType == 'Value' or visType == 'Points' or visType == 'Values' or visType == 'values':
+                            chosenLayerType = 'points'
+                        elif visType == 'Image' or visType == 'image':
+                            chosenLayerType = 'image'
+                        elif visType == 'Shapes' or visType == 'shapes' or visType == 'Shape' or visType == 'shape':
+                            chosenLayerType = 'shapes'
+                        logging.debug(f'Will perform RTvisualisation with layer type: {chosenLayerType}')
+                    except Exception as e:
+                        logging.error(f"Issue with finding RTvisualisation type of a analysisnode: error: {e}")
                     
-                    layerTypeInfo = [
-                        ['Analysis_Measurements','points'],
-                        ['Analysis_Shapes','shapes'],
-                        ['Analysis_Images','image'],
-                    ]
-                    
-                    folderName = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.sep+'AutonomousMicroscopy'+os.sep
-                    
-                    for layerType in layerTypeInfo:
-                        for root, dirs, files in os.walk(folderName+layerType[0]):
-                            for file in files:
-                                if selectedFunction.split('.')[0] in file: #type:ignore
-                                    if file.endswith(".py"):
-                                        with open(os.path.join(root, file), 'r') as f:
-                                            filecontent = f.read()
-                                        if selectedFunction.split('.')[1]+'(' in filecontent: #type:ignore
-                                            chosenLayerType = layerType[1]
-                                            break #to avoid searching in other files for this function
-                    
-                    
-                    layerName = visual_connected_node.visualisation_currentData['layerName']
-                    
-                    #If a layer with this name already exists, simply remove it:
-                    for layer in self.shared_data.napariViewer.layers: #type:ignore
-                        if layer.name == layerName:
-                            self.shared_data.napariViewer.layers.remove(layer) #type:ignore
-                            
-                    cmap = visual_connected_node.visualisation_currentData['colormap']
-                    if chosenLayerType == 'points':
-                        viewer = self.shared_data.napariViewer #type:ignore
-                        napariLayer = viewer.add_points(
-                            data=None,
-                            text=None,
-                            name=layerName,
-                            colormap = cmap
-                        )
-                    elif chosenLayerType == 'shapes':
-                        viewer = self.shared_data.napariViewer #type:ignore
-                        napariLayer = viewer.add_shapes(
-                            data=None,
-                            name=layerName,
-                            colormap = cmap
-                        )
-                    elif chosenLayerType == 'image':
-                        logging.debug('creating new image layer')
-                        viewer = self.shared_data.napariViewer #type:ignore
-                        im = np.random.random((30, 30))
-                        napariLayer = viewer.add_image(
-                            data=im,
-                            name=layerName,
-                            colormap = cmap
-                        )
-                    
-                    visualOutput = eval(visualEvalText)
-                    
-                    visual_connected_node.status = 'finished'
-            
+                    if chosenLayerType != None:
+                        
+                        layerName = visual_connected_node.visualisation_currentData['layerName']
+                        
+                        #If a layer with this name already exists, simply remove it:
+                        for layer in self.shared_data.napariViewer.layers: #type:ignore
+                            if layer.name == layerName:
+                                self.shared_data.napariViewer.layers.remove(layer) #type:ignore
+                                
+                        cmap = visual_connected_node.visualisation_currentData['colormap']
+                        if chosenLayerType == 'points':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            napariLayer = viewer.add_points(
+                                data=None,
+                                text=None,
+                                name=layerName,
+                            )
+                        elif chosenLayerType == 'shapes':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            napariLayer = viewer.add_shapes(
+                                data=None,
+                                name=layerName,
+                            )
+                        elif chosenLayerType == 'image':
+                            logging.debug('creating new image layer')
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            im = np.random.random((30, 30))
+                            napariLayer = viewer.add_image(
+                                data=im,
+                                name=layerName,
+                                colormap = cmap
+                            )
+                        
+                        visualOutput = eval(visualEvalText)
+                        
+                        visual_connected_node.status = 'finished'
+                    else:
+                        visual_connected_node.status = 'error'
+                        
             
         node.scoring_analysis_currentData['__output__'] = output
         
@@ -3990,64 +3975,58 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     visualEvalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'(output,napariLayer)','self.shared_data.core',nodzInfo=self)
                     visualEvalText = visualEvalText.replace(selectedFunction,f'{selectedFunction}_visualise') #type:ignore
                     
-                    chosenLayerType = 'points'
+                    #Figure out which visualisation we want to do
+                    chosenLayerType = None
+                    try:
+                        fnctmetadata = eval(f"{selectedFunction.split('.')[0]}.__function_metadata__()")
+                        visType = fnctmetadata[selectedFunction.split('.')[1]]['visualisation_type']
+                        
+                        if visType == 'value' or visType == 'points' or visType == 'Value' or visType == 'Points' or visType == 'Values' or visType == 'values':
+                            chosenLayerType = 'points'
+                        elif visType == 'Image' or visType == 'image':
+                            chosenLayerType = 'image'
+                        elif visType == 'Shapes' or visType == 'shapes' or visType == 'Shape' or visType == 'shape':
+                            chosenLayerType = 'shapes'
+                        logging.debug(f'Will perform visualisation with layer type: {chosenLayerType}')
+                    except Exception as e:
+                        logging.error(f"Issue with finding visualisation type of a analysisnode: error: {e}")
                     
-                    layerTypeInfo = [
-                        ['Analysis_Measurements','points'],
-                        ['Analysis_Shapes','shapes'],
-                        ['Analysis_Images','image'],
-                    ]
-                    
-                    folderName = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+os.sep+'AutonomousMicroscopy'+os.sep
-                    
-                    for layerType in layerTypeInfo:
-                        for root, dirs, files in os.walk(folderName+layerType[0]):
-                            for file in files:
-                                if selectedFunction.split('.')[0] in file: #type:ignore
-                                    if file.endswith(".py"):
-                                        with open(os.path.join(root, file), 'r') as f:
-                                            filecontent = f.read()
-                                        if selectedFunction.split('.')[1]+'(' in filecontent: #type:ignore
-                                            chosenLayerType = layerType[1]
-                                            break #to avoid searching in other files for this function
-                    
-                    
-                    layerName = visual_connected_node.visualisation_currentData['layerName']
-                    
-                    #If a layer with this name already exists, simply remove it:
-                    for layer in self.shared_data.napariViewer.layers: #type:ignore
-                        if layer.name == layerName:
-                            self.shared_data.napariViewer.layers.remove(layer) #type:ignore
-                            
-                    cmap = visual_connected_node.visualisation_currentData['colormap']
-                    if chosenLayerType == 'points':
-                        viewer = self.shared_data.napariViewer #type:ignore
-                        napariLayer = viewer.add_points(
-                            data=None,
-                            text=None,
-                            name=layerName,
-                            colormap = cmap
-                        )
-                    elif chosenLayerType == 'shapes':
-                        viewer = self.shared_data.napariViewer #type:ignore
-                        napariLayer = viewer.add_shapes(
-                            data=None,
-                            name=layerName,
-                            colormap = cmap
-                        )
-                    elif chosenLayerType == 'image':
-                        logging.debug('creating new image layer')
-                        viewer = self.shared_data.napariViewer #type:ignore
-                        im = np.random.random((30, 30))
-                        napariLayer = viewer.add_image(
-                            data=im,
-                            name=layerName,
-                            colormap = cmap
-                        )
-                    
-                    visualOutput = eval(visualEvalText)
-                    
-                    visual_connected_node.status = 'finished'
+                    if chosenLayerType != None:
+                        layerName = visual_connected_node.visualisation_currentData['layerName']
+                        
+                        #If a layer with this name already exists, simply remove it:
+                        for layer in self.shared_data.napariViewer.layers: #type:ignore
+                            if layer.name == layerName:
+                                self.shared_data.napariViewer.layers.remove(layer) #type:ignore
+                                
+                        cmap = visual_connected_node.visualisation_currentData['colormap']
+                        if chosenLayerType == 'points':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            napariLayer = viewer.add_points(
+                                data=None,
+                                text=None,
+                                name=layerName,
+                            )
+                        elif chosenLayerType == 'shapes':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            napariLayer = viewer.add_shapes(
+                                data=None,
+                                name=layerName,
+                            )
+                        elif chosenLayerType == 'image':
+                            viewer = self.shared_data.napariViewer #type:ignore
+                            im = np.random.random((30, 30))
+                            napariLayer = viewer.add_image(
+                                data=im,
+                                name=layerName,
+                                colormap = cmap
+                            )
+                        
+                        PerformVisualisation = eval(visualEvalText)
+                        
+                        visual_connected_node.status = 'finished'
+                    else:
+                        visual_connected_node.status = 'error'
         
         
         node.scoring_analysis_currentData['__output__'] = node.output

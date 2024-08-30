@@ -33,7 +33,8 @@ def __function_metadata__():
                 {"name": "OptBool2", "description": "OptBool", "default": 20}
             ],
             "help_string": "Average gray value.",
-            "display_name": "Average gray value"
+            "display_name": "Average gray value",
+            "visualisation_type" : "value" #'Image', 'points', 'value', or 'shapes'
         }
     }
 
@@ -42,7 +43,6 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 def AvgGrayValue(core,**kwargs):
-    
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
@@ -75,17 +75,16 @@ def AvgGrayValue(core,**kwargs):
 
 def AvgGrayValue_visualise(datastruct,core,**kwargs):
     #This is how datastruct is organised...
-    output,pointsLayer,mdaDataobject = datastruct
+    output,pointsLayer = datastruct
     
     
     # create features for each point
     features = {
-        'outputval': output
+        'outputval': output['overall_avg_intensity']
     }
-    # textv = {'string': 'Hi!','size':20,'color':'green','translation':np.array([-30,0])}
     textv = {
         'string': 'GrayValue {outputval:.2f}',
-        'size': 15,
+        'size': 10,
         'color': 'red',
         'translation': np.array([0, 0]),
         'anchor': 'upper_left',

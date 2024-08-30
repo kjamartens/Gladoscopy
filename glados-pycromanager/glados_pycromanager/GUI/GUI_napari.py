@@ -26,10 +26,7 @@ if is_pip_installed():
     from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
     from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
     from glados_pycromanager.GUI.utils import *
-
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     #Obtain the helperfunctions
     import glados_pycromanager.GUI.utils as utils
@@ -41,9 +38,7 @@ else:
     # Add the folder 2 folders up to the system path
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     #Import all scripts in the custom script folders
-    from Analysis_Images import * #type: ignore
     from Analysis_Measurements import * #type: ignore
-    from Analysis_Shapes import * #type: ignore
     from Real_Time_Analysis import * #type: ignore
     #Obtain the helperfunctions
     import utils
@@ -167,9 +162,33 @@ def main():
     # app.aboutToQuit.connect(lambda: perform_post_closing_actions(shared_data))
     # sys.exit(app.exec_())
 
+
+def show_UserManualNapari():
+    try:
+        
+        quickStartWindow = utils.SmallWindow(None)
+        QApplication.processEvents()
+        quickStartWindow.setWindowTitle('Quick start / User Manual')
+        QApplication.processEvents()
+        
+        if is_pip_installed():
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
+        else:
+            quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
+        QApplication.processEvents()
+        quickStartWindow.show()
+        
+
+    except Exception as e:
+        logging.error(f'Could not open quick start window. {e}')
+    
+    
 if __name__ == "__main__":
     # try:
+    
     main()
+    
     # except:
         # print('Error!')
 

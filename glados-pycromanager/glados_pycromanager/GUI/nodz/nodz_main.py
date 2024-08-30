@@ -985,7 +985,7 @@ class Nodz(QtWidgets.QGraphicsView):
             data['NODES_MDA'][node] = {}
             if nodeInst.mdaData is not None:
                 #Only store mda if its properly initialised as MDAGLados
-                if isinstance(nodeInst.mdaData,MDAGlados):
+                if isinstance(nodeInst.mdaData,MDAGlados.MDAGlados):
                     #Skip some attributes in nodes_mda:
                     mdaattr_skip = ['MDA_completed','MM_JSON','core','data','shared_data','gui','layout','nodeInfo','xypositionListWidget_XYGridManager']
                     for attr in vars(nodeInst.mdaData):

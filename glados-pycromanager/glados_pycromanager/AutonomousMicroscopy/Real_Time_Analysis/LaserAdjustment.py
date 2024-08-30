@@ -62,7 +62,7 @@ class laser_adjustment():
         print('INIT laser_adjustment')
         return None
 
-    def run(self,image,metadata,core,**kwargs):
+    def run(self,image,metadata,shared_data,core,**kwargs):
         print("At frame: "+metadata['ImageNumber'])
         propertyname = kwargs['Laser_id']
         MMprop_intensity_name = "Volts"

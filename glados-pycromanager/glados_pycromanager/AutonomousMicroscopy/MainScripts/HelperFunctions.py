@@ -9,11 +9,7 @@ import re
 # from stardist.models import StarDist2D
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#Import all scripts in the custom script folders
-# from AutonomousMicroscopy.Analysis_Shapes import *
-# from ROICalcScripts import *
-# from AutonomousMicroscopy.Scoring_Shapes import *
-# from ScoringMetrics import *
+
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------

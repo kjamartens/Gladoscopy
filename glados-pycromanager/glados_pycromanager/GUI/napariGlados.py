@@ -311,7 +311,7 @@ def napariUpdateAnalysisThreads(DataStructure):
 
     # Check if the queue is empty
     if image_queue_analysisA.empty():
-        image_queue_analysisA.put_nowait([liveImage,metadata])
+        image_queue_analysisA.put_nowait([liveImage,metadata,shared_data])
         #Start all analysisthreads
         for analysisThread in analysisThreads:
             if not analysisThread.isRunning():

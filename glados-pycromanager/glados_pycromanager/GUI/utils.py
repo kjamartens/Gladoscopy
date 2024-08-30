@@ -26,9 +26,7 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
@@ -37,9 +35,7 @@ else:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'AutonomousMicroscopy')
     #Import all scripts in the custom script folders
-    from AutonomousMicroscopy.Analysis_Images import *
     from AutonomousMicroscopy.Analysis_Measurements import *
-    from AutonomousMicroscopy.Analysis_Shapes import *
     from AutonomousMicroscopy.CustomFunctions import *
     from AutonomousMicroscopy.Real_Time_Analysis import * 
     import AutonomousMicroscopy.MainScripts.HelperFunctions 
@@ -2285,7 +2281,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
         return moduleMethodEvalTexts[0]
 
 
-def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2,p3):
+def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2,pshared_data,p3):
     
     methodKwargNames_method=[]
     methodKwargValues_method=[]
@@ -2340,7 +2336,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
     moduleMethodEvalTexts = []
     if methodName_method != '':
         #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3),methodKwargTypes=methodKwargTypes_method,skipInput=True)
+        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(pshared_data)+','+str(p3),methodKwargTypes=methodKwargTypes_method,skipInput=True)
         EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run') #type:ignore
         #append this to moduleEvalTexts
         moduleMethodEvalTexts.append(EvalTextMethod)
@@ -2647,13 +2643,13 @@ def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
     
     return RT_analysis_object
 
-def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,v3, nodzInfo=None):
+def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
     #Get the classname from rt_analysis_info
     functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
             className = function[1]
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','v3')
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','vshared_data','v3')
     logging.debug(f'RTanalysistext:{evalText}')
     
     if nodzInfo is not None:

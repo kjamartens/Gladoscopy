@@ -25,9 +25,7 @@ if is_pip_installed():
     from glados_pycromanager.GUI.utils import *
     from glados_pycromanager.GUI import runNapariPycroManager
     import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import *
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
 else:
     from napariGlados import *
@@ -36,10 +34,8 @@ else:
     # Add the folder 2 folders up to the system path
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     import AutonomousMicroscopy.MainScripts.HelperFunctions
-    #Import all scripts in the custom script folders
-    from AutonomousMicroscopy.Analysis_Images import *
+    #Import all scripts in the custom script folder
     from AutonomousMicroscopy.Analysis_Measurements import *
-    from AutonomousMicroscopy.Analysis_Shapes import *
     from AutonomousMicroscopy.Real_Time_Analysis import *
     from GUI import runNapariPycroManager
 

@@ -31,7 +31,8 @@ def __function_metadata__():
             "optional_kwargs": [
             ],
             "help_string": "Check whether Position is closer than Distance to any entry in List.",
-            "display_name": "Check Position for closeness to List"
+            "display_name": "Check Position for closeness to List",
+            "visualisation_type" : "value" #'Image', 'points', 'value', or 'shapes'
         }
     }
 

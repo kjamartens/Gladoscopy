@@ -18,16 +18,12 @@ def is_pip_installed():
 if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
     #Import all scripts in the custom script folders
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import *
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import *
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
     
     #Obtain the helperfunctions
     import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 else:
     #Import all scripts in the custom script folders
-    from AutonomousMicroscopy.Analysis_Shapes import *
-    from AutonomousMicroscopy.Analysis_Images import *
     from AutonomousMicroscopy.Analysis_Measurements import *
     
     #Obtain the helperfunctions

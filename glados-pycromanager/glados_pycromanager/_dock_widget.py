@@ -24,9 +24,7 @@ if is_pip_installed():
     from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
     from glados_pycromanager.GUI.utils import * #type: ignore
     #Import all scripts in the custom script folders
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     # Obtain the helperfunctions
     # import glados_pycromanager.GUI.HelperFunctions #type: ignore
@@ -45,9 +43,7 @@ else:
     # Add the folder 2 folders up to the system path
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     #Import all scripts in the custom script folders
-    from Analysis_Images import * #type: ignore
     from Analysis_Measurements import * #type: ignore
-    from Analysis_Shapes import * #type: ignore
     from Real_Time_Analysis import * #type: ignore
     # Obtain the helperfunctions
     import HelperFunctions #type: ignore

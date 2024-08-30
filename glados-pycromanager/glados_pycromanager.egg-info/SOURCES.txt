@@ -12,7 +12,6 @@ glados_pycromanager/Showcase_Basic1.json
 glados_pycromanager/__init__.py
 glados_pycromanager/_dock_widget.py
 glados_pycromanager/environment.yml
-glados_pycromanager/napari copy.yaml
 glados_pycromanager/napari.yaml
 glados_pycromanager/requirements.txt
 glados_pycromanager.egg-info/PKG-INFO

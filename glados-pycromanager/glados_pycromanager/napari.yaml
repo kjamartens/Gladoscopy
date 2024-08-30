@@ -1,4 +1,5 @@
 name: glados-pycromanager
+display_name: Glados-PycroManager
 contributions:
   commands:
     - id: glados-pycromanager.say_hi
@@ -10,6 +11,11 @@ contributions:
     - id: glados-pycromanager.mainWidgetCall
       title: Open my widget
       python_name: glados_pycromanager._dock_widget:MainWidget
+    - id: glados-pycromanager.UserManual
+      title: Open my widget
+      python_name: glados_pycromanager.GUI.GUI_napari:show_UserManualNapari
   widgets:
     - command: glados-pycromanager.mainWidgetCall
-      display_name: Glados
+      display_name: Run Glados-PycroManager
+    - command: glados-pycromanager.UserManual
+      display_name: User Manual

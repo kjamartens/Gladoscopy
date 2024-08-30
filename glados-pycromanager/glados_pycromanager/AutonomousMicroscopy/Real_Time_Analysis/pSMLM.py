@@ -271,7 +271,7 @@ class pSMLM():
         print('in RT_counter at time '+str(time.time()))
         return None
 
-    def run(self,image,metadata,core,**kwargs):
+    def run(self,image,metadata,shared_data,core,**kwargs):
         locPeaks = getLocalPeaks_rawIm(image, int(kwargs['ROIradius']),stdmult=int(kwargs['stdmult']))
         SMLMlocs_2 = getLocalizationList(locPeaks, image, 4)
         frameNumber = 0

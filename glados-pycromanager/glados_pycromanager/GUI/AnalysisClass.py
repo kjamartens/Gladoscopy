@@ -26,9 +26,7 @@ def is_pip_installed():
 if is_pip_installed():
     from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
     import glados_pycromanager.GUI.utils
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Images import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Shapes import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
 else:
@@ -37,9 +35,7 @@ else:
     sys.path.append('AutonomousMicroscopy')
     sys.path.append('AutonomousMicroscopy/MainScripts')
     #Import all scripts in the custom script folders
-    from Analysis_Images import * #type: ignore
     from Analysis_Measurements import * #type: ignore
-    from Analysis_Shapes import * #type: ignore
     from CustomFunctions import * #type: ignore
     from Real_Time_Analysis import * #type: ignore
 
@@ -304,6 +300,9 @@ class napariOverlay():
 
 #This code gets some image and does some analysis on this
 class AnalysisThread(QThread):
+    """
+    Used for visualisation of streamed data
+    """
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
@@ -585,21 +584,26 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.visualisation_queue = queue.Queue()
         #And start  the thread
         self.running = True
+        logging.debug('Init AnalysisThread_customFunction_Visualisation')
         # self.process_queue()
     
     def run(self):
         while self.running:
+            logging.debug('Run AnalysisThread_customFunction_Visualisation')
             logging.debug('Attempting to take from queue')
+            logging.debug('Queue size: {}'.format(self.visualisation_queue.qsize()))
+            logging.debug(f"sleeptime: {self.sleepTimeMs}")
             time.sleep(self.sleepTimeMs/1000.0)
             if not self.visualisation_queue.empty():
                 data = self.visualisation_queue.get()
-                RT_analysis_object,analysisInfo,image,metadata,core = data
+                RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
                 logging.debug('Ran updateVisualisation with RT analysis object')
                 self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
             
     
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
+        print('abcdef')
         utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
 
 #This code gets some image and does some analysis on this
@@ -632,7 +636,7 @@ class AnalysisThread_customFunction(QThread):
         self.napariOverlay = None
         self.nodzInfo=nodzInfo
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
-        
+        logging.debug('sarted AnalysisThread_customFunction')
         self.initAnalysis()
         
         # self.analysis_done_signal.connect(self.update_napariLayer)
@@ -766,7 +770,7 @@ class AnalysisThread_customFunction(QThread):
             if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
                 self.msleep(self.sleepTimeMs)
                 #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
-                analysisResult = self.runAnalysisThisImage(self.analysisInfo,image,metadata=metadata,core=self.shared_data.core)
+                analysisResult = self.runAnalysisThisImage(self.analysisInfo,image,metadata=metadata,shared_data=self.shared_data,core=self.shared_data.core)
                 # if self.analysisInfo == 'ChangeStageAtFrame':
                 #     analysisResult = self.changeStageAtFrame(image,metadata=metadata,core=self.shared_data.core,frame=500)
                     
@@ -796,20 +800,21 @@ class AnalysisThread_customFunction(QThread):
     
     def initAnalysis(self):
         self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core,nodzInfo=self.nodzInfo)
+        logging.debug('run initAnalysis')
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']: #type:ignore
             self.queue_visualisation = queue.Queue()
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
     
-    def runAnalysisThisImage(self,analysisInfo,image,metadata=None,core=None):
+    def runAnalysisThisImage(self,analysisInfo,image,metadata=None,shared_data=None,core=None):
         self.msleep(self.sleepTimeMs)
-        result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,core,nodzInfo=self.nodzInfo)
+        result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core,nodzInfo=self.nodzInfo)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             if self.visualisationObject.visualisation_queue.empty():
-                data = (self.RT_analysis_object,analysisInfo,image,metadata,core)
+                data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 self.visualisationObject.visualisation_queue.put(data)
                 logging.debug('Put data in visualisation_queue!')
                 # self.visualisationObject.process_queue()

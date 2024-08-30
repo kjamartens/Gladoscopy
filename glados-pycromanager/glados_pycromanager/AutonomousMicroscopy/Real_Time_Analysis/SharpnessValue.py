@@ -23,12 +23,12 @@ def __function_metadata__():
                 {"name": "FilterType", "description": "Filter Type ([Laplacian, Redondo])", "default": 'Laplacian', "type": str}
             ],
             "optional_kwargs": [
-                {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
             ],
             "help_string": "Sharpness value.",
             "display_name": "Sharpness value",
             "run_delay": 0,
-            "visualise_delay": 500,
+            "visualise_delay": 100,
+            "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
             "output":[
@@ -62,33 +62,11 @@ def blur_laplace(image):
     edgemap = cv2.Laplacian(blurim,  cv2.CV_64F)
     return edgemap
 
-# def testArray_report_redondo(core,position_array_test,zmovestage):
-#     res_arr = []
-#     for n in range(len(position_array_test)):
-#         print(f"n: {n}, abs_pos_arr[n]: {position_array_test[n]}")
-#         core.set_position(zmovestage,position_array_test[n]) #type:ignore
-#         core.wait_for_system()
-#         core.snap_image()
-#         im = core.get_tagged_image()
-#         im_ndarr = im.pix.reshape((im.tags["Height"],im.tags["Width"]))
-#         res_arr.append(np.mean(laplace_filter(im_ndarr)**2))
-#     return res_arr
-
-# def single_redondo(core,position,zmovestage):
-#     core.set_position(zmovestage,position) #type:ignore
-#     core.wait_for_system()
-#     core.snap_image()
-#     im = core.get_tagged_image()
-#     im_ndarr = im.pix.reshape((im.tags["Height"],im.tags["Width"]))
-#     return 
-
-
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 class SharpnessValue():
     def __init__(self,core,**kwargs):
-        print(core)
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
@@ -96,7 +74,7 @@ class SharpnessValue():
         self.currentValue = 0
         return None
 
-    def run(self,image,metadata,core,**kwargs):
+    def run(self,image,metadata,shared_data,core,**kwargs):
         if kwargs['FilterType'] == 'Redondo':
             self.currentValue = (np.mean(laplace_filter(image)**2))*1e-6
         elif kwargs['FilterType'] == 'Laplacian':
@@ -114,8 +92,6 @@ class SharpnessValue():
         return layerName,layerType
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        print('VISUALISING!')
-            
         # create features for each point
         features = {
             'outputval': self.currentValue
