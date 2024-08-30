@@ -5,19 +5,20 @@ koenjamartens@gmail.com
 Created 2023-2024
 
 <!-- TOC -->
-- [General overview](#general-overview)
-- [Installation instructions](#installation-instructions)
-- [Running instructions](#running-instructions)
-- [First use instructions](#first-use-instructions)
-    - [Controls](#controls)
-    - [Multi-D acquisition](#multi-d-acquisition)
-- [Autonomous microscopy - Overview and Example 1: Simple autonomous microscopy](#autonomous-microscopy---overview-and-example-1-simple-autonomous-microscopy)
-    - [Glados-pycromanager high level concept](#glados-pycromanager-high-level-concept)
-    - [Glados-pycromanager recipes](#glados-pycromanager-recipes)
-    - [Glados-pycromanager decision and scanning widgets](#glados-pycromanager-decision-and-scanning-widgets)
-    - [Glados-pycromanager variables](#glados-pycromanager-variables)
-    - [Testing and running Glados-pycromanager autonomous microscopy](#testing-and-running-glados-pycromanager-autonomous-microscopy)
-- [Autonomous microscopy - Example 2: Advanced autonomous microscopy](#autonomous-microscopy---example-2-advanced-autonomous-microscopy)
+
+- [Glados-pycromanager Developer manual](#glados-pycromanager-developer-manual)
+    - [General overview](#general-overview)
+    - [Debug notes](#debug-notes)
+    - [Types of extensions](#types-of-extensions)
+    - [General framework for extendability](#general-framework-for-extendability)
+    - [Function structure](#function-structure)
+    - [Difference between extension types](#difference-between-extension-types)
+        - [Custom functions](#custom-functions)
+        - [Analysis functions](#analysis-functions)
+            - [Visualisation of 'value'/'points' data](#visualisation-of-valuepoints-data)
+            - [Visualisation of 'image' data](#visualisation-of-image-data)
+            - [Visualisation of 'shapes' data](#visualisation-of-shapes-data)
+        - [Real-Time analysis](#real-time-analysis)
 
 <!-- /TOC -->
 

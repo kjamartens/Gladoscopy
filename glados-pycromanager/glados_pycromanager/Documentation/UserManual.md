@@ -202,6 +202,9 @@ The highlighted variable here is the 'overall average intensity' belonging to th
 This value is used for the decision widget, and to easily get this information in the other widget, if you press once on the variable, the exact variable nomenclature will be copied to the clipboard, and can be pasted in the decision area.  
 ![Variables widget for autonomous microscopy](Images/Autonomous_simple_4.png)
 
+
+**To figure out how to use variables in nodes, check the recipe `Showcase_Variables_1.json`**
+
 ### Testing and running Glados-pycromanager autonomous microscopy
 
 If you are happy with your recipe and decision/scanning settings, you can test the autonomous microscopy run. It is recommended to test often during setting up new routines, especially if you're new to autonomous microscopy.

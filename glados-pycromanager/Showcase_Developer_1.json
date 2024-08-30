@@ -1,0 +1,2708 @@
+{
+    "CONNECTIONS": [
+        [
+            "acqStart_0.Start",
+            "acquisition_1.Acquisition start"
+        ],
+        [
+            "acquisition_1.Visual",
+            "visualisation_3.Start"
+        ],
+        [
+            "initStart_0.Start",
+            "customFunction_0.Function start"
+        ],
+        [
+            "scoringStart_0.Start",
+            "acquisition_0.Acquisition start"
+        ],
+        [
+            "acquisition_0.Finished",
+            "analysisMeasurement_0.Analysis start"
+        ],
+        [
+            "analysisMeasurement_0.Finished",
+            "analysisMeasurement_1.Analysis start"
+        ],
+        [
+            "analysisMeasurement_1.Finished",
+            "analysisMeasurement_2.Analysis start"
+        ],
+        [
+            "analysisMeasurement_0.Visual",
+            "visualisation_0.Start"
+        ],
+        [
+            "analysisMeasurement_1.Visual",
+            "visualisation_1.Start"
+        ],
+        [
+            "analysisMeasurement_2.Visual",
+            "visualisation_2.Start"
+        ],
+        [
+            "acquisition_1.Real-time",
+            "realTimeAnalysis_0.Start"
+        ],
+        [
+            "acquisition_2.Real-time",
+            "realTimeAnalysis_1.Start"
+        ],
+        [
+            "acquisition_2.Visual",
+            "visualisation_4.Start"
+        ],
+        [
+            "acquisition_1.Finished",
+            "acquisition_2.Acquisition start"
+        ]
+    ],
+    "DECISION_WIDGET_INFO": {
+        "PYQTentries": {
+            "": "DirectDecision and Advanced"
+        },
+        "currentDecision": "AND_Score",
+        "currentMode": "DirectDecision"
+    },
+    "IF_STATEMENT": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES": {
+        "acqStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquiring start",
+            "position": [
+                210.0,
+                830.0
+            ],
+            "preset": "acqStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "acquisition_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                440.0,
+                410.0
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">10 frames with order t</span><br />90.0 ms exposure time<br />10 time points</p></body></html>",
+            "textboxheight": 50
+        },
+        "acquisition_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                476.0,
+                842.0
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">50 frames with order t</span><br />100.0 ms exposure time<br />50 time points</p></body></html>",
+            "textboxheight": 50
+        },
+        "acquisition_2": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                836.0,
+                842.0
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">100 frames with order t</span><br />100.0 ms exposure time<br />100 time points</p></body></html>",
+            "textboxheight": 50
+        },
+        "analysisMeasurement_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Analysis [Measurement]",
+            "position": [
+                764.0,
+                418.0
+            ],
+            "preset": "analysisMeasurement",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Average gray value</span><br />Input:<br /><span style=\" font-weight:600;\">ReqKwarg1</span>: DefaultKwarg<br /><span style=\" font-weight:600;\">ReqKwarg2</span>: 0<br /><span style=\" font-style:italic;\">OptBool2</span>: 20<br /><br />Output:<br /><span style=\" font-weight:600;\">overall_avg_intensity</span>: 29489.779296875<br /><span style=\" font-weight:600;\">slice_avg_intensity</span>: [29489.77929688 2948...9688 29489.77929688]</p></body></html>",
+            "textboxheight": 138
+        },
+        "analysisMeasurement_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Analysis [Measurement]",
+            "position": [
+                1052.0,
+                428.0
+            ],
+            "preset": "analysisMeasurement",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Average image (time)</span><br />Input:<br /><br />Output:<br /><span style=\" font-weight:600;\">average_image</span>: [[31125.3 31028. 30....2 25631.8 25587.8]]</p></body></html>",
+            "textboxheight": 86
+        },
+        "analysisMeasurement_2": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Analysis [Measurement]",
+            "position": [
+                1376.0,
+                457.5
+            ],
+            "preset": "analysisMeasurement",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Explanatory - draw random shape</span><br />Input:<br /><br />Output:<br />None</p></body></html>",
+            "textboxheight": 73
+        },
+        "customFunction_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Function start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Custom Function",
+            "position": [
+                476.0,
+                164.0
+            ],
+            "preset": "customFunction",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Example custom function - Roll a dice</span><br />Input:<br /><span style=\" font-weight:600;\">MaxDiceValue</span>: 6<br /><br />Output:<br /><span style=\" font-weight:600;\">DiceResult</span>: None</p></body></html>",
+            "textboxheight": 86
+        },
+        "initStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Initialisation start",
+            "position": [
+                174.0,
+                182.0
+            ],
+            "preset": "initStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "realTimeAnalysis_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Real-Time analysis",
+            "position": [
+                606.0,
+                998.0
+            ],
+            "preset": "realTimeAnalysis",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Example - influence the run by stopping it at a set frame</span><br /><span style=\" font-weight:600;\">LastFrame</span>: 30</p></body></html>",
+            "textboxheight": 60
+        },
+        "realTimeAnalysis_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Real-Time analysis",
+            "position": [
+                966.0,
+                998.0
+            ],
+            "preset": "realTimeAnalysis",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">RT counter</span><br /><span style=\" font-weight:600;\">ReqKwarg1</span>: DefaultKwarg<br /><span style=\" font-style:italic;\">OptBool2</span>: False</p></body></html>",
+            "textboxheight": 60
+        },
+        "scoringStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Scoring start",
+            "position": [
+                174.0,
+                398.0
+            ],
+            "preset": "scoringStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Scoring started at:</span><br /><span style=\" font-style:italic;\">2024-08-30 13:20:28</span></p></body></html>",
+            "textboxheight": 50
+        },
+        "stickyNote_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [],
+            "displayName": "Sticky Note",
+            "position": [
+                720.4407599571554,
+                161.44963202690388
+            ],
+            "preset": "stickyNote",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Showcase of a custom function<br /><br />A dice roll between 1-6. Observe the change in the 'Variables' tab to the right</p></body></html>",
+            "textboxheight": 73
+        },
+        "stickyNote_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [],
+            "displayName": "Sticky Note",
+            "position": [
+                1640.4841547076348,
+                446.23479304824474
+            ],
+            "preset": "stickyNote",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Examples of all types of Analysis (values/points, image, and shapes).</p></body></html>",
+            "textboxheight": 50
+        },
+        "stickyNote_2": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [],
+            "displayName": "Sticky Note",
+            "position": [
+                1176.41535147492,
+                906.1273574537304
+            ],
+            "preset": "stickyNote",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Examples of real-time analysis, both affecting the acquisition (first one will stop after 30 frames even though we set 50 frames), as well as analysis+visualisation (count the current frame). <br /><br />Also feel free to test the sharpness metric, which will show the real-time sharpness value of the image.</p></body></html>",
+            "textboxheight": 164
+        },
+        "visualisation_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                678.0,
+                602.0
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: analysisMeasurement_0</span><br />Colormap: gray</p></body></html>",
+            "textboxheight": 60
+        },
+        "visualisation_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                1002.0,
+                602.0
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: analysisMeasurement_1</span><br />Colormap: gray</p></body></html>",
+            "textboxheight": 60
+        },
+        "visualisation_2": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                1326.0,
+                602.0
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: analysisMeasurement_2</span><br />Colormap: gray</p></body></html>",
+            "textboxheight": 60
+        },
+        "visualisation_3": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                390.0,
+                993.0
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: acquisition_1</span><br />Colormap: gray</p></body></html>",
+            "textboxheight": 50
+        },
+        "visualisation_4": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                786.0,
+                993.0
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: acquisition_2</span><br />Colormap: gray</p></body></html>",
+            "textboxheight": 50
+        }
+    },
+    "NODES_CASE_SWITCH": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_CHANGE_GLOBAL_VAR": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_CUSTOMFUNCTION": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#Method": "Laplacian",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#StageName": "TIPFSOffset",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#aggressiveness": "5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#endPosition": "400",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#frame_time_ms": "200",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#n_images": "5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#n_positions": "6",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#startPosition": "0",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#waitTimeMs": "100",
+            "LineEdit#AutoFocusBF.auto_focus_iter_abs_bf#wantedResolution": "0.5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#Method": "Laplacian",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#StageName": "TIPFSOffset",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#aggressiveness": "5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#endPosition": "75",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#frame_time_ms": "200",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#n_images": "5",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#n_positions": "6",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#startPosition": "-75",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#waitTimeMs": "100",
+            "LineEdit#AutoFocusBF.auto_focus_iter_rel_bf#wantedResolution": "0.5",
+            "LineEdit#ExampleCustomFunction_DiceRoll.DiceRoll#MaxDiceValue": "6",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#power_pct_405": "100",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#power_pct_488": "100",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#power_pct_561": "100",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#power_pct_638": "100",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#power_pct_750": "100",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_delay_405": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_delay_488": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_delay_561": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_delay_638": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_delay_750": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_frames_405": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_frames_488": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_frames_561": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_frames_638": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_frames_750": "1",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_len_405": "0",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_len_488": "0",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_len_561": "0",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_len_638": "0",
+            "LineEdit#Strobo_lasers.set_strobo_lasers#pulse_len_750": "0",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#Method": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#StageName": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#aggressiveness": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#endPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#frame_time_ms": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#n_images": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#n_positions": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#startPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#waitTimeMs": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_abs_bf#wantedResolution": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#Method": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#StageName": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#aggressiveness": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#endPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#frame_time_ms": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#n_images": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#n_positions": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#startPosition": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#waitTimeMs": "",
+            "LineEditAdv#AutoFocusBF.auto_focus_iter_rel_bf#wantedResolution": "",
+            "LineEditAdv#ExampleCustomFunction_DiceRoll.DiceRoll#MaxDiceValue": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#power_pct_405": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#power_pct_488": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#power_pct_561": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#power_pct_638": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#power_pct_750": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_delay_405": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_delay_488": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_delay_561": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_delay_638": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_delay_750": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_frames_405": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_frames_488": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_frames_561": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_frames_638": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_frames_750": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_len_405": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_len_488": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_len_561": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_len_638": "",
+            "LineEditAdv#Strobo_lasers.set_strobo_lasers#pulse_len_750": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#Method": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#StageName": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#aggressiveness": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#endPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#frame_time_ms": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#n_images": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#n_positions": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#startPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#waitTimeMs": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_abs_bf#wantedResolution": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#Method": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#StageName": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#aggressiveness": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#endPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#frame_time_ms": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#n_images": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#n_positions": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#startPosition": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#waitTimeMs": "",
+            "LineEditVariable#AutoFocusBF.auto_focus_iter_rel_bf#wantedResolution": "",
+            "LineEditVariable#ExampleCustomFunction_DiceRoll.DiceRoll#MaxDiceValue": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#power_pct_405": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#power_pct_488": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#power_pct_561": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#power_pct_638": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#power_pct_750": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_delay_405": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_delay_488": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_delay_561": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_delay_638": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_delay_750": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_frames_405": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_frames_488": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_frames_561": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_frames_638": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_frames_750": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_len_405": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_len_488": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_len_561": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_len_638": "",
+            "LineEditVariable#Strobo_lasers.set_strobo_lasers#pulse_len_750": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Iterative Auto-focus BF [Relative Position]",
+                    "AutoFocusBF.auto_focus_iter_rel_bf"
+                ],
+                [
+                    "Iterative Auto-focus BF [Absolute Position]",
+                    "AutoFocusBF.auto_focus_iter_abs_bf"
+                ],
+                [
+                    "Example custom function - Roll a dice",
+                    "ExampleCustomFunction_DiceRoll.DiceRoll"
+                ],
+                [
+                    "Set stroboscopic lasers",
+                    "Strobo_lasers.set_strobo_lasers"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "Example custom function - Roll a dice"
+        },
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_MDA": {
+        "acqStart_0": {},
+        "acquisition_0": {
+            "GUI_channel_enabled": "False",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "False",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "False",
+            "GUI_storage_enabled": "False",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_xy_pos_fullInfo": null,
+            "GUI_z_enabled": "False",
+            "_GUI_grid_width": "7",
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "Camera",
+            "channels": [],
+            "exposure_ms": "90.0",
+            "exposure_s_or_ms": "ms",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1725016504.746638",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "5"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "6"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "7"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "8"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "9"
+                    }
+                }
+            ],
+            "mda_analysis_thread": null,
+            "num_time_points": "10",
+            "order": "t",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "data",
+                "config_groups",
+                "mainLayout",
+                "xypositionListWidget_XYGridManager",
+                "SLACK-CLIENT"
+            ],
+            "time_interval_s": "0.0",
+            "time_interval_s_or_ms": "ms",
+            "xy_positions": null,
+            "xy_positions_saveInfo": null,
+            "xyz_positions": null,
+            "z_end": "1.0",
+            "z_nr_steps": "2",
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "Z",
+            "z_start": "0.0",
+            "z_step": "0.5",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "acquisition_1": {
+            "GUI_channel_enabled": "False",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "False",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "False",
+            "GUI_storage_enabled": "False",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_xy_pos_fullInfo": null,
+            "GUI_z_enabled": "False",
+            "_GUI_grid_width": "7",
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "Camera",
+            "channels": [],
+            "exposure_ms": "100.0",
+            "exposure_s_or_ms": "ms",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1725023114.2609851",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "5"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "6"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "7"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "8"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "9"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "10"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "11"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "12"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "13"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "14"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "15"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "16"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "17"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "18"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "19"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "20"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "21"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "22"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "23"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "24"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "25"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "26"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "27"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "28"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "29"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "30"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "31"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "32"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "33"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "34"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "35"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "36"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "37"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "38"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "39"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "40"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "41"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "42"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "43"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "44"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "45"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "46"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "47"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "48"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "49"
+                    }
+                }
+            ],
+            "mda_analysis_thread": null,
+            "nodz_analysis_threads": [],
+            "num_time_points": "50",
+            "order": "t",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "data",
+                "config_groups",
+                "mainLayout",
+                "xypositionListWidget_XYGridManager",
+                "SLACK-CLIENT"
+            ],
+            "time_interval_s": "0.0",
+            "time_interval_s_or_ms": "ms",
+            "xy_positions": null,
+            "xy_positions_saveInfo": null,
+            "xyz_positions": null,
+            "z_end": "1.0",
+            "z_nr_steps": "2",
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "Z",
+            "z_start": "0.0",
+            "z_step": "0.5",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "acquisition_2": {
+            "GUI_channel_enabled": "False",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "False",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "False",
+            "GUI_storage_enabled": "False",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_xy_pos_fullInfo": null,
+            "GUI_z_enabled": "False",
+            "_GUI_grid_width": "7",
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "Camera",
+            "channels": [],
+            "exposure_ms": "100.0",
+            "exposure_s_or_ms": "ms",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1725024618.4310966",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "5"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "6"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "7"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "8"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "9"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "10"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "11"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "12"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "13"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "14"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "15"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "16"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "17"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "18"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "19"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "20"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "21"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "22"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "23"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "24"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "25"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "26"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "27"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "28"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "29"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "30"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "31"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "32"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "33"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "34"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "35"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "36"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "37"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "38"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "39"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "40"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "41"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "42"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "43"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "44"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "45"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "46"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "47"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "48"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "49"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "50"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "51"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "52"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "53"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "54"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "55"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "56"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "57"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "58"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "59"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "60"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "61"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "62"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "63"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "64"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "65"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "66"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "67"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "68"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "69"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "70"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "71"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "72"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "73"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "74"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "75"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "76"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "77"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "78"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "79"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "80"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "81"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "82"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "83"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "84"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "85"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "86"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "87"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "88"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "89"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "90"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "91"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "92"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "93"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "94"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "95"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "96"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "97"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "98"
+                    }
+                },
+                {
+                    "axes": {
+                        "time": "99"
+                    }
+                }
+            ],
+            "mda_analysis_thread": null,
+            "nodz_analysis_threads": [],
+            "num_time_points": "100",
+            "order": "t",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "data",
+                "config_groups",
+                "mainLayout",
+                "xypositionListWidget_XYGridManager",
+                "SLACK-CLIENT"
+            ],
+            "time_interval_s": "0.0",
+            "time_interval_s_or_ms": "ms",
+            "xy_positions": null,
+            "xy_positions_saveInfo": null,
+            "xyz_positions": null,
+            "z_end": "1.0",
+            "z_nr_steps": "2",
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "Z",
+            "z_start": "0.0",
+            "z_step": "0.5",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_MMCONFIGCHANGE": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_NEW_GLOBAL_VAR": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_RELSTAGECHANGE": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_RT_ANALYSIS": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {
+            "LineEdit#EndAtFrame.EndAtFrame#LastFrame": "30",
+            "LineEdit#LaserAdjustment.laser_adjustment#Laser_id": "TS_DAC02_488Laser",
+            "LineEdit#LaserAdjustment.laser_adjustment#maxFrame": "100",
+            "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_id": "TS_DAC02_488Laser",
+            "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_power": "{1:0.01, 2:0.05, 10:1.00}",
+            "LineEdit#RT_counter.RealTimeCounter#OptBool2": "False",
+            "LineEdit#RT_counter.RealTimeCounter#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#SharpnessValue.SharpnessValue#FilterType": "Laplacian",
+            "LineEdit#pSMLM.pSMLM#ROIradius": "3",
+            "LineEdit#pSMLM.pSMLM#stdmult": "2",
+            "LineEditAdv#EndAtFrame.EndAtFrame#LastFrame": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment#Laser_id": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment#maxFrame": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
+            "LineEditAdv#RT_counter.RealTimeCounter#OptBool2": "",
+            "LineEditAdv#RT_counter.RealTimeCounter#ReqKwarg1": "",
+            "LineEditAdv#SharpnessValue.SharpnessValue#FilterType": "",
+            "LineEditAdv#pSMLM.pSMLM#ROIradius": "",
+            "LineEditAdv#pSMLM.pSMLM#stdmult": "",
+            "LineEditVariable#EndAtFrame.EndAtFrame#LastFrame": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment#Laser_id": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment#maxFrame": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
+            "LineEditVariable#RT_counter.RealTimeCounter#OptBool2": "",
+            "LineEditVariable#RT_counter.RealTimeCounter#ReqKwarg1": "",
+            "LineEditVariable#SharpnessValue.SharpnessValue#FilterType": "",
+            "LineEditVariable#pSMLM.pSMLM#ROIradius": "",
+            "LineEditVariable#pSMLM.pSMLM#stdmult": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Example - influence the run by stopping it at a set frame",
+                    "EndAtFrame.EndAtFrame"
+                ],
+                [
+                    "LaserAdj",
+                    "LaserAdjustment.laser_adjustment"
+                ],
+                [
+                    "Advanced laser adjustment",
+                    "LaserAdjustment.laser_adjustment_advanced"
+                ],
+                [
+                    "pSMLM localization",
+                    "pSMLM.pSMLM"
+                ],
+                [
+                    "RT counter",
+                    "RT_counter.RealTimeCounter"
+                ],
+                [
+                    "Sharpness value",
+                    "SharpnessValue.SharpnessValue"
+                ]
+            ],
+            "__realTimeVisualisation__": false,
+            "__selectedDropdownEntryAnalysis__": "Example - influence the run by stopping it at a set frame",
+            "__selectedDropdownEntryRTAnalysis__": "Example - influence the run by stopping it at a set frame"
+        },
+        "realTimeAnalysis_1": {
+            "LineEdit#EndAtFrame.EndAtFrame#LastFrame": "50",
+            "LineEdit#LaserAdjustment.laser_adjustment#Laser_id": "TS_DAC02_488Laser",
+            "LineEdit#LaserAdjustment.laser_adjustment#maxFrame": "100",
+            "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_id": "TS_DAC02_488Laser",
+            "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_power": "{1:0.01, 2:0.05, 10:1.00}",
+            "LineEdit#RT_counter.RealTimeCounter#OptBool2": "False",
+            "LineEdit#RT_counter.RealTimeCounter#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#SharpnessValue.SharpnessValue#FilterType": "Laplacian",
+            "LineEdit#pSMLM.pSMLM#ROIradius": "3",
+            "LineEdit#pSMLM.pSMLM#stdmult": "2",
+            "LineEditAdv#EndAtFrame.EndAtFrame#LastFrame": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment#Laser_id": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment#maxFrame": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
+            "LineEditAdv#RT_counter.RealTimeCounter#OptBool2": "",
+            "LineEditAdv#RT_counter.RealTimeCounter#ReqKwarg1": "",
+            "LineEditAdv#SharpnessValue.SharpnessValue#FilterType": "",
+            "LineEditAdv#pSMLM.pSMLM#ROIradius": "",
+            "LineEditAdv#pSMLM.pSMLM#stdmult": "",
+            "LineEditVariable#EndAtFrame.EndAtFrame#LastFrame": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment#Laser_id": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment#maxFrame": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
+            "LineEditVariable#RT_counter.RealTimeCounter#OptBool2": "",
+            "LineEditVariable#RT_counter.RealTimeCounter#ReqKwarg1": "",
+            "LineEditVariable#SharpnessValue.SharpnessValue#FilterType": "",
+            "LineEditVariable#pSMLM.pSMLM#ROIradius": "",
+            "LineEditVariable#pSMLM.pSMLM#stdmult": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Example - influence the run by stopping it at a set frame",
+                    "EndAtFrame.EndAtFrame"
+                ],
+                [
+                    "LaserAdj",
+                    "LaserAdjustment.laser_adjustment"
+                ],
+                [
+                    "Advanced laser adjustment",
+                    "LaserAdjustment.laser_adjustment_advanced"
+                ],
+                [
+                    "pSMLM localization",
+                    "pSMLM.pSMLM"
+                ],
+                [
+                    "RT counter",
+                    "RT_counter.RealTimeCounter"
+                ],
+                [
+                    "Sharpness value",
+                    "SharpnessValue.SharpnessValue"
+                ]
+            ],
+            "__realTimeVisualisation__": true,
+            "__selectedDropdownEntryAnalysis__": "RT counter",
+            "__selectedDropdownEntryRTAnalysis__": "RT counter"
+        },
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_RUN_INLINE_SCRIPT": {
+        "acqStart_0": "",
+        "acquisition_0": "",
+        "acquisition_1": "",
+        "acquisition_2": "",
+        "analysisMeasurement_0": "",
+        "analysisMeasurement_1": "",
+        "analysisMeasurement_2": "",
+        "customFunction_0": "",
+        "initStart_0": "",
+        "realTimeAnalysis_0": "",
+        "realTimeAnalysis_1": "",
+        "scoringStart_0": "",
+        "stickyNote_0": "",
+        "stickyNote_1": "",
+        "stickyNote_2": "",
+        "visualisation_0": "",
+        "visualisation_1": "",
+        "visualisation_2": "",
+        "visualisation_3": "",
+        "visualisation_4": ""
+    },
+    "NODES_SCORING_ANALYSIS": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {
+            "ComboBoxSwitch#AverageImage.AvgImage#Image": "Value",
+            "ComboBoxSwitch#AverageImage2.AvgImageTWO#Image": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#Image": "Variable",
+            "ComboBoxSwitch#RandomShapes.DrawRandomShape#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_ImageVis#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "Value",
+            "ComboBoxSwitch#checkAgainstList.CheckVsList#Position": "Value",
+            "LineEdit#AverageImage.AvgImage#Image": "DefaultInput",
+            "LineEdit#AverageImage2.AvgImageTWO#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#OptBool2": "20",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg2": "0",
+            "LineEdit#RandomShapes.DrawRandomShape#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEdit#checkAgainstList.CheckVsList#Distance": "10",
+            "LineEdit#checkAgainstList.CheckVsList#List": "[]",
+            "LineEdit#checkAgainstList.CheckVsList#Position": "DefaultInput",
+            "LineEditAdv#AverageImage.AvgImage#Image": "",
+            "LineEditAdv#AverageImage2.AvgImageTWO#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditAdv#RandomShapes.DrawRandomShape#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#List": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Position": "",
+            "LineEditVariable#AverageImage.AvgImage#Image": "",
+            "LineEditVariable#AverageImage2.AvgImageTWO#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#Image": "data@acquisition_0",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditVariable#RandomShapes.DrawRandomShape#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#List": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Position": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Average image (time)",
+                    "AverageImage.AvgImage"
+                ],
+                [
+                    "Average gray value",
+                    "AverageIntensity.AvgGrayValue"
+                ],
+                [
+                    "Check Position for closeness to List",
+                    "checkAgainstList.CheckVsList"
+                ],
+                [
+                    "Explanatory - draw random shape",
+                    "RandomShapes.DrawRandomShape"
+                ],
+                [
+                    "StarDist Image Segmentation",
+                    "StarDist_image.StarDistSegment_ImageVis"
+                ],
+                [
+                    "StarDist Image Segmentation - via preloaded model",
+                    "StarDist_image.StarDistSegment_preLoadedModel_use"
+                ],
+                [
+                    "Average image (time) NUMBER TWO",
+                    "AverageImage2.AvgImageTWO"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "Average gray value"
+        },
+        "analysisMeasurement_1": {
+            "ComboBoxSwitch#AverageImage.AvgImage#Image": "Variable",
+            "ComboBoxSwitch#AverageImage2.AvgImageTWO#Image": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#Image": "Value",
+            "ComboBoxSwitch#RandomShapes.DrawRandomShape#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_ImageVis#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "Value",
+            "ComboBoxSwitch#checkAgainstList.CheckVsList#Position": "Value",
+            "LineEdit#AverageImage.AvgImage#Image": "DefaultInput",
+            "LineEdit#AverageImage2.AvgImageTWO#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#OptBool2": "20",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg2": "0",
+            "LineEdit#RandomShapes.DrawRandomShape#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEdit#checkAgainstList.CheckVsList#Distance": "10",
+            "LineEdit#checkAgainstList.CheckVsList#List": "[]",
+            "LineEdit#checkAgainstList.CheckVsList#Position": "DefaultInput",
+            "LineEditAdv#AverageImage.AvgImage#Image": "",
+            "LineEditAdv#AverageImage2.AvgImageTWO#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditAdv#RandomShapes.DrawRandomShape#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#List": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Position": "",
+            "LineEditVariable#AverageImage.AvgImage#Image": "data@acquisition_0",
+            "LineEditVariable#AverageImage2.AvgImageTWO#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditVariable#RandomShapes.DrawRandomShape#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#List": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Position": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Average image (time)",
+                    "AverageImage.AvgImage"
+                ],
+                [
+                    "Average gray value",
+                    "AverageIntensity.AvgGrayValue"
+                ],
+                [
+                    "Check Position for closeness to List",
+                    "checkAgainstList.CheckVsList"
+                ],
+                [
+                    "Explanatory - draw random shape",
+                    "RandomShapes.DrawRandomShape"
+                ],
+                [
+                    "StarDist Image Segmentation",
+                    "StarDist_image.StarDistSegment_ImageVis"
+                ],
+                [
+                    "StarDist Image Segmentation - via preloaded model",
+                    "StarDist_image.StarDistSegment_preLoadedModel_use"
+                ],
+                [
+                    "Average image (time) NUMBER TWO",
+                    "AverageImage2.AvgImageTWO"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "Average image (time)"
+        },
+        "analysisMeasurement_2": {
+            "ComboBoxSwitch#AverageImage.AvgImage#Image": "Value",
+            "ComboBoxSwitch#AverageImage2.AvgImageTWO#Image": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#Image": "Value",
+            "ComboBoxSwitch#RandomShapes.DrawRandomShape#Image": "Variable",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_ImageVis#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "Value",
+            "ComboBoxSwitch#checkAgainstList.CheckVsList#Position": "Value",
+            "LineEdit#AverageImage.AvgImage#Image": "DefaultInput",
+            "LineEdit#AverageImage2.AvgImageTWO#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#OptBool2": "20",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg2": "0",
+            "LineEdit#RandomShapes.DrawRandomShape#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEdit#checkAgainstList.CheckVsList#Distance": "10",
+            "LineEdit#checkAgainstList.CheckVsList#List": "[]",
+            "LineEdit#checkAgainstList.CheckVsList#Position": "DefaultInput",
+            "LineEditAdv#AverageImage.AvgImage#Image": "",
+            "LineEditAdv#AverageImage2.AvgImageTWO#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditAdv#RandomShapes.DrawRandomShape#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#List": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Position": "",
+            "LineEditVariable#AverageImage.AvgImage#Image": "",
+            "LineEditVariable#AverageImage2.AvgImageTWO#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditVariable#RandomShapes.DrawRandomShape#Image": "data@acquisition_0",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#List": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Position": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Average image (time)",
+                    "AverageImage.AvgImage"
+                ],
+                [
+                    "Average gray value",
+                    "AverageIntensity.AvgGrayValue"
+                ],
+                [
+                    "Check Position for closeness to List",
+                    "checkAgainstList.CheckVsList"
+                ],
+                [
+                    "Explanatory - draw random shape",
+                    "RandomShapes.DrawRandomShape"
+                ],
+                [
+                    "StarDist Image Segmentation",
+                    "StarDist_image.StarDistSegment_ImageVis"
+                ],
+                [
+                    "StarDist Image Segmentation - via preloaded model",
+                    "StarDist_image.StarDistSegment_preLoadedModel_use"
+                ],
+                [
+                    "Average image (time) NUMBER TWO",
+                    "AverageImage2.AvgImageTWO"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "Explanatory - draw random shape"
+        },
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_SCORING_END": {
+        "acqStart_0": {
+            "Variables": {}
+        },
+        "acquisition_0": {
+            "Variables": {}
+        },
+        "acquisition_1": {
+            "Variables": {}
+        },
+        "acquisition_2": {
+            "Variables": {}
+        },
+        "analysisMeasurement_0": {
+            "Variables": {}
+        },
+        "analysisMeasurement_1": {
+            "Variables": {}
+        },
+        "analysisMeasurement_2": {
+            "Variables": {}
+        },
+        "customFunction_0": {
+            "Variables": {}
+        },
+        "initStart_0": {
+            "Variables": {}
+        },
+        "realTimeAnalysis_0": {
+            "Variables": {}
+        },
+        "realTimeAnalysis_1": {
+            "Variables": {}
+        },
+        "scoringStart_0": {
+            "Variables": {}
+        },
+        "stickyNote_0": {
+            "Variables": {}
+        },
+        "stickyNote_1": {
+            "Variables": {}
+        },
+        "stickyNote_2": {
+            "Variables": {}
+        },
+        "visualisation_0": {
+            "Variables": {}
+        },
+        "visualisation_1": {
+            "Variables": {}
+        },
+        "visualisation_2": {
+            "Variables": {}
+        },
+        "visualisation_3": {
+            "Variables": {}
+        },
+        "visualisation_4": {
+            "Variables": {}
+        }
+    },
+    "NODES_SCORING_SCORING": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_SCORING_VISUALISATION": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_SLACK_REPORT": {
+        "acqStart_0": "",
+        "acquisition_0": "",
+        "acquisition_1": "",
+        "acquisition_2": "",
+        "analysisMeasurement_0": "",
+        "analysisMeasurement_1": "",
+        "analysisMeasurement_2": "",
+        "customFunction_0": "",
+        "initStart_0": "",
+        "realTimeAnalysis_0": "",
+        "realTimeAnalysis_1": "",
+        "scoringStart_0": "",
+        "stickyNote_0": "",
+        "stickyNote_1": "",
+        "stickyNote_2": "",
+        "visualisation_0": "",
+        "visualisation_1": "",
+        "visualisation_2": "",
+        "visualisation_3": "",
+        "visualisation_4": ""
+    },
+    "NODES_STICKY_NOTE": {
+        "acqStart_0": "",
+        "acquisition_0": "",
+        "acquisition_1": "",
+        "acquisition_2": "",
+        "analysisMeasurement_0": "",
+        "analysisMeasurement_1": "",
+        "analysisMeasurement_2": "",
+        "customFunction_0": "",
+        "initStart_0": "",
+        "realTimeAnalysis_0": "",
+        "realTimeAnalysis_1": "",
+        "scoringStart_0": "",
+        "stickyNote_0": "Showcase of a custom function<br><br>A dice roll between 1-6. Observe the change in the 'Variables' tab to the right",
+        "stickyNote_1": "Examples of all types of Analysis (values/points, image, and shapes).",
+        "stickyNote_2": "Examples of real-time analysis, both affecting the acquisition (first one will stop after 30 frames even though we set 50 frames), as well as analysis+visualisation (count the current frame).\n<br><br>\nAlso feel free to test the sharpness metric, which will show the real-time sharpness value of the image.",
+        "visualisation_0": "",
+        "visualisation_1": "",
+        "visualisation_2": "",
+        "visualisation_3": "",
+        "visualisation_4": ""
+    },
+    "NODES_STORE_DATA": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_TIMER": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {},
+        "visualisation_1": {},
+        "visualisation_2": {},
+        "visualisation_3": {},
+        "visualisation_4": {}
+    },
+    "NODES_VISUALISATION": {
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "acquisition_2": {},
+        "analysisMeasurement_0": {},
+        "analysisMeasurement_1": {},
+        "analysisMeasurement_2": {},
+        "customFunction_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "realTimeAnalysis_1": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "stickyNote_1": {},
+        "stickyNote_2": {},
+        "visualisation_0": {
+            "colormap": "gray",
+            "layerName": "analysisMeasurement_0"
+        },
+        "visualisation_1": {
+            "colormap": "gray",
+            "layerName": "analysisMeasurement_1"
+        },
+        "visualisation_2": {
+            "colormap": "gray",
+            "layerName": "analysisMeasurement_2"
+        },
+        "visualisation_3": {
+            "colormap": "gray",
+            "layerName": "acquisition_1"
+        },
+        "visualisation_4": {
+            "colormap": "gray",
+            "layerName": "acquisition_2"
+        }
+    },
+    "SCANNING_WIDGET_INFO": {
+        "LoadPos": {},
+        "currentMode": "LoadPos",
+        "scanMode": "LoadPos"
+    }
+}
