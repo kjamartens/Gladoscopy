@@ -8,6 +8,7 @@ from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayou
 from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt
 import logging
 import time
+import sys
 from PyQt5.QtCore import QTimer
 
 def is_pip_installed():
@@ -20,10 +21,9 @@ if is_pip_installed():
     import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
     import glados_pycromanager.GUI.MDAGlados as MDAGlados
 else:
-    import nodz_utils as utils
+    import nodz.nodz_utils as utils
     import utils as full_utils
-    from nodz_custom import *
-    import sys
+    from nodz.nodz_custom import *
     import AutonomousMicroscopy.MainScripts.HelperFunctions
     import MDAGlados as MDAGlados
     

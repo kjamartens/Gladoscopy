@@ -53,7 +53,7 @@ else:
     from AutonomousMicroscopy.CustomFunctions import * #type: ignore
     import utils
     from nodz import nodz_utils
-    import nodz_main as NodzMain
+    import nodz.nodz_main as NodzMain
     from MMcontrols import MMConfigUI, ConfigInfo
     from MDAGlados import MDAGlados
     import nodz.nodz_utils as nodz_utils
@@ -1628,7 +1628,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     package_path = os.path.dirname(glados_pycromanager.__file__)
                     quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
                 else:
-                    quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
+                    try:
+                        quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
+                    except:
+                        quickStartWindow.addMarkdown('glados_pycromanager/Documentation/UserManual.md')
                 QApplication.processEvents()
                 quickStartWindow.show()
             except Exception as e:
@@ -1649,7 +1652,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     package_path = os.path.dirname(glados_pycromanager.__file__)
                     quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
                 else:
-                    quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/DeveloperManual.md')
+                    try:
+                        quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/DeveloperManual.md')
+                    except:
+                        quickStartWindow.addMarkdown('glados_pycromanager/Documentation/DeveloperManual.md')
                 QApplication.processEvents()
                 quickStartWindow.show()
             except Exception as e:

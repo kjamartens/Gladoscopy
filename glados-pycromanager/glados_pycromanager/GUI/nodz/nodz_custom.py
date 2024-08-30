@@ -16,7 +16,7 @@ if is_pip_installed():
     from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
     from glados_pycromanager.GUI.MDAGlados import MDAGlados
 else:
-    import nodz_utils as utils
+    import nodz.nodz_utils as utils
     from MMcontrols import MMConfigUI, ConfigInfo
     from MDAGlados import MDAGlados
 
