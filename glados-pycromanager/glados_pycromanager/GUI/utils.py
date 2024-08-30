@@ -254,6 +254,11 @@ def kwargsFromFunction(functionname):
         rkwarr_arr = []
         okwarr_arr = []
         return f"No __function_metadata__ in {functionname}"
+    except TypeError:
+        #Likely due to trying to run this on an empty folder
+        rkwarr_arr = []
+        okwarr_arr = []
+        return f"Empty __function_metadata__ in {functionname}"
             
     return [rkwarr_arr, okwarr_arr]
 

@@ -25,7 +25,7 @@ def is_pip_installed():
 
 if is_pip_installed():
     from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
-    import glados_pycromanager.GUI.utils
+    import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore

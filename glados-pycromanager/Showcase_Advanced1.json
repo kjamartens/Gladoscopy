@@ -1,84 +1,84 @@
 {
     "CONNECTIONS": [
         [
-            "changeStagePos_1.Done",
-            "acqEnd_0.End"
-        ],
-        [
-            "changeProperties_1.Done",
-            "changeStagePos_1.Start"
-        ],
-        [
-            "acquisition_1.Finished",
-            "changeProperties_1.Start"
-        ],
-        [
-            "slackReport_1.Send",
-            "timer_0.Start"
-        ],
-        [
-            "acquisition_1.Visual",
-            "visualisation_1.Start"
-        ],
-        [
-            "changeGlobalVar_1.Finished",
-            "scoringEndVar_0.End"
-        ],
-        [
-            "changeGlobalVar_0.Finished",
-            "scoringEndVar_0.End"
-        ],
-        [
-            "ifStatement_0.Fail",
-            "changeGlobalVar_1.Start"
-        ],
-        [
-            "ifStatement_0.Succeed",
-            "changeGlobalVar_0.Start"
-        ],
-        [
-            "newGlobalVar_1.Finished",
-            "initEnd_0.End"
-        ],
-        [
-            "newGlobalVar_0.Finished",
-            "newGlobalVar_1.Start"
-        ],
-        [
-            "acquisition_0.Visual",
-            "visualisation_0.Start"
-        ],
-        [
-            "initStart_0.Start",
-            "newGlobalVar_0.Start"
-        ],
-        [
-            "acquisition_0.Real-time",
-            "realTimeAnalysis_0.Start"
-        ],
-        [
-            "timer_0.Finished",
-            "acquisition_0.Acquisition start"
-        ],
-        [
-            "acquisition_0.Finished",
-            "ifStatement_0.Start"
-        ],
-        [
-            "scoringStart_0.Start",
-            "slackReport_1.Start"
-        ],
-        [
-            "acqStart_0.Start",
-            "changeProperties_0.Start"
+            "changeStagePos_0.Done",
+            "acquisition_1.Acquisition start"
         ],
         [
             "changeProperties_0.Done",
             "changeStagePos_0.Start"
         ],
         [
-            "changeStagePos_0.Done",
-            "acquisition_1.Acquisition start"
+            "acqStart_0.Start",
+            "changeProperties_0.Start"
+        ],
+        [
+            "scoringStart_0.Start",
+            "slackReport_1.Start"
+        ],
+        [
+            "acquisition_0.Finished",
+            "ifStatement_0.Start"
+        ],
+        [
+            "timer_0.Finished",
+            "acquisition_0.Acquisition start"
+        ],
+        [
+            "acquisition_0.Real-time",
+            "realTimeAnalysis_0.Start"
+        ],
+        [
+            "initStart_0.Start",
+            "newGlobalVar_0.Start"
+        ],
+        [
+            "acquisition_0.Visual",
+            "visualisation_0.Start"
+        ],
+        [
+            "newGlobalVar_0.Finished",
+            "newGlobalVar_1.Start"
+        ],
+        [
+            "newGlobalVar_1.Finished",
+            "initEnd_0.End"
+        ],
+        [
+            "ifStatement_0.Succeed",
+            "changeGlobalVar_0.Start"
+        ],
+        [
+            "ifStatement_0.Fail",
+            "changeGlobalVar_1.Start"
+        ],
+        [
+            "changeGlobalVar_0.Finished",
+            "scoringEndVar_0.End"
+        ],
+        [
+            "changeGlobalVar_1.Finished",
+            "scoringEndVar_0.End"
+        ],
+        [
+            "acquisition_1.Visual",
+            "visualisation_1.Start"
+        ],
+        [
+            "slackReport_1.Send",
+            "timer_0.Start"
+        ],
+        [
+            "acquisition_1.Finished",
+            "changeProperties_1.Start"
+        ],
+        [
+            "changeProperties_1.Done",
+            "changeStagePos_1.Start"
+        ],
+        [
+            "changeStagePos_1.Done",
+            "acqEnd_0.End"
         ]
     ],
     "DECISION_WIDGET_INFO": {
@@ -163,7 +163,7 @@
                 1010.0
             ],
             "preset": "acqEnd",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:8.25pt;\"><br /></p></body></html>",
             "textboxheight": 50
         },
         "acqStart_0": {
@@ -188,7 +188,7 @@
                 1010.0
             ],
             "preset": "acqStart",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:8.25pt;\"><br /></p></body></html>",
             "textboxheight": 50
         },
         "acquisition_0": {
@@ -246,7 +246,7 @@
                 626.0
             ],
             "preset": "acquisition",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">10 frames with order t</span><br />500.0 ms exposure time<br />10 time points</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt; font-weight:600;\">10 frames with order t</span><span style=\" font-size:8.25pt;\"><br />500.0 ms exposure time<br />10 time points</span></p></body></html>",
             "textboxheight": 50
         },
         "acquisition_1": {
@@ -304,7 +304,7 @@
                 1022.0
             ],
             "preset": "acquisition",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">10 frames with order t</span><br />90.0 ms exposure time<br />10 time points</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt; font-weight:600;\">10 frames with order t</span><span style=\" font-size:8.25pt;\"><br />90.0 ms exposure time<br />10 time points</span></p></body></html>",
             "textboxheight": 50
         },
         "changeGlobalVar_0": {
@@ -340,7 +340,7 @@
                 614.0
             ],
             "preset": "changeGlobalVar",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Change global variable <span style=\" font-weight:600;\">WaitTime@Global</span> to <span style=\" font-weight:600;\">{WaitTime@Global}+1</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Change global variable </span><span style=\" font-size:8.25pt; font-weight:600;\">WaitTime@Global</span><span style=\" font-size:8.25pt;\"> to </span><span style=\" font-size:8.25pt; font-weight:600;\">{WaitTime@Global}+1</span></p></body></html>",
             "textboxheight": 50
         },
         "changeGlobalVar_1": {
@@ -376,7 +376,7 @@
                 758.0
             ],
             "preset": "changeGlobalVar",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Change global variable <span style=\" font-weight:600;\">ScoringWillPass@Global</span> to <span style=\" font-weight:600;\">0</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Change global variable </span><span style=\" font-size:8.25pt; font-weight:600;\">ScoringWillPass@Global</span><span style=\" font-size:8.25pt;\"> to </span><span style=\" font-size:8.25pt; font-weight:600;\">0</span></p></body></html>",
             "textboxheight": 50
         },
         "changeProperties_0": {
@@ -412,7 +412,7 @@
                 1010.0
             ],
             "preset": "changeProperties",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Changing 1 config(s):<br />Channel to Cy5</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Changing 1 config(s):<br />Channel to Cy5</span></p></body></html>",
             "textboxheight": 50
         },
         "changeProperties_1": {
@@ -448,7 +448,7 @@
                 1010.0
             ],
             "preset": "changeProperties",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Changing 1 config(s):<br />Channel to Cy5</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Changing 1 config(s):<br />Channel to Cy5</span></p></body></html>",
             "textboxheight": 50
         },
         "changeStagePos_0": {
@@ -484,7 +484,7 @@
                 1010.0
             ],
             "preset": "changeStagePos",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Relative</span> movement of stage <span style=\" font-weight:600;\">Z</span> by <span style=\" font-weight:600;\">-10.0</span> units</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt; font-weight:600;\">Relative</span><span style=\" font-size:8.25pt;\"> movement of stage </span><span style=\" font-size:8.25pt; font-weight:600;\">Z</span><span style=\" font-size:8.25pt;\"> by </span><span style=\" font-size:8.25pt; font-weight:600;\">-10.0</span><span style=\" font-size:8.25pt;\"> units</span></p></body></html>",
             "textboxheight": 50
         },
         "changeStagePos_1": {
@@ -520,7 +520,7 @@
                 1010.0
             ],
             "preset": "changeStagePos",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Relative</span> movement of stage <span style=\" font-weight:600;\">Z</span> by <span style=\" font-weight:600;\">10.0</span> units</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt; font-weight:600;\">Relative</span><span style=\" font-size:8.25pt;\"> movement of stage </span><span style=\" font-size:8.25pt; font-weight:600;\">Z</span><span style=\" font-size:8.25pt;\"> by </span><span style=\" font-size:8.25pt; font-weight:600;\">10.0</span><span style=\" font-size:8.25pt;\"> units</span></p></body></html>",
             "textboxheight": 50
         },
         "ifStatement_0": {
@@ -567,7 +567,7 @@
                 629.0
             ],
             "preset": "ifStatement",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Assess the statement <span style=\" font-weight:600;\">WaitTime@Global &lt; 2</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Assess the statement </span><span style=\" font-size:8.25pt; font-weight:600;\">WaitTime@Global &lt; 2</span></p></body></html>",
             "textboxheight": 50
         },
         "initEnd_0": {
@@ -592,7 +592,7 @@
                 417.2323232323232
             ],
             "preset": "initEnd",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:8.25pt;\"><br /></p></body></html>",
             "textboxheight": 50
         },
         "initStart_0": {
@@ -617,7 +617,7 @@
                 417.2323232323232
             ],
             "preset": "initStart",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
             "textboxheight": 50
         },
         "newGlobalVar_0": {
@@ -653,7 +653,7 @@
                 417.2323232323232
             ],
             "preset": "newGlobalVar",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Create new global variable <span style=\" font-weight:600;\">WaitTime</span> with value <span style=\" font-weight:600;\">1</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Create new global variable </span><span style=\" font-size:8.25pt; font-weight:600;\">WaitTime</span><span style=\" font-size:8.25pt;\"> with value </span><span style=\" font-size:8.25pt; font-weight:600;\">1</span></p></body></html>",
             "textboxheight": 50
         },
         "newGlobalVar_1": {
@@ -689,7 +689,7 @@
                 417.2323232323232
             ],
             "preset": "newGlobalVar",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Create new global variable <span style=\" font-weight:600;\">ScoringWillPass</span> with value <span style=\" font-weight:600;\">1</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Create new global variable </span><span style=\" font-size:8.25pt; font-weight:600;\">ScoringWillPass</span><span style=\" font-size:8.25pt;\"> with value </span><span style=\" font-size:8.25pt; font-weight:600;\">1</span></p></body></html>",
             "textboxheight": 50
         },
         "realTimeAnalysis_0": {
@@ -711,11 +711,11 @@
             "displayName": "Real-Time analysis",
             "position": [
                 1722.0,
-                782.0
+                784.0
             ],
             "preset": "realTimeAnalysis",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">RT counter</span><br /><span style=\" font-weight:600;\">ReqKwarg1</span>: DefaultKwarg<br /><span style=\" font-style:italic;\">OptBool2</span>: False</p></body></html>",
-            "textboxheight": 60
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">RT counter</span><br /><span style=\" font-weight:600;\">ReqKwarg1</span>: DefaultKwarg<br /><span style=\" font-style:italic;\">OptBool2</span>: False</p></body></html>",
+            "textboxheight": 64
         },
         "scoringEndVar_0": {
             "alternate": true,
@@ -739,7 +739,7 @@
                 614.0
             ],
             "preset": "scoringEndVar",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:8.25pt;\"><br /></p></body></html>",
             "textboxheight": 50
         },
         "scoringStart_0": {
@@ -764,7 +764,7 @@
                 614.0
             ],
             "preset": "scoringStart",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Scoring started at:</span><br /><span style=\" font-style:italic;\">2024-08-27 16:01:56</span></p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Scoring started at:</span><br /><span style=\" font-style:italic;\">2024-08-30 21:56:51</span></p></body></html>",
             "textboxheight": 50
         },
         "slackReport_1": {
@@ -800,7 +800,7 @@
                 614.0
             ],
             "preset": "slackReport",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Waiting {WaitTime@Global} second(s)</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt;\">Waiting {WaitTime@Global} second(s)</span></p></body></html>",
             "textboxheight": 50
         },
         "timer_0": {
@@ -836,7 +836,7 @@
                 614.0
             ],
             "preset": "timer",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Timer:</span> wait WaitTime@Global s</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt; font-weight:600;\">Timer:</span><span style=\" font-size:8.25pt;\"> wait WaitTime@Global s</span></p></body></html>",
             "textboxheight": 50
         },
         "visualisation_0": {
@@ -861,7 +861,7 @@
                 777.0
             ],
             "preset": "visualisation",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: acquisition_0</span><br />Colormap: gray</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt; font-weight:600;\">Layer name: acquisition_0</span><span style=\" font-size:8.25pt;\"><br />Colormap: gray</span></p></body></html>",
             "textboxheight": 50
         },
         "visualisation_1": {
@@ -886,7 +886,7 @@
                 1173.0
             ],
             "preset": "visualisation",
-            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: acquisition_1</span><br />Colormap: I Forest</p></body></html>",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:8.25pt; font-weight:600;\">Layer name: acquisition_1</span><span style=\" font-size:8.25pt;\"><br />Colormap: I Forest</span></p></body></html>",
             "textboxheight": 50
         }
     },
@@ -1356,37 +1356,41 @@
         "newGlobalVar_0": {},
         "newGlobalVar_1": {},
         "realTimeAnalysis_0": {
+            "LineEdit#EndAtFrame.EndAtFrame#LastFrame": "50",
             "LineEdit#LaserAdjustment.laser_adjustment#Laser_id": "TS_DAC02_488Laser",
             "LineEdit#LaserAdjustment.laser_adjustment#maxFrame": "100",
             "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_id": "TS_DAC02_488Laser",
             "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_power": "{1:0.01, 2:0.05, 10:1.00}",
-            "LineEdit#RT_counter.RT_counterV#OptBool2": "False",
-            "LineEdit#RT_counter.RT_counterV#ReqKwarg1": "DefaultKwarg",
+            "LineEdit#RT_counter.RealTimeCounter#OptBool2": "False",
+            "LineEdit#RT_counter.RealTimeCounter#ReqKwarg1": "DefaultKwarg",
             "LineEdit#SharpnessValue.SharpnessValue#FilterType": "Laplacian",
-            "LineEdit#SharpnessValue.SharpnessValue#OptBool2": "False",
             "LineEdit#pSMLM.pSMLM#ROIradius": "3",
             "LineEdit#pSMLM.pSMLM#stdmult": "2",
+            "LineEditAdv#EndAtFrame.EndAtFrame#LastFrame": "",
             "LineEditAdv#LaserAdjustment.laser_adjustment#Laser_id": "",
             "LineEditAdv#LaserAdjustment.laser_adjustment#maxFrame": "",
             "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
             "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
-            "LineEditAdv#RT_counter.RT_counterV#OptBool2": "",
-            "LineEditAdv#RT_counter.RT_counterV#ReqKwarg1": "",
+            "LineEditAdv#RT_counter.RealTimeCounter#OptBool2": "",
+            "LineEditAdv#RT_counter.RealTimeCounter#ReqKwarg1": "",
             "LineEditAdv#SharpnessValue.SharpnessValue#FilterType": "",
-            "LineEditAdv#SharpnessValue.SharpnessValue#OptBool2": "",
             "LineEditAdv#pSMLM.pSMLM#ROIradius": "",
             "LineEditAdv#pSMLM.pSMLM#stdmult": "",
+            "LineEditVariable#EndAtFrame.EndAtFrame#LastFrame": "",
             "LineEditVariable#LaserAdjustment.laser_adjustment#Laser_id": "",
             "LineEditVariable#LaserAdjustment.laser_adjustment#maxFrame": "",
             "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
             "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
-            "LineEditVariable#RT_counter.RT_counterV#OptBool2": "",
-            "LineEditVariable#RT_counter.RT_counterV#ReqKwarg1": "",
+            "LineEditVariable#RT_counter.RealTimeCounter#OptBool2": "",
+            "LineEditVariable#RT_counter.RealTimeCounter#ReqKwarg1": "",
             "LineEditVariable#SharpnessValue.SharpnessValue#FilterType": "",
-            "LineEditVariable#SharpnessValue.SharpnessValue#OptBool2": "",
             "LineEditVariable#pSMLM.pSMLM#ROIradius": "",
             "LineEditVariable#pSMLM.pSMLM#stdmult": "",
             "__displayNameFunctionNameMap__": [
+                [
+                    "Example - influence the run by stopping it at a set frame",
+                    "EndAtFrame.EndAtFrame"
+                ],
                 [
                     "LaserAdj",
                     "LaserAdjustment.laser_adjustment"
@@ -1401,7 +1405,7 @@
                 ],
                 [
                     "RT counter",
-                    "RT_counter.RT_counterV"
+                    "RT_counter.RealTimeCounter"
                 ],
                 [
                     "Sharpness value",
