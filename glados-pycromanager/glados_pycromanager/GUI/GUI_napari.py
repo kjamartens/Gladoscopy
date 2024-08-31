@@ -126,9 +126,8 @@ def main():
         
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtCore import Qt
-    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts) #type:ignore
-
-    #Run the UI on a second thread (hopefully robustly)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
     app = QApplication(sys.argv)
 
     worker = Worker()

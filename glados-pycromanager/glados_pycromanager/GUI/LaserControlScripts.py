@@ -442,6 +442,7 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
     form = sform
     # app = sapp
     shared_data = sshared_data
+    criticalErrors=False
 
     #Get onoff and intensity from MM
     try:
@@ -450,6 +451,7 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         InitFilterWheelRadioCheckbox()
     except:
         logging.debug('Error in InitLaserButtonLabels or InitLaserSliders')
+        criticalErrors=True
     #Get frametimeinfo
     InitBFRadioCheckbox()
     global frameduration;
@@ -496,6 +498,7 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
             exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
     except:
         logging.error("error in execing forms")
+        criticalErrors=True
     #Arm lasers button
     form.ARMlaserTriggerPushButton.clicked.connect(lambda: armLaserTriggering());
 
@@ -542,5 +545,6 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         initLaserTrigEditBoxes();
     except:
         logging.error("error in resetting laser boxes")
+        criticalErrors=True
     
-    return form
+    return form, criticalErrors

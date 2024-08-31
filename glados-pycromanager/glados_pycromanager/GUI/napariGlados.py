@@ -819,6 +819,7 @@ class dockWidget_fullGladosUI(dockWidgets):
     
     
         
+        
         ui = Ui_CustomDockWidget()
         ui.setupUi(tempWidget)
         #Open JSON file with MM settings
@@ -827,10 +828,8 @@ class dockWidget_fullGladosUI(dockWidgets):
         with open(MM_JSON_path) as f:
             MM_JSON = json.load(f)
             
-        runlaserControllerUI(core,MM_JSON,ui,shared_data)
-        #Run the laserController UI
-        logging.debug("dockWidget_fullGladosUI halfway")
-        
+        form, self.criticalErrors = runlaserControllerUI(core,MM_JSON,ui,shared_data)
+        #Run the laserController UI        
         #
         #Create a Vertical+horizontal layout:
         self.dockwidgetLayout = QGridLayout()
@@ -842,6 +841,7 @@ class dockWidget_fullGladosUI(dockWidgets):
         self.analysisLayout.addWidget(ui.centralwidget.children()[1].children()[0],1,1)
         
         self.dockWidget = self.layout.addLayout(self.dockwidgetLayout,0,0)
+        
 
         
 
@@ -886,8 +886,18 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     shared_data._defaultFocusDevice = core.get_focus_device()
     logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
 
+    #Run the UI on a second thread (hopefully robustly)
     #Napari start
     napariViewer = napari.Viewer()
+    
+    #Set QT attributes here for some reason...
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
+    QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
+    
+    # napariViewer._window._qt_viewer.canvas.view._transform.scale=[2,2,2,2]
     #Add a connect event if a layer is removed - to stop background processes
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
     shared_data.napariViewer = napariViewer
@@ -918,7 +928,10 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     
     if includecustomUI:
         gladosLaserInfo = dockWidget_fullGladosUI()
-        napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI")
+        if not gladosLaserInfo.criticalErrors:
+            napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI")
+        else:
+            logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
 
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
