@@ -75,17 +75,20 @@ class InteractiveListWidget(QTableWidget):
         logging.debug('init InteractiveListWidget')
         self.parent = parent #type: ignore
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
-        # self.horizontalHeader().setStretchLastSection(True)
-        
-        colWidth = 100
+        scaleFactor = 1
+        if parent != None:
+            scaleFactor = parent.shared_data.GUIscaleFactor
+        colWidth = int(60*scaleFactor)
         # Set the minimum size for the table widget
         self.setColumnWidth(0, int(colWidth*.9)) #Slightly smaller to prevent scrollbar to appear
-        self.setMinimumWidth(colWidth*columnCount) 
+        self.setMinimumWidth(colWidth*columnCount)
+        self.setMinimumHeight(20)
+        self.setFixedHeight(240)
         # Set the size policy to ensure the widget can expand but not shrink below the minimum size
-        self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
+        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         
         font = QFont()
-        font.setPointSize(fontsize)
+        font.setPointSize(int(scaleFactor*fontsize))
         self.setFont(font)
         # Reduce padding within cells
         self.setStyleSheet("QTableWidget::item { padding: 1px; }")
@@ -547,6 +550,7 @@ class MDAGlados(CustomMainWindow):
         self.lastTimeUpdateSize = time.time()
         self._GUI_grid_width = None
         self.data = None
+        self.GUI_orientation='Horizontal'
         
         self.fully_started = False
         
@@ -724,8 +728,10 @@ class MDAGlados(CustomMainWindow):
         #Adding a list widget to add a list of xy positions
         self.xypositionListWidget = XYStageList(parent=self)
         self.xypositionListWidget.setColumNames(["Name", "ID","xPos","yPos"])
-        self.xypositionListWidget.setColumnWidth(0, 60)
-        self.xypositionListWidget.setColumnWidth(1, 40)
+        self.xypositionListWidget.setColumnWidth(0, int(90*self.shared_data.GUIscaleFactor))
+        self.xypositionListWidget.setColumnWidth(1, int(30*self.shared_data.GUIscaleFactor))
+        self.xypositionListWidget.setColumnWidth(2, int(60*self.shared_data.GUIscaleFactor))
+        self.xypositionListWidget.setColumnWidth(3, int(60*self.shared_data.GUIscaleFactor))
         
         self.xy_stagesDropdownLabel = QLabel("XY Stage:")
         self.xy_stagesDropdown = QComboBox()
@@ -762,7 +768,7 @@ class MDAGlados(CustomMainWindow):
         #Adding widgets to layout
         xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
         xyLayout.addWidget(self.xy_stagesDropdown,0,1)
-        xyLayout.addWidget(self.xypositionListWidget,1,0,12,1)
+        xyLayout.addWidget(self.xypositionListWidget,1,0,8,1)
         xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
         xyLayout.addWidget(self.xypositionListWidget_deleteAllButton,3,1)
         xyLayout.addWidget(self.xypositionListWidget_moveUpButton,4,1)
@@ -839,6 +845,8 @@ class MDAGlados(CustomMainWindow):
         zLayout.addWidget(self.z_nrsteps_entry,3,1)
         zLayout.addWidget(self.z_stepdistance_radio,4,0)
         zLayout.addWidget(self.z_stepdistance_entry,4,1)
+        #Add a spacer at the bottom:
+        zLayout.addItem(QSpacerItem(1, 2, QSizePolicy.Minimum, QSizePolicy.Expanding),5,0,1,2)
         
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
         self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
@@ -899,8 +907,10 @@ class MDAGlados(CustomMainWindow):
         self.channelListWidget_addButton.clicked.connect(lambda: self.channelListWidget.addNewEntry())
 
         #Adding widgets to layout
-        channelLayout.addWidget(self.channelDropdownLabel,0,0)
-        channelLayout.addWidget(self.channelDropdown,0,1)
+        dropdownQH = QHBoxLayout()
+        dropdownQH.addWidget(self.channelDropdownLabel)
+        dropdownQH.addWidget(self.channelDropdown)
+        channelLayout.addLayout(dropdownQH,0,0,1,3)
         channelLayout.addWidget(self.channelListWidget,1,0,6,1)
         channelLayout.addWidget(self.channelListWidget_deleteButton,2,1)
         channelLayout.addWidget(self.channelListWidget_moveUpButton,3,1)
@@ -943,7 +953,7 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_storage_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         
         font = QFont()
-        font.setPointSize(7)  # Set the desired font size
+        font.setPointSize(int(7*self.shared_data.GUIscaleFactor))  # Set the desired font size
 
         [checkbox.setFont(font) for checkbox in [self.GUI_show_exposure_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox, self.GUI_show_channel_chkbox, self.GUI_show_time_chkbox, self.GUI_show_storage_chkbox]]
 
@@ -969,9 +979,9 @@ class MDAGlados(CustomMainWindow):
         self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions,GUI_acquire_button=GUI_acquire_button)
         
         #Change the font of everything in the layout
-        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", 7))
+        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", int(7*self.shared_data.GUIscaleFactor)))
         #Twice because it relies on dependancies inside qgridlayouts
-        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", 7))
+        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", int(7*self.shared_data.GUIscaleFactor)))
         
         if self.layout is not None:
             #Add the layout to the main layout
@@ -982,7 +992,7 @@ class MDAGlados(CustomMainWindow):
                 self.mainLayout = self.gui
             
             # Changing font and padding of all widgets
-            font = QFont("Arial", 7)
+            font = QFont("Arial", int(7*self.shared_data.GUIscaleFactor))
             for i in range(self.gui.count()):
                 try:
                     item = self.gui.itemAt(i)
@@ -1002,8 +1012,13 @@ class MDAGlados(CustomMainWindow):
         Returns:
             None
         """
-        
-        newNrColumns = max(1,min(10, size.width() // 150))
+        #Very practically, it can be 1, many, or 'square'. Since we have 6 widgets total, square is 2.
+        if size.width()>1.25*size.height():
+            newNrColumns = 10
+        elif size.height()>1.25*size.width():
+            newNrColumns = 1
+        else:
+            newNrColumns = 2
         self.GUI_grid_width = newNrColumns
     
     def getDevicesOfDeviceType(self,devicetype):
@@ -1046,7 +1061,7 @@ class MDAGlados(CustomMainWindow):
             QVBoxLayout: The layout containing the order dropdown and label.
         """
         
-        orderLayout = QVBoxLayout()
+        orderLayout = QHBoxLayout()
         letters_to_include = ''
         if GUI_show_channel:
             letters_to_include += 'c'
@@ -1159,9 +1174,12 @@ class MDAGlados(CustomMainWindow):
         self.gui.update()
         QCoreApplication.processEvents()
         
+        self.gui.setSizeConstraint(QGridLayout.SetMinimumSize)
         # At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
         optionsBGroupBox = QWidget()
         optionsBLayout = QVBoxLayout()
+        optionsBLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
+        optionsBLayout.setContentsMargins(0, 0, 0, 0)
         optionsBGroupBox.setLayout(optionsBLayout)
         optionsBLayout.addWidget(self.showOptionsGroupBox) # type: ignore
         self.showOptionsGroupBox.setEnabled(True)
@@ -1178,11 +1196,11 @@ class MDAGlados(CustomMainWindow):
         else:
             self.GUI_acquire_button.setEnabled(False)
         
-        self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
-        
         #Add order/exposure/time as single groupbox
         orderexposuretimegroupbox = QWidget()
         orderexposuretimelayout = QVBoxLayout()
+        orderexposuretimelayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
+        orderexposuretimelayout.setContentsMargins(0, 0, 0, 0)
         orderexposuretimegroupbox.setLayout(orderexposuretimelayout)
         
         if GUI_show_exposure:
@@ -1202,26 +1220,16 @@ class MDAGlados(CustomMainWindow):
         else:
             self.timeGroupBox.setEnabled(False)
         #     # QCoreApplication.processEvents()
-        self.gui.addWidget(orderexposuretimegroupbox, 1//gridWidth, 1%gridWidth) # type: ignore
-        
-        #Add XY, Z, Channel, groupboxes as individual groupboxes
-        curindex = 2
-        self.gui.addWidget(self.xyGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
         if GUI_show_xy:
             self.xyGroupBox.setEnabled(True)
         else:
             self.xyGroupBox.setEnabled(False)
             # QCoreApplication.processEvents()
-        self.gui.addWidget(self.zGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
         if GUI_show_z:
             self.zGroupBox.setEnabled(True)
         else:
             self.zGroupBox.setEnabled(False)
             # QCoreApplication.processEvents()
-        self.gui.addWidget(self.channelGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
         if GUI_show_channel:
             self.channelGroupBox.setEnabled(True)
         else:
@@ -1229,6 +1237,18 @@ class MDAGlados(CustomMainWindow):
             # QCoreApplication.processEvents()
         
         
+        self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
+        
+        self.gui.addWidget(orderexposuretimegroupbox, 1//gridWidth, 1%gridWidth) # type: ignore
+        
+        #Add XY, Z, Channel, groupboxes as individual groupboxes
+        curindex = 2
+        self.gui.addWidget(self.xyGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
+        curindex+=1
+        self.gui.addWidget(self.zGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
+        curindex+=1
+        self.gui.addWidget(self.channelGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
+        curindex+=1
         self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
         self.gui.setRowStretch(99,gridWidth+1) # type: ignore
         
@@ -1301,9 +1321,9 @@ class MDAGlados(CustomMainWindow):
             # widget.setMinimumSize(20, 20)
 
         if isinstance(widget, QGroupBox):
-            widget.setSizePolicy(
-                QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            )
+            # widget.setSizePolicy(
+            #     QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # )
             # Ensure QGroupBox respects the size of its contents
             widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
 

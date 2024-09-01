@@ -50,6 +50,7 @@ if __name__ == "__main__":
         from PyQt5.QtWidgets import QApplication
         from PyQt5.QtCore import Qt
         QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+        QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)
     
         app = QApplication(sys.argv)
         window = MainWindow()

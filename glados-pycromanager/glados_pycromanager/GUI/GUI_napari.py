@@ -62,7 +62,7 @@ class Worker(QObject):
     """
     finished = pyqtSignal()
 
-    def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data,includeCustomUI=True):
+    def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data,includeCustomUI=False):
         """
         Runs the NapariPycroManagerWrap function.
         
@@ -75,7 +75,12 @@ class Worker(QObject):
         Returns:
             None
         """
-        
+        import platform
+        # Get the computer's hostname
+        if 'SMIPC' in platform.node():
+            includeCustomUI=True
+        else:
+            includeCustomUI=False
         # Your code for running the NapariPycroManager function goes here
         runNapariPycroManager(core, MM_JSON, shared_data,includecustomUI=includeCustomUI)
         self.finished.emit()
@@ -126,8 +131,9 @@ def main():
         
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtCore import Qt
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
+    QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
     app = QApplication(sys.argv)
 
     worker = Worker()
@@ -171,7 +177,7 @@ def show_UserManualNapari():
         QApplication.processEvents()
         
         if is_pip_installed():
-            package_path = os.path.dirname(glados_pycromanager.__file__)
+            package_path = os.path.dirname(glados_pycromanager.__file__)# type:ignore
             quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
         else:
             quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')

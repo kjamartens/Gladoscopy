@@ -272,11 +272,11 @@ class MDAWidget(GladosWidget):
         Basically just updates the font/margins
         """
         from PyQt5.QtGui import QFont
-        self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
+        # self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
         # self.adjustSize()
         self.layoutInfo.adjustSize() #type:ignore
         super().resizeEvent(event)
-        self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
+        # self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
 
 class AutonomousMicroscopyWidget(GladosWidget):
     """

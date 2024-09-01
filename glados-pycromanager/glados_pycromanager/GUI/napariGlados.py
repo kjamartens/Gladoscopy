@@ -913,16 +913,124 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     # custom_widget_analysisThreads = dockWidget_analysisThreads()
     # napariViewer.window.add_dock_widget(custom_widget_analysisThreads, area="top", name="Real-time analysis",tabify=True)
     
+    #Do something funky for stylesheet re-scaling of pyqt5
+    from PyQt5.QtWidgets import QStyle
+    defaultFontSize = 14#QWidget().font().pointSize()
+    defaultPadding = 1#QWidget().style().pixelMetric(QStyle.PM_DefaultFrameWidth)
+    defaultSpacingH = QWidget().style().pixelMetric(QStyle.PM_LayoutHorizontalSpacing)
+    defaultSpacingV = QWidget().style().pixelMetric(QStyle.PM_LayoutVerticalSpacing)
+    
+    
+    defaultLeftMargin = QWidget().style().pixelMetric(QStyle.PM_LayoutLeftMargin)
+    defaultRightMargin = QWidget().style().pixelMetric(QStyle.PM_LayoutRightMargin)
+    defaultTopMargin = QWidget().style().pixelMetric(QStyle.PM_LayoutTopMargin)
+    defaultBottomMargin = QWidget().style().pixelMetric(QStyle.PM_LayoutBottomMargin)
+    
+    
+    
+    defaultSpacing=defaultSpacingH
+    # Create a custom stylesheet with a scaling factor
+    
+    scaleFactor = 0.75
+    shared_data.GUIscaleFactor = scaleFactor
+    useStyleSheet = True
+    ScaledStylesheetOld = f"""
+    QWidget {{
+        font-size: {int(defaultFontSize*scaleFactor)}px;
+        padding: {int(defaultSpacingH*scaleFactor)}px {int(defaultSpacingV*scaleFactor)}px;
+    }}
+    
+    QPushButton {{
+        padding: {int(defaultPadding * scaleFactor)}px {int(defaultPadding * scaleFactor)}px;
+        min-height: {int(20 * scaleFactor)}px; 
+        min-width: {int(20 * scaleFactor)}px; 
+    }}
+    QLineEdit {{
+        border-width: {int(0*scaleFactor)}px {int(0*scaleFactor)}px;
+        padding: {int(defaultPadding*scaleFactor)}px {int(defaultPadding*scaleFactor)}px;
+        margin: {int(0*scaleFactor)}px {int(0*scaleFactor)}px;min-height: {int(20 * scaleFactor)}px; 
+    }}
+    QCheckBox::indicator {{
+        width: {int(12 * scaleFactor)}px; 
+        height: {int(12 * scaleFactor)}px; 
+    }}
+    QAbstractButton::icon {{
+        width: {int(16 * scaleFactor)}px; 
+        height: {int(16 * scaleFactor)}px; 
+    }}
+    QComboBox {{
+        padding: {int(defaultPadding*scaleFactor)}px {int(defaultSpacing*scaleFactor)}px;
+        min-height: {int(20 * scaleFactor)}px;
+        min-width: {int(20 * scaleFactor)}px; 
+    }}
+    QComboBox::down-arrow {{
+        width: {int(12 * scaleFactor)}px; 
+        height: {int(12 * scaleFactor)}px; 
+    }}
+    """
+
+    # padding: {int(defaultSpacingH/2*scaleFactor)}px {int(defaultSpacingV/2*scaleFactor)}px;
+    ScaledStylesheet = f"""
+    QWidget {{
+        font-size: {int(defaultFontSize*scaleFactor)}px;
+        padding: {int(defaultSpacingH*scaleFactor)}px {int(defaultSpacingV*scaleFactor)}px;
+        margin: {int(defaultTopMargin/4*scaleFactor)}px {int(defaultRightMargin/4*scaleFactor)}px {int(defaultBottomMargin/4*scaleFactor)}px {int(defaultLeftMargin/4*scaleFactor)}px;
+    }}
+    QLineEdit {{
+        border-width: {int(4*scaleFactor)}px {int(4*scaleFactor)}px;
+        min-height: {int(25 * scaleFactor)}px; 
+        min-width: {int(25 * scaleFactor)}px; 
+    }}
+    QCheckBox::indicator {{
+        width: {int(12 * scaleFactor)}px; 
+        height: {int(12 * scaleFactor)}px; 
+    }}
+    QAbstractButton::icon {{
+        width: {int(12 * scaleFactor)}px; 
+        height: {int(12 * scaleFactor)}px; 
+    }}
+    QComboBox::down-arrow {{
+        width: {int(12 * scaleFactor)}px; 
+        height: {int(12 * scaleFactor)}px; 
+    }}
+    QComboBox{{
+        min-height: {int(25 * scaleFactor)}px; 
+        min-width: {int(25 * scaleFactor)}px; 
+    }}
+    QCheckBox{{
+        min-height: {int(25 * scaleFactor)}px; 
+        min-width: {int(25 * scaleFactor)}px; 
+    }}
+    QGroupBox {{
+        margin: 0px;
+        padding: 0px;
+        spacing: 0px;
+    }}
+    QVBoxLayout {{
+        spacing: 0px;
+    }}
+    """
+
+    
+    
     logging.debug('In runNapariPycroManager')
     
     custom_widget_MMcontrols = dockWidget_MMcontrol()
+    # Apply the stylesheet
+    if useStyleSheet:
+        custom_widget_MMcontrols.setStyleSheet(ScaledStylesheet)
+    #Add to napari
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
     
     custom_widget_MDA = dockWidget_MDA()
+    if useStyleSheet:
+        custom_widget_MDA.setStyleSheet(ScaledStylesheet)
     napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)
     
     if include_flowChart_automatedMicroscopy:
         custom_widget_flowChart = dockWidget_flowChart()
+        if useStyleSheet:
+            custom_widget_flowChart.setStyleSheet(ScaledStylesheet)
         napariViewer.window.add_dock_widget(custom_widget_flowChart, area="top", name="Autonomous microscopy",tabify=True)
         custom_widget_flowChart.dockWidget.focus()
     

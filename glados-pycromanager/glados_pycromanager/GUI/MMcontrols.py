@@ -341,7 +341,7 @@ class MMConfigUI(CustomMainWindow):
         #Add a horizontal auto-widening object to mainlayout:
         from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
         from PyQt5 import QtWidgets
-        spacer = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacer = QtWidgets.QSpacerItem(2, 1, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.mainLayout.addItem(spacer,0,99)
         
         #Update everything for good measure at the end of init
@@ -499,9 +499,9 @@ class MMConfigUI(CustomMainWindow):
             # widget.setMinimumSize(20, 20)
 
         if isinstance(widget, QGroupBox):
-            widget.setSizePolicy(
-                QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            )
+            # widget.setSizePolicy(
+            #     QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # )
             # Ensure QGroupBox respects the size of its contents
             widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
 
@@ -619,7 +619,7 @@ class MMConfigUI(CustomMainWindow):
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
         
         #Add one of those spacers at the bottom:
-        verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        verticalSpacer = QSpacerItem(2, 1, QSizePolicy.Minimum, QSizePolicy.Expanding)
         liveModeLayout.addItem(verticalSpacer)
         
         #Add a button to update all MM info
@@ -1820,7 +1820,7 @@ def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
         allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
     
     #Create the MM config via all config groups
-    MMconfig = MMConfigUI(allConfigGroups,autoSaveLoad=True)
+    MMconfig = MMConfigUI(allConfigGroups,number_config_columns=7,autoSaveLoad=True)
     main_layout.addLayout(MMconfig.mainLayout,0,0)
     
     return MMconfig
