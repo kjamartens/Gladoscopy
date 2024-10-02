@@ -273,20 +273,24 @@ class MMConfigUI(CustomMainWindow):
         self.mainLayout = QGridLayout()
         self.configEntries = {}
         
-        import glados_pycromanager
-        # Get the installation path of the package
-        package_path = os.path.dirname(glados_pycromanager.__file__)
-        # Construct the path to the Icons folder
-        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+        try:
+            import glados_pycromanager
+            # Get the installation path of the package
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            # Construct the path to the Icons folder
+            self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
 
-        if not os.path.exists(self.iconFolder):
-            #Find the iconPath folder
-            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-                self.iconFolder = './glados_pycromanager/GUI/Icons/'
-            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-                self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-            else:
-                self.iconFolder = ''
+            if not os.path.exists(self.iconFolder):
+                #Find the iconPath folder
+                if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+                    self.iconFolder = './glados_pycromanager/GUI/Icons/'
+                elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+                    self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+                else:
+                    self.iconFolder = ''
+        except:
+            logging.error("No glados_pycromanager package found")
+            self.iconFolder = ''
         
         
         if showLiveSnapExposureButtons:

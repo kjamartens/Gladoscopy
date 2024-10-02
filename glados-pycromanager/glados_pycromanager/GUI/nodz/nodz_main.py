@@ -1869,22 +1869,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.bottomAttrs = dict()
         self.topAttrs = dict()
 
+        self.iconFolder = full_utils.findIconFolder()
 
-        import glados_pycromanager
-        # Get the installation path of the package
-        package_path = os.path.dirname(glados_pycromanager.__file__)
-        # Construct the path to the Icons folder
-        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
-
-        if not os.path.exists(self.iconFolder):
-            #Find the iconPath folder
-            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-                self.iconFolder = './glados_pycromanager/GUI/Icons/'
-            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-                self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-            else:
-                self.iconFolder = ''
-                
         # Methods.
         import copy
         self.config = config.copy()

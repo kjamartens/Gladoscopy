@@ -864,13 +864,23 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
 
 
 def findIconFolder():
-    import glados_pycromanager
-    # Get the installation path of the package
-    package_path = os.path.dirname(glados_pycromanager.__file__)
-    # Construct the path to the Icons folder
-    iconFolder = os.path.join(package_path, 'GUI', 'Icons')
+    try:
+        import glados_pycromanager
+        # Get the installation path of the package
+        package_path = os.path.dirname(glados_pycromanager.__file__)
+        # Construct the path to the Icons folder
+        iconFolder = os.path.join(package_path, 'GUI', 'Icons')
 
-    if not os.path.exists(iconFolder):
+        if not os.path.exists(iconFolder):
+            #Find the iconPath folder
+            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
+                iconFolder = './glados_pycromanager/GUI/Icons/'
+            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
+                iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
+            else:
+                iconFolder = ''
+    except:
+        # logging.warning("Could not find glados_pycromanager package, using default icons")
         #Find the iconPath folder
         if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
             iconFolder = './glados_pycromanager/GUI/Icons/'
@@ -878,7 +888,6 @@ def findIconFolder():
             iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
         else:
             iconFolder = ''
-            
     return iconFolder
 
 def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',iconSize = 16):
