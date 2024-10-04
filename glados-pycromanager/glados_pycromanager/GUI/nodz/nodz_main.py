@@ -224,6 +224,7 @@ class Nodz(QtWidgets.QGraphicsView):
             self.setInteractive(False)
 
 
+
         else:
             self.currentState = 'DEFAULT'
 
@@ -312,6 +313,29 @@ class Nodz(QtWidgets.QGraphicsView):
 
         # Selection.
         elif self.currentState == 'SELECTION':
+            if QtCore.QRect(self.origin,event.pos()).normalized().width() < 3 and QtCore.QRect(self.origin,event.pos()).normalized().height() < 3:
+                #check for closeness to a connection, if very close, remove it :)
+                connectionMisclickTolerance = 20
+                connectionRemoved=False
+                for connection in [i for i in self.items() if isinstance(i, ConnectionItem)]:
+                    
+                    # Get the painter path of the connection
+                    path = connection.shape()
+                    min_distance = float('inf')
+                    import numpy as np
+                    
+                    #look if it's close to the cursor at any point
+                    for i in range(path.elementCount()):
+                        element = path.elementAt(i)
+                        distance = np.sqrt((self.mapToScene(event.pos()).x()-element.x)**2 + (self.mapToScene(event.pos()).y()-element.y)**2)
+                        min_distance=min(distance,min_distance)
+                        if min_distance < connectionMisclickTolerance:
+                            connection._remove()
+                            connectionRemoved = True
+                            break
+                    if connectionRemoved:
+                        break
+                
             self.rubberband.setGeometry(QtCore.QRect(self.origin,
                                                      event.pos()).normalized())
             painterPath = self._releaseRubberband()

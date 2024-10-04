@@ -39,7 +39,7 @@ def __function_metadata__():
             "help_string": "phasor-based SMLM.",
             "display_name": "pSMLM version",
             "run_delay": 20,
-            "visualise_delay": 20,
+            "visualise_delay": 100,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
