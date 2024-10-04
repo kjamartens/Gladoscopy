@@ -139,7 +139,17 @@ def InitateNapariUI(napariViewer):
         icon = QIcon(icon_path)
         napariViewer.window._qt_window.setWindowIcon(icon)
     except:
-        logging.error("Tried and failed to import glados_pycromanager.")
+        try:
+            import utils
+            
+            iconFolder = utils.findIconFolder()
+            icon_path = iconFolder+os.sep+'GladosIcon.ico'
+            icon = QIcon(icon_path)
+            napariViewer.window._qt_window.setWindowIcon(icon)
+        except:
+            logging.error("Tried and failed to import glados_pycromanager.")
+            pass
+        
     
     #Turn on scalebar
     showScaleBar(napariViewer)

@@ -4,8 +4,18 @@ def is_pip_installed():
 
 if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+    import glados_pycromanager.GUI.utils as utils
 else:
     from MainScripts import FunctionHandling
+    import utils
+from shapely import Polygon, affinity
+import math
+import logging
+import numpy as np
+import inspect
+import dask.array as da
+import time
+from scipy import signal
 from shapely import Polygon, affinity
 import math
 import numpy as np
@@ -26,10 +36,11 @@ def __function_metadata__():
             "optional_kwargs": [
                 {"name": "stdmult", "description": "stdmult", "default": 2, "type": int}
             ],
-            "help_string": "Real-time localization via pSMLM (phasor-based localization microscopy).",
-            "display_name": "pSMLM localization",
-            "run_delay": 0,
-            "visualise_delay": 10,
+            "help_string": "phasor-based SMLM.",
+            "display_name": "pSMLM version",
+            "run_delay": 20,
+            "visualise_delay": 20,
+            "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
             "output":[
@@ -37,10 +48,6 @@ def __function_metadata__():
         }
     }
 
-
-#-------------------------------------------------------------------------------------------------------------------------------
-#Callable functions
-#-------------------------------------------------------------------------------------------------------------------------------
 
 
 def DoGFilter(im,g1,g2):
@@ -103,208 +110,107 @@ def phasor_fitting(ROI,ROIradius,localpeak):
     LocalizationY = localpeak[0]-ROIradius+PositionY
     return [LocalizationX, LocalizationY]
 
-# From microEye:
-class Filter:
-    # Class attributes (shared among all instances)
-    class_attribute = 0
 
-    def __init__(self, param1=5, param2=5):
-        # Constructor (initialize object-specific attributes)
-        self.param1 = param1
-        self.param2 = param2
-        self.filterName = None
-        self._radial_coordinates = None
-
-    def instance_method(self):
-        # Instance method (operates on an instance)
-        return self.param1 + self.param2
-
-    @classmethod
-    def class_method(cls):
-        # Class method (operates on the class)
-        return cls.class_attribute
-    
-    def radial_coordinate(self, shape):
-        '''Generates a 2D array with radial coordinates
-        with according to the first two axis of the
-        supplied shape tuple
-
-        Returns
-        -------
-        R, Rsq
-            Radius 2d matrix (R) and radius squared matrix (Rsq)
-        '''
-        y_len = np.arange(-shape[0]//2, shape[0]//2)
-        x_len = np.arange(-shape[1]//2, shape[1]//2)
-
-        X, Y = np.meshgrid(x_len, y_len)
-
-        Rsq = (X**2 + Y**2)
-
-        self._radial_coordinates = (np.sqrt(Rsq), Rsq)
-
-        return self._radial_coordinates
-    
-    def butterworth_filter(self, shape = (128,128), center = 10, width = 20):
-        '''Generates a Gaussian bandpass filter of shape
-
-            Params
-            -------
-            shape
-                the shape of filter matrix
-            center
-                the center frequency
-            width
-                the filter bandwidth
-
-            Returns
-            -------
-            filter (np.ndarray)
-                the filter in fourier space
-        '''
-        if self._radial_coordinates is None:
-            R, Rsq = self.radial_coordinate(shape)
-        elif self._radial_coordinates[0].shape != shape[:2]:
-            R, Rsq = self.radial_coordinate(shape)
-        else:
-            R, Rsq = self._radial_coordinates
-
-        with np.errstate(divide='ignore', invalid='ignore'):
-            filter = 1 - (1 / (1+((R * width)/(Rsq - center**2))**10))
-            filter[filter == np.inf] = 0
-
-        a, b = np.unravel_index(R.argmin(), R.shape)
-
-        filter[a, b] = 1
-        self.filterName = 'butterWorth'
-        self.filter = filter
-        return filter
-    
-    def gauss_bandpass_filter(self, shape = (128,128), center = 10, width = 20):
-        '''Generates a Gaussian bandpass filter of shape
-
-            Params
-            -------
-            shape
-                the shape of filter matrix
-            center
-                the center frequency
-            width
-                the filter bandwidth
-
-            Returns
-            -------
-            filter (np.ndarray)
-                the filter in fourier space
-        '''
-        if self._radial_coordinates is None:
-            R, Rsq = self.radial_coordinate(shape)
-        elif self._radial_coordinates[0].shape != shape[:2]:
-            R, Rsq = self.radial_coordinate(shape)
-        else:
-            R, Rsq = self._radial_coordinates
-
-        with np.errstate(divide='ignore', invalid='ignore'):
-            filter = np.exp(-((Rsq - center**2)/(R * width))**2)
-            filter[filter == np.inf] = 0
-
-        a, b = np.unravel_index(R.argmin(), R.shape)
-
-        filter[a, b] = 1
-        self.filterName = 'GaussFilter'
-        self.filter = filter
-        return filter
-    
-    def DoGFilter(self, sigma1 = 2.5, sigma2 = 5):
-        self.filterName = 'DoGFilter'
-        self.filter = [sigma1,sigma2]
-        return self.filter
-        
-    def applyFilter(self, image: np.ndarray):
-        '''Applies an FFT bandpass filter to the 2D image.
-
-            Params
-            -------
-            image (np.ndarray)
-                the image to be filtered.
-        '''
-        if self.filterName != 'DoGFilter':
-            rows, cols = image.shape
-            nrows = cv2.getOptimalDFTSize(rows)
-            ncols = cv2.getOptimalDFTSize(cols)
-            nimg = np.zeros((nrows, ncols))
-            nimg[:rows, :cols] = image
-
-            ft = fftshift(cv2.dft(np.float64(nimg), flags=cv2.DFT_COMPLEX_OUTPUT))
-
-            img = np.zeros(nimg.shape, dtype=np.uint8)
-            ft[:, :, 0] *= self.filter
-            ft[:, :, 1] *= self.filter
-            idft = cv2.idft(ifftshift(ft))
-            idft = cv2.magnitude(idft[:, :, 0], idft[:, :, 1])
-            cv2.normalize(
-                idft, img, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-
-            # exex = time.msecsTo(QDateTime.currentDateTime())
-            return img[:rows, :cols]
-        else:
-            #We filter the image twice, with both sigma
-            #The images are converted to float value to ensure negative numbers during subtraction
-            Gauss1FilteredImage = gaussian_filter(im, sigma=self.filter[0]).astype(float);
-            Gauss2FilteredImage = gaussian_filter(im, sigma=self.filter[1]).astype(float);
-            #The difference of Gaussian is calculaed by subtracting the two images
-            return Gauss1FilteredImage-Gauss2FilteredImage
-
+#-------------------------------------------------------------------------------------------------------------------------------
+#Callable functions
+#-------------------------------------------------------------------------------------------------------------------------------
 class pSMLM():
     def __init__(self,core,**kwargs):
-        print(core)
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
-        self.pxsize = core.get_pixel_size_um()*1000
-        
-        self.file = open("SMLM_locs.csv",'w')
-        self.file.write("\"frame\",\"x [nm]\",\"y [nm]\"\n")
-        
-        self.SMLMlocs = []
 
-        print('in RT_counter at time '+str(time.time()))
+        self.SMLMlocs = []
+        self.fullSMLMlocs = []
+        self.dummyValue = 0
+        self.metadatav = []
+        self.currentFrame = 0
+        self.pxsizeum = core.get_pixel_size_um()
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):
+        logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
+        self.dummyValue = np.random.randint(0, 101)
         locPeaks = getLocalPeaks_rawIm(image, int(kwargs['ROIradius']),stdmult=int(kwargs['stdmult']))
-        SMLMlocs_2 = getLocalizationList(locPeaks, image, 4)
-        frameNumber = 0
-        if 'ImageNumber' in metadata:
-            frameNumber = float(metadata['ImageNumber'])
-        else:
-            frameNumber = float(metadata['Axes']['time'])
-    
+        self.SMLMlocs = getLocalizationList(locPeaks, image, 4)*self.pxsizeum
         
-        for i in range(0,len(SMLMlocs_2)):
-            self.file.write(str(int(frameNumber+1))+","+str(SMLMlocs_2[i,0]*self.pxsize)+","+str(SMLMlocs_2[i,1]*self.pxsize)+'\n')
+        #Append to full list with frame info
+        self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+        #Get the headers
+        column_headers = np.hstack([list(self.uniqueEntriesAllDims.keys()), ['x_pos', 'y_pos']])
+        mda_values = []
+        for v in list(self.uniqueEntriesAllDims.keys()):
+            mda_values = np.hstack((mda_values,metadata['Axes'][v]))
+        #Get the columns for the MDA values and append to the current localizations
+        mda_val_column = np.full((self.SMLMlocs.shape[0], 1), mda_values)
+        new_locs_with_mdaVals = np.hstack((mda_val_column, self.SMLMlocs))
+        
+        import pandas as pd
+        if len(self.fullSMLMlocs) == 0:
+            self.fullSMLMlocs = pd.DataFrame(new_locs_with_mdaVals, columns=column_headers)
+        else:
+            new_df = pd.DataFrame(new_locs_with_mdaVals, columns=column_headers)
+            self.fullSMLMlocs = pd.concat([self.fullSMLMlocs, new_df], ignore_index=True)
+        
+        self.lastImage = image
+        self.lastMetadata = metadata
+        logging.info(f'Finishing Updating pSMLM running at time: {time.time()}')
+        logging.info(f"Nr locs: {len(self.SMLMlocs)} ")
+        
+        self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+        mda_values = []
+        for v in list(self.uniqueEntriesAllDims.keys()):
+            mda_values = np.hstack((mda_values,metadata['Axes'][v]))
             
-        print(f"Nr locs: {len(SMLMlocs_2)} ")
-        self.SMLMlocs=SMLMlocs_2
-    def end(self,core,**kwargs):
-        time.sleep(0.1)
-        self.file.close()
-        print('end of pSMLM')
-        return
+        self.currentFrame = metadata['Axes'][v]
+        
+        return f'pSMLM2 result - frame {self.currentFrame}'
     
+    def end(self,core,**kwargs):
+        self.fullSMLMlocs
+        # all_possible_z = set(range(100))  # 0 to 99
+        # existing_z = set(self.fullSMLMlocs['z'].unique())
+        # missing_z = all_possible_z - existing_z
+
+        # print("Missing z values:")
+        # print(sorted(missing_z))
+        return
     
     def visualise_init(self): 
         layerName = 'pSMLM'
         layerType = 'points' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
+        self.firstLayerInit = True
         return layerName,layerType
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        napariLayer.data = self.SMLMlocs[:, [1, 0]].copy()
-        time.sleep(0.05)
-        napariLayer.symbol = 'disc'
-        napariLayer.size = 5
-        napariLayer.edge_color='red'
-        napariLayer.face_color = [0,0,0,0]
-        napariLayer.selected_data = []
-        # napariLayer.data = np.append(napariLayer.data,self.SMLMlocs[:, [1, 0]].copy(),axis=0)
-
+        # create features for each point
+        # features = {
+        #     'outputval': self.currentFrame
+        # }
+        # textv = {
+        #     'string': 'f: {outputval:.0f}',
+        #     'size': 10,
+        #     'color': 'red',
+        #     'translation': np.array([0, 0]),
+        #     'anchor': 'upper_left',
+        # }
+        try:
+            logging.info(f'Starting Updating pSMLM layer at time: {time.time()}')
+            logging.info(f"SMLM locs: {self.SMLMlocs}")
+                # napariLayer.size = 0
+            # napariLayer.data = np.array([[100,100]])
+            # napariLayer.text = text
+            if len(self.SMLMlocs) > 1:
+                logging.info('Actually SMLM loc vissing')
+                napariLayer.data = self.SMLMlocs[:, [1, 0]].copy() #Needs to be transposed
+                time.sleep(0.005)
+            # napariLayer.features = features
+            # napariLayer.text = textv
+            napariLayer.selected_data = []
+            napariLayer.symbol = 'disc'
+            napariLayer.size = 0.5
+            napariLayer.edge_color='red'
+            napariLayer.face_color = [0,0,0,0]
+        except:
+            logging.info(f"Issue with pSMLM layer update")
+        return napariLayer

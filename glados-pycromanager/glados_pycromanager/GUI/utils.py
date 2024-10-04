@@ -2702,24 +2702,26 @@ def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3','v4')
     logging.debug('Attempting to visualise RT Analysis')
-    #And run the .run function:
+    #And run the .visualise function:
     result = eval("RT_analysis_object" + evalText) #type:ignore
     logging.debug(result)
 
     return result
 
 def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
-    wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][0][1].split(".")[0]
+    indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
+    
+    wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
     functionMetadata = eval(wrapperName+".__function_metadata__()")
-    functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][0][1].split(".")[1]]
+    functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
     if runOrVis == 'run':
         if 'run_delay' not in functionMetadata2:
-            delay = 100 #Default value for run
+            delay = 10 #Default value for run
         else:
             delay = functionMetadata2['run_delay']
     elif runOrVis == 'visualise':
         if 'visualise_delay' not in functionMetadata2:
-            delay = 500 #Default value for vis
+            delay = 50 #Default value for vis
         else:
             delay = functionMetadata2['visualise_delay']
     

@@ -26,7 +26,7 @@ def __function_metadata__():
             "help_string": "Examplary method to influence the run",
             "display_name": "Example - influence the run by stopping it at a set frame",
             "run_delay": 0,
-            "visualise_delay": 1000,
+            "visualise_delay": 10,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],

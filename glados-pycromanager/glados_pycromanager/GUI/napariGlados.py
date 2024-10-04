@@ -310,7 +310,8 @@ def napariUpdateAnalysisThreads(DataStructure):
     liveImageLayer = getLayerIdFromName(layerName,napariViewer)
 
     # Check if the queue is empty
-    if image_queue_analysisA.empty():
+    # if image_queue_analysisA.empty():
+    if image_queue_analysisA.qsize() < 3:
         image_queue_analysisA.put_nowait([liveImage,metadata,shared_data])
         #Start all analysisthreads
         for analysisThread in analysisThreads:
@@ -355,15 +356,15 @@ class napariHandler():
         """
         if self.acqstate:
             if self.img_queue.qsize() < 3:
-                self.img_queue.put([image,metadata])
+                self.img_queue.put_nowait([image,metadata])
                 
             #Loop over all queues in shared_data.liveImageQueues and also append the image there:
             for queue in self.shared_data.liveImageQueues:
                 if queue.qsize() < 2:
-                    queue.put([image,metadata])
+                    queue.put_nowait([image,metadata])
                         
             if self.image_queue_analysis.qsize() < 3:
-                self.image_queue_analysis.put([image,metadata])
+                self.image_queue_analysis.put_nowait([image,metadata])
             
         else:
             logging.info('Broke off live mode')
@@ -401,15 +402,15 @@ class napariHandler():
                 metadata['Axes']=axes
                 logging.debug(f'grab_image_savedfn called in napariHandler read image: {dataset}, axes: {axes}, metadata: {metadata}')
                 if self.img_queue.qsize() < 3:
-                    self.img_queue.put([image,metadata])
+                    self.img_queue.put_nowait([image,metadata])
                     
                 #Loop over all queues in shared_data.liveImageQueues and also append the image there:
                 for queue in self.shared_data.liveImageQueues:
                     if queue.qsize() < 2:
-                        queue.put([image,metadata])
+                        queue.put_nowait([image,metadata])
                             
                 if self.image_queue_analysis.qsize() < 3:
-                    self.image_queue_analysis.put([image,metadata])
+                    self.image_queue_analysis.put_nowait([image,metadata])
             
         else:
             logging.info('Broke off live mode')
@@ -551,12 +552,14 @@ class napariHandler():
         img_queue = parent.img_queue
         while self.acqstate:
             time.sleep(self.sleep_time)
-            logging.debug('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
+            
+            # logging.debug('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(img_queue.qsize()))
+            
             # get elements from queue while there is more than one element
             # playing it safe: I'm always leaving one element in the queue
             while img_queue.qsize() > 0:
                 DataStructure = {}
-                DataStructure['data'] = img_queue.get()
+                DataStructure['data'] = img_queue.get_nowait()
                 DataStructure['napariViewer'] = self.shared_data.napariViewer
                 DataStructure['acqState'] = self.acqstate
                 DataStructure['core'] = self.shared_data.core
@@ -571,7 +574,7 @@ class napariHandler():
         # read out last remaining element(s) after end of acquisition
         while img_queue.qsize() > 0:
             DataStructure = {}
-            DataStructure['data'] = img_queue.get()
+            DataStructure['data'] = img_queue.get_nowait()
             DataStructure['napariViewer'] = self.shared_data.napariViewer
             DataStructure['acqState'] = self.acqstate
             DataStructure['core'] = self.shared_data.core

@@ -289,8 +289,13 @@ class MMConfigUI(CustomMainWindow):
                 else:
                     self.iconFolder = ''
         except:
-            logging.error("No glados_pycromanager package found")
-            self.iconFolder = ''
+            try:
+                import utils
+                self.iconFolder = utils.findIconFolder()
+            except:
+                logging.error("No glados_pycromanager package found")
+                self.iconFolder = ''
+                pass
         
         
         if showLiveSnapExposureButtons:

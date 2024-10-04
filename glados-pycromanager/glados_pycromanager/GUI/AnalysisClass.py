@@ -357,6 +357,7 @@ class AnalysisThread(QThread):
         Returns:
             None
         """
+        logging.info('2image_queue_analysis')
         while not self.isInterruptionRequested():
             #Run analysis on the image from the queue
             # logging.debug(self.image_queue_analysis.get())
@@ -582,6 +583,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.sleepTimeMs = delay
         self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS')
         self.visualisation_queue = queue.Queue()
+        
         #And start  the thread
         self.running = True
         logging.debug('Init AnalysisThread_customFunction_Visualisation')
@@ -589,22 +591,22 @@ class AnalysisThread_customFunction_Visualisation(QThread):
     
     def run(self):
         while self.running:
-            logging.debug('Run AnalysisThread_customFunction_Visualisation')
-            logging.debug('Attempting to take from queue')
-            logging.debug('Queue size: {}'.format(self.visualisation_queue.qsize()))
-            logging.debug(f"sleeptime: {self.sleepTimeMs}")
-            time.sleep(self.sleepTimeMs/1000.0)
+            # logging.debug('Run AnalysisThread_customFunction_Visualisation')
+            # logging.debug('Attempting to take from queue')
+            # logging.debug('Queue size: {}'.format(self.visualisation_queue.qsize()))
+            # logging.debug(f"sleeptime: {self.sleepTimeMs}")
             if not self.visualisation_queue.empty():
-                data = self.visualisation_queue.get()
+                data = self.visualisation_queue.get_nowait()
                 RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
                 logging.debug('Ran updateVisualisation with RT analysis object')
                 self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
+                self.visualisation_queue.task_done()
+            time.sleep(self.sleepTimeMs/1000.0)
             
     
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
-        print('abcdef')
-        utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
+        res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
 
 #This code gets some image and does some analysis on this
 class AnalysisThread_customFunction(QThread):
@@ -638,6 +640,7 @@ class AnalysisThread_customFunction(QThread):
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
         logging.debug('sarted AnalysisThread_customFunction')
         self.initAnalysis()
+        self.running = True
         
         # self.analysis_done_signal.connect(self.update_napariLayer)
         # if self.analysisInfo == 'CellSegmentOverlay':
@@ -669,14 +672,33 @@ class AnalysisThread_customFunction(QThread):
         Returns:
             None
         """
+        # logging.debug('self.image_queue_analysis.get()')
+        
+        #This part was an adventure and works, but I think I leave the old method (pre-okt 2024) in case it's doing something I'm unaware off.
+        # while self.running:
+        #     if not self.image_queue_analysis.empty():
+        #         logging.info('Performing analysisThread analysis')
+        #         self.analysis_result = self.runAnalysis(self.image_queue_analysis.get_nowait()) #type:ignore
+        #         self.analysis_done_signal.emit(self.analysis_result)
+        #         self.image_queue_analysis.task_done()
+            
+        #     time.sleep(max(10,self.sleepTimeMs)/1000.0)
+                
+        #     if self.is_running == False:
+        #         # self.finished.emit()
+        #         self.running=False
+        #         return
+        #     if self.isInterruptionRequested():
+        #         self.running = False
+        #         return
+        # -- end of 'this part...'
+        
         while not self.isInterruptionRequested():
             #Run analysis on the image from the queue
-            # logging.debug(self.image_queue_analysis.get())
             self.analysis_result = self.runAnalysis(self.image_queue_analysis.get()) #type:ignore
             self.analysis_done_signal.emit(self.analysis_result)
-            # self.finished.emit()
+            self.image_queue_analysis.task_done() #type:ignore
             if self.is_running == False:
-                # self.finished.emit()
                 return
         
         # Thread has finished, emit the finished signal
@@ -808,16 +830,21 @@ class AnalysisThread_customFunction(QThread):
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,shared_data=None,core=None):
         self.msleep(self.sleepTimeMs)
-        result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core,nodzInfo=self.nodzInfo)
+        
+        #We are absolutely not allowed to access the core during the real-time analysis running.
+        result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,shared_data,None,nodzInfo=self.nodzInfo)
+        
+        logging.info(f"Analysis on Image done with result: {result}")
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
-            if self.visualisationObject.visualisation_queue.empty():
+            # if self.visualisationObject.visualisation_queue.empty():
+            if self.visualisationObject.visualisation_queue.qsize() < 3:
+                # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
-                self.visualisationObject.visualisation_queue.put(data)
+                self.visualisationObject.visualisation_queue.put_nowait(data)
                 logging.debug('Put data in visualisation_queue!')
-                # self.visualisationObject.process_queue()
         
         return result
     
@@ -883,8 +910,8 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     #Instantiate an analysis thread and add a signal
     analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
         
-    analysis_thread.finished.connect(analysis_thread.deleteLater)
     analysis_thread.start()
+    analysis_thread.finished.connect(analysis_thread.deleteLater)
     
     #Append it to the list of analysisThreads
     shared_data.analysisThreads.append(analysis_thread)

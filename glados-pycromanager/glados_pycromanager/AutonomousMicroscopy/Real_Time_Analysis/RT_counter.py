@@ -11,7 +11,7 @@ import math
 import numpy as np
 import inspect
 import dask.array as da
-import time
+import time, logging
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -27,7 +27,7 @@ def __function_metadata__():
             "help_string": "RT counter.",
             "display_name": "RT counter",
             "run_delay": 0,
-            "visualise_delay": 100,
+            "visualise_delay": 12,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
@@ -42,36 +42,44 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 class RealTimeCounter():
     def __init__(self,core,**kwargs):
-        print('INITIALISING COUNTER REAL-TIME ANALYSIS')
-        print(core)
+        logging.info('INITIALISING COUNTER REAL-TIME ANALYSIS')
+        # print(core)
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
 
-        print('in RT_counter at time '+str(time.time()))
+        logging.info('in RT_counter at time '+str(time.time()))
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):
-        print('RUNNING COUNTER REAL-TIME ANALYSIS')
+        logging.info('RUNNING COUNTER REAL-TIME ANALYSIS')
         if 'ImageNumber' in metadata:
             self.currentValue = metadata['ImageNumber']
-            print("At frame: "+metadata['ImageNumber'])
+            logging.info("At frame: "+metadata['ImageNumber'])
         else:
-            self.currentValue = metadata['Axes']['time']
-            print("At axis-time: "+str(metadata['Axes']['time']))
+            #Append to full list with frame info
+            import utils
+            self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+            mda_values = []
+            for v in list(self.uniqueEntriesAllDims.keys()):
+                mda_values = np.hstack((mda_values,metadata['Axes'][v]))
+                
+            self.currentValue = metadata['Axes'][v]
+            logging.info(f"At axis-{v}: "+str(metadata['Axes'][v]))
     
     def end(self,core,**kwargs):
-        print('ENDING COUNTER REAL-TIME ANALYSIS')
+        logging.info('ENDING COUNTER REAL-TIME ANALYSIS')
         return
     
     def visualise_init(self): 
-        print('INITIALISING VISUALISATION COUNTER REAL-TIME ANALYSIS')
+        logging.info('INITIALISING VISUALISATION COUNTER REAL-TIME ANALYSIS')
         layerName = 'RT counter'
         layerType = 'points' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
+        self.firstLayerInit = True
         return layerName,layerType
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        print('RUNNING VISUALISATION COUNTER REAL-TIME ANALYSIS')
+        logging.info('RUNNING VISUALISATION COUNTER REAL-TIME ANALYSIS')
         features = {
             'outputval': self.currentValue
         }
@@ -82,9 +90,13 @@ class RealTimeCounter():
             'translation': np.array([0, 0]),
             'anchor': 'upper_left',
         }
-        napariLayer.data = [0, 256]
         napariLayer.features = features
-        napariLayer.text = textv
-        napariLayer.symbol = 'disc'
-        napariLayer.size = 0
-        napariLayer.selected_data = []
+        
+        if self.firstLayerInit:
+        #Only change if really needed:
+            napariLayer.data = [0, 0]
+            napariLayer.text = textv
+            napariLayer.symbol = 'disc'
+            napariLayer.size = 0
+            napariLayer.selected_data = []
+            self.firstLayerInit = False

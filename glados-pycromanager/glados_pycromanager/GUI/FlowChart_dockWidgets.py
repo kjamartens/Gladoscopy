@@ -1471,24 +1471,8 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         
         self.fullRunOngoing = False
         
-        try:
-            import glados_pycromanager
-            # Get the installation path of the package
-            package_path = os.path.dirname(glados_pycromanager.__file__)
-            # Construct the path to the Icons folder
-            self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
-        except:
-            self.iconFolder = ''
-        if not os.path.exists(self.iconFolder) or self.iconFolder == '':
-            #Find the iconPath folder
-            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-                self.iconFolder = './glados_pycromanager/GUI/Icons/'
-            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-                self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-            else:
-                self.iconFolder = ''
-            
-            
+        self.iconFolder = utils.findIconFolder()
+        
         self.buttonsArea = QVBoxLayout()
         
         #Add a hbox with warning icons, and set them to be grayscale/inactive:
