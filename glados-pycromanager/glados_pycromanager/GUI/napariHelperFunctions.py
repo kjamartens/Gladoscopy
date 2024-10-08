@@ -55,13 +55,57 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
         logging.debug('updating layer')
         layer = napariViewer.layers[layerId[0]]
         if layer.data.ndim == 2:
-            new_data = np.expand_dims(layer.data, axis=0)
-            new_data = np.append(new_data, image_data[np.newaxis, :, :], axis=0)
-            layer.data = new_data
-            logging.debug('NP-expanded layer')
+            new_data = np.zeros((2,layer.data.shape[0],layer.data.shape[1]))
+            new_data[0,:,:] = layer.data
+            new_data[1,:,:] = image_data
         else:
-            newdata = np.append(layer.data,image_data,axis=0)
-            layer.data = newdata
+            new_data = np.append(layer.data,image_data[np.newaxis, :, :],axis=0)
+        layer_old = layer
+        layer_name = layer.name
+        
+        #Remove the current layer:
+        #And add a new one with the old name etc:
+        layer = napariViewer.add_image(new_data)
+        layer.opacity = layer_old.opacity
+        layer.contrast_limits = layer_old.contrast_limits
+        layer._keep_auto_contrast = layer_old._keep_auto_contrast
+        layer.rendering = layer_old.rendering
+        layer.colormap = layer_old.colormap
+        layer.scale = layer_old.scale
+        layer.scale_factor = layer_old.scale_factor
+        layer.translate = layer_old.translate
+        layer.gamma = layer_old.gamma
+        layer.iso_threshold = layer_old.iso_threshold
+        layer.blending = layer_old.blending
+        layer.attenuation = layer_old.attenuation
+        
+        #remove old on
+        napariViewer.layers.remove(layer_old)
+        
+        #Give the new one the old one's name
+        layer.name = layer_name
+        # else:
+        #     layer.data = np.append(layer.data,image_data[np.newaxis, :, :],axis=0)
+        
+        #     #Fully recreate the layer. Seems to work but boy that's some odd way of handling this.
+        #     layer_old = layer
+        #     napariViewer.layers.remove(layer)
+        #     layer = napariViewer.add_image(layer.data)
+        #     layer_name = layer_old.name
+        #     layer.opacity = layer_old.opacity
+        #     layer.contrast_limits = layer_old.contrast_limits
+        #     layer._keep_auto_contrast = layer_old._keep_auto_contrast
+        #     layer.rendering = layer_old.rendering
+        #     layer.colormap = layer_old.colormap
+        #     layer.scale = layer_old.scale
+        #     layer.scale_factor = layer_old.scale_factor
+        #     layer.translate = layer_old.translate
+        #     layer.gamma = layer_old.gamma
+        #     layer.iso_threshold = layer_old.iso_threshold
+        #     layer.blending = layer_old.blending
+        #     layer.attenuation = layer_old.attenuation
+        #     layer.name = layer_name
+            
         current_slice = layer.data.shape[0]
         napariViewer.dims.set_current_step(0,current_slice)
         
