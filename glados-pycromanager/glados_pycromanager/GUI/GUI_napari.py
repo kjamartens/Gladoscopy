@@ -85,6 +85,78 @@ class Worker(QObject):
         runNapariPycroManager(core, MM_JSON, shared_data,includecustomUI=includeCustomUI)
         self.finished.emit()
 
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
+class headlessGUI(QWidget):
+    """
+    Small GUI for user input on a headless Pycromanager start
+    """
+    def __init__(self, shared_data):
+        super().__init__()
+        self.shared_data = shared_data
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle('Glados-PycroManager-Napari GUI')
+        self.setGeometry(100, 100, 300, 200)
+
+        self.backendLabel = QLabel('Backend:', self)
+
+        self.pythonRadio = QRadioButton('Python (recommended)', self)
+        self.javaRadio = QRadioButton('Java', self)
+        self.pythonRadio.setChecked(True)
+
+        self.buttonGroup = QButtonGroup()
+        self.buttonGroup.addButton(self.pythonRadio)
+        self.buttonGroup.addButton(self.javaRadio)
+
+        self.mm_app_pathLabel = QLabel('MM App Path:', self)
+        self.mm_app_pathLineEdit = QLineEdit("C:\\Users\\kjamartens\\Documents\\Software\\Micro-Manager-2.0\\", self)
+
+        self.config_fileLabel = QLabel('Config File:', self)
+        self.config_fileLineEdit = QLineEdit("C:\\Users\\kjamartens\\Documents\\Software\\Micro-Manager-2.0\\MMConfig_CamDisk.cfg", self)
+
+        self.buffer_size_mbLabel = QLabel('Buffer Size MB:', self)
+        self.buffer_size_mbLineEdit = QLineEdit("2048", self)
+
+        self.max_memory_mbLabel = QLabel('Max Memory MB:', self)
+        self.max_memory_mbLineEdit = QLineEdit("10000", self)
+
+        self.startButton = QPushButton('Start', self)
+        self.startButton.clicked.connect(self.start)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.backendLabel)
+        layout.addWidget(self.pythonRadio)
+        layout.addWidget(self.javaRadio)
+        layout.addWidget(self.mm_app_pathLabel)
+        layout.addWidget(self.mm_app_pathLineEdit)
+        layout.addWidget(self.config_fileLabel)
+        layout.addWidget(self.config_fileLineEdit)
+        layout.addWidget(self.buffer_size_mbLabel)
+        layout.addWidget(self.buffer_size_mbLineEdit)
+        layout.addWidget(self.max_memory_mbLabel)
+        layout.addWidget(self.max_memory_mbLineEdit)
+        layout.addWidget(self.startButton)
+
+        self.setLayout(layout)
+        self.show()
+
+    def start(self):
+        self.backend = 'Python' if self.pythonRadio.isChecked() else 'JAVA'
+        self.mm_app_path = self.mm_app_pathLineEdit.text()
+        self.config_file = self.config_fileLineEdit.text()
+        self.buffer_size_mb = self.buffer_size_mbLineEdit.text()
+        self.max_memory_mb = self.max_memory_mbLineEdit.text()
+
+        # start_headless(mm_app_path=mm_app_path, config_file=config_file, python_backend=self.backend=='Python', buffer_size_mb=int(buffer_size_mb), max_memory_mb=int(max_memory_mb))
+        # self.shared_data._headless = True
+        # print('headless MM started')
+        # self.core = Core()
+        
+        self.close()
+
+
+
 def main():
     """
     Run the main function to start Glados-PycroManager-Napari interface for autonomous microscopy.
@@ -106,6 +178,13 @@ def main():
     shared_data = Shared_data()
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
         
+    #Some QT attributes
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
+    QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
+    
     # get object representing MMCore, used throughout
     #try to open a running instance:
     try:
@@ -113,14 +192,21 @@ def main():
         shared_data.core = core
         shared_data._headless = False
     except:
-        #else, create a new headless instance:
-        print('Starting headless MM')
-        start_headless(mm_app_path= "C:\\Program Files\\Micro-Manager-2.0gamma\\", config_file="C:\\Users\\SMIPC2\\Desktop\\MM-config\\MMconfig_20240103c.cfg", python_backend=False, buffer_size_mb=2048, max_memory_mb=10000)
-        shared_data._headless = True
-        print('headless MM started')
+        #Create a small GUI for settings
+        appSmall = QApplication([])
+        headlessGUIv = headlessGUI(shared_data)
+        appSmall.exec_()
+        
+        #Get those settings and use to start headless
+        start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
         core = Core()
+        print('headless MM started')
+        
+        #Also store some settings in shared_data
+        shared_data._headless = True
+        shared_data.backend = headlessGUIv.backend
         shared_data.core = core
-
+    
     #Open JSON file with MM settings
     try:
         with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
@@ -129,11 +215,6 @@ def main():
         MM_JSON = None
         
         
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtCore import Qt
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
-    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
-    QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
     app = QApplication(sys.argv)
 
     worker = Worker()

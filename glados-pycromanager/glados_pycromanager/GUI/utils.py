@@ -973,7 +973,13 @@ class XYGridManager():
         self.grid_n_rows = 1
         self.grid_n_cols = 1
         
-        self.gridEntries = np.array([[self.core.get_xy_stage_position().x,self.core.get_xy_stage_position().y]]) #Need to be e.g.np.array([
+        try:
+            #Python backend
+            self.core.this == self.core
+            self.gridEntries = np.array([[self.core.get_xy_position()[0],self.core.get_xy_position()[1]]])
+        except:
+            #JAVA backend
+            self.gridEntries = np.array([[self.core.get_xy_stage_position().x,self.core.get_xy_stage_position().y]]) #Need to be e.g.np.array([
                             #     [100.5, 200.3],
                             #     [150.2, 250.7],
                             #     [200.8, 300.1],

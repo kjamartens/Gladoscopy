@@ -3532,7 +3532,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         #Config values, all configs
         allConfigs = self.core.get_available_config_groups()
         if allConfigs != None:
-            nrconfiggroups = allConfigs.size()
+            if self.shared_data.backend == 'JAVA':
+                nrconfiggroups = allConfigs.size()
+            elif self.shared_data.backend == 'Python':
+                nrconfiggroups = len(allConfigs)
             for config_id in range(nrconfiggroups):
                 configInfo = ConfigInfo(self.core,config_id)
                 configName = configInfo.configGroupName()
@@ -3545,7 +3548,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             
         #Pixel size, ROI size
         self.createSingleCoreVar('Pixel_size_um',self.core.get_pixel_size_um(),[float]) #type:ignore
-        self.createSingleCoreVar('ROI_size',[self.core.get_roi().width,self.core.get_roi().height],[list,np.ndarray]) #type:ignore
+        if self.shared_data.backend == 'JAVA':
+            self.createSingleCoreVar('ROI_size',[self.core.get_roi().width,self.core.get_roi().height],[list,np.ndarray]) #type:ignore
+        elif self.shared_data.backend == 'Python':
+            self.createSingleCoreVar('ROI_size',[self.core.get_roi()[2],self.core.get_roi()[3]],[list,np.ndarray]) #type:ignore
     
     def createSingleCoreVar(self,name,data,type,importance='Informative'):
         self.coreVariables[name] = {} 

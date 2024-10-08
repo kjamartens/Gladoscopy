@@ -65,9 +65,13 @@ def napariUpdateLive(DataStructure):
     """
     
     #TODO: Make this an advanced variable or so. 
-    display_update_time = 0.1 #0.05
+    #JAVA is way slower so needs this longer update time of the display
+    if shared_data.backend == 'JAVA':
+        display_update_time = 0.1 #0.05
+    elif shared_data.backend == 'Python':
+        display_update_time = 0.05
     
-    if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50ms ago already update live mode? don't display live then.
+    if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50-100ms ago already update live mode? don't display live then.
         return
     
     napariViewer = DataStructure['napariViewer']
@@ -355,16 +359,16 @@ class napariHandler():
                 metadata: metadata from micromanager
         """
         if self.acqstate:
-            if self.img_queue.qsize() < 3:
-                self.img_queue.put_nowait([image,metadata])
+            if self.img_queue.qsize() < 1:
+                self.img_queue.put([image,metadata])
                 
             #Loop over all queues in shared_data.liveImageQueues and also append the image there:
             for queue in self.shared_data.liveImageQueues:
                 if queue.qsize() < 2:
-                    queue.put_nowait([image,metadata])
+                    queue.put([image,metadata])
                         
-            if self.image_queue_analysis.qsize() < 3:
-                self.image_queue_analysis.put_nowait([image,metadata])
+            if self.image_queue_analysis.qsize() < 2:
+                self.image_queue_analysis.put([image,metadata])
             
         else:
             logging.info('Broke off live mode')
@@ -388,12 +392,12 @@ class napariHandler():
         if self.acqstate:
             #Check if there is any reason to read the image:
             reasonToReadImage = False
-            if self.img_queue.qsize() < 3:
+            if self.img_queue.qsize() < 2:
                 reasonToReadImage = True
             for queue in self.shared_data.liveImageQueues:
                 if queue.qsize() < 2:
                     reasonToReadImage = True
-            if self.image_queue_analysis.qsize() < 3:
+            if self.image_queue_analysis.qsize() < 2:
                 reasonToReadImage = True
             
             if reasonToReadImage:
@@ -401,16 +405,16 @@ class napariHandler():
                 metadata = {}
                 metadata['Axes']=axes
                 logging.debug(f'grab_image_savedfn called in napariHandler read image: {dataset}, axes: {axes}, metadata: {metadata}')
-                if self.img_queue.qsize() < 3:
-                    self.img_queue.put_nowait([image,metadata])
+                if self.img_queue.qsize() < 2:
+                    self.img_queue.put([image,metadata])
                     
                 #Loop over all queues in shared_data.liveImageQueues and also append the image there:
                 for queue in self.shared_data.liveImageQueues:
                     if queue.qsize() < 2:
-                        queue.put_nowait([image,metadata])
+                        queue.put([image,metadata])
                             
-                if self.image_queue_analysis.qsize() < 3:
-                    self.image_queue_analysis.put_nowait([image,metadata])
+                if self.image_queue_analysis.qsize() < 2:
+                    self.image_queue_analysis.put([image,metadata])
             
         else:
             logging.info('Broke off live mode')
@@ -559,7 +563,7 @@ class napariHandler():
             # playing it safe: I'm always leaving one element in the queue
             while img_queue.qsize() > 0:
                 DataStructure = {}
-                DataStructure['data'] = img_queue.get_nowait()
+                DataStructure['data'] = img_queue.get()
                 DataStructure['napariViewer'] = self.shared_data.napariViewer
                 DataStructure['acqState'] = self.acqstate
                 DataStructure['core'] = self.shared_data.core
@@ -574,7 +578,7 @@ class napariHandler():
         # read out last remaining element(s) after end of acquisition
         while img_queue.qsize() > 0:
             DataStructure = {}
-            DataStructure['data'] = img_queue.get_nowait()
+            DataStructure['data'] = img_queue.get()
             DataStructure['napariViewer'] = self.shared_data.napariViewer
             DataStructure['acqState'] = self.acqstate
             DataStructure['core'] = self.shared_data.core

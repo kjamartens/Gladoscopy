@@ -281,9 +281,14 @@ class ChannelList(InteractiveListWidget):
             #Currently selected channel: self.parentWidget.channelDropdown.currentText()
             #Find the corresponding options:
             currentChannel = self.parentWidget.channelDropdown.currentText()
-            nrConfigs = self.parentWidget.core.get_available_configs(currentChannel).size()
-            for i in range(nrConfigs):
-                newdropbox.addItem(self.parentWidget.core.get_available_configs(currentChannel).get(i))
+            if self.parentWidget.shared_data.backend == 'JAVA':
+                nrConfigs = self.parentWidget.core.get_available_configs(currentChannel).size()
+                for i in range(nrConfigs):
+                    newdropbox.addItem(self.parentWidget.core.get_available_configs(currentChannel).get(i))
+            elif self.parentWidget.shared_data.backend == 'Python':
+                nrConfigs = len(self.parentWidget.core.get_available_configs(currentChannel))
+                for i in range(nrConfigs):
+                    newdropbox.addItem(self.parentWidget.core.get_available_configs(currentChannel)[i])
             if channelEntry is not None:
                 try:
                     newdropbox.setCurrentText(channelEntry)
@@ -870,7 +875,10 @@ class MDAGlados(CustomMainWindow):
         self.channelDropdown = QComboBox()
         
         #Figure out from all config groups which ones are "dropdown"
-        nrconfiggroups = self.core.get_available_config_groups().size()
+        if self.shared_data.backend == 'JAVA':
+            nrconfiggroups = self.core.get_available_config_groups().size()
+        elif self.shared_data.backend == 'Python':
+            nrconfiggroups = len(self.core.get_available_config_groups())
         allConfigGroups={}
         for config_group_id in range(nrconfiggroups):
             allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
@@ -1023,28 +1031,40 @@ class MDAGlados(CustomMainWindow):
     
     def getDevicesOfDeviceType(self,devicetype):
         """
-        Find all devices that have a specific devicetype.
-        
-        Args:
-            devicetype (str): The type of device to search for. Refer to https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html for all devicetypes.
-        
-        Returns:
-            list: A list of devices that match the specified devicetype.
-        """
-        
         #Find all devices that have a specific devicetype
         #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
         #for all devicetypes
+        """
         #Get devices
-        devices = self.core.get_loaded_devices()
-        devices = [devices.get(i) for i in range(devices.size())]
-        devicesOfType = []
-        #Loop over devices
-        for device in devices:
-            if self.core.get_device_type(device).to_string() == devicetype:
-                logging.debug("found " + device + " of type " + devicetype)
-                devicesOfType.append(device)
-        return devicesOfType
+        devices = self.core.get_loaded_devices() #type:ignore
+        if self.shared_data.backend == 'Python':
+            devices = [devices[i] for i in range(len(devices))]
+            devicesOfType = []
+            deviceTypeArray = {}
+            deviceTypeArray[2] = 'CameraDevice'
+            deviceTypeArray[3] = 'ShutterDevice'
+            deviceTypeArray[4] = 'StateDevice'
+            deviceTypeArray[5] = 'StageDevice'
+            deviceTypeArray[6] = 'XYStageDevice'
+            deviceTypeArray[9] = 'AutoFocusDevice'
+            deviceTypeArray[10] = 'CoreDevice'
+            deviceTypeArray[15] = 'HubDevice'
+            #Loop over devices
+            for device in devices:
+                device_found_type = deviceTypeArray[self.core.get_device_type(device)]
+                if device_found_type == devicetype: #type:ignore
+                    logging.debug("found " + device + " of type " + devicetype)
+                    devicesOfType.append(device)
+            return devicesOfType
+        elif self.shared_data.backend == 'JAVA':
+            devices = [devices.get(i) for i in range(devices.size())]
+            devicesOfType = []
+            #Loop over devices
+            for device in devices:
+                if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
+                    logging.debug("found " + device + " of type " + devicetype)
+                    devicesOfType.append(device)
+            return devicesOfType
     
     def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice = None):
         """

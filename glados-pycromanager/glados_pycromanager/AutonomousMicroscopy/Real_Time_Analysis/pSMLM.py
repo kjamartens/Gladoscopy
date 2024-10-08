@@ -129,7 +129,7 @@ class pSMLM():
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):
-        logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
+        # logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
         self.dummyValue = np.random.randint(0, 101)
         locPeaks = getLocalPeaks_rawIm(image, int(kwargs['ROIradius']),stdmult=int(kwargs['stdmult']))
         self.SMLMlocs = getLocalizationList(locPeaks, image, 4)*self.pxsizeum
@@ -154,8 +154,8 @@ class pSMLM():
         
         self.lastImage = image
         self.lastMetadata = metadata
-        logging.info(f'Finishing Updating pSMLM running at time: {time.time()}')
-        logging.info(f"Nr locs: {len(self.SMLMlocs)} ")
+        # logging.info(f'Finishing Updating pSMLM running at time: {time.time()}')
+        # logging.info(f"Nr locs: {len(self.SMLMlocs)} ")
         
         self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
         mda_values = []
@@ -195,13 +195,13 @@ class pSMLM():
         #     'anchor': 'upper_left',
         # }
         try:
-            logging.info(f'Starting Updating pSMLM layer at time: {time.time()}')
-            logging.info(f"SMLM locs: {self.SMLMlocs}")
+            # logging.info(f'Starting Updating pSMLM layer at time: {time.time()}')
+            # logging.info(f"SMLM locs: {self.SMLMlocs}")
                 # napariLayer.size = 0
             # napariLayer.data = np.array([[100,100]])
             # napariLayer.text = text
             if len(self.SMLMlocs) > 1:
-                logging.info('Actually SMLM loc vissing')
+                # logging.info('Actually SMLM loc vissing')
                 napariLayer.data = self.SMLMlocs[:, [1, 0]].copy() #Needs to be transposed
                 time.sleep(0.005)
             # napariLayer.features = features

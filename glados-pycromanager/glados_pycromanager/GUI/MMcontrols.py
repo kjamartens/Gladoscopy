@@ -61,15 +61,24 @@ class ConfigInfo:
         """
         Returns the config group name
         """
-        return self.core.get_available_config_groups().get(self.config_group_id)
+        if shared_data.backend == 'JAVA':
+            return self.core.get_available_config_groups().get(self.config_group_id)
+        elif shared_data.backend == 'Python':
+            return self.core.get_available_config_groups()[self.config_group_id]
     
     def nrConfigs(self):
         """Returns the number of config options for this config group"""
-        return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).size()
+        if shared_data.backend == 'JAVA':
+            return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).size()
+        elif shared_data.backend == 'Python':
+            return len(self.core.get_available_configs(self.core.get_available_config_groups()[self.config_group_id]))
     
     def configName(self,config_id):
         """Returns the name of the config within the config group"""
-        return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).get(config_id)
+        if shared_data.backend == 'JAVA':   
+            return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).get(config_id)
+        elif shared_data.backend == 'Python':
+            return self.core.get_available_configs(self.core.get_available_config_groups()[self.config_group_id])[config_id]
     
     def deviceNameProperty_fromVerbose(self):
         """Returns the first device name and property from Verbose"""
@@ -85,7 +94,10 @@ class ConfigInfo:
     def hasPropertyLimits(self):
         """Returns whether the config group has property limits"""
         #Get the verbose info from the config group state
-        verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
+        if shared_data.backend == 'JAVA':
+            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
+        elif shared_data.backend == 'Python':
+            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).getVerbose()
         #Determine the number of devices in the verbose info
         nrDevicesFromVerbose = verboseInfoCurrentConfigGroup.count('<br>')
         if nrDevicesFromVerbose == 1 and self.nrConfigs() == 1:
@@ -124,10 +136,16 @@ class ConfigInfo:
             #If there is exactly one option...
             if self.nrConfigs() == 1:
                 #And the option is 'NewPreset', it means there are no presets specified
-                if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
-                    return False
-                else:
-                    return True
+                if shared_data.backend == 'JAVA':
+                    if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
+                        return False
+                    else:
+                        return True
+                elif shared_data.backend == 'Python':
+                    if self.core.get_available_configs(self.configGroupName())[0] == 'NewPreset':
+                        return False
+                    else:
+                        return True
         
     def isSlider(self):
         """Returns Boolean whether the config group should be represented as a slider"""
@@ -146,15 +164,26 @@ class ConfigInfo:
         else:
             #If there is exactly one option...
             if self.nrConfigs() == 1:
-                #And the option is 'NewPreset', it means there are no presets specified
-                if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
-                    #check if it's not a slider...
-                    if self.hasPropertyLimits():
-                        return False
+                if shared_data.backend == 'JAVA':
+                    #And the option is 'NewPreset', it means there are no presets specified
+                    if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
+                        #check if it's not a slider...
+                        if self.hasPropertyLimits():
+                            return False
+                        else:
+                            return True
                     else:
-                        return True
-                else:
-                    return False
+                        return False
+                elif shared_data.backend == 'Python':
+                    #And the option is 'NewPreset', it means there are no presets specified
+                    if self.core.get_available_configs(self.configGroupName())[0] == 'NewPreset':
+                        #check if it's not a slider...
+                        if self.hasPropertyLimits():
+                            return False
+                        else:
+                            return True
+                    else:
+                        return False
 
     def helpStringInfo(self):
         """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
@@ -178,7 +207,10 @@ class ConfigInfo:
         if self.isSlider():
             #A slider config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.configGroupName()
-            underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
+            if shared_data.backend == 'JAVA':
+                underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
+            elif shared_data.backend == 'Python':
+                underlyingProperty = self.core.get_available_configs(configGroupName)[0]
             configdata = self.core.get_config_data(configGroupName,underlyingProperty)
             device_label = configdata.get_setting(0).get_device_label()
             property_name = configdata.get_setting(0).get_property_name()
@@ -189,7 +221,10 @@ class ConfigInfo:
         if self.isInputField():
             #An input field config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.configGroupName()
-            underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
+            if shared_data.backend == 'JAVA':
+                underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
+            elif shared_data.backend == 'Python':
+                underlyingProperty = self.core.get_available_configs(configGroupName)[0]
             configdata = self.core.get_config_data(configGroupName,underlyingProperty)
             device_label = configdata.get_setting(0).get_device_label()
             property_name = configdata.get_setting(0).get_property_name()
@@ -669,9 +704,14 @@ class MMConfigUI(CustomMainWindow):
         #Snap an image
         shared_data.core.snap_image()
         #Get the just-snapped image
-        newImage = shared_data.core.get_tagged_image()
-        snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.tags["Height"],newImage.tags["Width"]))
-        snapLayer.data = np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
+        if shared_data.backend == 'Python':
+            newImage = shared_data.core.get_image()
+            snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.shape[0],newImage.shape[1]))
+            snapLayer.data = newImage
+        elif shared_data.backend == 'JAVA':
+            newImage = shared_data.core.get_tagged_image()
+            snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.tags["Height"],newImage.tags["Width"]))
+            snapLayer.data = np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
         #Move the layer to top
         moveLayerToTop(napariViewer,'Snap')
         return
@@ -685,10 +725,16 @@ class MMConfigUI(CustomMainWindow):
         #Snap an image
         shared_data.core.snap_image()
         #Get the just-snapped image
-        newImage = shared_data.core.get_tagged_image()
         
-        #And add to the 'Album' layer
-        addToExistingOrNewLayer(napariViewer,'Album',np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]]),shared_data_throughput = shared_data)
+        
+        if shared_data.backend == 'Python':
+            newImage = shared_data.core.get_image()
+            addToExistingOrNewLayer(napariViewer,'Album',newImage,shared_data_throughput = shared_data)
+        elif shared_data.backend == 'JAVA':
+            newImage = shared_data.core.get_tagged_image()
+            #And add to the 'Album' layer
+            addToExistingOrNewLayer(napariViewer,'Album',np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]]),shared_data_throughput = shared_data)
+        
         return
     
     def changeLiveMode(self):
@@ -1078,11 +1124,17 @@ class MMConfigUI(CustomMainWindow):
         #Obtain the stage info from MM:
         XYStageName = self.core.get_xy_stage_device() #type: ignore
         #Get the stage position
-        XYStagePos = self.core.get_xy_stage_position(XYStageName)#type: ignore
+        if shared_data.backend == 'JAVA':
+            XYStagePos = self.core.get_xy_stage_position(XYStageName)#type: ignore
+        elif shared_data.backend == 'Python':
+            XYStagePos = self.core.get_xy_position(XYStageName)#type: ignore
         
         #Get current pixel size via self.core.get_pixel_size_um()
         #Then move 0.1, 0.5, or 1 field with the arrows
-        field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
+        if shared_data.backend == 'JAVA':
+            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
+        elif shared_data.backend == 'Python':
+            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi()[2],self.core.get_pixel_size_um()*self.core.get_roi()[3]]#type: ignore
         field_move_fraction = [1,.5,.1]
         
         #Widget itself is a grid layout with 7x7 entries
@@ -1148,7 +1200,10 @@ class MMConfigUI(CustomMainWindow):
         #Set the values in the XY EditFields based on the buttons
         fieldUnits = [0.1,1,3]
         fieldUnit = fieldUnits[m]
-        field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
+        if shared_data.backend == 'JAVA':
+            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
+        elif shared_data.backend == 'Python':
+            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi()[2],self.core.get_pixel_size_um()*self.core.get_roi()[3]]#type: ignore
         
         x_value_um = field_size_um[0]*fieldUnit
         y_value_um = field_size_um[1]*fieldUnit
@@ -1164,14 +1219,34 @@ class MMConfigUI(CustomMainWindow):
         """
         #Get devices
         devices = self.core.get_loaded_devices() #type:ignore
-        devices = [devices.get(i) for i in range(devices.size())]
-        devicesOfType = []
-        #Loop over devices
-        for device in devices:
-            if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
-                logging.debug("found " + device + " of type " + devicetype)
-                devicesOfType.append(device)
-        return devicesOfType
+        if shared_data.backend == 'Python':
+            devices = [devices[i] for i in range(len(devices))]
+            devicesOfType = []
+            deviceTypeArray = {}
+            deviceTypeArray[2] = 'CameraDevice'
+            deviceTypeArray[3] = 'ShutterDevice'
+            deviceTypeArray[4] = 'StateDevice'
+            deviceTypeArray[5] = 'StageDevice'
+            deviceTypeArray[6] = 'XYStageDevice'
+            deviceTypeArray[9] = 'AutoFocusDevice'
+            deviceTypeArray[10] = 'CoreDevice'
+            deviceTypeArray[15] = 'HubDevice'
+            #Loop over devices
+            for device in devices:
+                device_found_type = deviceTypeArray[self.core.get_device_type(device)]
+                if device_found_type == devicetype: #type:ignore
+                    logging.debug("found " + device + " of type " + devicetype)
+                    devicesOfType.append(device)
+            return devicesOfType
+        elif shared_data.backend == 'JAVA':
+            devices = [devices.get(i) for i in range(devices.size())]
+            devicesOfType = []
+            #Loop over devices
+            for device in devices:
+                if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
+                    logging.debug("found " + device + " of type " + devicetype)
+                    devicesOfType.append(device)
+            return devicesOfType
     
     def oneDstageLayout(self):
         """
@@ -1360,8 +1435,12 @@ class MMConfigUI(CustomMainWindow):
         #Obtain the stage info from MM:
         XYStageName = self.core.get_xy_stage_device() #type:ignore
         #Get the stage position
-        XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
-        self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+        if shared_data.backend == 'JAVA':
+            XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
+            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+        elif shared_data.backend == 'Python':
+            XYStagePos = self.core.get_xy_position(XYStageName) #type:ignore
+            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
         
     def moveXYStage(self,relX,relY):
         """
@@ -1474,7 +1553,10 @@ class MMConfigUI(CustomMainWindow):
         upperLimit = self.config_groups[config_id].upperLimit()
         
         #A slider config by definition (?) only has a single property underneath, so get that:
-        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+        if shared_data.backend == 'JAVA':
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+        elif shared_data.backend == 'Python':
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
         configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
         device_label = configdata.get_setting(0).get_device_label()
         property_name = configdata.get_setting(0).get_property_name()
@@ -1544,7 +1626,11 @@ class MMConfigUI(CustomMainWindow):
                 configGroupName = self.config_groups[config_id].configGroupName()
                 #Set in MM:
                 #A slider config by definition (?) only has a single property underneath, so get that:
-                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+                
+                if shared_data.backend == 'JAVA':
+                    underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+                elif shared_data.backend == 'Python':
+                    underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
                 configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
                 device_label = configdata.get_setting(0).get_device_label()
                 property_name = configdata.get_setting(0).get_property_name()
@@ -1589,7 +1675,11 @@ class MMConfigUI(CustomMainWindow):
         configGroupName = self.config_groups[config_id].configGroupName()
 
         #An Editfield config by definition (?) only has a single property underneath, so get that:
-        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+        if shared_data.backend == 'JAVA':
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+        elif shared_data.backend == 'Python':
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+            
         configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
         device_label = configdata.get_setting(0).get_device_label()
         property_name = configdata.get_setting(0).get_property_name()
@@ -1617,7 +1707,11 @@ class MMConfigUI(CustomMainWindow):
         elif self.config_groups[config_id].isSlider():
             #A slider config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.config_groups[config_id].configGroupName()
-            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+            
+            if shared_data.backend == 'JAVA':
+                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+            elif shared_data.backend == 'Python':
+                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
             device_label = configdata.get_setting(0).get_device_label()
             property_name = configdata.get_setting(0).get_property_name()
@@ -1640,7 +1734,10 @@ class MMConfigUI(CustomMainWindow):
         elif self.config_groups[config_id].isInputField():
             #A editfield config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.config_groups[config_id].configGroupName()
-            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+            if shared_data.backend == 'JAVA':
+                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
+            elif shared_data.backend == 'Python':
+                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
             device_label = configdata.get_setting(0).get_device_label()
             property_name = configdata.get_setting(0).get_property_name()
@@ -1824,7 +1921,10 @@ def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     shared_data = sshared_data
     # Get all config groups
     allConfigGroups={}
-    nrconfiggroups = core.get_available_config_groups().size()
+    if shared_data.backend == 'Python':
+        nrconfiggroups = len(core.get_available_config_groups())
+    else:
+        nrconfiggroups = core.get_available_config_groups().size()
     for config_group_id in range(nrconfiggroups):
         allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
     

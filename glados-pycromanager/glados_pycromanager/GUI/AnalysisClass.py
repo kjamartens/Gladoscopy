@@ -857,7 +857,7 @@ class AnalysisThread_customFunction(QThread):
             self.visualisationObject.running=False
         return result
 
-#This function probably gets deprecated soon
+#This function is used for live/mda visualisation
 def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = None,createNewThread = True,throughputThread=None,liveorMDA='live'):
     global image_queue_analysis, napariViewer
     napariViewer = shared_data.napariViewer

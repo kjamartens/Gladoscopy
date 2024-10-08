@@ -46,6 +46,7 @@ class Shared_data(QObject):
         self.activeMDAobject = None
         self.mdaZarrData = {}
         self.nodzInstance = None
+        self.backend='JAVA' #JAVA or Python, if running headlessly
         self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.
         self.last_display_update_time = 0
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
