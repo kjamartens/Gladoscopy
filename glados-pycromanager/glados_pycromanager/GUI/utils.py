@@ -864,7 +864,8 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
 
 
 def findIconFolder():
-    try:
+    import importlib.util
+    if importlib.util.find_spec('glados_pycromanager') is not None:
         import glados_pycromanager
         # Get the installation path of the package
         package_path = os.path.dirname(glados_pycromanager.__file__)
@@ -879,7 +880,7 @@ def findIconFolder():
                 iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
             else:
                 iconFolder = ''
-    except:
+    else:
         # logging.warning("Could not find glados_pycromanager package, using default icons")
         #Find the iconPath folder
         if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
@@ -973,11 +974,9 @@ class XYGridManager():
         self.grid_n_rows = 1
         self.grid_n_cols = 1
         
-        try:
-            #Python backend
-            self.core.this == self.core
+        if self.parent.shared_data.backend == 'Python':
             self.gridEntries = np.array([[self.core.get_xy_position()[0],self.core.get_xy_position()[1]]])
-        except:
+        elif self.parent.shared_data.backend == 'JAVA':
             #JAVA backend
             self.gridEntries = np.array([[self.core.get_xy_stage_position().x,self.core.get_xy_stage_position().y]]) #Need to be e.g.np.array([
                             #     [100.5, 200.3],
@@ -3092,13 +3091,15 @@ class CustomMainWindow(QWidget):
                 for _ in range(maxParentInst):
                     if currentParent == None:
                         break
+                    if currentParent.parent == None:
+                        break
                     #Rather difficult method to figure out if we're in MDA or MMControls savestate
-                    try:
+                    if callable(currentParent.parent):
                         currentParent = currentParent.parent()
                         if isinstance(currentParent, napariGlados.dockWidget_MDA):
                             saveState = 'MDA'
                             break
-                    except:
+                    else:
                         try:
                             currentParent = currentParent.parent
                             if isinstance(currentParent, napariGlados.dockWidget_MDA):
@@ -3431,6 +3432,9 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
             sharedData = shared_data
         elif isinstance(shared_data.parent, Shared_data):
             sharedData = shared_data.parent
+        
+        if sharedData.nodzInstance == None: 
+            return
         errorIcon = sharedData.nodzInstance.errorIcon
         warningIcon = sharedData.nodzInstance.warningIcon
         infoIcon = sharedData.nodzInstance.infoIcon
@@ -3456,6 +3460,8 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         #For warning/error, all nodes have a .warning or .error, which contain the info.
         #We find this info and display it if necessary
         errorToolTip = ''
+        if not hasattr(sharedData.nodzInstance, 'nodes'):
+            return
         for node in sharedData.nodzInstance.nodes:
             if node.errorInfo != None:
                 if node.errorInfo != '':

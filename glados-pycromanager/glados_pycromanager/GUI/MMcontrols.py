@@ -308,7 +308,8 @@ class MMConfigUI(CustomMainWindow):
         self.mainLayout = QGridLayout()
         self.configEntries = {}
         
-        try:
+        import importlib.util
+        if importlib.util.find_spec('glados_pycromanager') is not None:
             import glados_pycromanager
             # Get the installation path of the package
             package_path = os.path.dirname(glados_pycromanager.__file__)
@@ -323,7 +324,7 @@ class MMConfigUI(CustomMainWindow):
                     self.iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
                 else:
                     self.iconFolder = ''
-        except:
+        else:
             try:
                 import utils
                 self.iconFolder = utils.findIconFolder()

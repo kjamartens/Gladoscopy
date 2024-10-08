@@ -5678,6 +5678,7 @@ class advDecisionGridLayout(QGroupBox):
         self.layout().addLayout(self.outerLayout,0,0) #type:ignore
         
         #Get out of this function if flowChart isn't initialised yet (i.e. first start-up):
+        #There doesn't seem to be a way to not do this via a try/except clause.
         try:
             self.parent.nodzinstance.nodes
         except RuntimeError:
@@ -5764,6 +5765,7 @@ class advDecisionGridLayout(QGroupBox):
         self.layout().addLayout(self.outerLayout,0,0) #type:ignore
         
         #Get out of this function if flowChart isn't initialised yet (i.e. first start-up):
+        #Doesn't seem to be a way without a try/except clause
         try:
             self.parent.nodzinstance.nodes
         except RuntimeError:

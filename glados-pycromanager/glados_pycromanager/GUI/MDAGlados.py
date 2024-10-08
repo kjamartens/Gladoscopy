@@ -1274,16 +1274,17 @@ class MDAGlados(CustomMainWindow):
         
         #try to trigger a dock widget resize event at this point.
         mdawidget_object = self.gui.parent() #type:ignore
-        try:
-            logging.debug('attempting to update parent')
-            from PyQt5.QtCore import QEvent
-            current_size = mdawidget_object.size() #type:ignore
-            resize_event = QEvent(QEvent.Resize) #type:ignore
-            resize_event.oldSize = lambda: current_size #type:ignore
-            resize_event.size = lambda: current_size #type:ignore
-            QApplication.sendEvent(mdawidget_object, resize_event)
-        except:
-            logging.debug('did not attempt to update parent')
+        if mdawidget_object is not None:
+            if hasattr(mdawidget_object,'size'):
+                logging.debug('attempting to update parent')
+                from PyQt5.QtCore import QEvent
+                current_size = mdawidget_object.size() #type:ignore
+                resize_event = QEvent(QEvent.Resize) #type:ignore
+                resize_event.oldSize = lambda: current_size #type:ignore
+                resize_event.size = lambda: current_size #type:ignore
+                QApplication.sendEvent(mdawidget_object, resize_event)
+            else:
+                logging.debug('did not attempt to update parent')
         
         
         QCoreApplication.processEvents()
@@ -1347,12 +1348,10 @@ class MDAGlados(CustomMainWindow):
             # Ensure QGroupBox respects the size of its contents
             widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
 
-        try:
+        if hasattr(widget, 'minimumSizeHint'):
             minsize = widget.minimumSizeHint()
-            if minsize[0] > -1 and minsize[1] > -1:
+            if minsize.width() > -1 and minsize.height() > -1:
                 widget.setMinimumSize(widget.minimumSizeHint())
-        except:
-            pass
 
         if hasattr(widget, 'layout'):
             layout = widget.layout()

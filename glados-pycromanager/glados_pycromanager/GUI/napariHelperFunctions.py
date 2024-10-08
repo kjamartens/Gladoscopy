@@ -84,27 +84,6 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
         
         #Give the new one the old one's name
         layer.name = layer_name
-        # else:
-        #     layer.data = np.append(layer.data,image_data[np.newaxis, :, :],axis=0)
-        
-        #     #Fully recreate the layer. Seems to work but boy that's some odd way of handling this.
-        #     layer_old = layer
-        #     napariViewer.layers.remove(layer)
-        #     layer = napariViewer.add_image(layer.data)
-        #     layer_name = layer_old.name
-        #     layer.opacity = layer_old.opacity
-        #     layer.contrast_limits = layer_old.contrast_limits
-        #     layer._keep_auto_contrast = layer_old._keep_auto_contrast
-        #     layer.rendering = layer_old.rendering
-        #     layer.colormap = layer_old.colormap
-        #     layer.scale = layer_old.scale
-        #     layer.scale_factor = layer_old.scale_factor
-        #     layer.translate = layer_old.translate
-        #     layer.gamma = layer_old.gamma
-        #     layer.iso_threshold = layer_old.iso_threshold
-        #     layer.blending = layer_old.blending
-        #     layer.attenuation = layer_old.attenuation
-        #     layer.name = layer_name
             
         current_slice = layer.data.shape[0]
         napariViewer.dims.set_current_step(0,current_slice)
@@ -165,7 +144,8 @@ def InitateNapariUI(napariViewer):
     napariViewer.title="GladOS - napari"
     # Set the window icon
     import os
-    try:
+    import importlib.util
+    if importlib.util.find_spec('glados_pycromanager') is not None:
         import glados_pycromanager
         # Get the installation path of the package
         package_path = os.path.dirname(glados_pycromanager.__file__)
@@ -184,10 +164,9 @@ def InitateNapariUI(napariViewer):
         icon_path = iconFolder+os.sep+'GladosIcon.ico'
         icon = QIcon(icon_path)
         napariViewer.window._qt_window.setWindowIcon(icon)
-    except:
+    else:
         try:
             import utils
-            
             iconFolder = utils.findIconFolder()
             icon_path = iconFolder+os.sep+'GladosIcon.ico'
             icon = QIcon(icon_path)
