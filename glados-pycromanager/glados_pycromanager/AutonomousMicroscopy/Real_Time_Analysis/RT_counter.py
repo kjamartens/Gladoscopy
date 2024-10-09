@@ -84,19 +84,21 @@ class RealTimeCounter():
             'outputval': self.currentValue
         }
         textv = {
-            'string': 'Current frame: {outputval:.0f}',
+            'string': ['Current frame: {outputval:.0f}'],
             'size': 10,
             'color': 'cyan',
-            'translation': np.array([0, 0]),
             'anchor': 'upper_left',
+            'translation': [10, 10]
         }
+        #
         napariLayer.features = features
-        
+        napariLayer.data = [0, 0]
+        napariLayer.text = textv
         if self.firstLayerInit:
         #Only change if really needed:
-            napariLayer.data = [0, 0]
-            napariLayer.text = textv
+            logging.info(features)
+            logging.info(textv)
             napariLayer.symbol = 'disc'
-            napariLayer.size = 0
+            napariLayer.size = 10
             napariLayer.selected_data = []
             self.firstLayerInit = False
