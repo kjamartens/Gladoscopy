@@ -381,6 +381,36 @@ class napariHandler():
         
         return image, metadata
     
+    def grab_image_liveVisualisation_and_liveAnalysis(self,image,metadata, event_queue):
+        """ 
+        Function that runs on every frame obtained in live mode and putis in the image queue
+        
+        Inputs: array image: image from micromanager
+                metadata: metadata from micromanager
+        """
+        if self.acqstate:
+            if self.img_queue.qsize() < 2:
+                self.img_queue.put([image,metadata])
+                
+            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
+            for queue in self.shared_data.liveImageQueues:
+                if queue.qsize() < 2:
+                    queue.put([image,metadata])
+                        
+            if self.image_queue_analysis.qsize() < 2:
+                self.image_queue_analysis.put([image,metadata])
+            
+        else:
+            logging.info('Broke off live mode')
+            event_queue.put(None)
+            try:
+                acq.abort()
+                logging.debug('aborted acquisition')
+            except:
+                logging.debug('attemped to abort acq')
+        
+        # return image, metadata
+
     
     def grab_image_savedfn(self,axes,dataset, event_queue):
         """ 
@@ -439,7 +469,7 @@ class napariHandler():
         # shared_data = self.shared_data
         logging.debug('in run_pycroManagerAcquisition_worker')
         #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
-        #The abortion is handled in grab_image_livemode
+        #The abortion is handled in grab_image_liveVisualisation_and_liveAnalysis
         if self.liveOrMda == 'live':
             while self.acqstate:
                 if self.shared_data.mdaMode:
@@ -452,7 +482,7 @@ class napariHandler():
                     #Already move the live layer to top
                     logging.debug('BMoved layer to top')
                     # moveLayerToTop(self.shared_data.napariViewer,"Live")
-                    with Acquisition(directory='./temp', name='LiveAcqShouldBeRemoved', show_display=False, image_saved_fn = self.grab_image_savedfn) as acq: #type:ignore
+                    with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                         acq.acquire(events)
@@ -500,7 +530,7 @@ class napariHandler():
                 #Already move the layer to top
                 # if self.shared_data.newestLayerName != '':
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
-                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_savedfn,napari_viewer=napariViewer) as acq: #type:ignore
+                with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis,napari_viewer=napariViewer) as acq: #type:ignore
                     self.shared_data._mdaModeAcqData = acq
                     events = self.shared_data._mdaModeParams
                     acq.acquire(events)
