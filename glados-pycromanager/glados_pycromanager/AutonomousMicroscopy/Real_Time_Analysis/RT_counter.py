@@ -47,14 +47,15 @@ class RealTimeCounter():
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
-
+        self.currentValue = 0
+        self.initVal = 25
         logging.info('in RT_counter at time '+str(time.time()))
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):
         logging.info('RUNNING COUNTER REAL-TIME ANALYSIS')
         if 'ImageNumber' in metadata:
-            self.currentValue = metadata['ImageNumber']
+            self.currentValue = float(metadata['ImageNumber'])
             logging.info("At frame: "+metadata['ImageNumber'])
         else:
             #Append to full list with frame info
@@ -80,25 +81,23 @@ class RealTimeCounter():
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
         logging.info('RUNNING VISUALISATION COUNTER REAL-TIME ANALYSIS')
-        features = {
-            'outputval': self.currentValue
+        napariLayer.data = np.array([[0, 0]])
+        properties = {
+            'outputval': [self.currentValue],
         }
         textv = {
-            'string': ['Current frame: {outputval:.0f}'],
+            'string': 'Current frame: {outputval:0.0f}',
             'size': 10,
             'color': 'cyan',
             'anchor': 'upper_left',
             'translation': [10, 10]
         }
         #
-        napariLayer.features = features
-        napariLayer.data = [0, 0]
+        napariLayer.properties = properties
         napariLayer.text = textv
         if self.firstLayerInit:
         #Only change if really needed:
-            logging.info(features)
-            logging.info(textv)
             napariLayer.symbol = 'disc'
-            napariLayer.size = 10
+            napariLayer.size = 0
             napariLayer.selected_data = []
             self.firstLayerInit = False
