@@ -44,21 +44,7 @@ else:
     import utils as utils
     from MDAGlados import MDAGlados
 
-
-# # Define a flag to control the continuous task
-# stop_continuous_task = False
-# # empty queue for (live) image data
-# img_queue = queue.Queue()
-# # Create a queue to pass image data between threads
-# image_queue_analysis = queue.Queue()
-# # Create a signal to communicate between threads
-# analysis_done_signal = pyqtSignal(object)
-
-# #Sleep time to keep responsiveness
-# sleep_time = 0.05
-
-
-#This needs to be a function outside of any class due to Yield-calling
+#These need to be functions outside of any class due to Yield-calling
 def napariUpdateLive(DataStructure):
     """ 
     Function that finally shows the  image in napari
@@ -364,41 +350,6 @@ class napariHandler():
         logging.debug('mdaacqdonefunction called in napariHandler')
         self.shared_data.mdaacqdonefunction()
         
-    def grab_image(self,image, metadata, event_queue):
-        """ 
-        Function that runs on every frame obtained in live mode and putis in the image queue
-        
-        Inputs: array image: image from micromanager
-                metadata: metadata from micromanager
-        """
-        #So in live-mode, this is called every 100 ms given 100ms frame:
-        logging.debug('Updated live preview requesting grab_image at time {}'.format(time.time()))
-        if self.acqstate:
-            if len(self.img_queue) < 3:
-                logging.debug('Updated live preview put in self.img_queue')
-                self.img_queue.append([image,metadata])
-                
-            #Loop over all queues in shared_data.liveImageQueues and also append the image there:
-            for queue in self.shared_data.liveImageQueues:
-                if len(queue) < 3:
-                    logging.debug('Updated live preview put in self.liveImageQueue: {}'.format(queue))
-                    queue.append([image,metadata])
-                        
-            if len(self.image_queue_analysis) < 3:
-                logging.debug('Updated live preview put in self.image_queue_analysis')
-                self.image_queue_analysis.append([image,metadata])
-            
-        else:
-            logging.info('Broke off live mode')
-            event_queue.clear()
-            try:
-                acq.abort()
-                logging.debug('aborted acquisition')
-            except:
-                logging.debug('attemped to abort acq')
-        
-        return image, metadata
-    
     def grab_image_liveVisualisation_and_liveAnalysis(self,image,metadata, event_queue):
         """ 
         Function that runs on every frame obtained in live mode and puts it in the image queue(s)
@@ -433,7 +384,6 @@ class napariHandler():
         
         # return image, metadata
 
-    
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):
         """ 
         Function that runs on every frame obtained in live mode and putis in the image queue
@@ -591,11 +541,10 @@ class napariHandler():
             #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
             cleanUpTemporaryFiles(shared_data=self.shared_data)
     
-    
     @thread_worker(connect={'yielded': napariUpdateAnalysisThreads})
     def run_analysis_worker(self,parent,layerName='Layer',layerColorMap='gray'):
         """
-        Worker which handles the visualisation of the live mode queue
+        Worker which handles the visualisation of the real-time analyses
         Connected to display_napari function to update display 
         """
         img_queue = parent.image_queue_analysis
@@ -616,7 +565,6 @@ class napariHandler():
                 DataStructure['finalisationProcedure'] = False
                 yield DataStructure
 
-    
     @thread_worker(connect={'yielded': napariUpdateLive})
     def run_napariVisualisation_worker(self,parent,layerName='Layer',layerColorMap='gray'):
         """
@@ -626,7 +574,7 @@ class napariHandler():
         img_queue = parent.img_queue
         while self.acqstate:
             
-            logging.debug('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(len(img_queue)))
+            # logging.debug('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(len(img_queue)))
             
             # get elements from queue while there is more than one element
             # playing it safe: I'm always leaving one element in the queue
@@ -744,7 +692,6 @@ class napariHandler():
                 worker1.start() #type:ignore
                 # worker2.start()
                 logging.debug("MDA mode started from acqModeChanged")
-
 
 class napariHandler_liveMode(napariHandler):
     def __init__(self, shared_data) -> None:
