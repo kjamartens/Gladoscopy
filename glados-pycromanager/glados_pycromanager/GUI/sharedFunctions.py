@@ -51,6 +51,7 @@ class Shared_data(QObject):
         self.last_display_update_time = 0
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
+        self.liveModeUpdateOngoing = False
         
         self.globalData = {}
         self.globalData['SLACK-TOKEN']={}

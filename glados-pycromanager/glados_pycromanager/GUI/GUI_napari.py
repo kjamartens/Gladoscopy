@@ -113,10 +113,10 @@ class headlessGUI(QWidget):
         self.mm_app_pathLineEdit = QLineEdit("C:\\Users\\kjamartens\\Documents\\Software\\Micro-Manager-2.0\\", self)
 
         self.config_fileLabel = QLabel('Config File:', self)
-        self.config_fileLineEdit = QLineEdit("C:\\Users\\kjamartens\\Documents\\Software\\Micro-Manager-2.0\\MMConfig_CamDisk.cfg", self)
+        self.config_fileLineEdit = QLineEdit("C:\\Users\\kjamartens\\Documents\\Software\\Micro-Manager-2.0\\MMConfig_Demo.cfg", self)
 
         self.buffer_size_mbLabel = QLabel('Buffer Size MB:', self)
-        self.buffer_size_mbLineEdit = QLineEdit("2048", self)
+        self.buffer_size_mbLineEdit = QLineEdit("4096", self)
 
         self.max_memory_mbLabel = QLabel('Max Memory MB:', self)
         self.max_memory_mbLineEdit = QLineEdit("10000", self)
@@ -167,6 +167,7 @@ def main():
     Returns:
         None
     """
+    #cProfiler testing
     
     #Create parser
     parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
@@ -272,6 +273,12 @@ def show_UserManualNapari():
     
 if __name__ == "__main__":
     # try:
+    
+    import cProfile
+    
+# Start the profiler
+    # cProfile.run("main()", "profiling_results.prof", sort="cumtime")
+
     
     main()
     
