@@ -609,11 +609,13 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
         #Force-set the current selected function
         
         currentSelectedFunctionReadable = None
-        for entry in curr_layout.parent().parent().currentData['__displayNameFunctionNameMap__']:
-            if entry[1] == current_selected_function:
-                currentSelectedFunctionReadable = entry[0]
-            
-        curr_layout.parent().parent().currentData['__selectedDropdownEntryAnalysis__'] = currentSelectedFunctionReadable
+        try:
+            for entry in curr_layout.parent().parent().currentData['__displayNameFunctionNameMap__']:
+                if entry[1] == current_selected_function:
+                    currentSelectedFunctionReadable = entry[0]
+            curr_layout.parent().parent().currentData['__selectedDropdownEntryAnalysis__'] = currentSelectedFunctionReadable
+        except: #This exception is if I'm doing this directly from the GUI, not from nodz
+            pass
         
         #Show/hide varialbes/advanced lineedits and such
         for i in range(curr_layout.count()):
@@ -1516,7 +1518,10 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
                     # self.comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=self.comboBox_switch: hideAdvVariables(comboBox))
             
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
-    logging.debug('Changing layout '+curr_layout.parent().objectName())
+    try:
+        logging.debug('Changing layout '+curr_layout.parent().objectName())
+    except:
+        pass
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
     #Get the dropdown info

@@ -44,6 +44,35 @@ else:
     import utils as utils
     from MDAGlados import MDAGlados
 
+def napariUpdateLive_3(DataStruct):
+    print('napariupdate live3')
+    napariViewer = DataStruct['napariViewer']
+    layerName = 'LiveT'
+    liveImage = DataStruct['image']
+    liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+
+    #If it's the first liveImageLayer
+    if not liveImageLayer:
+        print('live layer not found - creating')
+        nrLayersBefore = len(napariViewer.layers)
+        # Create a dask array with random noise
+        layer = napariViewer.add_image(liveImage[-1,:,:], rendering='attenuated_mip', name = layerName) #TODO: reimplement colormap, get multi-D testing, get accurate all frames etc
+        # layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+        # layer._keep_auto_contrast = True #type:ignore
+        # #Move to the front of the layers
+        # # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+        # napariViewer.reset_view()
+    #Else if the layer already exists, replace it!
+    else:
+        # print('live layer found')
+        # layer is present, replace its data
+        # layer = napariViewer.layers[layerName]
+        #Also move to top
+        # napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
+        napariViewer.layers[layerName].data = liveImage[-1,:,:]
+        # print(liveImage)
+        logging.debug(f'Would Put liveImage in the live layer with sizes: {liveImage.shape} and {napariViewer.layers[layerName].data.shape}')
+
 #These need to be functions outside of any class due to Yield-calling
 def napariUpdateLive(DataStructure):
     """ 
@@ -52,26 +81,36 @@ def napariUpdateLive(DataStructure):
     Basically the core visualisation method
     """
     
+    #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
+    min_delay_time = np.min(((50/1000),(float(shared_data.core.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
+    
     #TODO: Make this an advanced variable or so. 
     #JAVA is way slower so needs this longer update time of the display
     if shared_data.backend == 'JAVA':
-        display_update_time = 1/120 #0.05
+        display_update_time = 1/float(shared_data.globalData['VISUALISATION-FPS']['value']) #0.05
     elif shared_data.backend == 'Python':
-        display_update_time = 0.05
+        display_update_time = 1/float(shared_data.globalData['VISUALISATION-FPS']['value'])#0.05
     
     if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
         logging.debug('Updated live preview Hindered (due to display update time) at time {}'.format(time.time()))
         #Sleep for the remainder, then continue
         # time.sleep(display_update_time)
         return
-    logging.debug('Updated live preview Ran at time {}'.format(time.time()))
     
+    if time.time()-shared_data.last_display_update_time<min_delay_time and time.time()-shared_data.last_display_update_time>1/1000:
+        logging.debug('Updated live preview Delayed (due to display update time) val found {}'.format(time.time()-shared_data.last_display_update_time))
+        logging.debug('Updated live preview Delayed (due to display update time) by {}'.format(min_delay_time-(time.time()-shared_data.last_display_update_time)))
+        #Sleep for the remainder, then continue
+        time.sleep(min_delay_time-(time.time()-shared_data.last_display_update_time))
+        
+    shared_data.debugImageDisplayTimes.append(time.time())
     napariViewer = DataStructure['napariViewer']
     acqstate = DataStructure['acqState']
     core = DataStructure['core']
     image_queue_analysisA = DataStructure['image_queue_analysis']
     analysisThreads = DataStructure['analysisThreads']
     layerName = DataStructure['layer_name']
+    
     
     # Check if the update is in progress
     if shared_data.liveModeUpdateOngoing:
@@ -323,6 +362,56 @@ def napariUpdateAnalysisThreads(DataStructure):
                 logging.debug(f'starting analysis thread: {analysisThread}')
                 analysisThread.start()
 
+
+# def start_napari_signalling(viewer, dataset):
+    """
+    Start up a threadworker, which will check for new images arrived in the dataset
+    and then signal to napari to update or refresh as needed
+    :param viewer: the napari Viewer
+    :param dataset: the Datatset being acquired
+    :return:
+    """
+
+    # def update_layer(image):
+    #     """
+    #     update the napari layer with the new image
+    #     """
+    #     print('in updatelayer')
+    #     if image is not None:
+    #         try:
+    #             viewer.layers['pycromanager acquisition'].data = image
+    #         except KeyError:
+    #             viewer.add_image(image, name='pycromanager acquisition')
+
+    # def printvv(image):
+    #     print('asdf')
+    # @thread_worker(connect={'yielded': printvv})
+    # def napari_signaller():
+    #     """
+    #     Monitor for signals that Acquisition has a new image ready, and when that happens
+    #     update napari appropriately
+    #     """
+    #     print('AAAAAAAAAAAAAAAAAHUPDATELAYER')
+    #     # don't update faster than the display can handle
+    #     min_update_time = 1 / 30
+    #     last_update_time = time.time()
+    #     while True:
+    #         print('attempting this new method')
+    #         dataset_writing_complete = dataset.is_finished()
+    #         new_image_ready = dataset.await_new_image(timeout=.25)
+    #         if not new_image_ready:
+    #             continue
+    #         print('attempting this new method - image found')
+    #         image = dataset.as_array()
+    #         update_time = time.time()
+    #         yield image
+    #         if dataset_writing_complete:
+    #             break
+    #         if update_time - last_update_time < min_update_time:
+    #             time.sleep(min_update_time - (update_time - last_update_time))
+    #         last_update_time = time.time()
+
+    # napari_signaller()
 class napariHandler():
     def __init__(self, shared_data,liveOrMda='live') -> None:
         self.shared_data = shared_data
@@ -346,6 +435,9 @@ class napariHandler():
         self.sleep_time = 1/shared_data.globalData['VISUALISATION-FPS']['value'] #in sec
         self.layerName = 'newLayer'
 
+        #Start this shit
+        # self.stuurman_napari_implementation()
+
     def mdaacqdonefunction(self):
         logging.debug('mdaacqdonefunction called in napariHandler')
         self.shared_data.mdaacqdonefunction()
@@ -359,14 +451,14 @@ class napariHandler():
         """
         logging.debug('Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {}'.format(time.time()))
         if self.acqstate:
-            if len(self.img_queue)<5:
+            if len(self.img_queue) < 2:
                 logging.debug('Updated live preview put in self.img_queue -lvla')
                 self.img_queue.append([image,metadata]) #Don't use put_nowait
                 
             #Loop over all queues in shared_data.liveImageQueues and also append the image there:
             for queue in self.shared_data.liveImageQueues:
-                if len(queue) < 3:
-                    logging.debug('Updated live preview put in self.liveImageQueue: {} -lvla'.format(queue))
+                if len(queue) < 2:
+                    # logging.debug('Updated live preview put in self.liveImageQueue: {} -lvla'.format(queue))
                     queue.append([image,metadata]) #Don't use put_nowait
                         
             # if len(self.image_queue_analysis) < 3:
@@ -383,7 +475,7 @@ class napariHandler():
                 logging.debug('attemped to abort acq')
         
         # return image, metadata
-
+        
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):
         """ 
         Function that runs on every frame obtained in live mode and putis in the image queue
@@ -392,23 +484,24 @@ class napariHandler():
                 metadata: metadata from micromanager
         """
         logging.debug('Updated preview requesting grab_image_liveVisualisation_and_liveAnalysis_savedFn at time {}'.format(time.time()))
+        shared_data.debugImageArrivalTimes.append(time.time())
         if self.acqstate:
             #Check if there is any reason to read the image:
             reasonToReadImage = False
-            if len(self.img_queue) < 5:
+            if len(self.img_queue) < 2:
                 reasonToReadImage = True
             for queue in self.shared_data.liveImageQueues:
                 if len(queue) < 2:
                     reasonToReadImage = True
             if len(self.image_queue_analysis) < 2:
                 reasonToReadImage = True
-            
+                
             if reasonToReadImage:
                 image = dataset.read_image(**axes)
                 metadata = {}
                 metadata['Axes']=axes
                 logging.debug(f'grab_image_liveVisualisation_and_liveAnalysis_savedFn called in napariHandler read image: {dataset}, axes: {axes}, metadata: {metadata}')
-                if len(self.img_queue) < 5:
+                if len(self.img_queue) < 2:
                     self.img_queue.append([image,metadata])
                     
                 #Loop over all queues in shared_data.liveImageQueues and also append the image there:
@@ -416,8 +509,8 @@ class napariHandler():
                     if len(queue) < 2:
                         queue.append([image,metadata])
                             
-                if len(self.image_queue_analysis) < 2:
-                    self.image_queue_analysis.append([image,metadata])
+                # if len(self.image_queue_analysis) < 2:
+                #     self.image_queue_analysis.append([image,metadata])
             
         else:
             logging.info('Broke off live mode')
@@ -430,6 +523,9 @@ class napariHandler():
         
         # return image, metadata
 
+
+    
+
     @thread_worker
     def run_pycroManagerAcquisition_worker(self,parent):
         """ 
@@ -438,6 +534,8 @@ class napariHandler():
         Inputs: img_queue (unused, but required)
         """
         img_queue = parent.img_queue
+        shared_data.debugImageArrivalTimes=[]
+        shared_data.debugImageDisplayTimes=[]
         global acq
         # shared_data = self.shared_data
         logging.debug('in run_pycroManagerAcquisition_worker')
@@ -458,8 +556,7 @@ class napariHandler():
                     #
                     
                     #Acquisitions are slightly tricky. If run Headlessly, we take images directly from image_process_fn. However, if we run with a MM instance running, we use the image_saved_fn
-                    
-                    if shared_data._headless:
+                    if shared_data._headless and shared_data.backend == 'Python':
                         with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis ) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
                             events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
@@ -484,8 +581,8 @@ class napariHandler():
                     
                 #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                 logging.debug('starting MDA acq - before JavaBackendAcquisition')
-                savefolder = './temp'
-                savename = 'MdaAcqShouldBeRemoved'
+                savefolder = None#'./temp'
+                savename = None#'MdaAcqShouldBeRemoved'
                 if self.shared_data._mdaModeSaveLoc[0] != '':
                     savefolder = self.shared_data._mdaModeSaveLoc[0]
                     
@@ -515,13 +612,13 @@ class napariHandler():
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 
                 
-                if shared_data._headless:
+                if shared_data._headless and shared_data.backend == 'Python':
                     with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis,napari_viewer=napariViewer) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = self.shared_data._mdaModeParams
                         acq.acquire(events)
                 else:
-                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ,napari_viewer=napariViewer) as acq: #type:ignore
+                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = self.shared_data._mdaModeParams
                         acq.acquire(events)
@@ -560,6 +657,7 @@ class napariHandler():
                 DataStructure['core'] = self.shared_data.core
                 DataStructure['image_queue_analysis'] = self.image_queue_analysis
                 DataStructure['analysisThreads'] = self.shared_data.analysisThreads
+                logging.info('adding analysisThread in run_analysis_worker 1')
                 DataStructure['layer_name'] = layerName
                 DataStructure['layer_color_map'] = layerColorMap
                 DataStructure['finalisationProcedure'] = False
@@ -574,28 +672,31 @@ class napariHandler():
         img_queue = parent.img_queue
         while self.acqstate:
             
-            # logging.debug('in while-loop in visualise_live_mode_worker, len of img_queue: '+str(len(img_queue)))
-            
             # get elements from queue while there is more than one element
-            # playing it safe: I'm always leaving one element in the queue
             if img_queue:
-                DataStructure = {}
-                DataStructure['data'] = img_queue.popleft()
-                DataStructure['napariViewer'] = self.shared_data.napariViewer
-                DataStructure['acqState'] = self.acqstate
-                DataStructure['core'] = self.shared_data.core
-                DataStructure['image_queue_analysis'] = self.image_queue_analysis
-                DataStructure['analysisThreads'] = self.shared_data.analysisThreads
-                DataStructure['layer_name'] = layerName
-                DataStructure['layer_color_map'] = layerColorMap
-                DataStructure['finalisationProcedure'] = False
-                logging.debug('live mode worker - yield DataStructure')
-                yield DataStructure
+                logging.debug('napariVisualisationWorkerLoop')
+                if img_queue:
+                    DataStructure = {}
+                    DataStructure['data'] = img_queue.popleft()
+                    DataStructure['napariViewer'] = self.shared_data.napariViewer
+                    DataStructure['acqState'] = self.acqstate
+                    DataStructure['core'] = self.shared_data.core
+                    DataStructure['image_queue_analysis'] = self.image_queue_analysis
+                    DataStructure['analysisThreads'] = self.shared_data.analysisThreads
+                    logging.info('adding analysisThread in run_napariVisualisation_worker 1')
+                    logging.info(str(self.shared_data.analysisThreads))
+                    DataStructure['layer_name'] = layerName
+                    DataStructure['layer_color_map'] = layerColorMap
+                    DataStructure['finalisationProcedure'] = False
+                    logging.debug('live mode worker - yield DataStructure')
+                    yield DataStructure
             
-            time.sleep(1/240)
+            time.sleep(self.sleep_time) #This sleep time is based on the visualisation FPS in the adv. settings
+            # time.sleep(1/240) #Sleep briefly to retain responsiveness on this thread
+            
             # time.sleep(min(0.1,time.time() - shared_data.last_display_update_time))
             
-            # time.sleep(self.sleep_time) #This sleep time is based on the visualisation FPS in the adv. settings
+            # 
                 # self.napariUpdateLive(img_queue.get(block=False))
 
         # read out last remaining element(s) after end of acquisition
@@ -607,6 +708,7 @@ class napariHandler():
             DataStructure['core'] = self.shared_data.core
             DataStructure['image_queue_analysis'] = self.image_queue_analysis
             DataStructure['analysisThreads'] = self.shared_data.analysisThreads
+            logging.info('adding analysisThread in run_napariVisualisation_worker 2')
             DataStructure['layer_name'] = layerName
             DataStructure['layer_color_map'] = layerColorMap
             DataStructure['finalisationProcedure'] = False
@@ -623,6 +725,7 @@ class napariHandler():
                 DataStructure['core'] = self.shared_data.core
                 DataStructure['image_queue_analysis'] = self.image_queue_analysis
                 DataStructure['analysisThreads'] = self.shared_data.analysisThreads
+                logging.info('adding analysisThread in run_napariVisualisation_worker 3')
                 DataStructure['layer_name'] = layerName
                 DataStructure['layer_color_map'] = layerColorMap
                 DataStructure['finalisationProcedure'] = True
@@ -632,6 +735,7 @@ class napariHandler():
         # shared_data.lastMDAThread.destroy()
         # shared_data.lastMDAThread = None
         logging.debug("acquisition done")
+        self.shared_data.liveModeUpdateOngoing = False
 
     def acqModeChanged(self, newSharedData = None):
         """
@@ -667,7 +771,7 @@ class napariHandler():
                 #Start the worker to run the pycromanager acquisition
                 worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
                 worker1.start() #type:ignore
-                worker2 = self.run_analysis_worker(self) #type:ignore
+                # worker2 = self.run_analysis_worker(self) #type:ignore
                 
                 logging.info("Live mode started")
         elif self.liveOrMda == 'mda':
@@ -875,15 +979,36 @@ class dockWidget_fullGladosUI(dockWidgets):
         
 
 def startLiveModeVisualisation(shared_data,layerName='Live'):
+    # create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
+    
+    
+    #Check for running liveVisualisation threads and remove those
+    for thread in shared_data.analysisThreads:
+        if thread.analysisInfo == 'LiveModeVisualisation':
+            shared_data.analysisThreads.remove(thread)
+            logging.debug('removed old LiveModeVisualisation thread')
+    
+    
+    shared_data.newestLayerName = layerName
     create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis)
     shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
 
 def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
+    #Check for running mdaVisualisation threads and remove those
+    
+    for thread in shared_data.analysisThreads:
+        if thread.analysisInfo == 'mdaVisualisation':
+            shared_data.analysisThreads.remove(thread)
+            logging.debug('removed old mdaVisualisation thread')
+    
     #Set the latest layer name to be the layer name
     shared_data.newestLayerName = layerName
     #Create an analysis thread which runs this MDA visualisation
     create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis)
     shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
+    
+    # shared_data._mdamodeNapariHandler.stuurman_napari_implementation()
+
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:

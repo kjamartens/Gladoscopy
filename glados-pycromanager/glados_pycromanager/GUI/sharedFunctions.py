@@ -19,12 +19,56 @@ else:
     from napariGlados import napariHandler
     from utils import updateAutonousErrorWarningInfo
 
+class LoggingList(list):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger = logging.getLogger(__name__)
+
+    def append(self, item):
+        super().append(item)
+        self.on_analysisThreads_value_change()
+
+    def extend(self, items):
+        super().extend(items)
+        self.on_analysisThreads_value_change()
+
+    def insert(self, index, item):
+        super().insert(index, item)
+        self.on_analysisThreads_value_change()
+
+    def remove(self, item):
+        super().remove(item)
+        self.on_analysisThreads_value_change(removed_entry=item)
+
+    def pop(self, index=None):
+        v = super().pop(index)
+        self.on_analysisThreads_value_change()
+        return v
+    
+    
+    def on_analysisThreads_value_change(self,removed_entry=None):
+        logging.debug('Analysis Threads now: '+str(self))
+        # removed_entry = None
+        # if len(self) < len(self.prevSelf):
+        #     removed_entry = [entry for entry in self if entry not in self.prevSelf][0]
+        logging.debug('Analysis Threads now: ' + str(self))
+        if removed_entry is not None:
+            logging.debug('Removed entry: ' + str(removed_entry))
+            try:
+                removed_entry.stop()
+                removed_entry.destroy()
+                logging.debug('succesfully stopped/destroyed Analysis thread '+str(removed_entry))
+            except:
+                logging.debug('UNsuccesfully stopped/destroyed Analysis thread '+str(removed_entry))
+                pass
+    
 """Shared data summary
 
     Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
 """
 class Shared_data(QObject):
     mda_acq_done_signal = pyqtSignal(bool)
+    liveUpdateEvent = pyqtSignal(object)
     
     #Initialises the info of shared data
     def __init__(self):
@@ -35,7 +79,7 @@ class Shared_data(QObject):
         self._napariViewer = None
         self._headless = False
         self._busy = False
-        self._analysisThreads = []
+        self._analysisThreads = LoggingList()
         self._core = []
         self._liveImageQueues = []
         self._mdaImageQueues = []
@@ -52,6 +96,9 @@ class Shared_data(QObject):
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
         self.liveModeUpdateOngoing = False
+        self.liveModeVisualisationThreadRunning=False
+        self.debugImageArrivalTimes = []
+        self.debugImageDisplayTimes = []
         
         self.globalData = {}
         self.globalData['SLACK-TOKEN']={}
@@ -122,6 +169,10 @@ class Shared_data(QObject):
         self._RunningViaPIP = 'site-packages' in __file__ or 'dist-packages' in __file__
         self._RunningLocally = not self._RunningViaPIP
     
+    def __setattr__(self, name, value):
+        logging.info(f"Setting attribute {name} to {value}")
+        super().__setattr__(name, value)
+    
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)
@@ -168,8 +219,10 @@ class Shared_data(QObject):
     @property
     def analysisThreads(self):
         return self._analysisThreads
+    
     @analysisThreads.setter
     def analysisThreads(self, new_value):
+        logging.info('in analysisthread-setter')
         if new_value != self._analysisThreads:
             self._analysisThreads = new_value
             self.on_analysisThreads_value_change()

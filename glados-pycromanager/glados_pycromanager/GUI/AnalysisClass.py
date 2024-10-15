@@ -86,7 +86,7 @@ class napariOverlay():
                         
                 else: #else create the layer
                     if self.layerType == 'image':
-                        self.layer = napariViewer.add_image(name=self.layer_name,scale=self.layer_scale)
+                        self.layer = napariViewer.add_image(np.zeros((32,32)),name=self.layer_name,scale=self.layer_scale)
                     elif self.layerType == 'labels':
                         self.layer = napariViewer.add_labels([],name=self.layer_name,scale=self.layer_scale)
                     elif self.layerType == 'points':
@@ -330,18 +330,14 @@ class AnalysisThread(QThread):
         self.napariViewer = shared_data.napariViewer
         self.image_queue_analysis = analysisQueue
         self.sleepTimeMs = sleepTimeMs
-        if self.analysisInfo == 'CellSegmentOverlay':
-            storageloc = './AutonomousMicroscopy/ExampleData/StarDistModel'
-            # storageloc = './AutonomousMicroscopy/ExampleData/StarDist_hfx_20220823'
-            modelDirectory = storageloc.rsplit('/', 1)
-            #Load the model - better to do this out of the loop for time reasons
-            self.stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
         if analysisInfo == None:
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
         elif analysisInfo == 'LiveModeVisualisation':
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+            self.sleepTimeMs = 1/float(self.shared_data.globalData['VISUALISATION-FPS']['value'])
         elif analysisInfo == 'mdaVisualisation':
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+            self.sleepTimeMs = 1/float(self.shared_data.globalData['VISUALISATION-FPS']['value'])
         else:
             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
             #Create an empty overlay
@@ -359,19 +355,21 @@ class AnalysisThread(QThread):
         Returns:
             None
         """
-        logging.info('2image_queue_analysis')
         while not self.isInterruptionRequested():
             #Run analysis on the image from the queue
             # logging.debug(self.image_queue_analysis.get())
             # if self.image_queue_analysis.qsize() > 0:
             
-            #Get_nowait is not allowed in the following line:
-            self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
-            self.analysis_done_signal.emit(self.analysis_result)
-                # self.finished.emit()
-            if self.is_running == False:
-                # self.finished.emit()
-                return
+            if self.image_queue_analysis:
+                #Get_nowait is not allowed in the following line:
+                data = self.image_queue_analysis.popleft()
+                self.analysis_result = self.runAnalysis(data) #type:ignore
+                self.analysis_done_signal.emit(self.analysis_result)
+                if self.is_running == False:
+                    # self.finished.emit()
+                    return
+            #Always sleep between frames
+            time.sleep(self.sleepTimeMs)
         
         # Thread has finished, emit the finished signal
         self.finished.emit()
@@ -390,10 +388,10 @@ class AnalysisThread(QThread):
         """
         self.is_running = False
         #Also remove the image queue requestion from live mode
-        if self.image_queue_analysis in self.shared_data.liveImageQueues:
-            self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
-        elif self.image_queue_analysis in self.shared_data.mdaImageQueues:
-            self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
+        # if self.image_queue_analysis in self.shared_data.liveImageQueues:
+        #     self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
+        # if self.image_queue_analysis in self.shared_data.mdaImageQueues:
+        #     self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
     
     def destroy(self):
         """
@@ -447,28 +445,11 @@ class AnalysisThread(QThread):
         Notes:
             - The layer should be open before running the analysis.
             - The analysisInfo parameter should be set before calling this function.
-            - If analysisInfo is 'AvgGrayValueText', the analysisResult will be the result of calcAnalysisAvgGrayValue.
-            - If analysisInfo is 'GrayValueOverlay', the analysisResult will be the result of calcGrayValueOverlay.
-            - If analysisInfo is 'CellSegmentOverlay', the analysisResult will be the result of calcCellSegmentOverlay.
             - If analysisInfo is not set or is invalid, the analysisResult will be None.
         """
         if data is not None:
-            image = data[0]
-            metadata = data[1]
-            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
-                self.msleep(self.sleepTimeMs)
-                #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
-                if self.analysisInfo == 'AvgGrayValueText':
-                    analysisResult = self.calcAnalysisAvgGrayValue(image,metadata=metadata)
-                elif self.analysisInfo == 'ChangeStageAtFrame':
-                    analysisResult = self.changeStageAtFrame(image,metadata=metadata,core=self.shared_data.core,frame=500)
-                elif self.analysisInfo == 'GrayValueOverlay':
-                    analysisResult = self.calcGrayValueOverlay(image,metadata=metadata)
-                else:
-                    analysisResult = None
-                return [analysisResult,metadata]
-            elif self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
-                self.setPriority(self.HighestPriority) #type:ignore
+            if self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
+                self.setPriority(self.TimeCriticalPriority) #type:ignore
                 return None
             else:
                 return None
@@ -739,10 +720,10 @@ class AnalysisThread_customFunction(QThread):
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         self.is_running = False
         #Also remove the image queue requestion from live mode
-        if self.image_queue_analysis in self.shared_data.liveImageQueues:
-            self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
-        elif self.image_queue_analysis in self.shared_data.mdaImageQueues:
-            self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
+        # if self.image_queue_analysis in self.shared_data.liveImageQueues:
+        #     self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
+        # if self.image_queue_analysis in self.shared_data.mdaImageQueues:
+        #     self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
     
         try:
             #check if there's a layer associated with this...
@@ -826,7 +807,7 @@ class AnalysisThread_customFunction(QThread):
                     
                 return [analysisResult,metadata]
             elif self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
-                self.setPriority(self.HighestPriority) #type:ignore
+                self.setPriority(self.TimeCriticalPriority) #type:ignore
                 return None
             else:
                 return None
@@ -895,10 +876,10 @@ def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = N
         #Create a new analysis thread
         logging.debug('starting new image queue analysis')
         image_queue_analysis = deque()#queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
-        if liveorMDA == 'live':
-            shared_data.liveImageQueues.append(image_queue_analysis)
-        elif liveorMDA == 'MDA':
-            shared_data.mdaImageQueues.append(image_queue_analysis)
+        # if liveorMDA == 'live' or liveorMDA == 'MDA':
+        #     shared_data.liveImageQueues.append(image_queue_analysis)
+        # elif liveorMDA == 'MDA':
+            # shared_data.mdaImageQueues.append(image_queue_analysis)
         
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread and add a signal

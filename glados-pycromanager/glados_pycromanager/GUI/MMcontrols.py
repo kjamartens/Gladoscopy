@@ -32,11 +32,13 @@ def is_pip_installed():
 
 if is_pip_installed():
     from glados_pycromanager.GUI.utils import CustomMainWindow
+    import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.AnalysisClass import *
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 
 else:
     from utils import CustomMainWindow
+    import utils
     from AnalysisClass import *
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 class ConfigInfo:
@@ -241,7 +243,7 @@ class MMConfigUI(CustomMainWindow):
     """
         A class to create a MicroManager config UI
     """
-    def __init__(self, config_groups,parent=None,showConfigs = True,showStages=True,showROIoptions=True,showShutterOptions=True,showLiveSnapExposureButtons=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,autoSaveLoad=False):
+    def __init__(self, config_groups,parent=None,showConfigs = True,showStages=True,showROIoptions=True,showShutterOptions=True,showLiveSnapExposureButtons=True,number_config_columns=5,changes_update_MM = True,showCheckboxes = False,checkboxStartInactive=True,showRelativeStages = False,showRealTimeAnalysis=True,autoSaveLoad=False):
         """
         A class to create a MicroManager config UI with the given configuration groups.
         
@@ -263,6 +265,7 @@ class MMConfigUI(CustomMainWindow):
             showCheckboxes (bool, optional): Whether to show checkboxes for each config group. Defaults to False.
             checkboxStartInactive (bool, optional): Whether the checkboxes should start inactive. Defaults to True.
             showRelativeStages (bool, optional): Whether to show the relative stages in the UI. Defaults to False.
+            showRealTimeAnalysis (bool, optional): Whether to show the RT analysis in the UI. Defaults to True
             autoSaveLoad (bool, optional): Whether to automatically save and load the configs to file when the UI is opened and closed. Defaults to False. 
         """
         
@@ -290,6 +293,7 @@ class MMConfigUI(CustomMainWindow):
         self.showLiveSnapExposureButtons = showLiveSnapExposureButtons
         self.showCheckboxes = showCheckboxes
         self.showRelativeStages = showRelativeStages
+        self.showRealTimeAnalysis = showRealTimeAnalysis
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.changes_update_MM = changes_update_MM
@@ -382,6 +386,23 @@ class MMConfigUI(CustomMainWindow):
             self.relativeStagesGroupBox.setLayout(self.relativeStagesLayout())
             # self.relativeStagesGroupBox.setLayout(QLayout())
             self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
+        
+        
+        #Add the real-time analysis
+        if showRealTimeAnalysis:
+            #Now add the stages widget
+            # self.stagesWidget()
+            self.realTimeAnalysisGroupBox = QGroupBox("Real-time analysis")
+            self.realTimeAnalysisGroupBox.setObjectName('realTimeAnalysisGroupBox')
+            
+            self.rtAnalysisLayout = QGridLayout()
+            self.realTimeAnalysisGroupBox.setLayout(self.rtAnalysisLayout)
+            self.rtAnalysisSubGroupBoxLayout = QGridLayout()
+            self.rtAnalysisLayout.addLayout(self.rtAnalysisSubGroupBoxLayout,0,0,1,2)
+            
+            #Initialise the rt analysis layout:
+            self.realTimeAnalysisLayout()
+            self.mainLayout.addWidget(self.realTimeAnalysisGroupBox, 0, 5)
         
         #Add a horizontal auto-widening object to mainlayout:
         from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
@@ -750,8 +771,19 @@ class MMConfigUI(CustomMainWindow):
             self.LiveModeButton.setIcon(icon)
             #set exposure time first:
             shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
-            #Then start live mode:
+            #Then start live mode, which is just a custom MDA
             shared_data.liveMode = True
+            # from MDAGlados import MDAGlados
+            # liveMDA = MDAGlados(core,[],[],
+            #     shared_data,
+            #     z_start=0,
+            #     z_step=0,
+            #     z_end = 0,
+            #     num_time_points=500, 
+            #     exposure_ms= float(self.exposureTimeInputField.text()), 
+            #     exposure_s_or_ms = 'ms')
+            # liveMDA.MDA_acq_from_GUI(mdaLayerName='Live')
+            # shared_data.liveMode = True
         else:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Start Live Mode")
@@ -908,7 +940,10 @@ class MMConfigUI(CustomMainWindow):
         """
         #Get the current ROI info
         #[x,y,width,height]
-        roiv = [self.core.get_roi().x,self.core.get_roi().y,self.core.get_roi().width,self.core.get_roi().height] #type:ignore
+        if shared_data.backend == 'JAVA':
+            roiv = [self.core.get_roi().x,self.core.get_roi().y,self.core.get_roi().width,self.core.get_roi().height] #type:ignore
+        elif shared_data.backend == 'Python':
+            roiv = [self.core.get_roi()[0],self.core.get_roi()[1],self.core.get_roi()[2],self.core.get_roi()[3]] #type:ignore
         logging.debug('ROI zoom requested, current size: '+str(roiv))
         if option == 'ZoomIn':
             #zoom in twice
@@ -1113,6 +1148,91 @@ class MMConfigUI(CustomMainWindow):
         # stageLayout.addLayout(self.XYstageLayout())
         stageLayout.addLayout(self.oneDstageRelLayout())
         return stageLayout
+    
+    def realTimeAnalysisLayout(self):
+        """
+        Creates and returns a layout for real-time analysis of e.g. live/snap images that are created.
+        
+        """
+        
+        
+        
+        #Let's try to get all possible RT analysis options
+        realTimeAnalysisFunctions = utils.functionNamesFromDir('AutonomousMicroscopy\\Real_Time_Analysis')
+        realTimeAnalysisFunctionsAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Real_Time_Analysis')
+        #Remove duplicates - not sure why they're here:
+        realTimeAnalysisFunctionsAppData = list(set(realTimeAnalysisFunctionsAppData))
+        
+        realTimeAnalysisFunctionsAll = realTimeAnalysisFunctions + realTimeAnalysisFunctionsAppData
+        
+        
+        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(realTimeAnalysisFunctionsAll,'')
+        #Store this mapping also in the node
+        self.real_time_analysis_currentData = {}
+        self.real_time_analysis_currentData['__displayNameFunctionNameMap__'] = displaynameMapping
+        
+        #Add a dropbox with all the options
+        self.comboBox_RTanalysisFunctions = QComboBox(self)
+        if len(realTimeAnalysisFunctions) > 0:
+            for item in realTimeAnalysisFunctions:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
+        if len(realTimeAnalysisFunctionsAppData) > 0:
+            for item in realTimeAnalysisFunctionsAppData:
+                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
+                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
+        
+        self.rtAnalysisSubGroupBoxLayout.addWidget(self.comboBox_RTanalysisFunctions, 0, 1)
+        #give it an objectName:
+        self.comboBox_RTanalysisFunctions.setObjectName('comboBox_RTanalysisFunctions_KEEP')
+        
+        #Give it a connect-callback if it's changed (then the layout should be changed)
+        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, layout=self.rtAnalysisSubGroupBoxLayout, dropdown=self.comboBox_RTanalysisFunctions,displaynameMapping=displaynameMapping: utils.layout_changedDropdown(layout,dropdown,displaynameMapping))
+        #Also give it a connect-callback to store the currentinfo:
+        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
+
+        self.realTimeAnalysisGroupBox.currentData = {}
+        self.realTimeAnalysisGroupBox.currentData['__displayNameFunctionNameMap__'] = displaynameMapping
+        # pre-load all args/kwargs and their edit values - then hide all of them
+        utils.layout_init(self.rtAnalysisSubGroupBoxLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions,nodzInfo=self,skipInput=True)
+        
+        print('hi')
+        
+        #Pre-load the options if they're in the current node info
+        # if 'real_time_analysis_currentData' in vars(self):
+            
+        #     utils.preLoadOptions_realtime(self.rtAnalysisSubGroupBoxLayout,self.real_time_analysis_currentData) #type:ignore
+        
+        def activateRealTimeAnalysisFromDockWidget(self):
+            #TODO: remove existing analysis if present
+            self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryRTAnalysis__'] = self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryAnalysis__']
+            self.realTimeAnalysisGroupBox.currentData['__realTimeVisualisation__'] = True#dialog.visualisationBox.isChecked() #type:ignore 
+            self.current_analysis_thread = create_real_time_analysis_thread(shared_data,analysisInfo = self.realTimeAnalysisGroupBox.currentData,delay=None,nodzInfo=None)
+            print('hi!')
+        def deactivateRealTimeAnalysisFromDockWidget(self):
+            #remove the current_analysis_thread from shared_data.analysisThreads:
+            
+            for thread in shared_data.analysisThreads:
+                if thread == self.current_analysis_thread:
+                    # thread.destroy()
+                    shared_data.analysisThreads.remove(thread)
+                    logging.info('Removed analysis thread: '+str(thread))
+        
+        
+        self.rtAnalysisActivateButton = QPushButton('Activate')
+        #add a clicked-call:
+        self.rtAnalysisActivateButton.clicked.connect(lambda: activateRealTimeAnalysisFromDockWidget(self))
+        self.rtAnalysisDeactivateButton = QPushButton('Deactivate')
+        self.rtAnalysisDeactivateButton.clicked.connect(lambda: deactivateRealTimeAnalysisFromDockWidget(self))
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisActivateButton,1,0,1,1)
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisDeactivateButton,1,1,1,1)
+        
+        
+        
+        #Add a spacer at the bottom:
+        expandingspacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.rtAnalysisLayout.addItem(expandingspacer,2,0,1,2)
+        return self.rtAnalysisLayout
     
     def XYstageLayout(self):
         """

@@ -1565,11 +1565,12 @@ class MDAGlados(CustomMainWindow):
             startMDAVisualisation(self.shared_data,layerName=mdaLayerName)
         logging.debug('ended setting mdamode params')
         
-        #Set the Acquire button to say 'stop'
-        self.GUI_acquire_button.setText('Stop Acquisition') #type:ignore
-        #Remove active clicked-connect-calls:
-        self.GUI_acquire_button.clicked.disconnect() #type:ignore
-        self.GUI_acquire_button.clicked.connect(lambda index: self.stopMDA(mdaLayerName='MDA')) #type:ignore
+        if self.has_GUI:
+            #Set the Acquire button to say 'stop'
+            self.GUI_acquire_button.setText('Stop Acquisition') #type:ignore
+            #Remove active clicked-connect-calls:
+            self.GUI_acquire_button.clicked.disconnect() #type:ignore
+            self.GUI_acquire_button.clicked.connect(lambda index: self.stopMDA(mdaLayerName='MDA')) #type:ignore
         pass
     
     def resetMDAbutton(self,mdaLayerName='MDA'):
