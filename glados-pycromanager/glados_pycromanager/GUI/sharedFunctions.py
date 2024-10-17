@@ -81,7 +81,7 @@ class Shared_data(QObject):
         self._busy = False
         self._analysisThreads = LoggingList()
         self._core = []
-        self._liveImageQueues = []
+        self._RTAnalysisQueues = []
         self._mdaImageQueues = []
         self._defaultFocusDevice = ''
         self._mdaModeSaveLoc = ['','']
@@ -246,15 +246,15 @@ class Shared_data(QObject):
             self._core = new_value
 
     @property
-    def liveImageQueues(self):
-        return self._liveImageQueues
-    @liveImageQueues.setter
-    def liveImageQueues(self, new_value):
-        if new_value != self._liveImageQueues:
-            self._liveImageQueues = new_value
-            self.on_liveImageQueues_value_change()
-    def on_liveImageQueues_value_change(self):
-        logging.debug('liveImageQueues changed')
+    def RTAnalysisQueues(self):
+        return self._RTAnalysisQueues
+    @RTAnalysisQueues.setter
+    def RTAnalysisQueues(self, new_value):
+        if new_value != self._RTAnalysisQueues:
+            self._RTAnalysisQueues = new_value
+            self.on_RTAnalysisQueues_value_change()
+    def on_RTAnalysisQueues_value_change(self):
+        logging.debug('RTAnalysisQueues changed')
         
     @property
     def mdaImageQueues(self):

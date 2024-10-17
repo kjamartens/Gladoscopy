@@ -2731,7 +2731,7 @@ def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
             delay = functionMetadata2['run_delay']
     elif runOrVis == 'visualise':
         if 'visualise_delay' not in functionMetadata2:
-            delay = 50 #Default value for vis
+            delay = 200 #Default value for vis
         else:
             delay = functionMetadata2['visualise_delay']
     

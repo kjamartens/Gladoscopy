@@ -147,12 +147,6 @@ class headlessGUI(QWidget):
         self.config_file = self.config_fileLineEdit.text()
         self.buffer_size_mb = self.buffer_size_mbLineEdit.text()
         self.max_memory_mb = self.max_memory_mbLineEdit.text()
-
-        # start_headless(mm_app_path=mm_app_path, config_file=config_file, python_backend=self.backend=='Python', buffer_size_mb=int(buffer_size_mb), max_memory_mb=int(max_memory_mb))
-        # self.shared_data._headless = True
-        # print('headless MM started')
-        # self.core = Core()
-        
         self.close()
 
 
@@ -233,21 +227,6 @@ def main():
     
     #Run the app until closed
     sys.exit(app.exec_())
-
-    #Run the UI
-    # import threading
-    # thread = threading.Thread(target=runNapariPycroManager, args=(core, MM_JSON, shared_data))
-    # thread.start()
-    # # nPM = runNapariPycroManager(core,MM_JSON,shared_data)
-
-    # #Periodically update the MM info of the MMcontrolsWidget
-    # global MM_update_instance
-    # # MM_update_instance = periodicallyUpdate(updateFunction=nPM['MMcontrolWidget'].updateAllMMinfo)
-
-    # #Ensure it stays open
-    # app = QApplication([])
-    # app.aboutToQuit.connect(lambda: perform_post_closing_actions(shared_data))
-    # sys.exit(app.exec_())
 
 
 def show_UserManualNapari():

@@ -26,8 +26,8 @@ def __function_metadata__():
             ],
             "help_string": "Sharpness value.",
             "display_name": "Sharpness value",
-            "run_delay": 50,
-            "visualise_delay": 100,
+            "run_delay": 200,
+            "visualise_delay": 200,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],

@@ -73,7 +73,7 @@ class napariOverlay():
         #Get info from a RT analysis object (i.e. outside-based-analysis)
         if self.RT_analysisObject is not None:
             self.layer_name, self.layerType = self.RT_analysisObject.visualise_init()
-            logging.debug(f"Initialised napariOverlay with layer_name: {self.layer_name}, layerType: {self.layerType}")
+            logging.debug(f"#nO - Initialised napariOverlay with layer_name: {self.layer_name}, layerType: {self.layerType}")
             
         #Create the layer if layer_name is not none
         #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
@@ -299,267 +299,6 @@ class napariOverlay():
         """
         del self
 
-#This code gets some image and does some analysis on this
-class AnalysisThread(QThread):
-    """
-    Used for visualisation of streamed data
-    """
-    # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
-    # Create a signal to communicate between threads
-    analysis_done_signal = pyqtSignal(object)
-    finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=500):
-        """
-        Initializes the AnalysisThread object.
-
-        Args:
-            shared_data: The shared data object. See Shared_data class for more information
-            analysisInfo (Union[str, None]): Optional. The analysis 'title/method'. Default is 'Random'.
-            visualisationInfo (Union[str, None]): Optional. The visualisation 'title/method'. Default is 'Random'.
-
-        Returns:
-        None
-        """
-        super().__init__()	
-        self.is_running = True
-        self.running = self.is_running
-        self.analysis_ongoing = False
-        self.shared_data = shared_data
-        self.analysisInfo = analysisInfo
-        self.visualisationInfo = visualisationInfo
-        self.napariViewer = shared_data.napariViewer
-        self.image_queue_analysis = analysisQueue
-        self.sleepTimeMs = sleepTimeMs
-        if analysisInfo == None:
-            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
-        elif analysisInfo == 'LiveModeVisualisation':
-            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
-            self.sleepTimeMs = 1/float(self.shared_data.globalData['VISUALISATION-FPS']['value'])
-        elif analysisInfo == 'mdaVisualisation':
-            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
-            self.sleepTimeMs = 1/float(self.shared_data.globalData['VISUALISATION-FPS']['value'])
-        else:
-            self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
-            #Create an empty overlay
-            if visualisationInfo != None:
-                #Activate layer
-                self.initialise_napariLayer()
-    
-    def run(self):
-        """
-        Runs the function in a loop as long as `self.is_running` is True.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        while not self.isInterruptionRequested():
-            #Run analysis on the image from the queue
-            # logging.debug(self.image_queue_analysis.get())
-            # if self.image_queue_analysis.qsize() > 0:
-            
-            if self.image_queue_analysis:
-                #Get_nowait is not allowed in the following line:
-                data = self.image_queue_analysis.popleft()
-                self.analysis_result = self.runAnalysis(data) #type:ignore
-                self.analysis_done_signal.emit(self.analysis_result)
-                if self.is_running == False:
-                    # self.finished.emit()
-                    return
-            #Always sleep between frames
-            time.sleep(self.sleepTimeMs)
-        
-        # Thread has finished, emit the finished signal
-        self.finished.emit()
-        
-        
-        # while self.running:
-        #     if not self.image_queue_analysis.empty():
-        #         data = self.image_queue_analysis.get_nowait()
-        #         self.runAnalysis(data)
-        #         self.image_queue_analysis.task_done()
-        #     time.sleep(self.sleepTimeMs/1000.0)
-    
-    def stop(self):
-        """
-        Stops the execution of the function
-        """
-        self.is_running = False
-        #Also remove the image queue requestion from live mode
-        # if self.image_queue_analysis in self.shared_data.liveImageQueues:
-        #     self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
-        # if self.image_queue_analysis in self.shared_data.mdaImageQueues:
-        #     self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
-    
-    def destroy(self):
-        """
-        Destroy the object.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        try:
-            logging.debug('Destroying '+str(self.analysisInfo))
-        except:
-            logging.debug('Destroying some analysis thread')
-        #Wait for the thread to be finished
-        self.stop()
-        self.requestInterruption()
-        self.quit()
-        #Officially we'd need to wait here, but that seems to start an infinite loop somewhere
-        # self.wait()
-        # self.deleteLater()
-    
-    #Get corresponding layer of napariOverlay
-    def getLayer(self):
-        """
-        Obtain the napari overlay layer (napariOverlay class) associated with this analysisThread
-        
-        Args:
-            None
-
-        Returns:
-            napari.layers.Layer: The layer associated with the napari overlay.
-        """
-        return self.napariOverlay.getLayer()
-    
-    #Analysis is split into two parts: obtaining the analysis result and displaying this.
-    #Here, we calculate the analysis result based on the analysisInfo
-    def runAnalysis(self,data): 
-        """
-        Runs the analysis on the given image based on the analysis information provided.
-
-        Args:
-            data, containing:
-            image (Image): The image on which the analysis needs to be performed.
-            metadata: corresponding metadata
-
-        Returns:
-            analysisResult (Any): The result of the analysis. The analysis result will be passed to Visualise_Analysis_results.
-
-        Notes:
-            - The layer should be open before running the analysis.
-            - The analysisInfo parameter should be set before calling this function.
-            - If analysisInfo is not set or is invalid, the analysisResult will be None.
-        """
-        if data is not None:
-            if self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
-                self.setPriority(self.TimeCriticalPriority) #type:ignore
-                return None
-            else:
-                return None
-        else:
-            return None
-
-    #And here we perform the visualisation - can be fully separate from performing the analysis
-    #Initialisation is called upon creation
-    def initialise_napariLayer(self):
-        if self.visualisationInfo == 'AvgGrayValueText':
-            self.initAvgGrayValueText()
-        elif self.analysisInfo == 'GrayValueOverlay':
-            self.initGrayScaleImageOverlay()
-        elif self.analysisInfo == 'ChangeStageAtFrame':
-            self.initChangeStageAtFrame()
-        else:
-            self.initRandomOverlay()
-            
-    #Update ir called every time the analysis is done
-    def update_napariLayer(self,analysis_data):
-        if analysis_data is not None:
-            analysis_result = analysis_data[0]
-            metadata = analysis_data[1]
-            # logging.debug(analysis_result)
-            if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
-                if self.visualisationInfo == 'AvgGrayValueText':
-                    self.visualiseAvgGrayValueText(analysis_result=analysis_result,metadata=metadata)
-                elif self.analysisInfo == 'GrayValueOverlay':
-                    self.visualiseGrayScaleImageOverlay(analysis_result=analysis_result,metadata=metadata)
-                # else:
-                #     self.visualiseRandomOverlay()
-    
-    def outlineCoordinatesToImage(self,coords):
-    # Create a blank grayscale image with a white background
-        image = Image.new("L", (self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height), "black")
-        draw = ImageDraw.Draw(image)
-
-        # Iterate over each n in N
-        for n in range(coords.shape[0]):
-            # Get the x and y coordinates for the current n
-            x = coords[n, 0, :]
-            y = coords[n, 1, :]
-
-            # Create a list of (x, y) tuples for drawing the lines
-            points = [(x[i], y[i]) for i in range(len(x))]
-
-            # Draw the lines on the image
-            draw.line(points, fill="white",width=2)  # Use black for the lines
-
-        # Convert the image to grayscale mode (L)
-        grayscale_image = image.convert("L")
-        return np.fliplr(np.rot90(np.array(grayscale_image),k=3))
-    
-    """
-    Testing updating a stage during acq
-    """
-    
-    def changeStageAtFrame(self,image,metadata=None,core=None,frame=100):
-        logging.debug(float(metadata['ImageNumber'])) #type:ignore
-        
-        if float(metadata['ImageNumber'])>frame and self.notyetchanged == True: #type:ignore
-            core.set_relative_position('Z',100.0) #type:ignore
-            self.notyetchanged = False
-            logging.debug('Z position changed!')
-        
-    def initChangeStageAtFrame(self):
-        logging.debug('Initted changestageatframe')
-        self.notyetchanged = True
-    
-    """
-    Average gray value calculation and display
-    """
-    #Calculating average gray value of an image
-    def calcAnalysisAvgGrayValue(self,image,metadata=None):
-        return np.mean(np.mean(image))
-    
-    def visualiseAvgGrayValueText(self,analysis_result='Random',metadata={}):
-        self.napariOverlay.drawTextOverlay(text='Mean gray value: {:.0f}, at frame: {:.0f}'.format(analysis_result,float(metadata['ImageNumber'])),pos=[0,0],textCol='white',textSize=12)
-        
-    def initAvgGrayValueText(self):
-        self.napariOverlay.changeName('Average Gray Value')
-        self.napariOverlay.drawTextOverlay_init()
-    
-    """
-    Random overlay display
-    """   
-    def visualiseRandomOverlay(self,analysis_result=None,metadata={}):
-        self.napariOverlay.drawSquaresOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
-        
-    def initRandomOverlay(self):
-        self.napariOverlay.changeName('RandomOverlay')
-        self.napariOverlay.shapesOverlay_init()    
-    
-    """
-    Testing overlay of image - based on grayscale value
-    """
-    def calcGrayValueOverlay(self,image,metadata=None):
-        #Get an image that simply provides a Boolean based on percentile:
-        image2 = np.where(image<np.percentile(image,25),1,0)
-        return image2
-    
-    def visualiseGrayScaleImageOverlay(self,analysis_result=None,metadata={}):
-        #Expected analysis_result is a boolean image.
-        #Create an image overlay from napari
-        self.napariOverlay.drawImageOverlay(im=analysis_result) #type:ignore
-    
-    def initGrayScaleImageOverlay(self):
-        self.napariOverlay.imageOverlay_init()
-        self.napariOverlay.changeName('Grayscale Image Overlay')
-
 class AnalysisThread_customFunction_Visualisation(QThread):
     finished = pyqtSignal()# signal to indicate that the thread has finished
     def __init__(self,analysisObject,shared_data,analysisInfo: Union[str, None] = 'Random',delay=None):
@@ -570,7 +309,8 @@ class AnalysisThread_customFunction_Visualisation(QThread):
             #ensure that it's never faster than the visualisation rate
             min_delay_visualisation = int(1000/(float(shared_data.globalData['VISUALISATION-FPS']['value'])))
             delay = max(min_delay_visualisation,utils.realTimeAnalysis_getDelay(analysisInfo,runOrVis='visualise'))
-            
+        
+        logging.debug('#aC - init analysisThread_customFunction_Visualisation')
         self.is_running = True
         self.analysis_ongoing = False
         self.shared_data = shared_data
@@ -579,32 +319,30 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.sleepTimeMs = delay
         self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS')
         self.visualisation_queue = deque()#queue.Queue()
+        self.shared_data = shared_data
         
         #And start  the thread
         self.running = True
-        logging.debug('Init AnalysisThread_customFunction_Visualisation')
         # self.process_queue()
     
     def run(self):
         while self.running:
-            # logging.debug('Run AnalysisThread_customFunction_Visualisation')
-            # logging.debug('Attempting to take from queue')
-            # logging.debug('Queue size: {}'.format(self.visualisation_queue.qsize()))
-            # logging.debug(f"sleeptime: {self.sleepTimeMs}")
-            if self.visualisation_queue:
-                data = self.visualisation_queue.popleft()
-                RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
-                logging.debug('Ran updateVisualisation with RT analysis object')
-                self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
-                # self.visualisation_queue.task_done()
-            time.sleep(self.sleepTimeMs/1000.0)
+            #Only check the vis queue if live or mda is ongoing
+            if self.shared_data.liveMode or self.shared_data.mdaMode:
+                logging.debug(f'#aC - running analysisThread_customFunction_Visualisation, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
+                if self.visualisation_queue:
+                    data = self.visualisation_queue.popleft()
+                    RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
+                    self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
+                    # self.visualisation_queue.task_done()
+            #Always sleep while running
+            self.msleep(self.sleepTimeMs)
             
-    
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
         res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
 
-#This code gets some image and does some analysis on this
+#This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
 class AnalysisThread_customFunction(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
@@ -634,29 +372,9 @@ class AnalysisThread_customFunction(QThread):
         self.napariOverlay = None
         self.nodzInfo=nodzInfo
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
-        logging.debug('sarted AnalysisThread_customFunction')
+        logging.debug('#aC - started AnalysisThread_customFunction')
         self.initAnalysis()
         self.running = True
-        
-        # self.analysis_done_signal.connect(self.update_napariLayer)
-        # if self.analysisInfo == 'CellSegmentOverlay':
-        #     storageloc = './AutonomousMicroscopy/ExampleData/StarDistModel'
-        #     # storageloc = './AutonomousMicroscopy/ExampleData/StarDist_hfx_20220823'
-        #     modelDirectory = storageloc.rsplit('/', 1)
-        #     #Load the model - better to do this out of the loop for time reasons
-        #     self.stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
-        # if analysisInfo == None:
-        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
-        # elif analysisInfo == 'LiveModeVisualisation':
-        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
-        # elif analysisInfo == 'mdaVisualisation':
-        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
-        # else:
-        #     self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
-            #Create an empty overlay
-            # if visualisationInfo != None:
-            #     #Activate layer
-            #     self.initialise_napariLayer()
     
     def run(self):
         """
@@ -668,38 +386,18 @@ class AnalysisThread_customFunction(QThread):
         Returns:
             None
         """
-        # logging.debug('self.image_queue_analysis.get()')
         
-        #This part was an adventure and works, but I think I leave the old method (pre-okt 2024) in case it's doing something I'm unaware off.
-        # while self.running:
-        #     if not self.image_queue_analysis.empty():
-        #         logging.info('Performing analysisThread analysis')
-        #         self.analysis_result = self.runAnalysis(self.image_queue_analysis.get_nowait()) #type:ignore
-        #         self.analysis_done_signal.emit(self.analysis_result)
-        #         self.image_queue_analysis.task_done()
-            
-        #     time.sleep(max(10,self.sleepTimeMs)/1000.0)
-                
-        #     if self.is_running == False:
-        #         # self.finished.emit()
-        #         self.running=False
-        #         return
-        #     if self.isInterruptionRequested():
-        #         self.running = False
-        #         return
-        # -- end of 'this part...'
-        
-        while not self.isInterruptionRequested():
-            #Run analysis on the image from the queue
-            if self.image_queue_analysis:
-                self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
-                self.analysis_done_signal.emit(self.analysis_result)
-                # self.image_queue_analysis.task_done() #type:ignore
-                if self.is_running == False:
-                    return
-            else:
-                #If the queue is empty, sleep for a bit and try again
-                time.sleep(max(10,self.sleepTimeMs)/1000.0)
+        while self.is_running:
+            #Only check the vis queue if live or mda is ongoing
+            if self.shared_data.liveMode or self.shared_data.mdaMode:
+                logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
+                #Run analysis on the image from the queue
+                if self.image_queue_analysis:
+                    self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
+                    self.analysis_done_signal.emit(self.analysis_result)
+                    # self.image_queue_analysis.task_done() #type:ignore
+            #Always sleep while running
+            self.msleep(self.sleepTimeMs)
         
         # Thread has finished, emit the finished signal
         self.finished.emit()
@@ -720,8 +418,8 @@ class AnalysisThread_customFunction(QThread):
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         self.is_running = False
         #Also remove the image queue requestion from live mode
-        # if self.image_queue_analysis in self.shared_data.liveImageQueues:
-        #     self.shared_data.liveImageQueues.remove(self.image_queue_analysis)
+        # if self.image_queue_analysis in self.shared_data.RTAnalysisQueues:
+        #     self.shared_data.RTAnalysisQueues.remove(self.image_queue_analysis)
         # if self.image_queue_analysis in self.shared_data.mdaImageQueues:
         #     self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
     
@@ -814,26 +512,11 @@ class AnalysisThread_customFunction(QThread):
         else:
             return None
 
-
-
-    # #And here we perform the visualisation - can be fully separate from performing the analysis
-    # #Initialisation is called upon creation
-    # def initialise_napariLayer(self):
-    #     logging.debug('init_napariLayer')
-            
-    # #Update ir called every time the analysis is done
-    # def update_napariLayer(self,analysisInfo,image,metadata=None,core=None):
-    #     self.visualisationObject.updateVisualisation(analysisInfo,image,metadata,core)
-    #     # utils.realTimeAnalysis_visualisation(self.RT_analysis_object,analysisInfo,image,metadata,core)
-    
-    
-    
-    
     def initAnalysis(self):
         self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core,nodzInfo=self.nodzInfo)
         logging.debug('run initAnalysis')
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']: #type:ignore
-            self.queue_visualisation = deque()#queue.Queue()
+            self.queue_visualisation = deque()
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
     
@@ -866,39 +549,11 @@ class AnalysisThread_customFunction(QThread):
             self.visualisationObject.running=False
         return result
 
-#This function is used for live/mda visualisation
-def create_analysis_thread(shared_data,analysisInfo = None,visualisationInfo = None,createNewThread = True,throughputThread=None,liveorMDA='live'):
-    global image_queue_analysis, napariViewer
-    napariViewer = shared_data.napariViewer
-    if createNewThread == False:
-        image_queue_analysis = throughputThread
-    else:
-        #Create a new analysis thread
-        logging.debug('starting new image queue analysis')
-        image_queue_analysis = deque()#queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
-        # if liveorMDA == 'live' or liveorMDA == 'MDA':
-        #     shared_data.liveImageQueues.append(image_queue_analysis)
-        # elif liveorMDA == 'MDA':
-            # shared_data.mdaImageQueues.append(image_queue_analysis)
-        
-    # image_queue_analysis = image_queue_transfer
-    #Instantiate an analysis thread and add a signal
-    delay = int(1000/(float(shared_data.globalData['VISUALISATION-FPS']['value'])))
-    analysis_thread = AnalysisThread(shared_data,analysisInfo=analysisInfo,visualisationInfo=analysisInfo,analysisQueue=image_queue_analysis,sleepTimeMs = delay)
-    analysis_thread.analysis_done_signal.connect(analysis_thread.update_napariLayer)
-    analysis_thread.finished.connect(analysis_thread.deleteLater)
-    analysis_thread.start()
-    
-    #Append it to the list of analysisThreads
-    shared_data.analysisThreads.append(analysis_thread)
-    
-    return analysis_thread
 
-#Use this function from now on
 def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewThread = True,throughputThread=None,delay: float|None = None,nodzInfo=None):
-    
-    #Created/tested via nodz
-    
+    """
+    Function that creates separate threads for real-time analysis. Note that live/mda visualisation is simply a special case of real-time analysis.
+    """    
     global image_queue_analysis, napariViewer
     napariViewer = shared_data.napariViewer
     if createNewThread == False:
@@ -906,7 +561,7 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     else:
         #Create a new analysis thread
         image_queue_analysis = deque()#queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
-        shared_data.liveImageQueues.append(image_queue_analysis)
+        shared_data.RTAnalysisQueues.append(image_queue_analysis)
             
     if delay==None:
         #Get the delay of the function from the realTimeAnalysis module
@@ -923,3 +578,272 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     shared_data.analysisThreads.append(analysis_thread)
     
     return analysis_thread
+
+
+
+
+
+
+# #PRETTY SURE THIS IS DEPRECATED
+# #Maybe done for MDA visualisation ONLY
+# #This code gets some image and does some analysis on this
+# class AnalysisThread(QThread):
+#     """
+#     Obtained streamed data, and perform rt analysis and/or rt visualisation on this.
+#     """
+#     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
+#     # Create a signal to communicate between threads
+#     analysis_done_signal = pyqtSignal(object)
+#     finished = pyqtSignal()# signal to indicate that the thread has finished
+#     def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',visualisationInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=500):
+#         """
+#         Initializes the AnalysisThread object.
+
+#         Args:
+#             shared_data: The shared data object. See Shared_data class for more information
+#             analysisInfo (Union[str, None]): Optional. The analysis 'title/method'. Default is 'Random'.
+#             visualisationInfo (Union[str, None]): Optional. The visualisation 'title/method'. Default is 'Random'.
+
+#         Returns:
+#         None
+#         """
+#         super().__init__()	
+#         logging.debug('#aC - init AnalysisThread')
+#         self.is_running = True
+#         self.running = self.is_running
+#         self.analysis_ongoing = False
+#         self.shared_data = shared_data
+#         self.analysisInfo = analysisInfo
+#         self.visualisationInfo = visualisationInfo
+#         self.napariViewer = shared_data.napariViewer
+#         self.image_queue_analysis = analysisQueue
+#         self.sleepTimeMs = sleepTimeMs
+#         if analysisInfo == None:
+#             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+#         elif analysisInfo == 'LiveModeVisualisation':
+#             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+#             self.sleepTimeMs = 1000/float(self.shared_data.globalData['VISUALISATION-FPS']['value'])
+#         elif analysisInfo == 'mdaVisualisation':
+#             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=None)
+#             self.sleepTimeMs = 1000/float(self.shared_data.globalData['VISUALISATION-FPS']['value'])
+#         else:
+#             self.napariOverlay = napariOverlay(self.napariViewer,layer_name=analysisInfo)
+#             #Create an empty overlay
+#             if visualisationInfo != None:
+#                 #Activate layer
+#                 self.initialise_napariLayer()
+    
+#     def run(self):
+#         """
+#         Runs the function in a loop as long as `self.is_running` is True.
+
+#         Args:
+#             None
+
+#         Returns:
+#             None
+#         """
+#         while not self.isInterruptionRequested():
+#             #Run analysis on the image from the queue
+#             # logging.debug(self.image_queue_analysis.get())
+#             # if self.image_queue_analysis.qsize() > 0:
+#             logging.debug('#aC - runAnalysis is running')
+#             if self.image_queue_analysis:
+#                 #Get_nowait is not allowed in the following line:
+#                 data = self.image_queue_analysis.popleft()
+#                 self.analysis_result = self.runAnalysis(data) #type:ignore
+#                 self.analysis_done_signal.emit(self.analysis_result)
+#                 if self.is_running == False:
+#                     # self.finished.emit()
+#                     return
+#             #Always sleep between frames
+#             self.msleep(self.sleepTimeMs)
+        
+#         # Thread has finished, emit the finished signal
+#         self.finished.emit()
+        
+        
+#         # while self.running:
+#         #     if not self.image_queue_analysis.empty():
+#         #         data = self.image_queue_analysis.get_nowait()
+#         #         self.runAnalysis(data)
+#         #         self.image_queue_analysis.task_done()
+#         #     time.sleep(self.sleepTimeMs/1000.0)
+    
+#     def stop(self):
+#         """
+#         Stops the execution of the function
+#         """
+#         self.is_running = False
+#         #Also remove the image queue requestion from live mode
+#         # if self.image_queue_analysis in self.shared_data.RTAnalysisQueues:
+#         #     self.shared_data.RTAnalysisQueues.remove(self.image_queue_analysis)
+#         # if self.image_queue_analysis in self.shared_data.mdaImageQueues:
+#         #     self.shared_data.mdaImageQueues.remove(self.image_queue_analysis)
+    
+#     def destroy(self):
+#         """
+#         Destroy the object.
+
+#         Args:
+#             None
+
+#         Returns:
+#             None
+#         """
+#         try:
+#             logging.debug('Destroying '+str(self.analysisInfo))
+#         except:
+#             logging.debug('Destroying some analysis thread')
+#         #Wait for the thread to be finished
+#         self.stop()
+#         self.requestInterruption()
+#         self.quit()
+#         #Officially we'd need to wait here, but that seems to start an infinite loop somewhere
+#         # self.wait()
+#         # self.deleteLater()
+    
+#     #Get corresponding layer of napariOverlay
+#     def getLayer(self):
+#         """
+#         Obtain the napari overlay layer (napariOverlay class) associated with this analysisThread
+        
+#         Args:
+#             None
+
+#         Returns:
+#             napari.layers.Layer: The layer associated with the napari overlay.
+#         """
+#         return self.napariOverlay.getLayer()
+    
+#     #Analysis is split into two parts: obtaining the analysis result and displaying this.
+#     #Here, we calculate the analysis result based on the analysisInfo
+#     def runAnalysis(self,data): 
+#         """
+#         Runs the analysis on the given image based on the analysis information provided.
+
+#         Args:
+#             data, containing:
+#             image (Image): The image on which the analysis needs to be performed.
+#             metadata: corresponding metadata
+
+#         Returns:
+#             analysisResult (Any): The result of the analysis. The analysis result will be passed to Visualise_Analysis_results.
+
+#         Notes:
+#             - The layer should be open before running the analysis.
+#             - The analysisInfo parameter should be set before calling this function.
+#             - If analysisInfo is not set or is invalid, the analysisResult will be None.
+#         """
+#         if data is not None:
+#             if self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
+#                 self.setPriority(self.TimeCriticalPriority) #type:ignore
+#                 return None
+#             else:
+#                 return None
+#         else:
+#             return None
+
+#     #And here we perform the visualisation - can be fully separate from performing the analysis
+#     #Initialisation is called upon creation
+#     def initialise_napariLayer(self):
+#         if self.visualisationInfo == 'AvgGrayValueText':
+#             self.initAvgGrayValueText()
+#         elif self.analysisInfo == 'GrayValueOverlay':
+#             self.initGrayScaleImageOverlay()
+#         elif self.analysisInfo == 'ChangeStageAtFrame':
+#             self.initChangeStageAtFrame()
+#         else:
+#             self.initRandomOverlay()
+            
+#     #Update ir called every time the analysis is done
+#     def update_napariLayer(self,analysis_data):
+#         if analysis_data is not None:
+#             analysis_result = analysis_data[0]
+#             metadata = analysis_data[1]
+#             # logging.debug(analysis_result)
+#             if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
+#                 if self.visualisationInfo == 'AvgGrayValueText':
+#                     self.visualiseAvgGrayValueText(analysis_result=analysis_result,metadata=metadata)
+#                 elif self.analysisInfo == 'GrayValueOverlay':
+#                     self.visualiseGrayScaleImageOverlay(analysis_result=analysis_result,metadata=metadata)
+#                 # else:
+#                 #     self.visualiseRandomOverlay()
+    
+#     def outlineCoordinatesToImage(self,coords):
+#     # Create a blank grayscale image with a white background
+#         image = Image.new("L", (self.shared_data.core.get_roi().width,self.shared_data.core.get_roi().height), "black")
+#         draw = ImageDraw.Draw(image)
+
+#         # Iterate over each n in N
+#         for n in range(coords.shape[0]):
+#             # Get the x and y coordinates for the current n
+#             x = coords[n, 0, :]
+#             y = coords[n, 1, :]
+
+#             # Create a list of (x, y) tuples for drawing the lines
+#             points = [(x[i], y[i]) for i in range(len(x))]
+
+#             # Draw the lines on the image
+#             draw.line(points, fill="white",width=2)  # Use black for the lines
+
+#         # Convert the image to grayscale mode (L)
+#         grayscale_image = image.convert("L")
+#         return np.fliplr(np.rot90(np.array(grayscale_image),k=3))
+    
+#     """
+#     Testing updating a stage during acq
+#     """
+    
+#     def changeStageAtFrame(self,image,metadata=None,core=None,frame=100):
+#         logging.debug(float(metadata['ImageNumber'])) #type:ignore
+        
+#         if float(metadata['ImageNumber'])>frame and self.notyetchanged == True: #type:ignore
+#             core.set_relative_position('Z',100.0) #type:ignore
+#             self.notyetchanged = False
+#             logging.debug('Z position changed!')
+        
+#     def initChangeStageAtFrame(self):
+#         logging.debug('Initted changestageatframe')
+#         self.notyetchanged = True
+    
+#     """
+#     Average gray value calculation and display
+#     """
+#     #Calculating average gray value of an image
+#     def calcAnalysisAvgGrayValue(self,image,metadata=None):
+#         return np.mean(np.mean(image))
+    
+#     def visualiseAvgGrayValueText(self,analysis_result='Random',metadata={}):
+#         self.napariOverlay.drawTextOverlay(text='Mean gray value: {:.0f}, at frame: {:.0f}'.format(analysis_result,float(metadata['ImageNumber'])),pos=[0,0],textCol='white',textSize=12)
+        
+#     def initAvgGrayValueText(self):
+#         self.napariOverlay.changeName('Average Gray Value')
+#         self.napariOverlay.drawTextOverlay_init()
+    
+#     """
+#     Random overlay display
+#     """   
+#     def visualiseRandomOverlay(self,analysis_result=None,metadata={}):
+#         self.napariOverlay.drawSquaresOverlay(shapePosList=[[random.random()*100,random.random()*100,50,50],[100+random.random()*100,random.random()*100,100,100]],shapeCol=[(random.random(),random.random(),random.random()),(random.random(),random.random(),random.random())])
+        
+#     def initRandomOverlay(self):
+#         self.napariOverlay.changeName('RandomOverlay')
+#         self.napariOverlay.shapesOverlay_init()    
+    
+#     """
+#     Testing overlay of image - based on grayscale value
+#     """
+#     def calcGrayValueOverlay(self,image,metadata=None):
+#         #Get an image that simply provides a Boolean based on percentile:
+#         image2 = np.where(image<np.percentile(image,25),1,0)
+#         return image2
+    
+#     def visualiseGrayScaleImageOverlay(self,analysis_result=None,metadata={}):
+#         #Expected analysis_result is a boolean image.
+#         #Create an image overlay from napari
+#         self.napariOverlay.drawImageOverlay(im=analysis_result) #type:ignore
+    
+#     def initGrayScaleImageOverlay(self):
+#         self.napariOverlay.imageOverlay_init()
+#         self.napariOverlay.changeName('Grayscale Image Overlay')
