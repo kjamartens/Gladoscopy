@@ -19,10 +19,9 @@ def __function_metadata__():
     return { 
         "RealTimeCounter": {
             "required_kwargs": [
-                {"name": "ReqKwarg1", "description": "First required kwarg", "default": 'DefaultKwarg', "type": str}
+                {"name": "Color", "description": "Color of the text", "default": 'red', "type": str}
             ],
             "optional_kwargs": [
-                {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
             ],
             "help_string": "RT counter.",
             "display_name": "RT counter",
@@ -66,7 +65,6 @@ class RealTimeCounter():
                 mda_values = np.hstack((mda_values,metadata['Axes'][v]))
                 
             self.currentValue = metadata['Axes'][v]
-            logging.info(f"At axis-{v}: "+str(metadata['Axes'][v]))
     
     def end(self,core,**kwargs):
         logging.info('ENDING COUNTER REAL-TIME ANALYSIS')
@@ -87,11 +85,17 @@ class RealTimeCounter():
         }
         textv = {
             'string': 'Current frame: {outputval:0.0f}',
-            'size': 10,
-            'color': 'cyan',
+            'size': 10,  # Set a default value
+            'color': 'cyan',  # Set a default value 
             'anchor': 'upper_left',
-            'translation': [10, 10]
+            'translation': [0, 0]
         }
+        
+        # Then optionally override with kwargs if they exist:
+        if 'Color' in kwargs:
+            textv['color'] = kwargs['Color']
+        if 'Size' in kwargs:
+            textv['size'] = int(kwargs['Size'])
         #
         napariLayer.properties = properties
         napariLayer.text = textv
