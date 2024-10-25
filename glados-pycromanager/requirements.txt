@@ -56,6 +56,7 @@ PyQt5-Qt5==5.15.2
 PyQt5-sip==12.12.1
 pyqtgraph==0.13.3
 python-dateutil==2.8.2
+PyQtWebEngine-Qt5==5.15.2
 PyWavelets==1.4.1
 PyYAML==6.0
 pyzmq==25.1.0

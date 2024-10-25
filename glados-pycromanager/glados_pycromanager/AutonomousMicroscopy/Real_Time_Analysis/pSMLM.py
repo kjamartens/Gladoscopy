@@ -157,14 +157,14 @@ class pSMLM():
         # logging.info(f'Finishing Updating pSMLM running at time: {time.time()}')
         # logging.info(f"Nr locs: {len(self.SMLMlocs)} ")
         
-        self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-        mda_values = []
-        for v in list(self.uniqueEntriesAllDims.keys()):
-            mda_values = np.hstack((mda_values,metadata['Axes'][v]))
+        # self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+        # mda_values = []
+        # for v in list(self.uniqueEntriesAllDims.keys()):
+        #     mda_values = np.hstack((mda_values,metadata['Axes'][v]))
             
-        self.currentFrame = metadata['Axes'][v]
+        # self.currentFrame = metadata['Axes'][v]
         
-        return f'pSMLM2 result - frame {self.currentFrame}'
+        return f'pSMLM2 result - frame'
     
     def end(self,core,**kwargs):
         self.fullSMLMlocs

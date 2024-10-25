@@ -334,9 +334,9 @@ class napariHandler():
         # Define a flag to control the continuous task
         self.stop_continuous_task = False
         # empty queue for (live) image data
-        self.visualisation_queue = deque()
+        self.visualisation_queue = deque(maxlen=10)
         # Create a queue to pass image data between threads
-        self.image_queue_analysis = deque()
+        self.image_queue_analysis = deque(maxlen=10)
         # Create a signal to communicate between threads
         self.mda_acq_done_signal = pyqtSignal(bool)
 
@@ -350,8 +350,10 @@ class napariHandler():
     
     def put_data_in_visualisation_and_analysis_queues(self,visualisation_queue,analysis_queues,image,metadata):
         #Queue for visualisation of the data
+        print(f'#ac353 - current len of vis_queue: {len(visualisation_queue)}')
         if len(visualisation_queue) < 2:
             visualisation_queue.append([image,metadata]) 
+            print(f'#ac356 - current len of vis_queue: {len(visualisation_queue)}')
         
         #Queue(s) for RT analysis of the data:
         for queue in analysis_queues:
@@ -445,13 +447,14 @@ class napariHandler():
                     # moveLayerToTop(self.shared_data.napariViewer,"Live")
                     
                     #Acquisitions are slightly tricky. If run Headlessly, we take images directly from image_process_fn. However, if we run with a MM instance running, we use the image_saved_fn
-                    if shared_data._headless and shared_data.backend == 'Python':
-                        with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis ) as acq: #type:ignore
+                    if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
+                        with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
                             events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                             acq.acquire(events)
                     else:
-                        with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
+                    # shared_data._headless and shared_data.backend == 'Python':
+                        with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis ) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
                             events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                             acq.acquire(events)
@@ -500,17 +503,18 @@ class napariHandler():
                 # if self.shared_data.newestLayerName != '':
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 
-                
-                if shared_data._headless and shared_data.backend == 'Python':
-                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis,napari_viewer=napariViewer) as acq: #type:ignore
-                        self.shared_data._mdaModeAcqData = acq
-                        events = self.shared_data._mdaModeParams
-                        acq.acquire(events)
-                else:
+                if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
                     with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = self.shared_data._mdaModeParams
                         acq.acquire(events)
+                else:
+                    # if shared_data._headless and shared_data.backend == 'Python':
+                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis,napari_viewer=napariViewer) as acq: #type:ignore
+                        self.shared_data._mdaModeAcqData = acq
+                        events = self.shared_data._mdaModeParams
+                        acq.acquire(events)
+                # else:
                 
                 self.shared_data.mdaMode = False
                 self.acqstate = False #End the MDA acq state
@@ -535,10 +539,10 @@ class napariHandler():
         """
         visualisation_queue = parent.visualisation_queue
         while self.acqstate:
-            logging.debug('#nH - looping run_napariVisualisation_worker')
+            # logging.debug('#nH - looping run_napariVisualisation_worker')
             # get elements from queue while there is more than one element
             if visualisation_queue:
-                logging.debug('napariVisualisationWorkerLoop')
+                # logging.debug('napariVisualisationWorkerLoop')
                 if visualisation_queue:
                     DataStructure = {}
                     DataStructure['data'] = visualisation_queue.popleft()
@@ -547,7 +551,7 @@ class napariHandler():
                     DataStructure['core'] = self.shared_data.core
                     DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
                     DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
-                    logging.info('adding analysisThread in run_napariVisualisation_worker 1')
+                    # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
                     logging.info(str(self.shared_data.analysisThreads))
                     DataStructure['layer_name'] = layerName
                     DataStructure['layer_color_map'] = layerColorMap
@@ -598,7 +602,7 @@ class napariHandler():
         
         Is called, and shared_data.liveMode should be changed seperately from running this funciton
         """
-        logging.debug('#nH - acqModeChanged called from napariHandler')
+        # logging.debug('#nH - acqModeChanged called from napariHandler')
         if newSharedData is not None:
             global napariViewer, shared_data, Core
             self.shared_data = newSharedData

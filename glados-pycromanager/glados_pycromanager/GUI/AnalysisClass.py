@@ -318,7 +318,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.napariViewer = shared_data.napariViewer
         self.sleepTimeMs = delay
         self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS')
-        self.visualisation_queue = deque()#queue.Queue()
+        self.visualisation_queue = deque(maxlen=10)#queue.Queue()
         self.shared_data = shared_data
         
         #And start  the thread
@@ -343,6 +343,8 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
 
 #This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
+
+#Has to be a QThread and not e.g. multiprocessing because we rely on pickable objects - mostly the pycromanager core that we send around to influence the run during RT analysis
 class AnalysisThread_customFunction(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
@@ -360,6 +362,7 @@ class AnalysisThread_customFunction(QThread):
         Returns:
         None
         """
+        logging.debug('#aC - started AnalysisThread_customFunction')
         super().__init__()
         #Initiate some variables
         self.is_running = True
@@ -372,7 +375,6 @@ class AnalysisThread_customFunction(QThread):
         self.napariOverlay = None
         self.nodzInfo=nodzInfo
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
-        logging.debug('#aC - started AnalysisThread_customFunction')
         self.initAnalysis()
         self.running = True
     
@@ -516,7 +518,7 @@ class AnalysisThread_customFunction(QThread):
         self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core,nodzInfo=self.nodzInfo)
         logging.debug('run initAnalysis')
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']: #type:ignore
-            self.queue_visualisation = deque()
+            self.queue_visualisation = deque(maxlen=10)
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
     
@@ -532,6 +534,7 @@ class AnalysisThread_customFunction(QThread):
             logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             # if self.visualisationObject.visualisation_queue.empty():
+            # print(f'#ac537 -- len of queue: {len(self.visualisationObject.visualisation_queue)}')
             if len(self.visualisationObject.visualisation_queue) < 3:
                 # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
@@ -552,7 +555,7 @@ class AnalysisThread_customFunction(QThread):
 
 def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewThread = True,throughputThread=None,delay: float|None = None,nodzInfo=None):
     """
-    Function that creates separate threads for real-time analysis. Note that live/mda visualisation is simply a special case of real-time analysis.
+    Function that creates separate threads for real-time analysis. 
     """    
     global image_queue_analysis, napariViewer
     napariViewer = shared_data.napariViewer
@@ -560,7 +563,7 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
         image_queue_analysis = throughputThread
     else:
         #Create a new analysis thread
-        image_queue_analysis = deque()#queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
+        image_queue_analysis = deque(maxlen=10)#queue.Queue() #This now needs to be linked to pycromanager so that pycromanager pushes images to all image queues and not just one
         shared_data.RTAnalysisQueues.append(image_queue_analysis)
             
     if delay==None:

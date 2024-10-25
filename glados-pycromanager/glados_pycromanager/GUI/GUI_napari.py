@@ -110,10 +110,10 @@ class headlessGUI(QWidget):
         self.buttonGroup.addButton(self.javaRadio)
 
         self.mm_app_pathLabel = QLabel('MM App Path:', self)
-        self.mm_app_pathLineEdit = QLineEdit("C:\\Users\\kjamartens\\Documents\\Software\\Micro-Manager-2.0\\", self)
+        self.mm_app_pathLineEdit = QLineEdit("C:\\Data\\Software\\Micro-Manager-2.0\\", self)
 
         self.config_fileLabel = QLabel('Config File:', self)
-        self.config_fileLineEdit = QLineEdit("C:\\Users\\kjamartens\\Documents\\Software\\Micro-Manager-2.0\\MMConfig_Demo.cfg", self)
+        self.config_fileLineEdit = QLineEdit("C:\\Data\\Software\\Micro-Manager-2.0\\MMConfig_Demo.cfg", self)
 
         self.buffer_size_mbLabel = QLabel('Buffer Size MB:', self)
         self.buffer_size_mbLineEdit = QLineEdit("4096", self)

@@ -122,6 +122,12 @@ class Shared_data(QObject):
         self.globalData['MDAVISMETHOD']['description'] = 'Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.' #'multiDstack' or 'frameByFrame'
         self.globalData['MDAVISMETHOD']['inputType'] = 'dropdown' #'multiDstack' or 'frameByFrame'
         self.globalData['MDAVISMETHOD']['dropDownOptions'] = ['multiDstack','frameByFrame'] #'multiDstack' or 'frameByFrame'
+        self.globalData['MDABACKENDMETHOD']={}
+        self.globalData['MDABACKENDMETHOD']['value'] = 'process' #'process' or 'saved'
+        self.globalData['MDABACKENDMETHOD']['displayName'] = 'Backend transfer method'
+        self.globalData['MDABACKENDMETHOD']['description'] = 'Choose between the transfer method in the backend of the JAVA --> Python layer. Either directly grabs images via RAM (Can cause RAM issues), or performs a save-->load routine (limited by Disk write speed). Process is strongly recommended.'
+        self.globalData['MDABACKENDMETHOD']['inputType'] = 'dropdown'
+        self.globalData['MDABACKENDMETHOD']['dropDownOptions'] = ['process','saved']
         self.globalData['VISUALISATION-FPS'] = {}
         self.globalData['VISUALISATION-FPS']['value'] = 60
         self.globalData['VISUALISATION-FPS']['displayName'] = 'Visualisation FPS'
