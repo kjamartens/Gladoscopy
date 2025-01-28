@@ -121,7 +121,12 @@ def StarDistGeneralVis(datastruct,core,**kwargs):
     output,layer = datastruct
     
     layer.data = output['segmented_image']
-    layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
+    if core.get_pixel_size_um() != 0:
+        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
+    else:
+        import logging
+        logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
+        layer.scale = [1,1]
     layer.opacity = 0.6
     layer.contrast_limits=(0,0.1)#(0,rescaled.max())
     layer.blending = 'additive'

@@ -125,7 +125,10 @@ class pSMLM():
         self.dummyValue = 0
         self.metadatav = []
         self.currentFrame = 0
-        self.pxsizeum = core.get_pixel_size_um()
+        if core.get_pixel_size_um() != 0:
+            self.pxsizeum = core.get_pixel_size_um()
+        else:
+            self.pxsizeum = 1
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):

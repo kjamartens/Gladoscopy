@@ -1253,9 +1253,15 @@ class MMConfigUI(CustomMainWindow):
         #Get current pixel size via self.core.get_pixel_size_um()
         #Then move 0.1, 0.5, or 1 field with the arrows
         if shared_data.backend == 'JAVA':
-            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
+            if self.core.get_pixel_size_um() != 0:
+                field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
+            else:
+                field_size_um = [1*self.core.get_roi().width,1*self.core.get_roi().height]#type: ignore
         elif shared_data.backend == 'Python':
-            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi()[2],self.core.get_pixel_size_um()*self.core.get_roi()[3]]#type: ignore
+            if self.core.get_pixel_size_um() != 0:
+                field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi()[2],self.core.get_pixel_size_um()*self.core.get_roi()[3]]#type: ignore
+            else:
+                field_size_um = [1*self.core.get_roi()[2],1*self.core.get_roi()[3]]#type: ignore
         field_move_fraction = [1,.5,.1]
         
         #Widget itself is a grid layout with 7x7 entries

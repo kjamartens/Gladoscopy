@@ -3547,7 +3547,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                 self.createSingleCoreVar('config_'+configName,configValue,typev) #type:ignore
             
         #Pixel size, ROI size
-        self.createSingleCoreVar('Pixel_size_um',self.core.get_pixel_size_um(),[float]) #type:ignore
+        if self.core.get_pixel_size_um() != 0:
+            self.createSingleCoreVar('Pixel_size_um',self.core.get_pixel_size_um(),[float]) #type:ignore
+        else:
+            self.createSingleCoreVar('Pixel_size_um',1,[float]) #type:ignore
         if self.shared_data.backend == 'JAVA':
             self.createSingleCoreVar('ROI_size',[self.core.get_roi().width,self.core.get_roi().height],[list,np.ndarray]) #type:ignore
         elif self.shared_data.backend == 'Python':

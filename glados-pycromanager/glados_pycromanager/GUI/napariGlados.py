@@ -104,7 +104,11 @@ def napariUpdateLive(DataStructure):
             nrLayersBefore = len(napariViewer.layers)
             layer = napariViewer.add_image(liveImage, rendering='attenuated_mip', colormap=DataStructure['layer_color_map'],name = layerName)
             #Set correct scale - in nm
-            layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+            if core.get_pixel_size_um() != 0:
+                layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+            else:
+                logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
+                layer.scale = [1,1]
             layer._keep_auto_contrast = True #type:ignore
             napariViewer.reset_view()
         #Else if the layer already exists, replace it!
@@ -189,7 +193,11 @@ def napariUpdateLive(DataStructure):
                     
                     layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
-                    layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    if core.get_pixel_size_um() != 0:
+                        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    else:
+                        logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
+                        layer.scale = [1,1]
                     layer._keep_auto_contrast = True #type:ignore
                     
                     for dim_id in range(len(n_entries_in_dims)):
@@ -203,7 +211,11 @@ def napariUpdateLive(DataStructure):
                     nrLayersBefore = len(napariViewer.layers)
                     layer = napariViewer.add_image(latestImage, colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
-                    layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    if core.get_pixel_size_um() != 0:
+                        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    else:
+                        logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
+                        layer.scale = [1,1]
                     layer._keep_auto_contrast = True #type:ignore
                     napariViewer.reset_view()
             #Else if the layer already exists, replace it!

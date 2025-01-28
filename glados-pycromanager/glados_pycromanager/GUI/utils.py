@@ -1203,21 +1203,26 @@ class XYGridManager():
         """
         General function to update grid info - determines from the current class what the grid info should be, and stores this as self.gridEntries
         """
+        if self.core.get_pixel_size_um() != 0:
+            corePxSize = self.core.get_pixel_size_um()
+        else:
+            logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
+            corePxSize = 1
         #Update self.pos_overlap to contain the current value in um:
         text = self.overlapEditField.text()
         if self.overlapDropDown.currentText() == "um":
             self.pos_overlap = [float(text),float(text)]
         elif self.overlapDropDown.currentText() == "px":
-            self.pos_overlap = [float(text)*self.core.get_pixel_size_um(),float(text)*self.core.get_pixel_size_um()]
+            self.pos_overlap = [float(text)*corePxSize,float(text)*corePxSize]
         elif self.overlapDropDown.currentText() == "%":
-            self.pos_overlap = [float(text)/100 * self.core.get_image_width() * self.core.get_pixel_size_um(),float(text)/100 * self.core.get_image_height() * self.core.get_pixel_size_um()]
+            self.pos_overlap = [float(text)/100 * self.core.get_image_width() * corePxSize,float(text)/100 * self.core.get_image_height() * corePxSize]
             
         #Get the grid info:
         self.gridEntries = []
         if self.pos_choice == 'center':
             #If it's from center, we need to create a grid of self.grid_n_rows by self.grid_n_cols, centered around self.pos_center, taking self.pos_overlap (in um units) into account:
-            totXsize = (self.grid_n_cols)* self.core.get_image_width() * self.core.get_pixel_size_um() + (self.grid_n_cols - 1) * -self.pos_overlap[0]
-            totYsize = (self.grid_n_rows)* self.core.get_image_height() * self.core.get_pixel_size_um() + (self.grid_n_rows - 1) * -self.pos_overlap[1]
+            totXsize = (self.grid_n_cols)* self.core.get_image_width() * corePxSize + (self.grid_n_cols - 1) * -self.pos_overlap[0]
+            totYsize = (self.grid_n_rows)* self.core.get_image_height() * corePxSize + (self.grid_n_rows - 1) * -self.pos_overlap[1]
             centerPos = self.pos_center
         elif self.pos_choice == 'corner':
             #Check if any NaNs in the corner entries:
@@ -1227,21 +1232,21 @@ class XYGridManager():
                 totXsize = abs(self.pos_bottom_right[0]-self.pos_top_left[0])
                 totYsize = abs(self.pos_bottom_right[1]-self.pos_top_left[1])
                 #Using this and the overlap, determine the grid n rows/cols:
-                self.grid_n_rows = int(totYsize / (self.core.get_image_height() * self.core.get_pixel_size_um() + self.pos_overlap[1]))+1
-                self.grid_n_cols = int(totXsize / (self.core.get_image_width() * self.core.get_pixel_size_um() + self.pos_overlap[0]))+1
+                self.grid_n_rows = int(totYsize / (self.core.get_image_height() * corePxSize + self.pos_overlap[1]))+1
+                self.grid_n_cols = int(totXsize / (self.core.get_image_width() * corePxSize + self.pos_overlap[0]))+1
             
             
         if self.grid_flow_type == 'hor_normal': #row-by-row
             for yy in range(self.grid_n_rows):
                 for xx in range(self.grid_n_cols):
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
         elif self.grid_flow_type == 'ver_normal': #row-by-row
             for xx in range(self.grid_n_cols):
                 for yy in range(self.grid_n_rows):
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
         elif self.grid_flow_type == 'hor_snake':
             for yy in range(self.grid_n_rows):
@@ -1250,8 +1255,8 @@ class XYGridManager():
                     #reverse the range
                     rangev = range(self.grid_n_cols-1,-1,-1)
                 for xx in rangev:
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
         elif self.grid_flow_type == 'ver_snake':
             for xx in range(self.grid_n_cols):
@@ -1261,8 +1266,8 @@ class XYGridManager():
                     #reverse the range
                     rangev = range(self.grid_n_rows-1,-1,-1)
                 for yy in rangev:
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * self.core.get_pixel_size_um() ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * self.core.get_pixel_size_um() ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * self.core.get_pixel_size_um() ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * self.core.get_pixel_size_um() ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
             
         #Set the grid text
