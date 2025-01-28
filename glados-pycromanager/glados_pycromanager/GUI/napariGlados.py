@@ -464,9 +464,14 @@ class napariHandler():
                             self.shared_data._mdaModeAcqData = acq
                             events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                             acq.acquire(events)
+                    elif shared_data._headless and shared_data.backend == 'Python':
+                        logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                        with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
+                            self.shared_data._mdaModeAcqData = acq
+                            events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                            acq.acquire(events)
                     else:
-                    # shared_data._headless and shared_data.backend == 'Python':
-                        with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis ) as acq: #type:ignore
+                        with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
                             events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
                             acq.acquire(events)
@@ -494,7 +499,7 @@ class napariHandler():
                     if savefolderAdv != None:
                         savefolder = savefolderAdv
                     logging.debug(savefolder)
-                    
+
                 if self.shared_data._mdaModeSaveLoc[1] != '':
                     savename = self.shared_data._mdaModeSaveLoc[1]
                     savenameAdv = utils.nodz_evaluateAdv(savename,self.shared_data.nodzInstance)
@@ -515,19 +520,26 @@ class napariHandler():
                 # if self.shared_data.newestLayerName != '':
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 
+                logging.debug(f"MDABackendMethod is",shared_data.globalData['MDABACKENDMETHOD']['value'])
                 if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
+                    logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
                     with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = self.shared_data._mdaModeParams
                         acq.acquire(events)
-                else:
-                    # if shared_data._headless and shared_data.backend == 'Python':
-                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis,napari_viewer=napariViewer) as acq: #type:ignore
+                elif shared_data._headless and shared_data.backend == 'Python':
+                    logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
                         self.shared_data._mdaModeAcqData = acq
                         events = self.shared_data._mdaModeParams
                         acq.acquire(events)
-                # else:
-                
+                else:
+                    logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn) as acq: #type:ignore
+                        self.shared_data._mdaModeAcqData = acq
+                        events = self.shared_data._mdaModeParams
+                        acq.acquire(events)
+
                 self.shared_data.mdaMode = False
                 self.acqstate = False #End the MDA acq state
                 self.shared_data.appendNewMDAdataset(acq.get_dataset())

@@ -1421,6 +1421,7 @@ class MDAGlados(CustomMainWindow):
         #reset the MDA button in the GUI
         self.resetMDAbutton(mdaLayerName='MDA')
         logging.debug('about to emit MDA_completed')
+
         self.MDA_completed.emit(True)
     
     def MDA_acq_from_Node(self, nodeInfo):
