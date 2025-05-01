@@ -457,7 +457,8 @@ class napariHandler():
                     #Already move the live layer to top
                     # logging.debug('BMoved layer to top')
                     # moveLayerToTop(self.shared_data.napariViewer,"Live")
-                    
+                    savefolder = None
+                    savename = None
                     #Acquisitions are slightly tricky. If run Headlessly, we take images directly from image_process_fn. However, if we run with a MM instance running, we use the image_saved_fn
                     if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
                         with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
