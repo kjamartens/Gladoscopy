@@ -362,10 +362,10 @@ class napariHandler():
     
     def put_data_in_visualisation_and_analysis_queues(self,visualisation_queue,analysis_queues,image,metadata):
         #Queue for visualisation of the data
-        print(f'#ac353 - current len of vis_queue: {len(visualisation_queue)}')
+        # print(f'#ac353 - current len of vis_queue: {len(visualisation_queue)}')
         if len(visualisation_queue) < 2:
             visualisation_queue.append([image,metadata]) 
-            print(f'#ac356 - current len of vis_queue: {len(visualisation_queue)}')
+            # print(f'#ac356 - current len of vis_queue: {len(visualisation_queue)}')
         
         #Queue(s) for RT analysis of the data:
         for queue in analysis_queues:

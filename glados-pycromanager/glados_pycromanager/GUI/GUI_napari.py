@@ -10,13 +10,11 @@ os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
 import json
 import sys
-from PyQt5.QtWidgets import QApplication
-import shutil
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
+from PyQt5.QtCore import QThread, QObject, pyqtSignal
+from PyQt5.QtCore import Qt
 import logging
 import argparse
-from PyQt5.QtCore import QThread, QObject, pyqtSignal
-from PyQt5.QtWidgets import QApplication, QMainWindow
-import sys
 
 
 def is_pip_installed():
@@ -85,7 +83,6 @@ class Worker(QObject):
         runNapariPycroManager(core, MM_JSON, shared_data,includecustomUI=includeCustomUI)
         self.finished.emit()
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
 class headlessGUI(QWidget):
     """
     Small GUI for user input on a headless Pycromanager start
@@ -174,11 +171,10 @@ def main():
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
         
     #Some QT attributes
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtCore import Qt
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
     QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
+    QApplication.setAttribute(Qt.AA_UseDesktopOpenGL, True)# type:ignore
     
     # get object representing MMCore, used throughout
     #try to open a running instance:
@@ -186,7 +182,8 @@ def main():
         core = Core()
         shared_data.core = core
         shared_data._headless = False
-    except:
+    except Exception as e:
+        logging.warning(f'Try/exception occured! {e}')
         #Create a small GUI for settings
         appSmall = QApplication([])
         headlessGUIv = headlessGUI(shared_data)
@@ -195,7 +192,7 @@ def main():
         #Get those settings and use to start headless
         start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
         core = Core()
-        print('headless MM started')
+        logging.info('Headless MicroManager started')
         
         #Also store some settings in shared_data
         shared_data._headless = True
@@ -206,7 +203,8 @@ def main():
     try:
         with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
             MM_JSON = json.load(f)
-    except:
+    except Exception as e:
+        logging.warning(f'Try/exception occured! {e}')
         MM_JSON = None
         
         
@@ -231,7 +229,6 @@ def main():
 
 def show_UserManualNapari():
     try:
-        
         quickStartWindow = utils.SmallWindow(None)
         QApplication.processEvents()
         quickStartWindow.setWindowTitle('Quick start / User Manual')
@@ -241,7 +238,7 @@ def show_UserManualNapari():
             package_path = os.path.dirname(glados_pycromanager.__file__)# type:ignore
             quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
         else:
-            quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
+            quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
         QApplication.processEvents()
         quickStartWindow.show()
         
@@ -251,16 +248,4 @@ def show_UserManualNapari():
     
     
 if __name__ == "__main__":
-    # try:
-    
-    import cProfile
-    
-# Start the profiler
-    # cProfile.run("main()", "profiling_results.prof", sort="cumtime")
-
-    
     main()
-    
-    # except:
-        # print('Error!')
-
