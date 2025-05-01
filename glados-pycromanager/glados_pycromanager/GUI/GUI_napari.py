@@ -15,7 +15,7 @@ from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from PyQt5.QtCore import Qt
 import logging
 import argparse
-
+import napari
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -146,8 +146,6 @@ class headlessGUI(QWidget):
         self.max_memory_mb = self.max_memory_mbLineEdit.text()
         self.close()
 
-
-
 def main():
     """
     Run the main function to start Glados-PycroManager-Napari interface for autonomous microscopy.
@@ -158,7 +156,7 @@ def main():
     Returns:
         None
     """
-    #cProfiler testing
+    print('Glados-pycromanager main function called')
     
     #Create parser
     parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
@@ -167,17 +165,25 @@ def main():
     
     
     # Create an instance of the shared_data class
+    print('Creating shared data.')
     shared_data = Shared_data()
+    print('Cleaning up temporary files.')
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
         
     #Some QT attributes
+    print('Setting QT attributes.')
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
     QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
-    QApplication.setAttribute(Qt.AA_UseDesktopOpenGL, True)# type:ignore
+    
+    napariSettings = napari.settings.get_settings() #type: ignore
+    if napariSettings.application.playback_fps < 120:
+        napariSettings.application.playback_fps = 120
+        print('Set the napari Playback FPS to 120!')
     
     # get object representing MMCore, used throughout
     #try to open a running instance:
+    print('Finding or creating micromanager instance.')
     try:
         core = Core()
         shared_data.core = core

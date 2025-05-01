@@ -7,31 +7,17 @@ Contains the Scanning/Decision/Variables/Logger widgets encapsulated in the auto
 """
 
 #region imports
-#Add inclusion of this folder:
-import sys, os, appdirs
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QGroupBox
-from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QTextCursor
-sys.path.append('glados-pycromanager\\glados_pycromanager\\GUI\\nodz')
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QMainWindow, QGraphicsView, QPushButton, QVBoxLayout, QTextEdit, QPlainTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QDoubleSpinBox
-from PyQt5.QtCore import Qt, QSize
-from PyQt5 import QtGui
-from PyQt5.QtWidgets import QGridLayout, QPushButton
-from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction
-from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
-from PyQt5.QtCore import QRectF
-from qtpy.QtWidgets import QFileDialog, QMessageBox
-from qtpy.QtWidgets import QFileDialog
-import numpy as np
+import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from PyQt5.QtWidgets import QApplication, QComboBox
-from PyQt5.QtWidgets import QApplication, QSizePolicy, QSpacerItem, QVBoxLayout, QScrollArea, QMainWindow, QWidget, QSpinBox, QLabel
+import appdirs
+import numpy as np
 import logging
+from PyQt5.QtGui import QIcon, QFont, QColor, QTextCursor
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QSize, QRunnable, QTimer
+from PyQt5.QtWidgets import QApplication, QPushButton, QVBoxLayout, QTextEdit, QPlainTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QGridLayout, QLineEdit, QDialog, QComboBox, QDialogButtonBox, QFileDialog, QMessageBox, QSizePolicy, QSpacerItem,  QScrollArea, QSpinBox, QLabel, QTableWidget, QGroupBox
+sys.path.append('glados-pycromanager\\glados_pycromanager\\GUI\\nodz')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -1637,9 +1623,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
                 else:
                     try:
-                        quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/DeveloperManual.md')
-                    except:
-                        quickStartWindow.addMarkdown('glados_pycromanager/Documentation/DeveloperManual.md')
+                        quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
+                    except Exception as e:
+                        logging.debug(f'TryException: {e}')
+                        quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
                 QApplication.processEvents()
                 quickStartWindow.show()
             except Exception as e:
@@ -1655,7 +1642,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     package_path = os.path.dirname(glados_pycromanager.__file__)
                     htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
                 else:
-                    htmlPath = 'glados-pycromanager/glados_pycromanager/Documentation/index.html'
+                    htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
                 
                 webbrowser.open('file://' + os.path.realpath(htmlPath))
             except Exception as e:
@@ -5800,7 +5787,6 @@ class advDecisionGridLayout(QGroupBox):
 #endregion
 
 #region VariablesWidget
-from PyQt5.QtWidgets import QTableWidget
 
 class HoverTableWidget(QTableWidget):
     cellHovered = pyqtSignal(int, int)
@@ -6156,8 +6142,6 @@ class LoggerWidget(QPlainTextEdit):
 #endregion
 
 #region NodzWorkers
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QPushButton, QWidget
-from PyQt5.QtCore import QThreadPool, QRunnable, pyqtSlot
 # Define a WorkerSignals class to handle signals
 class WorkerSignals(QObject):
     """  

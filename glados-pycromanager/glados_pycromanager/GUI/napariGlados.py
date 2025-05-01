@@ -1,21 +1,16 @@
 import numpy as np
 import tempfile
 import zarr
-from PyQt5.QtCore import pyqtSignal, QObject
+from PyQt5.QtCore import pyqtSignal
 import napari
-import math
 from napari.qt import thread_worker
 import time
-import queue
-from PyQt5.QtWidgets import QMainWindow
-from pycromanager import Core
-from magicgui import magicgui
 from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QScrollArea
 import sys
 import logging
-import os, appdirs
+import os
+import appdirs
 from collections import deque
-
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -577,7 +572,7 @@ class napariHandler():
                     DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
                     DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
                     # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
-                    logging.info(str(self.shared_data.analysisThreads))
+                    logging.debug(str(self.shared_data.analysisThreads))
                     DataStructure['layer_name'] = layerName
                     DataStructure['layer_color_map'] = layerColorMap
                     DataStructure['finalisationProcedure'] = False
@@ -904,7 +899,7 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     #Set QT attributes here for some reason...
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtCore import Qt
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
     QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
     

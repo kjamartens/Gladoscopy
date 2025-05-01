@@ -1,26 +1,24 @@
 
 import shutil
-import os, appdirs
-import logging
-
-#Below here, copy from Eve's util functions:
 import os
+import appdirs
+import logging
 import warnings
 import inspect
 import importlib
 import re
-import warnings, logging
 import numpy as np
-import itertools
 import time
-import h5py
+import datetime
+import json
+import sys
 
 #Imports for PyQt5 (GUI)
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtGui import QCursor, QTextCursor, QIntValidator
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QTableWidget, QTableWidgetItem, QLayout, QMainWindow, QLabel, QPushButton, QSizePolicy, QGroupBox, QTabWidget, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QToolBar, QCheckBox,QDesktopWidget, QMessageBox, QTextEdit, QSlider, QSpacerItem
-from PyQt5.QtCore import Qt, QPoint, QProcess, QCoreApplication, QTimer, QFileSystemWatcher, QFile, QThread, pyqtSignal, QObject
-import sys
+from PyQt5.QtGui import QPainter, QIcon, QColor, QFontMetrics, QPen
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QLayout, QMainWindow, QLabel, QPushButton, QGroupBox, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QCheckBox, QSpacerItem
+from PyQt5.QtCore import Qt
+
+
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -1822,10 +1820,6 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
     layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap)
     # resetLayout(curr_layout)
 
-import sys
-from PyQt5.QtWidgets import QApplication, QLineEdit
-from PyQt5.QtGui import QPainter, QIcon, QPixmap, QColor, QFontMetrics, QPalette, QPen
-from PyQt5.QtCore import Qt
 
 #Start of a customLineEdit class to format a variable in a kwarg.
 class CustomLineEdit(QLineEdit):
@@ -2950,9 +2944,6 @@ def PushButtonAddVariableCallBack(line_edit,nodzInfo):
     else:
         logging.warning("Dialog rejected (Cancel pressed or closed)")
 
-
-import json
-
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -3294,23 +3285,26 @@ def openAdvancedSettings(shared_data):
     pass
 
 def getDimensionsFromAcqData(acqData):
-    alldims = acqData[0]['axes']
-    n_dims = len(alldims)
-    dimOrder = []
-    n_entries_in_dims = []
-    uniqueEntriesAllDims = {}
-    for dim in alldims:
-        uniqueEntries = []
-        for i in range(0,len(acqData)):
-            uniqueEntries.append(acqData[i]['axes'][dim])
-        uniqueEntries = np.unique(uniqueEntries)
-        nEntries = len(uniqueEntries)
-        n_entries_in_dims.append(nEntries)
-        dimOrder.append(dim)
-        uniqueEntriesAllDims.update({dim:uniqueEntries})
-    logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
-    # logging.debug(f"uniqueEntriesAllDims: {uniqueEntriesAllDims}")
-    return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
+    try:
+        alldims = acqData[0]['axes']
+        dimOrder = []
+        n_entries_in_dims = []
+        uniqueEntriesAllDims = {}
+        for dim in alldims:
+            uniqueEntries = []
+            for i in range(0,len(acqData)):
+                uniqueEntries.append(acqData[i]['axes'][dim])
+            uniqueEntries = np.unique(uniqueEntries)
+            nEntries = len(uniqueEntries)
+            n_entries_in_dims.append(nEntries)
+            dimOrder.append(dim)
+            uniqueEntriesAllDims.update({dim:uniqueEntries})
+        logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
+        return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
+    except Exception as e:
+        print(f'Problem with get Dimensions! {e}')
+        print(acqData)
+        print(acqData[0])
 
 def updateNodzVariablesTime(node):
     
@@ -3501,7 +3495,7 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         #     errorIcon.setToolTip(errorToolTip)
         #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='grayscale')
         
-import datetime
+
 def set_up_logger():
     """
     Set up a DEBUG and INFO logger, storing to LOG files in the APPDATA folder structure.
@@ -3539,7 +3533,7 @@ def set_up_logger():
 
         # Get the root logger
         logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)  # Set the overall logging level to DEBUG
+        logger.setLevel(logging.INFO)  # Set the overall logging level to logging.DEBUG or logging.INFO
 
         # Add the handlers to the logger
         logger.addHandler(file_handlerINFO)

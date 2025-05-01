@@ -1,3 +1,6 @@
+import numpy as np
+import inspect
+import utils
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -6,13 +9,6 @@ if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 else:
     from MainScripts import FunctionHandling
-from shapely import Polygon, affinity
-import math
-import numpy as np
-import inspect
-import dask.array as da
-import time, logging
-
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():
@@ -58,7 +54,6 @@ class RealTimeCounter():
             logging.info("At frame: "+metadata['ImageNumber'])
         else:
             #Append to full list with frame info
-            import utils
             self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
             mda_values = []
             for v in list(self.uniqueEntriesAllDims.keys()):

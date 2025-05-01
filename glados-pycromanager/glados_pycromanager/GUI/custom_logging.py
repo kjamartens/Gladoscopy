@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-import sys
 
 def _add_stream_handler(logger: logging.Logger):
 
@@ -21,7 +20,7 @@ def _add_file_handler(logger: logging.Logger, log_path: Path):
         fmt='%(asctime)s %(name)-12s %(levelname)-8s %(message)s', datefmt='%m-%d %H:%M')
 
     file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(logging.INFO)
 
     logger.addHandler(file_handler)
 
@@ -34,7 +33,7 @@ def create_logger(root_dir: Path, caller: str) -> logging.Logger:
     logger = logging.getLogger(caller)
     root = logging.getLogger()
 
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     # If haven't already launched handlers...
     if not len(logger.handlers):
