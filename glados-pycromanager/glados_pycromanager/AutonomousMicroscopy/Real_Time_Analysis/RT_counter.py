@@ -1,6 +1,7 @@
 import numpy as np
 import inspect
 import utils
+import logging
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__

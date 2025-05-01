@@ -3,19 +3,20 @@ The main function to call if running glados-napari from the python interface.
 """
 
 #region imports
-from pycromanager import Core
-from pycromanager import start_headless
-import os
-os.environ['NAPARI_ASYNC'] = '1'
-os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
-import json
-import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
-from PyQt5.QtCore import QThread, QObject, pyqtSignal
-from PyQt5.QtCore import Qt
 import logging
 import argparse
 import napari
+import os
+import json
+import sys
+from pycromanager import Core
+from pycromanager import start_headless
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QGridLayout, QPushButton, QRadioButton, QButtonGroup
+from PyQt5.QtCore import QThread, QObject, pyqtSignal, Qt
+
+#Napari optimizations
+os.environ['NAPARI_ASYNC'] = '1'
+os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -94,7 +95,7 @@ class headlessGUI(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Glados-PycroManager-Napari GUI')
-        self.setGeometry(100, 100, 300, 200)
+        self.setGeometry(100, 100, 400, 200)
 
         self.backendLabel = QLabel('Backend:', self)
 
@@ -106,11 +107,15 @@ class headlessGUI(QWidget):
         self.buttonGroup.addButton(self.pythonRadio)
         self.buttonGroup.addButton(self.javaRadio)
 
-        self.mm_app_pathLabel = QLabel('MM App Path:', self)
+        self.mm_app_pathLabel = QLabel('MicroManager Path:', self)
         self.mm_app_pathLineEdit = QLineEdit("C:\\Data\\Software\\Micro-Manager-2.0\\", self)
+        self.mm_app_browse = QPushButton('...', self)
+        self.mm_app_browse.clicked.connect(self.BrowseMMAppPath)
 
         self.config_fileLabel = QLabel('Config File:', self)
         self.config_fileLineEdit = QLineEdit("C:\\Data\\Software\\Micro-Manager-2.0\\MMConfig_Demo.cfg", self)
+        self.config_file_browse = QPushButton('...', self)
+        self.config_file_browse.clicked.connect(self.BrowseConfigFile)
 
         self.buffer_size_mbLabel = QLabel('Buffer Size MB:', self)
         self.buffer_size_mbLineEdit = QLineEdit("4096", self)
@@ -121,23 +126,31 @@ class headlessGUI(QWidget):
         self.startButton = QPushButton('Start', self)
         self.startButton.clicked.connect(self.start)
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.backendLabel)
-        layout.addWidget(self.pythonRadio)
-        layout.addWidget(self.javaRadio)
-        layout.addWidget(self.mm_app_pathLabel)
-        layout.addWidget(self.mm_app_pathLineEdit)
-        layout.addWidget(self.config_fileLabel)
-        layout.addWidget(self.config_fileLineEdit)
-        layout.addWidget(self.buffer_size_mbLabel)
-        layout.addWidget(self.buffer_size_mbLineEdit)
-        layout.addWidget(self.max_memory_mbLabel)
-        layout.addWidget(self.max_memory_mbLineEdit)
-        layout.addWidget(self.startButton)
+        layout = QGridLayout()
+        layout.addWidget(self.backendLabel, 0, 0)
+        layout.addWidget(self.pythonRadio, 0, 1)
+        layout.addWidget(self.javaRadio, 0, 2)
+        layout.addWidget(self.mm_app_pathLabel, 1, 0)
+        layout.addWidget(self.mm_app_pathLineEdit, 1, 1,1,2)
+        layout.addWidget(self.mm_app_browse, 1, 3)
+        layout.addWidget(self.config_fileLabel, 2, 0)
+        layout.addWidget(self.config_fileLineEdit, 2, 1,1,2)
+        layout.addWidget(self.config_file_browse, 2, 3)
+        layout.addWidget(self.buffer_size_mbLabel, 3, 0)
+        layout.addWidget(self.buffer_size_mbLineEdit, 3, 1)
+        layout.addWidget(self.max_memory_mbLabel, 3, 2)
+        layout.addWidget(self.max_memory_mbLineEdit, 3, 3)
+        layout.addWidget(self.startButton, 4, 0, 1, 4) # Span across two columns
 
         self.setLayout(layout)
         self.show()
 
+    def BrowseMMAppPath(self):
+        print("Browse MicroManager App Path")
+        
+    def BrowseConfigFile(self):
+        print("Browse Config file App Path")
+        
     def start(self):
         self.backend = 'Python' if self.pythonRadio.isChecked() else 'JAVA'
         self.mm_app_path = self.mm_app_pathLineEdit.text()
