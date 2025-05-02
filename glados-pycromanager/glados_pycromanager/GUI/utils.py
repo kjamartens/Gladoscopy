@@ -3195,6 +3195,17 @@ def forceReset(shared_data):
         except concurrent.futures.TimeoutError:
             logging.warning("Function did not complete within 5 seconds and thus quitted")
 
+def storeSharedData_GlobalData(shared_data):
+    """ Share the shared_data as JSON in the appdata folder"""
+    appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
+    if appdata_folder is None:
+        raise EnvironmentError("APPDATA environment variable not found")
+    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+    os.makedirs(app_specific_folder, exist_ok=True)
+    tempCustomWindow = CustomMainWindow()
+    tempCustomWindow.shared_data = shared_data
+    tempCustomWindow.save_state_globalData(os.path.join(app_specific_folder, 'glados_state.json'))
+
 def openAdvancedSettings(shared_data):
     """
     Allow the user to change the global/advanced settings via some GUI
@@ -3221,14 +3232,7 @@ def openAdvancedSettings(shared_data):
                     logging.warning(f"Couldn't save global data of entry {entry}")
         
         #Store in appdata
-        appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
-        if appdata_folder is None:
-            raise EnvironmentError("APPDATA environment variable not found")
-        app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-        os.makedirs(app_specific_folder, exist_ok=True)
-        tempCustomWindow = CustomMainWindow()
-        tempCustomWindow.shared_data = shared_data
-        tempCustomWindow.save_state_globalData(os.path.join(app_specific_folder, 'glados_state.json'))
+        storeSharedData_GlobalData(shared_data)
         
         logging.info('advanced settings stored!')
         dialog.close()

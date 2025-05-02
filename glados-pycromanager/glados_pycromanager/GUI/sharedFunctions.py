@@ -8,6 +8,8 @@ from flask import Flask
 import time
 from slackeventsapi import SlackEventAdapter
 import appdirs
+import os
+import json 
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -134,8 +136,36 @@ class Shared_data(QObject):
         self.globalData['VISUALISATION-FPS']['description'] = 'Update speed of napari visualisation (in frames per second)'
         self.globalData['VISUALISATION-FPS']['inputType'] = 'lineEdit'
         
-        #Overwrite all values that can be found from the .JSON:
-        import os, json
+        self.globalData['MMPATH'] = {}
+        self.globalData['MMPATH']['value'] = "C:/Program Files/Micro-Manager-2.0"
+        self.globalData['MMPATH']['displayName'] = 'Micromanager Path'
+        self.globalData['MMPATH']['description'] = 'Micromanager Path'
+        self.globalData['MMPATH']['inputType'] = 'lineEdit'
+        self.globalData['MMPATH']['hidden'] = True
+        self.globalData['MM_HEADLESS_BACKEND'] = {}
+        self.globalData['MM_HEADLESS_BACKEND']['value'] = "Python"
+        self.globalData['MM_HEADLESS_BACKEND']['inputType'] = 'lineEdit'
+        self.globalData['MM_HEADLESS_BACKEND']['hidden'] = True
+        self.globalData['MM_CONFIG_PATH'] = {}
+        self.globalData['MM_CONFIG_PATH']['value'] = "C:/Program Files/Micro-Manager-2.0/MMConfig_demo.cfg"
+        self.globalData['MM_CONFIG_PATH']['displayName'] = 'Micromanager config file path'
+        self.globalData['MM_CONFIG_PATH']['description'] = 'Micromanager config file path'
+        self.globalData['MM_CONFIG_PATH']['inputType'] = 'lineEdit'
+        self.globalData['MM_CONFIG_PATH']['hidden'] = True
+        self.globalData['MM_HEADLESS_BUFFER_MB'] = {}
+        self.globalData['MM_HEADLESS_BUFFER_MB']['value'] = 4096
+        self.globalData['MM_HEADLESS_BUFFER_MB']['displayName'] = 'Buffer size (MB)'
+        self.globalData['MM_HEADLESS_BUFFER_MB']['description'] = 'Buffer size of the headless Micromanager instance'
+        self.globalData['MM_HEADLESS_BUFFER_MB']['inputType'] = 'lineEdit'
+        self.globalData['MM_HEADLESS_BUFFER_MB']['hidden'] = True
+        self.globalData['MM_HEADLESS_MAX_MEMORY_MB'] = {}
+        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value'] = 12000
+        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['displayName'] = 'Max memory (MB)'
+        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['description'] = 'Maximum memory footprint of the headless Micromanager instance'
+        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['inputType'] = 'lineEdit'
+        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['hidden'] = True
+        
+        #Overwrite all values that can be found from the .JSON:x
         #load from appdata
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
@@ -171,7 +201,6 @@ class Shared_data(QObject):
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
         
         #Store whether we're running via PIP or via a local install
-        
         self._RunningViaPIP = 'site-packages' in __file__ or 'dist-packages' in __file__
         self._RunningLocally = not self._RunningViaPIP
     

@@ -11,7 +11,7 @@ import json
 import sys
 from pycromanager import Core
 from pycromanager import start_headless
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QGridLayout, QPushButton, QRadioButton, QButtonGroup
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QGridLayout, QPushButton, QRadioButton, QButtonGroup, QFileDialog
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, Qt
 
 #Napari optimizations
@@ -101,27 +101,30 @@ class headlessGUI(QWidget):
 
         self.pythonRadio = QRadioButton('Python (recommended)', self)
         self.javaRadio = QRadioButton('Java', self)
-        self.pythonRadio.setChecked(True)
+        if self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] == 'JAVA':
+            self.javaRadio.setChecked(True)
+        else:
+            self.pythonRadio.setChecked(True)
 
         self.buttonGroup = QButtonGroup()
         self.buttonGroup.addButton(self.pythonRadio)
         self.buttonGroup.addButton(self.javaRadio)
 
         self.mm_app_pathLabel = QLabel('MicroManager Path:', self)
-        self.mm_app_pathLineEdit = QLineEdit("C:\\Data\\Software\\Micro-Manager-2.0\\", self)
+        self.mm_app_pathLineEdit = QLineEdit(self.shared_data.globalData['MMPATH']['value'], self)
         self.mm_app_browse = QPushButton('...', self)
         self.mm_app_browse.clicked.connect(self.BrowseMMAppPath)
 
         self.config_fileLabel = QLabel('Config File:', self)
-        self.config_fileLineEdit = QLineEdit("C:\\Data\\Software\\Micro-Manager-2.0\\MMConfig_Demo.cfg", self)
+        self.config_fileLineEdit = QLineEdit(self.shared_data.globalData['MM_CONFIG_PATH']['value'], self)
         self.config_file_browse = QPushButton('...', self)
         self.config_file_browse.clicked.connect(self.BrowseConfigFile)
 
         self.buffer_size_mbLabel = QLabel('Buffer Size MB:', self)
-        self.buffer_size_mbLineEdit = QLineEdit("4096", self)
+        self.buffer_size_mbLineEdit = QLineEdit(str(self.shared_data.globalData['MM_HEADLESS_BUFFER_MB']['value']), self)
 
         self.max_memory_mbLabel = QLabel('Max Memory MB:', self)
-        self.max_memory_mbLineEdit = QLineEdit("10000", self)
+        self.max_memory_mbLineEdit = QLineEdit(str(self.shared_data.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value']), self)
 
         self.startButton = QPushButton('Start', self)
         self.startButton.clicked.connect(self.start)
@@ -146,10 +149,18 @@ class headlessGUI(QWidget):
         self.show()
 
     def BrowseMMAppPath(self):
-        print("Browse MicroManager App Path")
+        options = QFileDialog.Options()
+        folder_name = QFileDialog.getExistingDirectory(self, "Select Micro-Manager App Path", self.mm_app_pathLineEdit.text(), options=options)
+        if folder_name:
+            self.mm_app_pathLineEdit.setText(folder_name)
+
         
     def BrowseConfigFile(self):
-        print("Browse Config file App Path")
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "Select Micro-Manager Config File", self.config_fileLineEdit.text(), "Config Files (*.cfg);;All Files (*)", options=options)
+        if file_name:
+            self.config_fileLineEdit.setText(file_name)
+
         
     def start(self):
         self.backend = 'Python' if self.pythonRadio.isChecked() else 'JAVA'
@@ -157,6 +168,15 @@ class headlessGUI(QWidget):
         self.config_file = self.config_fileLineEdit.text()
         self.buffer_size_mb = self.buffer_size_mbLineEdit.text()
         self.max_memory_mb = self.max_memory_mbLineEdit.text()
+        
+        #Also store these in the shared_data
+        self.shared_data.globalData['MMPATH']['value'] = self.mm_app_path
+        self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] = self.backend
+        self.shared_data.globalData['MM_CONFIG_PATH']['value'] = self.config_file
+        self.shared_data.globalData['MM_HEADLESS_BUFFER_MB']['value'] = self.buffer_size_mb
+        self.shared_data.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value'] = self.max_memory_mb
+        utils.storeSharedData_GlobalData(self.shared_data)
+        
         self.close()
 
 def main():
