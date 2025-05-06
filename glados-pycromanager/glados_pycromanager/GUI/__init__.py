@@ -1,15 +1,14 @@
 
 #region imports
 from pycromanager import Core
-from pycromanager import start_headless
 import os
 os.environ['NAPARI_ASYNC'] = '1'
-import json
 import sys
-from PyQt5.QtWidgets import QApplication
-import shutil
 import logging
-import argparse
+import napari
+from napari.utils.notifications import show_info
+from PyQt5.QtWidgets import QApplication, QWidget
+from qtpy.QtWidgets import QVBoxLayout, QLabel
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI")
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy")
@@ -46,7 +45,6 @@ import sys
 #endregion
 
 
-from napari.utils.notifications import show_info
 
 def show_hello_message():
     show_info('Hello, world!')
@@ -124,16 +122,6 @@ def run_glados_pycromanager():
     # thread.finished.connect(thread.deleteLater)
     
     logging.info('INIT glados_pycromanager complete')
-
-#Import qwidget:
-from PyQt5.QtWidgets import QWidget
-
-
-
-import napari
-import napari
-from qtpy.QtWidgets import QVBoxLayout, QWidget, QLabel
-from qtpy.QtCore import Qt
 
 class TestWIdget(QWidget):
     """

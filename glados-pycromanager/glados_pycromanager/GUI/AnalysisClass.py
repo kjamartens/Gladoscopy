@@ -2,24 +2,12 @@
 Handles the GUI display of Glados-pycromanager, as well as the structure for analysis (normal and real-time) to run on secondary threads.
 """
 
-import numpy as np
-from PyQt5.QtCore import pyqtSignal, QThread
-import random
-import napari
-from napari.qt import thread_worker
-import time
-import queue
-from PyQt5.QtWidgets import QMainWindow
-from pycromanager import Core
-from magicgui import magicgui
-from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 import sys
-from napari.layers import Shapes
-from typing import Union, Tuple, List
+import numpy as np
 import logging
-# from stardist.models import StarDist2D
-from PIL import Image, ImageDraw
 from collections import deque
+from typing import Union, Tuple, List
+from PyQt5.QtCore import pyqtSignal, QThread
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__

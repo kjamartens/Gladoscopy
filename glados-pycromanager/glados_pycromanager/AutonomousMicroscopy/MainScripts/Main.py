@@ -1,15 +1,12 @@
-# from csbdeep.io import save_tiff_imagej_compatible
-# from stardist import _draw_polygons, export_imagej_rois
-import sys, os
+import sys
+import os
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import tifffile
-# from shapely import Polygon, affinity
-# import numpy as np
-# import math
-# from stardist.models import StarDist2D
 import matplotlib.pyplot as plt
-from matplotlib import colormaps # type: ignore
+from matplotlib import colormaps
+import numpy as np
+from PIL import Image, ImageDraw
 
 
 def is_pip_installed():
@@ -39,8 +36,6 @@ else:
 # Main script
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
-import numpy as np
-from PIL import Image, ImageDraw
 def outlineCoordinatesToImage(coords):
     # Create a blank RGB image with a white background
     image = Image.new("RGB", (512, 512), "white")

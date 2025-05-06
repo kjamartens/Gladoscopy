@@ -3,9 +3,7 @@
 
 import inspect
 import os
-from pathlib import Path
-
-from pdoc import _render_template, import_module
+from pdoc import import_module #type:ignore
 
 
 def generate_docs_and_central_index(modules_to_process: list[str],path) -> None:
@@ -15,16 +13,9 @@ def generate_docs_and_central_index(modules_to_process: list[str],path) -> None:
         modules_to_process (list[str]): List of modules to process
     """
 
-
-    modules = [import_module(module, reload=True) for module in modules_to_process]
-
     # Generate the docs for each module under docs folder
     command = f'pdoc --html --skip-errors --force --output-dir {path} {" ".join(modules_to_process)}'
     os.system(command=command)
-
-    # # Create a single base `index.html`
-    # with open(Path(path, "index.html"), "w", encoding="utf-8") as index:
-    #     index.write(_render_template("/html.mako", modules=sorted((module.__name__, inspect.getdoc(module)) for module in modules))) #type:ignore
 
 
 if __name__ == "__main__":

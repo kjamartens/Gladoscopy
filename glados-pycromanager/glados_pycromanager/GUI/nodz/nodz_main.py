@@ -1,15 +1,12 @@
 import os
-import re
-import json
-import logging
-from PyQt5 import QtGui, QtCore, QtWidgets
-from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboBox, QVBoxLayout, QDialogButtonBox, QMenu, QAction, QGraphicsSceneMouseEvent, QCheckBox
-from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent
-from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt
 import logging
 import time
-import sys
-from PyQt5.QtCore import QTimer
+import numpy as np
+import random
+from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtWidgets import QLineEdit, QComboBox, QMenu, QAction, QCheckBox
+from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent, QTextOption, QPixmap
+from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt, QTimer
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -322,7 +319,6 @@ class Nodz(QtWidgets.QGraphicsView):
                     # Get the painter path of the connection
                     path = connection.shape()
                     min_distance = float('inf')
-                    import numpy as np
                     
                     #look if it's close to the cursor at any point
                     for i in range(path.elementCount()):
@@ -402,7 +398,6 @@ class Nodz(QtWidgets.QGraphicsView):
             
         if event.key() == QtCore.Qt.Key_T: #type:ignore
             for node in self.scene().selectedItems():
-                import random
                 self.editNodeDisplayText(node, newDisplayText="NodeZZ"+str(random.randint(1, 10)))
                 
         # Emit signal.
@@ -994,9 +989,8 @@ class Nodz(QtWidgets.QGraphicsView):
                                 'displayName': nodeInst.displayName,
                                 'alternateFillColor': nodeInst.alternateFillColor}
 
-            import numpy
             def convert_to_string(obj):
-                if isinstance(obj, (int, float, numpy.int32)): #type:ignore
+                if isinstance(obj, (int, float, np.int32)): #type:ignore
                     return str(obj)
                 elif isinstance(obj, dict):
                     return {key: convert_to_string(value) for key, value in obj.items()}
@@ -1896,7 +1890,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.iconFolder = full_utils.findIconFolder()
 
         # Methods.
-        import copy
         self.config = config.copy()
         if nodeInfo is not None:
             #Adjust the width
@@ -1911,7 +1904,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
         h = self.textboxheight
         
         td = QTextDocument()
-        from PyQt5.QtGui import QTextOption
 
         text_option = QTextOption()
         text_option.setAlignment(Qt.AlignLeft) # type: ignore
@@ -2393,7 +2385,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
                             self.name)
 
         #Draw the icon
-        from PyQt5.QtGui import QPixmap
         if self.status == 'idle':
             self.icon = QPixmap(self.iconFolder+os.sep+'node_pending.png')
         elif self.status == 'running':
@@ -2607,7 +2598,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
         
         td.setHtml(textToDisplay)
         
-        from PyQt5.QtGui import QTextOption
         text_option = QTextOption()
         text_option.setAlignment(Qt.AlignLeft) # type: ignore
         text_option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)  # Add WordWrap

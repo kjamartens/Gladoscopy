@@ -1,4 +1,3 @@
-import os
 import json
 import re
 from PyQt5 import QtCore, QtGui

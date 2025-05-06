@@ -1,17 +1,15 @@
 
 #region imports
 import napari
-from qtpy.QtWidgets import QWidget
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtWidgets import QScrollArea
 import sys
 import os
 from pycromanager import Core
 import logging
-from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QGroupBox, QLabel, QVBoxLayout, QPushButton, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QSizePolicy, QScrollArea, QSpacerItem
+from PyQt5.QtGui import QFont
 
-from typing import List
 os.environ['NAPARI_ASYNC'] = '1'
+os.environ['NAPARI_OCTREE'] = '1'
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -163,7 +161,6 @@ class GladosWidget(QWidget):
         
         #Create the following structure: scrollArea --> container --> mainGridLayout
         #create a QScrollArea
-        from PyQt5.QtCore import Qt
         scrollArea = QScrollArea()
         scrollArea.setWidgetResizable(True)
         self.container = QWidget()
@@ -182,7 +179,6 @@ class GladosWidget(QWidget):
             mainGridLayout.addWidget(group_box, row, column)
 
         #add a spacer item to push the entire gridwindow to the top-left of the scroll area
-        from PyQt5.QtWidgets import QSpacerItem
         self.expandingspacer = QSpacerItem(10000, 10000, QSizePolicy.Expanding, QSizePolicy.Expanding)
         mainGridLayout.addItem(self.expandingspacer, rows+1, columns + 1)
         
@@ -238,7 +234,6 @@ class MMConfigWidget(GladosWidget):
         Called when the window is resized
         Basically just updates the font/margins
         """
-        from PyQt5.QtGui import QFont
         self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
         # self.adjustSize()
         self.layoutInfo.adjustSize() #type:ignore
@@ -271,7 +266,6 @@ class MDAWidget(GladosWidget):
         Called when the window is resized
         Basically just updates the font/margins
         """
-        from PyQt5.QtGui import QFont
         # self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
         # self.adjustSize()
         self.layoutInfo.adjustSize() #type:ignore

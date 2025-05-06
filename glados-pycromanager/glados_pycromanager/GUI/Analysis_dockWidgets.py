@@ -1,30 +1,9 @@
-from PyQt5.QtWidgets import QGridLayout, QPushButton
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget, QTableWidget, QWidget, QInputDialog, QTableWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
-from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
-from PyQt5 import uic
-
-import sys, appdirs
+import appdirs
 import os
 import json
-from pycromanager import Core, multi_d_acquisition_events, Acquisition
-import numpy as np
-import time
-import asyncio
-import pyqtgraph as pg
-import matplotlib.pyplot as plt
-from matplotlib import colormaps # type: ignore
 import matplotlib
-import pickle
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-import tifffile
-import time
-from PyQt5.QtCore import QTimer,QDateTime
 import logging
-from typing import List, Iterable
-import itertools
-import queue
+from PyQt5.QtWidgets import QMainWindow
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__

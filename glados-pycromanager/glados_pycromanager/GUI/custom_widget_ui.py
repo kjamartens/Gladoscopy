@@ -9,7 +9,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from pyqtgraph import PlotWidget
 
 class Ui_CustomDockWidget(object):
     def setupUi(self, MainWindow):
@@ -717,6 +717,4 @@ class Ui_CustomDockWidget(object):
         self.QLabelUV1.setText(_translate("MainWindow", "milliseconds"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_manual), _translate("MainWindow", "Manual"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_autonomous), _translate("MainWindow", "Autonomous"))
-from pyqtgraph import PlotWidget
-from PyQt5 import QtGui
 # import GUI_resourceFileIcons_rc
