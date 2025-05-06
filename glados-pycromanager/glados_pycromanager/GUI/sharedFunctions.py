@@ -205,7 +205,7 @@ class Shared_data(QObject):
         self._RunningLocally = not self._RunningViaPIP
     
     def __setattr__(self, name, value):
-        logging.info(f"Setting attribute {name} to {value}")
+        logging.debug(f"Setting attribute {name} to {value}")
         super().__setattr__(name, value)
     
     def mdaacqdonefunction(self):

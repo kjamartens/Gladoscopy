@@ -344,13 +344,13 @@ class AnalysisThread_customFunction_Visualisation(QThread):
 
 #This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
 
-#Has to be a QThread and not e.g. multiprocessing because we rely on pickable objects - mostly the pycromanager core that we send around to influence the run during RT analysis
+#Has to be a QThread and not e.g. multiprocessing because we rely on pickyyable objects - mostly the pycromanager core that we send around to influence the run during RT analysis
 class AnalysisThread_customFunction(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=100,nodzInfo=None):
+    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=1,nodzInfo=None):
         """
         Initializes the AnalysisThread object.
 

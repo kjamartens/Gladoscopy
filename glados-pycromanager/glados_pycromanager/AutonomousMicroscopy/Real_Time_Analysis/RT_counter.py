@@ -2,6 +2,7 @@ import numpy as np
 import inspect
 import utils
 import logging
+import time
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -22,8 +23,8 @@ def __function_metadata__():
             ],
             "help_string": "RT counter.",
             "display_name": "RT counter",
-            "run_delay": 100,
-            "visualise_delay": 100,
+            "run_delay": 0,
+            "visualise_delay": 10,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
@@ -49,7 +50,7 @@ class RealTimeCounter():
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):
-        logging.info('RUNNING COUNTER REAL-TIME ANALYSIS')
+        run_time = time.time()
         if 'ImageNumber' in metadata:
             self.currentValue = float(metadata['ImageNumber'])
             logging.info("At frame: "+metadata['ImageNumber'])
@@ -61,6 +62,7 @@ class RealTimeCounter():
                 mda_values = np.hstack((mda_values,metadata['Axes'][v]))
                 
             self.currentValue = metadata['Axes'][v]
+        logging.info(f"Running time counter rta: {time.time()-run_time}")
     
     def end(self,core,**kwargs):
         logging.info('ENDING COUNTER REAL-TIME ANALYSIS')
@@ -74,30 +76,32 @@ class RealTimeCounter():
         return layerName,layerType
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        logging.info('RUNNING VISUALISATION COUNTER REAL-TIME ANALYSIS')
+        vis_time = time.time()
         napariLayer.data = np.array([[0, 0]])
         properties = {
             'outputval': [self.currentValue],
         }
-        textv = {
-            'string': 'Current frame: {outputval:0.0f}',
-            'size': 10,  # Set a default value
-            'color': 'cyan',  # Set a default value 
-            'anchor': 'upper_left',
-            'translation': [0, 0]
-        }
-        
-        # Then optionally override with kwargs if they exist:
-        if 'Color' in kwargs:
-            textv['color'] = kwargs['Color']
-        if 'Size' in kwargs:
-            textv['size'] = int(kwargs['Size'])
-        #
+        #Only the properties need to be changed
         napariLayer.properties = properties
-        napariLayer.text = textv
         if self.firstLayerInit:
-        #Only change if really needed:
+            #The text data of the napariLayer need to be changed only on init.
+            textv = {
+                'string': 'Current frame: {outputval:0.0f}',
+                'size': 10,  # Set a default value
+                'color': 'cyan',  # Set a default value 
+                'anchor': 'upper_left',
+                'translation': [0, 0]
+            }
+            
+            # Then optionally override with kwargs if they exist:
+            if 'Color' in kwargs:
+                textv['color'] = kwargs['Color']
+            if 'Size' in kwargs:
+                textv['size'] = int(kwargs['Size'])
+            napariLayer.text = textv
+            #Only change if really needed:
             napariLayer.symbol = 'disc'
             napariLayer.size = 0
             napariLayer.selected_data = []
             self.firstLayerInit = False
+        logging.info(f"Visualising time counter rta: {time.time()-vis_time}")

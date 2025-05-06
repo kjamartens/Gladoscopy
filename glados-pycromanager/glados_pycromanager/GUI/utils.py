@@ -1,4 +1,4 @@
-
+#region imports
 import shutil
 import os
 import appdirs
@@ -18,8 +18,6 @@ from PyQt5.QtGui import QPainter, QIcon, QColor, QFontMetrics, QPen
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QLayout, QMainWindow, QLabel, QPushButton, QGroupBox, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QCheckBox, QSpacerItem
 from PyQt5.QtCore import Qt
 
-
-
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
@@ -37,7 +35,7 @@ else:
     from AutonomousMicroscopy.CustomFunctions import *
     from AutonomousMicroscopy.Real_Time_Analysis import * 
     import AutonomousMicroscopy.MainScripts.HelperFunctions 
-
+#endregion
 
 def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
     logging.debug('Cleaning up temporary files')
@@ -3289,21 +3287,27 @@ def openAdvancedSettings(shared_data):
     pass
 
 def getDimensionsFromAcqData(acqData):
+    time_getdimfromacqdata = time.time()
     try:
         alldims = acqData[0]['axes']
-        dimOrder = []
-        n_entries_in_dims = []
+        num_dims = len(alldims)
+        dimOrder = [None] * num_dims
+        n_entries_in_dims = [None] * num_dims
         uniqueEntriesAllDims = {}
-        for dim in alldims:
+
+        for i, dim in enumerate(alldims):
             uniqueEntries = []
-            for i in range(0,len(acqData)):
-                uniqueEntries.append(acqData[i]['axes'][dim])
+            for j in range(0, len(acqData)):
+                uniqueEntries.append(acqData[j]['axes'][dim])
             uniqueEntries = np.unique(uniqueEntries)
             nEntries = len(uniqueEntries)
-            n_entries_in_dims.append(nEntries)
-            dimOrder.append(dim)
-            uniqueEntriesAllDims.update({dim:uniqueEntries})
+            n_entries_in_dims[i] = nEntries
+            dimOrder[i] = dim
+            uniqueEntriesAllDims[dim] = uniqueEntries
+            
+            
         logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
+        print(f'Time to get dimensions from acq data: {time.time()-time_getdimfromacqdata}')
         return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
     except Exception as e:
         print(f'Problem with get Dimensions! {e}')

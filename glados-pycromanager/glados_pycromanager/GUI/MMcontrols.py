@@ -3,6 +3,9 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSi
 from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
 from PyQt5 import uic
 import sys, appdirs
+from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
+from PyQt5 import QtWidgets
+import importlib.util
 import os
 import json
 from pycromanager import Core, multi_d_acquisition_events, Acquisition
@@ -238,7 +241,6 @@ class ConfigInfo:
                 currentValue = 0
             return currentValue
         
-
 class MMConfigUI(CustomMainWindow):
     """
         A class to create a MicroManager config UI
@@ -281,9 +283,10 @@ class MMConfigUI(CustomMainWindow):
                 # global core, napariViewer
                 core = shared_data.core
                 napariViewer = shared_data.napariViewer
-            except:
-                logging.error('Line 237 fails')
+            except Exception as e:
+                logging.error(f'Line 237 fails: {e}')
         super().__init__()
+        self.shared_data = shared_data #Set global shared_data also as self.attribute
         self.fullyLoaded = False
         self.autoSaveLoad = autoSaveLoad
         self.showConfigs = showConfigs
@@ -312,7 +315,6 @@ class MMConfigUI(CustomMainWindow):
         self.mainLayout = QGridLayout()
         self.configEntries = {}
         
-        import importlib.util
         if importlib.util.find_spec('glados_pycromanager') is not None:
             import glados_pycromanager
             # Get the installation path of the package
@@ -405,8 +407,6 @@ class MMConfigUI(CustomMainWindow):
             self.mainLayout.addWidget(self.realTimeAnalysisGroupBox, 0, 5)
         
         #Add a horizontal auto-widening object to mainlayout:
-        from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
-        from PyQt5 import QtWidgets
         spacer = QtWidgets.QSpacerItem(2, 1, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.mainLayout.addItem(spacer,0,99)
         

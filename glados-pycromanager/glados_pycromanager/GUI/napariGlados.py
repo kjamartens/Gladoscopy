@@ -69,7 +69,7 @@ def napariUpdateLive(DataStructure):
         #Sleep for the remainder, then continue
         time.sleep(min_delay_time-(time.time()-shared_data.last_display_update_time))
         
-    shared_data.debugImageDisplayTimes.append(time.time())
+    #shared_data.debugImageDisplayTimes.append(time.time())
     napariViewer = DataStructure['napariViewer']
     acqstate = DataStructure['acqState']
     core = DataStructure['core']
@@ -97,6 +97,7 @@ def napariUpdateLive(DataStructure):
         #If it's the first liveImageLayer
         if not liveImageLayer:
             nrLayersBefore = len(napariViewer.layers)
+            #The following line takes 2 seconds to run: #TODO: optimize
             layer = napariViewer.add_image(liveImage, rendering='attenuated_mip', colormap=DataStructure['layer_color_map'],name = layerName)
             #Set correct scale - in nm
             if core.get_pixel_size_um() != 0:
@@ -458,18 +459,18 @@ class napariHandler():
                     if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
                         with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
-                            events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                            events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
                             acq.acquire(events)
                     elif shared_data._headless and shared_data.backend == 'Python':
                         logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
                         with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
-                            events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                            events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
                             acq.acquire(events)
                     else:
                         with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
-                            events = multi_d_acquisition_events(num_time_points=9999, time_interval_s=0)
+                            events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
                             acq.acquire(events)
 
                     logging.debug('After Acq Live')
@@ -639,7 +640,7 @@ class napariHandler():
                 self.visualisation_queue.clear()
                 logging.info("Live mode stopped")
             else:
-                logging.debug('liveMode changed to TRUE')
+                logging.info('liveMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Always start live-mode visualisation:

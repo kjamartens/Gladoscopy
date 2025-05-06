@@ -175,6 +175,7 @@ class headlessGUI(QWidget):
         self.shared_data.globalData['MM_CONFIG_PATH']['value'] = self.config_file
         self.shared_data.globalData['MM_HEADLESS_BUFFER_MB']['value'] = self.buffer_size_mb
         self.shared_data.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value'] = self.max_memory_mb
+        #And update the JSON
         utils.storeSharedData_GlobalData(self.shared_data)
         
         self.close()
