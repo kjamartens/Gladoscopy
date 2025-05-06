@@ -9,13 +9,67 @@ Contains the Scanning/Decision/Variables/Logger widgets encapsulated in the auto
 #region imports
 import sys
 import os
+import json
+import time
+import random
+import logging
+from datetime import datetime
+import re
+import tempfile
+import webbrowser
 import appdirs
 import numpy as np
-import logging
-from PyQt5.QtGui import QIcon, QFont, QColor, QTextCursor
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QSize, QRunnable, QTimer
-from PyQt5.QtWidgets import QApplication, QPushButton, QVBoxLayout, QTextEdit, QPlainTextEdit, QWidget, QTabWidget, QMenu, QAction, QColorDialog, QHBoxLayout, QCheckBox, QGridLayout, QLineEdit, QDialog, QComboBox, QDialogButtonBox, QFileDialog, QMessageBox, QSizePolicy, QSpacerItem,  QScrollArea, QSpinBox, QLabel, QTableWidget, QGroupBox
+import tifffile
+from PIL import Image
+import pyperclip
+import napari
+from ndtiff import NDTiffDataset
+
+from PyQt5 import QtGui, QtWidgets
+from PyQt5.QtCore import (
+    QObject,
+    QRunnable,
+    QSize,
+    Qt,
+    QThreadPool,
+    QTimer,
+    pyqtSignal,
+)
+from PyQt5.QtGui import QColor, QFont, QIcon, QTextCursor
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QGraphicsDropShadowEffect,
+    QGridLayout,
+    QGroupBox,
+    QHeaderView,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpacerItem,
+    QSpinBox,
+    QSplitter,
+    QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 sys.path.append('glados-pycromanager\\glados_pycromanager\\GUI\\nodz')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -323,7 +377,6 @@ class nodz_openInlineScriptDialog(QDialog):
         self.setWindowTitle("InlineScript Dialog")
         self.InlineScriptInfo  = ''
         if parentNode is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
             self.InlineScriptInfo  = parentNode.InlineScriptInfo
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -440,7 +493,6 @@ class nodz_generalAdvancedLineEditDialog(QDialog):
         setattr(self,storeVarName,0)
         # selfvar = getattr(self,storeVarName)
         if parentNode is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
             setattr(self,storeVarName,getattr(parentNode,storeVarName))
             # self.changeGlobalVarInfo  = parentNode.changeGlobalVarInfo 
 
@@ -651,7 +703,6 @@ class nodz_openMMConfigDialog(QDialog):
         
         self.setWindowTitle("MM config Dialog")
         if parentNode is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
             
             self.MMlayout = parentNode.MMconfigInfo.mainLayout
             
@@ -761,7 +812,6 @@ class nodz_visualisationDialog(QDialog):
         
         self.setWindowTitle("Visualisation Dialog")
         if parentNode is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget, QFormLayout
             layout_sub = QFormLayout()
             if 'layerName' not in parentNode.visualisation_currentData or parentNode.visualisation_currentData['layerName'] is not None:
                 connectedNodes = nodz_utils.getConnectedNodes(parentNode, 'topAttr')
@@ -776,7 +826,6 @@ class nodz_visualisationDialog(QDialog):
             self.layerNameEdit.setText(defaultText)
             layout_sub.addRow("Layer name:", self.layerNameEdit)
             
-            import napari
             
             self.colormapComboBox = QComboBox()
             colormaps = napari.utils.colormaps.AVAILABLE_COLORMAPS #type:ignore
@@ -828,7 +877,6 @@ class nodz_openMDADialog(QDialog):
         
         self.setWindowTitle("MDA Dialog")
         if parentData is not None:
-            from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
             testQWidget = QWidget()
             
             if currentNode is not None:
@@ -1542,10 +1590,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         self.globalVariables['XY_pos_measurementArray']['type'] = [np.ndarray,list]
         self.globalVariables['XY_pos_measurementArray']['data'] = []
         self.globalVariables['XY_pos_measurementArray']['importance'] = 'Informative'
-        
-        
-        #import qgroupbox:
-        from qtpy.QtWidgets import QGroupBox    
     
         #Create a tab widget:
         self.tabWidget = QTabWidget()
@@ -1637,7 +1681,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             Shows the Documentation .html files file
             """
             try:
-                import webbrowser
                 if is_pip_installed():
                     package_path = os.path.dirname(glados_pycromanager.__file__)
                     htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
@@ -1680,7 +1723,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         self.NodzPlusButtonsLayout.setColumnStretch(1, 1)   # Give less stretch to buttonsArea
 
         
-        from PyQt5.QtWidgets import  QSplitter
 
         self.splitter = QSplitter()
         self.splitter.addWidget(self.NodzPlusButtonsWidget)
@@ -1741,7 +1783,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         
         
         #Handling of the CallAction threads belonging to nodes is done via a QThreadPool
-        from PyQt5.QtCore import QThreadPool
         self.thread_pool = QThreadPool.globalInstance()
         
         #Focus on the nodes
@@ -1975,7 +2016,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         self.nodeInfo['analysisMeasurementDEBUG']['bottomAttributes'] = ['Visual']
         
         #We also add some custom JSON info about the node layout (colors and such)
-        import json
         #NOTE: taking a lot of these by grouping-colors. I.e. I create one color (acquisition), then for others in the same 'group', I use analogous scheme of colorffy.com
         self.nodeLayout = json.loads('''{
             
@@ -2212,7 +2252,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             
             #Set the variableNodz info, maybe later do this in seperate function?
             newNode.variablesNodz['data'] = {}
-            from ndtiff import NDTiffDataset
             newNode.variablesNodz['data']['type'] = [NDTiffDataset, np.ndarray]
             newNode.variablesNodz['data']['data'] = None
             newNode.variablesNodz['data']['importance'] = 'Default'
@@ -3150,16 +3189,12 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     displayRounded = config[1]
                 displayHTMLtext += f"<br>{config[0]} to {displayRounded}"
         elif nodeType == 'scoreEnd':
-            import time
-            from datetime import datetime
             displayHTMLtext = f"<i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
             for score_entry in dialog[0]:
                 displayHTMLtext += f"<br><b>{score_entry}:</b> {format(dialog[1][score_entry],'.2f')}"
             if len(dialog) > 2:
                 displayHTMLtext += f"<br><b>{dialog[2]}</b>"
         elif nodeType == 'scoreStart':
-            import time
-            from datetime import datetime
             displayHTMLtext = "<b>Scoring started at:</b>"
             displayHTMLtext += f"<br><i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
         
@@ -3379,7 +3414,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     lineEditAdvName = 'LineEditAdv#'+function[1]+'#'+inputOfFunction['name'] #type:ignore
                     if lineEditVarName in dstNode.scoring_analysis_currentData: #type:ignore
                         if dstNode.scoring_analysis_currentData[lineEditVarName] == '': #type:ignore
-                            import ndtiff
                             if ndtiff.NDTiffDataset in inputOfFunction['type']: #type:ignore
                                 if ndtiff.NDTiffDataset in shortestConnectedAcquisition.variablesNodz['data']['type']:
                                     dstNode.scoring_analysis_currentData[lineEditVarName] = 'data@'+shortestConnectedAcquisition.name #type:ignore
@@ -3647,7 +3681,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         currentNode.scoring_end_currentData['Variables'] = dialogLineEdits #type: ignore
         
         #the dialogLineEdits should be the new sockets of the current node. However, if a plug with the name already exists, it shouldn't be changed.
-        import time
         sleepTime = 0.02
         for _ in range(3): #Just repeat everything 3 times and hope it solves itself
             self.update()
@@ -3714,7 +3747,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         """
                 
         #the dialogLineEdits should be the new plugs of the current node. However, if a plug with the name already exists, it shouldn't be changed.
-        import time
         sleepTime = 0.02
         for _ in range(3): #Just repeat everything 3 times and hope it solves itself
             self.update()
@@ -4459,7 +4491,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         if isinstance(storeInfo, np.ndarray) and storeInfo.ndim > 1:
             #Check if we want to store a tiff
             if storeLoc[-4:] == '.tif' or storeLoc[-5:] == '.tiff':
-                import tifffile
                 tifffile.imsave(storeLoc,storeInfo)
                 logging.debug(f'Stored TIF image at {storeLoc}')
         
@@ -4509,7 +4540,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         except: #This will effectively set it as a string.
             node.flowChart.globalVariables[variable]['type'] = [(type((value)))]
         node.flowChart.globalVariables[variable]['importance'] = 'informative'
-        import time
         node.flowChart.globalVariables[variable]['lastUpdateTime'] = time.time()
         
         
@@ -4620,7 +4650,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                         slackReadableText = slackReadableText.replace('</b>','*')
                         self.shared_data.globalData['SLACK-CLIENT']['value'].chat_postMessage(channel=self.shared_data.globalData['SLACK-CHANNEL']['value'],text=slackReadableText) 
                     else: #we have an image!
-                        import re
                         #Extract the text between img tags:
                         imgInfo = re.findall('<img>(.*?)</img>',node.slackReportInfo)[0]
                         restText = re.sub('<img>(.*?)</img>','',node.slackReportInfo)
@@ -4637,12 +4666,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                         #Get the image
                         im = utils.nodz_evaluateVar(imgInfo,node.flowChart)
                         # Convert the ndarray to a PIL Image
-                        from PIL import Image
                         image = Image.fromarray(im/65535*255)# Or convert to RGB
                         image = image.convert("RGB")
                         
                         #Store the im as a PNG in a temporary folder:
-                        import tempfile
                         tempDir = tempfile.TemporaryDirectory()
                         tempFile = os.path.join(tempDir.name,'slackImage.png')
                         
@@ -4713,7 +4740,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             None
         """
         
-        import time
         positions = self.fullRunPositions
         pos = self.fullRunCurrentPos
         
@@ -5083,7 +5109,6 @@ class ScanningWidget(QWidget):
         self.mode_layout.addWidget(QLabel('Mode: '),0,0)
         self.mode_layout.addWidget(self.mode_dropdown,0,1)
 
-        from PyQt5.QtWidgets import QHBoxLayout
         for mode_option in self.scanArray_modes:
             self.scanLayouts[mode_option[0]] = advScanGridLayout(mode=mode_option[0],parent=self)
             
@@ -5217,7 +5242,6 @@ class advScanGridLayout(QGroupBox):
         if self.mode == 'LoadPos':
             positions = {}
             #Read a JSON:
-            import json
             with open(self.scanningInfoGUI['LoadPos']['fileName'], 'r') as f:
                 xypositionsRaw = json.load(f)
 
@@ -5260,7 +5284,6 @@ class advScanGridLayout(QGroupBox):
             Returns:
                 None
             """
-            from qtpy.QtWidgets import QFileDialog
             filename, _ = QFileDialog.getOpenFileName(self,'Open file', '', '*.POS Files (*.pos)')
             if filename:
                 self.lineEdit_posFilename.setText(filename)
@@ -5353,7 +5376,6 @@ class DecisionWidget(QWidget):
         self.mode_layout.addWidget(QLabel('Mode: '),0,0)
         self.mode_layout.addWidget(self.mode_dropdown,0,1)
 
-        from PyQt5.QtWidgets import QHBoxLayout
         for mode_option in self.decisionArray_modes:
             self.decisionLayouts[mode_option[0]] = QWidget()
             #Add a layout to this widget:
@@ -5661,7 +5683,6 @@ class advDecisionGridLayout(QGroupBox):
         """
         Code to update the GUI of the DirectDecision_AND_Score groupbox
         """
-        from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
         self.remove_widgets_in_layout(self.layout())
         
         self.outerLayout = QVBoxLayout()
@@ -5748,7 +5769,6 @@ class advDecisionGridLayout(QGroupBox):
         """
         Code to update the GUI of the DirectDecision_AND_Score groupbox
         """
-        from PyQt5.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
         self.remove_widgets_in_layout(self.layout())
         
         self.outerLayout = QVBoxLayout()
@@ -5893,7 +5913,6 @@ class VariablesBase(QWidget):
             
         #Loop over the nods in the nodzinstance:
         for node in self.nodzinstance.nodes:
-            from PyQt5.QtWidgets import QGraphicsColorizeEffect, QGraphicsEffect, QGraphicsDropShadowEffect, QGraphicsView, QApplication
             if node.name == hovered_entry:                
                 #Add a green shadow effect if it's the one hovered over.
                 effect = QGraphicsDropShadowEffect()
@@ -5917,7 +5936,6 @@ class VariablesBase(QWidget):
                 textEntry = 'None'
             self.selected_entry.append(textEntry)
         
-        import pyperclip
         copystr = f'{self.selected_entry[2]}@{self.selected_entry[1]}'
         pyperclip.copy(copystr)
         
@@ -6020,8 +6038,6 @@ class VariablesBase(QWidget):
         # Set the number of rows
         self.variablesTableWidget.setRowCount(len(allvariableData))
 
-        from PyQt5.QtWidgets import QTableWidgetItem
-        from datetime import datetime
         # Fill the table with data
         for row_id in range(len(allvariableData)):
             varData = allvariableData[row_id]
@@ -6060,7 +6076,6 @@ class VariablesDialog(QDialog, VariablesBase):
         variablesWidget.variablesTableWidget.horizontalHeader().setFont(header_font)
         variablesWidget.variablesTableWidget.verticalHeader().setFont(header_font)
         
-        from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QHeaderView
 
         # Make the table more compact
         variablesWidget.variablesTableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -6121,7 +6136,6 @@ class LoggerWidget(QPlainTextEdit):
         self.update_log_content()
         
         #random value between around 500: (desyncs multiple logger widgets)
-        import random
         if not logLevel == 'DEBUG':
             # Set up a timer to periodically update the log content
             self.timer = QTimer(self)
@@ -6169,11 +6183,9 @@ class generalNodzCallActionWorker(QRunnable):
         """ 
         Running of the different callActions belonging to all nodes.
         """
-        import logging
         logging.debug(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
         #Timer
         if self.nodzType == 'Timer':
-            import time
             time.sleep(self.args['wait_time'])
         elif self.nodzType == 'MMconfigChangeRan':
             #We need to change some configs (probably):
