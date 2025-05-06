@@ -1692,7 +1692,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             except Exception as e:
                 logging.error(f'Could not open the developer advancedi nfo. {e}')
                 
-        self.helpGroupBox = QGroupBox("Logger")
+        self.helpGroupBox = QGroupBox("Help")
         newgridlayout = QGridLayout()
         self.helpGroupBox.setLayout(newgridlayout)
         #Add a User Manual Button:
@@ -1739,12 +1739,20 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         
         
         #Create a tab for the decision widget:
+        self.tabWidget.setStyleSheet("""
+            QTabBar::tab {
+                min-width: 50px;
+            }
+        """)
         self.tabWidget.addTab(self.decision_groupbox, "Decision")
         self.tabWidget.addTab(self.scanwidget_groupbox, "Scanning")
         self.tabWidget.addTab(self.variablesWidgetGroupbox, "Variables")
         self.tabWidget.addTab(self.loggerINFOGroupBox, "Logger")
         self.tabWidget.addTab(self.loggerDEBUGGroupBox, "Debug")
         self.tabWidget.addTab(self.helpGroupBox, "Help")
+        self.tabWidget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        self.tabWidget.setMaximumWidth(QtWidgets.QWIDGETSIZE_MAX) # Ensure no maximum width is set
+
         
         #Global variables for MM/napari
         self.core = core

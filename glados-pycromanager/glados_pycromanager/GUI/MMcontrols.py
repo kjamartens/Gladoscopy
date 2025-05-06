@@ -1198,8 +1198,6 @@ class MMConfigUI(CustomMainWindow):
         # pre-load all args/kwargs and their edit values - then hide all of them
         utils.layout_init(self.rtAnalysisSubGroupBoxLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions,nodzInfo=self,skipInput=True)
         
-        print('hi')
-        
         #Pre-load the options if they're in the current node info
         # if 'real_time_analysis_currentData' in vars(self):
             
