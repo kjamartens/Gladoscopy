@@ -1,16 +1,22 @@
 import numpy as np
 import tempfile
 import zarr
-from PyQt5.QtCore import pyqtSignal
 import napari
-from napari.qt import thread_worker
 import time
-from qtpy.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QScrollArea
 import sys
 import logging
 import os
 import appdirs
+from napari.qt import thread_worker
 from collections import deque
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import Qt, pyqtSignal
+from qtpy.QtWidgets import (
+    QMainWindow, 
+    QVBoxLayout, 
+    QWidget, 
+    QScrollArea
+    )
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -898,8 +904,6 @@ def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,in
     napariViewer = napari.Viewer()
     
     #Set QT attributes here for some reason...
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtCore import Qt
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
     QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore

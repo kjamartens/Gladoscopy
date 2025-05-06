@@ -1,8 +1,8 @@
-
 from PyQt5.QtGui import QIcon
 import logging
-from napari.qt import thread_worker
 import numpy as np
+import os
+import importlib.util
 
 """ 
 General napari functions
@@ -151,8 +151,6 @@ def InitateNapariUI(napariViewer):
     #Set title, icon
     napariViewer.title="GladOS - napari"
     # Set the window icon
-    import os
-    import importlib.util
     if importlib.util.find_spec('glados_pycromanager') is not None:
         import glados_pycromanager
         # Get the installation path of the package

@@ -4,36 +4,43 @@ Main function of the multi-dimensional acquisitions in glados-pycromanager.
 Handles the GUI as well as the logic of the multi-dimensional acquisitions.
 Includes classes for Interactive Lists such as the Channels, XY positions.
 """
-
-import sys, appdirs
-import time
-from PyQt5.QtWidgets import QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton
-from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication
-from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
-from PyQt5 import uic
 import os
-# import PyQt5.QtWidgets
-import json
-from pycromanager import Core, multi_d_acquisition_events, Acquisition
-import numpy as np
-import asyncio
-import pyqtgraph as pg
-import matplotlib.pyplot as plt
-from matplotlib import colormaps # type: ignore
-#For drawing
-import matplotlib
-matplotlib.use('Qt5Agg')
-# from PyQt5 import QtCore, QtWidgets
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-import tifffile
 import time
-from PyQt5.QtCore import QTimer,QDateTime, pyqtSignal
 import logging
 from typing import List, Iterable
 import itertools
-import queue
-from PyQt5.QtWidgets import QTableWidget, QWidget, QInputDialog, QTableWidgetItem
+
+import appdirs
+from PyQt5.QtCore import (
+    QCoreApplication,
+    QEvent,
+    pyqtSignal,
+)
+from PyQt5.QtGui import (
+    QFont,
+    QDoubleValidator,
+    QIntValidator,
+)
+from PyQt5.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QRadioButton,
+    QSizePolicy,
+    QSpacerItem,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+from pycromanager import multi_d_acquisition_events
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -1277,7 +1284,6 @@ class MDAGlados(CustomMainWindow):
         if mdawidget_object is not None:
             if hasattr(mdawidget_object,'size'):
                 logging.debug('attempting to update parent')
-                from PyQt5.QtCore import QEvent
                 current_size = mdawidget_object.size() #type:ignore
                 resize_event = QEvent(QEvent.Resize) #type:ignore
                 resize_event.oldSize = lambda: current_size #type:ignore

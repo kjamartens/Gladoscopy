@@ -11,8 +11,21 @@ import json
 import sys
 from pycromanager import Core
 from pycromanager import start_headless
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QGridLayout, QPushButton, QRadioButton, QButtonGroup, QFileDialog
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, Qt
+from PyQt5.QtWidgets import (
+    QApplication,
+    QWidget,
+    QLabel, 
+    QLineEdit,
+    QGridLayout,
+    QPushButton,
+    QRadioButton, 
+    QButtonGroup,
+    QFileDialog)
+from PyQt5.QtCore import (
+    QThread,
+    QObject,
+    pyqtSignal,
+    Qt)
 
 #Napari optimizations
 os.environ['NAPARI_ASYNC'] = '1'

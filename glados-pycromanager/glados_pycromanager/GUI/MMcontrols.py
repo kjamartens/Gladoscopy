@@ -1,34 +1,37 @@
-from PyQt5.QtWidgets import QLayout, QLineEdit, QFrame, QGridLayout, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSpacerItem, QSizePolicy, QSlider, QCheckBox, QGroupBox, QVBoxLayout, QFileDialog, QRadioButton, QStackedWidget, QTableWidget, QWidget, QInputDialog, QTableWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread, QCoreApplication, QSize, pyqtSignal
-from PyQt5.QtGui import QResizeEvent, QIcon, QPixmap, QFont, QDoubleValidator, QIntValidator
-from PyQt5 import uic
-import sys, appdirs
-from PyQt5.QtWidgets import QSpacerItem, QSizePolicy
-from PyQt5 import QtWidgets
-import importlib.util
 import os
 import json
-from pycromanager import Core, multi_d_acquisition_events, Acquisition
-import numpy as np
 import time
-import asyncio
-import pyqtgraph as pg
-import matplotlib.pyplot as plt
-from matplotlib import colormaps # type: ignore
-import matplotlib
-import pickle
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-import tifffile
-import time
-from PyQt5.QtCore import QTimer,QDateTime
 import logging
-from typing import List, Iterable
-import itertools
-import queue
+import appdirs
+import importlib.util
+import numpy as np
 
-#For drawing
-matplotlib.use('Qt5Agg')
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import (
+    Qt,
+)
+from PyQt5.QtGui import (
+    QFont,
+    QDoubleValidator,
+    QIcon,
+)
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -1024,7 +1027,6 @@ class MMConfigUI(CustomMainWindow):
                 event.source.name = 'Draw ROI_'
                 #Pop up a dialog box to ask if they like it or not:
                 #Create a dialog box
-                from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
                 dialog =  QDialog()
                 dialog.setWindowTitle('Draw ROI')
                 #Add 3 buttons: 

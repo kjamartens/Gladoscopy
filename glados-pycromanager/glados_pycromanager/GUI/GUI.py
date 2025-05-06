@@ -1,9 +1,9 @@
 from pycromanager import Core
 import sys
-sys.path.append('GUI\\nodz')
-from PyQt5.QtWidgets import QMainWindow,QApplication
-
 import os
+sys.path.append('GUI\\nodz')
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import Qt
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -47,8 +47,6 @@ if __name__ == "__main__":
 
         #Setup UI
         
-        from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import Qt
         QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
         QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)
     
@@ -86,8 +84,6 @@ if __name__ == "__main__":
             MM_JSON = json.load(f)
 
 
-        from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import Qt
         QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
         #Setup UI
         app = QApplication(sys.argv)

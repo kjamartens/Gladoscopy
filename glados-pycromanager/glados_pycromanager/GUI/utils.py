@@ -14,8 +14,27 @@ import json
 import sys
 
 #Imports for PyQt5 (GUI)
-from PyQt5.QtGui import QPainter, QIcon, QColor, QFontMetrics, QPen
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QLayout, QMainWindow, QLabel, QPushButton, QGroupBox, QGridLayout, QWidget, QComboBox, QLineEdit, QFileDialog, QCheckBox, QSpacerItem
+from PyQt5.QtGui import (
+    QPainter,
+    QIcon,
+    QColor,
+    QFontMetrics,
+    QPen)
+from PyQt5.QtWidgets import (
+    QHBoxLayout,
+    QVBoxLayout,
+    QLayout, 
+    QMainWindow, 
+    QLabel, 
+    QPushButton,
+    QGroupBox,
+    QGridLayout,
+    QWidget,
+    QComboBox,
+    QLineEdit,
+    QFileDialog,
+    QCheckBox,
+    QSpacerItem)
 from PyQt5.QtCore import Qt
 
 def is_pip_installed():

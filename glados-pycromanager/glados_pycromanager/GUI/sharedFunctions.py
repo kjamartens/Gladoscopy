@@ -1,15 +1,11 @@
 
-from PyQt5.QtCore import QTimer
 import logging
-from PyQt5.QtCore import QObject, pyqtSignal
-
 import slack
-from flask import Flask
 import time
-from slackeventsapi import SlackEventAdapter
 import appdirs
 import os
 import json 
+from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
