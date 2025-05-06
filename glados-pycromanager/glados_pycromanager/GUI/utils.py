@@ -12,6 +12,7 @@ import time
 import datetime
 import json
 import sys
+import markdown
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import (
@@ -36,6 +37,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QSpacerItem)
 from PyQt5.QtCore import Qt
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -2875,8 +2877,6 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addWidget(htmlViewer) #type:ignore
 
     def addMarkdown(self,mdfile,width=700,height=800):
-        from PyQt5.QtWebEngineWidgets import QWebEngineView
-        import markdown
         
         newlayout = QVBoxLayout()
         markdownViewer = QWebEngineView()

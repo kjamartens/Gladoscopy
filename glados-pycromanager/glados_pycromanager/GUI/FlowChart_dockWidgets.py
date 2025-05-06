@@ -1643,9 +1643,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
                 else:
                     try:
-                        quickStartWindow.addMarkdown('glados-pycromanager/glados_pycromanager/Documentation/UserManual.md')
-                    except:
-                        quickStartWindow.addMarkdown('glados_pycromanager/Documentation/UserManual.md')
+                        quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
+                    except Exception as e:
+                        logging.info(f'TryException: {e}')
+                        quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
                 QApplication.processEvents()
                 quickStartWindow.show()
             except Exception as e:
@@ -1669,7 +1670,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     try:
                         quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
                     except Exception as e:
-                        logging.debug(f'TryException: {e}')
+                        logging.info(f'TryException: {e}')
                         quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
                 QApplication.processEvents()
                 quickStartWindow.show()
