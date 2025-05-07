@@ -9,6 +9,7 @@ import napari
 import os
 import json
 import sys
+import utils
 from pycromanager import Core
 from pycromanager import start_headless
 from PyQt5.QtWidgets import (
@@ -26,6 +27,9 @@ from PyQt5.QtCore import (
     QObject,
     pyqtSignal,
     Qt)
+from PyQt5.QtGui import (
+    QIcon,
+)
 
 #Napari optimizations
 os.environ['NAPARI_ASYNC'] = '1'
@@ -105,10 +109,36 @@ class headlessGUI(QWidget):
         super().__init__()
         self.shared_data = shared_data
         self.initUI()
-
     def initUI(self):
         self.setWindowTitle('Glados-PycroManager-Napari GUI')
-        self.setGeometry(100, 100, 400, 200)
+        
+        iconFolder = utils.findIconFolder()
+        icon_path = iconFolder+os.sep+'GladosIcon.ico'
+        self.setWindowIcon(QIcon(icon_path))
+        
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint) #type:ignore
+        
+        # Center the window on the screen, fall back to just somewhere
+        try:
+            screen = QApplication.primaryScreen()
+            screen_geometry = screen.availableGeometry() #type: ignore
+            window_width = 400
+            window_height = 200
+            self.setGeometry(
+                (screen_geometry.width() - window_width) // 2,
+                (screen_geometry.height() - window_height) // 2,
+                window_width,
+                window_height
+            )
+        except Exception as e:
+            logging.warning(f'Try/exception occured! {e}')
+            self.setGeometry(100, 100, 400, 200)
+            
+        
+        # Add a splash screen at the top
+        # splash_label = QLabel(self)
+        # splash_label.setPixmap(utils.get_glados_splash_screen().scaledToWidth(window_width))
+        # splash_label.setAlignment(Qt.AlignCenter)
 
         self.backendLabel = QLabel('Backend:', self)
 

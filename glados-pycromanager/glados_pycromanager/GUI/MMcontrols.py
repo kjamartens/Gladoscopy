@@ -40,13 +40,12 @@ if is_pip_installed():
     from glados_pycromanager.GUI.utils import CustomMainWindow
     import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.AnalysisClass import *
-    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
-
+    from glados_pycromanager.GUI.napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 else:
     from utils import CustomMainWindow
     import utils
     from AnalysisClass import *
-    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI, checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
+    from napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 class ConfigInfo:
     """
     This class contains information about a pycromanager config group
