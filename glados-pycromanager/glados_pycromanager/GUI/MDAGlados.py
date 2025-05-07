@@ -1134,6 +1134,7 @@ class MDAGlados(CustomMainWindow):
         self.setAllCheckBoxEnableValues()
         #This function will be called when the checkboxes are clicked. It will update the GUI accordingly:
         self.updateGUIwidgets(GUI_show_exposure=self.GUI_show_exposure_chkbox.isChecked(), GUI_show_xy = self.GUI_show_xy_chkbox.isChecked(), GUI_show_z=self.GUI_show_z_chkbox.isChecked(), GUI_show_channel=self.GUI_show_channel_chkbox.isChecked(), GUI_show_time=self.GUI_show_time_chkbox.isChecked(), GUI_show_storage=self.GUI_show_storage_chkbox.isChecked(),GUI_showOptions=True,GUI_acquire_button=self.GUI_acquire_button)
+        
         self.get_MDA_events_from_GUI()
     
     def setAllCheckBoxEnableValues(self):
@@ -1186,20 +1187,10 @@ class MDAGlados(CustomMainWindow):
         self.zGroupBox.setParent(None) # type: ignore
         self.channelGroupBox.setParent(None) # type: ignore
         self.timeGroupBox.setParent(None) # type: ignore
-        # # self.orderGroupBox.setParent(None) # type: ignore
+        if hasattr(self,'orderGroupBox'):
+            self.orderGroupBox.setParent(None) # type: ignore
         self.storageGroupBox.setParent(None) # type: ignore
         self.showOptionsGroupBox.setParent(None)  # type: ignore
-
-
-        # Clear the layout - this is required
-        while self.gui.count(): # type: ignore
-            item = self.gui.takeAt(0) # type: ignore
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
-        #redraw the self.gui:
-        self.gui.update()
-        QCoreApplication.processEvents()
         
         self.gui.setSizeConstraint(QGridLayout.SetMinimumSize)
         # At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
@@ -1246,22 +1237,18 @@ class MDAGlados(CustomMainWindow):
             self.timeGroupBox.setEnabled(True)
         else:
             self.timeGroupBox.setEnabled(False)
-        #     # QCoreApplication.processEvents()
         if GUI_show_xy:
             self.xyGroupBox.setEnabled(True)
         else:
             self.xyGroupBox.setEnabled(False)
-            # QCoreApplication.processEvents()
         if GUI_show_z:
             self.zGroupBox.setEnabled(True)
         else:
             self.zGroupBox.setEnabled(False)
-            # QCoreApplication.processEvents()
         if GUI_show_channel:
             self.channelGroupBox.setEnabled(True)
         else:
             self.channelGroupBox.setEnabled(False)
-            # QCoreApplication.processEvents()
         
         
         self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
