@@ -13,6 +13,8 @@ import datetime
 import json
 import sys
 import markdown
+from pycromanager import Core
+from typing import Any
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import (
@@ -35,9 +37,13 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QFileDialog,
     QCheckBox,
-    QSpacerItem)
-from PyQt5.QtCore import Qt
+    QSpacerItem,
+    QRadioButton)
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+#TODO: Maybe sharedFunctions need to be in the pip-installed list?
+# from sharedFunctions import Shared_data
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -964,6 +970,27 @@ def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',icon
     except:
         return None
 
+def get_xy_position(core = None,shared_data=None):
+    """
+    Get the stage XY position, which needs to be handled differently if it's JAVA or Python backend
+    """
+    if shared_data.backend == 'Python':
+        position = core.get_xy_position()
+    elif shared_data.backend == 'JAVA':
+        position = [core.get_xy_stage_position().x, core.get_xy_stage_position().y]
+    else:
+        try:
+            position = core.get_xy_position()
+        except Exception:
+            logging.debug('Unknown backend, not Python')
+            try:
+                position = [core.get_xy_stage_position().x, core.get_xy_stage_position().y]
+            except Exception:
+                logging.debug('Unknown backend, not Java')
+                position = [np.nan,np.nan]
+    
+    return position
+
 class XYGridManager():
     """  
     #Idea of XY grid: have methods to create a pop-up dialog, where users can set up the grid (top), setting up top/bottom/left/right/center and specifiy overlap. This then also includes a grid-flow (bottom) with options betwen e.g. normal grid, diagonal grid, spiral grid, etc
@@ -1096,16 +1123,8 @@ class XYGridManager():
         #Add a gridLayout to this groupbox:
         self.gridlayoutGridFlow = QGridLayout()
         self.groupBoxGridFlow.setLayout(self.gridlayoutGridFlow)
-        from PyQt5.QtWidgets import QRadioButton
-        from PyQt5.QtGui import QIcon
-        from PyQt5.QtCore import QSize
         
-        import glados_pycromanager
-        # Get the installation path of the package
-        package_path = os.path.dirname(glados_pycromanager.__file__)
-        # Construct the path to the Icons folder
-        self.iconFolder = os.path.join(package_path, 'GUI', 'Icons')
-
+        self.iconFolder = findIconFolder()
         if not os.path.exists(self.iconFolder):
             #Find the iconPath folder
             if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
@@ -1434,14 +1453,14 @@ class createGridFromCenterPopUpBox():
         # #Get the overlap unit:
         # overlapUnit = self.overlapDropDown.currentText()
         #Get the current position:
-        position = self.parent.core.get_xy_stage_position()
-        self.parent.pos_center = [position.x, position.y]
+        position = get_xy_position(self.parent.core,self.parent.parent.shared_data)
+        self.parent.pos_center = position
         
         self.parent.pos_choice = 'center'
         self.parent.updateGridInfo()
         #Close the popup box
         self.popupbox.close()
-        logging.debug(f"Rows: {rows}, Cols: {cols}, Position: {position.x},{position.y}")
+        logging.debug(f"Rows: {rows}, Cols: {cols}, Position: {position}")
     
     def rejectPopup(self):
         #Just close:

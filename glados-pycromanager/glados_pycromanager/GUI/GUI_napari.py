@@ -142,9 +142,9 @@ class headlessGUI(QWidget):
         new_width = window_width
         self.splash_label.setPixmap(
             splash_pixmap.scaled(new_width, int(splash_pixmap.height() * new_width / splash_pixmap.width()),
-            Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            Qt.KeepAspectRatio, Qt.SmoothTransformation) #type:ignore
         )
-        self.splash_label.setAlignment(Qt.AlignCenter)
+        self.splash_label.setAlignment(Qt.AlignCenter) #type:ignore
 
         self.backendLabel = QLabel('Backend:', self)
 
