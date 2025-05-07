@@ -29,6 +29,7 @@ from PyQt5.QtCore import (
     Qt)
 from PyQt5.QtGui import (
     QIcon,
+    QPixmap,
 )
 
 #Napari optimizations
@@ -97,7 +98,7 @@ class Worker(QObject):
             includeCustomUI=True
         else:
             includeCustomUI=False
-        # Your code for running the NapariPycroManager function goes here
+        # Run the NapariPycroManager function
         runNapariPycroManager(core, MM_JSON, shared_data,includecustomUI=includeCustomUI)
         self.finished.emit()
 
@@ -122,8 +123,8 @@ class headlessGUI(QWidget):
         try:
             screen = QApplication.primaryScreen()
             screen_geometry = screen.availableGeometry() #type: ignore
-            window_width = 400
-            window_height = 200
+            window_width = 500
+            window_height = 350
             self.setGeometry(
                 (screen_geometry.width() - window_width) // 2,
                 (screen_geometry.height() - window_height) // 2,
@@ -132,13 +133,18 @@ class headlessGUI(QWidget):
             )
         except Exception as e:
             logging.warning(f'Try/exception occured! {e}')
-            self.setGeometry(100, 100, 400, 200)
+            self.setGeometry(100, 100, 500, 350)
             
-        
         # Add a splash screen at the top
-        # splash_label = QLabel(self)
-        # splash_label.setPixmap(utils.get_glados_splash_screen().scaledToWidth(window_width))
-        # splash_label.setAlignment(Qt.AlignCenter)
+        self.splash_label = QLabel(self)
+        splash_png = iconFolder+os.sep+'GladosSplash_inv.png'
+        splash_pixmap = QPixmap(splash_png)
+        new_width = window_width
+        self.splash_label.setPixmap(
+            splash_pixmap.scaled(new_width, int(splash_pixmap.height() * new_width / splash_pixmap.width()),
+            Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
+        self.splash_label.setAlignment(Qt.AlignCenter)
 
         self.backendLabel = QLabel('Backend:', self)
 
@@ -173,20 +179,21 @@ class headlessGUI(QWidget):
         self.startButton.clicked.connect(self.start)
 
         layout = QGridLayout()
-        layout.addWidget(self.backendLabel, 0, 0)
-        layout.addWidget(self.pythonRadio, 0, 1)
-        layout.addWidget(self.javaRadio, 0, 2)
-        layout.addWidget(self.mm_app_pathLabel, 1, 0)
-        layout.addWidget(self.mm_app_pathLineEdit, 1, 1,1,2)
-        layout.addWidget(self.mm_app_browse, 1, 3)
-        layout.addWidget(self.config_fileLabel, 2, 0)
-        layout.addWidget(self.config_fileLineEdit, 2, 1,1,2)
-        layout.addWidget(self.config_file_browse, 2, 3)
-        layout.addWidget(self.buffer_size_mbLabel, 3, 0)
-        layout.addWidget(self.buffer_size_mbLineEdit, 3, 1)
-        layout.addWidget(self.max_memory_mbLabel, 3, 2)
-        layout.addWidget(self.max_memory_mbLineEdit, 3, 3)
-        layout.addWidget(self.startButton, 4, 0, 1, 4) # Span across two columns
+        layout.addWidget(self.splash_label,1,0,1,4)
+        layout.addWidget(self.backendLabel, 3, 0)
+        layout.addWidget(self.pythonRadio, 3, 1)
+        layout.addWidget(self.javaRadio, 3, 2)
+        layout.addWidget(self.mm_app_pathLabel, 4, 0)
+        layout.addWidget(self.mm_app_pathLineEdit, 4, 1,1,2)
+        layout.addWidget(self.mm_app_browse, 4, 3)
+        layout.addWidget(self.config_fileLabel, 5, 0)
+        layout.addWidget(self.config_fileLineEdit, 5, 1,1,2)
+        layout.addWidget(self.config_file_browse, 5, 3)
+        layout.addWidget(self.buffer_size_mbLabel, 6, 0)
+        layout.addWidget(self.buffer_size_mbLineEdit, 6, 1)
+        layout.addWidget(self.max_memory_mbLabel, 6, 2)
+        layout.addWidget(self.max_memory_mbLineEdit, 6, 3)
+        layout.addWidget(self.startButton, 7, 0, 1, 4) # Span across two columns
 
         self.setLayout(layout)
         self.show()
