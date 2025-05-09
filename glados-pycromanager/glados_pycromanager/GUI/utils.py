@@ -15,6 +15,7 @@ import sys
 import markdown
 from pycromanager import Core
 from typing import Any
+import webbrowser
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import (
@@ -38,7 +39,8 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QCheckBox,
     QSpacerItem,
-    QRadioButton)
+    QRadioButton,
+    QApplication)
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
@@ -2780,20 +2782,23 @@ class SmallWindow(QMainWindow):
     """
     
     #Create a small window that pops up
-    def __init__(self, parent, windowTitle="Small Window"):
+    def __init__(self, parent=None, windowTitle="Small Window"):
         super().__init__(parent)
         self.setWindowTitle(windowTitle)
         self.resize(300, 200)
 
-        self.parent = parent
-        # Set the window icon to the parent's icon
-        self.setWindowIcon(self.parent.windowIcon())
+        try:
+            # Set the window icon to the parent's icon
+            self.setWindowIcon(QIcon(findIconFolder()+os.sep+'GladosIcon.ico'))
+        except Exception as e:
+            logging.error(f'Cannot find icon folder with exception: {e}')
         
         #Add a layout
         layout = QVBoxLayout()
-        self.setCentralWidget(QWidget())  # Create a central widget for the window
-        self.centralWidget().setLayout(layout)  # Set the layout for the central widget
-
+        self.central_widget = QWidget()  # Create a central widget for the window
+        self.setCentralWidget(self.central_widget) # Set it
+        self.central_widget.setLayout(layout) # Set the layout on the widget
+        
     #Function to find/select a file and add it to the lineedit
     def openFileDialog(self,fileArgs = "All Files (*)"):
         options = QFileDialog.Options()
@@ -2940,7 +2945,95 @@ class SmallWindow(QMainWindow):
         newlayout.addWidget(markdownViewer)
         self.centralWidget().layout().addLayout(newlayout)
     
-
+class HelpGroupBox():
+    def __init__(self,parent):
+        self.parent = parent
+        self.helpGroupBox = QGroupBox("Help")
+        newgridlayout = QGridLayout()
+        self.helpGroupBox.setLayout(newgridlayout)
+        #Add a User Manual Button:
+        newgridlayout.addWidget(QLabel('Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!'))
+        button1 = QPushButton('User Manual')
+        button1.clicked.connect(lambda index: self.quickStartMenu())
+        newgridlayout.addWidget(button1)
+        button2 = QPushButton('Developer Manual')
+        button2.clicked.connect(lambda index: self.developerMenu())
+        newgridlayout.addWidget(button2)
+        button3 = QPushButton('Complete software info')
+        button3.clicked.connect(lambda index: self.DeveloperAdvMenu())
+        newgridlayout.addWidget(button3)
+        
+        # I need to store references to the windows so they aren't garbage-collected
+        self.quick_start_window = None
+        self.devMenuWindow = None
+        
+    def quickStartMenu(self):
+        """
+        Shows the UserManual.md file
+        """
+        try:
+            self.quick_start_window = SmallWindow()
+            QApplication.processEvents()
+            self.quick_start_window.setWindowTitle('Quick start / User Manual')
+            QApplication.processEvents()
+            
+            if is_pip_installed():
+                package_path = os.path.dirname(glados_pycromanager.__file__)
+                self.quick_start_window.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
+            else:
+                try:
+                    self.quick_start_window.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
+                except Exception as e:
+                    logging.info(f'TryException: {e}')
+                    self.quick_start_window.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
+            QApplication.processEvents()
+            self.quick_start_window.show() #Show
+            self.quick_start_window.raise_() # Bring to the front
+            self.quick_start_window.activateWindow() # Give focus
+        except Exception as e:
+            logging.error(f'Could not open quick start window. {e}')
+    
+    def developerMenu(self):
+        """
+        Shows the DeveloperManual.md file
+        """
+        try:
+            self.devMenuWindow = SmallWindow(self.parent)
+            QApplication.processEvents()
+            self.devMenuWindow.setWindowTitle('Developer manual')
+            QApplication.processEvents()
+            
+            if is_pip_installed():
+                package_path = os.path.dirname(glados_pycromanager.__file__)
+                self.devMenuWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
+            else:
+                try:
+                    self.devMenuWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
+                except Exception as e:
+                    logging.info(f'TryException: {e}')
+                    self.devMenuWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
+            QApplication.processEvents()
+            self.devMenuWindow.show() #Show
+            self.devMenuWindow.raise_() # Bring to the front
+            self.devMenuWindow.activateWindow() # Give focus
+        except Exception as e:
+            logging.error(f'Could not open developer menu. {e}')
+    
+    def DeveloperAdvMenu(self):
+        """
+        Shows the Documentation .html files file in a proper external webbrowser
+        """
+        try:
+            if is_pip_installed():
+                package_path = os.path.dirname(glados_pycromanager.__file__)
+                htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
+            else:
+                htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
+            
+            webbrowser.open('file://' + os.path.realpath(htmlPath))
+        except Exception as e:
+            logging.error(f'Could not open the developer advanced info. {e}')
+    
 
 def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
     from FlowChart_dockWidgets import VariablesDialog

@@ -1626,93 +1626,91 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         newgridlayout.addWidget(self.loggerDEBUGWidget)
         newgridlayout.addWidget(self.loggerDEBUGupdateButton)
         
+        self.helpGroupBox = utils.HelpGroupBox(self.parent).helpGroupBox
         
-        
-        def quickStartMenu(self):
-            """
-            Shows the UserManual.md file
-            """
-            try:
-                quickStartWindow = utils.SmallWindow(self)
-                QApplication.processEvents()
-                quickStartWindow.setWindowTitle('Quick start / User Manual')
-                QApplication.processEvents()
+        # def quickStartMenu(self):
+        #     """
+        #     Shows the UserManual.md file
+        #     """
+        #     try:
+        #         quickStartWindow = utils.SmallWindow(self)
+        #         QApplication.processEvents()
+        #         quickStartWindow.setWindowTitle('Quick start / User Manual')
+        #         QApplication.processEvents()
                 
-                if is_pip_installed():
-                    package_path = os.path.dirname(glados_pycromanager.__file__)
-                    quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
-                else:
-                    try:
-                        quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
-                    except Exception as e:
-                        logging.info(f'TryException: {e}')
-                        quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
-                QApplication.processEvents()
-                quickStartWindow.show()
-            except Exception as e:
-                logging.error(f'Could not open quick start window. {e}')
+        #         if is_pip_installed():
+        #             package_path = os.path.dirname(glados_pycromanager.__file__)
+        #             quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
+        #         else:
+        #             try:
+        #                 quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
+        #             except Exception as e:
+        #                 logging.info(f'TryException: {e}')
+        #                 quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
+        #         QApplication.processEvents()
+        #         quickStartWindow.show()
+        #     except Exception as e:
+        #         logging.error(f'Could not open quick start window. {e}')
         
+        # def developerMenu(self):
+        #     """
+        #     Shows the DeveloperManual.md file
+        #     """
+        #     try:
+        #         quickStartWindow = utils.SmallWindow(self)
+        #         QApplication.processEvents()
+        #         quickStartWindow.setWindowTitle('Developer manual')
+        #         QApplication.processEvents()
+                
+        #         if is_pip_installed():
+        #             package_path = os.path.dirname(glados_pycromanager.__file__)
+        #             quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
+        #         else:
+        #             try:
+        #                 quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
+        #             except Exception as e:
+        #                 logging.info(f'TryException: {e}')
+        #                 quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
+        #         QApplication.processEvents()
+        #         quickStartWindow.show()
+        #     except Exception as e:
+        #         logging.error(f'Could not open developer menu. {e}')
         
-        def developerMenu(self):
-            """
-            Shows the DeveloperManual.md file
-            """
-            try:
-                quickStartWindow = utils.SmallWindow(self)
-                QApplication.processEvents()
-                quickStartWindow.setWindowTitle('Developer manual')
-                QApplication.processEvents()
+        # def DeveloperAdvMenu(self):
+        #     """
+        #     Shows the Documentation .html files file
+        #     """
+        #     try:
+        #         if is_pip_installed():
+        #             package_path = os.path.dirname(glados_pycromanager.__file__)
+        #             htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
+        #         else:
+        #             htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
                 
-                if is_pip_installed():
-                    package_path = os.path.dirname(glados_pycromanager.__file__)
-                    quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
-                else:
-                    try:
-                        quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
-                    except Exception as e:
-                        logging.info(f'TryException: {e}')
-                        quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
-                QApplication.processEvents()
-                quickStartWindow.show()
-            except Exception as e:
-                logging.error(f'Could not open developer menu. {e}')
-        
-        def DeveloperAdvMenu(self):
-            """
-            Shows the Documentation .html files file
-            """
-            try:
-                if is_pip_installed():
-                    package_path = os.path.dirname(glados_pycromanager.__file__)
-                    htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
-                else:
-                    htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
+        #         webbrowser.open('file://' + os.path.realpath(htmlPath))
+        #     except Exception as e:
+        #         logging.error(f'Could not open the developer advanced info. {e}')
                 
-                webbrowser.open('file://' + os.path.realpath(htmlPath))
-            except Exception as e:
-                logging.error(f'Could not open the developer advancedi nfo. {e}')
-                
-        self.helpGroupBox = QGroupBox("Help")
-        newgridlayout = QGridLayout()
-        self.helpGroupBox.setLayout(newgridlayout)
-        #Add a User Manual Button:
-        newgridlayout.addWidget(QLabel('Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!'))
-        button1 = QPushButton('User Manual')
-        button1.clicked.connect(lambda index: quickStartMenu(self))
-        newgridlayout.addWidget(button1)
-        button2 = QPushButton('Developer Manual')
-        button2.clicked.connect(lambda index: developerMenu(self))
-        newgridlayout.addWidget(button2)
-        button3 = QPushButton('Complete software info')
-        button3.clicked.connect(lambda index: DeveloperAdvMenu(self))
-        newgridlayout.addWidget(button3)
+        # self.helpGroupBox = QGroupBox("Help")
+        # newgridlayout = QGridLayout()
+        # self.helpGroupBox.setLayout(newgridlayout)
+        # #Add a User Manual Button:
+        # newgridlayout.addWidget(QLabel('Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!'))
+        # button1 = QPushButton('User Manual')
+        # button1.clicked.connect(lambda index: quickStartMenu(self))
+        # newgridlayout.addWidget(button1)
+        # button2 = QPushButton('Developer Manual')
+        # button2.clicked.connect(lambda index: developerMenu(self))
+        # newgridlayout.addWidget(button2)
+        # button3 = QPushButton('Complete software info')
+        # button3.clicked.connect(lambda index: DeveloperAdvMenu(self))
+        # newgridlayout.addWidget(button3)
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
         self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.defineNodeInfo()
-        
         
         #One widget/layout has the nodz info and the buttons, the other has the tabWidget:
         self.NodzPlusButtonsWidget = QWidget()
@@ -1722,8 +1720,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         self.NodzPlusButtonsLayout.addLayout(self.buttonsArea,0,1)
         self.NodzPlusButtonsLayout.setColumnStretch(0, 10)  # Give more stretch to graphics_view
         self.NodzPlusButtonsLayout.setColumnStretch(1, 1)   # Give less stretch to buttonsArea
-
-        
 
         self.splitter = QSplitter()
         self.splitter.addWidget(self.NodzPlusButtonsWidget)
@@ -1736,7 +1732,6 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         """)
         
         self.mainLayout.addWidget(self.splitter)
-        
         
         #Create a tab for the decision widget:
         self.tabWidget.setStyleSheet("""
