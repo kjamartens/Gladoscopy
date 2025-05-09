@@ -2787,15 +2787,18 @@ class SmallWindow(QMainWindow):
         self.setWindowTitle(windowTitle)
         self.resize(300, 200)
 
-        self.parent = parent
-        # Set the window icon to the parent's icon
-        # self.setWindowIcon(self.parent.windowIcon())
+        try:
+            # Set the window icon to the parent's icon
+            self.setWindowIcon(QIcon(findIconFolder()+os.sep+'GladosIcon.ico'))
+        except Exception as e:
+            logging.error(f'Cannot find icon folder with exception: {e}')
         
         #Add a layout
         layout = QVBoxLayout()
-        self.setCentralWidget(QWidget())  # Create a central widget for the window
-        self.centralWidget().setLayout(layout)  # Set the layout for the central widget
-
+        self.central_widget = QWidget()  # Create a central widget for the window
+        self.setCentralWidget(self.central_widget) # Set it
+        self.central_widget.setLayout(layout) # Set the layout on the widget
+        
     #Function to find/select a file and add it to the lineedit
     def openFileDialog(self,fileArgs = "All Files (*)"):
         options = QFileDialog.Options()
