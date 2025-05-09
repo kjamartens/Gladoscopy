@@ -317,25 +317,5 @@ def main():
     sys.exit(app.exec_())
 
 
-# def show_UserManualNapari():
-#     try:
-#         quickStartWindow = utils.SmallWindow(None)
-#         QApplication.processEvents()
-#         quickStartWindow.setWindowTitle('Quick start / User Manual')
-#         QApplication.processEvents()
-        
-#         if is_pip_installed():
-#             package_path = os.path.dirname(glados_pycromanager.__file__)# type:ignore
-#             quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
-#         else:
-#             quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
-#         QApplication.processEvents()
-#         quickStartWindow.show()
-        
-
-#     except Exception as e:
-#         logging.error(f'Could not open quick start window. {e}')
-    
-    
 if __name__ == "__main__":
     main()

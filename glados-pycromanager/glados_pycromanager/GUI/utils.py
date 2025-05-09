@@ -1026,13 +1026,7 @@ class XYGridManager():
             self.gridEntries = np.array([[self.core.get_xy_position()[0],self.core.get_xy_position()[1]]])
         elif self.parent.shared_data.backend == 'JAVA':
             #JAVA backend
-            self.gridEntries = np.array([[self.core.get_xy_stage_position().x,self.core.get_xy_stage_position().y]]) #Need to be e.g.np.array([
-                            #     [100.5, 200.3],
-                            #     [150.2, 250.7],
-                            #     [200.8, 300.1],
-                            #     [250.4, 350.9],
-                            #     [300.6, 400.2]
-                            # ])
+            self.gridEntries = np.array([[self.core.get_xy_stage_position().x,self.core.get_xy_stage_position().y]]) 
     
     def openGUI(self):
         """ 
@@ -1397,7 +1391,6 @@ class XYGridManager():
         else:
             logging.error('No grid entries!')
         
-
     def reject(self):
         self.dialog.close()
 

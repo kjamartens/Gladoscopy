@@ -1252,6 +1252,9 @@ class MMConfigUI(CustomMainWindow):
         three arrow buttons to move in the XY stage relative to the current position,
         and text fields to set the size of the arrow buttons movement
         """
+        
+        typeOfXYStageLayout = "Small" #"Big" or "Small" - either a 4x4 grid or a 8x8 grid. The bigger looks somewhat nicer, but is too large to be usefulll
+        
         #Obtain the stage info from MM:
         XYStageName = self.core.get_xy_stage_device() #type: ignore
         #Get the stage position
@@ -1274,10 +1277,22 @@ class MMConfigUI(CustomMainWindow):
                 field_size_um = [1*self.core.get_roi()[2],1*self.core.get_roi()[3]]#type: ignore
         field_move_fraction = [1,.5,.1]
         
-        #Widget itself is a grid layout with 7x7 entries
+        #Widget itself is a grid layout with 3x3 entries
         XYStageLayout = QGridLayout()
         XYStageLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    
         
+        if typeOfXYStageLayout == "Small":
+            XY_UpLayout = QGridLayout()
+            XY_DownLayout = QGridLayout()
+            XY_LeftLayout = QGridLayout()
+            XY_RightLayout = QGridLayout()
+            
+            XYStageLayout.addLayout(XY_UpLayout,0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addLayout(XY_DownLayout,2,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addLayout(XY_LeftLayout,1,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            XYStageLayout.addLayout(XY_RightLayout,1,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+
         #XY move buttons
         self.XYmoveButtons = {}
         for m in range(1,4):
@@ -1292,12 +1307,26 @@ class MMConfigUI(CustomMainWindow):
             self.XYmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(float(self.XYMoveEditField[f"X_{4-m}"].text()),0))
             
             #Add buttons to layout
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4,8-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            if typeOfXYStageLayout == "Small":
+                XY_UpLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],0,4-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+                XY_DownLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],0,4-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+                XY_LeftLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4-m,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+                XY_RightLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4-m,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            elif typeOfXYStageLayout == "Big":
+                XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+                XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+                XYStageLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+                XYStageLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4,8-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+
         
+        #The next layout is the inputs to let the user choose how much movement each button should be.
         XYStageSetMovementLayout = QGridLayout()
+        
+        #Change the spacing/padding a bit
+        XYStageSetMovementLayout.setHorizontalSpacing(2) #Default 6 
+        XYStageSetMovementLayout.setVerticalSpacing(2)
+        XYStageSetMovementLayout.setContentsMargins(2,2,2,2) #Default 11
+
         XYStageSetMovementLayout.addWidget(QLabel('X'),0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
         XYStageSetMovementLayout.addWidget(QLabel('Y'),0,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
         self.XYMoveEditField = {}
@@ -1307,6 +1336,7 @@ class MMConfigUI(CustomMainWindow):
             self.XYMoveEditField[f"X_{m}"] = QLineEdit()
             XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"X_{m}"],m,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             self.XYMoveEditField[f"X_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
+            
             self.XYMoveEditField[f"Y_{m}"] = QLineEdit()
             XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Y_{m}"],m,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
             self.XYMoveEditField[f"Y_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
@@ -1318,12 +1348,18 @@ class MMConfigUI(CustomMainWindow):
             XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Button_{m}"],m,4,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
             
         #Add the setmovementlayout to the XY stage layout
-        XYStageLayout.addLayout(XYStageSetMovementLayout,8,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
-                
+        if typeOfXYStageLayout == "Small":
+            XYStageLayout.addLayout(XYStageSetMovementLayout,3,0,1,4, alignment=Qt.AlignmentFlag.AlignCenter)
+        elif typeOfXYStageLayout == "Big":
+            XYStageLayout.addLayout(XYStageSetMovementLayout,8,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
+            
         #Add a central label for info
         #this label contains the XY stage name, then an enter, then the current position:
         self.XYStageInfoWidget = QLabel()
-        XYStageLayout.addWidget(self.XYStageInfoWidget,4,4)
+        if typeOfXYStageLayout == "Small":
+            XYStageLayout.addWidget(self.XYStageInfoWidget,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        elif typeOfXYStageLayout == "Big":
+            XYStageLayout.addWidget(self.XYStageInfoWidget,4,4, alignment=Qt.AlignmentFlag.AlignCenter)
         #Update the text of it
         self.updateXYStageInfoWidget()
         
@@ -1572,19 +1608,25 @@ class MMConfigUI(CustomMainWindow):
         #Obtain the stage info from MM:
         XYStageName = self.core.get_xy_stage_device() #type:ignore
         #Get the stage position
-        if shared_data.backend == 'JAVA':
-            XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
-            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
-        elif shared_data.backend == 'Python':
-            XYStagePos = self.core.get_xy_position(XYStageName) #type:ignore
-            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
+        for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
+            if shared_data.backend == 'JAVA':
+                XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
+                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+            elif shared_data.backend == 'Python':
+                XYStagePos = self.core.get_xy_position(XYStageName) #type:ignore
+                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
+        #Align text center:
+        self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
     def moveXYStage(self,relX,relY):
         """
         Move XY stage with um positions in relx, rely:
         """
+        #Set the position
         self.core.set_relative_xy_position(relX,relY) #type:ignore
-        #Update the XYStageInfoWidget (if it exists)
+        
+        #Update the XYStageInfoWidget
+        #I do this twice on purpose: the first time it doesn't really update the new position yet.
         self.updateXYStageInfoWidget()
     #endregion
     
