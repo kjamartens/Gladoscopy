@@ -1321,6 +1321,12 @@ class MMConfigUI(CustomMainWindow):
         
         #The next layout is the inputs to let the user choose how much movement each button should be.
         XYStageSetMovementLayout = QGridLayout()
+        
+        #Change the spacing/padding a bit
+        XYStageSetMovementLayout.setHorizontalSpacing(2) #Default 6 
+        XYStageSetMovementLayout.setVerticalSpacing(2)
+        XYStageSetMovementLayout.setContentsMargins(2,2,2,2) #Default 11
+
         XYStageSetMovementLayout.addWidget(QLabel('X'),0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
         XYStageSetMovementLayout.addWidget(QLabel('Y'),0,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
         self.XYMoveEditField = {}
