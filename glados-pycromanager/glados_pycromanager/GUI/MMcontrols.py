@@ -714,10 +714,21 @@ class MMConfigUI(CustomMainWindow):
         self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
         debugHbox.addWidget(self.advSettingsButton)
         
+        
+        self.helpButton = QPushButton("Help")
+        self.helpButton.clicked.connect(lambda: self.openHelpWindow())
+        debugHbox.addWidget(self.helpButton)
+        
         liveModeLayout.addLayout(debugHbox,99,0,1,2)
         
         #Return the layout
         return liveModeLayout
+
+    def openHelpWindow(self):
+        help_window = utils.SmallWindow(self, windowTitle="Help")
+        help_group_box = utils.HelpGroupBox(help_window)
+        help_window.centralWidget().layout().addWidget(help_group_box.helpGroupBox)
+        help_window.show()
     
     def snapImage(self):
         """
