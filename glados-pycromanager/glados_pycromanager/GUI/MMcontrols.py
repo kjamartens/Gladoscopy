@@ -1608,19 +1608,25 @@ class MMConfigUI(CustomMainWindow):
         #Obtain the stage info from MM:
         XYStageName = self.core.get_xy_stage_device() #type:ignore
         #Get the stage position
-        if shared_data.backend == 'JAVA':
-            XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
-            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
-        elif shared_data.backend == 'Python':
-            XYStagePos = self.core.get_xy_position(XYStageName) #type:ignore
-            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
+        for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
+            if shared_data.backend == 'JAVA':
+                XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
+                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
+            elif shared_data.backend == 'Python':
+                XYStagePos = self.core.get_xy_position(XYStageName) #type:ignore
+                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
+        #Align text center:
+        self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
     def moveXYStage(self,relX,relY):
         """
         Move XY stage with um positions in relx, rely:
         """
+        #Set the position
         self.core.set_relative_xy_position(relX,relY) #type:ignore
-        #Update the XYStageInfoWidget (if it exists)
+        
+        #Update the XYStageInfoWidget
+        #I do this twice on purpose: the first time it doesn't really update the new position yet.
         self.updateXYStageInfoWidget()
     #endregion
     
