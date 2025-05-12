@@ -313,21 +313,31 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         
         #And start  the thread
         self.running = True
+        self._new_image = Event() #Event when a new image is put in the queue
         # self.process_queue()
     
+    def new_image(self):
+        self._new_image.set()
+        
     def run(self):
         while self.running:
-            tic = time.time()
-            #Only check the vis queue if live or mda is ongoing
-            if self.shared_data.liveMode or self.shared_data.mdaMode:
-                logging.debug(f'#aC - running analysisThread_customFunction_Visualisation, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
-                if self.visualisation_queue:
-                    data = self.visualisation_queue.popleft()
-                    RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
-                    self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
+            # tic = time.time()
+            # #Only check the vis queue if live or mda is ongoing
+            # if self.shared_data.liveMode or self.shared_data.mdaMode:
+            #     logging.debug(f'#aC - running analysisThread_customFunction_Visualisation, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
+            #     if self.visualisation_queue:
+            print('RT analysis waiting for new image...')
+            self._new_image.wait()#Wait for a new image
+            self._new_image.clear()
+            
+            data = self.visualisation_queue.popleft()
+            RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
+            self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
                     # self.visualisation_queue.task_done()
             #Always sleep while running
-            self.msleep(1)#self.sleepTimeMs)
+            self.msleep(max(1,self.sleepTimeMs))
+            print('RT analysis processed new image...')
+            
             # print(f'Time spend in analysisclass-run; {time.time()-tic}')
             
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
@@ -396,6 +406,7 @@ class AnalysisThread_customFunction(QThread):
             #     #Run analysis on the image from the queue
             
             self._new_image.wait()#Wait for a new image
+            self._new_image.clear()
             #Analyse it.
             if self.image_queue_analysis:
                 self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
@@ -415,7 +426,6 @@ class AnalysisThread_customFunction(QThread):
         #         self.runAnalysis(data)
         #         self.image_queue_analysis.task_done()
         #     time.sleep(self.sleepTimeMs/1000.0)
-    
     
     def stop(self):
         """
@@ -516,7 +526,7 @@ class AnalysisThread_customFunction(QThread):
             image = data[0]
             metadata = data[1]
             if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
-                self.msleep(self.sleepTimeMs)
+                # self.msleep(self.sleepTimeMs)
                 #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
                 analysisResult = self.runAnalysisThisImage(self.analysisInfo,image,metadata=metadata,shared_data=self.shared_data,core=self.shared_data.core)
                 # if self.analysisInfo == 'ChangeStageAtFrame':
@@ -541,7 +551,7 @@ class AnalysisThread_customFunction(QThread):
             self.visualisationObject.start()
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,shared_data=None,core=None):
-        self.msleep(self.sleepTimeMs)
+        # self.msleep(self.sleepTimeMs)
         
         #We are absolutely not allowed to access the core during the real-time analysis running.
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,shared_data,None,nodzInfo=self.nodzInfo)
@@ -553,10 +563,11 @@ class AnalysisThread_customFunction(QThread):
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             # if self.visualisationObject.visualisation_queue.empty():
             # print(f'#ac537 -- len of queue: {len(self.visualisationObject.visualisation_queue)}')
-            if len(self.visualisationObject.visualisation_queue) < 3:
+            if len(self.visualisationObject.visualisation_queue) < 1:
                 # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 self.visualisationObject.visualisation_queue.append(data)
+                self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 logging.debug('Put data in visualisation_queue!')
         
         return result
