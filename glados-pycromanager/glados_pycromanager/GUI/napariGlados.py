@@ -844,8 +844,25 @@ def startLiveModeVisualisation(shared_data,layerName='Live'):
     #Check for running liveVisualisation threads and remove those
     for thread in shared_data.analysisThreads:
         if thread.analysisInfo == 'LiveModeVisualisation':
-            shared_data.analysisThreads.remove(thread)
-            logging.debug('removed old LiveModeVisualisation thread')
+            #Find the thread/queue:
+            for item in shared_data.RTAnalysisQueuesThreads:
+                if item['Thread'] == thread:
+                    #Remove the thread
+                    if item['Thread']:
+                        # Signal the thread to stop (using an event, for example)
+                        item['Thread'].destroy()
+                    #Remove the queue
+                    if item['Queue']:
+                        # Clear the queue
+                        while item['Queue']:
+                            try:
+                                item['Queue'].popleft()
+                            except IndexError: # For deque
+                                break
+                    #remove from shared_data entry
+                    shared_data.RTAnalysisQueuesThreads.remove(item)
+                    logging.debug('removed old LiveModeVisualisation thread')   
+                    break
     
     shared_data.newestLayerName = layerName
     #2024-10-16 refactor attempt: next line isn't needed --> maybe image_queue_analysis isn't needed?
@@ -857,8 +874,26 @@ def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
     #Check for running mdaVisualisation threads and remove those
     for thread in shared_data.analysisThreads:
         if thread.analysisInfo == 'mdaVisualisation':
-            shared_data.analysisThreads.remove(thread)
-            logging.debug('removed old mdaVisualisation thread')
+            #Find the thread/queue:
+            for item in shared_data.RTAnalysisQueuesThreads:
+                if item['Thread'] == thread:
+                    #Remove the thread
+                    if item['Thread'] and item['Thread'].is_alive():
+                        # Signal the thread to stop (using an event, for example)
+                        item['Thread'].stop_signal.set()
+                        item['Thread'].join(timeout=1) # Wait for it to finish
+                    #Remove the queue
+                    if item['Queue']:
+                        # Clear the queue
+                        while item['Queue']:
+                            try:
+                                item['Queue'].popleft()
+                            except IndexError: # For deque
+                                break
+                    #remove from shared_data entry
+                    shared_data.RTAnalysisQueuesThreads.remove(item)
+                    logging.debug('removed old mdaVisualisation thread')
+                    break
     
     #Set the latest layer name to be the layer name
     shared_data.newestLayerName = layerName
@@ -872,19 +907,37 @@ def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
     layerRemoved = shared_data.napariViewer.layers[event.index].name
     #Find this layer in the analysis threads
-    for l in shared_data.analysisThreads:
-        if l.getLayer() is not None:
-            if l.getLayer().name == layerRemoved:
-                #Destroy the analysis thread
-                shared_data.analysisThreads.remove(l)
+    for thread in [item['Thread'] for item in shared_data.RTAnalysisQueuesThreads]:
+        if thread.visualisationObject is not None: 
+            if thread.visualisationObject.napariOverlay.layer.name == layerRemoved:
+                #Find the thread/queue:
+                for item in shared_data.RTAnalysisQueuesThreads:
+                    if item['Thread'] == thread:
+                        #Remove the thread
+                        if item['Thread']:
+                            # Signal the thread to stop (using an event, for example)
+                            item['Thread'].destroy()
+                        #Remove the queue
+                        if item['Queue']:
+                            # Clear the queue
+                            while item['Queue']:
+                                try:
+                                    item['Queue'].popleft()
+                                except IndexError: # For deque
+                                    break
+                        #remove from shared_data entry
+                        shared_data.RTAnalysisQueuesThreads.remove(item)
+                        logging.debug('removed old mdaVisualisation thread')
+                        break
                 
-                if 'skipAnalysisThreadDeletion' in vars(shared_data):
-                    if not shared_data.skipAnalysisThreadDeletion:
-                        l.destroy()
-                    else:
-                        shared_data.skipAnalysisThreadDeletion = False
-                else:
-                    l.destroy()
+                
+                # if 'skipAnalysisThreadDeletion' in vars(shared_data):
+                #     if not shared_data.skipAnalysisThreadDeletion:
+                #         l.destroy()
+                #     else:
+                #         shared_data.skipAnalysisThreadDeletion = False
+                # else:
+                #     l.destroy()
 #endregion
 
 def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):

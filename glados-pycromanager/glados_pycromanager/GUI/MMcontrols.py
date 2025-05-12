@@ -1220,15 +1220,26 @@ class MMConfigUI(CustomMainWindow):
             self.current_analysis_thread = create_real_time_analysis_thread(shared_data,analysisInfo = self.realTimeAnalysisGroupBox.currentData,delay=None,nodzInfo=None)
             print('hi!')
         def deactivateRealTimeAnalysisFromDockWidget(self):
-            #remove the current_analysis_thread from shared_data.RTAnalysisQueuesThreads['Threads']:
-            
+            #remove the current_analysis_thread from shared_data.analysisThreads:
+            #Find the thread/queue:
             for item in shared_data.RTAnalysisQueuesThreads:
-                thread = item['Threads']
-                if thread == self.current_analysis_thread:
-                    # thread.destroy()
-                    #TODO-20250512: Properly destroy this!
-                    shared_data.analysisThreads.remove(thread)
-                    logging.info('Removed analysis thread: '+str(thread))
+                if item['Thread'] == self.current_analysis_thread:
+                    #Remove the thread
+                    if item['Thread']:
+                        # Signal the thread to stop
+                        item['Thread'].destroy()
+                    #Remove the queue
+                    if item['Queue']:
+                        # Clear the queue
+                        while item['Queue']:
+                            try:
+                                item['Queue'].popleft()
+                            except IndexError: # For deque
+                                break
+                    #remove from shared_data entry
+                    shared_data.RTAnalysisQueuesThreads.remove(item)
+                    logging.debug('Removed analysis thread')   
+                    break
         
         
         self.rtAnalysisActivateButton = QPushButton('Activate')

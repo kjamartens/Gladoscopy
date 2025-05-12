@@ -24,7 +24,7 @@ def __function_metadata__():
             "help_string": "RT counter.",
             "display_name": "RT counter",
             "run_delay": 0,
-            "visualise_delay": 10,
+            "visualise_delay": 200,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
