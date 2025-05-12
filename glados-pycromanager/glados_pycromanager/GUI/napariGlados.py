@@ -584,26 +584,22 @@ class napariHandler():
             self._new_image.wait()#Wait for a new image
             self._new_image.clear()
             
-            # if visualisation_queue:
-            #     # logging.debug('napariVisualisationWorkerLoop')
-            #     if visualisation_queue:
-            DataStructure = {}
-            DataStructure['data'] = visualisation_queue.popleft()
-            DataStructure['napariViewer'] = self.shared_data.napariViewer
-            DataStructure['acqState'] = self.acqstate
-            DataStructure['core'] = self.shared_data.core
-            DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
-            DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
-            # # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
-            # logging.debug(str(self.shared_data.analysisThreads))
-            DataStructure['layer_name'] = layerName
-            DataStructure['layer_color_map'] = layerColorMap
-            DataStructure['finalisationProcedure'] = False
-            logging.debug('live mode worker - yield DataStructure')
-            yield DataStructure
+            if visualisation_queue:
+                DataStructure = {}
+                DataStructure['data'] = visualisation_queue.popleft()
+                DataStructure['napariViewer'] = self.shared_data.napariViewer
+                DataStructure['acqState'] = self.acqstate
+                DataStructure['core'] = self.shared_data.core
+                DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
+                DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
+                # # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
+                # logging.debug(str(self.shared_data.analysisThreads))
+                DataStructure['layer_name'] = layerName
+                DataStructure['layer_color_map'] = layerColorMap
+                DataStructure['finalisationProcedure'] = False
+                logging.debug('live mode worker - yield DataStructure')
+                yield DataStructure
             
-            # time.sleep(self.sleep_time) #This sleep time is based on the visualisation FPS in the adv. settings
-
         # read out last remaining element(s) after end of acquisition
         while visualisation_queue:
             DataStructure = {}

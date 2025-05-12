@@ -608,11 +608,9 @@ class AnalysisThread_customFunction(QThread):
             # if self.visualisationObject.visualisation_queue.empty():
             # print(f'#ac537 -- len of queue: {len(self.visualisationObject.visualisation_queue)}')
             if len(self.visualisationObject.visualisation_queue) < 1:
-            if len(self.visualisationObject.visualisation_queue) < 1:
                 # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 self.visualisationObject.visualisation_queue.append(data)
-                self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 logging.debug('Put data in visualisation_queue!')
         

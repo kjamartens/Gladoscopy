@@ -1218,15 +1218,26 @@ class MMConfigUI(CustomMainWindow):
             self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryRTAnalysis__'] = self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryAnalysis__']
             self.realTimeAnalysisGroupBox.currentData['__realTimeVisualisation__'] = True#dialog.visualisationBox.isChecked() #type:ignore 
             self.current_analysis_thread = create_real_time_analysis_thread(shared_data,analysisInfo = self.realTimeAnalysisGroupBox.currentData,delay=None,nodzInfo=None)
-            print('hi!')
+            
         def deactivateRealTimeAnalysisFromDockWidget(self):
             #remove the current_analysis_thread from shared_data.analysisThreads:
             #Find the thread/queue:
             for item in shared_data.RTAnalysisQueuesThreads:
                 if item['Thread'] == self.current_analysis_thread:
+                    
+                    #Attempt to remove the napari layer corresponding to it
+                    if item['Thread'].visualisationObject is not None:
+                        try:
+                            shared_data.napariViewer.layers.remove(item['Thread'].visualisationObject.napariOverlay.layer.name)
+                        except ValueError as e:
+                            layername = item['Thread'].visualisationObject.napariOverlay.layer
+                            logging.debug(f'Cannot delete an expected layer connected to visualisationLayer - realtime visualisation {e},{layername}')
+                            pass
+                    
                     #Remove the thread
                     if item['Thread']:
                         # Signal the thread to stop
+                        
                         item['Thread'].destroy()
                     #Remove the queue
                     if item['Queue']:
@@ -1236,8 +1247,13 @@ class MMConfigUI(CustomMainWindow):
                                 item['Queue'].popleft()
                             except IndexError: # For deque
                                 break
+                            
                     #remove from shared_data entry
-                    shared_data.RTAnalysisQueuesThreads.remove(item)
+                    try:
+                        shared_data.RTAnalysisQueuesThreads.remove(item)
+                    except ValueError as e:
+                        logging.error(f'RT analysis thread-queue is already deleted {e}')
+                        
                     logging.debug('Removed analysis thread')   
                     break
         
