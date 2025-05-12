@@ -31,6 +31,7 @@ from PyQt5.QtWidgets import (
     QStackedWidget,
     QVBoxLayout,
     QWidget,
+    QSlider,
 )
 
 def is_pip_installed():
@@ -89,7 +90,10 @@ class ConfigInfo:
     
     def deviceNameProperty_fromVerbose(self):
         """Returns the first device name and property from Verbose"""
-        verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
+        if shared_data.backend == 'Python':
+            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).getVerbose()
+        else:
+            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
         start_index = verboseInfoCurrentConfigGroup.find("<html>") + len("<html>")
         end_index = verboseInfoCurrentConfigGroup.find(":")
         deviceName = verboseInfoCurrentConfigGroup[start_index:end_index]
@@ -219,8 +223,12 @@ class ConfigInfo:
             elif shared_data.backend == 'Python':
                 underlyingProperty = self.core.get_available_configs(configGroupName)[0]
             configdata = self.core.get_config_data(configGroupName,underlyingProperty)
-            device_label = configdata.get_setting(0).get_device_label()
-            property_name = configdata.get_setting(0).get_property_name()
+            if shared_data.backend == 'Python':
+                device_label = configdata.getSetting(0).getDeviceLabel()
+                property_name = configdata.getSetting(0).getPropertyName()
+            else:
+                device_label = configdata.get_setting(0).get_device_label()
+                property_name = configdata.get_setting(0).get_property_name()
             
             #Finally we get the current value of the slider
             currentSliderValue = float(self.core.get_property(device_label,property_name))
@@ -233,8 +241,12 @@ class ConfigInfo:
             elif shared_data.backend == 'Python':
                 underlyingProperty = self.core.get_available_configs(configGroupName)[0]
             configdata = self.core.get_config_data(configGroupName,underlyingProperty)
-            device_label = configdata.get_setting(0).get_device_label()
-            property_name = configdata.get_setting(0).get_property_name()
+            if shared_data.backend == 'Python':
+                device_label = configdata.getSetting(0).getDeviceLabel()
+                property_name = configdata.getSetting(0).getPropertyName()
+            else:
+                device_label = configdata.get_setting(0).get_device_label()
+                property_name = configdata.get_setting(0).get_property_name()
             
             #Finally we get the current value of the slider
             try:
@@ -1416,7 +1428,7 @@ class MMConfigUI(CustomMainWindow):
     def getDevicesOfDeviceType(self,devicetype):
         """
         #Find all devices that have a specific devicetype
-        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html and https://github.com/micro-manager/mmCoreAndDevices/blob/main/MMDevice/MMDevice.cpp 
         #for all devicetypes
         """
         #Get devices
@@ -1425,20 +1437,30 @@ class MMConfigUI(CustomMainWindow):
             devices = [devices[i] for i in range(len(devices))]
             devicesOfType = []
             deviceTypeArray = {}
+            deviceTypeArray[1] = 'GenericDevice' #Unknown really
             deviceTypeArray[2] = 'CameraDevice'
             deviceTypeArray[3] = 'ShutterDevice'
             deviceTypeArray[4] = 'StateDevice'
             deviceTypeArray[5] = 'StageDevice'
             deviceTypeArray[6] = 'XYStageDevice'
+            deviceTypeArray[7] = 'GenericDevice' #Unknown, like a controller-type of device? HubDevice-ish
+            deviceTypeArray[8] = 'GenericDevice' #Unknown really
             deviceTypeArray[9] = 'AutoFocusDevice'
             deviceTypeArray[10] = 'CoreDevice'
+            deviceTypeArray[11] = 'GenericDevice' #Unknown really
+            deviceTypeArray[12] = 'GenericDevice' #Unknown really
+            deviceTypeArray[13] = 'GenericDevice' #Unknown really
+            deviceTypeArray[14] = 'GenericDevice' #Unknown really
             deviceTypeArray[15] = 'HubDevice'
             #Loop over devices
-            for device in devices:
-                device_found_type = deviceTypeArray[self.core.get_device_type(device)]
-                if device_found_type == devicetype: #type:ignore
-                    logging.debug("found " + device + " of type " + devicetype)
-                    devicesOfType.append(device)
+            try:
+                for device in devices:
+                    device_found_type = deviceTypeArray[self.core.get_device_type(device)]
+                    if device_found_type == devicetype: #type:ignore
+                        logging.debug("found " + device + " of type " + devicetype)
+                        devicesOfType.append(device)
+            except Exception as e:
+                print(e)
             return devicesOfType
         elif shared_data.backend == 'JAVA':
             devices = [devices.get(i) for i in range(devices.size())]
@@ -1765,8 +1787,12 @@ class MMConfigUI(CustomMainWindow):
         elif shared_data.backend == 'Python':
             underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
         configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-        device_label = configdata.get_setting(0).get_device_label()
-        property_name = configdata.get_setting(0).get_property_name()
+        if shared_data.backend == 'Python':
+            device_label = configdata.getSetting(0).getDeviceLabel()
+            property_name = configdata.getSetting(0).getPropertyName()
+        else:
+            device_label = configdata.get_setting(0).get_device_label()
+            property_name = configdata.get_setting(0).get_property_name()
         
         #Finally we get the current value of the slider
         currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
@@ -1839,8 +1865,12 @@ class MMConfigUI(CustomMainWindow):
                 elif shared_data.backend == 'Python':
                     underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
                 configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-                device_label = configdata.get_setting(0).get_device_label()
-                property_name = configdata.get_setting(0).get_property_name()
+                if shared_data.backend == 'Python':
+                    device_label = configdata.getSetting(0).getDeviceLabel()
+                    property_name = configdata.getSetting(0).getPropertyName()
+                else:
+                    device_label = configdata.get_setting(0).get_device_label()
+                    property_name = configdata.get_setting(0).get_property_name()
 
                 #Set this property:
                 self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
@@ -1888,8 +1918,12 @@ class MMConfigUI(CustomMainWindow):
             underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             
         configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-        device_label = configdata.get_setting(0).get_device_label()
-        property_name = configdata.get_setting(0).get_property_name()
+        if shared_data.backend == 'Python':
+            device_label = configdata.getSetting(0).getDeviceLabel()
+            property_name = configdata.getSetting(0).getPropertyName()
+        else:
+            device_label = configdata.get_setting(0).get_device_label()
+            property_name = configdata.get_setting(0).get_property_name()
 
         #Set this property:
         self.config_groups[config_id].core.set_property(device_label,property_name,CurrentText)
@@ -1920,8 +1954,12 @@ class MMConfigUI(CustomMainWindow):
             elif shared_data.backend == 'Python':
                 underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-            device_label = configdata.get_setting(0).get_device_label()
-            property_name = configdata.get_setting(0).get_property_name()
+            if shared_data.backend == 'Python':
+                device_label = configdata.getSetting(0).getDeviceLabel()
+                property_name = configdata.getSetting(0).getPropertyName()
+            else:
+                device_label = configdata.get_setting(0).get_device_label()
+                property_name = configdata.get_setting(0).get_property_name()
             
             #Finally we get the current value of the slider
             currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
@@ -1946,8 +1984,12 @@ class MMConfigUI(CustomMainWindow):
             elif shared_data.backend == 'Python':
                 underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-            device_label = configdata.get_setting(0).get_device_label()
-            property_name = configdata.get_setting(0).get_property_name()
+            if shared_data.backend == 'Python':
+                device_label = configdata.getSetting(0).getDeviceLabel()
+                property_name = configdata.getSetting(0).getPropertyName()
+            else:
+                device_label = configdata.get_setting(0).get_device_label()
+                property_name = configdata.get_setting(0).get_property_name()
 
             #Finally we get the current value of the editfield
             currentValue = (self.config_groups[config_id].core.get_property(device_label,property_name))

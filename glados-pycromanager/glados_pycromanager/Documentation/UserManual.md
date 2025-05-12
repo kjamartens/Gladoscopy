@@ -110,6 +110,12 @@ An empty napari viewer will pop up. Within napari, use Plugins --> Glados (glado
 
 Finally, you can fully clone glados-pycromanager from GitHub, and run 'GUI_napari.py' from the python enviroment, and it will open Napari with the glados-pycromanager plugin opened. This will allow you for full debugging accesss to the code, especially usefull when developing.
 
+## Often-encountered first-run issues
+
+Here is an unorganized list of problems that might occur on a first run.
+
+1. When attempting to run via a Python-backend, it mentions that it cannot find some adapter (e.g. andor_mmgr_dal.dll). If this is the case, add the Micromanager installation folder to the system's PATH, restart the PC, and try again.
+
 ## First use instructions
 
 After opening, an interface similar to this figure should pop up:

@@ -1039,7 +1039,7 @@ class MDAGlados(CustomMainWindow):
     def getDevicesOfDeviceType(self,devicetype):
         """
         #Find all devices that have a specific devicetype
-        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html and https://github.com/micro-manager/mmCoreAndDevices/blob/main/MMDevice/MMDevice.cpp 
         #for all devicetypes
         """
         #Get devices
@@ -1048,13 +1048,20 @@ class MDAGlados(CustomMainWindow):
             devices = [devices[i] for i in range(len(devices))]
             devicesOfType = []
             deviceTypeArray = {}
+            deviceTypeArray[1] = 'GenericDevice' #Unknown really
             deviceTypeArray[2] = 'CameraDevice'
             deviceTypeArray[3] = 'ShutterDevice'
             deviceTypeArray[4] = 'StateDevice'
             deviceTypeArray[5] = 'StageDevice'
             deviceTypeArray[6] = 'XYStageDevice'
+            deviceTypeArray[7] = 'GenericDevice' #Unknown, like a controller-type of device? HubDevice-ish
+            deviceTypeArray[8] = 'GenericDevice' #Unknown really
             deviceTypeArray[9] = 'AutoFocusDevice'
             deviceTypeArray[10] = 'CoreDevice'
+            deviceTypeArray[11] = 'GenericDevice' #Unknown really
+            deviceTypeArray[12] = 'GenericDevice' #Unknown really
+            deviceTypeArray[13] = 'GenericDevice' #Unknown really
+            deviceTypeArray[14] = 'GenericDevice' #Unknown really
             deviceTypeArray[15] = 'HubDevice'
             #Loop over devices
             for device in devices:

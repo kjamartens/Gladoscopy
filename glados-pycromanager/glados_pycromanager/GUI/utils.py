@@ -3435,8 +3435,6 @@ def getDimensionsFromAcqData(acqData):
         return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
     except Exception as e:
         print(f'Problem with get Dimensions! {e}')
-        print(acqData)
-        print(acqData[0])
 
 def updateNodzVariablesTime(node):
     
