@@ -1220,11 +1220,13 @@ class MMConfigUI(CustomMainWindow):
             self.current_analysis_thread = create_real_time_analysis_thread(shared_data,analysisInfo = self.realTimeAnalysisGroupBox.currentData,delay=None,nodzInfo=None)
             print('hi!')
         def deactivateRealTimeAnalysisFromDockWidget(self):
-            #remove the current_analysis_thread from shared_data.analysisThreads:
+            #remove the current_analysis_thread from shared_data.RTAnalysisQueuesThreads['Threads']:
             
-            for thread in shared_data.analysisThreads:
+            for item in shared_data.RTAnalysisQueuesThreads:
+                thread = item['Threads']
                 if thread == self.current_analysis_thread:
                     # thread.destroy()
+                    #TODO-20250512: Properly destroy this!
                     shared_data.analysisThreads.remove(thread)
                     logging.info('Removed analysis thread: '+str(thread))
         
@@ -1626,7 +1628,6 @@ class MMConfigUI(CustomMainWindow):
         self.core.set_relative_xy_position(relX,relY) #type:ignore
         
         #Update the XYStageInfoWidget
-        #I do this twice on purpose: the first time it doesn't really update the new position yet.
         self.updateXYStageInfoWidget()
     #endregion
     
