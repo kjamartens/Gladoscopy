@@ -7,6 +7,7 @@ import sys
 import logging
 import os
 import appdirs
+from threading import Event
 from napari.qt import thread_worker
 from collections import deque
 from PyQt5.QtWidgets import QApplication
@@ -353,6 +354,8 @@ class napariHandler():
         self.image_queue_analysis = deque(maxlen=10)
         # Create a signal to communicate between threads
         self.mda_acq_done_signal = pyqtSignal(bool)
+        #Event when a new image is put in the queue
+        self._new_image = Event() #Event when a new image is put in the queue
 
         #Sleep time to keep responsiveness
         self.sleep_time = 1/shared_data.globalData['VISUALISATION-FPS']['value'] #in sec
@@ -367,6 +370,7 @@ class napariHandler():
         # print(f'#ac353 - current len of vis_queue: {len(visualisation_queue)}')
         if len(visualisation_queue) < 1:
             visualisation_queue.append([image,metadata]) 
+            self.new_image() #give the signal that we have a new image ready to be visualised
             # print(f'#ac356 - current len of vis_queue: {len(visualisation_queue)}')
         
         #Queue(s) for RT analysis of the data:
@@ -444,7 +448,6 @@ class napariHandler():
         """ 
         Worker which handles live mode on/off turning etc
         
-        Inputs: visualisation_queue (unused, but required)
         """
         visualisation_queue = parent.visualisation_queue
         shared_data.debugImageArrivalTimes=[]
@@ -565,6 +568,10 @@ class napariHandler():
             #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
             cleanUpTemporaryFiles(shared_data=self.shared_data)
 
+
+    def new_image(self):
+        self._new_image.set()
+
     @thread_worker(connect={'yielded': napariUpdateLive})
     def run_napariVisualisation_worker(self,parent,layerName='Layer',layerColorMap='gray'):
         """
@@ -573,27 +580,29 @@ class napariHandler():
         """
         visualisation_queue = parent.visualisation_queue
         while self.acqstate:
-            # logging.debug('#nH - looping run_napariVisualisation_worker')
             # get elements from queue while there is more than one element
-            if visualisation_queue:
-                # logging.debug('napariVisualisationWorkerLoop')
-                if visualisation_queue:
-                    DataStructure = {}
-                    DataStructure['data'] = visualisation_queue.popleft()
-                    DataStructure['napariViewer'] = self.shared_data.napariViewer
-                    DataStructure['acqState'] = self.acqstate
-                    DataStructure['core'] = self.shared_data.core
-                    DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
-                    DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
-                    # # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
-                    # logging.debug(str(self.shared_data.analysisThreads))
-                    DataStructure['layer_name'] = layerName
-                    DataStructure['layer_color_map'] = layerColorMap
-                    DataStructure['finalisationProcedure'] = False
-                    logging.debug('live mode worker - yield DataStructure')
-                    yield DataStructure
+            self._new_image.wait()#Wait for a new image
+            self._new_image.clear()
             
-            time.sleep(self.sleep_time) #This sleep time is based on the visualisation FPS in the adv. settings
+            # if visualisation_queue:
+            #     # logging.debug('napariVisualisationWorkerLoop')
+            #     if visualisation_queue:
+            DataStructure = {}
+            DataStructure['data'] = visualisation_queue.popleft()
+            DataStructure['napariViewer'] = self.shared_data.napariViewer
+            DataStructure['acqState'] = self.acqstate
+            DataStructure['core'] = self.shared_data.core
+            DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
+            DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
+            # # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
+            # logging.debug(str(self.shared_data.analysisThreads))
+            DataStructure['layer_name'] = layerName
+            DataStructure['layer_color_map'] = layerColorMap
+            DataStructure['finalisationProcedure'] = False
+            logging.debug('live mode worker - yield DataStructure')
+            yield DataStructure
+            
+            # time.sleep(self.sleep_time) #This sleep time is based on the visualisation FPS in the adv. settings
 
         # read out last remaining element(s) after end of acquisition
         while visualisation_queue:

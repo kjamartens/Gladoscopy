@@ -9,6 +9,7 @@ import logging
 from collections import deque
 from typing import Union, Tuple, List
 from PyQt5.QtCore import pyqtSignal, QThread
+from threading import Event
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -338,7 +339,6 @@ class AnalysisThread_customFunction_Visualisation(QThread):
 #This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
 
 #Has to be a QThread and not e.g. multiprocessing because we rely on pickyyable objects - mostly the pycromanager core that we send around to influence the run during RT analysis
-from threading import Event
 class AnalysisThread_customFunction(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
@@ -394,7 +394,6 @@ class AnalysisThread_customFunction(QThread):
             # if self.shared_data.liveMode or self.shared_data.mdaMode:
             #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
             #     #Run analysis on the image from the queue
-            
             
             self._new_image.wait()#Wait for a new image
             #Analyse it.
