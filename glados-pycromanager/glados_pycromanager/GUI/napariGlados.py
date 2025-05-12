@@ -458,6 +458,8 @@ class napariHandler():
         #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
         #The abortion is handled in grab_image_liveVisualisation_and_liveAnalysis
         if self.liveOrMda == 'live':
+            savefolder = None
+            savename = None
             while self.acqstate:
                 if self.shared_data.mdaMode:
                     logging.error('LIVE NOT STARTED! MDA IS RUNNING')

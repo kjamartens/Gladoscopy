@@ -1,23 +1,28 @@
 # Glados-pycromanager
 
 Author: Koen J.A. Martens  
-koenjamartens@gmail.com  
+[koenjamartens@gmail.com]
 Created 2023-2024
 
 <!-- TOC -->
-- [General overview](#general-overview)
-- [Installation instructions](#installation-instructions)
-- [Running instructions](#running-instructions)
-- [First use instructions](#first-use-instructions)
-    - [Controls](#controls)
-    - [Multi-D acquisition](#multi-d-acquisition)
-- [Autonomous microscopy - Overview and Example 1: Simple autonomous microscopy](#autonomous-microscopy---overview-and-example-1-simple-autonomous-microscopy)
-    - [Glados-pycromanager high level concept](#glados-pycromanager-high-level-concept)
-    - [Glados-pycromanager recipes](#glados-pycromanager-recipes)
-    - [Glados-pycromanager decision and scanning widgets](#glados-pycromanager-decision-and-scanning-widgets)
-    - [Glados-pycromanager variables](#glados-pycromanager-variables)
-    - [Testing and running Glados-pycromanager autonomous microscopy](#testing-and-running-glados-pycromanager-autonomous-microscopy)
-- [Autonomous microscopy - Example 2: Advanced autonomous microscopy](#autonomous-microscopy---example-2-advanced-autonomous-microscopy)
+
+- [Glados-pycromanager](#glados-pycromanager)
+    - [General overview](#general-overview)
+    - [Installation instructions](#installation-instructions)
+    - [Running instructions](#running-instructions)
+                - [Run glados-pycromanager directly from conda](#run-glados-pycromanager-directly-from-conda)
+                - [Run napari from conda and open glados-pycromanager](#run-napari-from-conda-and-open-glados-pycromanager)
+                - [Full debugging access via the python interface](#full-debugging-access-via-the-python-interface)
+    - [First use instructions](#first-use-instructions)
+        - [Controls](#controls)
+        - [Multi-D acquisition](#multi-d-acquisition)
+    - [Autonomous microscopy - Overview and Example 1: Simple autonomous microscopy](#autonomous-microscopy---overview-and-example-1-simple-autonomous-microscopy)
+        - [Glados-pycromanager high level concept](#glados-pycromanager-high-level-concept)
+        - [Glados-pycromanager recipes](#glados-pycromanager-recipes)
+        - [Glados-pycromanager decision and scanning widgets](#glados-pycromanager-decision-and-scanning-widgets)
+        - [Glados-pycromanager variables](#glados-pycromanager-variables)
+        - [Testing and running Glados-pycromanager autonomous microscopy](#testing-and-running-glados-pycromanager-autonomous-microscopy)
+    - [Autonomous microscopy - Example 2: Advanced autonomous microscopy](#autonomous-microscopy---example-2-advanced-autonomous-microscopy)
 
 <!-- /TOC -->
 
@@ -26,6 +31,8 @@ Created 2023-2024
 Glados-pycromanager is an attempt to (1) create a usable, user-friendly user-interface for Pycromanager (i.e. python-Micromanager) with Napari, and (2) to create easy, user-friendly autonomous microscopy via Pycromanager.
 
 ## Installation instructions
+
+Install miniConda or anaConda from their official sources.
 
 Create a new conda environment, python version 3.10:
 
@@ -45,13 +52,21 @@ Install glados-pycromanager:
 pip install "../glados_pycromanager-0.0.1-py3-none-any.whl"
 ```
 
+or, for developers, install a full Conda environment:
+
+```batch
+pip install -r glados-pycromanager\glados_pycromanager\requirements.txt
+```
+
 Update micromanager to the latest nightly build:
 https://micro-manager.org/Micro-Manager_Nightly_Builds
 
-(Possibly) update pycro-manager to the latest pip version:
+Ensure that MicroManager is running pycro-manager server (check 'Run pycro-manager server on port 4827' in Tools-->Options)
+
+(Possibly) update pycro-manager and pymmcore to the latest pip version:
 
 ```batch
-pip install --upgrade pycromanager
+pip install --upgrade pycromanager pymmcore
 ```
 
 ## Running instructions
