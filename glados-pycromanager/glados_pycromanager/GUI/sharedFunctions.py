@@ -77,9 +77,12 @@ class Shared_data(QObject):
         self._napariViewer = None
         self._headless = False
         self._busy = False
-        self._analysisThreads = LoggingList()
         self._core = []
-        self._RTAnalysisQueues = []
+        
+        self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
+        # self._analysisThreads = LoggingList()
+        # self._RTAnalysisQueues = []
+        
         self._mdaImageQueues = []
         self._defaultFocusDevice = ''
         self._mdaModeSaveLoc = ['','']
@@ -219,6 +222,7 @@ class Shared_data(QObject):
             self._liveMode = new_value
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
+        print('LIVE mode changed!')
         time.sleep(0.1)
         self._livemodeNapariHandler.acqModeChanged(newSharedData=self)
         
@@ -276,16 +280,28 @@ class Shared_data(QObject):
         if new_value != self._core:
             self._core = new_value
 
+    # @property
+    # def RTAnalysisQueues(self):
+    #     return self._RTAnalysisQueues
+    # @RTAnalysisQueues.setter
+    # def RTAnalysisQueues(self, new_value):
+    #     if new_value != self._RTAnalysisQueues:
+    #         self._RTAnalysisQueues = new_value
+    #         self.on_RTAnalysisQueues_value_change()
+    # def on_RTAnalysisQueues_value_change(self):
+    #     logging.debug('RTAnalysisQueues changed')
+        
     @property
-    def RTAnalysisQueues(self):
-        return self._RTAnalysisQueues
-    @RTAnalysisQueues.setter
-    def RTAnalysisQueues(self, new_value):
-        if new_value != self._RTAnalysisQueues:
-            self._RTAnalysisQueues = new_value
-            self.on_RTAnalysisQueues_value_change()
-    def on_RTAnalysisQueues_value_change(self):
-        logging.debug('RTAnalysisQueues changed')
+    def RTAnalysisQueuesThreads(self):
+        return self._RTAnalysisQueuesThreads
+    @RTAnalysisQueuesThreads.setter
+    def RTAnalysisQueuesThreads(self, new_value):
+        if new_value != self._RTAnalysisQueuesThreads:
+            self._RTAnalysisQueuesThreads = new_value
+            self.on_RTAnalysisQueuesThreads_value_change()
+    def on_RTAnalysisQueuesThreads_value_change(self):
+        logging.debug('_RTAnalysisQueuesThreads changed')
+        
         
     @property
     def mdaImageQueues(self):
