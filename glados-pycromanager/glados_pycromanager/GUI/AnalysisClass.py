@@ -4,11 +4,13 @@ Handles the GUI display of Glados-pycromanager, as well as the structure for ana
 
 import sys
 import time
+import time
 import numpy as np
 import logging
 from collections import deque
 from typing import Union, Tuple, List
 from PyQt5.QtCore import pyqtSignal, QThread
+from threading import Event
 from threading import Event
 
 def is_pip_installed():
@@ -314,7 +316,12 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         #And start  the thread
         self.running = True
         self._new_image = Event() #Event when a new image is put in the queue
+        self._new_image = Event() #Event when a new image is put in the queue
         # self.process_queue()
+    
+    def new_image(self):
+        self._new_image.set()
+        
     
     def new_image(self):
         self._new_image.set()
@@ -340,7 +347,9 @@ class AnalysisThread_customFunction_Visualisation(QThread):
             
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
+        # tic = time.time()
         res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
+        # print(f'Time spend in updateVisualisation; {time.time()-tic}')
 
 #This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
 
@@ -379,6 +388,8 @@ class AnalysisThread_customFunction(QThread):
         self.running = True
         self._activity_event = Event() #Event when MDA/LIVE is started/stopped.
         self._new_image = Event() #Event when a new image is put in the queue
+        self._activity_event = Event() #Event when MDA/LIVE is started/stopped.
+        self._new_image = Event() #Event when a new image is put in the queue
     
     def run(self):
         """
@@ -392,6 +403,26 @@ class AnalysisThread_customFunction(QThread):
         """
         
         while self.is_running:
+            # # tic = time.time()
+            # # Wait until liveMode or mdaMode is active
+            # self._activity_event.wait()
+            
+            # #Only check the vis queue if live or mda is ongoing
+            # if self.shared_data.liveMode or self.shared_data.mdaMode:
+            #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
+            #     #Run analysis on the image from the queue
+            
+            self._new_image.wait()#Wait for a new image
+            self._new_image.clear()
+            #Analyse it.
+            if self.image_queue_analysis:
+                self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
+                self.analysis_done_signal.emit(self.analysis_result)
+                # self.image_queue_analysis.task_done() #type:ignore
+            #Always sleep while running - at least 1 ms
+            self.msleep(max(1,self.sleepTimeMs))
+            # print(f'Time spend in analysisclass-run; {time.time()-tic}')
+            
             # # tic = time.time()
             # # Wait until liveMode or mdaMode is active
             # self._activity_event.wait()
@@ -430,6 +461,7 @@ class AnalysisThread_customFunction(QThread):
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         self.is_running = False
         self._activity_event.set()
+        self._activity_event.set()
         #Also remove the image queue requestion from live mode
         # if self.image_queue_analysis in self.shared_data.RTAnalysisQueues:
         #     self.shared_data.RTAnalysisQueues.remove(self.image_queue_analysis)
@@ -467,6 +499,19 @@ class AnalysisThread_customFunction(QThread):
         #Officially we'd need to wait here, but that seems to start an infinite loop somewhere
         # self.wait()
         # self.deleteLater()
+    
+    def set_activity(self, is_active):
+        if is_active:
+            self._activity_event.set()
+            # print('setting self._activity_event')
+        else:
+            self._activity_event.clear()
+            # print('clearing self._activity_event')
+    
+    def new_image(self):
+        self._new_image.set()
+        # print('setting self.new_image')
+            
     
     def set_activity(self, is_active):
         if is_active:
@@ -523,6 +568,7 @@ class AnalysisThread_customFunction(QThread):
             metadata = data[1]
             if self.analysisInfo is not None and self.analysisInfo != 'LiveModeVisualisation' and self.analysisInfo != 'mdaVisualisation':
                 # self.msleep(self.sleepTimeMs)
+                # self.msleep(self.sleepTimeMs)
                 #Do analysis here - the info in analysisResult will be passed to Visualise_Analysis_results
                 analysisResult = self.runAnalysisThisImage(self.analysisInfo,image,metadata=metadata,shared_data=self.shared_data,core=self.shared_data.core)
                 # if self.analysisInfo == 'ChangeStageAtFrame':
@@ -541,12 +587,14 @@ class AnalysisThread_customFunction(QThread):
         self.RT_analysis_object = utils.realTimeAnalysis_init(self.analysisInfo,core=self.shared_data.core,nodzInfo=self.nodzInfo)
         logging.debug('run initAnalysis')
         #Make a rtVis thread if required
+        #Make a rtVis thread if required
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']: #type:ignore
             self.queue_visualisation = deque(maxlen=10)
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,shared_data=None,core=None):
+        # self.msleep(self.sleepTimeMs)
         # self.msleep(self.sleepTimeMs)
         
         #We are absolutely not allowed to access the core during the real-time analysis running.
@@ -560,9 +608,11 @@ class AnalysisThread_customFunction(QThread):
             # if self.visualisationObject.visualisation_queue.empty():
             # print(f'#ac537 -- len of queue: {len(self.visualisationObject.visualisation_queue)}')
             if len(self.visualisationObject.visualisation_queue) < 1:
+            if len(self.visualisationObject.visualisation_queue) < 1:
                 # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
                 self.visualisationObject.visualisation_queue.append(data)
+                self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 logging.debug('Put data in visualisation_queue!')
         
@@ -598,10 +648,12 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     #Instantiate an analysis thread and add a signal
     analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
     
+    
     analysis_thread.start()
     analysis_thread.finished.connect(analysis_thread.deleteLater)
     
     #Append it to the list of analysisThreads
+    shared_data.RTAnalysisQueuesThreads.append({'Queue':image_queue_analysis,'Thread':analysis_thread})
     shared_data.RTAnalysisQueuesThreads.append({'Queue':image_queue_analysis,'Thread':analysis_thread})
     
     return analysis_thread
