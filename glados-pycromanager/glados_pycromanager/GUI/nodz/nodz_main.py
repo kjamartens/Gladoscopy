@@ -2272,8 +2272,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
         in the process
 
         """
-        self.scene().nodes.pop(self.name) #type:ignore
-
         # Remove all sockets connections.
         for socket in self.sockets.values():
             while len(socket.connections)>0:
@@ -2292,6 +2290,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
             while len(topAttr.connections)>0:
                 topAttr.connections[0]._remove()
 
+
+        self.scene().nodes.pop(self.name) #type:ignore
 
         # Remove node.
         scene = self.scene()
