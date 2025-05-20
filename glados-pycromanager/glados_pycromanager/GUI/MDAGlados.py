@@ -1197,29 +1197,28 @@ class MDAGlados(CustomMainWindow):
         if hasattr(self,'orderGroupBox'):
             self.orderGroupBox.setParent(None) # type: ignore
         self.storageGroupBox.setParent(None) # type: ignore
-        self.showOptionsGroupBox.setParent(None)  # type: ignore
+        #self.showOptionsGroupBox.setParent(None)  # type: ignore
         
         self.gui.setSizeConstraint(QGridLayout.SetMinimumSize)
         # At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
         optionsBGroupBox = QWidget()
+        optionsBLayout = None
         optionsBLayout = QVBoxLayout()
         optionsBLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
         optionsBLayout.setContentsMargins(0, 0, 0, 0)
         optionsBGroupBox.setLayout(optionsBLayout)
-        optionsBLayout.addWidget(self.showOptionsGroupBox) # type: ignore
         self.showOptionsGroupBox.setEnabled(True)
-        optionsBLayout.addWidget(self.storageGroupBox) # type: ignore
         if GUI_show_storage: 
             self.storageGroupBox.setEnabled(True)
         else:
             self.storageGroupBox.setEnabled(False)
-        self.GUI_acquire_button = QPushButton("Acquire")
-        self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
-        optionsBLayout.addWidget(self.GUI_acquire_button) # type: ignore
         if GUI_acquire_button:
+            
+            self.GUI_acquire_button = QPushButton("Acquire")
+            self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
             self.GUI_acquire_button.setEnabled(True)
-        else:
-            self.GUI_acquire_button.setEnabled(False)
+        # else:
+        #     self.GUI_acquire_button.setEnabled(False)
         
         #Add order/exposure/time as single groupbox
         orderexposuretimegroupbox = QWidget()
@@ -1257,6 +1256,10 @@ class MDAGlados(CustomMainWindow):
         else:
             self.channelGroupBox.setEnabled(False)
         
+        optionsBLayout.addWidget(self.showOptionsGroupBox) # type: ignore
+        optionsBLayout.addWidget(self.storageGroupBox) # type: ignore
+        if GUI_acquire_button:
+            optionsBLayout.addWidget(self.GUI_acquire_button) # type: ignore
         
         self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
         

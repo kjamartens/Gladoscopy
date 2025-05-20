@@ -2282,7 +2282,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
             while len(plug.connections)>0:
                 plug.connections[0]._remove()
 
-
+        #Remove bottom/top attrs
         for bottomAttr in self.bottomAttrs.values():
             while len(bottomAttr.connections)>0:
                 bottomAttr.connections[0]._remove()
@@ -2290,7 +2290,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
             while len(topAttr.connections)>0:
                 topAttr.connections[0]._remove()
 
-
+        #Remove from nodes list
         self.scene().nodes.pop(self.name) #type:ignore
 
         # Remove node.

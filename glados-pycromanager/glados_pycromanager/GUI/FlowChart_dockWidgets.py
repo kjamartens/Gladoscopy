@@ -2801,6 +2801,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             node = self.findNodeByName(nodeName)
             try:
                 self.nodes.remove(node)
+                print(f"Removed node {nodeName}")
             except:
                 logging.warning(f"failed to remove node: {nodeName}")
         self.checkNodesOnErrors()
