@@ -6,6 +6,8 @@ Created by:
 Dr. Koen J.A. Martens, koenjamartens{at}gmail.com, 2023-2024  
 CC BY-NC-SA 4.0 licence
 
+Please contact me if you want to use/extend/etc.
+
 ![Glados-pycromanager overview image](glados-pycromanager/glados_pycromanager/Documentation/Images/Overview2.png)
 
 ![Example of user-friendly autonomous microscopy](glados-pycromanager/glados_pycromanager/Documentation/Images/Autonomous_simple_1.png)
@@ -17,3 +19,5 @@ Find the user manual with installation instructions [here](glados-pycromanager/g
 ## Detailed developer instructions
 
 The Glados-pycromanager codebase is explained [in this document](glados-pycromanager/glados_pycromanager/Documentation/index.html)
+
+### Glados-pycromanager is a work-in-progress!
