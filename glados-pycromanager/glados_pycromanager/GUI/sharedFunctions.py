@@ -11,9 +11,11 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
+    from glados_pycromanager.GUI import microscopeInterfaceLayer as MIL
     from glados_pycromanager.GUI.napariGlados import napariHandler
     from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
 else:
+    import microscopeInterfaceLayer as MIL
     from napariGlados import napariHandler
     from utils import updateAutonousErrorWarningInfo
 
@@ -78,6 +80,8 @@ class Shared_data(QObject):
         self._headless = False
         self._busy = False
         self._core = []
+        self.MILcore: MIL.MicroscopeInterfaceLayer | None = None
+        self.MILcorePyMM: MIL.MicroscopeInterfaceLayer | None = None #TODO: delete MILcorePyMM after fully testing
         
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()

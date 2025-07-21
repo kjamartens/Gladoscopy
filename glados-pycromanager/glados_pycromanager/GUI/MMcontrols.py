@@ -38,11 +38,13 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
+    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
     from glados_pycromanager.GUI.utils import CustomMainWindow
     import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.AnalysisClass import *
     from glados_pycromanager.GUI.napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 else:
+    import microscopeInterfaceLayer as MIL
     from utils import CustomMainWindow
     import utils
     from AnalysisClass import *
@@ -52,7 +54,7 @@ class ConfigInfo:
     This class contains information about a pycromanager config group
     Contains info such as name, min/max value etc
     """
-    def __init__(self,core,config_group_id):
+    def __init__(self,core,shared_data,config_group_id):
         """
         This class contains information about a pycromanager config group
         Contains info such as name, min/max value etc
@@ -62,6 +64,7 @@ class ConfigInfo:
             config_group_id (int): The id of the config group
         """
         self.core = core
+        self.shared_data = shared_data
         self.config_group_id = config_group_id
         pass
     
@@ -69,31 +72,19 @@ class ConfigInfo:
         """
         Returns the config group name
         """
-        if shared_data.backend == 'JAVA':
-            return self.core.get_available_config_groups().get(self.config_group_id)
-        elif shared_data.backend == 'Python':
-            return self.core.get_available_config_groups()[self.config_group_id]
+        return shared_data.MILcore.get_available_config_groups()[self.config_group_id]
     
     def nrConfigs(self):
         """Returns the number of config options for this config group"""
-        if shared_data.backend == 'JAVA':
-            return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).size()
-        elif shared_data.backend == 'Python':
-            return len(self.core.get_available_configs(self.core.get_available_config_groups()[self.config_group_id]))
+        return len(shared_data.MILcore.get_available_configs(shared_data.MILcore.get_available_config_groups()[self.config_group_id]))
     
     def configName(self,config_id):
         """Returns the name of the config within the config group"""
-        if shared_data.backend == 'JAVA':   
-            return self.core.get_available_configs(self.core.get_available_config_groups().get(self.config_group_id)).get(config_id)
-        elif shared_data.backend == 'Python':
-            return self.core.get_available_configs(self.core.get_available_config_groups()[self.config_group_id])[config_id]
+        return shared_data.MILcore.get_available_configs(shared_data.MILcore.get_available_config_groups()[self.config_group_id])[config_id]
     
     def deviceNameProperty_fromVerbose(self):
         """Returns the first device name and property from Verbose"""
-        if shared_data.backend == 'Python':
-            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).getVerbose()
-        else:
-            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
+        verboseInfoCurrentConfigGroup = shared_data.MILcore.verbose_info_from_config_group_state(shared_data.MILcore.get_config_group_state(self.configGroupName()))
         start_index = verboseInfoCurrentConfigGroup.find("<html>") + len("<html>")
         end_index = verboseInfoCurrentConfigGroup.find(":")
         deviceName = verboseInfoCurrentConfigGroup[start_index:end_index]
@@ -105,16 +96,13 @@ class ConfigInfo:
     def hasPropertyLimits(self):
         """Returns whether the config group has property limits"""
         #Get the verbose info from the config group state
-        if shared_data.backend == 'JAVA':
-            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).get_verbose()
-        elif shared_data.backend == 'Python':
-            verboseInfoCurrentConfigGroup = self.core.get_config_group_state(self.configGroupName()).getVerbose()
+        verboseInfoCurrentConfigGroup = shared_data.MILcore.verbose_info_from_config_group_state(shared_data.MILcore.get_config_group_state(self.configGroupName()))
         #Determine the number of devices in the verbose info
         nrDevicesFromVerbose = verboseInfoCurrentConfigGroup.count('<br>')
         if nrDevicesFromVerbose == 1 and self.nrConfigs() == 1:
             [deviceName,deviceProperty] = self.deviceNameProperty_fromVerbose()
             #Determines whether the device name/property has limits:
-            if self.core.has_property_limits(deviceName,deviceProperty):
+            if shared_data.MILcore.has_property_limits(deviceName,deviceProperty):
                 return True
             else:
                 return False
@@ -124,7 +112,7 @@ class ConfigInfo:
     def lowerLimit(self):
         """Finds lower limit of the device property"""
         [deviceName,deviceProperty] = self.deviceNameProperty_fromVerbose()
-        if self.core.has_property_limits(deviceName,deviceProperty):
+        if shared_data.MILcore.has_property_limits(deviceName,deviceProperty):
             lowerLimit = self.core.get_property_lower_limit(deviceName,deviceProperty)
         else:
             lowerLimit = 0
@@ -133,7 +121,7 @@ class ConfigInfo:
     def upperLimit(self):
         """Finds upper limit of the device property"""
         [deviceName,deviceProperty] = self.deviceNameProperty_fromVerbose()
-        if self.core.has_property_limits(deviceName,deviceProperty):
+        if shared_data.MILcore.has_property_limits(deviceName,deviceProperty):
             upperLimit = self.core.get_property_upper_limit(deviceName,deviceProperty)
         else:
             upperLimit = 0
@@ -147,16 +135,10 @@ class ConfigInfo:
             #If there is exactly one option...
             if self.nrConfigs() == 1:
                 #And the option is 'NewPreset', it means there are no presets specified
-                if shared_data.backend == 'JAVA':
-                    if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
-                        return False
-                    else:
-                        return True
-                elif shared_data.backend == 'Python':
-                    if self.core.get_available_configs(self.configGroupName())[0] == 'NewPreset':
-                        return False
-                    else:
-                        return True
+                if shared_data.MILcore.get_available_configs(self.configGroupName())[0] == 'NewPreset':
+                    return False
+                else:
+                    return True
         
     def isSlider(self):
         """Returns Boolean whether the config group should be represented as a slider"""
@@ -175,26 +157,15 @@ class ConfigInfo:
         else:
             #If there is exactly one option...
             if self.nrConfigs() == 1:
-                if shared_data.backend == 'JAVA':
-                    #And the option is 'NewPreset', it means there are no presets specified
-                    if self.core.get_available_configs(self.configGroupName()).get(0) == 'NewPreset':
-                        #check if it's not a slider...
-                        if self.hasPropertyLimits():
-                            return False
-                        else:
-                            return True
-                    else:
+                #And the option is 'NewPreset', it means there are no presets specified
+                if shared_data.MILcore.get_available_configs(self.configGroupName())[0] == 'NewPreset':
+                    #check if it's not a slider...
+                    if self.hasPropertyLimits():
                         return False
-                elif shared_data.backend == 'Python':
-                    #And the option is 'NewPreset', it means there are no presets specified
-                    if self.core.get_available_configs(self.configGroupName())[0] == 'NewPreset':
-                        #check if it's not a slider...
-                        if self.hasPropertyLimits():
-                            return False
-                        else:
-                            return True
                     else:
-                        return False
+                        return True
+                else:
+                    return False
 
     def helpStringInfo(self):
         """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
@@ -209,48 +180,34 @@ class ConfigInfo:
     
     def getCurrentMMValue(self):
         """Get the current MM value of this config group:"""
-        return self.core.get_current_config(self.configGroupName())
+        return shared_data.MILcore.get_current_config(self.configGroupName())
 
     def getStorableValue(self):
         """Get the current MM value of this config group, in a storable manner - i.e. depending on slider, input, dropdown:"""
         if self.isDropDown():
-            return self.core.get_current_config(self.configGroupName())
+            return shared_data.MILcore.get_current_config(self.configGroupName())
         if self.isSlider():
             #A slider config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.configGroupName()
-            if shared_data.backend == 'JAVA':
-                underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
-            elif shared_data.backend == 'Python':
-                underlyingProperty = self.core.get_available_configs(configGroupName)[0]
-            configdata = self.core.get_config_data(configGroupName,underlyingProperty)
-            if shared_data.backend == 'Python':
-                device_label = configdata.getSetting(0).getDeviceLabel()
-                property_name = configdata.getSetting(0).getPropertyName()
-            else:
-                device_label = configdata.get_setting(0).get_device_label()
-                property_name = configdata.get_setting(0).get_property_name()
+            underlyingProperty = shared_data.MILcore.get_available_configs(self.configGroupName())[0]
+            configdata = shared_data.MILcore.get_config_data(configGroupName,underlyingProperty)
+            device_label = shared_data.MILcore.get_config_device_label(configdata)
+            property_name = shared_data.MILcore.get_config_property_name(configdata)
             
             #Finally we get the current value of the slider
-            currentSliderValue = float(self.core.get_property(device_label,property_name))
+            currentSliderValue = float(shared_data.MILcore.get_property(device_label,property_name))
             return currentSliderValue
         if self.isInputField():
             #An input field config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.configGroupName()
-            if shared_data.backend == 'JAVA':
-                underlyingProperty = self.core.get_available_configs(configGroupName).get(0)
-            elif shared_data.backend == 'Python':
-                underlyingProperty = self.core.get_available_configs(configGroupName)[0]
-            configdata = self.core.get_config_data(configGroupName,underlyingProperty)
-            if shared_data.backend == 'Python':
-                device_label = configdata.getSetting(0).getDeviceLabel()
-                property_name = configdata.getSetting(0).getPropertyName()
-            else:
-                device_label = configdata.get_setting(0).get_device_label()
-                property_name = configdata.get_setting(0).get_property_name()
+            underlyingProperty = self.shared_data.MILcore.get_available_configs(configGroupName)[0]
+            configdata = self.shared_data.MILcore.get_config_data(configGroupName,underlyingProperty)
+            device_label = self.shared_data.MILcore.get_config_device_label(configdata)
+            property_name = self.shared_data.MILcore.get_config_property_name(configdata)
             
             #Finally we get the current value of the slider
             try:
-                currentValue = (self.core.get_property(device_label,property_name))
+                currentValue = (self.shared_data.MILcore.get_property(device_label,property_name))
             except:
                 currentValue = 0
             return currentValue
@@ -747,18 +704,14 @@ class MMConfigUI(CustomMainWindow):
         Function that's called when an image is snapped (i.e. get a single image), uses the float(self.exposureTimeInputField.text()) as time in ms
         """
         #Set the correct exposure time
-        shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
+        shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
         #Snap an image
-        shared_data.core.snap_image()
+        shared_data.MILcore.snap_image()
         #Get the just-snapped image
-        if shared_data.backend == 'Python':
-            newImage = shared_data.core.get_image()
-            snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.shape[0],newImage.shape[1]))
-            snapLayer.data = newImage
-        elif shared_data.backend == 'JAVA':
-            newImage = shared_data.core.get_tagged_image()
-            snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.tags["Height"],newImage.tags["Width"]))
-            snapLayer.data = np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
+        newImage = shared_data.MILcore.get_image()
+        
+        snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.shape[0],newImage.shape[1]))
+        snapLayer.data = newImage
         #Move the layer to top
         moveLayerToTop(napariViewer,'Snap')
         return
@@ -768,19 +721,12 @@ class MMConfigUI(CustomMainWindow):
         Add an image to the Album layer in napari
         """ 
         #Set the correct exposure time
-        shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
+        shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
         #Snap an image
-        shared_data.core.snap_image()
+        shared_data.MILcore.snap_image()
         #Get the just-snapped image
-        
-        
-        if shared_data.backend == 'Python':
-            newImage = shared_data.core.get_image()
-            addToExistingOrNewLayer(napariViewer,'Album',newImage,shared_data_throughput = shared_data)
-        elif shared_data.backend == 'JAVA':
-            newImage = shared_data.core.get_tagged_image()
-            #And add to the 'Album' layer
-            addToExistingOrNewLayer(napariViewer,'Album',np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]]),shared_data_throughput = shared_data)
+        newImage = shared_data.MILcore.get_image()
+        addToExistingOrNewLayer(napariViewer,'Album',newImage,shared_data_throughput = shared_data)
         
         return
     
@@ -788,27 +734,51 @@ class MMConfigUI(CustomMainWindow):
         """
         Function that should be called when live mode is changed. Sets the shared_data.liveMode to True or False.
         """
-        if shared_data.liveMode == False:
+        # import useq
+        # import microscopeInterfaceLayer as MIL
+
+        # def on_frame_callback_live(image: np.ndarray, event: useq.MDAEvent):
+        #     print(
+        #         f"received frame: {image.shape}, {image.dtype} "
+        #         f"@ index {event.index}, z={event.z_pos}"
+        #     )
+            
+        # if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+        #     print('Connected to PymmCore!')
+            
+        #     #Connect the live update to this upcoming MDA
+        #     connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
+            
+        #     mda_sequence = useq.MDASequence(
+        #         time_plan={"interval": 0.0, "loops": 999} #type: ignore
+        #     )
+            
+        #     #Actually start the MDA
+        #     self.shared_data.MILcore.core.run_mda(mda_sequence)
+        #     print('Started MDA sequence')
+        #     #Give some time to understand that it's running
+        #     time.sleep(0.1)
+        #     #Continuously update the app to process events while the MDA is running:
+        #     while self.shared_data.MILcore.core.mda.is_running():
+        #         time.sleep(0.01)     # Give Qt a tiny moment (optional, sometimes helps)
+        #         shared_data.mainApp.processEvents() # Process events (main napari thread)
+            
+        #     #When it's done, disconnect the callback
+        #     self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
+        #     print('Finished live!')
+
+                            
+            
+        if not shared_data.liveMode:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Stop Live Mode")
             icon = QIcon(self.iconFolder+os.sep+'General_Stop.png')
             # icon: Flaticon.com
             self.LiveModeButton.setIcon(icon)
             #set exposure time first:
-            shared_data.core.set_exposure(float(self.exposureTimeInputField.text()))
+            shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
             #Then start live mode, which is just a custom MDA
             shared_data.liveMode = True
-            # from MDAGlados import MDAGlados
-            # liveMDA = MDAGlados(core,[],[],
-            #     shared_data,
-            #     z_start=0,
-            #     z_step=0,
-            #     z_end = 0,
-            #     num_time_points=500, 
-            #     exposure_ms= float(self.exposureTimeInputField.text()), 
-            #     exposure_s_or_ms = 'ms')
-            # liveMDA.MDA_acq_from_GUI(mdaLayerName='Live')
-            # shared_data.liveMode = True
         else:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Start Live Mode")
@@ -817,6 +787,10 @@ class MMConfigUI(CustomMainWindow):
             self.LiveModeButton.setIcon(icon)
             #update live mode:
             shared_data.liveMode = False
+            
+            
+    
+        
     #endregion
 
     #region Shutter
@@ -857,11 +831,11 @@ class MMConfigUI(CustomMainWindow):
         """
         current_text = self.shutterOpenCloseButton.text()
         if current_text == 'Open':
-            self.core.set_shutter_open(True) #type:ignore
+            self.shared_data.MILcore.set_shutter_open(True)
             self.shutterOpenCloseButton.setText('Close')
             self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterClosed.png'))
         elif current_text == 'Close':
-            self.core.set_shutter_open(False) #type:ignore
+            self.shared_data.MILcore.set_shutter_open(False) #type:ignore
             self.shutterOpenCloseButton.setText('Open')
             self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterOpen.png'))
 
@@ -869,8 +843,8 @@ class MMConfigUI(CustomMainWindow):
         """
         Set the shutter to the new choice if the dropdown is changed
         """ 
-        selected_item = self.shutterChoiceDropdown.currentText()
-        self.core.set_shutter_device(selected_item) #type:ignore
+        selected_item = self.shutterChoiceDropdown.currentText
+        self.shared_data.MILcore.set_shutter_device(selected_item)
 
     def on_shutterAutoCheckboxChanged(self,state):
         """
@@ -878,26 +852,26 @@ class MMConfigUI(CustomMainWindow):
         """
         if state == 2:
             self.shutterOpenCloseButton.setEnabled(False)
-            self.core.set_auto_shutter(True) #type:ignore
+            self.shared_data.MILcore.set_auto_shutter(True)
         else:
             self.shutterOpenCloseButton.setEnabled(True)
-            self.core.set_auto_shutter(False) #type:ignore
+            self.shared_data.MILcore.set_auto_shutter(False)
     
     def updateShutterOptions(self):
         """" 
         Update the shutter GUI options based on what's what in MM
         """
         #Set the current shutter device to the one in MM
-        currentShutterDevice = self.core.get_shutter_device() #type:ignore
+        currentShutterDevice = self.shared_data.MILcore.get_shutter_device()
         self.shutterChoiceDropdown.currentText = currentShutterDevice
         #Set the auto-method to the one in MM:
-        currentShutterAuto = self.core.get_auto_shutter() #type:ignore
+        currentShutterAuto = self.shared_data.MILcore.get_auto_shutter()
         self.shutterAutoCheckbox.setChecked(currentShutterAuto)
-        if currentShutterAuto == False:
+        if not currentShutterAuto:
             self.shutterOpenCloseButton.setEnabled(True)
         #Set the button text
-        currentShutterOpen = self.core.get_shutter_open() #type:ignore
-        if currentShutterOpen == True:
+        currentShutterOpen = self.shared_data.MILcore.get_shutter_open()
+        if currentShutterOpen:
             self.shutterOpenCloseButton.setText('Close')
         else:
             self.shutterOpenCloseButton.setText('Open')
@@ -952,7 +926,7 @@ class MMConfigUI(CustomMainWindow):
 
         This function resets the ROI to its maximum size, which is the size of the image
         """
-        self.core.clear_roi() #type:ignore
+        self.shared_data.MILcore.clear_roi() #type:ignore
     
     def zoomROI(self,option):
         """
@@ -965,10 +939,7 @@ class MMConfigUI(CustomMainWindow):
         """
         #Get the current ROI info
         #[x,y,width,height]
-        if shared_data.backend == 'JAVA':
-            roiv = [self.core.get_roi().x,self.core.get_roi().y,self.core.get_roi().width,self.core.get_roi().height] #type:ignore
-        elif shared_data.backend == 'Python':
-            roiv = [self.core.get_roi()[0],self.core.get_roi()[1],self.core.get_roi()[2],self.core.get_roi()[3]] #type:ignore
+        roiv = self.shared_data.MILcore.get_roi()
         logging.debug('ROI zoom requested, current size: '+str(roiv))
         if option == 'ZoomIn':
             #zoom in twice
@@ -1008,12 +979,12 @@ class MMConfigUI(CustomMainWindow):
         #ROIpos should be a list of [x,y,width,height]
         logging.debug('Zooming ROI to ' + str(ROIpos))
         try:
-            if shared_data.liveMode == False:
-                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]) #type:ignore
-                self.core.wait_for_system() #type:ignore
+            if not shared_data.liveMode:
+                self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
+                self.shared_data.MILcore.wait_for_system() #type:ignore
             else:
                 shared_data.liveMode = False
-                self.core.set_roi(ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]) #type:ignore
+                self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
                 time.sleep(0.5)
                 shared_data.liveMode = True
         except:
@@ -1109,7 +1080,7 @@ class MMConfigUI(CustomMainWindow):
                 bottomrightxy = np.ceil(vertices[2][::-1])
                 #Set the boundaries based on the camera
                 mintopleft = [0,0]
-                maxbottomright = [shared_data.core.get_roi().width, shared_data.core.get_roi().height]
+                maxbottomright = [shared_data.MILcore.get_roi().width, shared_data.MILcore.get_roi().height]
                 #Find the bounded positions
                 topleftpos = np.maximum(topleftxy,mintopleft)
                 bottomrightpos = np.minimum(bottomrightxy,maxbottomright)
@@ -1297,25 +1268,16 @@ class MMConfigUI(CustomMainWindow):
         typeOfXYStageLayout = "Small" #"Big" or "Small" - either a 4x4 grid or a 8x8 grid. The bigger looks somewhat nicer, but is too large to be usefulll
         
         #Obtain the stage info from MM:
-        XYStageName = self.core.get_xy_stage_device() #type: ignore
+        XYStageName = self.shared_data.MILcore.get_xy_stage_device()
         #Get the stage position
-        if shared_data.backend == 'JAVA':
-            XYStagePos = self.core.get_xy_stage_position(XYStageName)#type: ignore
-        elif shared_data.backend == 'Python':
-            XYStagePos = self.core.get_xy_position(XYStageName)#type: ignore
+        XYStagePos = self.shared_data.MILcore.get_xy_stage_position(XYStageName)
         
-        #Get current pixel size via self.core.get_pixel_size_um()
+        #Get current pixel size
         #Then move 0.1, 0.5, or 1 field with the arrows
-        if shared_data.backend == 'JAVA':
-            if self.core.get_pixel_size_um() != 0:
-                field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
-            else:
-                field_size_um = [1*self.core.get_roi().width,1*self.core.get_roi().height]#type: ignore
-        elif shared_data.backend == 'Python':
-            if self.core.get_pixel_size_um() != 0:
-                field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi()[2],self.core.get_pixel_size_um()*self.core.get_roi()[3]]#type: ignore
-            else:
-                field_size_um = [1*self.core.get_roi()[2],1*self.core.get_roi()[3]]#type: ignore
+        if self.shared_data.MILcore.get_pixel_size_um() != 0:
+            field_size_um = [self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[2],self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[3]]#type: ignore
+        else:
+            field_size_um = [1*self.shared_data.MILcore.get_roi()[2],1*self.shared_data.MILcore.get_roi()[3]]
         field_move_fraction = [1,.5,.1]
         
         #Widget itself is a grid layout with 3x3 entries
@@ -1414,10 +1376,10 @@ class MMConfigUI(CustomMainWindow):
         #Set the values in the XY EditFields based on the buttons
         fieldUnits = [0.1,1,3]
         fieldUnit = fieldUnits[m]
-        if shared_data.backend == 'JAVA':
-            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi().width,self.core.get_pixel_size_um()*self.core.get_roi().height]#type: ignore
-        elif shared_data.backend == 'Python':
-            field_size_um = [self.core.get_pixel_size_um()*self.core.get_roi()[2],self.core.get_pixel_size_um()*self.core.get_roi()[3]]#type: ignore
+        if self.shared_data.MILcore.get_pixel_size_um() != 0:
+            field_size_um = [self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[2],self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[3]]#type: ignore
+        else:
+            field_size_um = [1*self.shared_data.MILcore.get_roi()[2],1*self.shared_data.MILcore.get_roi()[3]]
         
         x_value_um = field_size_um[0]*fieldUnit
         y_value_um = field_size_um[1]*fieldUnit
@@ -1432,45 +1394,35 @@ class MMConfigUI(CustomMainWindow):
         #for all devicetypes
         """
         #Get devices
-        devices = self.core.get_loaded_devices() #type:ignore
-        if shared_data.backend == 'Python':
-            devices = [devices[i] for i in range(len(devices))]
-            devicesOfType = []
-            deviceTypeArray = {}
-            deviceTypeArray[1] = 'GenericDevice' #Unknown really
-            deviceTypeArray[2] = 'CameraDevice'
-            deviceTypeArray[3] = 'ShutterDevice'
-            deviceTypeArray[4] = 'StateDevice'
-            deviceTypeArray[5] = 'StageDevice'
-            deviceTypeArray[6] = 'XYStageDevice'
-            deviceTypeArray[7] = 'GenericDevice' #Unknown, like a controller-type of device? HubDevice-ish
-            deviceTypeArray[8] = 'GenericDevice' #Unknown really
-            deviceTypeArray[9] = 'AutoFocusDevice'
-            deviceTypeArray[10] = 'CoreDevice'
-            deviceTypeArray[11] = 'GenericDevice' #Unknown really
-            deviceTypeArray[12] = 'GenericDevice' #Unknown really
-            deviceTypeArray[13] = 'GenericDevice' #Unknown really
-            deviceTypeArray[14] = 'GenericDevice' #Unknown really
-            deviceTypeArray[15] = 'HubDevice'
-            #Loop over devices
-            try:
-                for device in devices:
-                    device_found_type = deviceTypeArray[self.core.get_device_type(device)]
-                    if device_found_type == devicetype: #type:ignore
-                        logging.debug("found " + device + " of type " + devicetype)
-                        devicesOfType.append(device)
-            except Exception as e:
-                print(e)
-            return devicesOfType
-        elif shared_data.backend == 'JAVA':
-            devices = [devices.get(i) for i in range(devices.size())]
-            devicesOfType = []
-            #Loop over devices
+        devices = self.core.get_loaded_devices() 
+        devices = [devices[i] for i in range(len(devices))]
+        devicesOfType = []
+        deviceTypeArray = {}
+        deviceTypeArray[1] = 'GenericDevice' #Unknown really
+        deviceTypeArray[2] = 'CameraDevice'
+        deviceTypeArray[3] = 'ShutterDevice'
+        deviceTypeArray[4] = 'StateDevice'
+        deviceTypeArray[5] = 'StageDevice'
+        deviceTypeArray[6] = 'XYStageDevice'
+        deviceTypeArray[7] = 'GenericDevice' #Unknown, like a controller-type of device? HubDevice-ish
+        deviceTypeArray[8] = 'GenericDevice' #Unknown really
+        deviceTypeArray[9] = 'AutoFocusDevice'
+        deviceTypeArray[10] = 'CoreDevice'
+        deviceTypeArray[11] = 'GenericDevice' #Unknown really
+        deviceTypeArray[12] = 'GenericDevice' #Unknown really
+        deviceTypeArray[13] = 'GenericDevice' #Unknown really
+        deviceTypeArray[14] = 'GenericDevice' #Unknown really
+        deviceTypeArray[15] = 'HubDevice'
+        #Loop over devices
+        try:
             for device in devices:
-                if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
+                device_found_type = deviceTypeArray[self.core.get_device_type(device)]
+                if device_found_type == devicetype: #type:ignore
                     logging.debug("found " + device + " of type " + devicetype)
                     devicesOfType.append(device)
-            return devicesOfType
+        except Exception as e:
+            print(e)
+        return devicesOfType
     
     def oneDstageLayout(self):
         """
@@ -1493,7 +1445,7 @@ class MMConfigUI(CustomMainWindow):
         self.oneDstageDropdown.currentTextChanged.connect(lambda: self.storeAllControlValues())
         #Set default value to default z stage of MM
         try:
-            self.oneDstageDropdown.setCurrentText(self.core.get_focus_device()) #type:ignore
+            self.oneDstageDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
         except:
             pass
         #Add the dropdown to the layout:
@@ -1548,7 +1500,7 @@ class MMConfigUI(CustomMainWindow):
         """
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
-        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageDropdown.currentText()):.1f}") #type:ignore
+        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.shared_data.MILcore.get_position(self.oneDstageDropdown.currentText()):.1f}") #type:ignore
         
         for widget_id in range(0,self.oneDStackedWidget.count()):
             widget = self.oneDStackedWidget.widget(widget_id)
@@ -1574,9 +1526,9 @@ class MMConfigUI(CustomMainWindow):
         
         #Move the stage relatively
         if abs(amount) == 2:
-            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float)) #type:ignore
+            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float)) #type:ignore
         elif abs(amount) == 1:
-            self.core.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
+            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
         self.updateOneDstageLayout()
     
     
@@ -1601,7 +1553,7 @@ class MMConfigUI(CustomMainWindow):
         self.oneDstageRelDropdown.currentTextChanged.connect(lambda: self.storeAllControlValues())
         #Set default value to default z stage of MM
         try:
-            self.oneDstageRelDropdown.setCurrentText(self.core.get_focus_device()) #type:ignore
+            self.oneDstageRelDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
         except:
             pass
         #Add the dropdown to the layout:
@@ -1644,7 +1596,7 @@ class MMConfigUI(CustomMainWindow):
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
         logging.debug("Updating OneD stage layout")
-        self.oneDinfoRelWidget.setText(f"{self.oneDstageRelDropdown.currentText()}\r\n {self.core.get_position(self.oneDstageRelDropdown.currentText()):.1f}") #type:ignore
+        self.oneDinfoRelWidget.setText(f"{self.oneDstageRelDropdown.currentText()}\r\n {self.shared_data.MILcore.get_position(self.oneDstageRelDropdown.currentText()):.1f}") #type:ignore
         
         for widget_id in range(0,self.oneDRelStackedWidget.count()):
             widget = self.oneDRelStackedWidget.widget(widget_id)
@@ -1657,15 +1609,11 @@ class MMConfigUI(CustomMainWindow):
 
         """
         #Obtain the stage info from MM:
-        XYStageName = self.core.get_xy_stage_device() #type:ignore
+        XYStageName = self.shared_data.MILcore.get_xy_stage_device() #type:ignore
         #Get the stage position
         for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
-            if shared_data.backend == 'JAVA':
-                XYStagePos = self.core.get_xy_stage_position(XYStageName) #type:ignore
-                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos.x:.0f}/{XYStagePos.y:.0f}")
-            elif shared_data.backend == 'Python':
-                XYStagePos = self.core.get_xy_position(XYStageName) #type:ignore
-                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
+            XYStagePos = self.shared_data.MILcore.get_xy_position(XYStageName) #type:ignore
+            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
         #Align text center:
         self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
@@ -1674,7 +1622,7 @@ class MMConfigUI(CustomMainWindow):
         Move XY stage with um positions in relx, rely:
         """
         #Set the position
-        self.core.set_relative_xy_position(relX,relY) #type:ignore
+        self.shared_data.MILcore.set_relative_xy_position([relX,relY]) 
         
         #Update the XYStageInfoWidget
         self.updateXYStageInfoWidget()
@@ -2153,7 +2101,7 @@ class MMConfigUI(CustomMainWindow):
         return separator_line
     #endregion
     
-def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
+def microManagerControlsUI(MM_JSON,main_layout,sshared_data):
     """
     Controls the Micro Manager UI.
     
@@ -2170,12 +2118,9 @@ def microManagerControlsUI(core,MM_JSON,main_layout,sshared_data):
     shared_data = sshared_data
     # Get all config groups
     allConfigGroups={}
-    if shared_data.backend == 'Python':
-        nrconfiggroups = len(core.get_available_config_groups())
-    else:
-        nrconfiggroups = core.get_available_config_groups().size()
+    nrconfiggroups = len(shared_data.MILcore.get_available_config_groups())
     for config_group_id in range(nrconfiggroups):
-        allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
+        allConfigGroups[config_group_id] = ConfigInfo(shared_data.MILcore,shared_data,config_group_id)
     
     #Create the MM config via all config groups
     MMconfig = MMConfigUI(allConfigGroups,number_config_columns=7,autoSaveLoad=True)

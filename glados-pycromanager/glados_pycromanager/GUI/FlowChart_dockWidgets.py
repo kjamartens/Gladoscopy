@@ -80,6 +80,7 @@ if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
     from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
     from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
+    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
     import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.nodz import nodz_utils
     import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
@@ -92,6 +93,7 @@ else:
     from AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
     from AutonomousMicroscopy.CustomFunctions import * #type: ignore
     import utils
+    import microscopeInterfaceLayer as MIL
     from nodz import nodz_utils
     import nodz.nodz_main as NodzMain
     from MMcontrols import MMConfigUI, ConfigInfo
@@ -1273,7 +1275,7 @@ class FoVFindImaging_singleCh_configs(QDialog):
             
             # Get all config groups
             allConfigGroups={}
-            nrconfiggroups = core.get_available_config_groups().size()
+            nrconfiggroups = np.size(self.core.get_available_config_groups())
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
             
@@ -2346,7 +2348,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             #attach MMconfigUI to this:
             # Get all config groups
             allConfigGroups={}
-            nrconfiggroups = self.core.get_available_config_groups().size() #type:ignore
+            nrconfiggroups = np.size(self.core.get_available_config_groups()) #type:ignore
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
@@ -2363,7 +2365,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         elif nodeType == 'changeStagePos':
             # Get all config group s
             allConfigGroups={}
-            nrconfiggroups = self.core.get_available_config_groups().size() #type:ignore
+            nrconfiggroups =  np.size(self.core.get_available_config_groups()) #type:ignore
             for config_group_id in range(nrconfiggroups):
                 allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
         
@@ -3556,14 +3558,14 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             self.createSingleCoreVar(stage+'_current_pos',[pos],[list,np.ndarray]) #type:ignore
         
         #Config values, all configs
-        allConfigs = self.core.get_available_config_groups()
-        if allConfigs != None:
-            if self.shared_data.backend == 'JAVA':
-                nrconfiggroups = allConfigs.size()
-            elif self.shared_data.backend == 'Python':
-                nrconfiggroups = len(allConfigs)
+        allConfigs = self.shared_data.MILcore.get_available_config_groups()
+        if (type(allConfigs != None) == bool and allConfigs != None) or any(allConfigs != None):
+            # if self.shared_data.backend == 'JAVA':
+            #     nrconfiggroups = allConfigs.size()
+            # elif self.shared_data.backend == 'Python':
+            nrconfiggroups = len(allConfigs)
             for config_id in range(nrconfiggroups):
-                configInfo = ConfigInfo(self.core,config_id)
+                configInfo = ConfigInfo(self.core,shared_data,config_id)
                 configName = configInfo.configGroupName()
                 configValue = configInfo.getStorableValue()
                 try:
@@ -3573,14 +3575,14 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                 self.createSingleCoreVar('config_'+configName,configValue,typev) #type:ignore
             
         #Pixel size, ROI size
-        if self.core.get_pixel_size_um() != 0:
+        if self.shared_data.MILcore.get_pixel_size_um() != 0:
             self.createSingleCoreVar('Pixel_size_um',self.core.get_pixel_size_um(),[float]) #type:ignore
         else:
             self.createSingleCoreVar('Pixel_size_um',1,[float]) #type:ignore
-        if self.shared_data.backend == 'JAVA':
-            self.createSingleCoreVar('ROI_size',[self.core.get_roi().width,self.core.get_roi().height],[list,np.ndarray]) #type:ignore
-        elif self.shared_data.backend == 'Python':
-            self.createSingleCoreVar('ROI_size',[self.core.get_roi()[2],self.core.get_roi()[3]],[list,np.ndarray]) #type:ignore
+        # if self.shared_data.backend == 'JAVA':
+        #     self.createSingleCoreVar('ROI_size',[self.core.get_roi().width,self.core.get_roi().height],[list,np.ndarray]) #type:ignore
+        # elif self.shared_data.backend == 'Python':
+        self.createSingleCoreVar('ROI_size',[self.shared_data.MILcore.get_roi()[2],self.shared_data.MILcore.get_roi()[3]],[list,np.ndarray]) #type:ignore
     
     def createSingleCoreVar(self,name,data,type,importance='Informative'):
         self.coreVariables[name] = {} 

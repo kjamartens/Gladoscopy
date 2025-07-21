@@ -15,6 +15,7 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
+    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
     from glados_pycromanager.GUI.AnalysisClass import * #type:ignore
     from glados_pycromanager.GUI.utils import CustomMainWindow #type:ignore
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
@@ -33,6 +34,7 @@ else:
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy\\MainScripts")
     sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI\\nodz")
     from AnalysisClass import * #type:ignore
+    import microscopeInterfaceLayer as MIL #type:ignore
     from utils import CustomMainWindow #type:ignore
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
     from napariGlados import * #type: ignore

@@ -1022,11 +1022,7 @@ class XYGridManager():
         self.grid_n_rows = 1
         self.grid_n_cols = 1
         
-        if self.parent.shared_data.backend == 'Python':
-            self.gridEntries = np.array([[self.core.get_xy_position()[0],self.core.get_xy_position()[1]]])
-        elif self.parent.shared_data.backend == 'JAVA':
-            #JAVA backend
-            self.gridEntries = np.array([[self.core.get_xy_stage_position().x,self.core.get_xy_stage_position().y]]) 
+        self.gridEntries = np.array([[self.core.get_xy_position()[0],self.core.get_xy_position()[1]]])
     
     def openGUI(self):
         """ 

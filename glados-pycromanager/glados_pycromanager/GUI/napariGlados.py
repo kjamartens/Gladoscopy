@@ -6,7 +6,9 @@ import time
 import sys
 import logging
 import os
+import useq
 import appdirs
+import importlib
 from threading import Event
 from napari.qt import thread_worker
 from collections import deque
@@ -23,6 +25,7 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
+    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
     from glados_pycromanager.GUI.LaserControlScripts import *
     import glados_pycromanager.GUI.napariGlados as napariGlados
     from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
@@ -37,6 +40,7 @@ if is_pip_installed():
 else:
     from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
     from LaserControlScripts import *
+    import microscopeInterfaceLayer as MIL
     from MMcontrols import microManagerControlsUI
     from AnalysisClass import *
     from Analysis_dockWidgets import *
@@ -56,7 +60,7 @@ def napariUpdateLive(DataStructure):
     """
     
     #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
-    min_delay_time = np.min(((50/1000),(float(shared_data.core.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
+    min_delay_time = np.min(((50/1000),(float(shared_data.MILcore.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
     
     #JAVA is way slower so needs this longer update time of the display
     if shared_data.backend == 'JAVA':
@@ -107,8 +111,8 @@ def napariUpdateLive(DataStructure):
             #The following line takes 2 seconds to run: #TODO: optimize
             layer = napariViewer.add_image(liveImage, rendering='attenuated_mip', colormap=DataStructure['layer_color_map'],name = layerName)
             #Set correct scale - in nm
-            if core.get_pixel_size_um() != 0:
-                layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+            if shared_data.MILcore.get_pixel_size_um() != 0:
+                layer.scale = [shared_data.MILcore.get_pixel_size_um(),shared_data.MILcore.get_pixel_size_um()] #type:ignore
             else:
                 logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
                 layer.scale = [1,1]
@@ -196,8 +200,8 @@ def napariUpdateLive(DataStructure):
                     
                     layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
-                    if core.get_pixel_size_um() != 0:
-                        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    if shared_data.MILcore.get_pixel_size_um() != 0:
+                        layer.scale = [shared_data.MILcore.get_pixel_size_um(),shared_data.MILcore.get_pixel_size_um()] #type:ignore
                     else:
                         logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
                         layer.scale = [1,1]
@@ -214,8 +218,8 @@ def napariUpdateLive(DataStructure):
                     nrLayersBefore = len(napariViewer.layers)
                     layer = napariViewer.add_image(latestImage, colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
-                    if core.get_pixel_size_um() != 0:
-                        layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()] #type:ignore
+                    if shared_data.MILcore.get_pixel_size_um() != 0:
+                        layer.scale = [shared_data.MILcore.get_pixel_size_um(),shared_data.MILcore.get_pixel_size_um()] #type:ignore
                     else:
                         logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
                         layer.scale = [1,1]
@@ -405,7 +409,28 @@ class napariHandler():
                 logging.debug('attemped to abort acq')
         
         # return image, metadata
-        
+    
+    def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent):
+        if self.acqstate:
+            
+            #Check if there is any reason to read the image:
+            reasonToReadImage = False
+            #Check if it should be put in the visualisation queue
+            if len(self.visualisation_queue) < 5:
+                reasonToReadImage = True
+            #Check if it should be put in any of the analysis queues
+            for queue in [item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads]:
+                if len(queue) < 2:
+                    reasonToReadImage = True
+            if len(self.image_queue_analysis) < 5:
+                reasonToReadImage = True
+                
+            if reasonToReadImage:
+                metadata = {}
+                # metadata['Axes']=axes
+                #TODO: figure out how to get the axes from the event in PyMMcore
+                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+    
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):
         """ 
         Function that runs on every frame obtained in live mode and putis in the image queue
@@ -418,8 +443,10 @@ class napariHandler():
         if self.acqstate:
             #Check if there is any reason to read the image:
             reasonToReadImage = False
+            #Check if it should be put in the visualisation queue
             if len(self.visualisation_queue) < 2:
                 reasonToReadImage = True
+            #Check if it should be put in any of the analysis queues
             for queue in [item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads]:
                 if len(queue) < 2:
                     reasonToReadImage = True
@@ -473,27 +500,53 @@ class napariHandler():
                     # moveLayerToTop(self.shared_data.napariViewer,"Live")
                     savefolder = None
                     savename = None
+                    print('AAAAAAAAAAAAAAAAARGH2')
                     #Acquisitions are slightly tricky. If run Headlessly, we take images directly from image_process_fn. However, if we run with a MM instance running, we use the image_saved_fn
-                    if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
-                        with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
-                            self.shared_data._mdaModeAcqData = acq
-                            events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
-                            acq.acquire(events)
-                    elif shared_data._headless and shared_data.backend == 'Python':
-                        logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
-                        with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
-                            self.shared_data._mdaModeAcqData = acq
-                            events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
-                            acq.acquire(events)
-                    else:
-                        with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
-                            self.shared_data._mdaModeAcqData = acq
-                            events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
-                            acq.acquire(events)
+                    
+                    if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+                        print('Connected to PymmCore!')
+                        
+                        #Connect the live update to this upcoming MDA
+                        connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
+                        
+                        mda_sequence = useq.MDASequence(
+                            time_plan={"interval": 0.0, "loops": 999} #type: ignore
+                        )
+                        
+                        #Actually start the MDA
+                        self.shared_data.MILcore.core.run_mda(mda_sequence)
+                        print('Started MDA sequence')
+                        #Give some time to understand that it's running
+                        time.sleep(0.1)
+                        #Continuously update the app to process events while the MDA is running:
+                        while self.shared_data.MILcore.core.mda.is_running():
+                            time.sleep(0.01)     # Give Qt a tiny moment (optional, sometimes helps)
+                            shared_data.mainApp.processEvents() # Process events (main napari thread)
+                        
+                        #When it's done, disconnect the callback
+                        self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
+                        print('Finished live!')
+                    else: #Pycromanager backend, either JAVA or Python
+                        if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
+                            with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
+                                self.shared_data._mdaModeAcqData = acq
+                                events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
+                                acq.acquire(events)
+                        elif shared_data._headless and shared_data.backend == 'Python':
+                            logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                            with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
+                                self.shared_data._mdaModeAcqData = acq
+                                events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
+                                acq.acquire(events)
+                        else:
+                            with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
+                                self.shared_data._mdaModeAcqData = acq
+                                events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
+                                acq.acquire(events)
 
                     logging.debug('After Acq Live')
             #Now we're after the livestate
-            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.MILcore.stop_sequence_acquisition()
             self.shared_data.liveMode = False
             #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
             cleanUpTemporaryFiles(shared_data=self.shared_data)
@@ -561,7 +614,7 @@ class napariHandler():
 
             logging.debug('#nH - Stopping the acquisition from napariHandler')
             #Now we're after the acquisition
-            self.shared_data.core.stop_sequence_acquisition()
+            self.shared_data.MILcore.stop_sequence_acquisition()
             self.shared_data.mdaMode = False
             
             #Signal to all parents that the MDA acquisition is done - in the Nodz MDA, now we would trigger the MDA-based analysis for scoring or so
@@ -765,7 +818,7 @@ class dockWidget_MMcontrol(dockWidgets):
         logging.debug("dockWidget_MMcontrol started")
         super().__init__()
         #Add the full micro manager controls UI
-        self.dockWidget = microManagerControlsUI(core,MM_JSON,self.layout,shared_data)
+        self.dockWidget = microManagerControlsUI(MM_JSON,self.layout,shared_data)
 
 class dockWidget_MDA(dockWidgets):
     def __init__(self): 
@@ -786,7 +839,7 @@ class dockWidget_MDA(dockWidgets):
             
             try:
                 #Add the full micro manager controls UI
-                self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                self.dockWidget = MDAGlados(shared_data.MILcore,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
                             num_time_points = mdaInfo['num_time_points'], 
                             time_interval_s = mdaInfo['time_interval_s'], 
@@ -822,13 +875,13 @@ class dockWidget_MDA(dockWidgets):
                             autoSaveLoad=True).getGui()
             except KeyError:
                 #Add the full micro manager controls UI
-                self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+                self.dockWidget = MDAGlados(shared_data.MILcore,MM_JSON,self.layout,shared_data,
                             hasGUI=True,
                             GUI_acquire_button = True,
                             autoSaveLoad=True).getGui()
         else: #If no MDA state is yet saved, open a new MDAGlados from scratch
             #Add the full micro manager controls UI
-            self.dockWidget = MDAGlados(core,MM_JSON,self.layout,shared_data,
+            self.dockWidget = MDAGlados(shared_data.MILcore,MM_JSON,self.layout,shared_data,
                         hasGUI=True,
                         GUI_acquire_button = True,
                         autoSaveLoad=True).getGui()
@@ -841,7 +894,7 @@ class dockWidget_flowChart(dockWidgets):
         super().__init__()
         
         #Add the full micro manager controls UI
-        self.dockWidget = flowChart_dockWidgets(core,MM_JSON,self.layout,shared_data)
+        self.dockWidget = flowChart_dockWidgets(shared_data.MILcore,MM_JSON,self.layout,shared_data)
 
 class dockWidget_fullGladosUI(dockWidgets):
     def __init__(self): 
@@ -858,7 +911,7 @@ class dockWidget_fullGladosUI(dockWidgets):
         with open(MM_JSON_path) as f:
             MM_JSON = json.load(f)
             
-        form, self.criticalErrors = runlaserControllerUI(core,MM_JSON,ui,shared_data)
+        form, self.criticalErrors = runlaserControllerUI(shared_data.MILcore,MM_JSON,ui,shared_data)
         #Run the laserController UI        
         #
         #Create a Vertical+horizontal layout:
@@ -975,16 +1028,16 @@ def layer_removed_event_callback(event, shared_data):
                 #     l.destroy()
 #endregion
 
-def runNapariPycroManager(score,sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):
+def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
-    core = score
+    # core = score
     MM_JSON = sMM_JSON
     livestate = False
     shared_data = sshared_data
     
     #Get some info from core to put in shared_data
-    shared_data._defaultFocusDevice = core.get_focus_device()
+    shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
     logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
 
     #Run the UI on a second thread (hopefully robustly)

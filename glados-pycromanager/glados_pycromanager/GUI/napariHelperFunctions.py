@@ -31,14 +31,15 @@ def checkIfLayerExistsOrCreate(napariViewer,layer_name,layer_type='image',shared
     else:
         shared_dataF = shared_data_throughput
     layerId = getLayerIdFromName(layer_name,napariViewer)
+    
     if len(layerId) > 0:
         layer = napariViewer.layers[layerId[0]]
         return layer
     else: #create the layer
         layer = napariViewer.add_image(np.zeros(required_size),name = layer_name)
         #Set correct scale - in nm
-        if shared_dataF.core.get_pixel_size_um() != 0:
-            layer.scale = [shared_dataF.core.get_pixel_size_um(),shared_dataF.core.get_pixel_size_um()] #type:ignore
+        if shared_dataF.MILcore.get_pixel_size_um() != 0:
+            layer.scale = [shared_dataF.MILcore.get_pixel_size_um(),shared_dataF.MILcore.get_pixel_size_um()] #type:ignore
         else:
             logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
             layer.scale = [1,1] #type:ignore
@@ -99,8 +100,8 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
         logging.debug('creating layer')
         layer = napariViewer.add_image(image_data,name = layer_name)
         #Set correct scale - in nm
-        if shared_dataF.core.get_pixel_size_um() != 0:
-            layer.scale = [shared_dataF.core.get_pixel_size_um(),shared_dataF.core.get_pixel_size_um()] #type:ignore
+        if shared_dataF.MILcore.get_pixel_size_um() != 0:
+            layer.scale = [shared_dataF.MILcore.get_pixel_size_um(),shared_dataF.MILcore.get_pixel_size_um()] #type:ignore
         else:
             logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
             layer.scale = [1,1]

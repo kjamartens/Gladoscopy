@@ -46,6 +46,7 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
+    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
     import glados_pycromanager.GUI.utils
     from glados_pycromanager.GUI.utils import CustomMainWindow
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
@@ -54,6 +55,7 @@ if is_pip_installed():
     import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.MMcontrols import ConfigInfo
 else:
+    import microscopeInterfaceLayer as MIL
     import utils as utils
     from utils import CustomMainWindow
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
@@ -882,13 +884,10 @@ class MDAGlados(CustomMainWindow):
         self.channelDropdown = QComboBox()
         
         #Figure out from all config groups which ones are "dropdown"
-        if self.shared_data.backend == 'JAVA':
-            nrconfiggroups = self.core.get_available_config_groups().size()
-        elif self.shared_data.backend == 'Python':
-            nrconfiggroups = len(self.core.get_available_config_groups())
+        nrconfiggroups = len(self.shared_data.MILcore.get_available_config_groups())
         allConfigGroups={}
         for config_group_id in range(nrconfiggroups):
-            allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
+            allConfigGroups[config_group_id] = ConfigInfo(self.core,self.shared_data,config_group_id)
         comboboxindexes = []
         for config_group_id in range(nrconfiggroups):
             if allConfigGroups[config_group_id].isDropDown():
@@ -1043,42 +1042,42 @@ class MDAGlados(CustomMainWindow):
         #for all devicetypes
         """
         #Get devices
-        devices = self.core.get_loaded_devices() #type:ignore
-        if self.shared_data.backend == 'Python':
-            devices = [devices[i] for i in range(len(devices))]
-            devicesOfType = []
-            deviceTypeArray = {}
-            deviceTypeArray[1] = 'GenericDevice' #Unknown really
-            deviceTypeArray[2] = 'CameraDevice'
-            deviceTypeArray[3] = 'ShutterDevice'
-            deviceTypeArray[4] = 'StateDevice'
-            deviceTypeArray[5] = 'StageDevice'
-            deviceTypeArray[6] = 'XYStageDevice'
-            deviceTypeArray[7] = 'GenericDevice' #Unknown, like a controller-type of device? HubDevice-ish
-            deviceTypeArray[8] = 'GenericDevice' #Unknown really
-            deviceTypeArray[9] = 'AutoFocusDevice'
-            deviceTypeArray[10] = 'CoreDevice'
-            deviceTypeArray[11] = 'GenericDevice' #Unknown really
-            deviceTypeArray[12] = 'GenericDevice' #Unknown really
-            deviceTypeArray[13] = 'GenericDevice' #Unknown really
-            deviceTypeArray[14] = 'GenericDevice' #Unknown really
-            deviceTypeArray[15] = 'HubDevice'
-            #Loop over devices
-            for device in devices:
-                device_found_type = deviceTypeArray[self.core.get_device_type(device)]
-                if device_found_type == devicetype: #type:ignore
-                    logging.debug("found " + device + " of type " + devicetype)
-                    devicesOfType.append(device)
-            return devicesOfType
-        elif self.shared_data.backend == 'JAVA':
-            devices = [devices.get(i) for i in range(devices.size())]
-            devicesOfType = []
-            #Loop over devices
-            for device in devices:
-                if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
-                    logging.debug("found " + device + " of type " + devicetype)
-                    devicesOfType.append(device)
-            return devicesOfType
+        devices = self.shared_data.MILcore.get_loaded_devices()
+        # if self.shared_data.backend == 'Python':
+        devices = [devices[i] for i in range(len(devices))]
+        devicesOfType = []
+        deviceTypeArray = {}
+        deviceTypeArray[1] = 'GenericDevice' #Unknown really
+        deviceTypeArray[2] = 'CameraDevice'
+        deviceTypeArray[3] = 'ShutterDevice'
+        deviceTypeArray[4] = 'StateDevice'
+        deviceTypeArray[5] = 'StageDevice'
+        deviceTypeArray[6] = 'XYStageDevice'
+        deviceTypeArray[7] = 'GenericDevice' #Unknown, like a controller-type of device? HubDevice-ish
+        deviceTypeArray[8] = 'GenericDevice' #Unknown really
+        deviceTypeArray[9] = 'AutoFocusDevice'
+        deviceTypeArray[10] = 'CoreDevice'
+        deviceTypeArray[11] = 'GenericDevice' #Unknown really
+        deviceTypeArray[12] = 'GenericDevice' #Unknown really
+        deviceTypeArray[13] = 'GenericDevice' #Unknown really
+        deviceTypeArray[14] = 'GenericDevice' #Unknown really
+        deviceTypeArray[15] = 'HubDevice'
+        #Loop over devices
+        for device in devices:
+            device_found_type = deviceTypeArray[self.shared_data.MILcore.get_device_type(device)]
+            if device_found_type == devicetype: #type:ignore
+                logging.debug("found " + device + " of type " + devicetype)
+                devicesOfType.append(device)
+        return devicesOfType
+        # elif self.shared_data.backend == 'JAVA':
+        #     devices = [devices.get(i) for i in range(devices.size())]
+        #     devicesOfType = []
+        #     #Loop over devices
+        #     for device in devices:
+        #         if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
+        #             logging.debug("found " + device + " of type " + devicetype)
+        #             devicesOfType.append(device)
+        #     return devicesOfType
     
     def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice = None):
         """
@@ -1648,9 +1647,9 @@ class MDAGlados(CustomMainWindow):
         if self.zGroupBox.isEnabled():
             try:
                 #We also need to set the shared_data focus device for proper z-functioning
-                self.shared_data.core.set_focus_device(self.z_oneDstageDropdown.currentText())
+                self.shared_data.MILcore.set_focus_device(self.z_oneDstageDropdown.currentText())
             except:
-                self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
+                self.shared_data.MILcore.set_focus_device(self.shared_data._defaultFocusDevice)
                 
             self.z_stage_sel = self.z_oneDstageDropdown.currentText()
             
@@ -1691,7 +1690,7 @@ class MDAGlados(CustomMainWindow):
             self.z_nrsteps_radio_sel = self.z_nrsteps_radio.isChecked()
             self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
         else:
-            self.shared_data.core.set_focus_device(self.shared_data._defaultFocusDevice)
+            self.shared_data.MILcore.set_focus_device(self.shared_data._defaultFocusDevice)
         
         #Get the xy positions
         if self.xyGroupBox.isEnabled():

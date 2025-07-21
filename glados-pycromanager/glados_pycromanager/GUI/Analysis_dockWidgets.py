@@ -11,6 +11,7 @@ def is_pip_installed():
 if is_pip_installed():
     from glados_pycromanager.GUI.AnalysisClass import *
     import glados_pycromanager.GUI.napariGlados
+    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
     from glados_pycromanager.GUI.utils import CustomMainWindow
     from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
     from glados_pycromanager.GUI.MMcontrols import *
@@ -18,6 +19,7 @@ if is_pip_installed():
     from glados_pycromanager.GUI.FlowChart_dockWidgets import * 
 else:
     from AnalysisClass import *
+    import microscopeInterfaceLayer as MIL
     import napariGlados
     from utils import CustomMainWindow
     from napariHelperFunctions import getLayerIdFromName, InitateNapariUI

@@ -12,6 +12,7 @@ import sys
 import utils
 from pycromanager import Core
 from pycromanager import start_headless
+from pymmcore_plus import CMMCorePlus
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -40,6 +41,7 @@ def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
 
 if is_pip_installed():
+    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
     from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
     from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
     from glados_pycromanager.GUI.utils import *
@@ -48,6 +50,7 @@ if is_pip_installed():
     #Obtain the helperfunctions
     import glados_pycromanager.GUI.utils as utils
 else:
+    import microscopeInterfaceLayer as MIL
     from napariGlados import runNapariPycroManager
     from sharedFunctions import Shared_data, periodicallyUpdate
     from utils import *
@@ -79,7 +82,7 @@ class Worker(QObject):
     """
     finished = pyqtSignal()
 
-    def runNapariPycroManagerWrap(self, core, MM_JSON, shared_data,includeCustomUI=False):
+    def runNapariPycroManagerWrap(self, MM_JSON, shared_data,includeCustomUI=False):
         """
         Runs the NapariPycroManagerWrap function.
         
@@ -99,7 +102,7 @@ class Worker(QObject):
         else:
             includeCustomUI=False
         # Run the NapariPycroManager function
-        runNapariPycroManager(core, MM_JSON, shared_data,includecustomUI=includeCustomUI)
+        runNapariPycroManager(MM_JSON, shared_data,includecustomUI=includeCustomUI)
         self.finished.emit()
 
 class headlessGUI(QWidget):
@@ -148,14 +151,21 @@ class headlessGUI(QWidget):
 
         self.backendLabel = QLabel('Backend:', self)
 
+        self.pyMMCorePlusRadio = QRadioButton('PyMMCore+ (testing)', self)
         self.pythonRadio = QRadioButton('Python (recommended)', self)
         self.javaRadio = QRadioButton('Java', self)
+        self.pyMMCorePlusRadio.setChecked(False)
+        self.pythonRadio.setChecked(False)
+        self.javaRadio.setChecked(False)
         if self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] == 'JAVA':
             self.javaRadio.setChecked(True)
-        else:
+        if self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] == 'Python':
             self.pythonRadio.setChecked(True)
+        if self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] == 'PyMMCorePlus':
+            self.pyMMCorePlusRadio.setChecked(True)
 
         self.buttonGroup = QButtonGroup()
+        self.buttonGroup.addButton(self.pyMMCorePlusRadio)
         self.buttonGroup.addButton(self.pythonRadio)
         self.buttonGroup.addButton(self.javaRadio)
 
@@ -181,8 +191,9 @@ class headlessGUI(QWidget):
         layout = QGridLayout()
         layout.addWidget(self.splash_label,1,0,1,4)
         layout.addWidget(self.backendLabel, 3, 0)
-        layout.addWidget(self.pythonRadio, 3, 1)
-        layout.addWidget(self.javaRadio, 3, 2)
+        layout.addWidget(self.pyMMCorePlusRadio, 3, 1)
+        layout.addWidget(self.pythonRadio, 3, 2)
+        layout.addWidget(self.javaRadio, 3, 3)
         layout.addWidget(self.mm_app_pathLabel, 4, 0)
         layout.addWidget(self.mm_app_pathLineEdit, 4, 1,1,2)
         layout.addWidget(self.mm_app_browse, 4, 3)
@@ -270,8 +281,10 @@ def main():
     print('Finding or creating micromanager instance.')
     try:
         core = Core()
-        shared_data.core = core
+        # shared_data.core = core
         shared_data._headless = False
+        shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
+        shared_data.MILcore.set_core(core)
     except Exception as e:
         logging.warning(f'Try/exception occured! {e}')
         #Create a small GUI for settings
@@ -279,15 +292,26 @@ def main():
         headlessGUIv = headlessGUI(shared_data)
         appSmall.exec_()
         
-        #Get those settings and use to start headless
-        start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
-        core = Core()
-        logging.info('Headless MicroManager started')
-        
-        #Also store some settings in shared_data
-        shared_data._headless = True
-        shared_data.backend = headlessGUIv.backend
-        shared_data.core = core
+        if headlessGUIv.javaRadio.isChecked() or headlessGUIv.pythonRadio.isChecked():
+            logging.info('Headless PycroManager started')
+            
+            #Get those settings and use to start headless
+            start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
+            
+            #Also store some settings in shared_data
+            shared_data._headless = True
+            shared_data.backend = headlessGUIv.backend
+            # shared_data.core = core
+            shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
+            shared_data.MILcore.set_core(Core())
+        elif headlessGUIv.pyMMCorePlusRadio.isChecked():
+            logging.info('Headless PyMMCorePlus started')
+            
+            shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
+            shared_data.MILcore.set_core(CMMCorePlus(mm_path=headlessGUIv.mm_app_path))
+            shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
+            shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
+            #Max memory MB is not settable in PyMMCorePlus, so we don't set it
     
     #Open JSON file with MM settings
     try:
@@ -299,11 +323,13 @@ def main():
         
         
     app = QApplication(sys.argv)
+    
+    shared_data.mainApp = app
 
     worker = Worker()
     thread = QThread()
     worker.moveToThread(thread)
-    thread.started.connect(lambda: worker.runNapariPycroManagerWrap(core, MM_JSON, shared_data))
+    thread.started.connect(lambda: worker.runNapariPycroManagerWrap(MM_JSON, shared_data))
     thread.start()
     
     worker.finished.connect(thread.quit)
