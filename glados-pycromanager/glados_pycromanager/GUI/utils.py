@@ -3407,7 +3407,9 @@ def openAdvancedSettings(shared_data):
     pass
 
 def getDimensionsFromAcqData(acqData):
-    time_getdimfromacqdata = time.time()
+    # time_getdimfromacqdata = time.time()
+    # logging.info(f'acData: {acqData}')
+    # logging.info(f'metadata: {acqData[0]}')
     try:
         alldims = acqData[0]['axes']
         num_dims = len(alldims)
@@ -3427,7 +3429,7 @@ def getDimensionsFromAcqData(acqData):
             
             
         logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
-        print(f'Time to get dimensions from acq data: {time.time()-time_getdimfromacqdata}')
+        # print(f'Time to get dimensions from acq data: {time.time()-time_getdimfromacqdata}')
         return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
     except Exception as e:
         print(f'Problem with get Dimensions! {e}')

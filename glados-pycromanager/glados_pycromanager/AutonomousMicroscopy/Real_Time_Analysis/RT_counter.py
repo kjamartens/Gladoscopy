@@ -53,7 +53,7 @@ class RealTimeCounter():
         run_time = time.time()
         if 'ImageNumber' in metadata:
             self.currentValue = float(metadata['ImageNumber'])
-            logging.info("At frame: "+metadata['ImageNumber'])
+            logging.info("At frame: "+metadata['ImageNumber']+" (metadata-ImageNumber)")
         else:
             #Append to full list with frame info
             self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
@@ -61,7 +61,8 @@ class RealTimeCounter():
             for v in list(self.uniqueEntriesAllDims.keys()):
                 mda_values = np.hstack((mda_values,metadata['Axes'][v]))
                 
-            self.currentValue = metadata['Axes'][v]
+            self.currentValue = float(metadata['Axes'][v])
+            logging.info("At frame: "+str(metadata['Axes'][v])+" (metadata-Axes)")
         logging.info(f"Running time counter rta: {time.time()-run_time}")
     
     def end(self,core,**kwargs):

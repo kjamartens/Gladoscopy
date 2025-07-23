@@ -7,6 +7,7 @@ import sys
 import logging
 import os
 import useq
+from useq.pycromanager import to_pycromanager
 import appdirs
 import importlib
 from threading import Event
@@ -78,7 +79,7 @@ def napariUpdateLive(DataStructure):
         logging.debug('Updated live preview Delayed (due to display update time) val found {}'.format(time.time()-shared_data.last_display_update_time))
         logging.debug('Updated live preview Delayed (due to display update time) by {}'.format(min_delay_time-(time.time()-shared_data.last_display_update_time)))
         #Sleep for the remainder, then continue
-        time.sleep(min_delay_time-(time.time()-shared_data.last_display_update_time))
+        time.sleep(max(0,min_delay_time-(time.time()-shared_data.last_display_update_time)))
         
     #shared_data.debugImageDisplayTimes.append(time.time())
     napariViewer = DataStructure['napariViewer']
@@ -412,7 +413,6 @@ class napariHandler():
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent):
         if self.acqstate:
-            
             #Check if there is any reason to read the image:
             reasonToReadImage = False
             #Check if it should be put in the visualisation queue
@@ -426,9 +426,11 @@ class napariHandler():
                 reasonToReadImage = True
                 
             if reasonToReadImage:
+                #TODO: better way to get pycromanager-like metadata from pymmcore (and properly document what metadata is expected)
                 metadata = {}
-                # metadata['Axes']=axes
-                #TODO: figure out how to get the axes from the event in PyMMcore
+                metadata['Axes'] = {}
+                metadata['Axes']['time']=event.index['t']
+                logging.info(metadata)
                 self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
     
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):
@@ -438,7 +440,7 @@ class napariHandler():
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.debug('#nH - Updated preview requesting grab_image_liveVisualisation_and_liveAnalysis_savedFn at time {}'.format(time.time()))
+        logging.info('#nH - Updated preview requesting grab_image_liveVisualisation_and_liveAnalysis_savedFn at time {}'.format(time.time()))
         # shared_data.debugImageArrivalTimes.append(time.time())
         if self.acqstate:
             #Check if there is any reason to read the image:
@@ -457,6 +459,7 @@ class napariHandler():
                 image = dataset.read_image(**axes)
                 metadata = {}
                 metadata['Axes']=axes
+                print(metadata)
                 self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
             
         else:
@@ -471,7 +474,7 @@ class napariHandler():
         # return image, metadata
         
     @thread_worker
-    def run_pycroManagerAcquisition_worker(self,parent):
+    def run_MILCoreAcquisition_worker(self,parent):
         """ 
         Worker which handles live mode on/off turning etc
         
@@ -481,7 +484,7 @@ class napariHandler():
         shared_data.debugImageDisplayTimes=[]
         global acq
         # shared_data = self.shared_data
-        logging.debug('#nH - in run_pycroManagerAcquisition_worker')
+        logging.debug('#nH - in run_MILCoreAcquisition_worker')
         #The idea of live mode is that we do a very very long acquisition (10k frames), and real-time show the images, and then abort the acquisition when we stop life.
         #The abortion is handled in grab_image_liveVisualisation_and_liveAnalysis
         if self.liveOrMda == 'live':
@@ -500,11 +503,11 @@ class napariHandler():
                     # moveLayerToTop(self.shared_data.napariViewer,"Live")
                     savefolder = None
                     savename = None
-                    print('AAAAAAAAAAAAAAAAARGH2')
                     #Acquisitions are slightly tricky. If run Headlessly, we take images directly from image_process_fn. However, if we run with a MM instance running, we use the image_saved_fn
                     
                     if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
-                        print('Connected to PymmCore!')
+                        logging.info('Connected to PymmCore!')
+                        
                         
                         #Connect the live update to this upcoming MDA
                         connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
@@ -512,6 +515,8 @@ class napariHandler():
                         mda_sequence = useq.MDASequence(
                             time_plan={"interval": 0.0, "loops": 999} #type: ignore
                         )
+                        #Set proper expected mda:
+                        shared_data._mdaModeParams = to_pycromanager(mda_sequence)
                         
                         #Actually start the MDA
                         self.shared_data.MILcore.core.run_mda(mda_sequence)
@@ -707,6 +712,9 @@ class napariHandler():
         if self.liveOrMda == 'live':
             #Hook the live mode into the scripts here
             if self.shared_data.liveMode == False:
+                #Stop the ongoing acquisition
+                self.shared_data.MILcore.stop_sequence_acquisition()
+                #Signal that there is no acquisition ongoing
                 self.acqstate = False
                 self.stop_continuous_task = True
                 #Clear the image queue
@@ -715,11 +723,9 @@ class napariHandler():
                 #Check for all RT-analysis and ensure that they are stopping
                 for rtAnalysisThread in [item['Thread'] for item in self.shared_data.RTAnalysisQueuesThreads]:
                     rtAnalysisThread.set_activity(False)
-                    
+                
                 logging.info("Live mode stopped")
             else:
-                logging.info('liveMode changed to TRUE')
-                print('liveMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Always start live-mode visualisation:
@@ -728,7 +734,7 @@ class napariHandler():
                 moveLayerToTop(self.shared_data.napariViewer,"Live")
                 
                 #Start the worker to run the pycromanager acquisition
-                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                worker1 = self.run_MILCoreAcquisition_worker(self) #type:ignore
                 worker1.start() #type:ignore
                 # worker2 = self.run_analysis_worker(self) #type:ignore
                 
@@ -760,7 +766,7 @@ class napariHandler():
                 if self.shared_data.newestLayerName != '':
                     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 #Start the two workers, one to run it, one to visualise it.
-                worker1 = self.run_pycroManagerAcquisition_worker(self) #type:ignore
+                worker1 = self.run_MILCoreAcquisition_worker(self) #type:ignore
                 # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore
                 
