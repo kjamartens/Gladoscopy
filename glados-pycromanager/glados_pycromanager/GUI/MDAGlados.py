@@ -1384,8 +1384,10 @@ class MDAGlados(CustomMainWindow):
         """
         
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
-        self.data = self.shared_data.mdaDatasets[-1]
-        
+        try:
+            self.data = self.shared_data.mdaDatasets[-1]
+        except:
+            logging.error('#TODO: No MDA data found in shared_data.mdaDatasets. fix this with PyMMC (wheres the dataset stored? can we get this?).')
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
         
@@ -1598,10 +1600,10 @@ class MDAGlados(CustomMainWindow):
         """
         
         logging.info('Attempting to stop MDA')
-        #Reset the button
-        self.resetMDAbutton(mdaLayerName=mdaLayerName)
         #Abort the mda mode
         self.shared_data.MILcore.stop_sequence_acquisition()
+        #Reset the button
+        self.resetMDAbutton(mdaLayerName=mdaLayerName)
     
     def get_MDA_events_from_GUI(self):
         """

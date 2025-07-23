@@ -595,7 +595,7 @@ class napariHandler():
                 logging.debug(f"MDABackendMethod is",shared_data.globalData['MDABACKENDMETHOD']['value'])
                 if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
                     logging.info('Connected to PymmCore!')
-                    
+                    acq=None
                     
                     #Connect the live update to this upcoming MDA
                     connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
@@ -636,7 +636,10 @@ class napariHandler():
 
                 self.shared_data.mdaMode = False
                 self.acqstate = False #End the MDA acq state
-                self.shared_data.appendNewMDAdataset(acq.get_dataset())
+                if acq is not None:
+                    self.shared_data.appendNewMDAdataset(acq.get_dataset())
+                else:
+                    logging.error('#TODO: handle the case where no MDA dataset is returned in PyMMC')
 
             logging.debug('#nH - Stopping the acquisition from napariHandler')
             #Now we're after the acquisition
