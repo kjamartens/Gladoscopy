@@ -16,6 +16,7 @@ import markdown
 from pycromanager import Core
 from typing import Any
 import webbrowser
+import microscopeInterfaceLayer as MIL
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import (
@@ -3065,7 +3066,7 @@ def PushButtonAddVariableCallBack(line_edit,nodzInfo):
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','SLACK-CLIENT']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','SLACK-CLIENT']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):
@@ -3673,3 +3674,28 @@ def set_up_logger():
     for handler in logger.handlers:
         handler.formatter = logging.Formatter("%(asctime)s [%(levelname)s] \t %(message)s [%(filename)s:%(lineno)d]")
 
+
+def metadata_refactor(metadata, shared_data=None):
+    """
+    Refactor the metadata to be more consistent and easier to use.
+    """
+    #Metadata is a dict. This might be received from pycromanager, or from pymmc, or something else. We create a new, somewhat consistent metadata dict.
+    # new_metadata = dict()
+    # if shared_data.MILcore.MI() == MIL.MicroscopeInstance.PYCROMANAGER_JAVA or shared_data.MILcore.MI() == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+    #     new_metadata = metadata
+    # elif shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+    #     new_metadata['Time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
+    #     new_metadata['Exposure'] = shared_data.MILcore.core.getExposure()
+    #     new_metadata['ROI'] = shared_data.MILcore.core.getROI()
+    #     new_metadata['PixelSize_um'] = shared_data.MILcore.core.getPixelSizeUm()
+    #     new_metadata['Axes'] = metadata['Axes']
+    #     if 't' in metadata['Axes']:
+    #         new_metadata['Axes']['time'] = metadata['Axes']['t']
+    #         del new_metadata['Axes']['t']
+    
+    if 'mda_event' in metadata:
+        metadata['Axes'] = dict(metadata['mda_event'].index)
+        if 't' in metadata['Axes']:
+            metadata['Axes']['time'] = metadata['Axes']['t']
+            del metadata['Axes']['t']
+    return metadata

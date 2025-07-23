@@ -99,7 +99,7 @@ def napariUpdateLive(DataStructure):
     #Visualise the MDA data on a frame-by-frame method - i.e. not a 'stack', but simply a single image which is replaced every frame update
     if shared_data.globalData['MDAVISMETHOD']['value'] == 'frameByFrame' or DataStructure['layer_name']=='Live':
         liveImage = DataStructure['data'][0]
-        metadata = DataStructure['data'][1]
+        metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
         if liveImage is None:
             return
         if acqstate == False:
@@ -129,10 +129,8 @@ def napariUpdateLive(DataStructure):
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames
     elif shared_data.globalData['MDAVISMETHOD']['value'] == 'multiDstack':
         if DataStructure['finalisationProcedure'] == False:
-            liveImage = DataStructure['data'][0]
-            metadata = DataStructure['data'][1]
             latestImage = DataStructure['data'][0]
-            metadata = DataStructure['data'][1]
+            metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
             if latestImage is None:
                 return
             if acqstate == False:
@@ -193,7 +191,7 @@ def napariUpdateLive(DataStructure):
                     shared_data.mdaZarrData[layerName] = zarr.open(
                             str(tempfile.TemporaryDirectory().name),
                             shape = shape+[latestImage.shape[0],latestImage.shape[1]],
-                            chunks = tuple([1] * len(shape) + [latestImage.shape[0],liveImage.shape[1]]),
+                            chunks = tuple([1] * len(shape) + [latestImage.shape[0],latestImage.shape[1]]),
                             )
                     #Changing the first image to the latest acquired image
                     shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
@@ -210,11 +208,13 @@ def napariUpdateLive(DataStructure):
                     
                     for dim_id in range(len(n_entries_in_dims)):
                         napariViewer.dims.set_axis_label(dim_id, dimensionOrder[dim_id])
+                        logging.info(f"Setting axis label {dim_id} to {dimensionOrder[dim_id]}")
                     napariViewer.reset_view()
                     
                     #set the napariViewer to the correct slices:
                     for dim_id in range(len(n_entries_in_dims)):
                         napariViewer.dims.set_current_step(dim_id,0)
+                        logging.info(f"Setting current step {dim_id} to 0")
                 else:
                     nrLayersBefore = len(napariViewer.layers)
                     layer = napariViewer.add_image(latestImage, colormap=DataStructure['layer_color_map'],name = layerName)
@@ -240,7 +240,7 @@ def napariUpdateLive(DataStructure):
                         logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
                         sliceTuple += (int(currentSliceID),)
                         
-                    shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = liveImage #type:ignore
+                    shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = latestImage 
                     
                     #set the napariViewer to the correct slice:
                     for dim_id in range(len(n_entries_in_dims)):
@@ -255,7 +255,7 @@ def napariUpdateLive(DataStructure):
                     layer = napariViewer.layers[liveImageLayer[0]]
                     #Also move to top
                     napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
-                    layer.data = liveImage
+                    layer.data = latestImage
                     
         elif DataStructure['finalisationProcedure'] == True:
             #Render the missing images in the MDA acquisition
@@ -323,7 +323,7 @@ def napariUpdateAnalysisThreads(DataStructure):
     analysisThreads = DataStructure['analysisThreads']
     logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
     liveImage = DataStructure['data'][0]
-    metadata = DataStructure['data'][1]
+    metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
     layerName = DataStructure['layer_name']
     if liveImage is None:
         return
@@ -397,41 +397,40 @@ class napariHandler():
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.debug('#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {}'.format(time.time()))
+        logging.info('#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {}'.format(time.time()))
         if self.acqstate:
             self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
         else:
             logging.info('Broke off live mode')
             event_queue.clear()
             try:
-                acq.abort()
+                self.shared_data.MILcore.stop_sequence_acquisition()
                 logging.debug('aborted acquisition')
             except:
                 logging.debug('attemped to abort acq')
         
         # return image, metadata
     
-    def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent):
+    def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
         if self.acqstate:
-            #Check if there is any reason to read the image:
-            reasonToReadImage = False
-            #Check if it should be put in the visualisation queue
-            if len(self.visualisation_queue) < 5:
-                reasonToReadImage = True
-            #Check if it should be put in any of the analysis queues
-            for queue in [item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads]:
-                if len(queue) < 2:
-                    reasonToReadImage = True
-            if len(self.image_queue_analysis) < 5:
-                reasonToReadImage = True
+            # #Check if there is any reason to read the image:
+            # reasonToReadImage = False
+            # #Check if it should be put in the visualisation queue
+            # if len(self.visualisation_queue) < 5:
+            #     reasonToReadImage = True
+            # #Check if it should be put in any of the analysis queues
+            # for queue in [item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads]:
+            #     if len(queue) < 2:
+            #         reasonToReadImage = True
+            # if len(self.image_queue_analysis) < 5:
+            #     reasonToReadImage = True
                 
-            if reasonToReadImage:
-                #TODO: better way to get pycromanager-like metadata from pymmcore (and properly document what metadata is expected)
-                metadata = {}
-                metadata['Axes'] = {}
-                metadata['Axes']['time']=event.index['t']
-                logging.info(metadata)
-                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+            # if reasonToReadImage:
+            metadata = utils.metadata_refactor(metadata, self.shared_data)
+            self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+        else:
+            logging.info('Need to break off!')
+            self.shared_data.MILcore.stop_sequence_acquisition()
     
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):
         """ 
@@ -466,7 +465,7 @@ class napariHandler():
             logging.info('Broke off live mode')
             event_queue.clear()
             try:
-                acq.abort()
+                self.shared_data.MILcore.stop_sequence_acquisition()
                 logging.debug('aborted acquisition')
             except:
                 logging.debug('attemped to abort acq')
@@ -511,15 +510,15 @@ class napariHandler():
                         
                         #Connect the live update to this upcoming MDA
                         connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
-                        
-                        mda_sequence = useq.MDASequence(
+                        #Create the MDA plan
+                        mda_sequence_useq = useq.MDASequence(
                             time_plan={"interval": 0.0, "loops": 999} #type: ignore
                         )
                         #Set proper expected mda:
-                        shared_data._mdaModeParams = to_pycromanager(mda_sequence)
+                        shared_data._mdaModeParams = to_pycromanager(mda_sequence_useq)
                         
                         #Actually start the MDA
-                        self.shared_data.MILcore.core.run_mda(mda_sequence)
+                        self.shared_data.MILcore.core.run_mda(mda_sequence_useq)
                         print('Started MDA sequence')
                         #Give some time to understand that it's running
                         time.sleep(0.1)
@@ -594,24 +593,46 @@ class napariHandler():
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 
                 logging.debug(f"MDABackendMethod is",shared_data.globalData['MDABACKENDMETHOD']['value'])
-                if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
-                    logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
-                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
-                        self.shared_data._mdaModeAcqData = acq
-                        events = self.shared_data._mdaModeParams
-                        acq.acquire(events)
-                elif shared_data._headless and shared_data.backend == 'Python':
-                    logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
-                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
-                        self.shared_data._mdaModeAcqData = acq
-                        events = self.shared_data._mdaModeParams
-                        acq.acquire(events)
-                else:
-                    logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
-                    with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn) as acq: #type:ignore
-                        self.shared_data._mdaModeAcqData = acq
-                        events = self.shared_data._mdaModeParams
-                        acq.acquire(events)
+                if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+                    logging.info('Connected to PymmCore!')
+                    
+                    
+                    #Connect the live update to this upcoming MDA
+                    connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
+                    #Get the MDA plan
+                    mda_sequence_useq = shared_data._mdaModeParams_useq
+                    #Actually start the MDA
+                    self.shared_data.MILcore.core.run_mda(mda_sequence_useq)
+                    print('Started MDA sequence')
+                    #Give some time to understand that it's running
+                    time.sleep(0.1)
+                    #Continuously update the app to process events while the MDA is running:
+                    while self.shared_data.MILcore.core.mda.is_running():
+                        time.sleep(0.01)
+                        shared_data.mainApp.processEvents() # Process events (main napari thread)
+                    
+                    #When it's done, disconnect the callback
+                    self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
+                    print('Finished live!')
+                else: #Pycromanager backend, either JAVA or Python
+                    if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
+                        logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                        with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
+                            self.shared_data._mdaModeAcqData = acq
+                            events = self.shared_data._mdaModeParams
+                            acq.acquire(events)
+                    elif shared_data._headless and shared_data.backend == 'Python':
+                        logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                        with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
+                            self.shared_data._mdaModeAcqData = acq
+                            events = self.shared_data._mdaModeParams
+                            acq.acquire(events)
+                    else:
+                        logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                        with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn) as acq: #type:ignore
+                            self.shared_data._mdaModeAcqData = acq
+                            events = self.shared_data._mdaModeParams
+                            acq.acquire(events)
 
                 self.shared_data.mdaMode = False
                 self.acqstate = False #End the MDA acq state
@@ -732,7 +753,7 @@ class napariHandler():
                 napariGlados.startLiveModeVisualisation(self.shared_data)
                 #Move layer to top - if it isn't created yet, it will fail
                 moveLayerToTop(self.shared_data.napariViewer,"Live")
-                
+                                
                 #Start the worker to run the pycromanager acquisition
                 worker1 = self.run_MILCoreAcquisition_worker(self) #type:ignore
                 worker1.start() #type:ignore
@@ -759,13 +780,15 @@ class napariHandler():
                 logging.info("MDA mode stopped from acqModeChanged")
                 # self.mdaacqdonefunction()
             else:
-                logging.debug('mdaMode changed to TRUE')
+                logging.info('mdaMode changed to TRUE')
                 self.acqstate = True
                 self.stop_continuous_task = False
                 #Move layer to top - if it isn't created yet, it will fail
                 if self.shared_data.newestLayerName != '':
                     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 #Start the two workers, one to run it, one to visualise it.
+                
+                
                 worker1 = self.run_MILCoreAcquisition_worker(self) #type:ignore
                 # worker2 = self.run_napariVisualisation_worker(self) #type:ignore
                 worker1.start() #type:ignore

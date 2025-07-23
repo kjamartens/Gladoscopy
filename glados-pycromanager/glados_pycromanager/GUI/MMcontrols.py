@@ -734,40 +734,6 @@ class MMConfigUI(CustomMainWindow):
         """
         Function that should be called when live mode is changed. Sets the shared_data.liveMode to True or False.
         """
-        # import useq
-        # import microscopeInterfaceLayer as MIL
-
-        # def on_frame_callback_live(image: np.ndarray, event: useq.MDAEvent):
-        #     print(
-        #         f"received frame: {image.shape}, {image.dtype} "
-        #         f"@ index {event.index}, z={event.z_pos}"
-        #     )
-            
-        # if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
-        #     print('Connected to PymmCore!')
-            
-        #     #Connect the live update to this upcoming MDA
-        #     connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
-            
-        #     mda_sequence = useq.MDASequence(
-        #         time_plan={"interval": 0.0, "loops": 999} #type: ignore
-        #     )
-            
-        #     #Actually start the MDA
-        #     self.shared_data.MILcore.core.run_mda(mda_sequence)
-        #     print('Started MDA sequence')
-        #     #Give some time to understand that it's running
-        #     time.sleep(0.1)
-        #     #Continuously update the app to process events while the MDA is running:
-        #     while self.shared_data.MILcore.core.mda.is_running():
-        #         time.sleep(0.01)     # Give Qt a tiny moment (optional, sometimes helps)
-        #         shared_data.mainApp.processEvents() # Process events (main napari thread)
-            
-        #     #When it's done, disconnect the callback
-        #     self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
-        #     print('Finished live!')
-
-                            
             
         if not shared_data.liveMode:
             #update the button text of the live mode:

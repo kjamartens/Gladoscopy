@@ -1553,6 +1553,7 @@ class MDAGlados(CustomMainWindow):
         #Set the mda parameters
         
         self.shared_data._mdaModeParams = self.mda
+        self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
         self.shared_data.mda_acq_done_signal.connect(self.MDA_acq_finished)
@@ -1600,7 +1601,7 @@ class MDAGlados(CustomMainWindow):
         #Reset the button
         self.resetMDAbutton(mdaLayerName=mdaLayerName)
         #Abort the mda mode
-        self.shared_data._mdaModeAcqData.abort()
+        self.shared_data.MILcore.stop_sequence_acquisition()
     
     def get_MDA_events_from_GUI(self):
         """
@@ -1744,7 +1745,17 @@ class MDAGlados(CustomMainWindow):
         #Also update the nodz variables info:
         self.updateNodzVariables()
         
-        self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
+        # self.mda = self.shared_data.MILcore.create_mda(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order)
+        
+        import useq
+        from useq.pycromanager import to_pycromanager
+        self.mda_useq = useq.MDASequence(
+            axis_order = self.order,
+            time_plan = {"interval": 0.0, "loops": self.num_time_points},
+            z_plan= {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True},
+        )
+        self.mda = to_pycromanager(self.mda_useq)
+        #TODO: improve MDA call from useq
         
         logging.debug(f"mda: {self.mda}")
         if self.fully_started:

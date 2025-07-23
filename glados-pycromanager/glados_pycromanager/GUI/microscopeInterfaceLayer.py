@@ -9,7 +9,7 @@
 
 from enum import Enum
 import numpy as np
-
+from pycromanager import multi_d_acquisition_events
 
 from pycromanager import JavaObject, Core as PycroManagerCore
 from pymmcore import CMMCore as PymmcoreCore
@@ -25,7 +25,7 @@ class MicroscopeInstance(Enum):
 class MicroscopeInterfaceLayer:
     def __init__(self):
         self.core: PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None = None
-
+        self.mda: dict | None = None
     def set_core(self, core):
         self.core = core
 
@@ -620,9 +620,18 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for wait_for_system.")
     
-    
-    
-    
+    def create_mda(self, num_time_points:int=10, time_interval_s=0.0,z_start=0.0,z_end=0.0,z_step=0.0,channel_group='Channel',channels=[],channel_exposures_ms=[],xy_positions=[],xyz_positions=[],position_labels=[],order='t'):
+        """
+        Create MDA acquisition via multi_d_acquisition_events or via useq.
+        
+        For now, return in Pycromanager format, which is a dictionary. Possibly later TODO: change default output to a useq object.
+        """
+        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA or self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON or self.MI() == MicroscopeInstance.MMCORE_PLUS:
+            self.mda = multi_d_acquisition_events(num_time_points=num_time_points, time_interval_s=time_interval_s,z_start=z_start,z_end=z_end,z_step=z_step,channel_group=channel_group,channels=channels,channel_exposures_ms=channel_exposures_ms,xy_positions=xy_positions,xyz_positions=xyz_positions,position_labels=position_labels,order=order)
+            return self.mda
+        else:
+            raise ValueError("Unsupported microscope interface type for create_mda.")
+            
     
         
         
