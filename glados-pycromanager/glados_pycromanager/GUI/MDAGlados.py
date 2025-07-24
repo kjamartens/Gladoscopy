@@ -290,14 +290,9 @@ class ChannelList(InteractiveListWidget):
             #Currently selected channel: self.parentWidget.channelDropdown.currentText()
             #Find the corresponding options:
             currentChannel = self.parentWidget.channelDropdown.currentText()
-            if self.parentWidget.shared_data.backend == 'JAVA':
-                nrConfigs = self.parentWidget.core.get_available_configs(currentChannel).size()
-                for i in range(nrConfigs):
-                    newdropbox.addItem(self.parentWidget.core.get_available_configs(currentChannel).get(i))
-            elif self.parentWidget.shared_data.backend == 'Python':
-                nrConfigs = len(self.parentWidget.core.get_available_configs(currentChannel))
-                for i in range(nrConfigs):
-                    newdropbox.addItem(self.parentWidget.core.get_available_configs(currentChannel)[i])
+            nrConfigs = len(self.parentWidget.shared_data.MILcore.get_available_configs(currentChannel))
+            for i in range(nrConfigs):
+                newdropbox.addItem(self.parentWidget.shared_data.MILcore.get_available_configs(currentChannel)[i])
             if channelEntry is not None:
                 try:
                     newdropbox.setCurrentText(channelEntry)
@@ -307,7 +302,7 @@ class ChannelList(InteractiveListWidget):
             self.setCellWidget(rowPosition, 0, newdropbox)
             # self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
             if exposureEntry == None:
-                currentexposure = self.parentWidget.core.get_exposure()
+                currentexposure = self.parentWidget.shared_data.MILcore.get_exposure()
                 self.setItem(rowPosition, 1, QTableWidgetItem(str(currentexposure)))
             else:
                 self.setItem(rowPosition, 1, QTableWidgetItem(exposureEntry))
@@ -1751,10 +1746,20 @@ class MDAGlados(CustomMainWindow):
         
         import useq
         from useq.pycromanager import to_pycromanager
+        
+        channel_data = []
+        for i, channel_name in enumerate(self.channels):
+            if i < len(self.channel_exposures_ms) and self.channel_exposures_ms[i] is not None:
+                channel_data.append({"config": channel_name, "exposure": self.channel_exposures_ms[i]})
+            else:
+                channel_data.append({"config": channel_name, "exposure": self.exposure_ms})
+        
         self.mda_useq = useq.MDASequence(
             axis_order = self.order,
-            time_plan = {"interval": 0.0, "loops": self.num_time_points},
-            z_plan= {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True},
+            time_plan = {"interval": self.time_interval_s, "loops": self.num_time_points},
+            z_plan = {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True},
+            channels = channel_data,
+            stage_positions=[tuple(pos) for pos in self.xy_positions]
         )
         self.mda = to_pycromanager(self.mda_useq)
         #TODO: improve MDA call from useq

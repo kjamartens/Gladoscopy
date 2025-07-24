@@ -71,8 +71,6 @@ def napariUpdateLive(DataStructure):
     
     if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
         logging.debug('Updated live preview Hindered (due to display update time) at time {}'.format(time.time()))
-        #Sleep for the remainder, then continue
-        # time.sleep(display_update_time) #TODO: is this necessary?
         return
     
     if time.time()-shared_data.last_display_update_time<min_delay_time and time.time()-shared_data.last_display_update_time>1/1000:

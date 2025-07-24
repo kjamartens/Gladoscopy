@@ -224,7 +224,7 @@ class headlessGUI(QWidget):
 
         
     def start(self):
-        self.backend = 'Python' if self.pythonRadio.isChecked() else 'JAVA'
+        self.backend = 'JAVA' if self.javaRadio.isChecked() else 'Python' if self.pythonRadio.isChecked() else 'PyMMCorePlus'
         self.mm_app_path = self.mm_app_pathLineEdit.text()
         self.config_file = self.config_fileLineEdit.text()
         self.buffer_size_mb = self.buffer_size_mbLineEdit.text()

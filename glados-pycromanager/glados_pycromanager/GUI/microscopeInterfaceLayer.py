@@ -275,6 +275,18 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for getting image.")
     
+    def get_image_width(self) -> int:
+        """
+        Get the width of the image from the microscope camera.
+        """
+        return self.get_roi()[2]
+    
+    def get_image_height(self) -> int:
+        """
+        Get the height of the image from the microscope camera.
+        """
+        return self.get_roi()[3]
+    
     def get_loaded_devices(self) -> list:
         """
         Get a list of loaded devices in the microscope core.

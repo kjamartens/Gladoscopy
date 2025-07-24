@@ -81,7 +81,6 @@ class Shared_data(QObject):
         self._busy = False
         self._core = []
         self.MILcore: MIL.MicroscopeInterfaceLayer | None = None
-        self.MILcorePyMM: MIL.MicroscopeInterfaceLayer | None = None #TODO: delete MILcorePyMM after fully testing
         
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()

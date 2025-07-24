@@ -17,6 +17,7 @@ from pycromanager import Core
 from typing import Any
 import webbrowser
 import microscopeInterfaceLayer as MIL
+import collections
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import (
@@ -977,20 +978,7 @@ def get_xy_position(core = None,shared_data=None):
     """
     Get the stage XY position, which needs to be handled differently if it's JAVA or Python backend
     """
-    if shared_data.backend == 'Python':
-        position = core.get_xy_position()
-    elif shared_data.backend == 'JAVA':
-        position = [core.get_xy_stage_position().x, core.get_xy_stage_position().y]
-    else:
-        try:
-            position = core.get_xy_position()
-        except Exception:
-            logging.debug('Unknown backend, not Python')
-            try:
-                position = [core.get_xy_stage_position().x, core.get_xy_stage_position().y]
-            except Exception:
-                logging.debug('Unknown backend, not Java')
-                position = [np.nan,np.nan]
+    position = shared_data.MILcore.get_xy_position()
     
     return position
 
@@ -1316,8 +1304,8 @@ class XYGridManager():
         """
         #Create text of these positions with 2 dec places:
         if updateFromStage:
-            xx = "{:.2f}".format(self.core.get_xy_stage_position().x)
-            yy = "{:.2f}".format(self.core.get_xy_stage_position().y)
+            xx = "{:.2f}".format(self.core.get_xy_position()[0])
+            yy = "{:.2f}".format(self.core.get_xy_position()[1])
             text = f"{xx}, {yy}"
             
             if positionAttr == "pos_center":
@@ -3692,10 +3680,39 @@ def metadata_refactor(metadata, shared_data=None):
     #     if 't' in metadata['Axes']:
     #         new_metadata['Axes']['time'] = metadata['Axes']['t']
     #         del new_metadata['Axes']['t']
+    # metadata_orig = metadata.copy()  # Keep original metadata for reference
+    # if 'mda_event' in metadata:
+    #     metadata['Axes'] = dict(metadata['mda_event'].index)
+    #     if 't' in metadata['Axes']:
+    #         metadata['Axes']['time'] = metadata['Axes']['t']
+    #         del metadata['Axes']['t']
+    #     if 'c' in metadata['Axes']:
+    #         metadata['Axes']['channel'] = metadata['Axes']['c']
+    #         del metadata['Axes']['c']
+    #     if 'Z' in metadata['Axes']:
+    #         metadata['Axes']['z'] = metadata['Axes']['Z']
+    #         del metadata['Axes']['Z']
+    #     if 'p' in metadata['Axes']:
+    #         metadata['Axes']['position'] = metadata['Axes']['p']
+    #         del metadata['Axes']['p']
     
+    key_remapping = {
+        't': 'time',
+        'c': 'channel',
+        'Z': 'z',
+        'p': 'position'
+    }
+
     if 'mda_event' in metadata:
-        metadata['Axes'] = dict(metadata['mda_event'].index)
-        if 't' in metadata['Axes']:
-            metadata['Axes']['time'] = metadata['Axes']['t']
-            del metadata['Axes']['t']
+        original_axes = metadata['mda_event'].index
+        ordered_axes_data = collections.OrderedDict() # Use OrderedDict to guarantee order
+
+        # Iterate through the keys of the original index to preserve order
+        for original_key in original_axes:
+            # Get the new key name, defaulting to the original key if not in remapping
+            new_key = key_remapping.get(original_key, original_key)
+            ordered_axes_data[new_key] = original_axes[original_key]
+
+    metadata['Axes'] = ordered_axes_data
+    
     return metadata
