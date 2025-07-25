@@ -1,8 +1,0 @@
-*.pyc
-*.bak
-*Testing*
-*ExampleData*
-*temp*
-*MdaAcqShouldBeRemoved*
-Test_*
-glados-pycromanager/glados_state.json
