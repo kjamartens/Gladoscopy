@@ -3713,6 +3713,6 @@ def metadata_refactor(metadata, shared_data=None):
             new_key = key_remapping.get(original_key, original_key)
             ordered_axes_data[new_key] = original_axes[original_key]
 
-    metadata['Axes'] = ordered_axes_data
+        metadata['Axes'] = ordered_axes_data
     
     return metadata

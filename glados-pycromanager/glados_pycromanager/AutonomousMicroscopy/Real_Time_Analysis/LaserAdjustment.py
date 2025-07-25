@@ -6,7 +6,7 @@ if is_pip_installed():
     from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 else:
     from MainScripts import FunctionHandling
-from shapely import Polygon, affinity
+# from shapely import Polygon, affinity
 import math
 import numpy as np
 import inspect

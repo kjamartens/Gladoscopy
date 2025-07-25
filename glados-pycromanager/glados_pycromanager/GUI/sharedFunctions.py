@@ -6,6 +6,7 @@ import appdirs
 import os
 import json 
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
+from ndstorage import NDTiffDataset
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -91,6 +92,7 @@ class Shared_data(QObject):
         self._mdaModeSaveLoc = ['','']
         self._mdaModeNapariViewer = None
         self.mdaDatasets = []
+        self.pyMMCdataset: NDTiffDataset = NDTiffDataset('./',summary_metadata={})
         self.activeMDAobject = None
         self.mdaZarrData = {}
         self.nodzInstance = None

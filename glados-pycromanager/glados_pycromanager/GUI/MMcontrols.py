@@ -716,6 +716,83 @@ class MMConfigUI(CustomMainWindow):
         moveLayerToTop(napariViewer,'Snap')
         return
     
+        ## Testing area
+        
+        
+        import numpy as np
+        from bioio.writers import OmeTiffWriter # with bioio-ome-tiff installed
+        import tempfile
+        tempdataloc = os.path.join(str(tempfile.TemporaryDirectory().name))+"_glmic.zarr"
+        print(tempdataloc)
+
+
+        image = np.random.rand(10, 3, 512, 512)
+        OmeTiffWriter.save(image, tempdataloc+"file.ome.tiff", dim_order="ZCYX")
+        
+        
+        import numpy as np
+        import zarr
+
+        from ome_zarr.io import parse_url
+        from ome_zarr.writer import write_image
+
+        
+        path = tempdataloc
+
+        size_xy = 128
+        size_z = 10
+        rng = np.random.default_rng(0)
+        data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
+
+        # write the image data
+        store = parse_url(path, mode="w").store
+        root = zarr.group(store=store)
+        write_image(image=data, group=root, axes="zyx", storage_options=dict(chunks=(1, size_xy, size_xy)))
+        
+        
+        shape = (3, 2, 2, 4, 4)
+        data = np.random.randint(0,255,size=shape,dtype=np.uint8)
+
+        writer = OmeZarrWriterV3(
+            store=tempdataloc+"_glmic.zarr",
+            shape=shape,
+            dtype=data.dtype,
+            scale_factors=(1,1,2,2,2)
+        )
+
+        for t in range(shape[0]):
+            # extract single timepoint (C,Z,Y,X)
+            slice_t = data[t]
+            writer.write_timepoint(t, slice_t)
+        
+        
+        image = np.random.rand(10, 3, 256, 256)
+        bioio_ome_zarr.writers.OmeTiffWriter.save(image, tempdataloc+"_glmic.ome.tiff", dim_order="TCYX")
+
+        from ndstorage import NDTiffDataset
+        
+        summary_metadata = {'name_1': 123, 'name_2': 'something else'} # make this whatever you want
+        shared_data.pyMMCdataset = NDTiffDataset(tempdataloc, summary_metadata=summary_metadata, writable=True)
+
+        image_height = 256
+        image_width = 256
+
+        for time in range(10):
+            # generate random image
+            pixels = np.random.randint(0, 2 ** 16, (image_height, image_width), dtype=np.uint16)
+            
+            # a dict with strings as keys and strings or ints as values that uniquely identifies this image
+            image_coordinates = {'time': time, 'other_axis_name': 4} 
+            image_metadata = {'name_1': 123, 'name_2': 'something'} # whatever you want
+            shared_data.pyMMCdataset.put_image(image_coordinates, pixels, image_metadata)
+
+        shared_data.pyMMCdataset.finish()
+        
+        
+        
+        ## End testing
+    
+    
     def addImageToAlbum(self):
         """
         Add an image to the Album layer in napari

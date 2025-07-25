@@ -21,6 +21,7 @@ from qtpy.QtWidgets import (
     QWidget, 
     QScrollArea
     )
+from ndstorage import NDTiffDataset
 
 def is_pip_installed():
     return 'site-packages' in __file__ or 'dist-packages' in __file__
@@ -395,7 +396,7 @@ class napariHandler():
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.info('#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {}'.format(time.time()))
+        logging.debug('#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {}'.format(time.time()))
         if self.acqstate:
             self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
         else:
@@ -410,6 +411,10 @@ class napariHandler():
         # return image, metadata
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
+        
+        # image_coordinates = event
+        # self.shared_data.pyMMCdataset.put_image(image_coordinates,image,metadata)
+        
         if self.acqstate:
             # #Check if there is any reason to read the image:
             # reasonToReadImage = False
@@ -429,6 +434,31 @@ class napariHandler():
         else:
             logging.info('Need to break off!')
             self.shared_data.MILcore.stop_sequence_acquisition()
+    
+    def PyMMCore_finishedAcqCallback(self,sequence: useq.MDASequence):
+        print('heya! - seq finished')
+        print('sequence: ', sequence)
+        self.shared_data.tempData = sequence
+        
+    def PyMMCore_cancelledAcqCallback(self,sequence: useq.MDASequence):
+        print('heya! - seq cancelled')
+        print('sequence: ', sequence)
+        self.shared_data.tempDataC = sequence
+        
+    def PyMMCore_startedAcqCallback(self,sequence: useq.MDASequence):
+        print('heya! - seq started')
+        #Create a new NDTiff stack to store images in - for sure used for internal logic - possibly adding something later for secondary saving?
+        tempdataloc = os.path.join(str(tempfile.TemporaryDirectory().name),'ndtiff_data')
+        
+        #if it doesn't exist, create it
+        if not os.path.exists(tempdataloc):
+            os.makedirs(tempdataloc)
+        
+        # print('storing temp data in : ', tempdataloc)
+        # summary_metadata = {'name_1': 123, 'name_2': 'something else'} # make this whatever you want
+        # shared_data.pyMMCdataset = NDTiffDataset(tempdataloc, summary_metadata=summary_metadata, writable=True)
+        #asTODO: summary metadata
+        self.shared_data.tempDataStart = sequence
     
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):
         """ 
@@ -597,6 +627,9 @@ class napariHandler():
                     
                     #Connect the live update to this upcoming MDA
                     connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
+                    connected_callback_finishedAcq = self.shared_data.MILcore.core.mda.events.sequenceFinished.connect(self.PyMMCore_finishedAcqCallback)
+                    connected_callback_cancelledAcq = self.shared_data.MILcore.core.mda.events.sequenceCanceled.connect(self.PyMMCore_cancelledAcqCallback)
+                    connected_callback_startedAcq = self.shared_data.MILcore.core.mda.events.sequenceStarted.connect(self.PyMMCore_startedAcqCallback)
                     #Get the MDA plan
                     mda_sequence_useq = shared_data._mdaModeParams_useq
                     #Actually start the MDA
@@ -611,7 +644,10 @@ class napariHandler():
                     
                     #When it's done, disconnect the callback
                     self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
-                    print('Finished live!')
+                    self.shared_data.MILcore.core.mda.events.sequenceStarted.disconnect(connected_callback_startedAcq)
+                    # self.shared_data.MILcore.core.mda.events.sequenceFinished.disconnect(connected_callback_finishedAcq)
+                    # self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
+                    print('Finished MDA!')
                 else: #Pycromanager backend, either JAVA or Python
                     if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
                         logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
@@ -637,7 +673,8 @@ class napariHandler():
                 if acq is not None:
                     self.shared_data.appendNewMDAdataset(acq.get_dataset())
                 else:
-                    logging.error('#TODO: handle the case where no MDA dataset is returned in PyMMC')
+                    self.shared_data.pyMMCdataset.finish()
+                    logging.error('TODO: handle the case where no MDA dataset is returned in PyMMC')
 
             logging.debug('#nH - Stopping the acquisition from napariHandler')
             #Now we're after the acquisition

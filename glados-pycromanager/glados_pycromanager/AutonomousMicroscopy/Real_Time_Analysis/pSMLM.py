@@ -8,7 +8,7 @@ if is_pip_installed():
 else:
     from MainScripts import FunctionHandling
     import utils
-from shapely import Polygon, affinity
+# from shapely import Polygon, affinity
 import math
 import logging
 import numpy as np
@@ -16,7 +16,7 @@ import inspect
 import dask.array as da
 import time
 from scipy import signal
-from shapely import Polygon, affinity
+# from shapely import Polygon, affinity
 import math
 import numpy as np
 import inspect

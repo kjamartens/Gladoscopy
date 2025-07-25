@@ -1510,6 +1510,7 @@ class MDAGlados(CustomMainWindow):
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
         self.shared_data._mdaModeParams = self.mda
+        self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
         self.shared_data.mda_acq_done_signal.connect(self.MDA_acq_finished)
@@ -1580,13 +1581,14 @@ class MDAGlados(CustomMainWindow):
         """
         #ATM, first just update the button back and show that we can access this:
         if self.GUI_acquire_button is not None:
-            try:
-                self.GUI_acquire_button.setText('Acquire') #type:ignore
-                #Remove active clicked-connect-calls:
-                self.GUI_acquire_button.clicked.disconnect() #type:ignore
-                self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName=mdaLayerName)) #type:ignore
-            except RuntimeError:
-                pass #C/C++ object has been deleted if called from Nodz.
+            if type(self.GUI_acquire_button) is not bool:
+                try:
+                    self.GUI_acquire_button.setText('Acquire') #type:ignore
+                    #Remove active clicked-connect-calls:
+                    self.GUI_acquire_button.clicked.disconnect() #type:ignore
+                    self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName=mdaLayerName)) #type:ignore
+                except RuntimeError:
+                    pass #C/C++ object has been deleted if called from Nodz.
     
     def stopMDA(self,mdaLayerName='MDA'):
         """
@@ -1754,12 +1756,17 @@ class MDAGlados(CustomMainWindow):
             else:
                 channel_data.append({"config": channel_name, "exposure": self.exposure_ms})
         
+        if self.xy_positions is None:
+            xy_pos = []
+        else:
+            xy_pos = [tuple(pos) for pos in self.xy_positions]
+        
         self.mda_useq = useq.MDASequence(
             axis_order = self.order,
             time_plan = {"interval": self.time_interval_s, "loops": self.num_time_points},
             z_plan = {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True},
             channels = channel_data,
-            stage_positions=[tuple(pos) for pos in self.xy_positions]
+            stage_positions=xy_pos
         )
         self.mda = to_pycromanager(self.mda_useq)
         #TODO: improve MDA call from useq
