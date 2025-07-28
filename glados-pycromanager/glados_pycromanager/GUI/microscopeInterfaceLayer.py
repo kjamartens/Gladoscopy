@@ -515,6 +515,19 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for setting focus device.")
     
+    def set_property(self, device_name, property_name, newval):
+        """
+        Get the value of a property for a specific device.
+        """
+        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return self.core.set_property(device_name, property_name, newval)
+        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return self.core.set_property(device_name, property_name, newval)
+        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+            return self.core.setProperty(device_name, property_name, newval)
+        else:
+            raise ValueError("Unsupported microscope interface type for get_property.")
+    
     def set_relative_position(self, device_name: str, pos_change: float) -> None:
         """
         Set the relative position of a device.

@@ -1459,7 +1459,7 @@ class MMConfigUI(CustomMainWindow):
         #Loop over devices
         try:
             for device in devices:
-                device_found_type = deviceTypeArray[self.core.get_device_type(device)]
+                device_found_type = deviceTypeArray[self.shared_data.MILcore.get_device_type(device)]
                 if device_found_type == devicetype: #type:ignore
                     logging.debug("found " + device + " of type " + devicetype)
                     devicesOfType.append(device)
@@ -1773,17 +1773,10 @@ class MMConfigUI(CustomMainWindow):
         upperLimit = self.config_groups[config_id].upperLimit()
         
         #A slider config by definition (?) only has a single property underneath, so get that:
-        if shared_data.backend == 'JAVA':
-            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
-        elif shared_data.backend == 'Python':
-            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
         configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-        if shared_data.backend == 'Python':
-            device_label = configdata.getSetting(0).getDeviceLabel()
-            property_name = configdata.getSetting(0).getPropertyName()
-        else:
-            device_label = configdata.get_setting(0).get_device_label()
-            property_name = configdata.get_setting(0).get_property_name()
+        device_label = configdata.getSetting(0).getDeviceLabel()
+        property_name = configdata.getSetting(0).getPropertyName()
         
         #Finally we get the current value of the slider
         currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
@@ -1851,17 +1844,10 @@ class MMConfigUI(CustomMainWindow):
                 #Set in MM:
                 #A slider config by definition (?) only has a single property underneath, so get that:
                 
-                if shared_data.backend == 'JAVA':
-                    underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
-                elif shared_data.backend == 'Python':
-                    underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
                 configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-                if shared_data.backend == 'Python':
-                    device_label = configdata.getSetting(0).getDeviceLabel()
-                    property_name = configdata.getSetting(0).getPropertyName()
-                else:
-                    device_label = configdata.get_setting(0).get_device_label()
-                    property_name = configdata.get_setting(0).get_property_name()
+                device_label = configdata.getSetting(0).getDeviceLabel()
+                property_name = configdata.getSetting(0).getPropertyName()
 
                 #Set this property:
                 self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
@@ -1903,18 +1889,11 @@ class MMConfigUI(CustomMainWindow):
         configGroupName = self.config_groups[config_id].configGroupName()
 
         #An Editfield config by definition (?) only has a single property underneath, so get that:
-        if shared_data.backend == 'JAVA':
-            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
-        elif shared_data.backend == 'Python':
-            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             
         configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-        if shared_data.backend == 'Python':
-            device_label = configdata.getSetting(0).getDeviceLabel()
-            property_name = configdata.getSetting(0).getPropertyName()
-        else:
-            device_label = configdata.get_setting(0).get_device_label()
-            property_name = configdata.get_setting(0).get_property_name()
+        device_label = configdata.getSetting(0).getDeviceLabel()
+        property_name = configdata.getSetting(0).getPropertyName()
 
         #Set this property:
         self.config_groups[config_id].core.set_property(device_label,property_name,CurrentText)
@@ -1940,17 +1919,10 @@ class MMConfigUI(CustomMainWindow):
             #A slider config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.config_groups[config_id].configGroupName()
             
-            if shared_data.backend == 'JAVA':
-                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
-            elif shared_data.backend == 'Python':
-                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-            if shared_data.backend == 'Python':
-                device_label = configdata.getSetting(0).getDeviceLabel()
-                property_name = configdata.getSetting(0).getPropertyName()
-            else:
-                device_label = configdata.get_setting(0).get_device_label()
-                property_name = configdata.get_setting(0).get_property_name()
+            device_label = configdata.getSetting(0).getDeviceLabel()
+            property_name = configdata.getSetting(0).getPropertyName()
             
             #Finally we get the current value of the slider
             currentSliderValue = float(self.config_groups[config_id].core.get_property(device_label,property_name))
@@ -1970,17 +1942,10 @@ class MMConfigUI(CustomMainWindow):
         elif self.config_groups[config_id].isInputField():
             #A editfield config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.config_groups[config_id].configGroupName()
-            if shared_data.backend == 'JAVA':
-                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName).get(0)
-            elif shared_data.backend == 'Python':
-                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-            if shared_data.backend == 'Python':
-                device_label = configdata.getSetting(0).getDeviceLabel()
-                property_name = configdata.getSetting(0).getPropertyName()
-            else:
-                device_label = configdata.get_setting(0).get_device_label()
-                property_name = configdata.get_setting(0).get_property_name()
+            device_label = configdata.getSetting(0).getDeviceLabel()
+            property_name = configdata.getSetting(0).getPropertyName()
 
             #Finally we get the current value of the editfield
             currentValue = (self.config_groups[config_id].core.get_property(device_label,property_name))
