@@ -9,7 +9,6 @@ import napari
 import os
 import json
 import sys
-import utils
 from pycromanager import Core
 from pycromanager import start_headless
 from pymmcore_plus import CMMCorePlus
