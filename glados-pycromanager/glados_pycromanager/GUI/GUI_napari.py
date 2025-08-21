@@ -36,34 +36,21 @@ from PyQt5.QtGui import (
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
-    from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
-    from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
-    from glados_pycromanager.GUI.utils import *
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
-    #Obtain the helperfunctions
-    import glados_pycromanager.GUI.utils as utils
-else:
-    import microscopeInterfaceLayer as MIL
-    from napariGlados import runNapariPycroManager
-    from sharedFunctions import Shared_data, periodicallyUpdate
-    from utils import *
-
-    # Add the folder 2 folders up to the system path
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    #Import all scripts in the custom script folders
-    from Analysis_Measurements import * #type: ignore
-    from Real_Time_Analysis import * #type: ignore
-    #Obtain the helperfunctions
-    import utils
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
+from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
+from glados_pycromanager.GUI.utils import *
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+#Obtain the helperfunctions
+import glados_pycromanager.GUI.utils as utils
 #endregion
 
-def perform_post_closing_actions(shared_data):
+def perform_post_closing_actions(shared_data:Shared_data):
     """Performing closing actions
 
     Args:
@@ -81,7 +68,7 @@ class Worker(QObject):
     """
     finished = pyqtSignal()
 
-    def runNapariPycroManagerWrap(self, MM_JSON, shared_data,includeCustomUI=False):
+    def runNapariPycroManagerWrap(self, MM_JSON, shared_data:Shared_data,includeCustomUI:bool=False):
         """
         Runs the NapariPycroManagerWrap function.
         

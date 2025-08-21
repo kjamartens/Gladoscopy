@@ -3,22 +3,21 @@ import logging
 import slack
 import time
 import appdirs
-import os
+import os,sys
 import json 
 from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from ndstorage import NDTiffDataset
+from typing import Optional
+import sys
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    from glados_pycromanager.GUI import microscopeInterfaceLayer as MIL
-    from glados_pycromanager.GUI.napariGlados import napariHandler
-    from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
-else:
-    import microscopeInterfaceLayer as MIL
-    from napariGlados import napariHandler
-    from utils import updateAutonousErrorWarningInfo
+
+from glados_pycromanager.Core import microscopeInterfaceLayer as MIL
+from glados_pycromanager.GUI.napariGlados import napariHandler
+from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
 
 class LoggingList(list):
     def __init__(self, *args, **kwargs):
@@ -67,10 +66,10 @@ class LoggingList(list):
 
     Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
 """
+
 class Shared_data(QObject):
     mda_acq_done_signal = pyqtSignal(bool)
     liveUpdateEvent = pyqtSignal(object)
-    
     #Initialises the info of shared data
     def __init__(self):
         super().__init__()
@@ -81,7 +80,7 @@ class Shared_data(QObject):
         self._headless = False
         self._busy = False
         self._core = []
-        self.MILcore: MIL.MicroscopeInterfaceLayer | None = None
+        self.MILcore: Optional[MIL.MicroscopeInterfaceLayer] = None
         
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()

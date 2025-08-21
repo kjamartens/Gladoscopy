@@ -9,22 +9,16 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-    #Import all scripts in the custom script folders
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
-    
-    #Obtain the helperfunctions
-    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
-else:
-    #Import all scripts in the custom script folders
-    from AutonomousMicroscopy.Analysis_Measurements import *
-    
-    #Obtain the helperfunctions
-    import HelperFunctions
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+#Import all scripts in the custom script folders
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
+
+#Obtain the helperfunctions
+import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 
 #Created Conda environment (Python 3.10.11)
 #Required PIPs: in requirements.txt

@@ -16,7 +16,6 @@ import markdown
 from pycromanager import Core
 from typing import Any
 import webbrowser
-import microscopeInterfaceLayer as MIL
 import collections
 
 #Imports for PyQt5 (GUI)
@@ -49,23 +48,15 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 #TODO: Maybe sharedFunctions need to be in the pip-installed list?
 # from sharedFunctions import Shared_data
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
-    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
-else:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'AutonomousMicroscopy')
-    #Import all scripts in the custom script folders
-    from AutonomousMicroscopy.Analysis_Measurements import *
-    from AutonomousMicroscopy.CustomFunctions import *
-    from AutonomousMicroscopy.Real_Time_Analysis import * 
-    import AutonomousMicroscopy.MainScripts.HelperFunctions 
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 #endregion
 
 def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
@@ -2955,15 +2946,16 @@ class HelpGroupBox():
             self.quick_start_window.setWindowTitle('Quick start / User Manual')
             QApplication.processEvents()
             
-            if is_pip_installed():
-                package_path = os.path.dirname(glados_pycromanager.__file__)
-                self.quick_start_window.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
-            else:
-                try:
-                    self.quick_start_window.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
-                except Exception as e:
-                    logging.info(f'TryException: {e}')
-                    self.quick_start_window.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
+            #TODO: check that .MD help file still works
+            # if is_pip_installed():
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            self.quick_start_window.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
+            # else:
+            #     try:
+            #         self.quick_start_window.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
+            #     except Exception as e:
+            #         logging.info(f'TryException: {e}')
+            #         self.quick_start_window.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
             QApplication.processEvents()
             self.quick_start_window.show() #Show
             self.quick_start_window.raise_() # Bring to the front
@@ -2981,15 +2973,16 @@ class HelpGroupBox():
             self.devMenuWindow.setWindowTitle('Developer manual')
             QApplication.processEvents()
             
-            if is_pip_installed():
-                package_path = os.path.dirname(glados_pycromanager.__file__)
-                self.devMenuWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
-            else:
-                try:
-                    self.devMenuWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
-                except Exception as e:
-                    logging.info(f'TryException: {e}')
-                    self.devMenuWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
+            #TODO check if .md help still works
+            # if is_pip_installed():
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            self.devMenuWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
+            # else:
+            #     try:
+            #         self.devMenuWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
+            #     except Exception as e:
+            #         logging.info(f'TryException: {e}')
+            #         self.devMenuWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
             QApplication.processEvents()
             self.devMenuWindow.show() #Show
             self.devMenuWindow.raise_() # Bring to the front
@@ -3002,11 +2995,12 @@ class HelpGroupBox():
         Shows the Documentation .html files file in a proper external webbrowser
         """
         try:
-            if is_pip_installed():
-                package_path = os.path.dirname(glados_pycromanager.__file__)
-                htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
-            else:
-                htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
+            #TODO check if .md help still works
+            # if is_pip_installed():
+            package_path = os.path.dirname(glados_pycromanager.__file__)
+            htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
+            # else:
+            #     htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
             
             webbrowser.open('file://' + os.path.realpath(htmlPath))
         except Exception as e:
@@ -3533,7 +3527,6 @@ def getCoreDevicesOfDeviceType(core,devicetype):
     except:
         return []
 def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
-    
     """
     Update the autonomous error, warning, and info icons and tooltips in the GUI based on the shared data.
 
@@ -3545,16 +3538,14 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
     """
     if updateInfo == 'All': #Willa lways be the case, deprecated is ['Error','Warning','Info']
         
-        if is_pip_installed():
-            from glados_pycromanager.GUI.sharedFunctions import Shared_data
-        else:
-            from sharedFunctions import Shared_data
+        from glados_pycromanager.GUI.sharedFunctions import Shared_data
+        
         if isinstance(shared_data,Shared_data):
             sharedData = shared_data
         elif isinstance(shared_data.parent, Shared_data):
             sharedData = shared_data.parent
         
-        if sharedData.nodzInstance == None: 
+        if sharedData == None or sharedData.nodzInstance == None: 
             return
         errorIcon = sharedData.nodzInstance.errorIcon
         warningIcon = sharedData.nodzInstance.warningIcon

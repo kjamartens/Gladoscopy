@@ -57,7 +57,7 @@ if is_pip_installed():
     from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
     import glados_pycromanager.GUI.utils as utils
     from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
-    from glados_pycromanager.GUI.MDAGlados import MDAGlados
+    from glados_pycromanager.Core.MDAglados import MDAGlados
 else:
     from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
     from LaserControlScripts import *

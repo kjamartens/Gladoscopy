@@ -1,11 +1,10 @@
+import sys,os
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 
-if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-else:
-    from MainScripts import FunctionHandling
 # from stardist.models import StarDist2D
 from csbdeep.utils import normalize
 import inspect

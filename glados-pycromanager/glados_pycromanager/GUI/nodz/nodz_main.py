@@ -1,4 +1,4 @@
-import os
+import os,sys
 import logging
 import time
 import numpy as np
@@ -8,22 +8,15 @@ from PyQt5.QtWidgets import QLineEdit, QComboBox, QMenu, QAction, QCheckBox
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout, QMouseEvent, QTextOption, QPixmap
 from PyQt5.QtCore import QRectF,QPointF, QEvent, Qt, QTimer
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    import glados_pycromanager.GUI.nodz.nodz_utils as utils
-    import glados_pycromanager.GUI.utils as full_utils
-    from glados_pycromanager.GUI.nodz.nodz_custom import *
-    import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
-    import glados_pycromanager.GUI.MDAGlados as MDAGlados
-else:
-    import nodz.nodz_utils as utils
-    import utils as full_utils
-    from nodz.nodz_custom import *
-    import AutonomousMicroscopy.MainScripts.HelperFunctions
-    import MDAGlados as MDAGlados
-    
+import glados_pycromanager.GUI.nodz.nodz_utils as utils
+import glados_pycromanager.GUI.utils as full_utils
+from glados_pycromanager.GUI.nodz.nodz_custom import *
+import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+import glados_pycromanager.Core.MDAGlados as MDAGlados
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
 

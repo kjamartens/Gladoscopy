@@ -11,43 +11,23 @@ from PyQt5.QtGui import QFont
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1'
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
-    from glados_pycromanager.GUI.AnalysisClass import * #type:ignore
-    from glados_pycromanager.GUI.utils import CustomMainWindow #type:ignore
-    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
-    from glados_pycromanager.GUI.napariGlados import * #type: ignore
-    from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
-    from glados_pycromanager.GUI.utils import * #type: ignore
-    #Import all scripts in the custom script folders
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
-    # Obtain the helperfunctions
-    # import glados_pycromanager.GUI.HelperFunctions #type: ignore
-    from glados_pycromanager.GUI.napariHelperFunctions import showScaleBar #type: ignore
-else:
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI")
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy")
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\AutonomousMicroscopy\\MainScripts")
-    sys.path.append(os.path.dirname(os.path.abspath(__file__))+"\\GUI\\nodz")
-    from AnalysisClass import * #type:ignore
-    import microscopeInterfaceLayer as MIL #type:ignore
-    from utils import CustomMainWindow #type:ignore
-    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
-    from napariGlados import * #type: ignore
-    from sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
-    from utils import * #type: ignore
-    # Add the folder 2 folders up to the system path
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    #Import all scripts in the custom script folders
-    from Analysis_Measurements import * #type: ignore
-    from Real_Time_Analysis import * #type: ignore
-    # Obtain the helperfunctions
-    import HelperFunctions #type: ignore
-    from napariHelperFunctions import showScaleBar #type: ignore
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.GUI.AnalysisClass import * #type:ignore
+from glados_pycromanager.GUI.utils import CustomMainWindow #type:ignore
+from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
+from glados_pycromanager.GUI.napariGlados import * #type: ignore
+from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
+from glados_pycromanager.GUI.utils import * #type: ignore
+#Import all scripts in the custom script folders
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+# Obtain the helperfunctions
+# import glados_pycromanager.GUI.HelperFunctions #type: ignore
+from glados_pycromanager.GUI.napariHelperFunctions import showScaleBar #type: ignore
 #endregion
 
 #region Widget Definition
@@ -285,10 +265,7 @@ class AutonomousMicroscopyWidget(GladosWidget):
         super().__init__(viewer = viewer, parent=parent)
         
         #Add the full micro manager controls UI
-        if is_pip_installed():
-            from glados_pycromanager.GUI.Analysis_dockWidgets import autonomousMicroscopy_plugin
-        else:
-            from Analysis_dockWidgets import autonomousMicroscopy_plugin
+        from glados_pycromanager.GUI.Analysis_dockWidgets import autonomousMicroscopy_plugin
         self.dockWidget = autonomousMicroscopy_plugin(self) #type:ignore
         
         self.setLayout(self.dockWidget)
@@ -314,10 +291,7 @@ class GladosSlidersWidget(GladosWidget):
         super().__init__(viewer=viewer, parent=parent)
         
         #Add the full micro manager controls UI
-        if is_pip_installed():
-            from glados_pycromanager.GUI.Analysis_dockWidgets import gladosSliders_plugin
-        else:
-            from Analysis_dockWidgets import gladosSliders_plugin
+        from glados_pycromanager.GUI.Analysis_dockWidgets import gladosSliders_plugin
         self.dockWidget = gladosSliders_plugin(self) #type:ignore
         
 

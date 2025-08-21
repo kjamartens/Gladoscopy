@@ -23,34 +23,23 @@ from qtpy.QtWidgets import (
     )
 from ndstorage import NDTiffDataset
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
-    from glados_pycromanager.GUI.LaserControlScripts import *
-    import glados_pycromanager.GUI.napariGlados as napariGlados
-    from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
-    from glados_pycromanager.GUI.AnalysisClass import *
-    from glados_pycromanager.GUI.Analysis_dockWidgets import *
-    from glados_pycromanager.GUI.FlowChart_dockWidgets import *
-    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-    from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
-    import glados_pycromanager.GUI.utils as utils
-    from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
-    from glados_pycromanager.GUI.MDAGlados import MDAGlados
-else:
-    from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
-    from LaserControlScripts import *
-    import microscopeInterfaceLayer as MIL
-    from MMcontrols import microManagerControlsUI
-    from AnalysisClass import *
-    from Analysis_dockWidgets import *
-    from FlowChart_dockWidgets import *
-    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-    from utils import cleanUpTemporaryFiles
-    import utils as utils
-    from MDAGlados import MDAGlados
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.GUI.LaserControlScripts import *
+import glados_pycromanager.GUI.napariGlados as napariGlados
+from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
+from glados_pycromanager.GUI.AnalysisClass import *
+from glados_pycromanager.GUI.Analysis_dockWidgets import *
+from glados_pycromanager.GUI.FlowChart_dockWidgets import *
+from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+from glados_pycromanager.Core.MDAGlados import MDAGlados
+    # from glados_pycromanager.GUI.sharedFunctions import Shared_data #Gives circular import error in sharedFunctions
 
 #region real-time visualisation/analysis handling
 #These need to be functions outside of any class due to Yield-calling
@@ -1095,7 +1084,7 @@ def layer_removed_event_callback(event, shared_data):
                 #     l.destroy()
 #endregion
 
-def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI = False,include_flowChart_automatedMicroscopy = True):
+def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,include_flowChart_automatedMicroscopy:bool = True):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
     # core = score
@@ -1103,10 +1092,13 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI = False,include_
     livestate = False
     shared_data = sshared_data
     
-    #Get some info from core to put in shared_data
-    shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
-    logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
-
+    if shared_data.MILcore is not None:
+        #Get some info from core to put in shared_data
+        shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
+        logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
+    else:
+        logging.warning("MILcore is None, cannot set default focus device.")
+        
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
     napariViewer = napari.Viewer()

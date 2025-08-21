@@ -4,7 +4,7 @@ Main function of the multi-dimensional acquisitions in glados-pycromanager.
 Handles the GUI as well as the logic of the multi-dimensional acquisitions.
 Includes classes for Interactive Lists such as the Channels, XY positions.
 """
-import os
+import os,sys
 import time
 import logging
 from typing import List, Iterable
@@ -42,27 +42,18 @@ from PyQt5.QtWidgets import (
 )
 from pycromanager import multi_d_acquisition_events
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
-    import glados_pycromanager.GUI.utils
-    from glados_pycromanager.GUI.utils import CustomMainWindow
-    from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-    from glados_pycromanager.GUI.AnalysisClass import *
-    from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
-    import glados_pycromanager.GUI.utils as utils
-    from glados_pycromanager.GUI.MMcontrols import ConfigInfo
-else:
-    import microscopeInterfaceLayer as MIL
-    import utils as utils
-    from utils import CustomMainWindow
-    from napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-    from AnalysisClass import *
-    from AnalysisClass import create_real_time_analysis_thread
-    from MMcontrols import ConfigInfo
-
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+import glados_pycromanager.GUI.utils
+from glados_pycromanager.GUI.utils import CustomMainWindow
+from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+from glados_pycromanager.GUI.AnalysisClass import *
+from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.GUI.MMcontrols import ConfigInfo
 
 #region List Widgets
 class InteractiveListWidget(QTableWidget):
@@ -1472,10 +1463,7 @@ class MDAGlados(CustomMainWindow):
                     logging.debug('Starting Nodz-MDA visualisation')
                     #Prepare layerName for shared_data to order the layers later.
                     #Import here to prevent circular import
-                    if is_pip_installed():
-                        from glados_pycromanager.GUI.napariGlados import startMDAVisualisation
-                    else:
-                        from napariGlados import startMDAVisualisation
+                    from glados_pycromanager.GUI.napariGlados import startMDAVisualisation
                     self.shared_data.newestLayerName = layerName
                     startMDAVisualisation(self.shared_data,layerName=layerName,layerColorMap=colormap)
         
@@ -1560,10 +1548,7 @@ class MDAGlados(CustomMainWindow):
         #And start visualization
         if mdaLayerName is not None:
             #Import here to prevent circular import
-            if is_pip_installed():
-                from glados_pycromanager.GUI.napariGlados import startMDAVisualisation
-            else:
-                from napariGlados import startMDAVisualisation
+            from glados_pycromanager.GUI.napariGlados import startMDAVisualisation
             startMDAVisualisation(self.shared_data,layerName=mdaLayerName)
         logging.debug('ended setting mdamode params')
         

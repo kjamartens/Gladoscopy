@@ -1,16 +1,15 @@
 import numpy as np
 import inspect
-import utils
+import glados_pycromanager.GUI.utils
 import logging
 import time
+import sys,os
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 
-if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-else:
-    from MainScripts import FunctionHandling
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():

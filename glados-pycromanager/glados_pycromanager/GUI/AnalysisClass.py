@@ -12,27 +12,18 @@ from typing import Union, Tuple, List
 from PyQt5.QtCore import pyqtSignal, QThread
 from threading import Event
 from threading import Event
+import os
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
+import glados_pycromanager.GUI.utils as utils
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
 
-if is_pip_installed():
-    from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
-    import glados_pycromanager.GUI.utils as utils
-    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
-    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
-else:
-    from custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
-    import utils
-    import microscopeInterfaceLayer as MIL
-    sys.path.append('AutonomousMicroscopy')
-    sys.path.append('AutonomousMicroscopy/MainScripts')
-    #Import all scripts in the custom script folders
-    from Analysis_Measurements import * #type: ignore
-    from CustomFunctions import * #type: ignore
-    from Real_Time_Analysis import * #type: ignore
 
 #Class for overlays and their update and such
 class napariOverlay():

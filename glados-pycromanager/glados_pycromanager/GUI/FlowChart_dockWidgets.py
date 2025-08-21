@@ -73,32 +73,20 @@ from PyQt5.QtWidgets import (
 sys.path.append('glados-pycromanager\\glados_pycromanager\\GUI\\nodz')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
-    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
-    from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
-    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
-    import glados_pycromanager.GUI.utils as utils
-    from glados_pycromanager.GUI.nodz import nodz_utils
-    import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
-    from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
-    from glados_pycromanager.GUI.MDAGlados import MDAGlados
-    import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
-else:
-    #Import all scripts in the custom script folders
-    from AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-    from AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
-    from AutonomousMicroscopy.CustomFunctions import * #type: ignore
-    import utils
-    import microscopeInterfaceLayer as MIL
-    from nodz import nodz_utils
-    import nodz.nodz_main as NodzMain
-    from MMcontrols import MMConfigUI, ConfigInfo
-    from MDAGlados import MDAGlados
-    import nodz.nodz_utils as nodz_utils
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
+from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.GUI.nodz import nodz_utils
+import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
+from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
+from glados_pycromanager.Core.MDAGlados import MDAGlados
+import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
 #endregion
 
 #region Dialogs_Nodz

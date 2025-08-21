@@ -1,13 +1,10 @@
+import sys,os
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
-
-if is_pip_installed():
-    from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-    import glados_pycromanager.GUI.utils as utils
-else:
-    from MainScripts import FunctionHandling
-    import utils
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import glados_pycromanager.GUI.utils as utils
 # from shapely import Polygon, affinity
 import math
 import logging

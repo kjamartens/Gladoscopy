@@ -5,17 +5,13 @@ sys.path.append('GUI\\nodz')
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-if is_pip_installed():
-    from glados_pycromanager.GUI.LaserControlScripts import *
-    # from MMcontrols import *
-    from glados_pycromanager.GUI.napariGlados import *
-else:
-    from LaserControlScripts import *
-    # from MMcontrols import *
-    from napariGlados import *
+from glados_pycromanager.GUI.LaserControlScripts import *
+# from MMcontrols import *
+from glados_pycromanager.GUI.napariGlados import *
 # from MDAGlados import MDAGlados
 
 class Shared_data:

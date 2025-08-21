@@ -7,18 +7,15 @@ from PyQt5.QtWidgets import QLineEdit, QInputDialog, QDialog, QLineEdit, QComboB
 from PyQt5.QtGui import QFont, QColor, QTextDocument, QAbstractTextDocumentLayout
 from PyQt5.QtCore import QRectF
 
+import sys
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+import glados_pycromanager.GUI.nodz.nodz_utils as utils
+from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
+from glados_pycromanager.Core.MDAGlados import MDAGlados
 
-if is_pip_installed():
-    import glados_pycromanager.GUI.nodz.nodz_utils as utils
-    from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
-    from glados_pycromanager.GUI.MDAGlados import MDAGlados
-else:
-    import nodz.nodz_utils as utils
-    from MMcontrols import MMConfigUI, ConfigInfo
-    from MDAGlados import MDAGlados
 
 """ 
 Custom nodz attachments

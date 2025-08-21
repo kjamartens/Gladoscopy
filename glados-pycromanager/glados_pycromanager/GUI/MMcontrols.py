@@ -33,22 +33,17 @@ from PyQt5.QtWidgets import (
     QWidget,
     QSlider,
 )
+import sys
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def is_pip_installed():
-    return 'site-packages' in __file__ or 'dist-packages' in __file__
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.GUI.utils import CustomMainWindow
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.GUI.AnalysisClass import *
+from glados_pycromanager.GUI.napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 
-if is_pip_installed():
-    import glados_pycromanager.GUI.microscopeInterfaceLayer as MIL
-    from glados_pycromanager.GUI.utils import CustomMainWindow
-    import glados_pycromanager.GUI.utils as utils
-    from glados_pycromanager.GUI.AnalysisClass import *
-    from glados_pycromanager.GUI.napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
-else:
-    import microscopeInterfaceLayer as MIL
-    from utils import CustomMainWindow
-    import utils
-    from AnalysisClass import *
-    from napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
 class ConfigInfo:
     """
     This class contains information about a pycromanager config group
