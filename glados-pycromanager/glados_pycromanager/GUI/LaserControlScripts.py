@@ -1,3 +1,5 @@
+# Custom UI for Endefelder lab - deprecated, last used in 2022 or so
+
 import json
 from pycromanager import *
 #from pycromanager import Core

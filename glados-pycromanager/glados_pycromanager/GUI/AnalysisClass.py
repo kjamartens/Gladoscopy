@@ -17,7 +17,6 @@ import os
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 import glados_pycromanager.GUI.utils as utils
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore

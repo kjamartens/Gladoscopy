@@ -2104,13 +2104,11 @@ class MMConfigUI(CustomMainWindow):
         return separator_line
     #endregion
     
-def microManagerControlsUI(MM_JSON,main_layout,sshared_data):
+def microManagerControlsUI(main_layout,sshared_data):
     """
     Controls the Micro Manager UI.
     
     Args:
-        core: The Micro Manager core object.
-        MM_JSON: JSON object for Micro Manager.
         main_layout: The main layout of the UI.
         sshared_data: Shared data for the UI.
     

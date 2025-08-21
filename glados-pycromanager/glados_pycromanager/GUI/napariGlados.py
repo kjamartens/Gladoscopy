@@ -874,7 +874,7 @@ class dockWidget_MMcontrol(dockWidgets):
         logging.debug("dockWidget_MMcontrol started")
         super().__init__()
         #Add the full micro manager controls UI
-        self.dockWidget = microManagerControlsUI(MM_JSON,self.layout,shared_data)
+        self.dockWidget = microManagerControlsUI(self.layout,shared_data)
 
 class dockWidget_MDA(dockWidgets):
     def __init__(self): 
