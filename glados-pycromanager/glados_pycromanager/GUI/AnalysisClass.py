@@ -644,7 +644,7 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     
     #Append it to the list of analysisThreads
     shared_data.RTAnalysisQueuesThreads.append({'Queue':image_queue_analysis,'Thread':analysis_thread})
-    shared_data.RTAnalysisQueuesThreads.append({'Queue':image_queue_analysis,'Thread':analysis_thread})
+    # shared_data.RTAnalysisQueuesThreads.append({'Queue':image_queue_analysis,'Thread':analysis_thread})
     
     return analysis_thread
 

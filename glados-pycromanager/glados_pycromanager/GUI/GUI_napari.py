@@ -58,9 +58,6 @@ def perform_post_closing_actions(shared_data:Shared_data):
     """
     #Clean up temporary files
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
-    
-    # if shared_data._headless:
-    #     stop_headless()
 
 class Worker(QObject):
     """

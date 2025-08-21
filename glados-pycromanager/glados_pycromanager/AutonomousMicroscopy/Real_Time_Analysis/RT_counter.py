@@ -1,6 +1,6 @@
 import numpy as np
 import inspect
-import glados_pycromanager.GUI.utils
+import glados_pycromanager.GUI.utils as utils
 import logging
 import time
 import sys,os

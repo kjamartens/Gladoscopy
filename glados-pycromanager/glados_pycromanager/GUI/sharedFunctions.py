@@ -19,6 +19,11 @@ from glados_pycromanager.Core import microscopeInterfaceLayer as MIL
 from glados_pycromanager.GUI.napariGlados import napariHandler
 from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
 
+"""Shared data summary
+
+    Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
+"""
+
 class LoggingList(list):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -62,11 +67,6 @@ class LoggingList(list):
                 logging.debug('UNsuccesfully stopped/destroyed Analysis thread '+str(removed_entry))
                 pass
     
-"""Shared data summary
-
-    Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
-"""
-
 class Shared_data(QObject):
     mda_acq_done_signal = pyqtSignal(bool)
     liveUpdateEvent = pyqtSignal(object)
@@ -346,7 +346,6 @@ class Shared_data(QObject):
         except:
             pass
     
-
 class Dict_Specific_WarningErrorInfo(dict):
     def __init__(self, *args, **kwargs):
         self.parent = kwargs.pop('parent', None)

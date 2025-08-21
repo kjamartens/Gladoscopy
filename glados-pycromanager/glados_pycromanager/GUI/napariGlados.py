@@ -659,12 +659,15 @@ class napariHandler():
 
                 self.shared_data.mdaMode = False
                 self.acqstate = False #End the MDA acq state
+                
                 if acq is not None:
                     self.shared_data.appendNewMDAdataset(acq.get_dataset())
                 else:
-                    self.shared_data.pyMMCdataset.finish()
-                    logging.error('TODO: handle the case where no MDA dataset is returned in PyMMC')
-
+                    try:
+                        self.shared_data.pyMMCdataset.finish()
+                    except:
+                        logging.error('TODO: handle the case where no MDA dataset is returned in PyMMC')
+                        
             logging.debug('#nH - Stopping the acquisition from napariHandler')
             #Now we're after the acquisition
             self.shared_data.MILcore.stop_sequence_acquisition()

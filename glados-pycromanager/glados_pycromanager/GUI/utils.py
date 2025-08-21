@@ -3165,8 +3165,8 @@ class CustomMainWindow(QWidget):
         self.save_state_globalData(filename)
             
     def save_state_MDA(self, filename):
-        import napariGlados
-        import MDAGlados
+        import glados_pycromanager.GUI.napariGlados as napariGlados
+        import glados_pycromanager.Core.MDAGlados as MDAGlados
         logging.debug('SAVING STATE')
         if os.path.exists(filename):
             #Load the mda state
