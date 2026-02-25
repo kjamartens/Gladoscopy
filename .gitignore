@@ -10,3 +10,6 @@ slackImage.png
 testingFocus.ipynb
 glados-pycromanager/Glados_logpath.log
 Glados_logpath.log
+/build
+/dist
+/glados_pycromanager/glados_pycromanager.egg-info
