@@ -421,18 +421,21 @@ class MicroscopeInterfaceLayer:
         """
         Get the current X-Y position of a stage.
         """
-        if xy_stage_name is None:
-            xy_stage_name = self.get_xy_stage_device()
-            
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
-            return self.core.get_xy_position(xy_stage_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
-            return self.core.get_xy_position(xy_stage_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
-            return self.core.getXYPosition(xy_stage_name)
-        else:
-            raise ValueError("Unsupported microscope interface type for get_xy_position.")
-    
+        #TODO: Catch if no xy stage is present
+        try:
+            if xy_stage_name is None:
+                xy_stage_name = self.get_xy_stage_device()
+                
+            if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+                return self.core.get_xy_position(xy_stage_name)
+            elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                return self.core.get_xy_position(xy_stage_name)
+            elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+                return self.core.getXYPosition(xy_stage_name)
+            else:
+                raise ValueError("Unsupported microscope interface type for get_xy_position.")
+        except:
+            return [0,0]
     def get_xy_stage_device(self) -> str:
         """
         Get the name of the X-Y stage device.
@@ -450,16 +453,20 @@ class MicroscopeInterfaceLayer:
         """
         Get the current position of the X-Y stage.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
-            print('TODO: get_xy_stage_position not implemented for PYCROMANAGER_JAVA')
-            return self.core.get_xy_stage_position(xy_stage_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
-            return self.core.get_xy_position(xy_stage_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
-            return self.core.getXYPosition(xy_stage_name)
-        else:
-            raise ValueError("Unsupported microscope interface type for get_xy_stage_position.")
-    
+        #TODO: Catch if no xy stage present
+        try:
+            if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+                print('TODO: get_xy_stage_position not implemented for PYCROMANAGER_JAVA')
+                return self.core.get_xy_stage_position(xy_stage_name)
+            elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                return self.core.get_xy_position(xy_stage_name)
+            elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+                return self.core.getXYPosition(xy_stage_name)
+            else:
+                raise ValueError("Unsupported microscope interface type for get_xy_stage_position.")
+        except:
+            return [0,0]
+        
     def set_auto_shutter(self, auto_shutter: bool) -> None:
         """
         Set the auto shutter state.

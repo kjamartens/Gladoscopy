@@ -3,6 +3,26 @@ The main function to call if running glados-napari from the python interface.
 """
 
 #region imports
+
+import npe2.manifest
+from pydantic import BaseModel
+
+# 1. We manually define the missing schema type Pydantic is looking for
+class Draft06JsonSchema(BaseModel):
+    pass
+
+# 2. We inject it into the npe2 manifest namespace where it's missing
+if not hasattr(npe2.manifest, 'Draft06JsonSchema'):
+    npe2.manifest.Draft06JsonSchema = Draft06JsonSchema
+
+# 3. We force the PluginManifest to rebuild itself with this new info
+try:
+    npe2.manifest.PluginManifest.model_rebuild()
+except Exception as e:
+    print(f"Manual manifest rebuild failed, but continuing: {e}")
+    
+    
+
 import logging
 import argparse
 import napari

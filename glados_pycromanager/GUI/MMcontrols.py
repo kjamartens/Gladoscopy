@@ -1646,14 +1646,18 @@ class MMConfigUI(CustomMainWindow):
         Updates the XY stage info widget with the current position of the stage
 
         """
-        #Obtain the stage info from MM:
-        XYStageName = self.shared_data.MILcore.get_xy_stage_device() #type:ignore
-        #Get the stage position
-        for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
-            XYStagePos = self.shared_data.MILcore.get_xy_position(XYStageName) #type:ignore
-            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
-        #Align text center:
-        self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        #TODO: catch if no xy stage present
+        try:
+            #Obtain the stage info from MM:
+            XYStageName = self.shared_data.MILcore.get_xy_stage_device() #type:ignore
+            #Get the stage position
+            for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
+                XYStagePos = self.shared_data.MILcore.get_xy_position(XYStageName) #type:ignore
+                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
+            #Align text center:
+            self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        except:
+            pass
         
     def moveXYStage(self,relX,relY):
         """

@@ -22,7 +22,7 @@ def __function_metadata__():
             "help_string": "Calculates and displays the 2D FFT magnitude spectrum in real-time.",
             "display_name": "Real-Time FFT",
             "run_delay": 0,
-            "visualise_delay": 0,
+            "visualise_delay": 200,
             "visualisation_type": "image", # Changed to 'image' for FFT display
             "input":[],
             "output":[],
