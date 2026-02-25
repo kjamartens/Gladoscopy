@@ -1105,6 +1105,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
     napariViewer = napari.Viewer()
+    napariViewer.window._qt_window.showMaximized()
     
     #Set QT attributes here for some reason...
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
