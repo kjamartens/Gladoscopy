@@ -389,6 +389,9 @@ class napariHandler():
         logging.debug('#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {}'.format(time.time()))
         if self.acqstate:
             self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+            #Give image and metadata back for storage done by pycromanager in case of MDA, NOT in case of live-viewing.
+            if not self.shared_data.liveMode:
+                return image, metadata
         else:
             logging.info('Broke off live mode')
             event_queue.clear()
@@ -397,10 +400,7 @@ class napariHandler():
                 logging.debug('aborted acquisition')
             except:
                 logging.debug('attemped to abort acq')
-        
-        #Give image and metadata back for storage done by pycromanager in case of MDA, NOT in case of live-viewing.
-        if not self.shared_data.liveMode:
-            return image, metadata
+            return None
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
         
@@ -498,6 +498,7 @@ class napariHandler():
         Worker which handles live mode on/off turning etc
         
         """
+        from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
         visualisation_queue = parent.visualisation_queue
         shared_data.debugImageArrivalTimes=[]
         shared_data.debugImageDisplayTimes=[]
@@ -558,8 +559,6 @@ class napariHandler():
                                 acq.acquire(events)
                         elif shared_data._headless and shared_data.backend == 'Python':
                             try:
-                                from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
-                                
                                 logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
                                 with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
                                     self.shared_data._mdaModeAcqData = acq
