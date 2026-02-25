@@ -3050,7 +3050,7 @@ def PushButtonAddVariableCallBack(line_edit,nodzInfo):
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','SLACK-CLIENT']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):

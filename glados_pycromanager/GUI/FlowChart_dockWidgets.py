@@ -4402,7 +4402,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             if 'reporting_' in node.name:
                 node.status = 'running'
                 if 'SLACK' in self.shared_data.globalData: #type:ignore
-                    if self.shared_data.globalData['SLACK-TOKEN']['value'] is not None and not len(self.shared_data.globalData['SLACK-TOKEN']['value']) == 0: #type:ignore
+                    if self.shared_data.config.webook_config.slack_token is not None and not len(self.shared_data.config.webook_config.slack_token) == 0: #type:ignore
                         slackReadableText = readableText
                         slackReadableText = slackReadableText.replace('<br>','\r\n')
                         slackReadableText = slackReadableText.replace('<i>','_')
@@ -4410,7 +4410,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                         slackReadableText = slackReadableText.replace('<b>','*')
                         slackReadableText = slackReadableText.replace('</b>','*')
                         slackReadableText = "New Score: \n" + slackReadableText
-                        self.shared_data.globalData['SLACK-CLIENT']['value'].chat_postMessage(channel=self.shared_data.globalData['SLACK-CHANNEL']['value'],text=slackReadableText) #type:ignore
+                        self.shared_data.config.webook_config.slack_client.chat_postMessage(channel=self.shared_data.config.webook_config.slack_channel,text=slackReadableText) #type:ignore
                         node.status = 'finished'
                     else:
                         node.status = 'error'
@@ -4634,49 +4634,48 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
             if readableText == None:
                 readableText = node.slackReportInfo
-            if 'SLACK-CLIENT' in self.shared_data.globalData: #type:ignore
-                if self.shared_data.globalData['SLACK-TOKEN']['value'] is not None and not len(self.shared_data.globalData['SLACK-TOKEN']['value']) == 0: #type:ignore
-                    slackReadableText = readableText
-                    if not ("<img>" in node.slackReportInfo and "</img>" in node.slackReportInfo):
-                        slackReadableText = slackReadableText.replace('<br>','\r\n')
-                        slackReadableText = slackReadableText.replace('<i>','_')
-                        slackReadableText = slackReadableText.replace('</i>','_')
-                        slackReadableText = slackReadableText.replace('<b>','*')
-                        slackReadableText = slackReadableText.replace('</b>','*')
-                        self.shared_data.globalData['SLACK-CLIENT']['value'].chat_postMessage(channel=self.shared_data.globalData['SLACK-CHANNEL']['value'],text=slackReadableText) 
-                    else: #we have an image!
-                        #Extract the text between img tags:
-                        imgInfo = re.findall('<img>(.*?)</img>',node.slackReportInfo)[0]
-                        restText = re.sub('<img>(.*?)</img>','',node.slackReportInfo)
-                        restText = restText.replace('<br>','\r\n')
-                        restText = restText.replace('<i>','_')
-                        restText = restText.replace('</i>','_')
-                        restText = restText.replace('<b>','*')
-                        restText = restText.replace('</b>','*')
-                        
-                        #remove the curly brackets in imgInfo:
-                        imgInfo = imgInfo.replace('{','')
-                        imgInfo = imgInfo.replace('}','')
-                        
-                        #Get the image
-                        im = utils.nodz_evaluateVar(imgInfo,node.flowChart)
-                        # Convert the ndarray to a PIL Image
-                        image = Image.fromarray(im/65535*255)# Or convert to RGB
-                        image = image.convert("RGB")
-                        
-                        #Store the im as a PNG in a temporary folder:
-                        tempDir = tempfile.TemporaryDirectory()
-                        tempFile = os.path.join(tempDir.name,'slackImage.png')
-                        
-                        # Save the image as a PNG file
-                        image.save(tempFile, "PNG")
-                        #Send the message with the read-tempFile
-                        slack_image = self.shared_data.globalData['SLACK-CLIENT']['value'].files_upload(
-                            title="Glados Image",
-                            channels=self.shared_data.globalData['SLACK-CHANNEL']['value'],
-                            content=open(tempFile, 'rb').read(),
-                            initial_comment = restText,
-                        )
+            if self.shared_dataconfig.webook_config.slack_token is not None and not len(self.shared_data.config.webook_config.slack_token) == 0: #type:ignore
+                slackReadableText = readableText
+                if not ("<img>" in node.slackReportInfo and "</img>" in node.slackReportInfo):
+                    slackReadableText = slackReadableText.replace('<br>','\r\n')
+                    slackReadableText = slackReadableText.replace('<i>','_')
+                    slackReadableText = slackReadableText.replace('</i>','_')
+                    slackReadableText = slackReadableText.replace('<b>','*')
+                    slackReadableText = slackReadableText.replace('</b>','*')
+                    self.shared_data.config.webook_config.slack_client.chat_postMessage(channel=self.shared_data.config.webook_config.slack_channel,text=slackReadableText) 
+                else: #we have an image!
+                    #Extract the text between img tags:
+                    imgInfo = re.findall('<img>(.*?)</img>',node.slackReportInfo)[0]
+                    restText = re.sub('<img>(.*?)</img>','',node.slackReportInfo)
+                    restText = restText.replace('<br>','\r\n')
+                    restText = restText.replace('<i>','_')
+                    restText = restText.replace('</i>','_')
+                    restText = restText.replace('<b>','*')
+                    restText = restText.replace('</b>','*')
+                    
+                    #remove the curly brackets in imgInfo:
+                    imgInfo = imgInfo.replace('{','')
+                    imgInfo = imgInfo.replace('}','')
+                    
+                    #Get the image
+                    im = utils.nodz_evaluateVar(imgInfo,node.flowChart)
+                    # Convert the ndarray to a PIL Image
+                    image = Image.fromarray(im/65535*255)# Or convert to RGB
+                    image = image.convert("RGB")
+                    
+                    #Store the im as a PNG in a temporary folder:
+                    tempDir = tempfile.TemporaryDirectory()
+                    tempFile = os.path.join(tempDir.name,'slackImage.png')
+                    
+                    # Save the image as a PNG file
+                    image.save(tempFile, "PNG")
+                    #Send the message with the read-tempFile
+                    slack_image = self.shared_data.config.webook_config.slack_client.files_upload(
+                        title="Glados Image",
+                        channels=self.shared_data.config.webook_config.slack_channel,
+                        content=open(tempFile, 'rb').read(),
+                        initial_comment = restText,
+                    )
         except Exception as e:
             logging.warning(f'Slack gave an unexpected error: {e}')
                     
