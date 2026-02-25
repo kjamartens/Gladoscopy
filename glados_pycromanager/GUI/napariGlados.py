@@ -1236,7 +1236,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     if useStyleSheet:
         custom_widget_MMcontrols.setStyleSheet(ScaledStylesheet)
     #Add to napari
-    dw = napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
+    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
     
     custom_widget_MDA = dockWidget_MDA()
     if useStyleSheet:
@@ -1259,7 +1259,11 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
 
     # Force the "Controls" widget to the front
     custom_widget_MMcontrols.parent().raise_()
-    dw.resize(dw.width(), 500)
+    #Sketchy way to set initial height of 500px
+    custom_widget_MMcontrols.parent().setFixedHeight(425)
+    QApplication.processEvents()
+    custom_widget_MMcontrols.parent().setMinimumHeight(0)
+    custom_widget_MMcontrols.parent().setMaximumHeight(16777215)
     
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
