@@ -1235,7 +1235,8 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     if useStyleSheet:
         custom_widget_MMcontrols.setStyleSheet(ScaledStylesheet)
     #Add to napari
-    napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
+    dw = napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
+    dw.resize(dw.width(), 500)
     
     custom_widget_MDA = dockWidget_MDA()
     if useStyleSheet:
@@ -1256,6 +1257,9 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
         else:
             logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
 
+    # Force the "Controls" widget to the front
+    custom_widget_MMcontrols.parent().raise_()
+    
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
     returnInfo['MMcontrolWidget'] = custom_widget_MMcontrols.getDockWidget()
