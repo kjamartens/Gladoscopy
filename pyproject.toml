@@ -33,8 +33,8 @@ dependencies = [
     "dask==2025.7.0",
     "pycromanager==1.0.2",
     "pymmcore-plus==0.15.3",
-    "bioimageio-core==0.9.0",
-    "bioio==3.0.0",
+    "bioimageio-core", #0.8.0
+    "bioio",
     "tifffile==2025.6.11",
     "zarr==3.1.0",
     "napari[all]==0.6.6",
@@ -53,6 +53,7 @@ dependencies = [
     "slack==0.0.2",
     "slackeventsapi==3.0.3",
     "opencv-python==4.13.0.92",
+    "pydantic<2.10",
 ]
 
 [tool.setuptools.packages.find]
