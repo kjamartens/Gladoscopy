@@ -93,7 +93,7 @@ class headlessGUI(QWidget):
     """
     Small GUI for user input on a headless Pycromanager start
     """
-    def __init__(self, shared_data):
+    def __init__(self, shared_data: Shared_data):
         super().__init__()
         self.shared_data = shared_data
         self.initUI()
@@ -152,7 +152,8 @@ class headlessGUI(QWidget):
         self.buttonGroup.addButton(self.javaRadio)
 
         self.mm_app_pathLabel = QLabel('MicroManager Path:', self)
-        self.mm_app_pathLineEdit = QLineEdit(self.shared_data.globalData['MMPATH']['value'], self)
+        # self.mm_app_pathLineEdit = QLineEdit(self.shared_data.globalData['MMPATH']['value'], self)
+        self.mm_app_pathLineEdit = QLineEdit(self.shared_data.config.micromanager_config.path, self)
         self.mm_app_browse = QPushButton('...', self)
         self.mm_app_browse.clicked.connect(self.BrowseMMAppPath)
 
@@ -214,6 +215,7 @@ class headlessGUI(QWidget):
         
         #Also store these in the shared_data
         self.shared_data.globalData['MMPATH']['value'] = self.mm_app_path
+        self.shared_data.config.micromanager_config.path = self.mm_app_path
         self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] = self.backend
         self.shared_data.globalData['MM_CONFIG_PATH']['value'] = self.config_file
         self.shared_data.globalData['MM_HEADLESS_BUFFER_MB']['value'] = self.buffer_size_mb

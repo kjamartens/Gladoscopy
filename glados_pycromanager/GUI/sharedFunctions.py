@@ -9,6 +9,8 @@ from PyQt5.QtCore import QTimer, QObject, pyqtSignal
 from ndstorage import NDTiffDataset
 from typing import Optional
 import sys
+import dataclasses
+from dataclasses import dataclass, fields
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -67,6 +69,122 @@ class LoggingList(list):
                 logging.debug('UNsuccesfully stopped/destroyed Analysis thread '+str(removed_entry))
                 pass
     
+    
+
+def setting(default, display_name="", description="", input_type="lineEdit", options=None, hidden=False):
+    return dataclasses.field(
+        default=default,
+        metadata={
+            "display_name": display_name,
+            "description": description,
+            "input_type": input_type,
+            "options": options or [],
+            "hidden": hidden,
+        }
+    )
+        
+@dataclass
+class SlackConfig:
+    token:   str = setting("xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf",
+                            "Slack Token",   "The token for Slack messaging (Slack-token)")
+    secret:  str = setting("e8cd04aa4cc9ec7c51729ec6ecf98c1c",
+                            "Slack Secret",  "The secret ID for Slack messaging (Slack-secret)")
+    channel: str = setting("glados-bot",
+                            "Slack Channel", "Channel for the Slack node to send messages to (Slack-channel)")
+
+
+@dataclass
+class MDAConfig:
+    vis_method:     str = setting("multiDstack", "MDA Visualisation method",
+                                "Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.",
+                                input_type="dropdown", options=["multiDstack", "frameByFrame"])
+    backend_method: str = setting("process", "Backend transfer method",
+                                "Choose between the transfer method in the backend of the JAVA --> Python layer. Either directly grabs images via RAM (Can cause RAM issues), or performs a save-->load routine (limited by Disk write speed). Process is strongly recommended.",
+                                input_type="dropdown", options=["process", "saved"])
+
+
+@dataclass
+class VisualisationConfig:
+    fps: int = setting(60, "Visualisation FPS", "Update speed of napari visualisation (in frames per second)")
+
+
+@dataclass
+class MicroManagerConfig:
+    path:             str = setting("C:/Program Files/Micro-Manager-2.0",
+                                    "Micromanager Path", "Micromanager Path",
+                                    hidden=True)
+    headless_backend: str = setting("Python",
+                                    hidden=True)
+    config_path:      str = setting("C:/Program Files/Micro-Manager-2.0/MMConfig_demo.cfg",
+                                    "Micromanager config file path", "Micromanager config file path",
+                                    hidden=True)
+    buffer_mb:        int = setting(4096,  "Buffer size (MB)",  "Buffer size of the headless Micromanager instance",  hidden=True)
+    max_memory_mb:    int = setting(12000, "Max memory (MB)",   "Maximum memory footprint of the headless Micromanager instance", hidden=True)
+
+
+@dataclass
+class Config:
+    mda_config:           MDAConfig           = dataclasses.field(default_factory=MDAConfig)
+    visualisation_config: VisualisationConfig = dataclasses.field(default_factory=VisualisationConfig)
+    micromanager_config: MicroManagerConfig  = dataclasses.field(default_factory=MicroManagerConfig)
+
+
+def load_config_from_json(cfg: Config) -> Config:
+    """Load saved settings from appdata JSON, overwriting defaults where found."""
+    appdata_folder = appdirs.user_data_dir()
+    if appdata_folder is None:
+        raise EnvironmentError("APPDATA environment variable not found")
+    
+    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+    os.makedirs(app_specific_folder, exist_ok=True)
+    json_path = os.path.join(app_specific_folder, 'glados_state.json')
+
+    if not os.path.exists(json_path):
+        return cfg
+
+    with open(json_path, 'r') as file:
+        glados_info = json.load(file)
+    
+    saved = glados_info.get('GlobalData', {})
+
+    # Walk every group and field, overwrite if found in JSON
+    for group_field in fields(cfg):
+        group = getattr(cfg, group_field.name)
+        for f in fields(group):
+            key = f"{group_field.name}.{f.name}"  # e.g. "slack.token"
+            if key in saved:
+                try:
+                    setattr(group, f.name, saved[key])
+                except Exception:
+                    pass
+
+    return cfg
+
+def save_config_to_json(cfg: Config):
+    """Save all current config values to appdata JSON."""
+    appdata_folder = appdirs.user_data_dir()
+    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+    os.makedirs(app_specific_folder, exist_ok=True)
+    json_path = os.path.join(app_specific_folder, 'glados_state.json')
+
+    # Flatten config into {"group.field": value} dict
+    flat = {}
+    for group_field in fields(cfg):
+        group = getattr(cfg, group_field.name)
+        for f in fields(group):
+            flat[f"{group_field.name}.{f.name}"] = getattr(group, f.name)
+
+    # Preserve any other keys already in the JSON (e.g. MDA state)
+    existing = {}
+    if os.path.exists(json_path):
+        with open(json_path, 'r') as file:
+            existing = json.load(file)
+
+    existing['GlobalData'] = flat
+
+    with open(json_path, 'w') as file:
+        json.dump(existing, file, indent=4)
+        
 class Shared_data(QObject):
     mda_acq_done_signal = pyqtSignal(bool)
     liveUpdateEvent = pyqtSignal(object)
@@ -104,6 +222,9 @@ class Shared_data(QObject):
         self.liveModeVisualisationThreadRunning=False
         self.debugImageArrivalTimes = []
         self.debugImageDisplayTimes = []
+        
+        self.config = Config()
+        load_config_from_json(self.config)
         
         self.globalData = {}
         self.globalData['SLACK-TOKEN']={}
@@ -198,7 +319,7 @@ class Shared_data(QObject):
                 logging.debug('Slack client initialised')
             except:
                 logging.error('Error with Slack!')
-        
+    
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
@@ -206,7 +327,8 @@ class Shared_data(QObject):
         #Store whether we're running via PIP or via a local install
         self._RunningViaPIP = 'site-packages' in __file__ or 'dist-packages' in __file__
         self._RunningLocally = not self._RunningViaPIP
-    
+        
+        
     def __setattr__(self, name, value):
         logging.debug(f"Setting attribute {name} to {value}")
         super().__setattr__(name, value)
@@ -214,7 +336,7 @@ class Shared_data(QObject):
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)
-        
+    
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.
     @property

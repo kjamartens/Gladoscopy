@@ -3070,10 +3070,17 @@ class CustomMainWindow(QWidget):
             state['GlobalData'] = {}
             
         #Loop over everything in self.shared_data.globalData dict and store the ['value']s:
-        for key, value in self.shared_data.globalData.items():
-            if key not in self.storingExceptions:
-                state['GlobalData'][key] = value['value']
-            
+        # for key, value in self.shared_data.globalData.items():
+        #     if key not in self.storingExceptions:
+        #         state['GlobalData'][key] = value['value']
+                
+        from dataclasses import dataclass, fields
+        cfg = self.shared_data.config
+        for group_field in fields(cfg):
+            group = getattr(cfg, group_field.name)
+            for f in fields(group):
+                state['GlobalData'][f"{group_field.name}.{f.name}"] = getattr(group, f.name)
+        
         with open(filename, 'w') as file:
             json.dump(state, file, indent=4)
 
