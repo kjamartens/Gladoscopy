@@ -248,11 +248,9 @@ class Shared_data(QObject):
                 except:
                     pass
         
-        if self.globalData['SLACK-TOKEN']['value'] is not None and not len(self.globalData['SLACK-TOKEN']['value']) == 0:
+        if self.config.webhook_config.slack_token is not None and not len(self.config.webhook_config.slack_token) == 0:
             try:
-                self.globalData['SLACK-CLIENT'] = {}
-                self.globalData['SLACK-CLIENT']['value'] = slack.WebClient(token=self.globalData['SLACK-TOKEN']['value' ])
-                self.globalData['SLACK-CLIENT']['hidden'] = True
+                self.config.webhook_config.slack_client = slack.WebClient(token=self.config.webhook_config.slack_token)
                 logging.debug('Slack client initialised')
             except:
                 logging.error('Error with Slack!')
