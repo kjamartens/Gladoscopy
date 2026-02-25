@@ -397,7 +397,8 @@ class napariHandler():
             except:
                 logging.debug('attemped to abort acq')
         
-        # return image, metadata
+        #Give image and metadata back for storage done by pycromanager.
+        return image, metadata
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
         
@@ -646,7 +647,7 @@ class napariHandler():
                             acq.acquire(events)
                     elif shared_data._headless and shared_data.backend == 'Python':
                         logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
-                        with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
+                        with Acquisition(directory=savefolder, name=savename,image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis, show_display=showdisplay, napari_viewer=napariViewer) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
                             events = self.shared_data._mdaModeParams
                             acq.acquire(events)
@@ -1105,6 +1106,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
     napariViewer = napari.Viewer()
+    napariViewer.window._qt_window.showMaximized()
     
     #Set QT attributes here for some reason...
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
@@ -1255,6 +1257,14 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
         else:
             logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
 
+    # Force the "Controls" widget to the front
+    custom_widget_MMcontrols.parent().raise_()
+    #Sketchy way to set initial height of 500px
+    custom_widget_MMcontrols.parent().setFixedHeight(425)
+    QApplication.processEvents()
+    custom_widget_MMcontrols.parent().setMinimumHeight(0)
+    custom_widget_MMcontrols.parent().setMaximumHeight(16777215)
+    
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
     returnInfo['MMcontrolWidget'] = custom_widget_MMcontrols.getDockWidget()
