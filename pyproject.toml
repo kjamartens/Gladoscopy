@@ -52,6 +52,7 @@ dependencies = [
     "pyperclip==1.11.0",
     "slack==0.0.2",
     "slackeventsapi==3.0.3",
+    "opencv-python==4.13.0.92",
 ]
 
 [tool.setuptools.packages.find]
