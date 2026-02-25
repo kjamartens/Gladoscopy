@@ -291,7 +291,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         if delay==None:
             #Get the delay of the function from the realTimeAnalysis module,
             #ensure that it's never faster than the visualisation rate
-            min_delay_visualisation = int(1000/(float(shared_data.globalData['VISUALISATION-FPS']['value'])))
+            min_delay_visualisation = int(1000/(float(shared_data.config.visualisation_config.fps)))
             delay = max(min_delay_visualisation,utils.realTimeAnalysis_getDelay(analysisInfo,runOrVis='visualise'))
         
         logging.debug('#aC - init analysisThread_customFunction_Visualisation')

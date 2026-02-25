@@ -139,11 +139,11 @@ class headlessGUI(QWidget):
         self.pyMMCorePlusRadio.setChecked(False)
         self.pythonRadio.setChecked(False)
         self.javaRadio.setChecked(False)
-        if self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] == 'JAVA':
+        if self.shared_data.config.micromanager_config.headless_backend == 'JAVA':
             self.javaRadio.setChecked(True)
-        if self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] == 'Python':
+        if self.shared_data.config.micromanager_config.headless_backend == 'Python':
             self.pythonRadio.setChecked(True)
-        if self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] == 'PyMMCorePlus':
+        if self.shared_data.config.micromanager_config.headless_backend == 'PyMMCorePlus':
             self.pyMMCorePlusRadio.setChecked(True)
 
         self.buttonGroup = QButtonGroup()
@@ -152,21 +152,20 @@ class headlessGUI(QWidget):
         self.buttonGroup.addButton(self.javaRadio)
 
         self.mm_app_pathLabel = QLabel('MicroManager Path:', self)
-        # self.mm_app_pathLineEdit = QLineEdit(self.shared_data.globalData['MMPATH']['value'], self)
         self.mm_app_pathLineEdit = QLineEdit(self.shared_data.config.micromanager_config.path, self)
         self.mm_app_browse = QPushButton('...', self)
         self.mm_app_browse.clicked.connect(self.BrowseMMAppPath)
 
         self.config_fileLabel = QLabel('Config File:', self)
-        self.config_fileLineEdit = QLineEdit(self.shared_data.globalData['MM_CONFIG_PATH']['value'], self)
+        self.config_fileLineEdit = QLineEdit(self.shared_data.config.micromanager_config.config_path, self)
         self.config_file_browse = QPushButton('...', self)
         self.config_file_browse.clicked.connect(self.BrowseConfigFile)
 
         self.buffer_size_mbLabel = QLabel('Buffer Size MB:', self)
-        self.buffer_size_mbLineEdit = QLineEdit(str(self.shared_data.globalData['MM_HEADLESS_BUFFER_MB']['value']), self)
+        self.buffer_size_mbLineEdit = QLineEdit(str(self.shared_data.config.micromanager_config.buffer_mb), self)
 
         self.max_memory_mbLabel = QLabel('Max Memory MB:', self)
-        self.max_memory_mbLineEdit = QLineEdit(str(self.shared_data.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value']), self)
+        self.max_memory_mbLineEdit = QLineEdit(str(self.shared_data.config.micromanager_config.max_memory_mb), self)
 
         self.startButton = QPushButton('Start', self)
         self.startButton.clicked.connect(self.start)
@@ -210,16 +209,15 @@ class headlessGUI(QWidget):
         self.backend = 'JAVA' if self.javaRadio.isChecked() else 'Python' if self.pythonRadio.isChecked() else 'PyMMCorePlus'
         self.mm_app_path = self.mm_app_pathLineEdit.text()
         self.config_file = self.config_fileLineEdit.text()
-        self.buffer_size_mb = self.buffer_size_mbLineEdit.text()
-        self.max_memory_mb = self.max_memory_mbLineEdit.text()
+        self.buffer_size_mb = int(self.buffer_size_mbLineEdit.text())
+        self.max_memory_mb = int(self.max_memory_mbLineEdit.text())
         
         #Also store these in the shared_data
-        self.shared_data.globalData['MMPATH']['value'] = self.mm_app_path
         self.shared_data.config.micromanager_config.path = self.mm_app_path
-        self.shared_data.globalData['MM_HEADLESS_BACKEND']['value'] = self.backend
-        self.shared_data.globalData['MM_CONFIG_PATH']['value'] = self.config_file
-        self.shared_data.globalData['MM_HEADLESS_BUFFER_MB']['value'] = self.buffer_size_mb
-        self.shared_data.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value'] = self.max_memory_mb
+        self.shared_data.config.micromanager_config.headless_backend = self.backend
+        self.shared_data.config.micromanager_config.config_path = self.config_file
+        self.shared_data.config.micromanager_config.buffer_mb = self.buffer_size_mb
+        self.shared_data.config.micromanager_config.max_memory_mb = self.max_memory_mb
         #And update the JSON
         utils.storeSharedData_GlobalData(self.shared_data)
         

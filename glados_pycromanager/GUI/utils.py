@@ -17,6 +17,7 @@ from pycromanager import Core
 from typing import Any
 import webbrowser
 import collections
+from dataclasses import fields
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import (
@@ -3359,32 +3360,34 @@ def openAdvancedSettings(shared_data):
     layout.addWidget(QLabel("Please restart glados-pycromanager after changing any of these settings!"),0,0,1,2)
     currentRow = 1
     #Loop over all globalData entries:
-    for entry in shared_data.globalData:
-        if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
-            currentRow+=1
-            try:
-                label = QLabel(shared_data.globalData[entry]['displayName'])
-                hoverInfo = shared_data.globalData[entry]['description']
-                layout.addWidget(label,currentRow,0)
-                label.setToolTip(hoverInfo)
-                
-                typeV = shared_data.globalData[entry]['inputType']
-                currentValue = shared_data.globalData[entry]['value']
-                if typeV == 'lineEdit':
-                    editField = QLineEdit()
-                    editField.setText(str(currentValue))
-                    editField.setObjectName(entry)
-                    layout.addWidget(editField,currentRow,1)
-                    label.setToolTip(editField)
-                elif typeV == 'dropdown':
-                    editField = QComboBox()
-                    editField.addItems(shared_data.globalData[entry]['dropDownOptions'])
-                    editField.setObjectName(entry)
-                    editField.setCurrentText(str(currentValue))
-                    layout.addWidget(editField,currentRow,1)
-                    label.setToolTip(editField)
-            except:
-                pass
+    for group_field in fields(shared_data.config):
+        group = getattr(shared_data.config, group_field.name)
+        for f in fields(group):
+            if not f.metadata.get("hidden", True):
+                currentValue = getattr(group, f.name)
+                currentRow+=1
+                try:
+                    label = QLabel(f.metadata['display_name'])
+                    hoverInfo = f.metadata['description']
+                    layout.addWidget(label,currentRow,0)
+                    label.setToolTip(hoverInfo)
+                    
+                    typeV = f.metadata['input_type']
+                    if typeV == 'lineEdit':
+                        editField = QLineEdit()
+                        editField.setText(str(currentValue))
+                        editField.setObjectName(f.name)
+                        layout.addWidget(editField,currentRow,1)
+                        label.setToolTip(editField)
+                    elif typeV == 'dropdown':
+                        editField = QComboBox()
+                        editField.addItems(f.metadata['dropDownOptions'])
+                        editField.setObjectName(f.name)
+                        editField.setCurrentText(str(currentValue))
+                        layout.addWidget(editField,currentRow,1)
+                        label.setToolTip(editField)
+                except:
+                    pass
 
 
     button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
