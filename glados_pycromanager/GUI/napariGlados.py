@@ -397,7 +397,8 @@ class napariHandler():
             except:
                 logging.debug('attemped to abort acq')
         
-        # return image, metadata
+        #Give image and metadata back for storage done by pycromanager.
+        return image, metadata
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
         
@@ -646,7 +647,7 @@ class napariHandler():
                             acq.acquire(events)
                     elif shared_data._headless and shared_data.backend == 'Python':
                         logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
-                        with Acquisition(directory=savefolder, name=savename, show_display=showdisplay, napari_viewer=napariViewer,image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
+                        with Acquisition(directory=savefolder, name=savename,image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis, show_display=showdisplay, napari_viewer=napariViewer) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
                             events = self.shared_data._mdaModeParams
                             acq.acquire(events)
@@ -1236,7 +1237,6 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
         custom_widget_MMcontrols.setStyleSheet(ScaledStylesheet)
     #Add to napari
     dw = napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
-    dw.resize(dw.width(), 500)
     
     custom_widget_MDA = dockWidget_MDA()
     if useStyleSheet:
@@ -1259,6 +1259,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
 
     # Force the "Controls" widget to the front
     custom_widget_MMcontrols.parent().raise_()
+    dw.resize(dw.width(), 500)
     
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
