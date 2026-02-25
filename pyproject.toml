@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glados-pycromanager"
+version = "0.0.2"
+authors = [
+  { name="Koen J.A. Martens", email="koenjamartens@gmail.com" }
+]
+license = { file = "LICENSE" }
+
+description = "Glados-pycromanager: Napari interface for Pycromanager and autonomous microscopy"
+
+readme = "README.md"
+
+requires-python = ">=3.13, <3.14"
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+]
+
+keywords = ["microscopy", "molecule", "pycromanager", "micromanager"]
+
+dependencies = [
+    "numpy==2.2.6",
+    "pandas==2.3.1",
+    "scipy==1.16.0",
+    "matplotlib==3.10.3",
+    "h5py==3.14.0",
+    "xarray==2025.1.2",
+    "dask==2025.7.0",
+    "pycromanager==1.0.2",
+    "pymmcore-plus==0.15.3",
+    "bioimageio-core==0.9.0",
+    "bioio==3.0.0",
+    "tifffile==2025.6.11",
+    "zarr==3.1.0",
+    "napari[all]==0.5.6",
+    "pyqt5==5.15.11",
+    "pyqtgraph==0.13.3",
+    "pyqtwebengine==5.15.7",
+    "vispy==0.14.3",
+    "tensorflow==2.20.0",
+    "keras==3.13.2",
+    "csbdeep==0.7.3",
+    "flask==3.1.1",
+    "loguru==0.7.3",
+    "tqdm==4.67.1",
+    "ndtiff==3.1.0",
+    "pyperclip==1.11.0",
+    "slack==0.0.2",
+    "slackeventsapi==3.0.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["glados_pycromanager"]
+
+[tool.setuptools.package-data]
+"glados_pycromanager" = [
+    "napari.yaml",            
+    "GUI/Icons/*",            
+    "GUI/nodz/*",              
+    "GUI/nodz/default_config.json", 
+    "GUI/*",                   
+    "/*",
+    "/Documentation/*",
+    "/Documentation/Images/*",
+]
+[project.scripts]
+"glados" = "glados_pycromanager.GUI.GUI_napari:main"
+"glados-pycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
+"gladospycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
+"glados-pycro-manager" = "glados_pycromanager.GUI.GUI_napari:main"
+
+[project.entry-points."napari.manifest"]
+glados-pycromanager = "glados_pycromanager:napari.yaml"
