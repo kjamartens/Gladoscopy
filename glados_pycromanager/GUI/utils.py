@@ -3321,25 +3321,48 @@ def openAdvancedSettings(shared_data):
     Allow the user to change the global/advanced settings via some GUI
     """
     def acceptS(dialog,shared_data):
-        #Set the current values in shared_data.globalData:
-        for entry in shared_data.globalData:
-            if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
-                try:
-                    if shared_data.globalData[entry]['inputType'] == 'lineEdit':
-                        shared_data.globalData[entry]['value'] = dialog.findChild(QLineEdit, entry).text()
-                    elif shared_data.globalData[entry]['inputType'] == 'dropdown':
-                        shared_data.globalData[entry]['value'] = dialog.findChild(QComboBox, entry).currentText()
-                    #Try to make integer/float:
+        #Set the current values in shared_data.config:
+        #Loop over all config entries:
+        for group_field in fields(shared_data.config):
+            group = getattr(shared_data.config, group_field.name)
+            for f in fields(group):
+                if not f.metadata.get("hidden", True):
                     try:
-                        shared_data.globalData[entry]['value'] = float(shared_data.globalData[entry]['value'])
+                        if f.metadata['input_type'] == 'lineEdit':
+                            setattr(group, f.name, dialog.findChild(QLineEdit, f.name).text())
+                        elif f.metadata['input_type'] == 'dropdown':
+                            setattr(group, f.name, dialog.findChild(QComboBox, f.name).currentText())
+                        #Try to make integer/float:
+                        try:
+                            setattr(group, f.name,float(getattr(group, f.name)))
+                        except:
+                            pass
+                        try:
+                            setattr(group, f.name,int(getattr(group, f.name)))
+                        except:
+                            pass
                     except:
-                        pass
-                    try:
-                        shared_data.globalData[entry]['value'] = int(shared_data.globalData[entry]['value'])
-                    except:
-                        pass
-                except:
-                    logging.warning(f"Couldn't save global data of entry {entry}")
+                        logging.warning(f"Couldn't save global data of entry {f}")
+        
+        
+        # for entry in shared_data.globalData:
+        #     if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
+        #         try:
+        #             if shared_data.globalData[entry]['inputType'] == 'lineEdit':
+        #                 shared_data.globalData[entry]['value'] = dialog.findChild(QLineEdit, entry).text()
+        #             elif shared_data.globalData[entry]['inputType'] == 'dropdown':
+        #                 shared_data.globalData[entry]['value'] = dialog.findChild(QComboBox, entry).currentText()
+        #             #Try to make integer/float:
+        #             try:
+        #                 shared_data.globalData[entry]['value'] = float(shared_data.globalData[entry]['value'])
+        #             except:
+        #                 pass
+        #             try:
+        #                 shared_data.globalData[entry]['value'] = int(shared_data.globalData[entry]['value'])
+        #             except:
+        #                 pass
+        #         except:
+        #             logging.warning(f"Couldn't save global data of entry {entry}")
         
         #Store in appdata
         storeSharedData_GlobalData(shared_data)
@@ -3381,7 +3404,7 @@ def openAdvancedSettings(shared_data):
                         label.setToolTip(editField)
                     elif typeV == 'dropdown':
                         editField = QComboBox()
-                        editField.addItems(f.metadata['dropDownOptions'])
+                        editField.addItems(f.metadata['options'])
                         editField.setObjectName(f.name)
                         editField.setCurrentText(str(currentValue))
                         layout.addWidget(editField,currentRow,1)

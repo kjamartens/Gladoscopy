@@ -56,9 +56,9 @@ def napariUpdateLive(DataStructure):
     
     #JAVA is way slower so needs this longer update time of the display
     if shared_data.backend == 'JAVA':
-        display_update_time = 1/float(shared_data.globalData['VISUALISATION-FPS']['value']) #0.05
+        display_update_time = 1/float(shared_data.config.visualisation_config.fps) #0.05
     elif shared_data.backend == 'Python':
-        display_update_time = 1/float(shared_data.globalData['VISUALISATION-FPS']['value'])#0.05
+        display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
     
     if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
         logging.debug('Updated live preview Hindered (due to display update time) at time {}'.format(time.time()))
@@ -86,7 +86,7 @@ def napariUpdateLive(DataStructure):
     shared_data.liveModeUpdateOngoing = True
     
     #Visualise the MDA data on a frame-by-frame method - i.e. not a 'stack', but simply a single image which is replaced every frame update
-    if shared_data.globalData['MDAVISMETHOD']['value'] == 'frameByFrame' or DataStructure['layer_name']=='Live':
+    if shared_data.config.mda_config.vis_method == 'frameByFrame' or DataStructure['layer_name']=='Live':
         liveImage = DataStructure['data'][0]
         metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
         if liveImage is None:
@@ -116,7 +116,7 @@ def napariUpdateLive(DataStructure):
             logging.debug('Put liveImage in the live layer')
     
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames
-    elif shared_data.globalData['MDAVISMETHOD']['value'] == 'multiDstack':
+    elif shared_data.config.mda_config.vis_method == 'multiDstack':
         if DataStructure['finalisationProcedure'] == False:
             latestImage = DataStructure['data'][0]
             metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
@@ -352,7 +352,7 @@ class napariHandler():
         self._new_image = Event() #Event when a new image is put in the queue
 
         #Sleep time to keep responsiveness
-        self.sleep_time = 1/shared_data.globalData['VISUALISATION-FPS']['value'] #in sec
+        self.sleep_time = 1/shared_data.config.visualisation_config.fps #in sec
         self.layerName = 'newLayer'
 
     def mdaacqdonefunction(self):
@@ -398,8 +398,9 @@ class napariHandler():
             except:
                 logging.debug('attemped to abort acq')
         
-        #Give image and metadata back for storage done by pycromanager.
-        return image, metadata
+        #Give image and metadata back for storage done by pycromanager in case of MDA, NOT in case of live-viewing.
+        if not self.shared_data.liveMode:
+            return image, metadata
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
         
@@ -550,17 +551,26 @@ class napariHandler():
                         self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
                         print('Finished live!')
                     else: #Pycromanager backend, either JAVA or Python
-                        if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
+                        if shared_data.config.mda_config.backend_method == 'saved':
                             with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                                 self.shared_data._mdaModeAcqData = acq
                                 events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
                                 acq.acquire(events)
                         elif shared_data._headless and shared_data.backend == 'Python':
-                            logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
-                            with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
-                                self.shared_data._mdaModeAcqData = acq
-                                events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
-                                acq.acquire(events)
+                            try:
+                                from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
+                                
+                                logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
+                                with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
+                                    self.shared_data._mdaModeAcqData = acq
+                                    events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
+                                    acq.acquire(events)
+                            except HardwareControlException:
+                                #Early quit of the acquisition
+                                logging.info("Acquisition interrupted.")
+                            except Exception as e:
+                                logging.error(f"An actual error occurred: {e}")
+                                
                         else:
                             with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                                 self.shared_data._mdaModeAcqData = acq
@@ -611,7 +621,7 @@ class napariHandler():
                 # if self.shared_data.newestLayerName != '':
                 #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
                 
-                logging.debug(f"MDABackendMethod is",shared_data.globalData['MDABACKENDMETHOD']['value'])
+                logging.debug(f"MDABackendMethod is",shared_data.config.mda_config.backend_method)
                 if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
                     logging.info('Connected to PymmCore!')
                     acq=None
@@ -640,7 +650,7 @@ class napariHandler():
                     # self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
                     print('Finished MDA!')
                 else: #Pycromanager backend, either JAVA or Python
-                    if shared_data.globalData['MDABACKENDMETHOD']['value'] == 'saved':
+                    if shared_data.config.mda_config.backend_method == 'saved':
                         logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
                         with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                             self.shared_data._mdaModeAcqData = acq
@@ -729,7 +739,7 @@ class napariHandler():
             yield DataStructure#visualisation_queue.get(block = False)
             
         #Do the final N images
-        if self.shared_data.globalData['MDAVISMETHOD']['value'] == 'multiDstack':
+        if self.shared_data.config.mda_config.backend_method == 'multiDstack':
             if layerName == 'MDA':
                 logging.debug('Finalising MDA visualisation...')
                 DataStructure = {}
