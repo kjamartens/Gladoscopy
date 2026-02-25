@@ -84,16 +84,6 @@ def setting(default, display_name="", description="", input_type="lineEdit", opt
     )
         
 @dataclass
-class SlackConfig:
-    token:   str = setting("xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf",
-                            "Slack Token",   "The token for Slack messaging (Slack-token)")
-    secret:  str = setting("e8cd04aa4cc9ec7c51729ec6ecf98c1c",
-                            "Slack Secret",  "The secret ID for Slack messaging (Slack-secret)")
-    channel: str = setting("glados-bot",
-                            "Slack Channel", "Channel for the Slack node to send messages to (Slack-channel)")
-
-
-@dataclass
 class MDAConfig:
     vis_method:     str = setting("multiDstack", "MDA Visualisation method",
                                 "Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.",
@@ -103,6 +93,15 @@ class MDAConfig:
                                 input_type="dropdown", options=["process", "saved"])
 
 
+@dataclass
+class WebhookConfig:
+    slack_token:   str = setting("xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf",
+                            "Slack Token",   "The token for Slack messaging (Slack-token)")
+    slack_secret:  str = setting("e8cd04aa4cc9ec7c51729ec6ecf98c1c",
+                            "Slack Secret",  "The secret ID for Slack messaging (Slack-secret)")
+    slack_channel: str = setting("glados-bot",
+                            "Slack Channel", "Channel for the Slack node to send messages to (Slack-channel)")
+    
 @dataclass
 class VisualisationConfig:
     fps: int = setting(60, "Visualisation FPS", "Update speed of napari visualisation (in frames per second)")
@@ -127,6 +126,7 @@ class Config:
     mda_config:           MDAConfig           = dataclasses.field(default_factory=MDAConfig)
     visualisation_config: VisualisationConfig = dataclasses.field(default_factory=VisualisationConfig)
     micromanager_config: MicroManagerConfig  = dataclasses.field(default_factory=MicroManagerConfig)
+    webhook_config: WebhookConfig  = dataclasses.field(default_factory=WebhookConfig)
 
 
 def load_config_from_json(cfg: Config) -> Config:
@@ -225,69 +225,6 @@ class Shared_data(QObject):
         
         self.config = Config()
         load_config_from_json(self.config)
-        
-        self.globalData = {}
-        self.globalData['SLACK-TOKEN']={}
-        self.globalData['SLACK-TOKEN']['value'] = "xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf"
-        self.globalData['SLACK-TOKEN']['displayName'] = "Slack Token"
-        self.globalData['SLACK-TOKEN']['description'] = "The token for Slack messaging (Slack-token)"
-        self.globalData['SLACK-TOKEN']['inputType'] = "lineEdit"
-        self.globalData['SLACK-SECRET']={}
-        self.globalData['SLACK-SECRET']['value'] = "e8cd04aa4cc9ec7c51729ec6ecf98c1c"
-        self.globalData['SLACK-SECRET']['displayName'] = "Slack Secret"
-        self.globalData['SLACK-SECRET']['description'] = "The secret ID for Slack messaging (Slack-secret)"
-        self.globalData['SLACK-SECRET']['inputType'] = "lineEdit"
-        self.globalData['SLACK-CHANNEL']={}
-        self.globalData['SLACK-CHANNEL']['value'] = "glados-bot"
-        self.globalData['SLACK-CHANNEL']['displayName'] = "Slack Channel"
-        self.globalData['SLACK-CHANNEL']['description'] = "Channel for the Slack node to send messages to (Slack-channel)"
-        self.globalData['SLACK-CHANNEL']['inputType'] = "lineEdit"
-        self.globalData['MDAVISMETHOD']={}
-        self.globalData['MDAVISMETHOD']['value'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['displayName'] = 'MDA Visualisation method' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['description'] = 'Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['inputType'] = 'dropdown' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['dropDownOptions'] = ['multiDstack','frameByFrame'] #'multiDstack' or 'frameByFrame'
-        self.globalData['MDABACKENDMETHOD']={}
-        self.globalData['MDABACKENDMETHOD']['value'] = 'process' #'process' or 'saved'
-        self.globalData['MDABACKENDMETHOD']['displayName'] = 'Backend transfer method'
-        self.globalData['MDABACKENDMETHOD']['description'] = 'Choose between the transfer method in the backend of the JAVA --> Python layer. Either directly grabs images via RAM (Can cause RAM issues), or performs a save-->load routine (limited by Disk write speed). Process is strongly recommended.'
-        self.globalData['MDABACKENDMETHOD']['inputType'] = 'dropdown'
-        self.globalData['MDABACKENDMETHOD']['dropDownOptions'] = ['process','saved']
-        self.globalData['VISUALISATION-FPS'] = {}
-        self.globalData['VISUALISATION-FPS']['value'] = 60
-        self.globalData['VISUALISATION-FPS']['displayName'] = 'Visualisation FPS'
-        self.globalData['VISUALISATION-FPS']['description'] = 'Update speed of napari visualisation (in frames per second)'
-        self.globalData['VISUALISATION-FPS']['inputType'] = 'lineEdit'
-        
-        self.globalData['MMPATH'] = {}
-        self.globalData['MMPATH']['value'] = "C:/Program Files/Micro-Manager-2.0"
-        self.globalData['MMPATH']['displayName'] = 'Micromanager Path'
-        self.globalData['MMPATH']['description'] = 'Micromanager Path'
-        self.globalData['MMPATH']['inputType'] = 'lineEdit'
-        self.globalData['MMPATH']['hidden'] = True
-        self.globalData['MM_HEADLESS_BACKEND'] = {}
-        self.globalData['MM_HEADLESS_BACKEND']['value'] = "Python"
-        self.globalData['MM_HEADLESS_BACKEND']['inputType'] = 'lineEdit'
-        self.globalData['MM_HEADLESS_BACKEND']['hidden'] = True
-        self.globalData['MM_CONFIG_PATH'] = {}
-        self.globalData['MM_CONFIG_PATH']['value'] = "C:/Program Files/Micro-Manager-2.0/MMConfig_demo.cfg"
-        self.globalData['MM_CONFIG_PATH']['displayName'] = 'Micromanager config file path'
-        self.globalData['MM_CONFIG_PATH']['description'] = 'Micromanager config file path'
-        self.globalData['MM_CONFIG_PATH']['inputType'] = 'lineEdit'
-        self.globalData['MM_CONFIG_PATH']['hidden'] = True
-        self.globalData['MM_HEADLESS_BUFFER_MB'] = {}
-        self.globalData['MM_HEADLESS_BUFFER_MB']['value'] = 4096
-        self.globalData['MM_HEADLESS_BUFFER_MB']['displayName'] = 'Buffer size (MB)'
-        self.globalData['MM_HEADLESS_BUFFER_MB']['description'] = 'Buffer size of the headless Micromanager instance'
-        self.globalData['MM_HEADLESS_BUFFER_MB']['inputType'] = 'lineEdit'
-        self.globalData['MM_HEADLESS_BUFFER_MB']['hidden'] = True
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB'] = {}
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value'] = 12000
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['displayName'] = 'Max memory (MB)'
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['description'] = 'Maximum memory footprint of the headless Micromanager instance'
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['inputType'] = 'lineEdit'
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['hidden'] = True
         
         #Overwrite all values that can be found from the .JSON:x
         #load from appdata
