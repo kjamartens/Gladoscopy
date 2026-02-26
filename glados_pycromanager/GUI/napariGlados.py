@@ -27,7 +27,6 @@ from ndstorage import NDTiffDataset
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.config import config as config
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 from glados_pycromanager.GUI.LaserControlScripts import *
 import glados_pycromanager.GUI.napariGlados as napariGlados
@@ -1130,8 +1129,9 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
     napariViewer = napari.Viewer()
-    if config.ui.FULLSCREEN:
-        napariViewer.window._qt_window.showMaximized()
+    #TODO: add fullscreen flag
+    # if config.ui.FULLSCREEN:
+    napariViewer.window._qt_window.showMaximized()
     
     #Set QT attributes here for some reason...
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
@@ -1283,7 +1283,8 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     # Force the "Controls" widget to the front
     custom_widget_MMcontrols.parent().raise_()
     #Sketchy way to set initial height
-    custom_widget_MMcontrols.parent().setFixedHeight(config.ui.WIDGET_TAB_HEIGHT)
+    #TODO: set config tab height
+    custom_widget_MMcontrols.parent().setFixedHeight(400)#config.ui.WIDGET_TAB_HEIGHT)
     QApplication.processEvents()
     custom_widget_MMcontrols.parent().setMinimumHeight(0)
     custom_widget_MMcontrols.parent().setMaximumHeight(16777215)

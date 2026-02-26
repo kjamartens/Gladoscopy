@@ -41,7 +41,6 @@ os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.config import config as config
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
 from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
@@ -108,24 +107,25 @@ class headlessGUI(QWidget):
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint) #type:ignore
         
         # Center the window on the screen, fall back to just somewhere
+        #TODO: new config in shared_data
         try:
             screen = QApplication.primaryScreen()
             screen_geometry = screen.availableGeometry() #type: ignore
             self.setGeometry(
-                (screen_geometry.width() - config.startup_ui.WIDTH) // 2,
-                (screen_geometry.height() - config.startup_ui.HEIGHT) // 2,
-                config.startup_ui.WIDTH,
-                config.startup_ui.HEIGHT
+                (screen_geometry.width() - 500) // 2,
+                (screen_geometry.height() - 350) // 2,
+                500,
+                350
             )
         except Exception as e:
             logging.warning(f'Try/exception occured! {e}')
-            self.setGeometry(100, 100, config.startup_ui.WIDTH, config.startup_ui.HEIGHT)
+            self.setGeometry(100, 100, 500, 350)
             
         # Add a splash screen at the top
         self.splash_label = QLabel(self)
         splash_png = iconFolder+os.sep+'GladosSplash_inv.png'
         splash_pixmap = QPixmap(splash_png)
-        new_width = config.startup_ui.WIDTH
+        new_width = 500
         self.splash_label.setPixmap(
             splash_pixmap.scaled(new_width, int(splash_pixmap.height() * new_width / splash_pixmap.width()),
             Qt.KeepAspectRatio, Qt.SmoothTransformation) #type:ignore
@@ -255,9 +255,9 @@ def main():
     QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
     
     napariSettings = napari.settings.get_settings() #type: ignore
-    if napariSettings.application.playback_fps < config.performance.FPS:
-        napariSettings.application.playback_fps = config.performance.FPS
-        print(f'Set the napari Playback FPS to {config.performance.FPS}!')
+    if napariSettings.application.playback_fps < shared_data.config.visualisation_config.fps:
+        napariSettings.application.playback_fps = shared_data.config.visualisation_config.fps
+        print(f'Set the napari Playback FPS to {shared_data.config.visualisation_config.fps}!')
     
     # get object representing MMCore, used throughout
     #try to open a running instance:

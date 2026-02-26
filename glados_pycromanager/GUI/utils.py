@@ -53,7 +53,6 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.config import config as config
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
 from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
