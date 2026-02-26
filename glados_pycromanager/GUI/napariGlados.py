@@ -786,6 +786,9 @@ class napariHandler():
                 for rtAnalysisThread in [item['Thread'] for item in self.shared_data.RTAnalysisQueuesThreads]:
                     rtAnalysisThread.set_activity(False)
                 
+                #Stop live mode napari display worker
+                napariGlados.stopLiveModeVisualisation(shared_data)
+                
                 logging.info("Live mode stopped")
             else:
                 self.acqstate = True
@@ -818,6 +821,9 @@ class napariHandler():
                 for rtAnalysisThread in [item['Thread'] for item in self.shared_data.RTAnalysisQueuesThreads]:
                     rtAnalysisThread.set_activity(False)
                     
+                #Stop live mode napari display worker
+                napariGlados.stopMDAVisualisation(shared_data)
+                
                 logging.info("MDA mode stopped from acqModeChanged")
                 # self.mdaacqdonefunction()
             else:
@@ -1026,7 +1032,11 @@ def startLiveModeVisualisation(shared_data,layerName='Live'):
     #2024-10-16 refactor attempt: next line isn't needed --> maybe image_queue_analysis isn't needed?
     # create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis) #type: ignore
     #Start a worker dedicated to running the live mode visualisation
-    shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
+    shared_data._livemodeNapariHandler.liveModeVisualisationWorker = shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
+
+def stopLiveModeVisualisation(shared_data,layerName='Live'):
+    shared_data._livemodeNapariHandler.liveModeVisualisationWorker.quit()
+    shared_data._livemodeNapariHandler.liveModeVisualisationWorker = None
 
 def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
     #Check for running mdaVisualisation threads and remove those
@@ -1059,7 +1069,11 @@ def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
     #2024-10-16 refactor attempt: next line isn't needed --> maybe image_queue_analysis isn't needed?
     # create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis) #type: ignore
     #Start a worker dedicated to running the mda mode visualisation
-    shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
+    shared_data._mdamodeNapariHandler.mdaModeVisualisationWorker = shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
+
+def stopMDAVisualisation(shared_data,layerName='Live'):
+    shared_data._mdamodeNapariHandler.mdaModeVisualisationWorker.quit()
+    shared_data._mdamodeNapariHandler.mdaModeVisualisationWorker = None
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
@@ -1085,7 +1099,7 @@ def layer_removed_event_callback(event, shared_data):
                                     break
                         #remove from shared_data entry
                         shared_data.RTAnalysisQueuesThreads.remove(item)
-                        logging.debug('removed old mdaVisualisation thread')
+                        logging.debug('removed rtanalysis thread')
                         break
                 
                 
