@@ -1118,6 +1118,7 @@ class MMConfigUI(CustomMainWindow):
                 bottomrightxy = np.ceil(vertices[2][::-1])
                 #Set the boundaries based on the camera
                 mintopleft = [0,0]
+                #TODO: Fix this (at least in pymmc backend)
                 maxbottomright = [shared_data.MILcore.get_roi().width, shared_data.MILcore.get_roi().height]
                 #Find the bounded positions
                 topleftpos = np.maximum(topleftxy,mintopleft)
