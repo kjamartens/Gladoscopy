@@ -549,7 +549,7 @@ class napariHandler():
                         
                         #When it's done, disconnect the callback
                         self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
-                        print('Finished live!')
+                        logging.info('Finished live!')
                     else: #Pycromanager backend, either JAVA or Python
                         if shared_data.config.mda_config.backend_method == 'saved':
                             with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
@@ -699,27 +699,41 @@ class napariHandler():
         Worker which handles the visualisation of the live mode queue
         Connected to display_napari function to update display 
         """
+        
+        # Get a reference to the worker object itself to check for .quit() signals
+        current_worker = getattr(self, 'visualisation_worker', None) # Get reference to itself
+        
         visualisation_queue = parent.visualisation_queue
-        while self.acqstate:
-            # get elements from queue while there is more than one element
-            self._new_image.wait()#Wait for a new image
-            self._new_image.clear()
-            
-            if visualisation_queue:
-                DataStructure = {}
-                DataStructure['data'] = visualisation_queue.popleft()
-                DataStructure['napariViewer'] = self.shared_data.napariViewer
-                DataStructure['acqState'] = self.acqstate
-                DataStructure['core'] = self.shared_data.core
-                DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
-                DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
-                # # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
-                # logging.debug(str(self.shared_data.analysisThreads))
-                DataStructure['layer_name'] = layerName
-                DataStructure['layer_color_map'] = layerColorMap
-                DataStructure['finalisationProcedure'] = False
-                logging.debug('live mode worker - yield DataStructure')
-                yield DataStructure
+        try:
+            while self.acqstate:
+                # 1. Check if the user called .quit() from the outside
+                if current_worker and current_worker.abort_requested:
+                    break
+                
+                # get elements from queue while there is more than one element
+                self._new_image.wait(timeout=1)#Wait for a new image
+                self._new_image.clear()
+                
+                if visualisation_queue:
+                    DataStructure = {}
+                    DataStructure['data'] = visualisation_queue.popleft()
+                    DataStructure['napariViewer'] = self.shared_data.napariViewer
+                    DataStructure['acqState'] = self.acqstate
+                    DataStructure['core'] = self.shared_data.core
+                    DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
+                    DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
+                    # # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
+                    # logging.debug(str(self.shared_data.analysisThreads))
+                    DataStructure['layer_name'] = layerName
+                    DataStructure['layer_color_map'] = layerColorMap
+                    DataStructure['finalisationProcedure'] = False
+                    logging.debug('live mode worker - yield DataStructure')
+                    yield DataStructure
+        finally:
+            # This 'finally' block acts as your "destroy" logic
+            # It runs whether the loop finishes naturally or is aborted
+            logging.info("Visualization worker: Performing final cleanup")
+            visualisation_queue.clear()
             
         # read out last remaining element(s) after end of acquisition
         while visualisation_queue:
@@ -1031,11 +1045,18 @@ def startLiveModeVisualisation(shared_data,layerName='Live'):
     #2024-10-16 refactor attempt: next line isn't needed --> maybe image_queue_analysis isn't needed?
     # create_analysis_thread(shared_data,analysisInfo='LiveModeVisualisation',createNewThread=False,throughputThread=shared_data._livemodeNapariHandler.image_queue_analysis) #type: ignore
     #Start a worker dedicated to running the live mode visualisation
-    shared_data._livemodeNapariHandler.liveModeVisualisationWorker = shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
+    shared_data._livemodeNapariHandler.visualisation_worker = shared_data._livemodeNapariHandler.run_napariVisualisation_worker(shared_data._livemodeNapariHandler,layerName = layerName)
+    shared_data._livemodeNapariHandler.visualisation_worker.finished.connect(_on_worker_fully_stopped_live)
+
+def _on_worker_fully_stopped_live():
+    logging.debug("LIVE worker is confirmed DEAD.")
+    shared_data._livemodeNapariHandler.visualisation_worker = None
 
 def stopLiveModeVisualisation(shared_data,layerName='Live'):
-    shared_data._livemodeNapariHandler.liveModeVisualisationWorker.quit()
-    shared_data._livemodeNapariHandler.liveModeVisualisationWorker = None
+    if shared_data._livemodeNapariHandler.visualisation_worker is not None:
+        shared_data._livemodeNapariHandler.visualisation_worker.yielded.disconnect()
+        shared_data._livemodeNapariHandler.visualisation_worker.quit()
+        shared_data._livemodeNapariHandler._new_image.set()
 
 def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
     #Check for running mdaVisualisation threads and remove those
@@ -1068,11 +1089,18 @@ def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
     #2024-10-16 refactor attempt: next line isn't needed --> maybe image_queue_analysis isn't needed?
     # create_analysis_thread(shared_data,analysisInfo='mdaVisualisation',createNewThread=False,throughputThread=shared_data._mdamodeNapariHandler.image_queue_analysis) #type: ignore
     #Start a worker dedicated to running the mda mode visualisation
-    shared_data._mdamodeNapariHandler.mdaModeVisualisationWorker = shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
+    shared_data._mdamodeNapariHandler.visualisation_worker = shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
+    shared_data._mdamodeNapariHandler.visualisation_worker.finished.connect(_on_worker_fully_stopped_mda)
+
+def _on_worker_fully_stopped_mda():
+    logging.debug("MDA worker is confirmed DEAD.")
+    shared_data._mdamodeNapariHandler.visualisation_worker.visualisation_worker = None
 
 def stopMDAVisualisation(shared_data,layerName='Live'):
-    shared_data._mdamodeNapariHandler.mdaModeVisualisationWorker.quit()
-    shared_data._mdamodeNapariHandler.mdaModeVisualisationWorker = None
+    if shared_data._mdamodeNapariHandler.visualisation_worker is not None:
+        shared_data._mdamodeNapariHandler.visualisation_worker.yielded.disconnect()
+        shared_data._mdamodeNapariHandler.visualisation_worker.quit()
+        shared_data._mdamodeNapariHandler._new_image.set()
 
 def layer_removed_event_callback(event, shared_data):
     #The name of the layer that is being removed:
