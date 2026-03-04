@@ -22,6 +22,7 @@ from qtpy.QtWidgets import (
     QScrollArea
     )
 from ndstorage import NDTiffDataset
+import gc
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -53,11 +54,7 @@ def napariUpdateLive(DataStructure):
     #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
     min_delay_time = np.min(((50/1000),(float(shared_data.MILcore.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
     
-    #JAVA is way slower so needs this longer update time of the display
-    if shared_data.backend == 'JAVA':
-        display_update_time = 1/float(shared_data.config.visualisation_config.fps) #0.05
-    elif shared_data.backend == 'Python':
-        display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
+    display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
     
     if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
         logging.debug('Updated live preview Hindered (due to display update time) at time {}'.format(time.time()))
@@ -111,9 +108,17 @@ def napariUpdateLive(DataStructure):
         else:
             # layer is present, replace its data
             layer = napariViewer.layers[liveImageLayer[0]]
+            
+            # Store reference to old data
+            old_data = layer.data
+    
             layer.data = liveImage
             logging.debug('Put liveImage in the live layer')
-    
+            
+            #Explicitly remove old data:
+            del old_data
+            # gc.collect()
+            
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames
     elif shared_data.config.mda_config.vis_method == 'multiDstack':
         if DataStructure['finalisationProcedure'] == False:
@@ -366,18 +371,31 @@ class napariHandler():
             self.new_image() #give the signal that we have a new image ready to be visualised
             # print(f'#ac356 - current len of vis_queue: {len(visualisation_queue)}')
         
-        #Queue(s) for RT analysis of the data:
+        # #Queue(s) for RT analysis of the data:
+        # for queue in analysis_queues:
+        #     #Find the corresponding analysis thread
+        #     for item in self.shared_data.RTAnalysisQueuesThreads:
+        #         if 'Queue' in item and item['Queue'] is queue:
+        #             thread = item.get('Thread')
+                    
+        #             if len(queue) < 1:
+        #                 queue.append([image,metadata])
+        #                 #Signal the thread we have a new entry
+        #                 thread.new_image()
+        start = time.perf_counter()
+
         for queue in analysis_queues:
-            #Find the corresponding analysis thread
             for item in self.shared_data.RTAnalysisQueuesThreads:
                 if 'Queue' in item and item['Queue'] is queue:
                     thread = item.get('Thread')
-                    
                     if len(queue) < 1:
                         queue.append([image,metadata])
-                        #Signal the thread we have a new entry
                         thread.new_image()
-    
+                    break
+
+        end = time.perf_counter()
+        logging.info(f"Loop (no intermediate logs): {(end-start)*1000:.4f}ms")
+        
     def grab_image_liveVisualisation_and_liveAnalysis(self,image,metadata, event_queue):
         """ 
         Function that runs on every frame obtained in live mode and puts it in the image queue(s)
@@ -532,7 +550,7 @@ class napariHandler():
                         connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
                         #Create the MDA plan
                         mda_sequence_useq = useq.MDASequence(
-                            time_plan={"interval": 0.0, "loops": 999} #type: ignore
+                            time_plan={"interval": 0.0, "loops": shared_data.config.mda_config.live_mode_nr_frames} #type: ignore
                         )
                         #Set proper expected mda:
                         shared_data._mdaModeParams = to_pycromanager(mda_sequence_useq)
@@ -554,14 +572,14 @@ class napariHandler():
                         if shared_data.config.mda_config.backend_method == 'saved':
                             with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                                 self.shared_data._mdaModeAcqData = acq
-                                events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
+                                events = multi_d_acquisition_events(num_time_points=shared_data.config.mda_config.live_mode_nr_frames, time_interval_s=0)
                                 acq.acquire(events)
                         elif shared_data._headless and shared_data.backend == 'Python':
                             try:
                                 logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
                                 with Acquisition(directory=None, name=None, show_display=False, image_process_fn = self.grab_image_liveVisualisation_and_liveAnalysis) as acq: #type:ignore
                                     self.shared_data._mdaModeAcqData = acq
-                                    events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
+                                    events = multi_d_acquisition_events(num_time_points=shared_data.config.mda_config.live_mode_nr_frames, time_interval_s=0)
                                     acq.acquire(events)
                             except HardwareControlException:
                                 #Early quit of the acquisition
@@ -572,7 +590,7 @@ class napariHandler():
                         else:
                             with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                                 self.shared_data._mdaModeAcqData = acq
-                                events = multi_d_acquisition_events(num_time_points=999, time_interval_s=0)
+                                events = multi_d_acquisition_events(num_time_points=shared_data.config.mda_config.live_mode_nr_frames, time_interval_s=0)
                                 acq.acquire(events)
 
                     logging.debug('After Acq Live')
@@ -711,7 +729,7 @@ class napariHandler():
                     break
                 
                 # get elements from queue while there is more than one element
-                self._new_image.wait(timeout=1)#Wait for a new image
+                self._new_image.wait(timeout=0.1)#Wait for a new image
                 self._new_image.clear()
                 
                 if visualisation_queue:

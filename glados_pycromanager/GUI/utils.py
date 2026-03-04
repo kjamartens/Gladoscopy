@@ -3636,10 +3636,129 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         # else:
         #     errorIcon.setToolTip(errorToolTip)
         #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='grayscale')
-        
+
+import logging
+import logging.handlers
+from queue import Queue
+import atexit
+
+
+
+class ColoredFormatter(logging.Formatter):
+    """Colored formatter for terminal output"""
+    
+    # ANSI color codes
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    cyan = "\x1b[36;20m"
+    green = "\x1b[32;20m"
+    reset = "\x1b[0m"
+    
+    FORMATS = {
+        logging.DEBUG: grey + "%(asctime)s [%(levelname)-8s]" + reset + " %(message)s " + cyan + "[%(filename)s:%(lineno)d]" + reset,
+        logging.INFO: green + "%(asctime)s [%(levelname)-8s]" + reset + " %(message)s " + cyan + "[%(filename)s:%(lineno)d]" + reset,
+        logging.WARNING: yellow + "%(asctime)s [%(levelname)-8s]" + reset + " %(message)s " + cyan + "[%(filename)s:%(lineno)d]" + reset,
+        logging.ERROR: red + "%(asctime)s [%(levelname)-8s]" + reset + " %(message)s " + cyan + "[%(filename)s:%(lineno)d]" + reset,
+        logging.CRITICAL: bold_red + "%(asctime)s [%(levelname)-8s]" + reset + " %(message)s " + cyan + "[%(filename)s:%(lineno)d]" + reset,
+    }
+    
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
+        return formatter.format(record)
+
 
 def set_up_logger():
     """
+    Set up a DEBUG and INFO logger, storing to LOG files in the APPDATA folder structure.
+    Now with async logging and optional colored terminal output.
+    """
+    
+    # Set up logging at correct level
+    appdata_folder = appdirs.user_data_dir()
+    if appdata_folder is None:
+        raise EnvironmentError("APPDATA environment variable not found")
+    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+    
+    # Clear old log files older than a week
+    if os.path.exists(app_specific_folder):
+        one_week_ago = datetime.datetime.now() - datetime.timedelta(weeks=1)
+        for file in os.listdir(app_specific_folder):
+            if file.endswith(".log"):
+                file_path = os.path.join(app_specific_folder, file)
+                file_mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(file_path))
+                if file_mod_time < one_week_ago:
+                    os.remove(file_path)
+    
+    # Get the current date and time to add to log file names
+    current_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    try:
+        # Plain formatter for FILES (no color codes)
+        file_formatter = logging.Formatter(
+            fmt="%(asctime)s [%(levelname)-8s] %(message)s [%(filename)s:%(lineno)d]",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        
+        # Set up file-based INFO and DEBUG logging
+        log_file_path_DEBUG = os.path.join(app_specific_folder, f'Glados_logpath_DEBUG_{current_datetime}.log')
+        log_file_path_INFO = os.path.join(app_specific_folder, f'Glados_logpath_INFO_{current_datetime}.log')
+        
+        # Create the file handlers with PLAIN formatter
+        file_handlerDEBUG = logging.FileHandler(log_file_path_DEBUG)
+        file_handlerDEBUG.setLevel(logging.DEBUG)
+        file_handlerDEBUG.setFormatter(file_formatter)  # Plain, no colors
+        
+        file_handlerINFO = logging.FileHandler(log_file_path_INFO)
+        file_handlerINFO.setLevel(logging.INFO)
+        file_handlerINFO.setFormatter(file_formatter)  # Plain, no colors
+        
+        # Console handler with colors (only if terminal supports it)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        
+        # Try colored formatter, fall back to plain if colors don't work
+        import sys
+        if sys.stdout.isatty():  # Check if running in actual terminal
+            console_handler.setFormatter(ColoredFormatter())
+        else:
+            console_handler.setFormatter(file_formatter)  # Use plain for redirected output
+        
+        # Create async queue and handler
+        log_queue = Queue(-1)
+        queue_handler = logging.handlers.QueueHandler(log_queue)
+        
+        # Create listener that processes logs in background thread
+        queue_listener = logging.handlers.QueueListener(
+            log_queue,
+            file_handlerINFO,
+            file_handlerDEBUG,
+            console_handler,  # Add console handler here
+            respect_handler_level=True
+        )
+        
+        # Get the root logger
+        logger = logging.getLogger()
+        logger.handlers.clear()
+        logger.setLevel(logging.INFO)
+        
+        # Add ONLY the queue handler to logger
+        logger.addHandler(queue_handler)
+        
+        # Start the async listener
+        queue_listener.start()
+        
+        # Auto-stop listener on program exit
+        atexit.register(queue_listener.stop)
+        
+    except:
+        logging.error('Error in setting up loggers')
+        
+def set_up_logger_depracated():
+    """
+    DEPRACATED - incredibly slow, new set_up_logger is async (2026-03-04)
     Set up a DEBUG and INFO logger, storing to LOG files in the APPDATA folder structure.
     """
     

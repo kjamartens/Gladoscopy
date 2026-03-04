@@ -91,7 +91,7 @@ class MDAConfig:
     backend_method: str = setting("process", "Backend transfer method",
                                 "Choose between the transfer method in the backend of the JAVA --> Python layer. Either directly grabs images via RAM (Can cause RAM issues), or performs a save-->load routine (limited by Disk write speed). Process is strongly recommended.",
                                 input_type="dropdown", options=["process", "saved"])
-
+    live_mode_nr_frames: int = setting(999,"Number of frames taken for live mode","The live mode here is basically just a MDA with many frames. Set how many frames here.")
 
 @dataclass
 class WebhookConfig:

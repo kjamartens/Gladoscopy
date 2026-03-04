@@ -53,6 +53,7 @@ dependencies = [
     "slackeventsapi==3.0.3",
     "opencv-python==4.13.0.92",
     "pydantic<2.10",
+    "diplib==3.6.0",
 ]
 
 [tool.setuptools]

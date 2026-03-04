@@ -4,6 +4,7 @@ import glados_pycromanager.GUI.utils as utils
 import logging
 import time
 import sys, os
+import diplib as dip
 
 # Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -55,13 +56,19 @@ class RealTimeFFT():
         
         try:
             # 1. Compute 2D FFT
-            fft_data = np.fft.fft2(image)
+            # fft_data = np.fft.fft2(image)
             
-            # 2. Shift zero-frequency component to the center
-            fft_shifted = np.fft.fftshift(fft_data)
+            img_dip = dip.Image(image)
+            fft_dip = dip.FourierTransform(img_dip)
+            magnitude = dip.Abs(fft_dip)
+            magnitude = np.array(magnitude)
+            # fft_data = dip.FourierTransform(image)
             
-            # 3. Get Magnitude
-            magnitude = np.abs(fft_shifted)
+            # # 2. Shift zero-frequency component to the center
+            # fft_shifted = np.fft.fftshift(fft_data)
+            
+            # # 3. Get Magnitude
+            # magnitude = np.abs(fft_shifted)
             
             # 4. Apply Log Scaling for visualization (standard practice)
             if self.log_scale:
