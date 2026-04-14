@@ -1373,6 +1373,8 @@ class MDAGlados(CustomMainWindow):
         try:
             self.data = self.shared_data.mdaDatasets[-1]
         except:
+            import zarr
+            data = zarr.open(self.shared_data.mdaZarrData['MDA'])
             logging.error('#TODO: No MDA data found in shared_data.mdaDatasets. fix this with PyMMC (wheres the dataset stored? can we get this?).')
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False

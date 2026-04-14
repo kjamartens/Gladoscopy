@@ -1,4 +1,3 @@
-
 #Goal: a common interface layer for multiple backends to control micromannager.
 
 #Supported for now:
@@ -26,6 +25,7 @@ class MicroscopeInterfaceLayer:
     def __init__(self):
         self.core: PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None = None
         self.mda: dict | None = None
+
     def set_core(self, core):
         self.core = core
 
@@ -97,9 +97,7 @@ class MicroscopeInterfaceLayer:
         # If the vector contains strings, the dtype will be object or string
         return np.array(python_list, dtype=object) # Use dtype=object for mixed types or strings
 
-
     #Callables
-
     def clear_roi(self) -> None:
         """
         Clear the region of interest (ROI) for the camera.
@@ -436,6 +434,7 @@ class MicroscopeInterfaceLayer:
                 raise ValueError("Unsupported microscope interface type for get_xy_position.")
         except:
             return [0,0]
+
     def get_xy_stage_device(self) -> str:
         """
         Get the name of the X-Y stage device.

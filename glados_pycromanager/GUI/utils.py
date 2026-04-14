@@ -3102,9 +3102,7 @@ class CustomMainWindow(QWidget):
         if 'GlobalData' not in state:
             state['GlobalData'] = {}
         
-        #TODO: fix import
-        import MMcontrols
-        import napariGlados
+        import glados_pycromanager.GUI.napariGlados as napariGlados
         
         iterable = []
         

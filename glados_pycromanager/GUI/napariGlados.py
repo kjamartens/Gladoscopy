@@ -307,7 +307,7 @@ def napariUpdateLive(DataStructure):
     
 def napariUpdateAnalysisThreads(DataStructure):
     """ 
-    Function that finally shows the  image in napari
+    
     """
     napariViewer = DataStructure['napariViewer']
     acqstate = DataStructure['acqState']
@@ -394,7 +394,7 @@ class napariHandler():
                     break
 
         end = time.perf_counter()
-        logging.info(f"Loop (no intermediate logs): {(end-start)*1000:.4f}ms")
+        logging.debug(f"Loop (no intermediate logs): {(end-start)*1000:.4f}ms")
         
     def grab_image_liveVisualisation_and_liveAnalysis(self,image,metadata, event_queue):
         """ 
@@ -464,9 +464,10 @@ class napariHandler():
             os.makedirs(tempdataloc)
         
         # print('storing temp data in : ', tempdataloc)
-        # summary_metadata = {'name_1': 123, 'name_2': 'something else'} # make this whatever you want
-        # shared_data.pyMMCdataset = NDTiffDataset(tempdataloc, summary_metadata=summary_metadata, writable=True)
-        #asTODO: summary metadata
+        summary_metadata = {'name_1': 123, 'name_2': 'something else'} # make this whatever you want
+        shared_data.pyMMCdataset = NDTiffDataset(tempdataloc, summary_metadata=summary_metadata, writable=True)
+        
+        #TODO: summary metadata
         self.shared_data.tempDataStart = sequence
     
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):

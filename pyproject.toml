@@ -32,12 +32,12 @@ dependencies = [
     "xarray==2025.1.2",
     "dask==2025.7.0",
     "pycromanager==1.0.2",
-    "pymmcore-plus==0.15.3",
+    "pymmcore-plus==0.18.1",
     "bioimageio-core", #0.8.0
     "bioio",
     "tifffile==2025.6.11",
     "zarr==3.1.0",
-    "napari[all] @ git+https://github.com/napari/napari.git@v0.7.0a3",
+    "napari[all]==0.7.0,
     "pyqt5==5.15.11",
     "pyqtgraph==0.13.3",
     "pyqtwebengine==5.15.7",
@@ -52,7 +52,7 @@ dependencies = [
     "slack==0.0.2",
     "slackeventsapi==3.0.3",
     "opencv-python==4.13.0.92",
-    "pydantic<2.10",
+    "pydantic==2.12.5",
     "diplib==3.6.0",
 ]
 
