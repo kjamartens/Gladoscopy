@@ -11,7 +11,6 @@ Glados-pycromanager: a Napari-based UI for Pycromanager (python-Micromanager) pl
 - Python 3.13 is required (`pyproject.toml`, `environment.yaml`). The user manual still mentions 3.10 — that is outdated; do not follow it.
 - One-shot Windows setup: run `win_create_env.bat`. It creates a conda env named `GladosEnv` from `environment.yaml`, then `uv pip install -e .` for editable install.
 - The dependency pin set in `pyproject.toml` is strict (numpy/pandas/scipy/napari/pyqt5/tensorflow all hard-pinned). Avoid casually bumping them; the GUI is sensitive to napari/PyQt5 versions.
-- Note: line 40 of `pyproject.toml` (`napari[all]==0.7.0,`) has an unterminated string literal — be aware if editing the file.
 
 ## Running
 
@@ -83,4 +82,4 @@ Keep it on new top-level modules under `glados_pycromanager/` if they're meant t
 
 ## Documentation
 
-User-facing docs live at `glados_pycromanager/Documentation/UserManual.md` (the README's link to a `glados-pycromanager/glados_pycromanager/Documentation/...` path is stale — the outer `glados-pycromanager/` directory does not exist). Images are in `glados_pycromanager/Documentation/Images/`.
+User-facing docs live at `glados_pycromanager/Documentation/UserManual.md`; the developer overview is at `glados_pycromanager/Documentation/index.html`. Images are in `glados_pycromanager/Documentation/Images/`.
