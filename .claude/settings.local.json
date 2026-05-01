@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(C:/Users/LocalAdmin.TUD277807/.conda/envs/GladosEnv/python.exe -m pytest tests/)"
+    ]
+  }
+}

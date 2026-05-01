@@ -27,7 +27,15 @@ Other entry points:
 - `napari` then *Plugins → Glados-PycroManager → Run Glados-PycroManager* — uses `_dock_widget:MainWidget` (the napari plugin path; assumes a Pycromanager Java server on port 4827 is already up — `Core()` is called directly with no headless prompt).
 - Run `glados_pycromanager/GUI/GUI_napari.py` from your IDE for full debugger access. The file contains a `sys.path.insert` shim so it works when not installed.
 
-There is no test suite, lint config, or build script in the repo — `Test.py` and `test.ipynb` at the root are ad-hoc scratch files (DIPlib FFT benchmark, etc.), not a test runner. Do not invent `pytest` / `ruff` invocations.
+A small pytest suite lives in `tests/`. Run it with:
+
+```
+pytest
+```
+
+(`pytest` is in `[project.optional-dependencies].dev`; install with `pip install -e ".[dev]"`.) Coverage is currently limited to pure-logic surfaces — backend detection on `MicroscopeInterfaceLayer`, the `java_arr_to_numpy` helper, and the `HelperFunctions` string builders. There is no GUI / hardware integration test.
+
+`Test.py` and `test.ipynb` at the repo root are unrelated scratch files (DIPlib FFT benchmark, etc.), not part of the suite. There is no lint config.
 
 ## Architecture
 
