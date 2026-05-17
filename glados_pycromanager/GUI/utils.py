@@ -2739,62 +2739,17 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.fileLocationLineEdit
 
-    def addHtml(self,htmlfile,width=700,height=800):
-        from PyQt5.QtWebEngineWidgets import QWebEngineView
-        htmlViewer = QWebEngineView()
-        htmlViewer.setFixedHeight(height)
-        htmlViewer.setFixedWidth(width)
-        html_file = htmlfile
-        with open(html_file, encoding='utf-8') as file:
-            html_content = file.read()
-        htmlViewer.setHtml(html_content)
-        #Add the html viewer to the central widget:
-        self.centralWidget().layout().addWidget(htmlViewer) #type:ignore
+    def addHtml(self, htmlfile, width=700, height=800):
+        # Body moved to glados_pycromanager.ui.markdown_view (Phase 7.4).
+        from glados_pycromanager.ui.markdown_view import add_html_to_window
 
-    def addMarkdown(self,mdfile,width=700,height=800):
-        
-        newlayout = QVBoxLayout()
-        markdownViewer = QWebEngineView()
-        markdownViewer.setFixedHeight(height)
-        markdownViewer.setFixedWidth(width)
-        md_file = mdfile
-        with open(md_file, encoding='utf-8') as file:
-            md_content = file.read()
-        # Convert Markdown to HTML
-        html_content = markdown.markdown(md_content, extensions=['markdown_captions','fenced_code', 'codehilite', 'toc', 'attr_list', 'meta'])
-        # Get the directory of the Markdown file
-        base_dir = os.path.dirname(os.path.abspath(md_file))
-        # Create a complete HTML document with MathJax support
-        full_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <script type="text/javascript" async
-                src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
-            </script>
-            <script type="text/x-mathjax-config">
-                MathJax.Hub.Config({{
-                    tex2jax: {{
-                        inlineMath: [['$','$']],
-                        processEscapes: true
-                    }} 
-                }});
-            </script>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
-                img {{ max-width: 100%; height: auto; }}
-            </style>
-        </head>
-        <body>
-            {html_content}
-        </body>
-        </html>
-        """
-        from PyQt5.QtCore import QUrl
-        # Load the HTML content into the web view
-        markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + "/"))
-        newlayout.addWidget(markdownViewer)
-        self.centralWidget().layout().addLayout(newlayout)
+        add_html_to_window(self, htmlfile, width=width, height=height)
+
+    def addMarkdown(self, mdfile, width=700, height=800):
+        # Body moved to glados_pycromanager.ui.markdown_view (Phase 7.4).
+        from glados_pycromanager.ui.markdown_view import add_markdown_to_window
+
+        add_markdown_to_window(self, mdfile, width=width, height=height)
     
 class HelpGroupBox:
     def __init__(self,parent):

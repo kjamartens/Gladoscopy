@@ -609,7 +609,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 7.1 | Create `glados_pycromanager/io/__init__.py`, `glados_pycromanager/io/appdata.py`. Move `load_config_from_json`, `storeSharedData_GlobalData`, `cleanUpTemporaryFiles` | New module compiles | Commit `refactor: move AppData I/O into io.appdata` |
 | [x] 7.2 | In old `utils.py`, re-export the moved names with a `DeprecationWarning` to avoid breaking callers | Backward compatible | Commit `refactor: utils.py shim re-exports` |
 | [x] 7.3 | Create `glados_pycromanager/ui/widgets/builders.py`. Move Qt widget helpers (`createGroupBox`, etc.) | Builders isolated | Commit `refactor: move Qt builders to ui.widgets.builders` |
-| [ ] 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |
+| [x] 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |
 | [ ] 7.5 | Create `glados_pycromanager/util/fs.py`. Move filesystem helpers | FS helpers isolated | Commit `refactor: extract filesystem helpers` |
 | [ ] 7.6 | Add a temporary `tests/test_utils_reexport.py` that imports every public name from the old path and the new path and asserts equality | Reexports verified | Commit `test: shim re-export equivalence` |
 | [ ] 7.7 | Verification gate | CI green; manual smoke test of `glados` startup | Commit `chore: phase 7 verification` referencing test pass |
