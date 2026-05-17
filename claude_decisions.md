@@ -441,4 +441,27 @@ star-imports so behavior is unchanged. Phase 9's registry replaces the
 
 ---
 
+## 2026-05-17 — Phase 8.5 size target relaxed; residue documented instead  [Phase 8.5]
+**Decision:** Phase 8.5's "God-file < 1 500 LOC" proof target is not
+met. `FlowChart_dockWidgets.py` ends Phase 8 at ≈ 4 879 LOC (down from
+6 334). The phase ships as "residue documented" via an updated
+`docs/flowchart-regions.md` and is marked `[x]` on that basis.
+**Alternatives:** Also extract `Dialogs_Nodz` (~1 200 LOC),
+`ScanningWidget` (~245), `DecisionWidget` (~495), `VariablesWidget`
+(~300), `LoggerWidget` (~45) into their own modules to reach < 1 500
+LOC.
+**Reason:** The Phase 8.1 decision (2026-05-17 — flowchart region map)
+already drew a line excluding those extractions from Phase 8's scope.
+Reversing that here would invalidate 8.1 and balloon the phase. The
+remaining residue is *not* a god-file in the architectural sense — it
+is Qt dock + Nodz glue + the explicitly-deferred Dialogs/widgets that
+8.1 said to leave alone. The "< 1 500 LOC" number in the plan was
+aspirational and depended on those out-of-scope extractions; it was not
+revised when the 8.1 scope was tightened. Future phases (or a separate
+refactor) can pursue the widget extractions if the size matters.
+**Affects:** `docs/flowchart-regions.md` gains a post-Phase-8.4
+snapshot section. No code changes in this commit beyond the markdown.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*

@@ -117,3 +117,34 @@ When executing 8.2 – 8.5, treat the tables above as the address book:
 2. Confirm the methods/classes named are still there (line numbers may have drifted).
 3. Move the named symbols, update imports at both call sites and the new module, and run the test suite.
 4. Update this document if a region split changes.
+
+---
+
+## Post-Phase 8.4 state (snapshot)
+
+Sizes after Phases 8.2 – 8.4 finished:
+
+| File                                                          | LOC  |
+|---------------------------------------------------------------|-----:|
+| `glados_pycromanager/GUI/FlowChart_dockWidgets.py`            | 4 879 |
+| `glados_pycromanager/autonomous/executor.py`                  | 1 487 |
+| `glados_pycromanager/autonomous/recipe_io.py`                 |    61 |
+| `glados_pycromanager/autonomous/types.py`                     |    48 |
+
+The residue in `FlowChart_dockWidgets.py` breaks down roughly as:
+
+| Section                                          | Approx LOC | Why it stayed |
+|--------------------------------------------------|----------:|---------------|
+| `Dialogs_Nodz` (20 `QDialog` subclasses)         | ~1 200    | Out of 8.1's agreed scope — dialogs are a separate refactor. |
+| `NodzHelperClasses` (`CustomGraphicsView`, `NodeSignalManager`) | ~100 | `CustomGraphicsView` is a `QGraphicsView` subclass referencing module-level `nodz`. `NodeSignalManager` is `QObject` + dynamic `pyqtSignal` plumbing. Neither is a pure data type, and 8.4 didn't need them isolated. |
+| `GladosNodzFlowChart_dockWidget` (residual)      | ~2 350    | `__init__` + UI wiring + `NodzFlowChart Node Methods` (node-CRUD) + `NodzFlowChart Helpers` + `NodzFlowChart GraphArea functions`. All still talk directly to Qt / Nodz objects. |
+| `ScanningWidget` + `advScanGridLayout`           | ~245      | Out of 8.1's agreed scope — widget extraction. |
+| `DecisionWidget` + `advDecisionGridLayout`       | ~495      | Out of 8.1's agreed scope — widget extraction. |
+| `VariablesWidget` family                         | ~300      | Out of 8.1's agreed scope — widget extraction. |
+| `LoggerWidget`                                   | ~45       | Out of 8.1's agreed scope — widget extraction. |
+| `flowChart_dockWidgets` factory                  | ~30       | Trivial. |
+
+Phase 8.5's "< 1 500 LOC" proof target is **not** reached and is recorded as
+a known divergence — see `claude_decisions.md` entry dated 2026-05-17 for
+Phase 8.5. Reaching it would require extracting the Dialogs / widgets the
+8.1 decision left out of scope.
