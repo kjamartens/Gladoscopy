@@ -384,4 +384,26 @@ data types today.
 
 ---
 
+## 2026-05-17 — `autonomous/types.py` ships with only `GladosGraph`  [Phase 8.2]
+**Decision:** The new `glados_pycromanager/autonomous/types.py` module
+contains a single class, `GladosGraph`. Nothing else was extracted.
+**Alternatives:** Also move `WorkerSignals`, `NodeSignalManager`, or
+promote some of the dict-shaped node-info structures in `defineNodeInfo`
+to dataclasses.
+**Reason:** Phase 8.2's brief is to extract symbols that are *already*
+discrete, framework-free data types — not to invent new ones.
+`WorkerSignals` is a `pyqtSignal` holder and moves with the executor in
+Phase 8.4 (`NodzWorkers` region). `NodeSignalManager` is a `QObject`
+subclass tightly coupled to Qt signal plumbing — neither a pure type nor
+something the executor extraction needs separated yet. Converting the
+`defineNodeInfo` dicts to dataclasses is a larger redesign that would
+ripple through Phase 9's registry work and is out of scope for an
+"extract what's already a type" pass. The flowchart-regions decision on
+2026-05-17 already foreshadowed this outcome.
+**Affects:** new package `glados_pycromanager/autonomous/`; new
+`autonomous/types.py`; `GUI/FlowChart_dockWidgets.py` gains an import and
+loses the in-file `GladosGraph` definition (~60 LOC removed).
+
+---
+
 *Append future decisions below this line, newest at the bottom.*

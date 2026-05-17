@@ -81,6 +81,7 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
 import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
 import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.autonomous.types import GladosGraph
 from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
 from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
 from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
@@ -1329,63 +1330,6 @@ class CustomGraphicsView(QtWidgets.QGraphicsView):
             None
         """
         nodz.setFixedSize(self.viewport().size())
-
-class GladosGraph:
-    """ 
-    Create a 'graph' in code-form of all connections in the scoring or acquisition flowchart. Basically gives information about what node is connected to what other nodes
-    """
-    #Also adds these values correctly for each node:
-        # self.n_connect_at_start = 0 #number of others connected at start (which should all be finished!)
-        # self.connectedToFinish = []
-        # self.connectedToData = []
-        
-    def __init__(self,parent):
-        """
-        Initialize a GladosGraph object
-        Create a 'graph' in code-form of all connections in the scoring or acquisition flowchart. Basically gives information about what node is connected to what other nodes
-
-        This function initializes a GladosGraph object.
-
-        Args:
-            parent (nodz_mda.GladosFlowchart): The nodz_mda flowchart object.
-
-        Returns:
-            None
-
-        """ 
-        self.parent = parent
-        self.nodes = []
-        self.startNodeIndex = -1
-        # self.unstartedNodes = []
-        # self.ongoingNodes = []
-        # self.finishedNodes = []
-
-    def addRawGraphEval(self,graphEval):
-        """
-        Adds information about connections to the nodes in a graphEval
-
-        This function adds information about connections to the nodes in a graphEval.
-        In particular, it adds to each node the nodes it is connected to
-        based on the connections in graphEval.
-
-        Args:
-            graphEval (list): A list of tuples that describe the connections in the graph.
-                Each tuple has the form (sending_node_name, receiving_node_name)
-
-        Returns:
-            None
-
-        """
-        #Also generate a list of all nodes in this graph
-        self.allNodeNames = []
-        for graphEvalPartFull in graphEval:
-            for graphEvalPartFull2 in graphEvalPartFull:
-                graphEvalPart = graphEvalPartFull2.split('.')[0]
-                if graphEvalPart not in self.allNodeNames:
-                    self.allNodeNames.append(graphEvalPart)
-        
-        for nodeName in self.allNodeNames:
-            self.nodes.append(self.parent.findNodeByName(nodeName))
 
 class NodeSignalManager(QObject):
     """
