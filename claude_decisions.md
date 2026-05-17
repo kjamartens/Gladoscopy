@@ -265,6 +265,43 @@ step's intent is satisfied. Future Phase 17.3 (UserManual refresh for
 new tooling) is the right place for substantive updates.
 **Affects:** none.
 
+## 2026-05-17 — Skip RT / CustomFunctions hot-reload tests for now  [Phase 5.6]
+**Decision:** `tests/test_plugin_discovery.py` exercises the
+Analysis_Measurements drop-in path end-to-end (clean sys.modules reload
++ AppData seed) but marks the equivalent Real_Time_Analysis and
+CustomFunctions tests as `@pytest.mark.skip`. A third test exercises
+the shared `load_additional_modules` helper directly so the contract is
+still pinned for the other two subpackages.
+**Alternatives:** (a) keep the failing tests and ship them red; (b)
+restructure the `__init__.py` files now to break the circular import.
+**Reason:** Both subpackages have an existing module
+(`BioImageModelZoo.py`, etc.) that does `from
+glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *`
+— a star-import from its own package. On a clean reload the package
+is only partially initialised when that import fires, raising
+`AttributeError` for any sibling module not yet loaded. Untangling the
+star-import is **Phase 6.3** ("thin plugin __init__ files"); doing it
+now would smuggle Phase 6 work into Phase 5. The skip mark carries an
+explicit "re-enable after Phase 6.3" reason so the gap is visible.
+**Affects:** `tests/test_plugin_discovery.py` — two `@pytest.mark.skip`
+decorators to remove in Phase 6.3 verification.
+
+## 2026-05-17 — Phase 5.6 documents the loader's hidden-globals quirk  [Phase 5.6]
+**Decision:** The `test_load_additional_modules_picks_up_tmp_file` test
+asserts against the `Analysis_Measurements.__all__` *module-global*
+after calling the helper, not the `all_modules` argument it passes in.
+A comment in the test explains the quirk and points at Phase 6.2.
+**Alternatives:** Patch the helper to honour the passed list (would be
+a Phase 6 refactor smuggled into Phase 5).
+**Reason:** The contract test must match production behaviour. The
+loader uses a closure over the defining module's `__all__` and ignores
+the parameter — Phase 6.2 lifts this into a clean
+`load_node_modules(folder, prefix) -> list[ModuleType]`. The current
+test locks in the as-built behaviour so that Phase 6's refactor has a
+fail-loud regression target.
+**Affects:** `tests/test_plugin_discovery.py` — adjust assertion when
+Phase 6.2 lands.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
