@@ -637,7 +637,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | [x] 8.6 | Add `tests/test_recipe_io.py` and `tests/test_executor.py` against `Showcase_Basic1.json` | Locked-in behavior | Commit `test: recipe IO and executor` |
 | [x] 8.7 | Verification gate | CI green; manual: open the autonomous dock, load `Showcase_Basic1.json`, no regressions | Smoke note in commit |
 
-### [~] Phase 9 — Replace `eval()` with a function registry
+### [x] Phase 9 — Replace `eval()` with a function registry
 
 **Goal**: Kill the eval-based dispatch in autonomous microscopy.
 
@@ -650,7 +650,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | [x] 9.5 | Replace each `eval(createFunctionWithKwargs(...))` call site with `dispatch(name, **kwargs)` | Eval-free hot path | Commit per call site (10–15 commits) |
 | [x] 9.6 | Keep `createFunctionWithKwargs` for string display only, mark unsafe variants `_str_for_display` | Clear separation | Commit `refactor: rename eval-only string builders` |
 | [x] 9.7 | Update `tests/test_helper_functions.py` and add `tests/test_registry.py` | Coverage on the new path | Commit `test: registry dispatch` |
-| [ ] 9.8 | Verification gate | CI green; manual: run the example recipe end-to-end | Pytest + run note |
+| [x] 9.8 | Verification gate | CI green; manual: run the example recipe end-to-end | Pytest + run note |
 
 ### [ ] Phase 10 — Error-handling: tighten existing **and** add new checks
 
