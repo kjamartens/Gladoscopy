@@ -95,12 +95,12 @@ class MDAConfig:
 
 @dataclass
 class WebhookConfig:
-    slack_token:   str = setting("xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf",
-                            "Slack Token",   "The token for Slack messaging (Slack-token)")
-    slack_secret:  str = setting("e8cd04aa4cc9ec7c51729ec6ecf98c1c",
-                            "Slack Secret",  "The secret ID for Slack messaging (Slack-secret)")
-    slack_channel: str = setting("glados-bot",
-                            "Slack Channel", "Channel for the Slack node to send messages to (Slack-channel)")
+    slack_token:   str = setting("",
+                            "Slack Token",   "The token for Slack messaging (Slack-token). Configure via Slack Settings dialog.")
+    slack_secret:  str = setting("",
+                            "Slack Secret",  "The secret ID for Slack messaging (Slack-secret). Configure via Slack Settings dialog.")
+    slack_channel: str = setting("",
+                            "Slack Channel", "Channel for the Slack node to send messages to (Slack-channel). Configure via Slack Settings dialog.")
     
 @dataclass
 class VisualisationConfig:
