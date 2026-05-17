@@ -15,6 +15,7 @@ import numpy as np
 from csbdeep.utils import normalize
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -36,6 +37,7 @@ def __function_metadata__():
     }
 
 
+@register("ExampleCustomFunction_DiceRoll.DiceRoll")
 def DiceRoll(core,**kwargs):
     import logging
     diceRoll = np.random.randint(1,int(kwargs['MaxDiceValue']))
