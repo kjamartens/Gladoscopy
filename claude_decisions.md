@@ -357,4 +357,31 @@ elsewhere.
 
 ---
 
+## 2026-05-17 — Flowchart region map indexed by `#region` markers, not Nodz region semantics  [Phase 8.1]
+**Decision:** `docs/flowchart-regions.md` maps `FlowChart_dockWidgets.py` by
+its own intra-file `#region` markers (`Dialogs_Nodz`, `NodzHelperClasses`,
+the eight intra-class regions, `ScanningWidget`, `DecisionWidget`,
+`VariablesWidget`, `LoggerWidget`, `NodzWorkers`) and by the extraction
+targets named in Phase 8.2 – 8.5 (`autonomous/types.py`,
+`autonomous/recipe_io.py`, `autonomous/executor.py`).
+**Alternatives:** The plan's literal phrasing — "lines x–y handle
+Initialisation pane, y–z handle Scoring graph, z–w handle Acquisition
+graph, w–end handle the runtime executor" — would have produced four
+init/score/acq/exec ranges.
+**Reason:** The file isn't actually structured by Nodz-region semantics
+(pink/green/yellow). Init/Scoring/Acquisition handlers are interleaved in a
+single `NodzFlowChart Node-specific` region, and the run-orchestration
+methods (`fullAutonomousRunStart`, `runInitOnly`, `runScoringOnly`,
+`runAcquiring`) live together in `NodzFlowChart runs`. Cutting along the
+extraction-target lines (types / recipe-IO / executor) is the seam future
+sub-phases actually need; cutting along init/score/acq would just produce
+a map that doesn't match the code.
+**Affects:** `docs/flowchart-regions.md`; foreshadows that Phase 8.4 will
+combine three regions (`NodzFlowChart runs` + `NodzFlowChart Node-specific`
++ `NodzWorkers`) into one `executor.py`, and that Phase 8.2 may produce a
+near-empty `autonomous/types.py` because the file holds few standalone
+data types today.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*

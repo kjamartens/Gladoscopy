@@ -622,14 +622,14 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 7.6 | Add a temporary `tests/test_utils_reexport.py` that imports every public name from the old path and the new path and asserts equality | Reexports verified | Commit `test: shim re-export equivalence` |
 | [x] 7.7 | Verification gate | CI green; manual smoke test of `glados` startup | Commit `chore: phase 7 verification` referencing test pass |
 
-### [ ] Phase 8 — Split god-files: `FlowChart_dockWidgets.py`
+### [~] Phase 8 — Split god-files: `FlowChart_dockWidgets.py`
 
 **Goal**: Carve the 6 285-LOC flowchart module along its natural seams.
 Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| [ ] 8.1 | Read and document the file's regions in `docs/flowchart-regions.md` (a map: lines x–y handle Initialisation pane, y–z handle Scoring graph, z–w handle Acquisition graph, w–end handle the runtime executor) | Plan ready | Commit `docs: flowchart-regions map` |
+| [x] 8.1 | Read and document the file's regions in `docs/flowchart-regions.md` (a map: lines x–y handle Initialisation pane, y–z handle Scoring graph, z–w handle Acquisition graph, w–end handle the runtime executor) | Plan ready | Commit `docs: flowchart-regions map` |
 | [ ] 8.2 | Extract pure data classes / enums into `glados_pycromanager/autonomous/types.py` | First slice out | Commit `refactor: extract autonomous types` |
 | [ ] 8.3 | Extract the JSON recipe load/save helpers into `glados_pycromanager/autonomous/recipe_io.py` | Recipe I/O isolated | Commit `refactor: extract recipe I/O` |
 | [ ] 8.4 | Extract the runtime executor into `glados_pycromanager/autonomous/executor.py` | Executor isolated | Commit `refactor: extract autonomous executor` |
