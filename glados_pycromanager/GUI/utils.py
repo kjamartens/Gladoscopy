@@ -145,8 +145,8 @@ def functionNamesFromDir(dirname):
     try:
         additional_folder_name = os.path.join("C:\\Users\\Koen Martens\\AppData\\Local\\UniBonn\\Glados",dirname)
         functionnamearr = addFilesToAbsolutePath(functionnamearr,additional_folder_name)
-    except:
-        pass
+    except OSError as exc:
+        logging.debug('Optional hard-coded AppData path %s unavailable: %s', additional_folder_name, exc)
     
     #return all functions
     return functionnamearr
@@ -617,8 +617,8 @@ def typeFromKwarg(functionname,kwargname):
                 #check if this has a default value:
                 if 'type' in functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]:
                     typing = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['type']
-        
-    except:
+
+    except (KeyError, IndexError, TypeError, AttributeError):
         typing=None
     return typing
 
@@ -643,7 +643,8 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
                 if entry[1] == current_selected_function:
                     currentSelectedFunctionReadable = entry[0]
             curr_layout.parent().parent().currentData['__selectedDropdownEntryAnalysis__'] = currentSelectedFunctionReadable
-        except: #This exception is if I'm doing this directly from the GUI, not from nodz
+        except (AttributeError, KeyError):
+            # raised when called directly from the GUI rather than nodz
             pass
         
         #Show/hide varialbes/advanced lineedits and such
@@ -686,12 +687,12 @@ def attemptToEvaluateVariables(value,nodzInfo):
         if checkExactlySingleVariable:
             try:
                 finalVal = nodz_evaluateVar(value,nodzInfo)
-            except:
+            except (KeyError, AttributeError, TypeError, ValueError):
                 finalVal = value
         elif checkAdvanced:
             try:
                 finalVal = nodz_evaluateAdv(value,nodzInfo)
-            except:
+            except (KeyError, AttributeError, TypeError, ValueError, SyntaxError, NameError):
                 finalVal = value
         else:
             finalVal = value
@@ -727,8 +728,8 @@ def nodz_setVariableToValue(variable,value,nodzInfo):
                 if type(eval(value)) in nodzInfo.globalVariables[variableName]['type']:
                     nodzInfo.globalVariables[variableName]['data'] = eval(value)
                     logging.debug(f"Set global variable {variableName} to {eval(value)}")
-            except:
-                logging.error(f'Type mismatch in variable setting! {variableName} and {value}')
+            except (SyntaxError, NameError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                logging.error('Type mismatch in variable setting! %s and %s (%s)', variableName, value, exc)
     return
 
 def nodz_evaluateVar(varName,nodzInfo):
@@ -812,12 +813,12 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
                 if calculatable: #if calculatable
                     try:
                         updating_string = updating_string.replace(foundstring,""+data+"")
-                    except:
+                    except TypeError:
                         updating_string = updating_string.replace(foundstring,""+str(data)+"")
                 else: #uncalculatable, add as string
                     try:
                         updating_string = updating_string.replace(foundstring,""+data+"")
-                    except:
+                    except TypeError:
                         updating_string = updating_string.replace(foundstring,""+str(data)+"")
         except KeyError:
             pass
@@ -830,23 +831,23 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
         else:
             try:
                 finalData = eval(updating_string_backslash)
-            except:
-                logging.error(f"Error when assessing adv variable {varName}: {updating_string_backslash}")
+            except (SyntaxError, NameError, ValueError, TypeError, AttributeError) as exc:
+                logging.error('Error when assessing adv variable %s: %s (%s)', varName, updating_string_backslash, exc)
                 finalData = None
             return finalData
     else:
         #If not a true advanced, try, in turn, if it's int, if it's float, and if it can be evaluated as a var.
         try:
             varNameN = int(varName)
-        except:
+        except (ValueError, TypeError):
             try:
                 varNameN = float(varName)
-            except:
+            except (ValueError, TypeError):
                 try:
                     varNameN = nodz_evaluateVar(varName,nodzInfo)
                     logging.warning(f"Wrong syntax for advanced variable [but seems to be a variable instead]! Details: {varName} - interpreting as variable")
-                except:
-                    logging.error(f'Wrong syntax for advanced variable! Details: {varName} - interpreting as value')
+                except (KeyError, AttributeError, TypeError, ValueError, NameError):
+                    logging.error('Wrong syntax for advanced variable! Details: %s - interpreting as value', varName)
                     varNameN = varName
         return varNameN
 
@@ -1468,7 +1469,7 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
     try:
         logging.debug('Changing layout '+curr_layout.parent().objectName())
-    except:
+    except (AttributeError, RuntimeError):
         pass
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
@@ -1987,7 +1988,7 @@ def kwargValueInputChanged(line_edit):
             try:
                 value = str(line_edit.text())
                 setLineEditStyle(line_edit,type='Normal')
-            except:
+            except (AttributeError, RuntimeError, TypeError):
                 #Show as warning
                 setLineEditStyle(line_edit,type='Warning')
         elif expectedType is not str:
@@ -2003,7 +2004,7 @@ def kwargValueInputChanged(line_edit):
                         setLineEditStyle(line_edit,type='Normal')
                     else:
                         setLineEditStyle(line_edit,type='Warning')
-            except:
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 #Show as warning
                 setLineEditStyle(line_edit,type='Warning')
     else:
@@ -2692,7 +2693,7 @@ class SmallWindow(QMainWindow):
             #Get all but the last element of this:
             filefolder = '/'.join(filefolder[:-1])
             folderName = filefolder
-        except:
+        except (AttributeError, IndexError, TypeError):
             folderName = ""
         
         file_name, _ = QFileDialog.getOpenFileName(None, "Open File", folderName, fileArgs, options=options)
@@ -2709,7 +2710,7 @@ class SmallWindow(QMainWindow):
                 LineEditText = LineEditText.split('.')
                 LineEditText[-2] = LineEditText[-2]+textAddPrePeriod
                 LineEditText = '.'.join(LineEditText)
-            except:
+            except (IndexError, AttributeError):
                 pass
         lineedit.setText(LineEditText)
     
@@ -3008,14 +3009,13 @@ class CustomMainWindow(QWidget):
                             if isinstance(currentParent.dockwidget, napariGlados.dockWidget_MMcontrol):
                                 saveState = 'MMControls'
                                 break
-                        except:
+                        except AttributeError:
                             try:
                                 if currentParent.type == 'MMConfig':
                                     saveState = 'MMControls'
                                     break
-                            except:
+                            except AttributeError:
                                 pass
-                            pass
                     
                 if saveState is not None:
                     try:
@@ -3025,7 +3025,7 @@ class CustomMainWindow(QWidget):
                             textv = value.currentText()
                         else:
                             textv = None
-                    except:
+                    except (AttributeError, RuntimeError):
                         textv = None
                     state[saveState][key] = {
                         'text': textv,
@@ -3082,7 +3082,7 @@ class CustomMainWindow(QWidget):
                             if isinstance(currentParent, napariGlados.dockWidget_MDA):
                                 saveState = 'MDA'
                                 break
-                        except:
+                        except AttributeError:
                             break
                     
                 if saveState is not None:
@@ -3133,29 +3133,29 @@ def forceReset_actual(shared_data):
     try:
         shared_data.liveMode = False
         logging.debug("Attempted: shared_data.liveMode=False")
-    except:
+    except (AttributeError, RuntimeError):
         logging.debug("Attempted but failed: shared_data.liveMode=False")
     try:
         shared_data.mdaMode = False
         logging.debug("Attempted: shared_data.mdaMode=False")
-    except:
+    except (AttributeError, RuntimeError):
         logging.debug("Attempted but failed: shared_data.mdaMode=False")
     time.sleep(0.1)
     try:
         core.stop_sequence_acquisition()
         logging.debug("Attempted: core.stop_sequence_acquisition()")
-    except:
+    except (AttributeError, RuntimeError, OSError):
         logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
     try:
         core.stop_exposure_sequence(core.get_camera_device())
         logging.debug("Attempted: core.stop_sequence_acquisition()")
-    except:
-        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
+    except (AttributeError, RuntimeError, OSError):
+        logging.debug("Attempted but failed: core.stop_exposure_sequence()")
     time.sleep(0.1)
     try:
         core.clear_circular_buffer()
         logging.debug("Attempted: core.clear_circular_buffer()")
-    except:
+    except (AttributeError, RuntimeError, OSError):
         logging.debug("Attempted but failed: core.clear_circular_buffer()")
 
 def forceReset(shared_data):
@@ -3207,14 +3207,14 @@ def openAdvancedSettings(shared_data):
                         #Try to make integer/float:
                         try:
                             setattr(group, f.name,float(getattr(group, f.name)))
-                        except:
+                        except (ValueError, TypeError):
                             pass
                         try:
                             setattr(group, f.name,int(getattr(group, f.name)))
-                        except:
+                        except (ValueError, TypeError):
                             pass
-                    except:
-                        logging.warning(f"Couldn't save global data of entry {f}")
+                    except (AttributeError, KeyError, TypeError) as exc:
+                        logging.warning("Couldn't save global data of entry %s: %s", f, exc)
         
         
         # for entry in shared_data.globalData:
@@ -3281,7 +3281,7 @@ def openAdvancedSettings(shared_data):
                         editField.setCurrentText(str(currentValue))
                         layout.addWidget(editField,currentRow,1)
                         label.setToolTip(editField)
-                except:
+                except (AttributeError, RuntimeError):
                     pass
 
 
@@ -3430,7 +3430,8 @@ def getCoreDevicesOfDeviceType(core,devicetype):
                 logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
-    except:
+    except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as exc:
+        logging.warning('Enumerating devices of type %s failed: %s', devicetype, exc)
         return []
 def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
     """
@@ -3623,9 +3624,9 @@ def set_up_logger():
         
         # Auto-stop listener on program exit
         atexit.register(queue_listener.stop)
-        
-    except:
-        logging.error('Error in setting up loggers')
+
+    except (OSError, ValueError, RuntimeError) as exc:
+        logging.error('Error in setting up loggers: %s', exc)
         
 def set_up_logger_depracated():
     """
@@ -3670,8 +3671,8 @@ def set_up_logger_depracated():
         # Add the handlers to the logger
         logger.addHandler(file_handlerINFO)
         logger.addHandler(file_handlerDEBUG)
-    except:
-        logging.error('Error in setting up loggers')
+    except (OSError, ValueError, RuntimeError) as exc:
+        logging.error('Error in setting up loggers: %s', exc)
 
 
     for handler in logger.handlers:
