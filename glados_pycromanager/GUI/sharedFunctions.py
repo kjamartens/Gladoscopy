@@ -66,9 +66,8 @@ class LoggingList(list):
                 removed_entry.stop()
                 removed_entry.destroy()
                 logging.debug('succesfully stopped/destroyed Analysis thread '+str(removed_entry))
-            except:
-                logging.debug('UNsuccesfully stopped/destroyed Analysis thread '+str(removed_entry))
-                pass
+            except (AttributeError, RuntimeError) as exc:
+                logging.warning('Could not stop/destroy Analysis thread %s: %s', removed_entry, exc)
     
     
 
@@ -224,15 +223,15 @@ class Shared_data(QObject):
             for key in globalDataInfo:
                 try:
                     self.globalData[key]['value'] = globalDataInfo[key]
-                except:
-                    pass
+                except (KeyError, TypeError, AttributeError) as exc:
+                    logging.debug('globalData key %r not present in current schema (%s)', key, exc)
         
         if self.config.webhook_config.slack_token is not None and not len(self.config.webhook_config.slack_token) == 0:
             try:
                 self.config.webhook_config.slack_client = slack.WebClient(token=self.config.webhook_config.slack_token)
                 logging.debug('Slack client initialised')
-            except:
-                logging.error('Error with Slack!')
+            except (ValueError, TypeError, AttributeError, OSError) as exc:
+                logging.error('Slack client initialisation failed: %s', exc)
     
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
@@ -379,8 +378,8 @@ class Shared_data(QObject):
             if self.loadingOngoing == False:
                 from utils import updateAutonousErrorWarningInfo
                 updateAutonousErrorWarningInfo(self,updateInfo='All')
-        except:
-            pass
+        except (AttributeError, ImportError, RuntimeError) as exc:
+            logging.debug('updateAutonousErrorWarningInfo not available yet: %s', exc)
     
 class Dict_Specific_WarningErrorInfo(dict):
     def __init__(self, *args, **kwargs):
