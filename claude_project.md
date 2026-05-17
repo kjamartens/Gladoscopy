@@ -637,13 +637,13 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | [x] 8.6 | Add `tests/test_recipe_io.py` and `tests/test_executor.py` against `Showcase_Basic1.json` | Locked-in behavior | Commit `test: recipe IO and executor` |
 | [x] 8.7 | Verification gate | CI green; manual: open the autonomous dock, load `Showcase_Basic1.json`, no regressions | Smoke note in commit |
 
-### [ ] Phase 9 — Replace `eval()` with a function registry
+### [~] Phase 9 — Replace `eval()` with a function registry
 
 **Goal**: Kill the eval-based dispatch in autonomous microscopy.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| [ ] 9.1 | Add `glados_pycromanager/autonomous/registry.py` with `@register("Module.Function")` decorator and a `dispatch(name, **kwargs)` function | Registry ready | Commit `feat: autonomous function registry` |
+| [x] 9.1 | Add `glados_pycromanager/autonomous/registry.py` with `@register("Module.Function")` decorator and a `dispatch(name, **kwargs)` function | Registry ready | Commit `feat: autonomous function registry` |
 | [ ] 9.2 | Decorate all functions in `Analysis_Measurements/` with `@register(...)` (one commit per file: `AverageImage`, `AverageIntensity`, `RandomShapes`, `StarDist_image`, `checkAgainstList`) | 5 small commits | 5 commits `feat: register <node>` |
 | [ ] 9.3 | Decorate all functions in `Real_Time_Analysis/` (`BioImageModelZoo`, `EndAtFrame`, `FFT_im`, `LaserAdjustment`, `pSMLM`, `RT_counter`, `SharpnessValue`) | 7 small commits | 7 commits |
 | [ ] 9.4 | Decorate all in `CustomFunctions/` (`AutoFocusBF`, `Strobo_lasers`, `ExampleCustomFunction_DiceRoll`) | 3 small commits | 3 commits |
