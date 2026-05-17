@@ -302,6 +302,24 @@ fail-loud regression target.
 **Affects:** `tests/test_plugin_discovery.py` — adjust assertion when
 Phase 6.2 lands.
 
+## 2026-05-17 — Add "Scheduled / deferred" section to claude_issues.md  [Phase 6 entry]
+**Decision:** Issues that explicitly name a future phase as their fix
+target live under a new "Scheduled / deferred" section instead of the
+strict "Open issues" list. The continue-protocol's "open list must be
+empty" guardrail then keeps its teeth (blocking issues actually block),
+while documented-future-fixes don't force pre-emption of plan order.
+**Alternatives:** (a) leave deferred items in "Open issues" — the
+continue protocol then either fires the planned future phase early or
+silently passes over the guardrail; (b) drop them entirely — loses
+traceability.
+**Reason:** Came up when Phase 5.7 surfaced the `MIL.create_mda`
+mutable-default trap, which is already scheduled for Phase 10.8. The
+strict open-list-must-be-empty reading would push 10.8 work into Phase
+6 prematurely. Splitting "blocking" from "scheduled" matches what the
+inbox is actually used for.
+**Affects:** `claude_issues.md` structure; future entries must choose
+the right section.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
