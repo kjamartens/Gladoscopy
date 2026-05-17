@@ -209,7 +209,8 @@ class ConfigInfo:
             #Finally we get the current value of the slider
             try:
                 currentValue = (self.shared_data.MILcore.get_property(device_label,property_name))
-            except:
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logging.debug('get_property(%s,%s) failed: %s', device_label, property_name, exc)
                 currentValue = 0
             return currentValue
         
@@ -255,8 +256,8 @@ class MMConfigUI(CustomMainWindow):
                 # global core, napariViewer
                 core = shared_data.core
                 napariViewer = shared_data.napariViewer
-            except Exception as e:
-                logging.error(f'Line 237 fails: {e}')
+            except AttributeError as e:
+                logging.error('shared_data.core / napariViewer not set: %s', e)
         super().__init__()
         self.shared_data = shared_data #Set global shared_data also as self.attribute
         self.fullyLoaded = False
@@ -306,10 +307,9 @@ class MMConfigUI(CustomMainWindow):
             try:
                 import utils
                 self.iconFolder = utils.findIconFolder()
-            except:
-                logging.error("No glados_pycromanager package found")
+            except (ImportError, AttributeError, OSError) as exc:
+                logging.error("No glados_pycromanager package found: %s", exc)
                 self.iconFolder = ''
-                pass
         
         
         if showLiveSnapExposureButtons:
@@ -997,8 +997,8 @@ class MMConfigUI(CustomMainWindow):
                 newY = int(roiv[1]+(curTotHeight-newTotHeight)/2)
                 #Set the new ROI size
                 self.setROI([newX,newY,newTotWidth,newTotHeight])
-            except:
-                logging.error('ZOOMING IN DIDN\'T WORK!')
+            except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+                logging.error('Zoom-in failed: %s', exc)
         elif option == 'ZoomOut':
             #zoom in twice
             try:
@@ -1011,9 +1011,9 @@ class MMConfigUI(CustomMainWindow):
                 newY = int(roiv[1]-(newTotHeight-curTotHeight)/2)
                 #Set the new ROI size
                 self.setROI([newX,newY,newTotWidth,newTotHeight])
-            except:
-                logging.error('ZOOMING IN DIDN\'T WORK!')
-    
+            except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+                logging.error('Zoom-out failed: %s', exc)
+
     def setROI(self,ROIpos):
         """
         Set the ROI to the specified position and size.
@@ -1031,8 +1031,8 @@ class MMConfigUI(CustomMainWindow):
                 self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
                 time.sleep(0.5)
                 shared_data.liveMode = True
-        except:
-            logging.error('ZOOMING DIDN\'T WORK!')
+        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+            logging.error('setROI(%s) failed: %s', ROIpos, exc)
     
     def shape_drawn_callback(self, event):
         if len(self.drawROIlayer.data) > 0:
@@ -1138,8 +1138,8 @@ class MMConfigUI(CustomMainWindow):
         #remove the self.drawROIlayer:
         try:
             shared_data.napariViewer.layers.remove(self.drawROIlayer)
-        except:
-            logging.error('Failed to remove the drawROIlayer')
+        except (AttributeError, RuntimeError, KeyError, ValueError) as exc:
+            logging.warning('Failed to remove the drawROIlayer: %s', exc)
         
         #Reset the Draw ROI button
         self.ROIoptionsButtons['drawROI'].setText('Draw ROI')
@@ -1465,8 +1465,8 @@ class MMConfigUI(CustomMainWindow):
                 if device_found_type == devicetype: #type:ignore
                     logging.debug("found " + device + " of type " + devicetype)
                     devicesOfType.append(device)
-        except Exception as e:
-            print(e)
+        except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as e:
+            logging.warning('Enumerating devices of type %s failed: %s', devicetype, e)
         return devicesOfType
     
     def oneDstageLayout(self):
@@ -1491,8 +1491,8 @@ class MMConfigUI(CustomMainWindow):
         #Set default value to default z stage of MM
         try:
             self.oneDstageDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
-        except:
-            pass
+        except (RuntimeError, OSError, AttributeError) as exc:
+            logging.debug('get_focus_device() not available for oneDstage: %s', exc)
         #Add the dropdown to the layout:
         self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0)
         
@@ -1599,8 +1599,8 @@ class MMConfigUI(CustomMainWindow):
         #Set default value to default z stage of MM
         try:
             self.oneDstageRelDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
-        except:
-            pass
+        except (RuntimeError, OSError, AttributeError) as exc:
+            logging.debug('get_focus_device() not available for oneDstageRel: %s', exc)
         #Add the dropdown to the layout:
         self.oneDStageRelLayout.addWidget(self.oneDstageRelDropdown,0,0)
         
@@ -1663,8 +1663,8 @@ class MMConfigUI(CustomMainWindow):
                 self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
             #Align text center:
             self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        except:
-            pass
+        except (RuntimeError, OSError, AttributeError, TypeError) as exc:
+            logging.debug('XY stage position update skipped: %s', exc)
         
     def moveXYStage(self,relX,relY):
         """
