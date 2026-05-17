@@ -18,6 +18,7 @@ import ndtiff
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -189,6 +190,7 @@ def sharpnessScore_from_image(image,method='Redondo'):
     print(f"Sharpness score: {finalScore}")
     return finalScore
 
+@register("AutoFocusBF.auto_focus_iter_rel_bf")
 def auto_focus_iter_rel_bf(core,**kwargs):
     
     #Check if we have the required kwargs
@@ -287,6 +289,7 @@ def auto_focus_iter_rel_bf(core,**kwargs):
     
     return output
 
+@register("AutoFocusBF.auto_focus_iter_abs_bf")
 def auto_focus_iter_abs_bf(core,**kwargs):
     
     #Check if we have the required kwargs
