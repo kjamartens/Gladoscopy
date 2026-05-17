@@ -166,6 +166,24 @@ step pulls in heavy Glados-side imports. Disabling the three offenders is
 the lowest-risk fix and the result is identical to explicit-path mode.
 **Affects:** `pyproject.toml` (`[tool.pytest.ini_options].addopts`).
 
+## 2026-05-17 — uv.lock stays tracked  [Phase 1.2]
+**Decision:** Leave `uv.lock` un-ignored (tracked when present). The default
+`.gitignore` already comments it out with the recommendation to commit it.
+**Alternatives:** Ignore it via `.gitignore` (skip lockfile entirely).
+**Reason:** This is an application/UI bundle (not a library), so reproducible
+installs from a committed lockfile are a clear win — matches the pyproject
+hard-pin philosophy. There is no `uv.lock` in the repo yet; this decision
+just preserves the default so when one is generated it gets tracked.
+**Affects:** `.gitignore` (line 101 comment retained).
+
+## 2026-05-17 — `.venv/` already ignored  [Phase 1.2]
+**Decision:** Skip adding `.venv/` as a duplicate entry — line 153 (`.venv`)
+in the existing `.gitignore` already covers it.
+**Alternatives:** Add a redundant trailing-slash form.
+**Reason:** Plan step 1.2 listed `.venv/` but the existing entry handles
+both file-and-dir cases. Avoiding duplication keeps `.gitignore` clean.
+**Affects:** none — pre-existing entry suffices.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*

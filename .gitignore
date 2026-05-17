@@ -220,3 +220,11 @@ __marimo__/
 .vscode/
 .qodo/
 /.vscode
+
+# Project-specific
+scalene-profile.*
+*.docx
+~$*
+*.swp
+bash.exe.stackdump
+
