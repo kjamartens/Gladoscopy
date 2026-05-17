@@ -91,3 +91,50 @@ Keep it on new top-level modules under `glados_pycromanager/` if they're meant t
 ## Documentation
 
 User-facing docs live at `glados_pycromanager/Documentation/UserManual.md`; the developer overview is at `glados_pycromanager/Documentation/index.html`. Images are in `glados_pycromanager/Documentation/Images/`.
+
+## Optimization plan & "continue" protocol
+
+There is a long-form optimization roadmap at `claude_project.md`. It defines a
+multi-phase plan that runs on a dedicated branch named `claude_optimization`
+(already created — make sure you are on that branch before touching code),
+with small atomic commits per step.
+
+Three companion files live alongside it:
+
+- **`claude_issues.md`** — inbox for bugs/regressions/follow-ups that must
+  be fixed *before* further plan progress. Empty checklist is fine until
+  issues appear.
+- **`claude_decisions.md`** — append-only log of design and process decisions
+  taken while executing the plan. Whenever you make a non-trivial choice
+  (which option to pick, what to skip, what to defer), record it there in
+  the documented format. This is the place to look when answering "why was
+  it done this way?" in a future session.
+- **`claude_project.md`** — the plan itself.
+
+When the user says **"continue"** (or any equivalent like "keep going",
+"resume", "next step"), follow this protocol exactly:
+
+1. **Confirm you are on `claude_optimization`.** If not, `git checkout
+   claude_optimization`. Never commit plan work to another branch.
+2. **Read `claude_issues.md` first.** If it contains any unresolved issues
+   (typically as a checklist of `- [ ] ...` items), fix those one by one,
+   each in its own commit on the `claude_optimization` branch. Mark items
+   `- [x]` as you resolve them and move them under `## Resolved (history)`.
+   Do not proceed to step 3 until the open list is empty.
+3. **Then advance the plan.** Look at the most recent commit on
+   `claude_optimization` and pick up at the next un-committed step from the
+   Actionables section of `claude_project.md`. Execute exactly that step in
+   a single small commit. Do not skip ahead.
+4. **Record decisions.** When you make a non-trivial choice while executing
+   a step (skip an item, pick option A over B, defer something), add an
+   entry to `claude_decisions.md` in the same commit.
+5. **Stop at the next phase verification gate** and wait for the user's
+   confirmation before starting the next phase.
+6. If `claude_project.md` does not exist, or the branch does not exist, ask
+   the user before re-creating them.
+7. Every commit message follows conventional-commits style (`feat:`, `fix:`,
+   `refactor:`, `perf:`, `test:`, `docs:`, `chore:`, `tool:`, `ci:`,
+   `style:`, `reliability:`, `security:`, `release:`, `ux:`, `build:`).
+
+Do not run the optimization plan unprompted — it only kicks off on
+"continue" (or an explicit instruction).
