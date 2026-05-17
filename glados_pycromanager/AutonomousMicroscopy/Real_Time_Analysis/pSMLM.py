@@ -21,6 +21,7 @@ from skimage.feature.peak import peak_local_max
 
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -112,6 +113,7 @@ def phasor_fitting(ROI,ROIradius,localpeak):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("pSMLM.pSMLM")
 class pSMLM:
     def __init__(self,core,**kwargs):
         #Check if we have the required kwargs
