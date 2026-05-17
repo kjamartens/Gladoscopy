@@ -249,6 +249,22 @@ classes back to blocking once their findings hit zero.
 **Affects:** `.github/workflows/ci.yml` — remove `--exit-zero` /
 `continue-on-error` as cleanups land.
 
+## 2026-05-17 — Skip Phase 4.3 — UserManual already at 3.13  [Phase 4.3]
+**Decision:** Phase 4.3 ("update UserManual.md Python version 3.10 → 3.13")
+is a no-op: `glados_pycromanager/Documentation/UserManual.md` already
+reads "Python 3.13" at the two installation references (`environment.yaml`
+context and the `conda create … python=3.13` example). No `3.10`
+matches under the `Documentation/` tree. The plan was written against
+the historical state CLAUDE.md flagged; the file was apparently fixed
+between then and now. Skipping the step rather than creating an empty
+commit.
+**Alternatives:** Author a cosmetic touch (e.g. a "Requirements" line)
+to give 4.3 an artifact.
+**Reason:** "Don't add features beyond what the task requires"; the
+step's intent is satisfied. Future Phase 17.3 (UserManual refresh for
+new tooling) is the right place for substantive updates.
+**Affects:** none.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
