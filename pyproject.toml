@@ -64,7 +64,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-ra"
+# Disable napari's auto-registered pytest plugins — they trigger a
+# multi-minute hang during session init/teardown on this codebase.
+addopts = "-ra -p no:napari -p no:npe2 -p no:napari_plugin_engine"
 
 [tool.setuptools]
 packages = ["glados_pycromanager"]

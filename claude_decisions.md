@@ -149,6 +149,23 @@ phases (0–17) and added a "continue" protocol section to `CLAUDE.md`.
     Phase 15 (typing scope).
   - Fixed cross-phase references after renumbering.
 
+## 2026-05-17 — Disable napari pytest plugins via addopts  [Phase 1.1]
+**Decision:** Add `-p no:napari -p no:npe2 -p no:napari_plugin_engine` to
+`addopts` in `[tool.pytest.ini_options]` so the full pytest suite runs from
+the repo root without hanging.
+**Alternatives:** (a) always invoke pytest with an explicit `tests/` path
+(works but easy to forget and breaks `pytest` from any CWD), (b) downgrade
+pytest or napari (risky pin churn), (c) actually delete the offending test
+(no such test exists — the suite is 31 unit tests, all pure-logic).
+**Reason:** `pytest -q` with no args hangs 10+ minutes; `pytest tests/` works
+in ~1.2s; `--collect-only` is fast in both cases. Difference: napari's
+pytest-plugin entry-point triggers `npe2` plugin discovery during session
+teardown when rootdir scanning is broader. The Glados package registers a
+napari manifest (`[project.entry-points."napari.manifest"]`), so the discover
+step pulls in heavy Glados-side imports. Disabling the three offenders is
+the lowest-risk fix and the result is identical to explicit-path mode.
+**Affects:** `pyproject.toml` (`[tool.pytest.ini_options].addopts`).
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
