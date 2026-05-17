@@ -130,6 +130,10 @@ python_files = ["test_*.py"]
 # Disable napari's auto-registered pytest plugins — they trigger a
 # multi-minute hang during session init/teardown on this codebase.
 addopts = "-ra -p no:napari -p no:npe2 -p no:napari_plugin_engine"
+# Project is PyQt5-pinned (pyproject deps). pytest-qt otherwise grabs
+# PyQt6 from napari[all]'s install and our tests then refuse to import
+# PyQt5 over the top.
+qt_api = "pyqt5"
 
 [tool.setuptools.packages.find]
 # Auto-discover every subpackage (Core, GUI, AutonomousMicroscopy/*, …)
