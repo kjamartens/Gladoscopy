@@ -1,46 +1,37 @@
-# #Required INIT to ensure that all python files in this folder and the corresponding AppData folder are found and passed on      
-import importlib.util
-import os
+"""Auto-discover real-time-analysis nodes. See `Analysis_Measurements/__init__.py`."""
+from __future__ import annotations
 
-import appdirs
+import sys
+
+from glados_pycromanager.plugins.discovery import (
+    load_node_modules,
+    log_failures,
+    user_appdata_dir_for,
+)
+
+_NAME_PARTS = __name__.split(".")
+_HERE = (_NAME_PARTS[-2], _NAME_PARTS[-1])
+_PKG = sys.modules[__name__]
+_SOURCE_DIR = __spec__.submodule_search_locations[0] if __spec__ else None  # type: ignore[union-attr]
+
+__all__: list[str] = []
 
 
-#Set up a function to load modules/scripts in the environment
-def load_additional_modules(dirname, all_modules, prefix = ''):
-    #Loop over all py files in the directory:
-    for f in os.listdir(dirname):
-        #Check if they should be appended, and if so, append them to all
-        if f != "__init__.py" and os.path.isfile(os.path.join(dirname, f)) and f.endswith(".py"):
-            __all__.append(f[:-3])
-        
-    #Loop over all and add them as import
-    for module_name in all_modules:
-        try:
-            #First try the normal import
-            exec(f"from .{module_name} import *")
-        except ModuleNotFoundError:
-            #Otherwise import via importlib (from appdata folder)
-            module_name_without_extension = os.path.splitext(module_name)[0]
-            module_path = os.path.join(dirname, f"{module_name}.py")
-            full_module_name = f"{prefix}{module_name}" if prefix else module_name
-            spec = importlib.util.spec_from_file_location(full_module_name, module_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            globals()[module_name_without_extension] = module
+def _register(modules) -> None:
+    for mod in modules:
+        stem = mod.__name__.rsplit(".", 1)[-1]
+        setattr(_PKG, stem, mod)
+        if stem not in __all__:
+            __all__.append(stem)
 
-__all__ = []
-#First load modules from this exact path
-dirname = os.path.dirname(os.path.abspath(__file__))
-load_additional_modules(dirname,__all__)
-#Then add additional modules from the relevant appdirectory
-app_data_dir = appdirs.user_data_dir()
-path_components = os.path.normpath(dirname).split(os.sep)
-second_to_last_component = path_components[-2]
-last_component = path_components[-1]
-appdata_folder = os.path.join(app_data_dir, 'Glados-PycroManager',second_to_last_component,last_component)
-#Check if this folder exists, if not, create it:
-if not os.path.isdir(appdata_folder):
-    os.makedirs(appdata_folder)
-#Load modules from the appdata folder
-load_additional_modules(appdata_folder,__all__,prefix = f'{second_to_last_component}.{last_component}')
-pass
+
+_source_mods, _source_failures = load_node_modules(_SOURCE_DIR, prefix=__name__)
+_register(_source_mods)
+log_failures(_source_failures)
+
+_APPDATA_DIR = user_appdata_dir_for(_HERE)
+_appdata_mods, _appdata_failures = load_node_modules(
+    _APPDATA_DIR, prefix=f"{__name__}.appdata"
+)
+_register(_appdata_mods)
+log_failures(_appdata_failures)

@@ -595,7 +595,7 @@ here cover *current behavior*, locking it in before refactoring.
 |---|------|------------------|-------|
 | [x] 6.1 | In `MicroscopeInterfaceLayer.__init__`, add `self._mi: MicroscopeInstance = UNKNOWN`. Update `set_core` to compute it once. Have `MI()/get_MI()/get_microscope_interface()` return the cached value | Faster dispatch, same behavior | Commit `perf: cache microscope interface type in MIL`; `test_mil_dispatch.py` still green |
 | [ ] 6.2 | Extract plugin discovery from `Analysis_Measurements/__init__.py`, `Real_Time_Analysis/__init__.py`, `CustomFunctions/__init__.py` into `glados_pycromanager/plugins/discovery.py:load_node_modules(folder, prefix)` | Single, testable implementation | Commit `refactor: hoist plugin discovery into a single module` |
-| [ ] 6.3 | Each subpackage `__init__.py` becomes 5–10 lines calling `load_node_modules` | Less magic | Commit `refactor: thin plugin __init__ files` |
+| [x] 6.3 | Each subpackage `__init__.py` becomes 5–10 lines calling `load_node_modules` | Less magic | Commit `refactor: thin plugin __init__ files` |
 | [ ] 6.4 | Replace the `exec("from .X import *")` with `importlib.import_module` + explicit `globals().update(...)` | No more `exec` on plugin load | Commit `refactor: drop exec from plugin loader` |
 | [ ] 6.5 | Surface failed plugin loads in a log warning (not silent `except`) | Visible failures | Commit `reliability: log plugin load failures` |
 | [ ] 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |

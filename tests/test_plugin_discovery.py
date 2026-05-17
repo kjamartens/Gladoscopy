@@ -82,11 +82,6 @@ def test_dropin_plugin_loads_from_appdata(isolated_appdata):
     assert metadata["DropInNode"]["displayName"] == "Drop-In Node"
 
 
-@pytest.mark.skip(
-    reason="Real_Time_Analysis hot-reload trips a pre-existing circular import "
-           "(BioImageModelZoo.py star-imports its own package); Phase 6.3 will "
-           "trim the __init__ and re-enable this."
-)
 def test_dropin_works_in_realtime_subfolder(isolated_appdata):
     _seed_dropin(isolated_appdata, "Real_Time_Analysis", module_name="DropInRT")
     pkg = _clean_reimport(
@@ -95,10 +90,6 @@ def test_dropin_works_in_realtime_subfolder(isolated_appdata):
     assert "DropInRT" in pkg.__all__
 
 
-@pytest.mark.skip(
-    reason="CustomFunctions hot-reload trips the same circular-import issue "
-           "as Real_Time_Analysis; re-enable after Phase 6.3."
-)
 def test_dropin_works_in_customfunctions(isolated_appdata):
     _seed_dropin(isolated_appdata, "CustomFunctions", module_name="DropInCustom")
     pkg = _clean_reimport(
@@ -107,32 +98,22 @@ def test_dropin_works_in_customfunctions(isolated_appdata):
     assert "DropInCustom" in pkg.__all__
 
 
-def test_load_additional_modules_picks_up_tmp_file(tmp_path):
-    """Direct test of the loader helper — no package reload involved.
-
-    Until Phase 6 extracts a clean `load_node_modules(folder, prefix)`,
-    `load_additional_modules` is the most-shared piece of the discovery
-    contract. Drop a .py into an arbitrary folder, call the helper, and
-    assert the symbol was injected into the caller's globals.
-    """
-    from glados_pycromanager.AutonomousMicroscopy import (
-        Analysis_Measurements as pkg,
-    )
+def test_load_node_modules_picks_up_tmp_file(tmp_path):
+    """Direct test of the Phase 6.2 helper — no package reload involved."""
+    from glados_pycromanager.plugins.discovery import load_node_modules
 
     folder = tmp_path / "drop_zone"
     folder.mkdir()
     (folder / "AdHocNode.py").write_text(PLUGIN_BODY)
+    (folder / "Broken.py").write_text("1 / 0  # raises ZeroDivisionError\n")
 
-    # NB: load_additional_modules has a quirky contract — it appends new
-    # names to the *module-global* `__all__` of its own defining module
-    # (Analysis_Measurements.__init__), not to the `all_modules` list
-    # passed as an arg. We assert against that observable side-effect.
-    # Phase 6.2 lifts this into a clean `load_node_modules` that returns
-    # the list instead of mutating a hidden global.
-    before = set(pkg.__all__)
-    pkg.load_additional_modules(str(folder), [])
-    after = set(pkg.__all__)
-    assert "AdHocNode" in after - before
+    modules, failures = load_node_modules(str(folder), prefix="")
+    names = [m.__name__ for m in modules]
+    assert "AdHocNode" in names
+    # And the helper surfaces (rather than swallows) errors.
+    assert any(f.module_name == "Broken" for f in failures)
+    failed = next(f for f in failures if f.module_name == "Broken")
+    assert isinstance(failed.error, ZeroDivisionError)
 
 
 def test_missing_appdata_subfolder_is_created(isolated_appdata):
