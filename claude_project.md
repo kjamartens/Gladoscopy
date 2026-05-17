@@ -481,7 +481,19 @@ For each item, the change is described as it would appear in a code review.
 > and bisectable. Each phase ends with a verification gate (tests + clean
 > diff) before the next phase begins.
 
-### Phase 0 — Claude architecture setup
+**Status glyphs** (applied to phase headings and to every sub-phase row):
+
+- `[x]` — finished and committed.
+- `[~]` — in progress (phase has some completed sub-steps but not all).
+- `[ ]` — open / not started.
+
+When Claude finishes a sub-step it must flip that row's box to `[x]` in
+the same commit (or in the verification-gate commit at end of phase),
+and flip the phase heading to `[~]` or `[x]` as appropriate. Keep the
+glyphs in sync with reality — they're the at-a-glance map of where work
+stands.
+
+### [x] Phase 0 — Claude architecture setup
 
 **Goal**: Stand up the Claude-collaboration scaffolding so that the
 "continue" protocol works, decisions are tracked, and the slash
@@ -490,29 +502,29 @@ Branch is created in this phase and used from this point on.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 0.1 | Cut `claude_optimization` branch from current HEAD (`Code-cleanup`) — **already done in this session** | Branch exists, in use | `git branch --show-current` returns `claude_optimization` |
-| 0.2 | Add `claude_issues.md` (empty template with "Open issues" / "Resolved" sections) | "Continue" protocol has an inbox | Commit `chore(claude): add claude_issues.md` |
-| 0.3 | Add `claude_decisions.md` (append-only design/process log, format documented inside) | Decision log live | Commit `chore(claude): add claude_decisions.md` |
-| 0.4 | Update `CLAUDE.md` "Optimization plan & continue protocol" section: explicit branch check, pointer to `claude_decisions.md`, decision-recording duty | Future sessions know the protocol | Commit `docs(claude): document continue protocol and decisions log` |
-| 0.5 | Add interpretation-check section + revised phase plan in `claude_project.md` (reflects user feedback: Slack-removal-only, nodz left alone, error-checks add+tighten) | Plan matches user intent | Commit `docs(claude): expand claude_project plan with user revisions` |
-| 0.6 | Create `.claude/commands/` directory with a placeholder `README.md` listing the commands that will be authored in Phase 16 (`run-tests`, `lint`, `profile-startup`, `new-node`) | Slash-command home exists | Commit `chore(claude): scaffold .claude/commands` |
-| 0.7 | Create `.claude/agents/` directory with placeholder `README.md` listing the agents authored in Phase 16 (`code-reviewer`, `test-author`, `node-doctor`) | Agent home exists | Commit `chore(claude): scaffold .claude/agents` |
-| 0.8 | Append the Phase 0 decisions made so far to `claude_decisions.md` (branch base, Slack handling, nodz exclusion, error-handling scope) | Decisions logged | Commit `docs(claude): log Phase 0 decisions` |
-| 0.9 | Verification gate | All files exist; `git log --oneline` shows the Phase 0 commits; no code changed yet | `ls claude_*.md .claude/commands .claude/agents && git log --oneline` |
+| [x] 0.1 | Cut `claude_optimization` branch from current HEAD (`Code-cleanup`) — **already done in this session** | Branch exists, in use | `git branch --show-current` returns `claude_optimization` |
+| [x] 0.2 | Add `claude_issues.md` (empty template with "Open issues" / "Resolved" sections) | "Continue" protocol has an inbox | Commit `chore(claude): add claude_issues.md` |
+| [x] 0.3 | Add `claude_decisions.md` (append-only design/process log, format documented inside) | Decision log live | Commit `chore(claude): add claude_decisions.md` |
+| [x] 0.4 | Update `CLAUDE.md` "Optimization plan & continue protocol" section: explicit branch check, pointer to `claude_decisions.md`, decision-recording duty | Future sessions know the protocol | Commit `docs(claude): document continue protocol and decisions log` |
+| [x] 0.5 | Add interpretation-check section + revised phase plan in `claude_project.md` (reflects user feedback: Slack-removal-only, nodz left alone, error-checks add+tighten) | Plan matches user intent | Commit `docs(claude): expand claude_project plan with user revisions` |
+| [x] 0.6 | Create `.claude/commands/` directory with a placeholder `README.md` listing the commands that will be authored in Phase 16 (`run-tests`, `lint`, `profile-startup`, `new-node`) | Slash-command home exists | Commit `chore(claude): scaffold .claude/commands` |
+| [x] 0.7 | Create `.claude/agents/` directory with placeholder `README.md` listing the agents authored in Phase 16 (`code-reviewer`, `test-author`, `node-doctor`) | Agent home exists | Commit `chore(claude): scaffold .claude/agents` |
+| [x] 0.8 | Append the Phase 0 decisions made so far to `claude_decisions.md` (branch base, Slack handling, nodz exclusion, error-handling scope) | Decisions logged | Commit `docs(claude): log Phase 0 decisions` |
+| [x] 0.9 | Verification gate | All files exist; `git log --oneline` shows the Phase 0 commits; no code changed yet | `ls claude_*.md .claude/commands .claude/agents && git log --oneline` |
 
-### Phase 1 — Branch guardrails & baseline
+### [x] Phase 1 — Branch guardrails & baseline
 
 **Goal**: Baseline the current state and put guardrails in place so the
 subsequent code-modifying phases are safe.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 1.1 | `pip install -e ".[dev]"` and run `pytest -q` to capture baseline | Baseline pass count recorded | Commit `chore: record baseline test result` (writes `docs/baseline.txt`) |
-| 1.2 | Add `.gitignore` entries: `scalene-profile.*`, `*.docx`, `~$*`, `.venv/`, `*.swp`, `bash.exe.stackdump` (uv.lock — record decision in `claude_decisions.md`) | Profiling/scratch artifacts no longer tracked | Commit `chore: tidy .gitignore` |
-| 1.3 | `git rm --cached scalene-profile.html scalene-profile.json` (keep on disk) | ~68 MB unstaged | Commit `chore: untrack scalene profile artifacts` |
-| 1.4 | Verification gate | Tests still pass; `git status` clean of incidental tracked files | `pytest -q` green |
+| [x] 1.1 | `pip install -e ".[dev]"` and run `pytest -q` to capture baseline | Baseline pass count recorded | Commit `chore: record baseline test result` (writes `docs/baseline.txt`) |
+| [x] 1.2 | Add `.gitignore` entries: `scalene-profile.*`, `*.docx`, `~$*`, `.venv/`, `*.swp`, `bash.exe.stackdump` (uv.lock — record decision in `claude_decisions.md`) | Profiling/scratch artifacts no longer tracked | Commit `chore: tidy .gitignore` |
+| [x] 1.3 | `git rm --cached scalene-profile.html scalene-profile.json` (keep on disk) | ~68 MB unstaged | Commit `chore: untrack scalene profile artifacts` |
+| [x] 1.4 | Verification gate | Tests still pass; `git status` clean of incidental tracked files | `pytest -q` green |
 
-### Phase 2 — Remove Slack credentials, add GUI input
+### [x] Phase 2 — Remove Slack credentials, add GUI input
 
 **Goal**: Strip the stale committed Slack credentials and replace them with
 a tiny settings dialog so the user can fill them in at runtime. Persistence
@@ -521,118 +533,118 @@ rotation is required (the token is stale per user).
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 2.1 | Replace `WebhookConfig` defaults in `GUI/sharedFunctions.py` with empty strings (`slack_token=""`, `slack_secret=""`, `slack_channel=""`). Keep the `setting(...)` metadata so they remain UI-discoverable | Credentials gone from source | Commit `security: remove stale slack credentials from defaults`; `grep -R "xoxb-" .` empty |
-| 2.2 | Add `glados_pycromanager/GUI/slack_settings_dialog.py` — small `QDialog` with three line edits (token / secret / channel) and OK/Cancel. Token field is a password-style line edit | Dialog class exists | Commit `feat(ui): slack settings dialog` |
-| 2.3 | Wire a "Slack settings…" menu/button (most natural location is the Webhooks area inside the existing settings dialog, if one exists; otherwise add to the autonomous dock toolbar). On OK, write back to `shared_data.config.webhook_config` and call `storeSharedData_GlobalData` so they persist to `glados_state.json` | Reachable from UI, persisted | Commit `feat(ui): wire slack settings dialog` |
-| 2.4 | Add `tests/test_slack_settings_persistence.py` — round-trip the three values through `Shared_data` save/load | Locked in | Commit `test: slack settings persistence` |
-| 2.5 | Add a guard at Slack-send call sites: if `slack_token` is empty, log a warning and no-op instead of erroring | No nuisance failures when unconfigured | Commit `reliability: noop slack send when unconfigured` |
-| 2.6 | Add `SECURITY.md` (short — how to report vulns, note the rotation history line for the historical Slack token) | File exists | Commit `docs: add SECURITY.md` |
-| 2.7 | Add `bandit` to `[project.optional-dependencies].dev`; run `bandit -r glados_pycromanager --exclude glados_pycromanager/GUI/nodz` and store the report at `docs/bandit-baseline.txt` | Baseline known, nodz excluded | Commit `chore: bandit baseline` |
-| 2.8 | Inventory every `eval(` call site into `docs/eval-inventory.md` (file, line, what it evals) — feeds Phase 9 | Inventory ready | Commit `docs: inventory eval call sites` |
-| 2.9 | Verification gate | `pytest -q` green; `grep -R "xoxb-" .` empty; the dialog opens, accepts input, persists; subsequent launch reads it back | Tests + manual note |
+| [x] 2.1 | Replace `WebhookConfig` defaults in `GUI/sharedFunctions.py` with empty strings (`slack_token=""`, `slack_secret=""`, `slack_channel=""`). Keep the `setting(...)` metadata so they remain UI-discoverable | Credentials gone from source | Commit `security: remove stale slack credentials from defaults`; `grep -R "xoxb-" .` empty |
+| [x] 2.2 | Add `glados_pycromanager/GUI/slack_settings_dialog.py` — small `QDialog` with three line edits (token / secret / channel) and OK/Cancel. Token field is a password-style line edit | Dialog class exists | Commit `feat(ui): slack settings dialog` |
+| [x] 2.3 | Wire a "Slack settings…" menu/button (most natural location is the Webhooks area inside the existing settings dialog, if one exists; otherwise add to the autonomous dock toolbar). On OK, write back to `shared_data.config.webhook_config` and call `storeSharedData_GlobalData` so they persist to `glados_state.json` | Reachable from UI, persisted | Commit `feat(ui): wire slack settings dialog` |
+| [x] 2.4 | Add `tests/test_slack_settings_persistence.py` — round-trip the three values through `Shared_data` save/load | Locked in | Commit `test: slack settings persistence` |
+| [x] 2.5 | Add a guard at Slack-send call sites: if `slack_token` is empty, log a warning and no-op instead of erroring | No nuisance failures when unconfigured | Commit `reliability: noop slack send when unconfigured` |
+| [x] 2.6 | Add `SECURITY.md` (short — how to report vulns, note the rotation history line for the historical Slack token) | File exists | Commit `docs: add SECURITY.md` |
+| [x] 2.7 | Add `bandit` to `[project.optional-dependencies].dev`; run `bandit -r glados_pycromanager --exclude glados_pycromanager/GUI/nodz` and store the report at `docs/bandit-baseline.txt` | Baseline known, nodz excluded | Commit `chore: bandit baseline` |
+| [x] 2.8 | Inventory every `eval(` call site into `docs/eval-inventory.md` (file, line, what it evals) — feeds Phase 9 | Inventory ready | Commit `docs: inventory eval call sites` |
+| [x] 2.9 | Verification gate | `pytest -q` green; `grep -R "xoxb-" .` empty; the dialog opens, accepts input, persists; subsequent launch reads it back | Tests + manual note |
 
-### Phase 3 — Tooling foundation
+### [x] Phase 3 — Tooling foundation
 
 **Goal**: Wire up lint, format, type-check, CI, pre-commit, Makefile.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 3.1 | Add `[tool.ruff]` config (line-length 100, `E,F,I,B,UP,SIM,PL`, `extend-exclude = ["glados_pycromanager/GUI/nodz"]`); add `ruff` to `[project.optional-dependencies].dev` | `ruff check` runs, skips nodz | Commit `tool: add ruff config` |
-| 3.2 | `ruff check --fix --select I,UP glados_pycromanager` (import sorting + pyupgrade only — non-behavioral; nodz already excluded) | Imports sorted, syntax modernized | Commit `style: ruff auto-fix imports and pyupgrade` |
-| 3.3 | Add `[tool.mypy]` config (`ignore_missing_imports = true`, `check_untyped_defs = false`, `python_version = "3.13"`, `exclude = "glados_pycromanager/GUI/nodz"`) | `mypy glados_pycromanager` runs (warnings OK), skips nodz | Commit `tool: add mypy config` |
-| 3.4 | Add `pre-commit` config (`pre-commit-hooks`, `ruff`, `ruff-format`, `mypy`) and install hooks locally; nodz path excluded via the tools' own configs | Hooks run | Commit `tool: pre-commit config` |
-| 3.5 | Add `Makefile` (or `tasks.py`) with `make test`, `make lint`, `make format`, `make run`, `make profile-startup` | Devs have one entry point | Commit `tool: add Makefile` |
-| 3.6 | Add `.github/workflows/ci.yml` running on Windows + Python 3.13: install `[dev]`, `ruff`, `mypy`, `pytest` | CI runs on push | Commit `ci: add github actions workflow`; CI run on the branch is green |
-| 3.7 | Verification gate | CI green; `pytest -q` green | GH Actions badge / log |
+| [x] 3.1 | Add `[tool.ruff]` config (line-length 100, `E,F,I,B,UP,SIM,PL`, `extend-exclude = ["glados_pycromanager/GUI/nodz"]`); add `ruff` to `[project.optional-dependencies].dev` | `ruff check` runs, skips nodz | Commit `tool: add ruff config` |
+| [x] 3.2 | `ruff check --fix --select I,UP glados_pycromanager` (import sorting + pyupgrade only — non-behavioral; nodz already excluded) | Imports sorted, syntax modernized | Commit `style: ruff auto-fix imports and pyupgrade` |
+| [x] 3.3 | Add `[tool.mypy]` config (`ignore_missing_imports = true`, `check_untyped_defs = false`, `python_version = "3.13"`, `exclude = "glados_pycromanager/GUI/nodz"`) | `mypy glados_pycromanager` runs (warnings OK), skips nodz | Commit `tool: add mypy config` |
+| [x] 3.4 | Add `pre-commit` config (`pre-commit-hooks`, `ruff`, `ruff-format`, `mypy`) and install hooks locally; nodz path excluded via the tools' own configs | Hooks run | Commit `tool: pre-commit config` |
+| [x] 3.5 | Add `Makefile` (or `tasks.py`) with `make test`, `make lint`, `make format`, `make run`, `make profile-startup` | Devs have one entry point | Commit `tool: add Makefile` |
+| [x] 3.6 | Add `.github/workflows/ci.yml` running on Windows + Python 3.13: install `[dev]`, `ruff`, `mypy`, `pytest` | CI runs on push | Commit `ci: add github actions workflow`; CI run on the branch is green |
+| [x] 3.7 | Verification gate | CI green; `pytest -q` green | GH Actions badge / log |
 
-### Phase 4 — Repo hygiene
+### [x] Phase 4 — Repo hygiene
 
 **Goal**: Remove dev scratch, fix packaging metadata, add docs scaffolding.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 4.1 | Move `Test.py`, `test.ipynb` to `scratch/` and add `scratch/` to `[tool.setuptools.exclude-package-data]` | Repo root cleaner | Commit `chore: move scratch files out of root` |
-| 4.2 | Fix `[tool.setuptools.package-data]` globs in `pyproject.toml` (drop the leading-slash entries; use `find:`) | Wheel still builds with same files | Commit `build: clean up package-data globs`; `python -m build` succeeds |
-| 4.3 | Update `UserManual.md` Python version reference from 3.10 to 3.13 | Doc matches reality | Commit `docs: bump Python version in UserManual` |
-| 4.4 | Add `CONTRIBUTING.md`, `CHANGELOG.md` (with an "Unreleased" entry referencing this branch) | Project hygiene up | Commit `docs: add CONTRIBUTING and CHANGELOG` |
-| 4.5 | Add `docs/module-map.md` — one paragraph per top-level module (skip nodz internals; record one line "vendored, see upstream") | Claude has a fast index | Commit `docs: add module map` |
-| 4.6 | Add `docs/adr/0001-mil-abstraction.md`, `0002-plugin-discovery.md`, `0003-shared-data.md`, `0004-python-313.md`, `0005-vendored-nodz.md` | ADRs in place | Commit `docs: seed ADRs` |
-| 4.7 | Verification gate | CI green; `python -m build` succeeds | Build artifact attached |
+| [x] 4.1 | Move `Test.py`, `test.ipynb` to `scratch/` and add `scratch/` to `[tool.setuptools.exclude-package-data]` | Repo root cleaner | Commit `chore: move scratch files out of root` |
+| [x] 4.2 | Fix `[tool.setuptools.package-data]` globs in `pyproject.toml` (drop the leading-slash entries; use `find:`) | Wheel still builds with same files | Commit `build: clean up package-data globs`; `python -m build` succeeds |
+| [x] 4.3 | Update `UserManual.md` Python version reference from 3.10 to 3.13 | Doc matches reality | Commit `docs: bump Python version in UserManual` |
+| [x] 4.4 | Add `CONTRIBUTING.md`, `CHANGELOG.md` (with an "Unreleased" entry referencing this branch) | Project hygiene up | Commit `docs: add CONTRIBUTING and CHANGELOG` |
+| [x] 4.5 | Add `docs/module-map.md` — one paragraph per top-level module (skip nodz internals; record one line "vendored, see upstream") | Claude has a fast index | Commit `docs: add module map` |
+| [x] 4.6 | Add `docs/adr/0001-mil-abstraction.md`, `0002-plugin-discovery.md`, `0003-shared-data.md`, `0004-python-313.md`, `0005-vendored-nodz.md` | ADRs in place | Commit `docs: seed ADRs` |
+| [x] 4.7 | Verification gate | CI green; `python -m build` succeeds | Build artifact attached |
 
-### Phase 5 — Test scaffolding
+### [~] Phase 5 — Test scaffolding
 
 **Goal**: Stand up the test infrastructure refactors will lean on. Tests
 here cover *current behavior*, locking it in before refactoring.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 5.1 | Add `pytest-qt`, `pytest-mock` to dev deps | Available | Commit `test: add pytest-qt and pytest-mock` |
-| 5.2 | Add `tests/conftest.py` with shared fixtures: `tmp_appdata`, `mock_core`, `fake_mil` | Fixtures available | Commit `test: shared conftest fixtures` |
-| 5.3 | Add `tests/fakes/fake_mil.py` — a FakeMicroscopeInterfaceLayer | Tests can substitute hardware | Commit `test: fake microscope interface layer` |
-| 5.4 | Add `tests/test_shared_data_io.py` — round-trip Config to JSON | Locks the config schema | Commit `test: shared_data JSON round-trip` |
-| 5.5 | Add `tests/test_mil_dispatch.py` — every public MIL method dispatches by backend (parameterized) | Locks MIL behavior | Commit `test: MIL backend dispatch coverage` |
-| 5.6 | Add `tests/test_plugin_discovery.py` — drop a `.py` into tmp AppData, assert loadable | Locks plugin contract | Commit `test: plugin discovery from AppData` |
-| 5.7 | Add `tests/test_mda_event_builder.py` — pure-Python event list generation | Locks MDA logic | Commit `test: MDA event builder` |
-| 5.8 | Verification gate | CI green; new tests all pass | `pytest -q` count higher than baseline |
+| [x] 5.1 | Add `pytest-qt`, `pytest-mock` to dev deps | Available | Commit `test: add pytest-qt and pytest-mock` |
+| [x] 5.2 | Add `tests/conftest.py` with shared fixtures: `tmp_appdata`, `mock_core`, `fake_mil` | Fixtures available | Commit `test: shared conftest fixtures` |
+| [x] 5.3 | Add `tests/fakes/fake_mil.py` — a FakeMicroscopeInterfaceLayer | Tests can substitute hardware | Commit `test: fake microscope interface layer` |
+| [x] 5.4 | Add `tests/test_shared_data_io.py` — round-trip Config to JSON | Locks the config schema | Commit `test: shared_data JSON round-trip` |
+| [x] 5.5 | Add `tests/test_mil_dispatch.py` — every public MIL method dispatches by backend (parameterized) | Locks MIL behavior | Commit `test: MIL backend dispatch coverage` |
+| [ ] 5.6 | Add `tests/test_plugin_discovery.py` — drop a `.py` into tmp AppData, assert loadable | Locks plugin contract | Commit `test: plugin discovery from AppData` |
+| [ ] 5.7 | Add `tests/test_mda_event_builder.py` — pure-Python event list generation | Locks MDA logic | Commit `test: MDA event builder` |
+| [ ] 5.8 | Verification gate | CI green; new tests all pass | `pytest -q` count higher than baseline |
 
-### Phase 6 — Architecture: MIL caching and plugin discovery
+### [ ] Phase 6 — Architecture: MIL caching and plugin discovery
 
 **Goal**: First behavioral refactor, smallest blast radius, fully test-backed.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 6.1 | In `MicroscopeInterfaceLayer.__init__`, add `self._mi: MicroscopeInstance = UNKNOWN`. Update `set_core` to compute it once. Have `MI()/get_MI()/get_microscope_interface()` return the cached value | Faster dispatch, same behavior | Commit `perf: cache microscope interface type in MIL`; `test_mil_dispatch.py` still green |
-| 6.2 | Extract plugin discovery from `Analysis_Measurements/__init__.py`, `Real_Time_Analysis/__init__.py`, `CustomFunctions/__init__.py` into `glados_pycromanager/plugins/discovery.py:load_node_modules(folder, prefix)` | Single, testable implementation | Commit `refactor: hoist plugin discovery into a single module` |
-| 6.3 | Each subpackage `__init__.py` becomes 5–10 lines calling `load_node_modules` | Less magic | Commit `refactor: thin plugin __init__ files` |
-| 6.4 | Replace the `exec("from .X import *")` with `importlib.import_module` + explicit `globals().update(...)` | No more `exec` on plugin load | Commit `refactor: drop exec from plugin loader` |
-| 6.5 | Surface failed plugin loads in a log warning (not silent `except`) | Visible failures | Commit `reliability: log plugin load failures` |
-| 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |
+| [ ] 6.1 | In `MicroscopeInterfaceLayer.__init__`, add `self._mi: MicroscopeInstance = UNKNOWN`. Update `set_core` to compute it once. Have `MI()/get_MI()/get_microscope_interface()` return the cached value | Faster dispatch, same behavior | Commit `perf: cache microscope interface type in MIL`; `test_mil_dispatch.py` still green |
+| [ ] 6.2 | Extract plugin discovery from `Analysis_Measurements/__init__.py`, `Real_Time_Analysis/__init__.py`, `CustomFunctions/__init__.py` into `glados_pycromanager/plugins/discovery.py:load_node_modules(folder, prefix)` | Single, testable implementation | Commit `refactor: hoist plugin discovery into a single module` |
+| [ ] 6.3 | Each subpackage `__init__.py` becomes 5–10 lines calling `load_node_modules` | Less magic | Commit `refactor: thin plugin __init__ files` |
+| [ ] 6.4 | Replace the `exec("from .X import *")` with `importlib.import_module` + explicit `globals().update(...)` | No more `exec` on plugin load | Commit `refactor: drop exec from plugin loader` |
+| [ ] 6.5 | Surface failed plugin loads in a log warning (not silent `except`) | Visible failures | Commit `reliability: log plugin load failures` |
+| [ ] 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |
 
-### Phase 7 — Split god-files: `utils.py`
+### [ ] Phase 7 — Split god-files: `utils.py`
 
 **Goal**: Carve `GUI/utils.py` (3 860 LOC) into responsibility modules.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 7.1 | Create `glados_pycromanager/io/__init__.py`, `glados_pycromanager/io/appdata.py`. Move `load_config_from_json`, `storeSharedData_GlobalData`, `cleanUpTemporaryFiles` | New module compiles | Commit `refactor: move AppData I/O into io.appdata` |
-| 7.2 | In old `utils.py`, re-export the moved names with a `DeprecationWarning` to avoid breaking callers | Backward compatible | Commit `refactor: utils.py shim re-exports` |
-| 7.3 | Create `glados_pycromanager/ui/widgets/builders.py`. Move Qt widget helpers (`createGroupBox`, etc.) | Builders isolated | Commit `refactor: move Qt builders to ui.widgets.builders` |
-| 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |
-| 7.5 | Create `glados_pycromanager/util/fs.py`. Move filesystem helpers | FS helpers isolated | Commit `refactor: extract filesystem helpers` |
-| 7.6 | Add a temporary `tests/test_utils_reexport.py` that imports every public name from the old path and the new path and asserts equality | Reexports verified | Commit `test: shim re-export equivalence` |
-| 7.7 | Verification gate | CI green; manual smoke test of `glados` startup | Commit `chore: phase 7 verification` referencing test pass |
+| [ ] 7.1 | Create `glados_pycromanager/io/__init__.py`, `glados_pycromanager/io/appdata.py`. Move `load_config_from_json`, `storeSharedData_GlobalData`, `cleanUpTemporaryFiles` | New module compiles | Commit `refactor: move AppData I/O into io.appdata` |
+| [ ] 7.2 | In old `utils.py`, re-export the moved names with a `DeprecationWarning` to avoid breaking callers | Backward compatible | Commit `refactor: utils.py shim re-exports` |
+| [ ] 7.3 | Create `glados_pycromanager/ui/widgets/builders.py`. Move Qt widget helpers (`createGroupBox`, etc.) | Builders isolated | Commit `refactor: move Qt builders to ui.widgets.builders` |
+| [ ] 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |
+| [ ] 7.5 | Create `glados_pycromanager/util/fs.py`. Move filesystem helpers | FS helpers isolated | Commit `refactor: extract filesystem helpers` |
+| [ ] 7.6 | Add a temporary `tests/test_utils_reexport.py` that imports every public name from the old path and the new path and asserts equality | Reexports verified | Commit `test: shim re-export equivalence` |
+| [ ] 7.7 | Verification gate | CI green; manual smoke test of `glados` startup | Commit `chore: phase 7 verification` referencing test pass |
 
-### Phase 8 — Split god-files: `FlowChart_dockWidgets.py`
+### [ ] Phase 8 — Split god-files: `FlowChart_dockWidgets.py`
 
 **Goal**: Carve the 6 285-LOC flowchart module along its natural seams.
 Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 8.1 | Read and document the file's regions in `docs/flowchart-regions.md` (a map: lines x–y handle Initialisation pane, y–z handle Scoring graph, z–w handle Acquisition graph, w–end handle the runtime executor) | Plan ready | Commit `docs: flowchart-regions map` |
-| 8.2 | Extract pure data classes / enums into `glados_pycromanager/autonomous/types.py` | First slice out | Commit `refactor: extract autonomous types` |
-| 8.3 | Extract the JSON recipe load/save helpers into `glados_pycromanager/autonomous/recipe_io.py` | Recipe I/O isolated | Commit `refactor: extract recipe I/O` |
-| 8.4 | Extract the runtime executor into `glados_pycromanager/autonomous/executor.py` | Executor isolated | Commit `refactor: extract autonomous executor` |
-| 8.5 | The remaining `FlowChart_dockWidgets.py` is the Qt dock + Nodz glue only | God-file < 1 500 LOC | Commit `refactor: trim FlowChart_dockWidgets to glue only` |
-| 8.6 | Add `tests/test_recipe_io.py` and `tests/test_executor.py` against `Showcase_Basic1.json` | Locked-in behavior | Commit `test: recipe IO and executor` |
-| 8.7 | Verification gate | CI green; manual: open the autonomous dock, load `Showcase_Basic1.json`, no regressions | Smoke note in commit |
+| [ ] 8.1 | Read and document the file's regions in `docs/flowchart-regions.md` (a map: lines x–y handle Initialisation pane, y–z handle Scoring graph, z–w handle Acquisition graph, w–end handle the runtime executor) | Plan ready | Commit `docs: flowchart-regions map` |
+| [ ] 8.2 | Extract pure data classes / enums into `glados_pycromanager/autonomous/types.py` | First slice out | Commit `refactor: extract autonomous types` |
+| [ ] 8.3 | Extract the JSON recipe load/save helpers into `glados_pycromanager/autonomous/recipe_io.py` | Recipe I/O isolated | Commit `refactor: extract recipe I/O` |
+| [ ] 8.4 | Extract the runtime executor into `glados_pycromanager/autonomous/executor.py` | Executor isolated | Commit `refactor: extract autonomous executor` |
+| [ ] 8.5 | The remaining `FlowChart_dockWidgets.py` is the Qt dock + Nodz glue only | God-file < 1 500 LOC | Commit `refactor: trim FlowChart_dockWidgets to glue only` |
+| [ ] 8.6 | Add `tests/test_recipe_io.py` and `tests/test_executor.py` against `Showcase_Basic1.json` | Locked-in behavior | Commit `test: recipe IO and executor` |
+| [ ] 8.7 | Verification gate | CI green; manual: open the autonomous dock, load `Showcase_Basic1.json`, no regressions | Smoke note in commit |
 
-### Phase 9 — Replace `eval()` with a function registry
+### [ ] Phase 9 — Replace `eval()` with a function registry
 
 **Goal**: Kill the eval-based dispatch in autonomous microscopy.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 9.1 | Add `glados_pycromanager/autonomous/registry.py` with `@register("Module.Function")` decorator and a `dispatch(name, **kwargs)` function | Registry ready | Commit `feat: autonomous function registry` |
-| 9.2 | Decorate all functions in `Analysis_Measurements/` with `@register(...)` (one commit per file: `AverageImage`, `AverageIntensity`, `RandomShapes`, `StarDist_image`, `checkAgainstList`) | 5 small commits | 5 commits `feat: register <node>` |
-| 9.3 | Decorate all functions in `Real_Time_Analysis/` (`BioImageModelZoo`, `EndAtFrame`, `FFT_im`, `LaserAdjustment`, `pSMLM`, `RT_counter`, `SharpnessValue`) | 7 small commits | 7 commits |
-| 9.4 | Decorate all in `CustomFunctions/` (`AutoFocusBF`, `Strobo_lasers`, `ExampleCustomFunction_DiceRoll`) | 3 small commits | 3 commits |
-| 9.5 | Replace each `eval(createFunctionWithKwargs(...))` call site with `dispatch(name, **kwargs)` | Eval-free hot path | Commit per call site (10–15 commits) |
-| 9.6 | Keep `createFunctionWithKwargs` for string display only, mark unsafe variants `_str_for_display` | Clear separation | Commit `refactor: rename eval-only string builders` |
-| 9.7 | Update `tests/test_helper_functions.py` and add `tests/test_registry.py` | Coverage on the new path | Commit `test: registry dispatch` |
-| 9.8 | Verification gate | CI green; manual: run the example recipe end-to-end | Pytest + run note |
+| [ ] 9.1 | Add `glados_pycromanager/autonomous/registry.py` with `@register("Module.Function")` decorator and a `dispatch(name, **kwargs)` function | Registry ready | Commit `feat: autonomous function registry` |
+| [ ] 9.2 | Decorate all functions in `Analysis_Measurements/` with `@register(...)` (one commit per file: `AverageImage`, `AverageIntensity`, `RandomShapes`, `StarDist_image`, `checkAgainstList`) | 5 small commits | 5 commits `feat: register <node>` |
+| [ ] 9.3 | Decorate all functions in `Real_Time_Analysis/` (`BioImageModelZoo`, `EndAtFrame`, `FFT_im`, `LaserAdjustment`, `pSMLM`, `RT_counter`, `SharpnessValue`) | 7 small commits | 7 commits |
+| [ ] 9.4 | Decorate all in `CustomFunctions/` (`AutoFocusBF`, `Strobo_lasers`, `ExampleCustomFunction_DiceRoll`) | 3 small commits | 3 commits |
+| [ ] 9.5 | Replace each `eval(createFunctionWithKwargs(...))` call site with `dispatch(name, **kwargs)` | Eval-free hot path | Commit per call site (10–15 commits) |
+| [ ] 9.6 | Keep `createFunctionWithKwargs` for string display only, mark unsafe variants `_str_for_display` | Clear separation | Commit `refactor: rename eval-only string builders` |
+| [ ] 9.7 | Update `tests/test_helper_functions.py` and add `tests/test_registry.py` | Coverage on the new path | Commit `test: registry dispatch` |
+| [ ] 9.8 | Verification gate | CI green; manual: run the example recipe end-to-end | Pytest + run note |
 
-### Phase 10 — Error-handling: tighten existing **and** add new checks
+### [ ] Phase 10 — Error-handling: tighten existing **and** add new checks
 
 **Goal**: Two complementary jobs in this phase:
   (a) drive the 131 bare/broad `except:` count down to near zero by
@@ -669,61 +681,61 @@ Produce `docs/error-audit.md` with two tables:
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 10.0 | Write `docs/error-audit.md` (Tables A and B above) | Audit complete | Commit `docs: error-handling audit` |
-| 10.1 | Add `glados_pycromanager/errors.py` (`BackendError`, `RecipeError`, `NodeLoadError`, `ConfigError`, `NodeDispatchError`, `MDAEventError`) | Typed exceptions exist | Commit `feat: typed exceptions module` |
-| 10.2 | **Tighten** bare-except sites one file at a time (one commit per file): `sharedFunctions.py`, `napariGlados.py`, `MMcontrols.py`, `MDAGlados.py`, `FlowChart_dockWidgets.py`, `utils.py` (nodz/* excluded). Each commit pairs with a regression test if the previously-swallowed error was reachable | Narrower excepts, error-level logs, re-raise where appropriate | 6 commits `reliability: tighten except blocks in <file>` |
-| 10.3 | **Add** check + tests: `Shared_data` JSON load — corrupted JSON, missing version, future version. Tests: `tests/test_errors_shared_data_load.py` (3 negative cases + 1 positive round-trip) | New defensive boundary | Commit `reliability: validate shared_data JSON on load` |
-| 10.4 | **Add** check + tests: atomic JSON write (write to `*.tmp`, `os.replace`). Test: kill-mid-write simulation via monkeypatched `json.dump` raising halfway | Crash mid-write no longer corrupts state | Commit `reliability: atomic shared_data write` |
-| 10.5 | **Add** check + tests: plugin loader rejects malformed `__function_metadata__` with `NodeLoadError`. Tests: drop a malformed `.py` into tmp AppData, assert `NodeLoadError` raised and logged | Bad plugins fail loudly | Commit `reliability: validate plugin metadata` |
-| 10.6 | **Add** check + tests: `recipe_io.load` validates schema version, required region keys, and node-id references resolve. Tests: 4 negative cases + happy-path on `Showcase_Basic1.json` | Recipes fail fast | Commit `reliability: validate recipe schema on load` |
-| 10.7 | **Add** check + tests: `MIL.set_core(None)` raises `BackendError`; UNKNOWN backend logs once. Tests: parameterized over each backend type + None + bogus object | Backend probe stricter | Commit `reliability: stricter MIL.set_core` |
-| 10.8 | **Add** check + tests: MDA event builder rejects impossible plans. Tests: negative frame count, missing channel, zero step interval | MDA construction safe | Commit `reliability: validate MDA event inputs` |
-| 10.9 | **Add** check: headless dialog validates MM path + config file (file exists, .cfg suffix); Start button disabled otherwise. Test: `pytest-qt` smoke | Fewer bad starts | Commit `reliability: validate headless dialog inputs` |
-| 10.10 | **Add** check + tests: Slack send guards empty token (log info, no-op), wraps network errors in `BackendError`. Tests: empty creds, mocked `requests` raising | Slack failure isolated | Commit `reliability: defensive slack send` |
-| 10.11 | **Add** check + tests: AppData plugin walk on missing/unreadable directory logs and continues. Test: pass nonexistent path | Loader robust | Commit `reliability: tolerant AppData walk` |
-| 10.12 | **Add** check + tests: registry `dispatch` raises `NodeDispatchError` on unknown name. Test: `dispatch("nope")` | Hard failure on bad recipe | Commit `reliability: NodeDispatchError on unknown function` |
-| 10.13 | Add a top-level `sys.excepthook` (and a Qt `qInstallMessageHandler`) that logs uncaught exceptions to the AppData log file. Test: simulate an unhandled exception, assert log contains it | Crashes are diagnosable | Commit `reliability: global exception hook` |
-| 10.14 | Verification gate | `grep -R "except:" glados_pycromanager --exclude-dir=nodz` returns 0; every new test passes; total test count ≥ baseline + 25 | Grep + pytest summary |
+| [ ] 10.0 | Write `docs/error-audit.md` (Tables A and B above) | Audit complete | Commit `docs: error-handling audit` |
+| [ ] 10.1 | Add `glados_pycromanager/errors.py` (`BackendError`, `RecipeError`, `NodeLoadError`, `ConfigError`, `NodeDispatchError`, `MDAEventError`) | Typed exceptions exist | Commit `feat: typed exceptions module` |
+| [ ] 10.2 | **Tighten** bare-except sites one file at a time (one commit per file): `sharedFunctions.py`, `napariGlados.py`, `MMcontrols.py`, `MDAGlados.py`, `FlowChart_dockWidgets.py`, `utils.py` (nodz/* excluded). Each commit pairs with a regression test if the previously-swallowed error was reachable | Narrower excepts, error-level logs, re-raise where appropriate | 6 commits `reliability: tighten except blocks in <file>` |
+| [ ] 10.3 | **Add** check + tests: `Shared_data` JSON load — corrupted JSON, missing version, future version. Tests: `tests/test_errors_shared_data_load.py` (3 negative cases + 1 positive round-trip) | New defensive boundary | Commit `reliability: validate shared_data JSON on load` |
+| [ ] 10.4 | **Add** check + tests: atomic JSON write (write to `*.tmp`, `os.replace`). Test: kill-mid-write simulation via monkeypatched `json.dump` raising halfway | Crash mid-write no longer corrupts state | Commit `reliability: atomic shared_data write` |
+| [ ] 10.5 | **Add** check + tests: plugin loader rejects malformed `__function_metadata__` with `NodeLoadError`. Tests: drop a malformed `.py` into tmp AppData, assert `NodeLoadError` raised and logged | Bad plugins fail loudly | Commit `reliability: validate plugin metadata` |
+| [ ] 10.6 | **Add** check + tests: `recipe_io.load` validates schema version, required region keys, and node-id references resolve. Tests: 4 negative cases + happy-path on `Showcase_Basic1.json` | Recipes fail fast | Commit `reliability: validate recipe schema on load` |
+| [ ] 10.7 | **Add** check + tests: `MIL.set_core(None)` raises `BackendError`; UNKNOWN backend logs once. Tests: parameterized over each backend type + None + bogus object | Backend probe stricter | Commit `reliability: stricter MIL.set_core` |
+| [ ] 10.8 | **Add** check + tests: MDA event builder rejects impossible plans. Tests: negative frame count, missing channel, zero step interval | MDA construction safe | Commit `reliability: validate MDA event inputs` |
+| [ ] 10.9 | **Add** check: headless dialog validates MM path + config file (file exists, .cfg suffix); Start button disabled otherwise. Test: `pytest-qt` smoke | Fewer bad starts | Commit `reliability: validate headless dialog inputs` |
+| [ ] 10.10 | **Add** check + tests: Slack send guards empty token (log info, no-op), wraps network errors in `BackendError`. Tests: empty creds, mocked `requests` raising | Slack failure isolated | Commit `reliability: defensive slack send` |
+| [ ] 10.11 | **Add** check + tests: AppData plugin walk on missing/unreadable directory logs and continues. Test: pass nonexistent path | Loader robust | Commit `reliability: tolerant AppData walk` |
+| [ ] 10.12 | **Add** check + tests: registry `dispatch` raises `NodeDispatchError` on unknown name. Test: `dispatch("nope")` | Hard failure on bad recipe | Commit `reliability: NodeDispatchError on unknown function` |
+| [ ] 10.13 | Add a top-level `sys.excepthook` (and a Qt `qInstallMessageHandler`) that logs uncaught exceptions to the AppData log file. Test: simulate an unhandled exception, assert log contains it | Crashes are diagnosable | Commit `reliability: global exception hook` |
+| [ ] 10.14 | Verification gate | `grep -R "except:" glados_pycromanager --exclude-dir=nodz` returns 0; every new test passes; total test count ≥ baseline + 25 | Grep + pytest summary |
 
-### Phase 11 — Logging unification
+### [ ] Phase 11 — Logging unification
 
 **Goal**: One way to log, per CLAUDE.md. Nodz folder skipped.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 11.1 | Centralize logger setup in `glados_pycromanager/observability/logger.py` (rotating file + console + module-level format) | Single setup | Commit `feat: centralized logger` |
-| 11.2 | Remove `loguru` imports (one commit per file that uses it) | Single logger lib | Commits `style: replace loguru with logging in <file>` |
-| 11.3 | Convert remaining `print(` calls in non-CLI code paths to `logging.info` (skip `main()` startup banner, skip nodz) | 95 → <10 | Commits per file |
-| 11.4 | Drop `loguru` from `pyproject.toml` dependencies | Smaller env | Commit `chore: drop loguru dep` |
-| 11.5 | Verification gate | `grep -R "from loguru" glados_pycromanager` empty; CI green | Grep + pytest |
+| [ ] 11.1 | Centralize logger setup in `glados_pycromanager/observability/logger.py` (rotating file + console + module-level format) | Single setup | Commit `feat: centralized logger` |
+| [ ] 11.2 | Remove `loguru` imports (one commit per file that uses it) | Single logger lib | Commits `style: replace loguru with logging in <file>` |
+| [ ] 11.3 | Convert remaining `print(` calls in non-CLI code paths to `logging.info` (skip `main()` startup banner, skip nodz) | 95 → <10 | Commits per file |
+| [ ] 11.4 | Drop `loguru` from `pyproject.toml` dependencies | Smaller env | Commit `chore: drop loguru dep` |
+| [ ] 11.5 | Verification gate | `grep -R "from loguru" glados_pycromanager` empty; CI green | Grep + pytest |
 
-### Phase 12 — Startup performance
+### [ ] Phase 12 — Startup performance
 
 **Goal**: Measurable startup speedup.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 12.1 | Add `scripts/profile_startup.ps1` (and `make profile-startup`) — wraps `python -X importtime` | Reproducible measurement | Commit `tool: startup profile script` |
-| 12.2 | Capture baseline import time → `docs/perf-baseline.txt` | Numbers locked | Commit `docs: startup baseline numbers` |
-| 12.3 | Lazy-import tensorflow/keras (move imports inside the node functions that use them) | Faster cold start | Commit `perf: lazy import tensorflow in <node>` (one per file) |
-| 12.4 | Lazy-import csbdeep / stardist / bioimageio / diplib / opencv | Faster cold start | Commits per dep |
-| 12.5 | Defer the AppData plugin walk until the autonomous dock is constructed | Faster cold start | Commit `perf: defer AppData plugin scan` |
-| 12.6 | Capture post-change import time → append to `docs/perf-baseline.txt` | Numbers comparable | Commit `docs: post-optimization startup numbers` |
-| 12.7 | Verification gate | New numbers strictly faster; CI green | Diff in baseline file |
+| [ ] 12.1 | Add `scripts/profile_startup.ps1` (and `make profile-startup`) — wraps `python -X importtime` | Reproducible measurement | Commit `tool: startup profile script` |
+| [ ] 12.2 | Capture baseline import time → `docs/perf-baseline.txt` | Numbers locked | Commit `docs: startup baseline numbers` |
+| [ ] 12.3 | Lazy-import tensorflow/keras (move imports inside the node functions that use them) | Faster cold start | Commit `perf: lazy import tensorflow in <node>` (one per file) |
+| [ ] 12.4 | Lazy-import csbdeep / stardist / bioimageio / diplib / opencv | Faster cold start | Commits per dep |
+| [ ] 12.5 | Defer the AppData plugin walk until the autonomous dock is constructed | Faster cold start | Commit `perf: defer AppData plugin scan` |
+| [ ] 12.6 | Capture post-change import time → append to `docs/perf-baseline.txt` | Numbers comparable | Commit `docs: post-optimization startup numbers` |
+| [ ] 12.7 | Verification gate | New numbers strictly faster; CI green | Diff in baseline file |
 
-### Phase 13 — Runtime performance (live loop)
+### [ ] Phase 13 — Runtime performance (live loop)
 
 **Goal**: Address the 2-second hot-path TODO and parallelize scoring.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 13.1 | Profile `napariGlados.py` live loop with `cProfile` in a smoke session against the demo config; store top-20 in `docs/perf-runtime.txt` | Bottleneck identified | Commit `perf: runtime profile baseline` |
-| 13.2 | Fix the 2-second stall (line 97); the fix is profile-dependent (likely cache a Java-bridge attribute) | Live FPS up | Commit `perf: fix 2s stall in live update loop` |
-| 13.3 | Audit each `@thread_worker` site — anything blocking the UI thread? Move to a worker | Smoother UI | Commit `perf: move <X> off UI thread` (per site) |
-| 13.4 | Evaluate parallel scoring in the autonomous executor (independent score nodes can run via `concurrent.futures`) | Scoring speedup | Commit `perf: parallel scoring stage` |
-| 13.5 | Verification gate | Runtime profile after < before; CI green | Diff in perf file |
+| [ ] 13.1 | Profile `napariGlados.py` live loop with `cProfile` in a smoke session against the demo config; store top-20 in `docs/perf-runtime.txt` | Bottleneck identified | Commit `perf: runtime profile baseline` |
+| [ ] 13.2 | Fix the 2-second stall (line 97); the fix is profile-dependent (likely cache a Java-bridge attribute) | Live FPS up | Commit `perf: fix 2s stall in live update loop` |
+| [ ] 13.3 | Audit each `@thread_worker` site — anything blocking the UI thread? Move to a worker | Smoother UI | Commit `perf: move <X> off UI thread` (per site) |
+| [ ] 13.4 | Evaluate parallel scoring in the autonomous executor (independent score nodes can run via `concurrent.futures`) | Scoring speedup | Commit `perf: parallel scoring stage` |
+| [ ] 13.5 | Verification gate | Runtime profile after < before; CI green | Diff in perf file |
 
-### Phase 14 — UX polish
+### [ ] Phase 14 — UX polish
 
 Note: Phase 10 may have already handled the `headlessGUI` validation; if so
 mark 14.1 done. Tooltips on nodes don't modify Nodz internals — they attach
@@ -731,54 +743,54 @@ metadata from outside.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 14.1 | Validate paths in `headlessGUI`; gray out Start until valid (if not already done in 10.9) | Fewer bad starts | Commit `ux: validate headless paths` |
-| 14.2 | Show the splash *before* the noisy print sequence in `main()` | Better perceived startup | Commit `ux: earlier splash` |
-| 14.3 | Surface plugin-load failures in a notification widget | Visible failures | Commit `ux: plugin failure notifications` |
-| 14.4 | Tooltips on Nodz nodes from `__function_metadata__` (attached from outside nodz, no nodz edits) | Inline help | Commit `ux: node tooltips from metadata` |
-| 14.5 | "Load example recipe" button on empty canvas | First-run wins | Commit `ux: empty canvas CTA` |
-| 14.6 | Verification gate | CI green; manual smoke screenshots | Commit `chore: phase 14 verification` |
+| [ ] 14.1 | Validate paths in `headlessGUI`; gray out Start until valid (if not already done in 10.9) | Fewer bad starts | Commit `ux: validate headless paths` |
+| [ ] 14.2 | Show the splash *before* the noisy print sequence in `main()` | Better perceived startup | Commit `ux: earlier splash` |
+| [ ] 14.3 | Surface plugin-load failures in a notification widget | Visible failures | Commit `ux: plugin failure notifications` |
+| [ ] 14.4 | Tooltips on Nodz nodes from `__function_metadata__` (attached from outside nodz, no nodz edits) | Inline help | Commit `ux: node tooltips from metadata` |
+| [ ] 14.5 | "Load example recipe" button on empty canvas | First-run wins | Commit `ux: empty canvas CTA` |
+| [ ] 14.6 | Verification gate | CI green; manual smoke screenshots | Commit `chore: phase 14 verification` |
 
-### Phase 15 — Type hints and `py.typed`
+### [ ] Phase 15 — Type hints and `py.typed`
 
 Nodz folder is excluded from this phase (already excluded by mypy config).
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 15.1 | Annotate `Shared_data`, MIL public surface, `errors.py`, `registry.py`, `recipe_io.py`, `executor.py` | Strong types where it matters | Commit per file |
-| 15.2 | Tighten `mypy` config: `disallow_untyped_defs = true` for typed modules only (per-module config) | Gradual typing | Commit `tool: stricter mypy for typed modules` |
-| 15.3 | Add `py.typed` marker | Downstream type-checkers see types | Commit `feat: add py.typed marker` |
-| 15.4 | Verification gate | `mypy glados_pycromanager` exits 0 for the typed module subset; CI green | mypy log |
+| [ ] 15.1 | Annotate `Shared_data`, MIL public surface, `errors.py`, `registry.py`, `recipe_io.py`, `executor.py` | Strong types where it matters | Commit per file |
+| [ ] 15.2 | Tighten `mypy` config: `disallow_untyped_defs = true` for typed modules only (per-module config) | Gradual typing | Commit `tool: stricter mypy for typed modules` |
+| [ ] 15.3 | Add `py.typed` marker | Downstream type-checkers see types | Commit `feat: add py.typed marker` |
+| [ ] 15.4 | Verification gate | `mypy glados_pycromanager` exits 0 for the typed module subset; CI green | mypy log |
 
-### Phase 16 — Claude integration (fill the Phase 0 skeleton)
+### [ ] Phase 16 — Claude integration (fill the Phase 0 skeleton)
 
 The skeleton directories were created in Phase 0; this phase fills them.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 16.1 | Expand `CLAUDE.md`: invariants, forbidden patterns, the registry pattern, the logging convention, the typed-exceptions convention | Claude has the rules | Commit `docs(claude): expand project guidance` |
-| 16.2 | Author `.claude/commands/run-tests.md`, `lint.md`, `profile-startup.md`, `new-node.md` | Slash commands | Commit `claude: add slash commands` |
-| 16.3 | Author `.claude/agents/code-reviewer.md`, `test-author.md`, `node-doctor.md` | Subagents | Commit `claude: add subagents` |
-| 16.4 | Pre-allow `pytest`, `ruff`, `mypy`, `git status`, `git diff`, `git log`, `make test`, `make lint` in `.claude/settings.json` | Fewer permission prompts | Commit `claude: preapprove safe commands` |
-| 16.5 | Verification gate | CI green; slash commands listed in `/help` when run locally | Local run note |
+| [ ] 16.1 | Expand `CLAUDE.md`: invariants, forbidden patterns, the registry pattern, the logging convention, the typed-exceptions convention | Claude has the rules | Commit `docs(claude): expand project guidance` |
+| [ ] 16.2 | Author `.claude/commands/run-tests.md`, `lint.md`, `profile-startup.md`, `new-node.md` | Slash commands | Commit `claude: add slash commands` |
+| [ ] 16.3 | Author `.claude/agents/code-reviewer.md`, `test-author.md`, `node-doctor.md` | Subagents | Commit `claude: add subagents` |
+| [ ] 16.4 | Pre-allow `pytest`, `ruff`, `mypy`, `git status`, `git diff`, `git log`, `make test`, `make lint` in `.claude/settings.json` | Fewer permission prompts | Commit `claude: preapprove safe commands` |
+| [ ] 16.5 | Verification gate | CI green; slash commands listed in `/help` when run locally | Local run note |
 
-### Phase 17 — Documentation regeneration
-
-| # | Step | Expected outcome | Proof |
-|---|------|------------------|-------|
-| 17.1 | Convert `Documentation/index.html` to a markdown source under `docs/dev/` and have `_CreateDocumentation.py` emit the HTML as a build step | Source-of-truth in markdown | Commit `docs: markdownize developer docs` |
-| 17.2 | Regenerate HTML; commit only the regenerated artifact | Docs match code | Commit `docs: regenerated developer docs` |
-| 17.3 | Update `UserManual.md` to match the new tooling (Makefile, CI) | User docs current | Commit `docs: refresh UserManual for new tooling` |
-| 17.4 | Verification gate | All docs render; CI green | Screenshot or grep |
-
-### Phase 18 — Final cleanup and release prep
+### [ ] Phase 17 — Documentation regeneration
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| 18.1 | Delete the temporary `utils.py` shim once all imports point to new homes (grep first) | No legacy shim | Commit `refactor: drop utils.py shim` |
-| 18.2 | Bump version in `pyproject.toml` (e.g. `0.0.2 → 0.1.0`); update `CHANGELOG.md` "Unreleased" → `0.1.0` with date | Release ready | Commit `release: bump to 0.1.0` |
-| 18.3 | Tag candidate `v0.1.0-rc1` locally | Tag exists | `git tag` shows |
-| 18.4 | Final verification: `pytest -q`, `ruff check`, `mypy`, `python -m build`, manual run of `glados` and the napari plugin, manual run of `Showcase_Basic1.json` end-to-end | All green | Commit `chore: final verification` with notes |
-| 18.5 | Open PR `claude_optimization → main` (or `Code-cleanup`, per `claude_decisions.md`) with a summary linking each phase | PR exists | PR URL recorded |
+| [ ] 17.1 | Convert `Documentation/index.html` to a markdown source under `docs/dev/` and have `_CreateDocumentation.py` emit the HTML as a build step | Source-of-truth in markdown | Commit `docs: markdownize developer docs` |
+| [ ] 17.2 | Regenerate HTML; commit only the regenerated artifact | Docs match code | Commit `docs: regenerated developer docs` |
+| [ ] 17.3 | Update `UserManual.md` to match the new tooling (Makefile, CI) | User docs current | Commit `docs: refresh UserManual for new tooling` |
+| [ ] 17.4 | Verification gate | All docs render; CI green | Screenshot or grep |
+
+### [ ] Phase 18 — Final cleanup and release prep
+
+| # | Step | Expected outcome | Proof |
+|---|------|------------------|-------|
+| [ ] 18.1 | Delete the temporary `utils.py` shim once all imports point to new homes (grep first) | No legacy shim | Commit `refactor: drop utils.py shim` |
+| [ ] 18.2 | Bump version in `pyproject.toml` (e.g. `0.0.2 → 0.1.0`); update `CHANGELOG.md` "Unreleased" → `0.1.0` with date | Release ready | Commit `release: bump to 0.1.0` |
+| [ ] 18.3 | Tag candidate `v0.1.0-rc1` locally | Tag exists | `git tag` shows |
+| [ ] 18.4 | Final verification: `pytest -q`, `ruff check`, `mypy`, `python -m build`, manual run of `glados` and the napari plugin, manual run of `Showcase_Basic1.json` end-to-end | All green | Commit `chore: final verification` with notes |
+| [ ] 18.5 | Open PR `claude_optimization → main` (or `Code-cleanup`, per `claude_decisions.md`) with a summary linking each phase | PR exists | PR URL recorded |
 
 ### How to prove progress at any time
 
