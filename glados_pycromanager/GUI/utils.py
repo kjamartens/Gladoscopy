@@ -872,87 +872,13 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
     return allData
 
 
-def findIconFolder():
-    import importlib.util
-    if importlib.util.find_spec('glados_pycromanager') is not None:
-        import glados_pycromanager
-        # Get the installation path of the package
-        package_path = os.path.dirname(glados_pycromanager.__file__)
-        # Construct the path to the Icons folder
-        iconFolder = os.path.join(package_path, 'GUI', 'Icons')
-
-        if not os.path.exists(iconFolder):
-            #Find the iconPath folder
-            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-                iconFolder = './glados_pycromanager/GUI/Icons/'
-            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-                iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-            else:
-                iconFolder = ''
-    else:
-        # logging.warning("Could not find glados_pycromanager package, using default icons")
-        #Find the iconPath folder
-        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-            iconFolder = './glados_pycromanager/GUI/Icons/'
-        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-            iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-        else:
-            iconFolder = ''
-    return iconFolder
-
-def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',iconSize = 16):
-    """
-    Sets the warning, error, or info icon for the given widget. The icon is loaded from the specified iconFolder and can be optionally altered to grayscale.
-
-    Args:
-        widget (QWidget): The widget to set the icon for.
-        type (str): The type of icon to set, either 'warning', 'error', or 'info'.
-        iconFolder (str): The folder path containing the icon files.
-        alteration (str, optional): The alteration to apply to the icon, either 'grayscale' or None. Defaults to 'grayscale'.
-        iconSize (int, optional): Size of the icon. Defaults to 16.
-
-    Returns:
-        QWidget: The widget with the icon set.
-    """
-    try:
-        from PyQt5.QtCore import Qt
-        from PyQt5.QtGui import QImage, QPixmap, qAlpha, qGray, qRgba
-        
-        if type == 'warning':
-            iconLoc = iconFolder+os.sep+'WarningIcon.png'
-        elif type == 'error':
-            iconLoc = iconFolder+os.sep+'ErrorIcon.png'
-        else:
-            iconLoc = iconFolder+os.sep+'InfoIcon.png'
-        
-        
-        # Load the original pixmap
-        pixmap = QPixmap(iconLoc)
-
-        if alteration == 'grayscale':
-            # Convert to QImage
-            image = pixmap.toImage()
-
-            #No clue what it's doing here, but Cody proposed it, and its way faster than looping
-            # Convert QImage to NumPy array
-            ptr = image.bits()
-            ptr.setsize(image.byteCount())
-            image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
-            # Perform grayscale conversion
-            gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
-            image_array[:, :, :3] = gray_array[:, :, np.newaxis]
-            # Convert back to QImage
-            grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
-
-            # Convert back to QPixmap
-            pixmap = QPixmap.fromImage(grayscale_image)
-        scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
-        widget.setPixmap(scaled_pixmap)
-        
-        return widget
-    except:
-        return None
+# Phase 7.3: bodies moved to `glados_pycromanager.ui.widgets.builders`.
+# Re-exported here so existing `utils.findIconFolder(...)` calls keep
+# working unchanged. Phase 18.1 deletes this shim.
+from glados_pycromanager.ui.widgets.builders import (  # noqa: F401
+    findIconFolder,
+    setWarningErrorInfoIcon,
+)
 
 def get_xy_position(core = None,shared_data=None):
     """
@@ -2062,38 +1988,12 @@ def kwargValueInputChanged(line_edit):
         setLineEditStyle(line_edit,type='Normal')
     pass
 
-def setLineEditStyle(line_edit,type='Normal'):
-    if type == 'Normal':
-        line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
-    elif type == 'Warning':
-        line_edit.setStyleSheet("border: 1px solid red;")
-
-def checkAndShowWidget(layout, widgetName):
-    # Iterate over the layout's items
-    for index in range(layout.count()):
-        item = layout.itemAt(index)
-        # Check if the item is a widget
-        if item.widget() is not None:
-            widget = item.widget()
-            # Check if the widget has the desired name
-            if widget.objectName() == widgetName:
-                # Widget already exists, unhide it
-                widget.show()
-                # logging.debug('898 showing widget: '+widget.objectName())
-                return
-        else:
-            for index2 in range(item.count()):
-                item_sub = item.itemAt(index2)
-                # Check if the item is a widget
-                if item_sub.widget() is not None:
-                    widget = item_sub.widget()
-                    # Check if the widget has the desired name
-                    if widget.objectName() == widgetName:
-                        # Widget already exists, unhide it
-                        widget.show()
-                        logging.debug('909 showing widget: '+widget.objectName())
-                        return
-    return False
+# Phase 7.3: setLineEditStyle + checkAndShowWidget moved to
+# ui.widgets.builders. Re-exported below.
+from glados_pycromanager.ui.widgets.builders import (  # noqa: F401
+    checkAndShowWidget,
+    setLineEditStyle,
+)
 
 #Remove everythign in this layout except className_dropdown
 def resetLayout(curr_layout,className):
@@ -2153,17 +2053,11 @@ def getMethodDropdownInfo(curr_layout,className):
     return curr_dropdown
 
 
-def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
-    parentFolder = line_edit_objName.text()
-    if parentFolder != "":
-        parentFolder = os.path.dirname(parentFolder)
-    
-    file_path = generalFileSearchButtonAction(parent=parent,text=text,filter=filter,parentFolder=parentFolder)
-    line_edit_objName.setText(file_path)
-        
-def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
-    file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
-    return file_path
+# Phase 7.3: file-dialog helpers moved to ui.widgets.builders. Shim.
+from glados_pycromanager.ui.widgets.builders import (  # noqa: F401
+    generalFileSearchButtonAction,
+    lineEditFileLookup,
+)
 
 
 def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None,skipp2=False):
