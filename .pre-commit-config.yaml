@@ -1,0 +1,39 @@
+# Run `pre-commit install` once after `pip install pre-commit` to activate.
+# Vendored Nodz (`glados_pycromanager/GUI/nodz/`) is excluded via the
+# `tool.ruff.extend-exclude` and `tool.mypy.exclude` settings in
+# pyproject.toml — no per-hook exclude needed here.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: "^glados_pycromanager/GUI/nodz/|^glados_pycromanager/Documentation/.*\\.html$|\\.svg$"
+      - id: end-of-file-fixer
+        exclude: "^glados_pycromanager/GUI/nodz/|^glados_pycromanager/Documentation/.*\\.html$|\\.svg$"
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+        exclude: "^glados_pycromanager/GUI/nodz/"
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.13
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.18.2
+    hooks:
+      - id: mypy
+        # Skip dependency installation; mypy + the project deps live in
+        # the dev env. The Phase 15 strictness bump will revisit this.
+        additional_dependencies: []
+        args: ["--config-file=pyproject.toml"]
+        # Mypy on a per-file basis is noisy with the current god-files;
+        # keep it informational only until Phase 15 carves typed modules.
+        files: "^glados_pycromanager/(GUI/slack_settings_dialog\\.py|Core/microscopeInterfaceLayer\\.py)$"

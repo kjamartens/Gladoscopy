@@ -210,6 +210,28 @@ sites use this helper.
 variants, future reporting nodes) pick up the same behavior.
 **Affects:** same file as above.
 
+## 2026-05-17 — pre-commit mypy hook scoped to small typed modules  [Phase 3.4]
+**Decision:** The `mypy` pre-commit hook only runs on
+`glados_pycromanager/GUI/slack_settings_dialog.py` and
+`glados_pycromanager/Core/microscopeInterfaceLayer.py`. CI / the
+`make lint` target still runs mypy across the package — only the
+per-commit hook is narrow.
+**Alternatives:** Run mypy on every file in pre-commit; that would
+print 286 errors on every commit and starve attention from real issues.
+**Reason:** Mypy is informational until Phase 15 carves out typed
+modules. Narrow pre-commit scope keeps the feedback loop fast and
+green; the package-wide check still runs in CI / `make lint`.
+**Affects:** `.pre-commit-config.yaml` — widen the `files:` regex as
+Phase 15 lands.
+
+## 2026-05-17 — Do not run `pre-commit install` automatically  [Phase 3.4]
+**Decision:** Ship the config file but leave git-hook installation to
+the user. README/CONTRIBUTING (Phase 4.4) will document the one-liner.
+**Alternatives:** Auto-install via a post-checkout shim.
+**Reason:** Installing git hooks is a per-clone side effect that
+silently modifies `.git/hooks/` — opt-in only.
+**Affects:** none — pure docs/process.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
