@@ -417,8 +417,11 @@ class FlowchartExecutorMixin:
         #Figure out the belonging evaluation-text
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
-        #And evaluate the custom function with custom parameters
-        output = eval(evalText) #type:ignore
+        #Phase 9.5: dispatch via registry instead of bare eval.
+        output = registry.dispatch_from_eval_text(
+            evalText,
+            scope={**globals(), **nodeDict, 'self': self, 'nodzInfo': nodzInfo},
+        )
         
         #Display final output to the user for now
         logging.info(f"Final output from node {node.name}: {output}")
@@ -485,13 +488,22 @@ class FlowchartExecutorMixin:
                                 colormap = cmap
                             )
                         
-                        visualOutput = eval(visualEvalText)
-                        
+                        visualOutput = registry.dispatch_from_eval_text(
+                            visualEvalText,
+                            scope={
+                                **globals(),
+                                **nodeDict,
+                                'self': self,
+                                'output': output,
+                                'napariLayer': napariLayer,
+                            },
+                        )
+
                         visual_connected_node.status = 'finished'
                     else:
                         visual_connected_node.status = 'error'
-                        
-            
+
+
         node.scoring_analysis_currentData['__output__'] = output
         
         #Store the output as NodzVariables
@@ -604,13 +616,23 @@ class FlowchartExecutorMixin:
                                 colormap = cmap
                             )
                         
-                        PerformVisualisation = eval(visualEvalText)
-                        
+                        #Phase 9.5: dispatch via registry instead of bare eval.
+                        PerformVisualisation = registry.dispatch_from_eval_text(
+                            visualEvalText,
+                            scope={
+                                **globals(),
+                                **nodeDict,
+                                'self': self,
+                                'output': output,
+                                'napariLayer': napariLayer,
+                            },
+                        )
+
                         visual_connected_node.status = 'finished'
                     else:
                         visual_connected_node.status = 'error'
-        
-        
+
+
         node.scoring_analysis_currentData['__output__'] = node.output
         
         #Store the output as NodzVariables
