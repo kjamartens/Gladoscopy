@@ -16,6 +16,7 @@ import numpy as np
 from scipy import signal
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -69,6 +70,7 @@ def blur_laplace(image):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("SharpnessValue.SharpnessValue")
 class SharpnessValue:
     def __init__(self,core,**kwargs):
         #Check if we have the required kwargs
