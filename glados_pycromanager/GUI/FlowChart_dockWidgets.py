@@ -87,6 +87,10 @@ import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
 from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
 from glados_pycromanager.Core.MDAGlados import MDAGlados
 import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
+from glados_pycromanager.GUI.slack_settings_dialog import (
+    SlackSettingsDialog,
+    apply_to_shared_data as _apply_slack_settings,
+)
 #endregion
 
 #region Dialogs_Nodz
@@ -1559,6 +1563,10 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         self.buttonsArea.addWidget(self.interruptRunButton)
         self.interruptRunButton.clicked.connect(lambda index: self.interruptRun())
         # self.runAcquiringButton.setIcon(QIcon(self.iconFolder+os.sep+'Start_acq.png'))
+
+        self.slackSettingsButton = QPushButton(' Slack settings…')
+        self.buttonsArea.addWidget(self.slackSettingsButton)
+        self.slackSettingsButton.clicked.connect(lambda _: self.openSlackSettingsDialog())
         
         # self.runScoringPlusAcqButton = QPushButton('Run Scoring + Acq')
         # self.buttonsArea.addWidget(self.runScoringPlusAcqButton)
@@ -4872,14 +4880,33 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             logging.error('Could not find acqStart node in flowchart')
     
     def interruptRun(self):
-        """ 
+        """
         Interrupt the run - stop the scoring/init/acq and stop ongoing acquisitions.
         """
-        
+
         #Trying this for now:
         self.shared_data._mdaModeAcqData.abort()
-        
+
         return
+
+    def openSlackSettingsDialog(self):
+        """Open the Slack settings dialog and persist on accept.
+
+        Replaces the previously hard-coded WebhookConfig defaults — the
+        user enters token/secret/channel at runtime; values are written
+        back onto shared_data and persisted via the standard AppData JSON.
+        """
+        cfg = self.shared_data.config.webhook_config
+        dialog = SlackSettingsDialog(
+            parent=self.parent if self.parent is not None else None,
+            token=cfg.slack_token or "",
+            secret=cfg.slack_secret or "",
+            channel=cfg.slack_channel or "",
+        )
+        if dialog.exec_() == QDialog.Accepted:
+            token, secret, channel = dialog.values
+            _apply_slack_settings(self.shared_data, token, secret, channel)
+            utils.storeSharedData_GlobalData(self.shared_data)
     
     def debugScoring(self):
         """
