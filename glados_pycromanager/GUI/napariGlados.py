@@ -291,10 +291,10 @@ def napariUpdateLive(DataStructure):
                             currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
                             sliceTuple += (int(currentSliceID),)
                         #Put it in
-                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage 
+                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage
                         logging.debug(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
-                    except:
-                        logging.debug(f'Entry {expectedEntry} tried, but not acquired')
+                    except (KeyError, IndexError, TypeError, ValueError) as exc:
+                        logging.debug('Entry %s tried, but not acquired: %s', expectedEntry, exc)
             
             logging.debug('Finalised up visualisation...')
             #Move to the end
@@ -414,8 +414,8 @@ class napariHandler:
             try:
                 self.shared_data.MILcore.stop_sequence_acquisition()
                 logging.debug('aborted acquisition')
-            except:
-                logging.debug('attemped to abort acq')
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logging.warning('Stop-sequence on live abort failed: %s', exc)
             return None
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
@@ -504,9 +504,9 @@ class napariHandler:
             try:
                 self.shared_data.MILcore.stop_sequence_acquisition()
                 logging.debug('aborted acquisition')
-            except:
-                logging.debug('attemped to abort acq')
-        
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logging.warning('Stop-sequence on live abort failed: %s', exc)
+
         # return image, metadata
         
     @thread_worker
@@ -693,8 +693,8 @@ class napariHandler:
                 else:
                     try:
                         self.shared_data.pyMMCdataset.finish()
-                    except:
-                        logging.error('TODO: handle the case where no MDA dataset is returned in PyMMC')
+                    except (AttributeError, RuntimeError, OSError) as exc:
+                        logging.error('pyMMCdataset.finish() failed (no MDA dataset returned): %s', exc)
                         
             logging.debug('#nH - Stopping the acquisition from napariHandler')
             #Now we're after the acquisition
