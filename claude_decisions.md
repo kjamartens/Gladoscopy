@@ -464,4 +464,25 @@ snapshot section. No code changes in this commit beyond the markdown.
 
 ---
 
+## 2026-05-17 — `Showcase_Basic1.json` absent; structural tests instead  [Phase 8.6]
+**Decision:** `tests/test_recipe_io.py` patches `QFileDialog` /
+`QMessageBox` and uses a `MagicMock` flowchart; `tests/test_executor.py`
+locks in the mixin's method set, the MRO ordering, and the back-compat
+re-exports. Neither test loads a real recipe.
+**Alternatives:** Add a checked-in `Showcase_Basic1.json` fixture and
+run the executor against it.
+**Reason:** The recipe file the plan names does not exist in the repo
+(it is referenced as a user-side example only). Authoring a recipe from
+scratch that exercises the executor end-to-end would require modelling
+~36 node types and an MM/Nodz environment in test — well beyond the
+scope of a "lock in current behavior" test pass. The contract tests
+catch the realistic regression risks for Phase 8.4: a method falling
+out of the mixin, the MRO being wrong, or the back-compat re-exports
+breaking. Phase 9 will add registry-level tests; Phase 10.6 adds
+recipe-schema tests.
+**Affects:** `tests/test_recipe_io.py` (6 tests), `tests/test_executor.py`
+(44 parametrised + 5 sanity tests). Total suite grows from 134 → 183.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*

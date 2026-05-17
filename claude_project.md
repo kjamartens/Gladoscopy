@@ -634,7 +634,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | [x] 8.3 | Extract the JSON recipe load/save helpers into `glados_pycromanager/autonomous/recipe_io.py` | Recipe I/O isolated | Commit `refactor: extract recipe I/O` |
 | [x] 8.4 | Extract the runtime executor into `glados_pycromanager/autonomous/executor.py` | Executor isolated | Commit `refactor: extract autonomous executor` |
 | [x] 8.5 | The remaining `FlowChart_dockWidgets.py` is the Qt dock + Nodz glue only | God-file < 1 500 LOC | Commit `refactor: trim FlowChart_dockWidgets to glue only` |
-| [ ] 8.6 | Add `tests/test_recipe_io.py` and `tests/test_executor.py` against `Showcase_Basic1.json` | Locked-in behavior | Commit `test: recipe IO and executor` |
+| [x] 8.6 | Add `tests/test_recipe_io.py` and `tests/test_executor.py` against `Showcase_Basic1.json` | Locked-in behavior | Commit `test: recipe IO and executor` |
 | [ ] 8.7 | Verification gate | CI green; manual: open the autonomous dock, load `Showcase_Basic1.json`, no regressions | Smoke note in commit |
 
 ### [ ] Phase 9 — Replace `eval()` with a function registry
