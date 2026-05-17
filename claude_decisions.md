@@ -339,6 +339,22 @@ would have meant writing an intermediate version that uses exec via
 the new helper, then immediately removing it — pure churn.
 **Affects:** `claude_project.md` row 6.4 only.
 
+## 2026-05-17 — Skip Phase 7.5 — no remaining fs helpers in utils.py  [Phase 7.5]
+**Decision:** Phase 7.5 ("create `util/fs.py`, move filesystem
+helpers") is a no-op: the only meaningful filesystem helper in
+`GUI/utils.py` was `cleanUpTemporaryFiles`, which Phase 7.1 already
+moved to `glados_pycromanager.io.appdata`. The other inspection-style
+helpers (`function_exists`, `subfunction_exists`, `functionNamesFromDir`)
+are Phase 9 (registry replacement) territory, not "fs helpers".
+**Alternatives:** (a) Carve `cleanUpTemporaryFiles` back out of
+`io.appdata` into `util/fs.py` — pure churn; (b) Move
+`function_exists`/`subfunction_exists` here as a stand-in — they don't
+fit the "filesystem" label and would block Phase 9 work.
+**Reason:** Same principle as the Phase 4.3 skip — don't create empty
+work to honour a plan row whose intent has already been satisfied
+elsewhere.
+**Affects:** `claude_project.md` row 7.5 only.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
