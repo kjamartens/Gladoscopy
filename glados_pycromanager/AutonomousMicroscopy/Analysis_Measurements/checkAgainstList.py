@@ -15,6 +15,7 @@ import ndtiff
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -44,6 +45,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("checkAgainstList.CheckVsList")
 def CheckVsList(core,**kwargs):
     
     #Check if we have the required kwargs

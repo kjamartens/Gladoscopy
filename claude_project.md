@@ -644,7 +644,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
 | [x] 9.1 | Add `glados_pycromanager/autonomous/registry.py` with `@register("Module.Function")` decorator and a `dispatch(name, **kwargs)` function | Registry ready | Commit `feat: autonomous function registry` |
-| [ ] 9.2 | Decorate all functions in `Analysis_Measurements/` with `@register(...)` (one commit per file: `AverageImage`, `AverageIntensity`, `RandomShapes`, `StarDist_image`, `checkAgainstList`) | 5 small commits | 5 commits `feat: register <node>` |
+| [x] 9.2 | Decorate all functions in `Analysis_Measurements/` with `@register(...)` (one commit per file: `AverageImage`, `AverageIntensity`, `RandomShapes`, `StarDist_image`, `checkAgainstList`) | 5 small commits | 5 commits `feat: register <node>` |
 | [ ] 9.3 | Decorate all functions in `Real_Time_Analysis/` (`BioImageModelZoo`, `EndAtFrame`, `FFT_im`, `LaserAdjustment`, `pSMLM`, `RT_counter`, `SharpnessValue`) | 7 small commits | 7 commits |
 | [ ] 9.4 | Decorate all in `CustomFunctions/` (`AutoFocusBF`, `Strobo_lasers`, `ExampleCustomFunction_DiceRoll`) | 3 small commits | 3 commits |
 | [ ] 9.5 | Replace each `eval(createFunctionWithKwargs(...))` call site with `dispatch(name, **kwargs)` | Eval-free hot path | Commit per call site (10–15 commits) |
