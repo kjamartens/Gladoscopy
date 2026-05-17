@@ -571,7 +571,7 @@ rotation is required (the token is stale per user).
 | [x] 4.6 | Add `docs/adr/0001-mil-abstraction.md`, `0002-plugin-discovery.md`, `0003-shared-data.md`, `0004-python-313.md`, `0005-vendored-nodz.md` | ADRs in place | Commit `docs: seed ADRs` |
 | [x] 4.7 | Verification gate | CI green; `python -m build` succeeds | Build artifact attached |
 
-### [~] Phase 5 — Test scaffolding
+### [x] Phase 5 — Test scaffolding
 
 **Goal**: Stand up the test infrastructure refactors will lean on. Tests
 here cover *current behavior*, locking it in before refactoring.
@@ -585,7 +585,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 5.5 | Add `tests/test_mil_dispatch.py` — every public MIL method dispatches by backend (parameterized) | Locks MIL behavior | Commit `test: MIL backend dispatch coverage` |
 | [x] 5.6 | Add `tests/test_plugin_discovery.py` — drop a `.py` into tmp AppData, assert loadable | Locks plugin contract | Commit `test: plugin discovery from AppData` |
 | [x] 5.7 | Add `tests/test_mda_event_builder.py` — pure-Python event list generation | Locks MDA logic | Commit `test: MDA event builder` |
-| [ ] 5.8 | Verification gate | CI green; new tests all pass | `pytest -q` count higher than baseline |
+| [x] 5.8 | Verification gate | CI green; new tests all pass | `pytest -q` count higher than baseline |
 
 ### [ ] Phase 6 — Architecture: MIL caching and plugin discovery
 
