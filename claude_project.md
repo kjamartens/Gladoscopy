@@ -652,7 +652,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | [x] 9.7 | Update `tests/test_helper_functions.py` and add `tests/test_registry.py` | Coverage on the new path | Commit `test: registry dispatch` |
 | [x] 9.8 | Verification gate | CI green; manual: run the example recipe end-to-end | Pytest + run note |
 
-### [ ] Phase 10 — Error-handling: tighten existing **and** add new checks
+### [~] Phase 10 — Error-handling: tighten existing **and** add new checks
 
 **Goal**: Two complementary jobs in this phase:
   (a) drive the 131 bare/broad `except:` count down to near zero by
@@ -689,7 +689,7 @@ Produce `docs/error-audit.md` with two tables:
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| [ ] 10.0 | Write `docs/error-audit.md` (Tables A and B above) | Audit complete | Commit `docs: error-handling audit` |
+| [x] 10.0 | Write `docs/error-audit.md` (Tables A and B above) | Audit complete | Commit `docs: error-handling audit` |
 | [ ] 10.1 | Add `glados_pycromanager/errors.py` (`BackendError`, `RecipeError`, `NodeLoadError`, `ConfigError`, `NodeDispatchError`, `MDAEventError`) | Typed exceptions exist | Commit `feat: typed exceptions module` |
 | [ ] 10.2 | **Tighten** bare-except sites one file at a time (one commit per file): `sharedFunctions.py`, `napariGlados.py`, `MMcontrols.py`, `MDAGlados.py`, `FlowChart_dockWidgets.py`, `utils.py` (nodz/* excluded). Each commit pairs with a regression test if the previously-swallowed error was reachable | Narrower excepts, error-level logs, re-raise where appropriate | 6 commits `reliability: tighten except blocks in <file>` |
 | [ ] 10.3 | **Add** check + tests: `Shared_data` JSON load — corrupted JSON, missing version, future version. Tests: `tests/test_errors_shared_data_load.py` (3 negative cases + 1 positive round-trip) | New defensive boundary | Commit `reliability: validate shared_data JSON on load` |

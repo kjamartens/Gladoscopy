@@ -550,4 +550,30 @@ the unsafe variants to flag their narrower remaining role.
 
 ---
 
+## 2026-05-17 — Error audit groups some files by category rather than per-site prose  [Phase 10.0]
+**Decision:** `docs/error-audit.md` Table A still lists every individual
+bare/broad `except:` line (per the plan's "every site" requirement) but
+the *proposed narrowed exception* is expressed via a small set of named
+categories (`CORE_CALL`, `WIDGET_OP`, `DICT_KEY`, `CAST`, …) defined at
+the top of the doc, rather than writing a unique sentence per line.
+Per-line rows only diverge from the category default where the
+behaviour does. The MDA mutex-defaults item from `claude_issues.md`
+"Scheduled / deferred" is folded into Table B row 6 as one of the
+negative tests Phase 10.8 will cover; the issue inbox entry stays put
+until 10.8 lands.
+**Alternatives:** (a) Write a unique prose proposal for each of ~150
+sites — very long, mostly repetitive, hard to scan. (b) Aggregate by
+file only without per-line rows — fails the plan's explicit "every
+site" requirement and loses the per-line targets for the sub-phase
+commits.
+**Reason:** Categories carry the *pattern* (e.g. "this is a Java-bridge
+call, wrap into BackendError") while line-by-line rows preserve the
+checklist. The doc stays under ~400 lines and the per-file commits in
+10.2 still have an unambiguous line-level target.
+**Affects:** `docs/error-audit.md` (Table A categories table +
+per-file site tables); flow downstream in 10.2 sub-phase commits which
+will reference rows by file:line.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*
