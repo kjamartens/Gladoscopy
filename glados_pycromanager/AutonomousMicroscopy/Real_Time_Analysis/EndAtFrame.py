@@ -15,6 +15,7 @@ import dask.array as da
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -43,6 +44,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("EndAtFrame.EndAtFrame")
 class EndAtFrame:
     def __init__(self,core,**kwargs):
         print(core)
