@@ -132,6 +132,11 @@ addopts = "-ra -p no:napari -p no:npe2 -p no:napari_plugin_engine"
 [tool.setuptools]
 packages = ["glados_pycromanager"]
 
+# scratch/ holds repo-local exploration (Test.py, test.ipynb, etc.) —
+# explicitly excluded from sdist/wheel via MANIFEST.in equivalents.
+[tool.setuptools.exclude-package-data]
+"*" = ["scratch/*"]
+
 
 [tool.setuptools.package-data]
 "glados_pycromanager" = [
