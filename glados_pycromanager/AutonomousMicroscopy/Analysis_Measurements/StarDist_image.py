@@ -15,6 +15,7 @@ import numpy as np
 from csbdeep.utils import normalize
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -64,6 +65,7 @@ def __function_metadata__():
     }
 
 #Normal stardist segmentation, requires image_data and modelStorageLoc as required kwargs
+@register("StarDist_image.StarDistSegment_ImageVis")
 def StarDistSegment_ImageVis(core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
@@ -134,12 +136,15 @@ def StarDistGeneralVis(datastruct,core,**kwargs):
     layer.contrast_limits=(0,0.1)#(0,rescaled.max())
     layer.blending = 'additive'
 
+@register("StarDist_image.StarDistSegment_ImageVis_visualise")
 def StarDistSegment_ImageVis_visualise(datastruct,core,**kwargs):
     StarDistGeneralVis(datastruct,core,**kwargs)
     
+@register("StarDist_image.StarDistSegment_preLoadedModel_use_visualise")
 def StarDistSegment_preLoadedModel_use_visualise(datastruct,core,**kwargs):
     StarDistGeneralVis(datastruct,core,**kwargs)
     
+@register("StarDist_image.StarDistSegment_preLoadedModel_use")
 def StarDistSegment_preLoadedModel_use(core,**kwargs):
     NDTIFFStack = kwargs['Image']
     mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
