@@ -584,7 +584,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 5.4 | Add `tests/test_shared_data_io.py` — round-trip Config to JSON | Locks the config schema | Commit `test: shared_data JSON round-trip` |
 | [x] 5.5 | Add `tests/test_mil_dispatch.py` — every public MIL method dispatches by backend (parameterized) | Locks MIL behavior | Commit `test: MIL backend dispatch coverage` |
 | [x] 5.6 | Add `tests/test_plugin_discovery.py` — drop a `.py` into tmp AppData, assert loadable | Locks plugin contract | Commit `test: plugin discovery from AppData` |
-| [ ] 5.7 | Add `tests/test_mda_event_builder.py` — pure-Python event list generation | Locks MDA logic | Commit `test: MDA event builder` |
+| [x] 5.7 | Add `tests/test_mda_event_builder.py` — pure-Python event list generation | Locks MDA logic | Commit `test: MDA event builder` |
 | [ ] 5.8 | Verification gate | CI green; new tests all pass | `pytest -q` count higher than baseline |
 
 ### [ ] Phase 6 — Architecture: MIL caching and plugin discovery

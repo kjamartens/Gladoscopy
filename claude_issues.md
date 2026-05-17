@@ -23,7 +23,7 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Open issues
 
-*(none yet)*
+- [ ] **`MIL.create_mda` mutable-default trap** — defaults `xy_positions=[]` *and* `xyz_positions=[]` together which pycromanager rejects, and `position_labels=[]` + `xy_positions=[]` silently yields zero events. Captured by `tests/test_mda_event_builder.py::test_default_call_raises_due_to_mutex_defaults`. Fix as part of **Phase 10.8** (validate MDA event inputs); after fix, update that test from "expects ValueError" to "raises typed MDAEventError" or "returns saner default events". See `glados_pycromanager/Core/microscopeInterfaceLayer.py:654`.
 
 ---
 
