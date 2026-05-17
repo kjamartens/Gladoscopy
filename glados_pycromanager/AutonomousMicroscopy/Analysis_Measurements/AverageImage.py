@@ -13,6 +13,7 @@ import ndtiff
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -40,6 +41,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("AverageImage.AvgImage")
 def AvgImage(core,**kwargs):
     
     #Check if we have the required kwargs
@@ -62,6 +64,7 @@ def AvgImage(core,**kwargs):
     return output
 
 
+@register("AverageImage.AvgImage_visualise")
 def AvgImage_visualise(datastruct,core,**kwargs):
     # This is how datastruct is organised...
     output,imageLayer = datastruct
