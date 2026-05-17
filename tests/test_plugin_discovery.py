@@ -116,6 +116,33 @@ def test_load_node_modules_picks_up_tmp_file(tmp_path):
     assert isinstance(failed.error, ZeroDivisionError)
 
 
+def test_log_failures_emits_warning_per_failure(tmp_path, caplog):
+    """Phase 6.5 contract — failures are *not* silent."""
+    import logging
+
+    from glados_pycromanager.plugins.discovery import (
+        load_node_modules,
+        log_failures,
+    )
+
+    folder = tmp_path / "drop_zone"
+    folder.mkdir()
+    (folder / "Broken1.py").write_text("raise RuntimeError('boom1')\n")
+    (folder / "Broken2.py").write_text("raise RuntimeError('boom2')\n")
+
+    _, failures = load_node_modules(str(folder), prefix="")
+    assert len(failures) == 2
+
+    with caplog.at_level(logging.WARNING, logger="glados_pycromanager.plugins.discovery"):
+        log_failures(failures)
+
+    warning_lines = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Broken1" in m for m in warning_lines)
+    assert any("Broken2" in m for m in warning_lines)
+    # And no silent swallowing — the count matches.
+    assert sum(1 for m in warning_lines if "Plugin load failed" in m) == 2
+
+
 def test_missing_appdata_subfolder_is_created(isolated_appdata):
     # No pre-seeded plugin file; the loader still has to create the
     # AppData/.../Analysis_Measurements directory tree and not raise.
