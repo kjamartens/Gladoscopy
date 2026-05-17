@@ -406,4 +406,39 @@ loses the in-file `GladosGraph` definition (~60 LOC removed).
 
 ---
 
+## 2026-05-17 — Executor extracted as a mixin, not a separate object  [Phase 8.4]
+**Decision:** `glados_pycromanager/autonomous/executor.py` ships
+`FlowchartExecutorMixin` containing every method from the
+`NodzFlowChart Node-specific` and `NodzFlowChart runs` regions of
+`FlowChart_dockWidgets.py`. `GladosNodzFlowChart_dockWidget` now
+inherits `FlowchartExecutorMixin, NodzMain.Nodz` instead of just
+`NodzMain.Nodz`. `WorkerSignals` and `generalNodzCallActionWorker` also
+moved into `executor.py` (top-level) and are re-imported in the old
+location for back-compat.
+**Alternatives:** (a) Standalone `Executor(flowchart)` class with
+composition — every `self.X` rewritten to `self.flowchart.X` across
+~1 370 LOC. (b) Module-level free functions taking `flowchart` as the
+first argument. (c) Leave the methods in place and only extract the
+worker classes.
+**Reason:** The runtime methods are densely interconnected (≈ 36
+methods, each calling several others through `self`, mutating dock-widget
+attributes like `self.fullRunOngoing`, `self.preventScoring`,
+`self.thread_pool`). A composition rewrite that touches every reference
+is high-risk over that surface area and produces a churny diff that's
+hard to review for behavioral equivalence. The mixin moves the code
+verbatim — same indentation, same `self.X` references, same control
+flow — so behavior preservation is mechanical to verify. Future
+refactors (Phase 9 registry, Phase 10 typed errors) can convert toward
+composition once the mixin is in place. Free functions were rejected
+for the same reason as composition. Worker-only extraction would not
+shrink the god-file meaningfully.
+**Affects:** new `glados_pycromanager/autonomous/executor.py`
+(~1 400 LOC); `GUI/FlowChart_dockWidgets.py` shrinks from 6 243 to
+~4 875 LOC; `eval(evalText)` in the worker now resolves names against
+`executor.py`'s globals — executor.py mirrors the same plugin
+star-imports so behavior is unchanged. Phase 9's registry replaces the
+`eval` entirely.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*
