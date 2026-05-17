@@ -60,7 +60,50 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "bandit>=1.7",
+    "ruff>=0.6",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+# Vendored Nodz is treated as third-party; see claude_decisions.md
+# "Vendored Nodz left alone" (2026-05-17).
+extend-exclude = [
+    "glados_pycromanager/GUI/nodz",
+    "scratch",
+    "build",
+    "dist",
+    "scalene-profile.*",
+]
+
+[tool.ruff.lint]
+# E/F = pycodestyle + pyflakes; I = isort; B = bugbear; UP = pyupgrade;
+# SIM = simplify; PL = pylint subset. Per claude_project.md Phase 3.1.
+select = ["E", "F", "I", "B", "UP", "SIM", "PL"]
+# Bulk-tightening of existing code happens phase by phase; for now silence
+# rules that would flag thousands of pre-existing call sites and starve
+# signal on real regressions.
+ignore = [
+    "E501",     # line-too-long — pre-existing churn; tightened per file as we touch them
+    "E402",     # module-level imports not at top — sys.path shim pattern
+    "E741",     # ambiguous variable names (l, I, O) — pre-existing
+    "PLR0911",  # too-many-return-statements — many existing
+    "PLR0912",  # too-many-branches — Qt slots
+    "PLR0913",  # too-many-arguments — Qt slots
+    "PLR0915",  # too-many-statements — god-files; split in Phase 7/8
+    "PLR2004",  # magic-value comparison — pervasive
+    "PLW2901",  # for-loop-variable-overwritten — pre-existing
+    "B007",     # unused loop variable — pre-existing
+    "B008",     # function-call-in-default-argument — Qt patterns
+    "B904",     # raise-from in except — broader sweep in Phase 10
+    "SIM108",   # ternary suggestion — readability preference
+    "SIM117",   # nested with — readability preference
+    "UP007",    # X | Y union — keeps PyQt5 compat clear
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004", "B011"]
+"glados_pycromanager/AutonomousMicroscopy/MainScripts/Main.py" = ["F401", "F403", "F405"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
