@@ -131,13 +131,37 @@ class Config:
 
 
 # Phase 7.1 moved the JSON load/save bodies to
-# `glados_pycromanager.io.appdata`. Names are re-exported here so existing
-# `from glados_pycromanager.GUI.sharedFunctions import load_config_from_json`
-# imports keep working. Phase 7.2 adds the `DeprecationWarning` shim.
-from glados_pycromanager.io.appdata import (  # noqa: F401
-    load_config_from_json,
-    save_config_to_json,
+# `glados_pycromanager.io.appdata`. Phase 7.2 adds `DeprecationWarning`
+# shims so call sites that still import from `sharedFunctions` (the
+# legacy path) see a one-time warning. Phase 18.1 deletes both wrappers
+# entirely.
+import warnings as _shim_warnings  # noqa: E402
+
+from glados_pycromanager.io import appdata as _appdata  # noqa: E402
+
+_DEPRECATION_MSG = (
+    "{name}() has moved to glados_pycromanager.io.appdata.{name}; the "
+    "GUI.sharedFunctions re-export is scheduled for removal in Phase 18.1 "
+    "of claude_project.md."
 )
+
+
+def load_config_from_json(cfg):
+    _shim_warnings.warn(
+        _DEPRECATION_MSG.format(name="load_config_from_json"),
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata.load_config_from_json(cfg)
+
+
+def save_config_to_json(cfg):
+    _shim_warnings.warn(
+        _DEPRECATION_MSG.format(name="save_config_to_json"),
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata.save_config_to_json(cfg)
 
 
 class Shared_data(QObject):

@@ -58,12 +58,22 @@ from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type
 
 #endregion
 
-# Phase 7.1 moved the body of `cleanUpTemporaryFiles` to
-# `glados_pycromanager.io.appdata`. Imported below so existing callers
-# (`utils.cleanUpTemporaryFiles(...)`) keep working unchanged.
-from glados_pycromanager.io.appdata import (  # noqa: F401
-    cleanUpTemporaryFiles,
-)
+# Phase 7.1/7.2: body moved to `glados_pycromanager.io.appdata`; shim
+# kept here for back-compat with one-time DeprecationWarning per call.
+import warnings as _shim_warnings_cleanup  # noqa: E402
+
+from glados_pycromanager.io import appdata as _appdata_cleanup  # noqa: E402
+
+
+def cleanUpTemporaryFiles(mainFolder="./", shared_data=None):
+    _shim_warnings_cleanup.warn(
+        "cleanUpTemporaryFiles() has moved to glados_pycromanager.io.appdata."
+        "cleanUpTemporaryFiles; the GUI.utils re-export is scheduled for "
+        "removal in Phase 18.1 of claude_project.md.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata_cleanup.cleanUpTemporaryFiles(mainFolder, shared_data)
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3280,12 +3290,22 @@ def forceReset(shared_data):
         except concurrent.futures.TimeoutError:
             logging.warning("Function did not complete within 5 seconds and thus quitted")
 
-# Phase 7.1 moved the body of `storeSharedData_GlobalData` to
-# `glados_pycromanager.io.appdata`. Re-exported so existing call sites
-# (`utils.storeSharedData_GlobalData(shared_data)`) keep working.
-from glados_pycromanager.io.appdata import (  # noqa: F401
-    storeSharedData_GlobalData,
-)
+# Phase 7.1/7.2: body moved to `glados_pycromanager.io.appdata`; shim
+# kept here for back-compat with one-time DeprecationWarning per call.
+import warnings as _shim_warnings_store  # noqa: E402
+
+from glados_pycromanager.io import appdata as _appdata_store  # noqa: E402
+
+
+def storeSharedData_GlobalData(shared_data):
+    _shim_warnings_store.warn(
+        "storeSharedData_GlobalData() has moved to glados_pycromanager.io."
+        "appdata.storeSharedData_GlobalData; the GUI.utils re-export is "
+        "scheduled for removal in Phase 18.1 of claude_project.md.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata_store.storeSharedData_GlobalData(shared_data)
 
 def openAdvancedSettings(shared_data):
     """

@@ -12,12 +12,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from glados_pycromanager.GUI.sharedFunctions import (
-    Config,
+from glados_pycromanager.GUI.sharedFunctions import Config
+from glados_pycromanager.GUI.slack_settings_dialog import apply_to_shared_data
+from glados_pycromanager.io.appdata import (
     load_config_from_json,
     save_config_to_json,
 )
-from glados_pycromanager.GUI.slack_settings_dialog import apply_to_shared_data
 
 
 @pytest.fixture

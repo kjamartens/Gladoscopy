@@ -607,7 +607,7 @@ here cover *current behavior*, locking it in before refactoring.
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
 | [x] 7.1 | Create `glados_pycromanager/io/__init__.py`, `glados_pycromanager/io/appdata.py`. Move `load_config_from_json`, `storeSharedData_GlobalData`, `cleanUpTemporaryFiles` | New module compiles | Commit `refactor: move AppData I/O into io.appdata` |
-| [ ] 7.2 | In old `utils.py`, re-export the moved names with a `DeprecationWarning` to avoid breaking callers | Backward compatible | Commit `refactor: utils.py shim re-exports` |
+| [x] 7.2 | In old `utils.py`, re-export the moved names with a `DeprecationWarning` to avoid breaking callers | Backward compatible | Commit `refactor: utils.py shim re-exports` |
 | [ ] 7.3 | Create `glados_pycromanager/ui/widgets/builders.py`. Move Qt widget helpers (`createGroupBox`, etc.) | Builders isolated | Commit `refactor: move Qt builders to ui.widgets.builders` |
 | [ ] 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |
 | [ ] 7.5 | Create `glados_pycromanager/util/fs.py`. Move filesystem helpers | FS helpers isolated | Commit `refactor: extract filesystem helpers` |
