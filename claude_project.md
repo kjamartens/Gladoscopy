@@ -600,7 +600,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 6.5 | Surface failed plugin loads in a log warning (not silent `except`) | Visible failures | Commit `reliability: log plugin load failures` |
 | [x] 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |
 
-### [~] Phase 7 — Split god-files: `utils.py`
+### [x] Phase 7 — Split god-files: `utils.py`
 
 **Goal**: Carve `GUI/utils.py` (3 860 LOC) into responsibility modules.
 
@@ -612,7 +612,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |
 | [x] 7.5 | Create `glados_pycromanager/util/fs.py`. Move filesystem helpers | FS helpers isolated | Commit `refactor: extract filesystem helpers` |
 | [x] 7.6 | Add a temporary `tests/test_utils_reexport.py` that imports every public name from the old path and the new path and asserts equality | Reexports verified | Commit `test: shim re-export equivalence` |
-| [ ] 7.7 | Verification gate | CI green; manual smoke test of `glados` startup | Commit `chore: phase 7 verification` referencing test pass |
+| [x] 7.7 | Verification gate | CI green; manual smoke test of `glados` startup | Commit `chore: phase 7 verification` referencing test pass |
 
 ### [ ] Phase 8 — Split god-files: `FlowChart_dockWidgets.py`
 
