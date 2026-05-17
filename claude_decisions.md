@@ -320,6 +320,25 @@ inbox is actually used for.
 **Affects:** `claude_issues.md` structure; future entries must choose
 the right section.
 
+## 2026-05-17 — Phase 6.4 already accomplished by 6.3  [Phase 6.4]
+**Decision:** Phase 6.4 ("Replace the `exec(\"from .X import *\")` with
+`importlib.import_module` + explicit `globals().update(...)`") is a
+no-op as a separate commit: the Phase 6.3 rewrite of the three
+subpackage `__init__.py` files dropped `exec()` entirely and uses the
+discovery helper (`importlib.util.spec_from_file_location` /
+`importlib.import_module`). `grep -rn "exec(" glados_pycromanager/AutonomousMicroscopy glados_pycromanager/plugins`
+returns only docstring references. Flipping the checkbox to `[x]` and
+recording rationale here in lieu of an empty commit.
+**Alternatives:** Split 6.3 into "thin __init__" (with exec still
+present) + 6.4 "swap exec → importlib" to honour the plan's two-step
+sequencing.
+**Reason:** The exec → importlib swap was inseparable from the thin
+__init__ rewrite — the new `__init__.py` is *built around* the
+discovery helper, which uses importlib by construction. Splitting them
+would have meant writing an intermediate version that uses exec via
+the new helper, then immediately removing it — pure churn.
+**Affects:** `claude_project.md` row 6.4 only.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
