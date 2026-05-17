@@ -48,15 +48,23 @@ def register(name: str) -> Callable[[Callable], Callable]:
     """
 
     def _decorator(fn: Callable) -> Callable:
-        if name in _REGISTRY and _REGISTRY[name] is not fn:
-            # Re-registration with a different callable usually means a
-            # duplicate decorator or an AppData-dropped node colliding
-            # with a built-in. Surface it; recipe behaviour would be
-            # silent-overwrite otherwise.
-            raise NodeDispatchError(
-                f"Refusing to re-register node function {name!r}: "
-                f"existing {_REGISTRY[name]!r}, new {fn!r}"
+        existing = _REGISTRY.get(name)
+        if existing is not None and existing is not fn:
+            # A different *callable* under the same name is almost always a
+            # real conflict (duplicate decorator, AppData-dropped node
+            # shadowing a built-in). But Python test reloaders re-execute
+            # plugin modules, which produces a brand-new function object
+            # for the same source location — that case is idempotent, not
+            # a conflict.
+            same_source = (
+                getattr(existing, "__module__", None) == getattr(fn, "__module__", None)
+                and getattr(existing, "__qualname__", None) == getattr(fn, "__qualname__", None)
             )
+            if not same_source:
+                raise NodeDispatchError(
+                    f"Refusing to re-register node function {name!r}: "
+                    f"existing {existing!r}, new {fn!r}"
+                )
         _REGISTRY[name] = fn
         return fn
 
