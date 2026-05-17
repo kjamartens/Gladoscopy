@@ -2552,9 +2552,19 @@ def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
     else:
         nodeDict = None
 
-    #Get the object
-    RT_analysis_object = eval(getFunctionEvalTextFromCurrentData_RTAnalysis_init(className,rt_analysis_info)) #type:ignore
-    
+    #Get the object via the autonomous registry (Phase 9.5). The eval
+    #text from RTAnalysis_init is shaped like
+    #"LaserAdjustment.laser_adjustment(core=core, Laser_id='X', maxFrame=100)"
+    #— the head ("LaserAdjustment.laser_adjustment") is the registry
+    #key, so dispatch_from_eval_text instantiates the class through the
+    #registry rather than eval'ing the class lookup.
+    from glados_pycromanager.autonomous import registry as _registry
+    _init_eval_text = getFunctionEvalTextFromCurrentData_RTAnalysis_init(className, rt_analysis_info)
+    RT_analysis_object = _registry.dispatch_from_eval_text(
+        _init_eval_text,
+        scope={'core': core, 'nodeDict': nodeDict, 'nodzInfo': nodzInfo},
+    )
+
     return RT_analysis_object
 
 def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
