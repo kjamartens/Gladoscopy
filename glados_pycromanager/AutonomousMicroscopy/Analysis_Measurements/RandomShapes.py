@@ -15,6 +15,7 @@ import ndtiff
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -41,12 +42,14 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("RandomShapes.DrawRandomShape")
 def DrawRandomShape(core,**kwargs):
     
     output = {}
     return output
 
 
+@register("RandomShapes.DrawRandomShape_visualise")
 def DrawRandomShape_visualise(datastruct,core,**kwargs):
     # This is how datastruct is organised...
     output,shapesLayer = datastruct
