@@ -528,7 +528,7 @@ class nodz_generalAdvancedLineEditDialog(QDialog):
             #Pre-load the value of the comboboxswitch:
             try:
                 self.advLineEditLayouts[varName].comboBox_switch.setCurrentText(getattr(self,storeVarName)[self.advLineEditLayouts[varName].comboBox_switch.objectName()]) #type:ignore
-            except:
+            except (KeyError, AttributeError, RuntimeError):
                 pass
             
             #When loading, hide the non-relevants:
@@ -557,8 +557,8 @@ class nodz_generalAdvancedLineEditDialog(QDialog):
                 getattr(self,self.storeVarName)[lineEditLayout.line_edit_variable.objectName()] = lineEditLayout.line_edit_variable.text()
                 #Store the value of the combobox
                 getattr(self,self.storeVarName)[lineEditLayout.comboBox_switch.objectName()] = lineEditLayout.comboBox_switch.currentText()
-                
-            except:
+
+            except (AttributeError, RuntimeError, KeyError):
                 pass
         
 
@@ -1139,7 +1139,7 @@ class nodz_caseSwitchDialog(QDialog):
             self.varSwitchAdvLineEdit.comboBox_switch.currentIndexChanged.disconnect(self.textChanged)
             self.varSwitchAdvLineEdit.comboBox_switch.setCurrentText(self.caseSwitchInfo[self.varSwitchAdvLineEdit.comboBox_switch.objectName()])
             self.varSwitchAdvLineEdit.comboBox_switch.currentIndexChanged.connect(self.textChanged)
-        except:
+        except (AttributeError, RuntimeError, KeyError, TypeError):
             pass
         
         #Finally actually add it to layout
@@ -1442,8 +1442,8 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             try:
                 # global core, napariViewer
                 napariViewer = shared_data.napariViewer
-            except:
-                logging.warning('Line 1372 fails')
+            except AttributeError as exc:
+                logging.warning('shared_data.napariViewer not set: %s', exc)
         
         self.parent = parent
         
@@ -2466,8 +2466,8 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             self.update()
             # self.updateCoreVariables()
             self.variablesWidget.updateVariables()
-        except:
-            pass
+        except (AttributeError, RuntimeError) as exc:
+            logging.debug('variablesWidget update skipped: %s', exc)
         logging.debug(f'Node with name {node.name} ran')
 
     def NodeDoubleClicked(self,nodeName):
@@ -2544,8 +2544,8 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 try:
                     currentNode.dialogInfo = dialog #type:ignore
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'analysisMeasurement')
-                except:
-                    logging.warning('Failed to set text in analysisMeasurementDialog')
+                except (AttributeError, KeyError, TypeError) as exc:
+                    logging.warning('Failed to set text in analysisMeasurementDialog: %s', exc)
                 logging.debug('Pressed OK on analysisMeasurementDialog')
         elif 'customFunction' in nodeName:
             currentNode = self.findNodeByName(nodeName)
@@ -2557,8 +2557,8 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 try:
                     currentNode.dialogInfo = dialog #type:ignore
                     self.set_readable_text_after_dialogChange(currentNode,dialog,'customFunction')
-                except:
-                    logging.warning('Failed to set text in analysisMeasurementDialog')
+                except (AttributeError, KeyError, TypeError) as exc:
+                    logging.warning('Failed to set text in customFunctionDialog: %s', exc)
                 logging.debug('Pressed OK on customFunctionDialog')
             
             
@@ -2746,15 +2746,15 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                         if node_data['name'] in nodeName:
                             # if self.nodeInfo[node_type]['MaxNodeCounter'] < np.inf:
                             self.nodeInfo[node_type]['NodeCounter'] -= 1
-                    except:
+                    except (KeyError, TypeError, AttributeError):
                         pass
             #Also remove from self.nodes:
             node = self.findNodeByName(nodeName)
             try:
                 self.nodes.remove(node)
-                print(f"Removed node {nodeName}")
-            except:
-                logging.warning(f"failed to remove node: {nodeName}")
+                logging.debug("Removed node %s", nodeName)
+            except (ValueError, AttributeError) as exc:
+                logging.warning("Failed to remove node %s: %s", nodeName, exc)
         self.checkNodesOnErrors()
     
     def finishedEmits(self,node):
@@ -3141,7 +3141,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             for config in dialog.ConfigsToBeChanged():
                 try:
                     displayRounded = str(round(float(config[1]),3))
-                except:
+                except (ValueError, TypeError):
                     displayRounded = config[1]
                 displayHTMLtext += f"<br>{config[0]} to {displayRounded}"
         elif nodeType == 'scoreEnd':
@@ -3160,19 +3160,19 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
             try:
                 displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
-            except:
+            except (KeyError, IndexError, TypeError, AttributeError):
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'storeData':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.storeDataInfo,currentNode.flowChart,dontEvaluate=True)
             try:
                 displayHTMLtext = f"Store data <b>{self.limitTextLength(values['item_to_store'][1])}</b> at location <b>{self.limitTextLength(values['store_location'][1])}</b>"
-            except:
+            except (KeyError, IndexError, TypeError, AttributeError):
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'changeGlobalVar':
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.changeGlobalVarInfo,currentNode.flowChart,dontEvaluate=True)
             try:
                 displayHTMLtext = f"Change global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> to <b>{self.limitTextLength(values['globalVarValue'][1],textLength = 60)}</b>"
-            except:
+            except (KeyError, IndexError, TypeError, AttributeError):
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         
         elif nodeType == 'ifStatement':
@@ -3183,7 +3183,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 comparatorValue = comparatorValue.replace('<','&lt;')
                 
                 displayHTMLtext = f"Assess the statement <b>{values['valueToCheck'][1]} {comparatorValue} {values['valueCheckAgainst'][1]}</b>"
-            except:
+            except (KeyError, IndexError, TypeError, AttributeError):
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
             
         elif nodeType == 'runInlineScript':
@@ -3197,7 +3197,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.newGlobalVarInfo,currentNode.flowChart,dontEvaluate=True)
             try:
                 displayHTMLtext = f"Create new global variable <b>{self.limitTextLength(values['globalVarName'][1])}</b> with value <b>{self.limitTextLength(values['globalVarValue'][1])}</b>"
-            except:
+            except (KeyError, IndexError, TypeError, AttributeError):
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'customFunction':
             methodName = dialog.currentData['__selectedDropdownEntryAnalysis__']
@@ -3258,13 +3258,13 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             #Set the displayHTML text:
             try:
                 displayHTMLtext = "<b>Relative</b> movement of stage <b>"+chosenStage+"</b> by <b>"+str(setMovement)+"</b> units"
-            except:
+            except (KeyError, IndexError, TypeError, AttributeError):
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == "caseSwitch":
             values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(currentNode.caseSwitchInfo,currentNode.flowChart,dontEvaluate=True)
             try:
                 displayHTMLtext = "Perform a case/switch logic based on variable <b>"+self.limitTextLength(values['Var'][1])+"</b>"
-            except:
+            except (KeyError, IndexError, TypeError, AttributeError):
                 displayHTMLtext = "<font color='#c00000'>Likely error with this node info!</font>"
         elif nodeType == 'stickyNote':
             displayHTMLtext = f"{currentNode.stickyNoteInfo}"
@@ -3409,7 +3409,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 try:
                     #This disconnects all signals
                     signal.disconnect()
-                except:
+                except (TypeError, RuntimeError):
                     #Otherwise we FULLY reset the signal?
                     logging.debug('attempted to disconnect a disconnected signal')
                     # nodeType = self.nodeLookupName_withoutCounter(node.name)
@@ -3425,7 +3425,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 try:
                     #This disconnects all signals
                     signal.disconnect()
-                except:
+                except (TypeError, RuntimeError):
                     logging.warning('attempted to disconnect a disconnected signal')
                     # nodeType = self.nodeLookupName_withoutCounter(node.name)
                     # if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
@@ -3519,7 +3519,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 configValue = configInfo.getStorableValue()
                 try:
                     typev = [type(configValue)]
-                except:
+                except (AttributeError, NameError, TypeError):
                     typev = [str]
                 self.createSingleCoreVar('config_'+configName,configValue,typev) #type:ignore
             
@@ -3831,9 +3831,9 @@ class ScanningWidget(QWidget):
             
         try:
             self.scanLayouts[self.scanArray_modes[self.mode_dropdown.currentIndex()][0]].setVisible(True)
-            
+
             self.currentMode = self.scanArray_modes[self.mode_dropdown.currentIndex()][0]
-        except:
+        except (KeyError, IndexError, AttributeError, RuntimeError):
             pass
 
     def getPositionInfo(self):
@@ -3860,8 +3860,8 @@ class ScanningWidget(QWidget):
             if scanMode == "LoadPos":
                 try:
                     self.scanLayouts[scanMode].lineEdit_posFilename.setText(self.scanLayouts[scanMode].scanningInfoGUI['LoadPos']['fileName'])
-                except:
-                    logging.debug('No fileName specified in scanMode loading')
+                except (KeyError, AttributeError, TypeError) as exc:
+                    logging.debug('No fileName specified in scanMode loading: %s', exc)
         logging.debug('Updated all scan layouts')
 
     def assessScan(self):
@@ -3901,7 +3901,7 @@ class advScanGridLayout(QGroupBox):
         #Create a QGridLayout to place in this groupbox:
         try:
             self.setLayout(QGridLayout())
-        except:
+        except (RuntimeError, AttributeError):
             pass
         #Create a quick label that we place in 1,1:
         self.layout().addWidget(QLabel(f"{mode}",self))
@@ -4130,7 +4130,7 @@ class DecisionWidget(QWidget):
             groupbox.setVisible(False) #False
         try:
             self.decisionLayouts[self.decisionArray_modes[self.mode_dropdown.currentIndex()][0]].setVisible(True)
-        except:
+        except (KeyError, IndexError, AttributeError, RuntimeError):
             pass
 
     def changeDecisionMode(self):        
@@ -4427,14 +4427,14 @@ class advDecisionGridLayout(QGroupBox):
                 try:
                     eval(f"{varCurrentValue}")
                     varcurrentvalEvaluable = True
-                except:
+                except (SyntaxError, NameError, ValueError, TypeError, AttributeError):
                     varcurrentvalEvaluable = False
                     
                 vartestvalEvaluable = False
                 try:
                     eval(f"{varTestValue}")
                     vartestvalEvaluable = True
-                except:
+                except (SyntaxError, NameError, ValueError, TypeError, AttributeError):
                     vartestvalEvaluable = False
                     
                 if not varcurrentvalEvaluable and not vartestvalEvaluable:
@@ -4599,7 +4599,7 @@ class VariablesBase(QWidget):
         try:
             #Specifically, get the origin Nodz
             hovered_entry = self.variablesTableWidget.item(row,1).text()# self.variablesTableWidget.item(row, column).text()
-        except:
+        except (AttributeError, IndexError):
             hovered_entry = None
             
         #Loop over the nods in the nodzinstance:
