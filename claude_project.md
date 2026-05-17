@@ -631,7 +631,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 |---|------|------------------|-------|
 | [x] 8.1 | Read and document the file's regions in `docs/flowchart-regions.md` (a map: lines x–y handle Initialisation pane, y–z handle Scoring graph, z–w handle Acquisition graph, w–end handle the runtime executor) | Plan ready | Commit `docs: flowchart-regions map` |
 | [x] 8.2 | Extract pure data classes / enums into `glados_pycromanager/autonomous/types.py` | First slice out | Commit `refactor: extract autonomous types` |
-| [ ] 8.3 | Extract the JSON recipe load/save helpers into `glados_pycromanager/autonomous/recipe_io.py` | Recipe I/O isolated | Commit `refactor: extract recipe I/O` |
+| [x] 8.3 | Extract the JSON recipe load/save helpers into `glados_pycromanager/autonomous/recipe_io.py` | Recipe I/O isolated | Commit `refactor: extract recipe I/O` |
 | [ ] 8.4 | Extract the runtime executor into `glados_pycromanager/autonomous/executor.py` | Executor isolated | Commit `refactor: extract autonomous executor` |
 | [ ] 8.5 | The remaining `FlowChart_dockWidgets.py` is the Qt dock + Nodz glue only | God-file < 1 500 LOC | Commit `refactor: trim FlowChart_dockWidgets to glue only` |
 | [ ] 8.6 | Add `tests/test_recipe_io.py` and `tests/test_executor.py` against `Showcase_Basic1.json` | Locked-in behavior | Commit `test: recipe IO and executor` |

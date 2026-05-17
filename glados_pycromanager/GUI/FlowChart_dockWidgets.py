@@ -81,6 +81,7 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
 import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
 import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.autonomous import recipe_io
 from glados_pycromanager.autonomous.types import GladosGraph
 from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
 from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
@@ -3570,49 +3571,12 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
     
     #region NodzFlowChart Saving Loading
     def storeGraphJSON(self):
-        """
-        Save the current graph to a JSON file.
+        """Save the current graph to a JSON file (delegates to ``recipe_io``)."""
+        recipe_io.store_graph_json(self)
 
-        This function saves the current graph to a JSON file, which can be loaded later using `loadPickle()`.
-        """
-        filename, _ = QFileDialog.getSaveFileName(self, 'Save file', '', 'JSON files (*.json)')
-        if filename:
-            if not filename.endswith('.json'):
-                filename += '.json'
-            with open(filename, 'wb') as f:
-                self.saveGraph(filename)
-    
     def loadGraphJSON(self):
-        """
-        Load the graph from a JSON file.
-
-        This function loads the graph from a JSON file created using `storeGraphJSON()`.
-        """        
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open file', '', 'JSON files (*.json)')
-        if filename:
-            try:
-                #Fully clear graph and delete all nodes from memory:
-                self.clearGraph()
-                self.nodes = []
-                #Set all counters to 0:
-                for nodeType in self.nodeInfo:
-                    if nodeType[:2] != '__': #Ignore internal/special node info ('__init__' etc)
-                        self.nodeInfo[nodeType]['NodeCounter'] = 0
-                        self.nodeInfo[nodeType]['NodeCounterNeverReset'] = 0
-                #Load the graph
-                with open(filename, 'rb') as f:
-                    self.loadGraph_KM(filename)
-                
-                #Update warnings/info/errors:
-                self.shared_data.warningErrorInfoInfo["Info"]['Other'] = ["Loaded "+filename]
-                # utils.updateAutonousErrorWarningInfo(self.shared_data)
-            except:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Warning)
-                msg.setText("Could not load file: " + filename)
-                msg.setWindowTitle("Warning")
-                msg.setStandardButtons(QMessageBox.Ok)
-                msg.exec_()
+        """Load the graph from a JSON file (delegates to ``recipe_io``)."""
+        recipe_io.load_graph_json(self)
     #endregion
     
     #region NodzFlowChart Node-specific
