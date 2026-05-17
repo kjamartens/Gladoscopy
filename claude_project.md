@@ -485,13 +485,21 @@ For each item, the change is described as it would appear in a code review.
 
 - `[x]` — finished and committed.
 - `[~]` — in progress (phase has some completed sub-steps but not all).
+- `[-]` — **skipped** intentionally; no commit produced. There must be
+  a matching decision entry in `claude_decisions.md` explaining why
+  (e.g. the step's intent was already satisfied by a previous commit,
+  or the artefact already existed). Use `[-]` instead of `[x]` so a
+  skim of the table immediately shows which rows have *no* commit
+  behind them.
 - `[ ]` — open / not started.
 
 When Claude finishes a sub-step it must flip that row's box to `[x]` in
 the same commit (or in the verification-gate commit at end of phase),
-and flip the phase heading to `[~]` or `[x]` as appropriate. Keep the
-glyphs in sync with reality — they're the at-a-glance map of where work
-stands.
+flip skipped rows to `[-]` (with a decision-log entry), and flip the
+phase heading to `[~]` or `[x]` as appropriate. A phase heading reaches
+`[x]` when every row is `[x]` or `[-]` — skipped rows still count as
+"resolved". Keep the glyphs in sync with reality — they're the
+at-a-glance map of where work stands.
 
 ### [x] Phase 0 — Claude architecture setup
 
@@ -565,7 +573,7 @@ rotation is required (the token is stale per user).
 |---|------|------------------|-------|
 | [x] 4.1 | Move `Test.py`, `test.ipynb` to `scratch/` and add `scratch/` to `[tool.setuptools.exclude-package-data]` | Repo root cleaner | Commit `chore: move scratch files out of root` |
 | [x] 4.2 | Fix `[tool.setuptools.package-data]` globs in `pyproject.toml` (drop the leading-slash entries; use `find:`) | Wheel still builds with same files | Commit `build: clean up package-data globs`; `python -m build` succeeds |
-| [x] 4.3 | Update `UserManual.md` Python version reference from 3.10 to 3.13 | Doc matches reality | Commit `docs: bump Python version in UserManual` |
+| [-] 4.3 | Update `UserManual.md` Python version reference from 3.10 to 3.13 | Doc matches reality | Commit `docs: bump Python version in UserManual` |
 | [x] 4.4 | Add `CONTRIBUTING.md`, `CHANGELOG.md` (with an "Unreleased" entry referencing this branch) | Project hygiene up | Commit `docs: add CONTRIBUTING and CHANGELOG` |
 | [x] 4.5 | Add `docs/module-map.md` — one paragraph per top-level module (skip nodz internals; record one line "vendored, see upstream") | Claude has a fast index | Commit `docs: add module map` |
 | [x] 4.6 | Add `docs/adr/0001-mil-abstraction.md`, `0002-plugin-discovery.md`, `0003-shared-data.md`, `0004-python-313.md`, `0005-vendored-nodz.md` | ADRs in place | Commit `docs: seed ADRs` |
@@ -596,7 +604,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 6.1 | In `MicroscopeInterfaceLayer.__init__`, add `self._mi: MicroscopeInstance = UNKNOWN`. Update `set_core` to compute it once. Have `MI()/get_MI()/get_microscope_interface()` return the cached value | Faster dispatch, same behavior | Commit `perf: cache microscope interface type in MIL`; `test_mil_dispatch.py` still green |
 | [ ] 6.2 | Extract plugin discovery from `Analysis_Measurements/__init__.py`, `Real_Time_Analysis/__init__.py`, `CustomFunctions/__init__.py` into `glados_pycromanager/plugins/discovery.py:load_node_modules(folder, prefix)` | Single, testable implementation | Commit `refactor: hoist plugin discovery into a single module` |
 | [x] 6.3 | Each subpackage `__init__.py` becomes 5–10 lines calling `load_node_modules` | Less magic | Commit `refactor: thin plugin __init__ files` |
-| [x] 6.4 | Replace the `exec("from .X import *")` with `importlib.import_module` + explicit `globals().update(...)` | No more `exec` on plugin load | Commit `refactor: drop exec from plugin loader` |
+| [-] 6.4 | Replace the `exec("from .X import *")` with `importlib.import_module` + explicit `globals().update(...)` | No more `exec` on plugin load | Commit `refactor: drop exec from plugin loader` |
 | [x] 6.5 | Surface failed plugin loads in a log warning (not silent `except`) | Visible failures | Commit `reliability: log plugin load failures` |
 | [x] 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |
 
@@ -610,7 +618,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 7.2 | In old `utils.py`, re-export the moved names with a `DeprecationWarning` to avoid breaking callers | Backward compatible | Commit `refactor: utils.py shim re-exports` |
 | [x] 7.3 | Create `glados_pycromanager/ui/widgets/builders.py`. Move Qt widget helpers (`createGroupBox`, etc.) | Builders isolated | Commit `refactor: move Qt builders to ui.widgets.builders` |
 | [x] 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |
-| [x] 7.5 | Create `glados_pycromanager/util/fs.py`. Move filesystem helpers | FS helpers isolated | Commit `refactor: extract filesystem helpers` |
+| [-] 7.5 | Create `glados_pycromanager/util/fs.py`. Move filesystem helpers | FS helpers isolated | Commit `refactor: extract filesystem helpers` |
 | [x] 7.6 | Add a temporary `tests/test_utils_reexport.py` that imports every public name from the old path and the new path and asserts equality | Reexports verified | Commit `test: shim re-export equivalence` |
 | [x] 7.7 | Verification gate | CI green; manual smoke test of `glados` startup | Commit `chore: phase 7 verification` referencing test pass |
 
