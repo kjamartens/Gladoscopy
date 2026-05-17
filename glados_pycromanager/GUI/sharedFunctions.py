@@ -130,62 +130,16 @@ class Config:
     webhook_config: WebhookConfig  = dataclasses.field(default_factory=WebhookConfig)
 
 
-def load_config_from_json(cfg: Config) -> Config:
-    """Load saved settings from appdata JSON, overwriting defaults where found."""
-    appdata_folder = appdirs.user_data_dir()
-    if appdata_folder is None:
-        raise OSError("APPDATA environment variable not found")
-    
-    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-    os.makedirs(app_specific_folder, exist_ok=True)
-    json_path = os.path.join(app_specific_folder, 'glados_state.json')
+# Phase 7.1 moved the JSON load/save bodies to
+# `glados_pycromanager.io.appdata`. Names are re-exported here so existing
+# `from glados_pycromanager.GUI.sharedFunctions import load_config_from_json`
+# imports keep working. Phase 7.2 adds the `DeprecationWarning` shim.
+from glados_pycromanager.io.appdata import (  # noqa: F401
+    load_config_from_json,
+    save_config_to_json,
+)
 
-    if not os.path.exists(json_path):
-        return cfg
 
-    with open(json_path) as file:
-        glados_info = json.load(file)
-    
-    saved = glados_info.get('GlobalData', {})
-
-    # Walk every group and field, overwrite if found in JSON
-    for group_field in fields(cfg):
-        group = getattr(cfg, group_field.name)
-        for f in fields(group):
-            key = f"{group_field.name}.{f.name}"  # e.g. "slack.token"
-            if key in saved:
-                try:
-                    setattr(group, f.name, saved[key])
-                except Exception:
-                    pass
-
-    return cfg
-
-def save_config_to_json(cfg: Config):
-    """Save all current config values to appdata JSON."""
-    appdata_folder = appdirs.user_data_dir()
-    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-    os.makedirs(app_specific_folder, exist_ok=True)
-    json_path = os.path.join(app_specific_folder, 'glados_state.json')
-
-    # Flatten config into {"group.field": value} dict
-    flat = {}
-    for group_field in fields(cfg):
-        group = getattr(cfg, group_field.name)
-        for f in fields(group):
-            flat[f"{group_field.name}.{f.name}"] = getattr(group, f.name)
-
-    # Preserve any other keys already in the JSON (e.g. MDA state)
-    existing = {}
-    if os.path.exists(json_path):
-        with open(json_path) as file:
-            existing = json.load(file)
-
-    existing['GlobalData'] = flat
-
-    with open(json_path, 'w') as file:
-        json.dump(existing, file, indent=4)
-        
 class Shared_data(QObject):
     mda_acq_done_signal = pyqtSignal(bool)
     liveUpdateEvent = pyqtSignal(object)

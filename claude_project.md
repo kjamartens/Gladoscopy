@@ -600,13 +600,13 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 6.5 | Surface failed plugin loads in a log warning (not silent `except`) | Visible failures | Commit `reliability: log plugin load failures` |
 | [x] 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |
 
-### [ ] Phase 7 — Split god-files: `utils.py`
+### [~] Phase 7 — Split god-files: `utils.py`
 
 **Goal**: Carve `GUI/utils.py` (3 860 LOC) into responsibility modules.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| [ ] 7.1 | Create `glados_pycromanager/io/__init__.py`, `glados_pycromanager/io/appdata.py`. Move `load_config_from_json`, `storeSharedData_GlobalData`, `cleanUpTemporaryFiles` | New module compiles | Commit `refactor: move AppData I/O into io.appdata` |
+| [x] 7.1 | Create `glados_pycromanager/io/__init__.py`, `glados_pycromanager/io/appdata.py`. Move `load_config_from_json`, `storeSharedData_GlobalData`, `cleanUpTemporaryFiles` | New module compiles | Commit `refactor: move AppData I/O into io.appdata` |
 | [ ] 7.2 | In old `utils.py`, re-export the moved names with a `DeprecationWarning` to avoid breaking callers | Backward compatible | Commit `refactor: utils.py shim re-exports` |
 | [ ] 7.3 | Create `glados_pycromanager/ui/widgets/builders.py`. Move Qt widget helpers (`createGroupBox`, etc.) | Builders isolated | Commit `refactor: move Qt builders to ui.widgets.builders` |
 | [ ] 7.4 | Create `glados_pycromanager/ui/markdown_view.py`. Move the QWebEngine markdown viewer code | Markdown view isolated | Commit `refactor: extract markdown viewer` |

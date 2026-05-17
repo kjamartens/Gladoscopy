@@ -58,32 +58,12 @@ from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type
 
 #endregion
 
-def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
-    logging.debug('Cleaning up temporary files')
-    
-    #Remove all the datasets from the internal mdadatasets info, so they are freed up
-    if shared_data != None:
-        if len(shared_data.mdaDatasets) > (3-1):
-            for index,mdadataset in enumerate(shared_data.mdaDatasets):
-                try:
-                    if 'ShouldBeRemoved' in mdadataset.path:
-                        #pop it from the list:
-                        try:
-                            shared_data.mdaDatasets.pop(index)
-                        except:
-                            pass
-                except:
-                    pass #Nowadays in JavaRAMDataStorage, can be safely ignored.
-    
-    #Remove them from disk - keep in mind that the last three will be kept
-    if os.path.exists(os.path.join(mainFolder,'temp')):
-        for folder in os.listdir(os.path.join(mainFolder,'temp')):
-            if 'LiveAcqShouldBeRemoved' in folder or 'MdaAcqShouldBeRemoved' in folder:
-                try:
-                    shutil.rmtree(os.path.join(mainFolder,os.path.join('temp',folder)))
-                    logging.debug(f"Deleted {os.path.join(mainFolder,os.path.join('temp',folder))}")
-                except:
-                    pass
+# Phase 7.1 moved the body of `cleanUpTemporaryFiles` to
+# `glados_pycromanager.io.appdata`. Imported below so existing callers
+# (`utils.cleanUpTemporaryFiles(...)`) keep working unchanged.
+from glados_pycromanager.io.appdata import (  # noqa: F401
+    cleanUpTemporaryFiles,
+)
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3300,16 +3280,12 @@ def forceReset(shared_data):
         except concurrent.futures.TimeoutError:
             logging.warning("Function did not complete within 5 seconds and thus quitted")
 
-def storeSharedData_GlobalData(shared_data):
-    """ Share the shared_data as JSON in the appdata folder"""
-    appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
-    if appdata_folder is None:
-        raise OSError("APPDATA environment variable not found")
-    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-    os.makedirs(app_specific_folder, exist_ok=True)
-    tempCustomWindow = CustomMainWindow()
-    tempCustomWindow.shared_data = shared_data
-    tempCustomWindow.save_state_globalData(os.path.join(app_specific_folder, 'glados_state.json'))
+# Phase 7.1 moved the body of `storeSharedData_GlobalData` to
+# `glados_pycromanager.io.appdata`. Re-exported so existing call sites
+# (`utils.storeSharedData_GlobalData(shared_data)`) keep working.
+from glados_pycromanager.io.appdata import (  # noqa: F401
+    storeSharedData_GlobalData,
+)
 
 def openAdvancedSettings(shared_data):
     """
