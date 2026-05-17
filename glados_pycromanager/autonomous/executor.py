@@ -90,6 +90,7 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
 import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
 import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.autonomous import registry
 from glados_pycromanager.autonomous.types import GladosGraph
 from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
 from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
@@ -201,8 +202,18 @@ class generalNodzCallActionWorker(QRunnable):
             shared_data = self.args['shared_data']
             self.shared_data = shared_data
             logging.info(evalText)
-            #Finally do the analysis
-            node.output = eval(evalText)
+            #Phase 9.5: dispatch via the autonomous registry instead of bare eval.
+            #The function name is parsed out of evalText and looked up in
+            #_REGISTRY; arg expressions resolve against the worker's scope
+            #plus the nodzVariable dict.
+            scope = {
+                **globals(),
+                **nodeDict,
+                'self': self,
+                'core': core,
+                'shared_data': shared_data,
+            }
+            node.output = registry.dispatch_from_eval_text(evalText, scope=scope)
         
         #Emit that the node is finished :) 
         self.signals.finished.emit()
