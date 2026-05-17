@@ -129,25 +129,36 @@ python_files = ["test_*.py"]
 # multi-minute hang during session init/teardown on this codebase.
 addopts = "-ra -p no:napari -p no:npe2 -p no:napari_plugin_engine"
 
-[tool.setuptools]
-packages = ["glados_pycromanager"]
+[tool.setuptools.packages.find]
+# Auto-discover every subpackage (Core, GUI, AutonomousMicroscopy/*, …)
+# under the project root so they ship in the wheel.
+where = ["."]
+include = ["glados_pycromanager*"]
+exclude = [
+    "glados_pycromanager.GUI.nodz.tmp*",
+    "scratch*",
+    "tests*",
+    "docs*",
+]
 
 # scratch/ holds repo-local exploration (Test.py, test.ipynb, etc.) —
-# explicitly excluded from sdist/wheel via MANIFEST.in equivalents.
+# explicitly excluded from sdist/wheel.
 [tool.setuptools.exclude-package-data]
 "*" = ["scratch/*"]
 
-
+# Non-Python files shipped inside the package. Paths are relative to
+# each package directory (no leading slash). Dropped the leading-slash
+# globs ("/*", "/Documentation/*") — they pointed at filesystem-root
+# and silently included nothing.
 [tool.setuptools.package-data]
 "glados_pycromanager" = [
-    "napari.yaml",            
-    "GUI/Icons/*",            
-    "GUI/nodz/*",              
-    "GUI/nodz/default_config.json", 
-    "GUI/*",                   
-    "/*",
-    "/Documentation/*",
-    "/Documentation/Images/*",
+    "napari.yaml",
+    "GUI/Icons/*",
+    "GUI/nodz/*",
+    "GUI/nodz/default_config.json",
+    "Documentation/*.md",
+    "Documentation/*.html",
+    "Documentation/Images/*",
 ]
 [project.scripts]
 "glados" = "glados_pycromanager.GUI.GUI_napari:main"
