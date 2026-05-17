@@ -485,4 +485,18 @@ recipe-schema tests.
 
 ---
 
+## 2026-05-17 — Phase 9.4 split 3-files into 2 commits, not 3  [Phase 9.4]
+**Decision:** `Strobo_lasers.py` and `ExampleCustomFunction_DiceRoll.py`
+landed in the same commit (`835d331`) instead of two separate commits
+as the plan called for. Total decoration commits for 9.4 are 2, not 3.
+**Alternatives:** `git reset` + re-commit to split.
+**Reason:** The slip is harmless — both edits are mechanical
+`@register` additions, the diff is trivially reviewable, and splitting
+would force a destructive rewrite of public history on the working
+branch. Counted as a single procedural deviation, not a content issue.
+**Affects:** Commit ledger only; file content and registry state are
+identical to what the 3-commit plan would have produced.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*
