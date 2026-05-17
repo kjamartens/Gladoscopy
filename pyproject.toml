@@ -59,6 +59,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "bandit>=1.7",
 ]
 
 [tool.pytest.ini_options]

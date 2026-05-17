@@ -1,0 +1,1408 @@
+Run started:2026-05-17 10:30:06.793443+00:00
+
+Test results:
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\AutonomousMicroscopy\Analysis_Measurements\__init__.py:18:12
+17	            #First try the normal import
+18	            exec(f"from .{module_name} import *")
+19	        except ModuleNotFoundError:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\Analysis_Measurements\checkAgainstList.py:50:19
+49	    try:
+50	        listInfo = eval(kwargs['List'])
+51	    except:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\Analysis_Measurements\checkAgainstList.py:58:52
+57	                try:
+58	                    totalEuclidianDist = math.sqrt((eval(kwargs['Position'])[0]-entry[0])**2 + (eval(kwargs['Position'])[1]-entry[1])**2)
+59	                except:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\Analysis_Measurements\checkAgainstList.py:58:96
+57	                try:
+58	                    totalEuclidianDist = math.sqrt((eval(kwargs['Position'])[0]-entry[0])**2 + (eval(kwargs['Position'])[1]-entry[1])**2)
+59	                except:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\CustomFunctions\Strobo_lasers.py:95:20
+94	        wavelength = wavelength_arr[laser_id]
+95	        pulse_len = eval('pulse_len_'+str(wavelength))
+96	        pulse_delay = eval('pulse_delay_'+str(wavelength))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\CustomFunctions\Strobo_lasers.py:96:22
+95	        pulse_len = eval('pulse_len_'+str(wavelength))
+96	        pulse_delay = eval('pulse_delay_'+str(wavelength))
+97	        pulse_frames = eval('pulse_frames_'+str(wavelength))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\CustomFunctions\Strobo_lasers.py:97:23
+96	        pulse_delay = eval('pulse_delay_'+str(wavelength))
+97	        pulse_frames = eval('pulse_frames_'+str(wavelength))
+98	        power_pct = eval('power_pct_'+str(wavelength))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\CustomFunctions\Strobo_lasers.py:98:20
+97	        pulse_frames = eval('pulse_frames_'+str(wavelength))
+98	        power_pct = eval('power_pct_'+str(wavelength))
+99	        
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\AutonomousMicroscopy\CustomFunctions\__init__.py:18:12
+17	            #First try the normal import
+18	            exec(f"from .{module_name} import *")
+19	        except ModuleNotFoundError:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\HelperFunctions.py:54:39
+53	                try:
+54	                    functionMetadata = eval(f'{str(functionName)}.__function_metadata__()')
+55	                    for singlefunctiondata in functionMetadata:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\HelperFunctions.py:66:66
+65	                    subroutines = []
+66	                    for subroutineName, obj in inspect.getmembers(eval(f'{functionName}')):
+67	                        if function_exists(obj):
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\HelperFunctions.py:100:31
+99	        if not '.' in functionname:
+100	            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+101	            #Loop over all entries
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\HelperFunctions.py:106:31
+105	            functionparent = functionname.split('.')[0]
+106	            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+107	            #sub-select the looprange
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\HelperFunctions.py:152:31
+151	        if not '.' in functionname:
+152	            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+153	            finaltext = f"""\
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\HelperFunctions.py:163:31
+162	            functionparent = functionname.split('.')[0]
+163	            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+164	            #sub-select the looprange
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\Main.py:68:9
+67	#Non-preloaded stardistsegmentation
+68	coords = eval(HelperFunctions.createFunctionWithKwargs("StarDist.StarDistSegment",image_data="ImageData",modelStorageLoc="\"./AutonomousMicroscopy/ExampleData/StarDistModel\"",prob_thresh="0.35",nms_thresh="0.2"))
+69	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\Main.py:73:18
+72	#Three examples
+73	cellCrowdedness = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.nrneighbours_basedonCellWidth",outline_coords="coords",multiple_cellWidth_lookup="1"))
+74	cellCrowdedness_gauss=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.gaussScore",methodValue="cellCrowdedness",meanVal="3",sigmaVal="2"))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\Main.py:74:22
+73	cellCrowdedness = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.nrneighbours_basedonCellWidth",outline_coords="coords",multiple_cellWidth_lookup="1"))
+74	cellCrowdedness_gauss=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.gaussScore",methodValue="cellCrowdedness",meanVal="3",sigmaVal="2"))
+75	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\Main.py:76:11
+75	
+76	cellArea = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.cellArea",outline_coords="coords"))
+77	cellArea_bounds=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.lowerUpperBound",methodValue="cellArea",lower_bound="300",upper_bound="500"))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\Main.py:77:16
+76	cellArea = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.cellArea",outline_coords="coords"))
+77	cellArea_bounds=eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.lowerUpperBound",methodValue="cellArea",lower_bound="300",upper_bound="500"))
+78	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\Main.py:79:12
+78	
+79	cellAssym = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.lengthWidthRatio",outline_coords="coords"))
+80	cellAssym_relativeToMax = eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.relativeToMaxScore",methodValue="cellAssym"))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\MainScripts\Main.py:80:26
+79	cellAssym = eval(HelperFunctions.createFunctionWithKwargs("SimpleCellOperants.lengthWidthRatio",outline_coords="coords"))
+80	cellAssym_relativeToMax = eval(HelperFunctions.createFunctionWithKwargs("DefaultScoringMetrics.relativeToMaxScore",methodValue="cellAssym"))
+81	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\Real_Time_Analysis\LaserAdjustment.py:106:30
+105	        
+106	        self.LaserKeys = list(eval(kwargs['Laser_power']+".keys()"))
+107	        print(self.LaserKeys)
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\AutonomousMicroscopy\Real_Time_Analysis\LaserAdjustment.py:116:21
+115	        ""
+116	        laserPower = eval(kwargs['Laser_power'])
+117	        
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\AutonomousMicroscopy\Real_Time_Analysis\__init__.py:18:12
+17	            #First try the normal import
+18	            exec(f"from .{module_name} import *")
+19	        except ModuleNotFoundError:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\Core\MDAGlados.py:601:16
+600	                    self.showOptionChanged()
+601	                except:
+602	                    pass
+603	    #endregion
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\Core\MDAGlados.py:1002:16
+1001	                        item.widget().setStyleSheet("padding: 2px; margin: 1px; spacing: 1px;")  # Change padding as needed
+1002	                except:
+1003	                    pass
+1004	    
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\AnalysisClass.py:469:8
+468	            # self.shared_data.napariViewer.layers.remove(layer)
+469	        except:
+470	            pass
+471	        
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:521:12
+520	                self.advLineEditLayouts[varName].comboBox_switch.setCurrentText(getattr(self,storeVarName)[self.advLineEditLayouts[varName].comboBox_switch.objectName()]) #type:ignore
+521	            except:
+522	                pass
+523	            
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:551:12
+550	                
+551	            except:
+552	                pass
+553	        
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:1132:8
+1131	            self.varSwitchAdvLineEdit.comboBox_switch.currentIndexChanged.connect(self.textChanged)
+1132	        except:
+1133	            pass
+1134	        
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:1426:35
+1425	        # Dynamically add a new signal to the object
+1426	        setattr(self, signal_name, eval('self.new_signal'))
+1427	        self.signals.append(eval('self.new_signal'))
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:1427:28
+1426	        setattr(self, signal_name, eval('self.new_signal'))
+1427	        self.signals.append(eval('self.new_signal'))
+1428	        
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:2516:8
+2515	            self.variablesWidget.updateVariables()
+2516	        except:
+2517	            pass
+2518	        logging.debug(f'Node with name {node.name} ran')
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:2796:20
+2795	                            self.nodeInfo[node_type]['NodeCounter'] -= 1
+2796	                    except:
+2797	                        pass
+2798	            #Also remove from self.nodes:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:3860:17
+3859	        #And evaluate the custom function with custom parameters
+3860	        output = eval(evalText) #type:ignore
+3861	        
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:3881:39
+3880	                    try:
+3881	                        fnctmetadata = eval(f"{selectedFunction.split('.')[0]}.__function_metadata__()")
+3882	                        visType = fnctmetadata[selectedFunction.split('.')[1]]['visualisation_type']
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:3927:39
+3926	                        
+3927	                        visualOutput = eval(visualEvalText)
+3928	                        
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:4002:39
+4001	                    try:
+4002	                        fnctmetadata = eval(f"{selectedFunction.split('.')[0]}.__function_metadata__()")
+4003	                        visType = fnctmetadata[selectedFunction.split('.')[1]]['visualisation_type']
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:4046:47
+4045	                        
+4046	                        PerformVisualisation = eval(visualEvalText)
+4047	                        
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:4358:8
+4357	                        logging.debug(f"Data found for {attr}: {data[attr]}")
+4358	        except:
+4359	            pass
+4360	        
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:4540:70
+4539	        try:
+4540	            node.flowChart.globalVariables[variable]['type'] = [(type(eval(value)))]
+4541	        except: #This will effectively set it as a string.
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:4560:17
+4559	        
+4560	        result = eval(str(varInfo['valueToCheck'][0])+varInfo['comparator'][0]+str(varInfo['valueCheckAgainst'][0]))
+4561	        
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:4592:16
+4591	            try:
+4592	                eval(line)
+4593	                logging.debug(f'Ran commdand succesfully: {line}')
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:5185:8
+5184	            self.currentMode = self.scanArray_modes[self.mode_dropdown.currentIndex()][0]
+5185	        except:
+5186	            pass
+5187	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:5253:8
+5252	            self.setLayout(QGridLayout())
+5253	        except:
+5254	            pass
+5255	        #Create a quick label that we place in 1,1:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:5482:8
+5481	            self.decisionLayouts[self.decisionArray_modes[self.mode_dropdown.currentIndex()][0]].setVisible(True)
+5482	        except:
+5483	            pass
+5484	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:5712:15
+5711	            
+5712	            if eval(f"{data[scoreMetric]} {operator} {value}"):
+5713	                indivBooleans[scoreMetric] = True
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:5777:20
+5776	                try:
+5777	                    eval(f"{varCurrentValue}")
+5778	                    varcurrentvalEvaluable = True
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:5784:20
+5783	                try:
+5784	                    eval(f"{varTestValue}")
+5785	                    vartestvalEvaluable = True
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:5800:19
+5799	                
+5800	                if eval(evalText):
+5801	                    totalTrueTests+=1
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:6183:29
+6182	            self.timer.timeout.connect(self.update_log_content)
+6183	            self.timer.start(random.randint(400, 600))
+6184	            
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\FlowChart_dockWidgets.py:6297:26
+6296	            #Finally do the analysis
+6297	            node.output = eval(evalText)
+6298	        
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:76:12
+75	        if core.get_property(propertyname, MMprop_onoff) == MM_JSON["lasers"]["MM_Property_OnOff_OnValue"]:
+76	            exec("form.PushLaser_"+str(i)+".setText(\"Now On\")")
+77	        else:
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:78:12
+77	        else:
+78	            exec("form.PushLaser_"+str(i)+".setText(\"Now Off\")")
+79	        #Set the label of the laser at get_property
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:80:8
+79	        #Set the label of the laser at get_property
+80	        exec("form.NameLaser_"+str(i)+".setText(\""+str(MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"])+" nm\")")
+81	        exec("form.NameLaser_"+str(i)+"_2.setText(\""+str(MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"])+" nm\")")
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:81:8
+80	        exec("form.NameLaser_"+str(i)+".setText(\""+str(MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"])+" nm\")")
+81	        exec("form.NameLaser_"+str(i)+"_2.setText(\""+str(MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"])+" nm\")")
+82	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:86:8
+85	        rgbval = GetRGBFromLambda(wvlngth);
+86	        exec("form.PushLaser_"+str(i)+".setStyleSheet(\"color:white; background-color: rgb(\"+str(rgbval[0])+\",\"+str(rgbval[1])+\",\"+str(rgbval[2])+\")\")")
+87	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:91:8
+90	        ValIntPerc = min(100,MMJSON_to_ValIntPerc(MM_JSON,i));
+91	        exec("form.SliderLaser_"+str(i)+".setValue(" + str(int(ValIntPerc)) + ")")
+92	        #Get the intensity as a value from the slider
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:93:8
+92	        #Get the intensity as a value from the slider
+93	        exec("form.EditIntensity_Laser_"+str(i)+".setText(\"" +str(int(ValIntPerc))+"\")")
+94	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:133:4
+132	    #Create ValIntPerc variable and extract
+133	    exec("global ValInt; ValInt = form.SliderLaser_"+str(laserID)+".value()");
+134	    #I don't want 99 percentages...
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:147:8
+146	        #Create ValIntPerc variable and extract
+147	        exec("global ValIntPerc; ValIntPerc = int(form.EditIntensity_Laser_"+str(laserID)+".text())");
+148	        #Change the intensity
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:152:4
+151	        InitLaserSliders(MM_JSON)
+152	    except:
+153	        #Do nothing
+154	        pass
+155	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:159:8
+158	    for i in range(0,6):
+159	        exec("form.FW_radioButton_"+str(i)+".setText(\"" + MM_JSON["filter_wheel"]["Label"+str(i)] + "\")")
+160	        #Reset colours - not needed for now, but still keeping
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:165:4
+164	    #Set the correct checkbox
+165	    exec("form.FW_radioButton_" + str(curSelectedState) + ".setChecked(1)")
+166	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:176:8
+175	    for i in range(0,3):
+176	        exec("form.BF_radioButton_"+str(i)+".setText(\"" + MM_JSON["BF_radioLabels"]["Label"+str(i)] + "\")")
+177	    #Get the current BF state from MM
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:191:4
+190	    #Set the correct checkbox
+191	    exec("form.BF_radioButton_" + str(curSelectedState) + ".setChecked(1)")
+192	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:263:8
+262	        #Get the info from the boxes above
+263	        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
+264	        exec("global duration; duration = int(form.Length_Edit_Laser_"+str(i)+".text())");
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:264:8
+263	        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
+264	        exec("global duration; duration = int(form.Length_Edit_Laser_"+str(i)+".text())");
+265	        if duration == 0: #type:ignore
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:269:8
+268	            drawduration = duration/1000; #type:ignore
+269	        exec("global everyxframes; everyxframes = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())");
+270	        #Get wavelength to enable correct colours
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:353:8
+352	    for i in range(0,5):
+353	        exec("form.Length_Edit_Laser_"+str(i)+".setText(\"" +str(0)+"\")");
+354	        exec("form.Delay_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:354:8
+353	        exec("form.Length_Edit_Laser_"+str(i)+".setText(\"" +str(0)+"\")");
+354	        exec("form.Delay_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
+355	        exec("form.BlinkFrames_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:355:8
+354	        exec("form.Delay_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
+355	        exec("form.BlinkFrames_Edit_Laser_"+str(i)+".setText(\"" +str(1)+"\")");
+356	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:371:4
+370	
+371	    exec("global nrframesrepeat; nrframesrepeat = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())")
+372	    for k in range(0,nrframesrepeat): #type:ignore
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:373:8
+372	    for k in range(0,nrframesrepeat): #type:ignore
+373	        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
+374	        exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:374:8
+373	        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
+374	        exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
+375	        if k == 0:
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:471:8
+470	        #Change on-off state when button is pressed
+471	        exec("form.FW_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeFilterWheelFromRadioCheckBox(" + str(i) + "));")
+472	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:476:8
+475	        #Change on-off state when button is pressed
+476	        exec("form.BF_radioButton_" + str(i) + ".clicked.connect(lambda: ChangeBFFromRadioCheckBox(" + str(i) + "));")
+477	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:482:8
+481	        #Change on-off state when button is pressed
+482	        exec("form.PushLaser_" + str(i) + ".clicked.connect(lambda: SwitchOnOffLaser(" + str(i) + "));")
+483	        #Change intensity when slider is changed
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:484:8
+483	        #Change intensity when slider is changed
+484	        exec("form.SliderLaser_" + str(i) + ".sliderReleased.connect(lambda: ChangeIntensityLaser_Slider(" + str(i) + "));")
+485	        exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser_Slider_onlySimple(" + str(i) + "));")
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:485:8
+484	        exec("form.SliderLaser_" + str(i) + ".sliderReleased.connect(lambda: ChangeIntensityLaser_Slider(" + str(i) + "));")
+485	        exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser_Slider_onlySimple(" + str(i) + "));")
+486	        #Change intensity when intensity edit field is changed
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:487:8
+486	        #Change intensity when intensity edit field is changed
+487	        exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
+488	
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:498:12
+497	        for i in range(0,5):
+498	            exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+499	            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:499:12
+498	            exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+499	            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+500	            exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:500:12
+499	            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+500	            exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+501	    except:
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:527:12
+526	        for i in range(0,5):
+527	            exec("form.PushLaser_" + str(i) + ".setEnabled(1);");
+528	        ResetLasersTrigger();
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b102_exec_used.html
+   Location: glados_pycromanager\GUI\LaserControlScripts.py:533:12
+532	        for i in range(0,5):
+533	            exec("form.PushLaser_" + str(i) + ".setEnabled(0);");
+534	            SwitchOffLaser(i);
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\MMcontrols.py:1488:8
+1487	            self.oneDstageDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
+1488	        except:
+1489	            pass
+1490	        #Add the dropdown to the layout:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\MMcontrols.py:1596:8
+1595	            self.oneDstageRelDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
+1596	        except:
+1597	            pass
+1598	        #Add the dropdown to the layout:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\MMcontrols.py:1660:8
+1659	            self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+1660	        except:
+1661	            pass
+1662	        
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\sharedFunctions.py:158:16
+157	                    setattr(group, f.name, saved[key])
+158	                except Exception:
+159	                    pass
+160	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\sharedFunctions.py:248:16
+247	                    self.globalData[key]['value'] = globalDataInfo[key]
+248	                except:
+249	                    pass
+250	        
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\sharedFunctions.py:403:8
+402	                updateAutonousErrorWarningInfo(self,updateInfo='All')
+403	        except:
+404	            pass
+405	    
+
+--------------------------------------------------
+>> Issue: [B107:hardcoded_password_default] Possible hardcoded password: ''
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b107_hardcoded_password_default.html
+   Location: glados_pycromanager\GUI\slack_settings_dialog.py:36:4
+35	
+36	    def __init__(self, parent=None, token: str = "", secret: str = "", channel: str = ""):
+37	        super().__init__(parent)
+38	        self.setWindowTitle("Slack settings")
+39	        self.setMinimumWidth(420)
+40	
+41	        self._token_edit = QLineEdit(token, self)
+42	        self._token_edit.setEchoMode(QLineEdit.Password)
+43	        self._token_edit.setPlaceholderText("xoxb-…")
+44	
+45	        self._secret_edit = QLineEdit(secret, self)
+46	        self._secret_edit.setEchoMode(QLineEdit.Password)
+47	
+48	        self._channel_edit = QLineEdit(channel, self)
+49	        self._channel_edit.setPlaceholderText("e.g. glados-bot")
+50	
+51	        form = QFormLayout()
+52	        form.addRow("Slack token:", self._token_edit)
+53	        form.addRow("Signing secret:", self._secret_edit)
+54	        form.addRow("Channel:", self._channel_edit)
+55	
+56	        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self)
+57	        buttons.accepted.connect(self.accept)
+58	        buttons.rejected.connect(self.reject)
+59	
+60	        layout = QVBoxLayout(self)
+61	        layout.addLayout(form)
+62	        layout.addWidget(buttons)
+63	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:75:24
+74	                            shared_data.mdaDatasets.pop(index)
+75	                        except:
+76	                            pass
+77	                except:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:77:16
+76	                            pass
+77	                except:
+78	                    pass #Nowadays in JavaRAMDataStorage, can be safely ignored.
+79	    
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:87:16
+86	                    logging.debug(f"Deleted {os.path.join(mainFolder,os.path.join('temp',folder))}")
+87	                except:
+88	                    pass
+89	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:131:43
+130	                    try:
+131	                        functionMetadata = eval(f'{str(functionName)}.__function_metadata__()')
+132	                        for singlefunctiondata in functionMetadata:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:143:70
+142	                        subroutines = []
+143	                        for subroutineName, obj in inspect.getmembers(eval(f'{functionName}')):
+144	                            if function_exists(obj):
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:160:4
+159	        functionnamearr = addFilesToAbsolutePath(functionnamearr,additional_folder_name)
+160	    except:
+161	        pass
+162	    
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:234:31
+233	        if not '.' in functionname:
+234	            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+235	            #Loop over all entries
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:240:31
+239	            functionparent = functionname.split('.')[0]
+240	            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+241	            #sub-select the looprange
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:288:31
+287	        if not '.' in functionname:
+288	            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+289	            #Loop over all entries
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:294:31
+293	            functionparent = functionname.split('.')[0]
+294	            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+295	            #sub-select the looprange
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:312:31
+311	        if not '.' in functionname:
+312	            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+313	            #Loop over all entries
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:318:31
+317	            functionparent = functionname.split('.')[0]
+318	            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+319	            #sub-select the looprange
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:341:31
+340	        if not '.' in functionname:
+341	            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+342	            finaltext = f"""\
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:353:35
+352	                functionparent = functionname.split('.')[0]
+353	                functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+354	                #sub-select the looprange
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:363:35
+362	                #Get the full function metadata
+363	                functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+364	                #Get the help string of a single kwarg
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:483:23
+482	    #Get the full function metadata
+483	    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+484	    if 'optional_kwargs'  in functionMetadata[functionname.split('.')[1]]:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:510:29
+509	    #Create a gridLayout with labels and line-edits, dropdowns or checkboxes based on the function's metadata:
+510	    motherFunctionMetadata = eval(f'{str(motherFunctionFromFunctionName(functionname))}.__function_metadata__()')
+511	    functionMetadata = motherFunctionMetadata[daughterFunctionsFromFunctionName(functionname)]
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:567:27
+566	        #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
+567	        functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
+568	        if 'display_name' in functionMetadata[singlefunctiondata]:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:598:27
+597	        #Get the full function metadata
+598	        functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+599	        for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:636:8
+635	            curr_layout.parent().parent().currentData['__selectedDropdownEntryAnalysis__'] = currentSelectedFunctionReadable
+636	        except: #This exception is if I'm doing this directly from the GUI, not from nodz
+637	            pass
+638	        
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:717:24
+716	            try:
+717	                if type(eval(value)) in nodzInfo.globalVariables[variableName]['type']:
+718	                    nodzInfo.globalVariables[variableName]['data'] = eval(value)
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:718:69
+717	                if type(eval(value)) in nodzInfo.globalVariables[variableName]['type']:
+718	                    nodzInfo.globalVariables[variableName]['data'] = eval(value)
+719	                    logging.debug(f"Set global variable {variableName} to {eval(value)}")
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:719:75
+718	                    nodzInfo.globalVariables[variableName]['data'] = eval(value)
+719	                    logging.debug(f"Set global variable {variableName} to {eval(value)}")
+720	            except:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:740:22
+739	        
+740	            varData = eval(kwargvalue)
+741	        
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:822:28
+821	            try:
+822	                finalData = eval(updating_string_backslash)
+823	            except:
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: glados_pycromanager\GUI\utils.py:1458:30
+1457	        import random
+1458	        randomName2 = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+1459	        
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:1536:4
+1535	        logging.debug('Changing layout '+curr_layout.parent().objectName())
+1536	    except:
+1537	        pass
+1538	    #This removes everything except the first entry (i.e. the drop-down menu)
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:2060:24
+2059	            try:
+2060	                value = eval(line_edit.text())
+2061	                if expectedType == float:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:2632:39
+2631	                        #Change the partialString with the special case
+2632	                        partialString+=eval(specialcaseKwargPartialStringAddition[ps_index])
+2633	                    else:
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:2675:25
+2674	    #Get the object
+2675	    RT_analysis_object = eval(getFunctionEvalTextFromCurrentData_RTAnalysis_init(className,rt_analysis_info)) #type:ignore
+2676	    
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:2694:13
+2693	    #And run the .run function:
+2694	    result = eval("RT_analysis_object" + evalText) #type:ignore
+2695	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:2712:13
+2711	    #And run the .run function:
+2712	    result = eval("RT_analysis_object" + evalText) #type:ignore
+2713	
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:2725:13
+2724	    #And run the .visualise function:
+2725	    result = eval("RT_analysis_object" + evalText) #type:ignore
+2726	    logging.debug(result)
+
+--------------------------------------------------
+>> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer ast.literal_eval.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval
+   Location: glados_pycromanager\GUI\utils.py:2734:23
+2733	    wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
+2734	    functionMetadata = eval(wrapperName+".__function_metadata__()")
+2735	    functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:2799:12
+2798	                LineEditText = '.'.join(LineEditText)
+2799	            except:
+2800	                pass
+2801	        lineedit.setText(LineEditText)
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:3148:28
+3147	                                    break
+3148	                            except:
+3149	                                pass
+3150	                            pass
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:3336:24
+3335	                            setattr(group, f.name,float(getattr(group, f.name)))
+3336	                        except:
+3337	                            pass
+3338	                        try:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:3340:24
+3339	                            setattr(group, f.name,int(getattr(group, f.name)))
+3340	                        except:
+3341	                            pass
+3342	                    except:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: glados_pycromanager\GUI\utils.py:3410:16
+3409	                        label.setToolTip(editField)
+3410	                except:
+3411	                    pass
+3412	
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 16188
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 33
+		Medium: 100
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 1
+		High: 132
+Files skipped (0):
