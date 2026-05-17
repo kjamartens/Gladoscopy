@@ -24,37 +24,54 @@ class MicroscopeInstance(Enum):
 class MicroscopeInterfaceLayer:
     def __init__(self):
         self.core: PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None = None
+        # Cached backend tag — computed once in `set_core` so each MIL call
+        # doesn't re-run the isinstance + Java-bridge attribute chain.
+        # Phase 6.1 of claude_project.md.
+        self._mi: MicroscopeInstance = MicroscopeInstance.UNKNOWN
         self.mda: dict | None = None
 
     def set_core(self, core):
         self.core = core
+        self._mi = self._detect_microscope_instance(core)
 
     def get_core(self):
         return self.core
 
-    def get_microscope_interface(self):
-        if isinstance(self.core, PymmcorePlusCore):
+    @staticmethod
+    def _detect_microscope_instance(core) -> "MicroscopeInstance":
+        """Pure classification of `core` → `MicroscopeInstance`.
+
+        Extracted so `set_core` can compute the tag once and stash it on
+        `self._mi`. Public callers should keep using
+        `get_microscope_interface()` / `MI()` / `get_MI()`, all of which
+        return the cached value.
+        """
+        if isinstance(core, PymmcorePlusCore):
             return MicroscopeInstance.MMCORE_PLUS
-        elif isinstance(self.core, PymmcoreCore):
+        if isinstance(core, PymmcoreCore):
             return MicroscopeInstance.PYCROMANAGER_PYTHON
-        elif isinstance(self.core, PycroManagerCore):
+        if isinstance(core, PycroManagerCore):
             return MicroscopeInstance.PYCROMANAGER_JAVA
-        elif JavaObject and isinstance(self.core, JavaObject):
+        if JavaObject and isinstance(core, JavaObject):
             return MicroscopeInstance.PYCROMANAGER_JAVA
-        elif JavaObject and hasattr(self.core, '_interfaces') and len(self.core._interfaces) > 1 and self.core._interfaces[1] == 'java.lang.Object':
+        if (
+            JavaObject
+            and hasattr(core, "_interfaces")
+            and len(core._interfaces) > 1
+            and core._interfaces[1] == "java.lang.Object"
+        ):
             return MicroscopeInstance.PYCROMANAGER_JAVA
-        elif self.core is None:
-            return MicroscopeInstance.UNKNOWN
-        else:
-            #Unknown!
-            return MicroscopeInstance.UNKNOWN
+        return MicroscopeInstance.UNKNOWN
+
+    def get_microscope_interface(self) -> "MicroscopeInstance":
+        return self._mi
 
     #Alternative method call for the same
     def MI(self):
-        return self.get_microscope_interface()
-    
+        return self._mi
+
     def get_MI(self):
-        return self.get_microscope_interface()
+        return self._mi
 
     #Helper function
     def java_arr_to_numpy(self, str_vector_obj)-> np.ndarray:
