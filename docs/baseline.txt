@@ -1,0 +1,45 @@
+Pytest baseline for the claude_optimization branch
+==================================================
+
+Captured: 2026-05-17 (UTC)
+Branch:   claude_optimization
+Commit:   67d2e18 fix(test): disable napari pytest plugins that hang the suite
+
+Environment
+-----------
+Python:       3.13.12
+Interpreter:  C:\Users\koen-\miniconda3\envs\GladosEnv\python.exe (conda env GladosEnv)
+pytest:       9.0.3
+Platform:     win32
+
+Pytest invocation
+-----------------
+$ python -m pytest -q
+...............................                                         [100%]
+31 passed in 2.10s
+
+Configuration notes
+-------------------
+- pyproject.toml `[tool.pytest.ini_options].addopts` includes
+  `-p no:napari -p no:npe2 -p no:napari_plugin_engine` because the napari
+  pytest plugins otherwise hang session init/teardown for 10+ minutes when
+  npe2 discovers this project's own napari manifest entry point.
+- testpaths = ["tests"]
+- python_files = ["test_*.py"]
+
+Test files
+----------
+tests/test_helper_functions.py            13 tests passing
+tests/test_microscope_interface_layer.py  18 tests passing
+
+Coverage scope (per CLAUDE.md)
+------------------------------
+Pure-logic surfaces only:
+- HelperFunctions string builders (createFunctionWithArgs, createFunctionWithKwargs)
+- function_exists
+- MicroscopeInterfaceLayer backend detection (enum + isinstance dispatch)
+- java_arr_to_numpy
+- A subset of MIL dispatch on the PymmcorePlusCore branch
+
+Out of scope: GUI / hardware / autonomous-microscopy runtime / napari plugin
+path. Phase 5 of claude_project.md grows this coverage.
