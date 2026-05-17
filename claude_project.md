@@ -649,7 +649,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | [x] 9.4 | Decorate all in `CustomFunctions/` (`AutoFocusBF`, `Strobo_lasers`, `ExampleCustomFunction_DiceRoll`) | 3 small commits | 3 commits |
 | [x] 9.5 | Replace each `eval(createFunctionWithKwargs(...))` call site with `dispatch(name, **kwargs)` | Eval-free hot path | Commit per call site (10–15 commits) |
 | [x] 9.6 | Keep `createFunctionWithKwargs` for string display only, mark unsafe variants `_str_for_display` | Clear separation | Commit `refactor: rename eval-only string builders` |
-| [ ] 9.7 | Update `tests/test_helper_functions.py` and add `tests/test_registry.py` | Coverage on the new path | Commit `test: registry dispatch` |
+| [x] 9.7 | Update `tests/test_helper_functions.py` and add `tests/test_registry.py` | Coverage on the new path | Commit `test: registry dispatch` |
 | [ ] 9.8 | Verification gate | CI green; manual: run the example recipe end-to-end | Pytest + run note |
 
 ### [ ] Phase 10 — Error-handling: tighten existing **and** add new checks
