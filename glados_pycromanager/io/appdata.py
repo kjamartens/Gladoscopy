@@ -125,7 +125,10 @@ def save_config_to_json(cfg: "Config") -> None:
     """Flatten `cfg` into `{group.field: value}` and persist to AppData JSON.
 
     Other top-level keys already in the file (e.g. `MDA`, `MMControls`)
-    are preserved untouched.
+    are preserved untouched. The write is atomic: contents go to a
+    sibling ``*.tmp`` file first, then :func:`os.replace` swaps it into
+    place. A crash mid-write therefore leaves the previous version of
+    ``glados_state.json`` intact rather than truncated.
     """
     json_path = glados_state_path()
 
@@ -137,14 +140,39 @@ def save_config_to_json(cfg: "Config") -> None:
 
     existing: dict[str, object] = {}
     if os.path.exists(json_path):
-        with open(json_path) as fh:
-            existing = json.load(fh)
+        try:
+            with open(json_path) as fh:
+                loaded = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "Existing %s could not be read while saving; will overwrite: %s",
+                json_path,
+                exc,
+            )
+        else:
+            if isinstance(loaded, dict):
+                existing = loaded
 
     existing["GlobalData"] = flat
     existing[SCHEMA_VERSION_KEY] = STATE_SCHEMA_VERSION
 
-    with open(json_path, "w") as fh:
-        json.dump(existing, fh, indent=4)
+    tmp_path = json_path + ".tmp"
+    replaced = False
+    try:
+        with open(tmp_path, "w") as fh:
+            json.dump(existing, fh, indent=4)
+        os.replace(tmp_path, json_path)
+        replaced = True
+    finally:
+        # On any failure (json.dump TypeError, disk-full OSError, even
+        # a synchronous shutdown), strip the half-written *.tmp so it
+        # does not look authoritative on the next start.
+        if not replaced:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                pass
 
 
 def storeSharedData_GlobalData(shared_data) -> None:
