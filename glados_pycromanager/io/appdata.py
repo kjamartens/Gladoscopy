@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING
 
 import appdirs
 
+from glados_pycromanager.errors import ConfigError
+
 if TYPE_CHECKING:  # avoid a runtime import cycle with sharedFunctions
     from glados_pycromanager.GUI.sharedFunctions import Config
 
@@ -26,6 +28,12 @@ logger = logging.getLogger(__name__)
 
 APP_NAME = "Glados-PycroManager"
 STATE_FILENAME = "glados_state.json"
+
+#: Current persisted schema version. Bump when a non-backward-compatible
+#: rename/removal of a Config field lands; pair the bump with a small
+#: migrator in :func:`load_config_from_json`.
+STATE_SCHEMA_VERSION = 1
+SCHEMA_VERSION_KEY = "schema_version"
 
 
 def appdata_root() -> str:
@@ -43,16 +51,61 @@ def glados_state_path() -> str:
     return os.path.join(appdata_root(), STATE_FILENAME)
 
 
-def load_config_from_json(cfg: "Config") -> "Config":
-    """Overwrite `cfg` fields with values found in `glados_state.json`."""
+def load_config_from_json(cfg: "Config", *, strict: bool = False) -> "Config":
+    """Overwrite `cfg` fields with values found in `glados_state.json`.
+
+    Raises :class:`~glados_pycromanager.errors.ConfigError` if the file
+    is present but unreadable (corrupted JSON, I/O error) or persisted
+    by a *future* schema version this build does not understand.
+
+    When ``strict`` is ``False`` (the default), a legacy file lacking
+    the ``schema_version`` key is accepted and a warning is logged —
+    existing installs upgrade transparently. When ``strict`` is ``True``
+    a missing schema version is itself a :class:`ConfigError`; this is
+    used by tests and validation tools.
+    """
     json_path = glados_state_path()
     if not os.path.exists(json_path):
         return cfg
 
-    with open(json_path) as fh:
-        glados_info = json.load(fh)
+    try:
+        with open(json_path) as fh:
+            glados_info = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ConfigError(
+            f"glados_state.json at {json_path!r} is unreadable: {exc}"
+        ) from exc
+
+    if not isinstance(glados_info, dict):
+        raise ConfigError(
+            f"glados_state.json at {json_path!r} must be a JSON object, "
+            f"got {type(glados_info).__name__}"
+        )
+
+    version = glados_info.get(SCHEMA_VERSION_KEY)
+    if version is None:
+        if strict:
+            raise ConfigError(
+                f"glados_state.json at {json_path!r} has no "
+                f"{SCHEMA_VERSION_KEY!r} field"
+            )
+        logger.warning(
+            "glados_state.json has no %s; treating as legacy and upgrading on next save",
+            SCHEMA_VERSION_KEY,
+        )
+    elif not isinstance(version, int) or version > STATE_SCHEMA_VERSION:
+        raise ConfigError(
+            f"glados_state.json at {json_path!r} has unsupported "
+            f"{SCHEMA_VERSION_KEY}={version!r} (this build supports up to "
+            f"{STATE_SCHEMA_VERSION})"
+        )
 
     saved = glados_info.get("GlobalData", {})
+    if not isinstance(saved, dict):
+        raise ConfigError(
+            f"glados_state.json 'GlobalData' must be an object, got "
+            f"{type(saved).__name__}"
+        )
 
     # Walk every group and field, overwrite if found in JSON.
     for group_field in dataclasses.fields(cfg):
@@ -88,6 +141,7 @@ def save_config_to_json(cfg: "Config") -> None:
             existing = json.load(fh)
 
     existing["GlobalData"] = flat
+    existing[SCHEMA_VERSION_KEY] = STATE_SCHEMA_VERSION
 
     with open(json_path, "w") as fh:
         json.dump(existing, fh, indent=4)
