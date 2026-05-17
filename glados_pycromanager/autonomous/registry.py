@@ -20,7 +20,8 @@ re-points the import without churn.
 
 from __future__ import annotations
 
-from typing import Callable
+import ast
+from typing import Any, Callable, Mapping
 
 
 class NodeDispatchError(KeyError):
@@ -114,6 +115,64 @@ def get(name: str) -> Callable:
         raise NodeDispatchError(
             f"No node function registered as {name!r}"
         ) from exc
+
+
+def dispatch_from_eval_text(eval_text: str, scope: Mapping[str, Any] | None = None) -> Any:
+    """Parse a ``Module.Function(args)`` source string and dispatch via the registry.
+
+    Phase 9.5 replacement for the bare ``eval(eval_text)`` recipe-call
+    pattern. The *function name* is resolved through :func:`dispatch` —
+    unknown names raise :class:`NodeDispatchError` instead of executing
+    arbitrary code at module scope. Argument expressions are still
+    evaluated (in ``scope``) so identifier references like
+    ``ImageData_3`` and attribute chains like ``self.shared_data.core``
+    continue to resolve the way the legacy eval string did.
+
+    This is a *partial* security improvement: argument expressions can
+    still call functions present in ``scope``. A full mitigation would
+    require a small recipe-expression language and is out of scope for
+    Phase 9. Phase 10.6 will validate recipe schemas before dispatch.
+
+    Args:
+        eval_text: The recipe-built call expression, e.g.
+            ``"AverageImage.AvgImage(self.shared_data.core, Image=ImageData_3)"``.
+        scope: Mapping used as the globals/locals for argument-expression
+            evaluation. Pass everything the legacy ``eval(eval_text)``
+            could see (`self`, `core`, `shared_data`, the nodzVariable
+            dict, plus the module globals if needed).
+
+    Returns:
+        The return value of the registered function.
+
+    Raises:
+        ValueError: If ``eval_text`` does not parse as a single call
+            expression.
+        NodeDispatchError: If the resolved function name is not in the
+            registry.
+    """
+    try:
+        tree = ast.parse(eval_text, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(
+            f"dispatch_from_eval_text could not parse {eval_text!r}: {exc}"
+        ) from exc
+    if not isinstance(tree.body, ast.Call):
+        raise ValueError(
+            f"dispatch_from_eval_text expected a Call expression, got {type(tree.body).__name__}"
+        )
+    call = tree.body
+    func_name = ast.unparse(call.func)
+    scope_dict: dict[str, Any] = dict(scope) if scope else {}
+    args = [
+        eval(compile(ast.Expression(a), "<dispatch-arg>", "eval"), scope_dict)
+        for a in call.args
+    ]
+    kwargs = {
+        kw.arg: eval(compile(ast.Expression(kw.value), "<dispatch-kw>", "eval"), scope_dict)
+        for kw in call.keywords
+        if kw.arg is not None
+    }
+    return dispatch(func_name, *args, **kwargs)
 
 
 def _reset_for_tests() -> None:
