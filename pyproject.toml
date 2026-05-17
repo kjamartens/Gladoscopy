@@ -61,6 +61,23 @@ dev = [
     "pytest>=8.0",
     "bandit>=1.7",
     "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[tool.mypy]
+python_version = "3.13"
+# Gradual adoption: start permissive, tighten module by module in Phase 15.
+ignore_missing_imports = true
+check_untyped_defs = false
+follow_imports = "silent"
+warn_unused_ignores = false
+warn_redundant_casts = false
+# Vendored Nodz is treated as third-party; see claude_decisions.md.
+exclude = [
+    "glados_pycromanager/GUI/nodz/",
+    "scratch/",
+    "build/",
+    "dist/",
 ]
 
 [tool.ruff]
