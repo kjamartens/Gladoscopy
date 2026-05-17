@@ -290,9 +290,8 @@ class ChannelList(InteractiveListWidget):
             if channelEntry is not None:
                 try:
                     newdropbox.setCurrentText(channelEntry)
-                except:
-                    logging.warning('Wrong mix of channel and entries')
-                    pass
+                except (AttributeError, RuntimeError) as exc:
+                    logging.warning('Wrong mix of channel and entries: %s', exc)
             self.setCellWidget(rowPosition, 0, newdropbox)
             # self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
             if exposureEntry == None:
@@ -392,7 +391,7 @@ class XYStageList(InteractiveListWidget):
                     #add the new ID to be the max existing ID + 1
                     existing_ids = [int(self.item(row, 1).text()) for row in range(self.rowCount())]
                     id = max(existing_ids) + 1
-                except:
+                except (ValueError, TypeError, AttributeError):
                     id = self.rowCount() + 1
         rowPosition = self.rowCount()
         self.insertRow(rowPosition)
@@ -601,8 +600,8 @@ class MDAGlados(CustomMainWindow):
                 try:
                     logging.debug(f"updating gui with nr of columns: {self._GUI_grid_width}")
                     self.showOptionChanged()
-                except:
-                    pass
+                except (AttributeError, RuntimeError) as exc:
+                    logging.debug('showOptionChanged() failed during GUI grid width update: %s', exc)
     #endregion
     
     #region GUI
@@ -990,7 +989,8 @@ class MDAGlados(CustomMainWindow):
             #Add the layout to the main layout
             try:
                 self.layout.addLayout(self.gui,0,0)
-            except:
+            except (AttributeError, RuntimeError, TypeError) as exc:
+                logging.debug('addLayout failed, falling back to setLayout: %s', exc)
                 self.setLayout(self.gui)
                 self.mainLayout = self.gui
             
@@ -1002,7 +1002,7 @@ class MDAGlados(CustomMainWindow):
                     if item.widget():
                         item.widget().setFont(font)
                         item.widget().setStyleSheet("padding: 2px; margin: 1px; spacing: 1px;")  # Change padding as needed
-                except:
+                except (AttributeError, RuntimeError):
                     pass
     
     def handleSizeChange(self, size):
@@ -1375,10 +1375,10 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         try:
             self.data = self.shared_data.mdaDatasets[-1]
-        except:
+        except (IndexError, AttributeError, KeyError) as exc:
             import zarr
             data = zarr.open(self.shared_data.mdaZarrData['MDA'])
-            logging.error('#TODO: No MDA data found in shared_data.mdaDatasets. fix this with PyMMC (wheres the dataset stored? can we get this?).')
+            logging.error('No MDA data found in shared_data.mdaDatasets (%s); falling back to zarr MDA store.', exc)
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
         
@@ -1610,7 +1610,7 @@ class MDAGlados(CustomMainWindow):
                 if self.exposureDropdown.currentText() == 's':
                     self.exposure_ms *= 1000
                     self.exposure_s_or_ms = 's'
-            except:
+            except (ValueError, TypeError):
                 self.exposure_ms = None
                 self.exposure_s_or_ms = 'ms'
         
@@ -1622,7 +1622,7 @@ class MDAGlados(CustomMainWindow):
                 if self.timeIntervalDropdown.currentText() == 'ms':
                     self.time_interval_s_or_ms = 'ms'
                     self.time_interval_s /= 1000
-            except:
+            except (ValueError, TypeError):
                 self.num_time_points = None
                 self.time_interval_s = None
                 self.time_interval_s_or_ms = 'ms'
@@ -1638,7 +1638,8 @@ class MDAGlados(CustomMainWindow):
             try:
                 #We also need to set the shared_data focus device for proper z-functioning
                 self.shared_data.MILcore.set_focus_device(self.z_oneDstageDropdown.currentText())
-            except:
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logging.warning('set_focus_device(%s) failed, reverting to default: %s', self.z_oneDstageDropdown.currentText(), exc)
                 self.shared_data.MILcore.set_focus_device(self.shared_data._defaultFocusDevice)
                 
             self.z_stage_sel = self.z_oneDstageDropdown.currentText()
@@ -1687,7 +1688,8 @@ class MDAGlados(CustomMainWindow):
             try:
                 self.xy_positions = self.xypositionListWidget.getPositionsArray()
                 self.xy_positions_saveInfo = self.xypositionListWidget.getSaveInfoPositionsArray()
-            except:
+            except (AttributeError, RuntimeError) as exc:
+                logging.debug('xy positions widget unavailable: %s', exc)
                 self.xy_positions = None
                 self.xy_positions_saveInfo = None
         else:
@@ -1715,7 +1717,8 @@ class MDAGlados(CustomMainWindow):
                             except ValueError:  # Add an empty string for non-float
                                 self.channel_exposures_ms.append("")
 
-            except:
+            except (AttributeError, RuntimeError, KeyError) as exc:
+                logging.debug('channel widget parse failed: %s', exc)
                 self.channel_group = None
                 self.channels = None
                 self.channel_exposures_ms = None
