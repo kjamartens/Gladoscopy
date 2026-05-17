@@ -587,7 +587,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 5.7 | Add `tests/test_mda_event_builder.py` — pure-Python event list generation | Locks MDA logic | Commit `test: MDA event builder` |
 | [x] 5.8 | Verification gate | CI green; new tests all pass | `pytest -q` count higher than baseline |
 
-### [~] Phase 6 — Architecture: MIL caching and plugin discovery
+### [x] Phase 6 — Architecture: MIL caching and plugin discovery
 
 **Goal**: First behavioral refactor, smallest blast radius, fully test-backed.
 
@@ -598,7 +598,7 @@ here cover *current behavior*, locking it in before refactoring.
 | [x] 6.3 | Each subpackage `__init__.py` becomes 5–10 lines calling `load_node_modules` | Less magic | Commit `refactor: thin plugin __init__ files` |
 | [x] 6.4 | Replace the `exec("from .X import *")` with `importlib.import_module` + explicit `globals().update(...)` | No more `exec` on plugin load | Commit `refactor: drop exec from plugin loader` |
 | [x] 6.5 | Surface failed plugin loads in a log warning (not silent `except`) | Visible failures | Commit `reliability: log plugin load failures` |
-| [ ] 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |
+| [x] 6.6 | Verification gate | `test_plugin_discovery.py` + `test_mil_dispatch.py` green; manually start `glados`, confirm nodes still appear | Pytest log + screenshot or note in commit |
 
 ### [ ] Phase 7 — Split god-files: `utils.py`
 
