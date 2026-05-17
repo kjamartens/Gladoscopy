@@ -427,39 +427,61 @@ def infoFromMetadata(functionname,**kwargs):
     except AttributeError:
         return f"No __function_metadata__ in {functionname}"
 
-#Run a function with unknown number of parameters via the eval() method
-#Please note that the arg values need to be the string variants of the variable, not the variable itself!
-def createFunctionWithArgs(functionname,*args):
-    #Start string with functionname.functionname - probably changing later for safety/proper usages
+#Build a display-only string for "Module.Function(arg1, arg2, ...)".
+#Phase 9.6: renamed from createFunctionWithArgs. The production call
+#path no longer eval's these strings — use
+#registry.dispatch_from_eval_text instead. Old name preserved as a
+#deprecated alias until the next major release.
+def createFunctionWithArgs_str_for_display(functionname,*args):
     fullstring = functionname+"."+functionname+"("
-    #Add all arguments to the function
     idloop = 0
     for arg in args:
         if idloop>0:
             fullstring = fullstring+","
         fullstring = fullstring+str(arg)
         idloop+=1
-    #Finish the function string
     fullstring = fullstring+")"
-    #run the function
     return fullstring
 
-#Run a function with unknown number of kwargs via the eval() method
-#Please note that the kwarg values need to be the string variants of the variable, not the variable itself!
-def createFunctionWithKwargs(functionname,**kwargs):
-    #Start string with functionname.functionname - probably changing later for safety/proper usages
+
+def createFunctionWithArgs(functionname,*args):
+    """Deprecated. Use ``createFunctionWithArgs_str_for_display``."""
+    import warnings
+    warnings.warn(
+        "utils.createFunctionWithArgs is a display-only helper now; "
+        "eval'ing its result is unsafe — use "
+        "glados_pycromanager.autonomous.registry.dispatch_from_eval_text instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return createFunctionWithArgs_str_for_display(functionname, *args)
+
+
+#Build a display-only string for "Module.Function(kw1=v1, kw2=v2, ...)".
+#Phase 9.6: renamed from createFunctionWithKwargs. Same notes as above.
+def createFunctionWithKwargs_str_for_display(functionname,**kwargs):
     fullstring = functionname+"("
-    #Add all arguments to the function
     idloop = 0
     for key, value in kwargs.items():
         if idloop>0:
             fullstring = fullstring+","
         fullstring = fullstring+str(key)+"="+str(value)
         idloop+=1
-    #Finish the function string
     fullstring = fullstring+")"
-    #run the function
     return fullstring
+
+
+def createFunctionWithKwargs(functionname,**kwargs):
+    """Deprecated. Use ``createFunctionWithKwargs_str_for_display``."""
+    import warnings
+    warnings.warn(
+        "utils.createFunctionWithKwargs is a display-only helper now; "
+        "eval'ing its result is unsafe — use "
+        "glados_pycromanager.autonomous.registry.dispatch_from_eval_text instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return createFunctionWithKwargs_str_for_display(functionname, **kwargs)
 
 
 def defaultValueFromKwarg(functionname,kwargname):
