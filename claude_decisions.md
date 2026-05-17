@@ -499,4 +499,55 @@ identical to what the 3-commit plan would have produced.
 
 ---
 
+## 2026-05-17 — Phase 9.5 ships 5 call-site replacements + a dispatch_from_eval_text helper, defers 3 instance-method sites  [Phase 9.5]
+**Decision:** Phase 9.5 replaces five production Pattern B
+(eval-of-recipe-call) sites:
+  1. `executor.py:205` — worker `AnalysisNode/CustomFunctionNode` dispatch.
+  2. `executor.py:421` — `AnalysisNode_DEBUG_started` recipe call.
+  3. `executor.py:488` — `AnalysisNode_DEBUG_started` visualisation.
+  4. `executor.py:619` — `analysisNode_finished` visualisation.
+  5. `utils.py:2556` — `realTimeAnalysis_init` RT constructor.
+The replacements use a new
+`autonomous.registry.dispatch_from_eval_text(eval_text, scope)` helper
+that parses the call expression with `ast`, looks up the function in
+the registry, and evaluates argument expressions in the supplied
+scope. The three sibling RT helpers (`realTimeAnalysis_run/_end
+/_visualisation` at `utils.py:2575/2593/2606`) still use
+`eval("RT_analysis_object" + evalText)` — these are *bound method
+calls* on the RT object, not registry dispatches, so they need a
+different helper. Deferred to a follow-up; not blocking Phase 9.
+**Alternatives:** (a) Refactor
+`getFunctionEvalTextFromCurrentData` family to return a (name, args,
+kwargs) tuple so dispatch can be called directly without parsing the
+eval string. Pros: no `ast.parse` of generated code, no
+`eval()`-of-argument-expressions. Cons: deep rewrite across the
+Variable / Advanced resolution path that builds the eval string;
+high risk over the Phase-9 scope. (b) Use `compile`+`exec` with a
+locked-down `__builtins__={}`. Cons: argument expressions can still
+reference functions in `scope`; same exposure as the current helper.
+(c) Add a small `call_method_from_eval_text` helper for the three
+instance-method-call sites. Considered; not done because doing it
+properly requires confirming the legacy semantics under load (RT
+analysis lifecycle), which is out of scope for a "no-behavior-change"
+phase.
+**Reason:** The plan called for "10 – 15 commits" assuming a
+mechanical 1:1 swap. The real shape of the call sites — eight Pattern B
+evals plus deeply-nested visualisations whose arguments reference
+locals built inside the call site — is denser and less mechanical. The
+five replacements that landed cover every site where the function name
+is recipe-controlled, which is what makes the eval security-relevant
+in the first place. The three remaining sites are instance-method
+calls on objects we already constructed via the registry, so they are
+no worse than calling `obj.run(...)` directly. Phase 10's recipe-
+schema validation will close the residual gap.
+**Affects:** `glados_pycromanager/autonomous/registry.py`
+(`dispatch_from_eval_text` + `import ast`); `executor.py` (3 method
+bodies in `FlowchartExecutorMixin`); `utils.py:realTimeAnalysis_init`.
+Total: 6 commits under Phase 9.5 (helper + 5 call-site swaps). The
+`eval()`-based call-string builders (`createFunctionWithKwargs`,
+`getFunctionEvalTextFromCurrentData*`) still exist — Phase 9.6 renames
+the unsafe variants to flag their narrower remaining role.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*
