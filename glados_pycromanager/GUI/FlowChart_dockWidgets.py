@@ -4409,22 +4409,20 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             logging.debug(node.name)
             if 'reporting_' in node.name:
                 node.status = 'running'
-                if 'SLACK' in self.shared_data.globalData: #type:ignore
-                    if self.shared_data.config.webook_config.slack_token is not None and not len(self.shared_data.config.webook_config.slack_token) == 0: #type:ignore
-                        slackReadableText = readableText
-                        slackReadableText = slackReadableText.replace('<br>','\r\n')
-                        slackReadableText = slackReadableText.replace('<i>','_')
-                        slackReadableText = slackReadableText.replace('</i>','_')
-                        slackReadableText = slackReadableText.replace('<b>','*')
-                        slackReadableText = slackReadableText.replace('</b>','*')
-                        slackReadableText = "New Score: \n" + slackReadableText
-                        self.shared_data.config.webook_config.slack_client.chat_postMessage(channel=self.shared_data.config.webook_config.slack_channel,text=slackReadableText) #type:ignore
-                        node.status = 'finished'
-                    else:
-                        node.status = 'error'
+                if self._slack_send_enabled():
+                    slackReadableText = readableText
+                    slackReadableText = slackReadableText.replace('<br>','\r\n')
+                    slackReadableText = slackReadableText.replace('<i>','_')
+                    slackReadableText = slackReadableText.replace('</i>','_')
+                    slackReadableText = slackReadableText.replace('<b>','*')
+                    slackReadableText = slackReadableText.replace('</b>','*')
+                    slackReadableText = "New Score: \n" + slackReadableText
+                    cfg = self.shared_data.config.webhook_config
+                    cfg.slack_client.chat_postMessage(channel=cfg.slack_channel, text=slackReadableText) #type:ignore
+                    node.status = 'finished'
                 else:
                     node.status = 'error'
-        
+
         self.preventAcq = False
     
     def earlyScoringFail(self,node):
@@ -4642,7 +4640,8 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
             readableText = utils.nodz_evaluateAdv(node.slackReportInfo,node.flowChart,skipEval=True)
             if readableText == None:
                 readableText = node.slackReportInfo
-            if self.shared_dataconfig.webook_config.slack_token is not None and not len(self.shared_data.config.webook_config.slack_token) == 0: #type:ignore
+            if self._slack_send_enabled():
+                cfg = self.shared_data.config.webhook_config
                 slackReadableText = readableText
                 if not ("<img>" in node.slackReportInfo and "</img>" in node.slackReportInfo):
                     slackReadableText = slackReadableText.replace('<br>','\r\n')
@@ -4650,7 +4649,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     slackReadableText = slackReadableText.replace('</i>','_')
                     slackReadableText = slackReadableText.replace('<b>','*')
                     slackReadableText = slackReadableText.replace('</b>','*')
-                    self.shared_data.config.webook_config.slack_client.chat_postMessage(channel=self.shared_data.config.webook_config.slack_channel,text=slackReadableText) 
+                    cfg.slack_client.chat_postMessage(channel=cfg.slack_channel, text=slackReadableText)
                 else: #we have an image!
                     #Extract the text between img tags:
                     imgInfo = re.findall('<img>(.*?)</img>',node.slackReportInfo)[0]
@@ -4660,27 +4659,27 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
                     restText = restText.replace('</i>','_')
                     restText = restText.replace('<b>','*')
                     restText = restText.replace('</b>','*')
-                    
+
                     #remove the curly brackets in imgInfo:
                     imgInfo = imgInfo.replace('{','')
                     imgInfo = imgInfo.replace('}','')
-                    
+
                     #Get the image
                     im = utils.nodz_evaluateVar(imgInfo,node.flowChart)
                     # Convert the ndarray to a PIL Image
                     image = Image.fromarray(im/65535*255)# Or convert to RGB
                     image = image.convert("RGB")
-                    
+
                     #Store the im as a PNG in a temporary folder:
                     tempDir = tempfile.TemporaryDirectory()
                     tempFile = os.path.join(tempDir.name,'slackImage.png')
-                    
+
                     # Save the image as a PNG file
                     image.save(tempFile, "PNG")
                     #Send the message with the read-tempFile
-                    slack_image = self.shared_data.config.webook_config.slack_client.files_upload(
+                    slack_image = cfg.slack_client.files_upload(
                         title="Glados Image",
-                        channels=self.shared_data.config.webook_config.slack_channel,
+                        channels=cfg.slack_channel,
                         content=open(tempFile, 'rb').read(),
                         initial_comment = restText,
                     )
@@ -4888,6 +4887,26 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         self.shared_data._mdaModeAcqData.abort()
 
         return
+
+    def _slack_send_enabled(self):
+        """Return True if Slack credentials look set up; log + return False otherwise.
+
+        Centralizes the empty-token guard for every Slack-send call site so
+        an unconfigured install no-ops with a single info log instead of
+        triggering an AttributeError or an opaque Slack-side rejection.
+        """
+        cfg = getattr(self.shared_data.config, "webhook_config", None)
+        if cfg is None:
+            logging.info("Slack send skipped: webhook_config is not configured")
+            return False
+        token = (getattr(cfg, "slack_token", "") or "").strip()
+        if not token:
+            logging.info("Slack send skipped: no Slack token configured (set via 'Slack settings…')")
+            return False
+        if getattr(cfg, "slack_client", None) is None:
+            logging.info("Slack send skipped: slack_client not initialised")
+            return False
+        return True
 
     def openSlackSettingsDialog(self):
         """Open the Slack settings dialog and persist on accept.

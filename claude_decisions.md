@@ -184,6 +184,32 @@ in the existing `.gitignore` already covers it.
 both file-and-dir cases. Avoiding duplication keeps `.gitignore` clean.
 **Affects:** none — pre-existing entry suffices.
 
+## 2026-05-17 — Fix `webook_config` / `shared_dataconfig` typos in slack-send sites  [Phase 2.5]
+**Decision:** While adding the empty-token guard, also fix two pre-existing typos
+at the Slack-send call sites in `FlowChart_dockWidgets.py`:
+- `self.shared_data.config.webook_config` → `webhook_config` (missing 'h', 4 occurrences in the score-end + report-call paths)
+- `self.shared_dataconfig.webook_config` → `self.shared_data.config.webhook_config` (missing dot)
+**Alternatives:** Leave typos in place and only add a no-op guard; defer typo fix to Phase 9/10.
+**Reason:** The guard step (2.5) is functionally a no-op without the typo
+fix — every Slack-send call site currently raises `AttributeError` on a
+mistyped attribute before the guard can even evaluate token-empty. The
+fix is a one-line-per-site rename, scoped exactly to the same call sites
+the guard touches. Leaving it would have required a second pass through
+the same lines in Phase 10.
+**Affects:** `glados_pycromanager/GUI/FlowChart_dockWidgets.py`
+(`scoreEnd`-reporting block ~L4410, `runslackReportCallAction` ~L4636).
+
+## 2026-05-17 — Slack-send guard uses helper, not inline checks  [Phase 2.5]
+**Decision:** Introduce `_slack_send_enabled()` on
+`GladosNodzFlowChart_dockWidget` that checks `webhook_config` presence,
+non-empty token, and an initialised `slack_client`. Both Slack-send call
+sites use this helper.
+**Alternatives:** Duplicate inline `if cfg.slack_token: …` at each site.
+**Reason:** A single helper centralizes the empty-token policy and the
+"set via 'Slack settings…'" hint, so future Slack add-ons (image upload
+variants, future reporting nodes) pick up the same behavior.
+**Affects:** same file as above.
+
 ---
 
 *Append future decisions below this line, newest at the bottom.*
