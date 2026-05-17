@@ -1,16 +1,17 @@
 
-import logging
-import slack
-import time
-import appdirs
-import os,sys
-import json 
-from PyQt5.QtCore import QTimer, QObject, pyqtSignal
-from ndstorage import NDTiffDataset
-from typing import Optional
-import sys
 import dataclasses
+import json
+import logging
+import os
+import sys
+import time
 from dataclasses import dataclass, fields
+from typing import Optional
+
+import appdirs
+import slack
+from ndstorage import NDTiffDataset
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -133,7 +134,7 @@ def load_config_from_json(cfg: Config) -> Config:
     """Load saved settings from appdata JSON, overwriting defaults where found."""
     appdata_folder = appdirs.user_data_dir()
     if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
+        raise OSError("APPDATA environment variable not found")
     
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
     os.makedirs(app_specific_folder, exist_ok=True)
@@ -142,7 +143,7 @@ def load_config_from_json(cfg: Config) -> Config:
     if not os.path.exists(json_path):
         return cfg
 
-    with open(json_path, 'r') as file:
+    with open(json_path) as file:
         glados_info = json.load(file)
     
     saved = glados_info.get('GlobalData', {})
@@ -177,7 +178,7 @@ def save_config_to_json(cfg: Config):
     # Preserve any other keys already in the JSON (e.g. MDA state)
     existing = {}
     if os.path.exists(json_path):
-        with open(json_path, 'r') as file:
+        with open(json_path) as file:
             existing = json.load(file)
 
     existing['GlobalData'] = flat
@@ -198,7 +199,7 @@ class Shared_data(QObject):
         self._headless = False
         self._busy = False
         self._core = []
-        self.MILcore: Optional[MIL.MicroscopeInterfaceLayer] = None
+        self.MILcore: MIL.MicroscopeInterfaceLayer | None = None
         
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()
@@ -230,12 +231,12 @@ class Shared_data(QObject):
         #load from appdata
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
-            raise EnvironmentError("APPDATA environment variable not found")
+            raise OSError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
         os.makedirs(app_specific_folder, exist_ok=True)
         if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
             #Load the mda state
-            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+            with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
                 gladosInfo = json.load(file)
                 if 'GlobalData' in gladosInfo:
                     globalDataInfo = gladosInfo['GlobalData']

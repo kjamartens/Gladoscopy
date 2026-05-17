@@ -1,4 +1,5 @@
-import warnings 
+import warnings
+
 
 def argumentChecking(dictionaryInfo, function_name, given_kwargs):
     #Checks whether named required and optional arguments are given or not, and gives errors when things are missing.

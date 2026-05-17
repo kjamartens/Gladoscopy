@@ -1,18 +1,19 @@
-import os
-import json
-import time
-import logging
-import appdirs
 import importlib.util
-import numpy as np
+import json
+import logging
+import os
+import sys
+import time
 
+import appdirs
+import numpy as np
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import (
     Qt,
 )
 from PyQt5.QtGui import (
-    QFont,
     QDoubleValidator,
+    QFont,
     QIcon,
 )
 from PyQt5.QtWidgets import (
@@ -27,22 +28,27 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSizePolicy,
+    QSlider,
     QSpacerItem,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
-    QSlider,
 )
-import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.GUI.utils import CustomMainWindow
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.AnalysisClass import *
-from glados_pycromanager.GUI.napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
+from glados_pycromanager.GUI.napariHelperFunctions import (
+    addToExistingOrNewLayer,
+    checkIfLayerExistsOrCreate,
+    moveLayerToTop,
+)
+from glados_pycromanager.GUI.utils import CustomMainWindow
+
 
 class ConfigInfo:
     """
@@ -166,11 +172,11 @@ class ConfigInfo:
         """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
         infostring='No option for this config'
         if self.isDropDown():
-            infostring = "Device {} should be an dropdown with {} options".format(self.configGroupName(),self.nrConfigs())
+            infostring = f"Device {self.configGroupName()} should be an dropdown with {self.nrConfigs()} options"
         if self.isSlider():
-            infostring = "Device {} should be an Slider with limits {}-{}".format(self.configGroupName(),self.lowerLimit(),self.upperLimit())
+            infostring = f"Device {self.configGroupName()} should be an Slider with limits {self.lowerLimit()}-{self.upperLimit()}"
         if self.isInputField():
-            infostring = "Device {} should be an input field".format(self.configGroupName())
+            infostring = f"Device {self.configGroupName()} should be an input field"
         return infostring
     
     def getCurrentMMValue(self):
@@ -411,7 +417,7 @@ class MMConfigUI(CustomMainWindow):
                 #Store in appdata
                 appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
-                    raise EnvironmentError("APPDATA environment variable not found")
+                    raise OSError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
                 os.makedirs(app_specific_folder, exist_ok=True)
                 self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
@@ -448,12 +454,12 @@ class MMConfigUI(CustomMainWindow):
         #Load from APPData, if it exists
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
-            raise EnvironmentError("APPDATA environment variable not found")
+            raise OSError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
         
         if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
             #Load the file
-            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+            with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
                 gladosInfo = json.load(file)
                 MMControlsInfo = gladosInfo['MMControls']
         
@@ -487,7 +493,7 @@ class MMConfigUI(CustomMainWindow):
                 #Store in appdata
                 appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
-                    raise EnvironmentError("APPDATA environment variable not found")
+                    raise OSError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
                 os.makedirs(app_specific_folder, exist_ok=True)
                 self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
@@ -714,9 +720,10 @@ class MMConfigUI(CustomMainWindow):
         ## Testing area
         
         
-        import numpy as np
-        from bioio.writers import OmeTiffWriter # with bioio-ome-tiff installed
         import tempfile
+
+        import numpy as np
+        from bioio.writers import OmeTiffWriter  # with bioio-ome-tiff installed
         tempdataloc = os.path.join(str(tempfile.TemporaryDirectory().name))+"_glmic.zarr"
         print(tempdataloc)
 
@@ -727,7 +734,6 @@ class MMConfigUI(CustomMainWindow):
         
         import numpy as np
         import zarr
-
         from ome_zarr.io import parse_url
         from ome_zarr.writer import write_image
 
@@ -2085,7 +2091,7 @@ class MMConfigUI(CustomMainWindow):
                 device_items.append(
                 {
                 "name": device,
-                "value": "{} properties".format(len(props)),
+                "value": f"{len(props)} properties",
                 "items": property_items,
                 }
                 )

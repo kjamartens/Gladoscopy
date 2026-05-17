@@ -1,7 +1,9 @@
 # #Required INIT to ensure that all python files in this folder and the corresponding AppData folder are found and passed on      
-import os
 import importlib.util
+import os
+
 import appdirs
+
 
 #Set up a function to load modules/scripts in the environment
 def load_additional_modules(dirname, all_modules, prefix = ''):

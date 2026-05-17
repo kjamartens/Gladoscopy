@@ -1,17 +1,21 @@
-from pycromanager import Core
-import sys
 import os
+import sys
+
+from pycromanager import Core
+
 sys.path.append('GUI\\nodz')
-from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from glados_pycromanager.GUI.LaserControlScripts import *
+
 # from MMcontrols import *
 from glados_pycromanager.GUI.napariGlados import *
+
 # from MDAGlados import MDAGlados
 
 class Shared_data:
@@ -38,7 +42,7 @@ if __name__ == "__main__":
         core = Core()
 
         #Open JSON file with MM settings
-        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')) as f:
             MM_JSON = json.load(f)
 
         #Setup UI
@@ -76,7 +80,7 @@ if __name__ == "__main__":
         print('No micromanager, test mode!')
 
         #Open JSON file with MM settings
-        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')) as f:
             MM_JSON = json.load(f)
 
 

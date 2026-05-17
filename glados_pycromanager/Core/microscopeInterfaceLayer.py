@@ -7,10 +7,10 @@
 #MMCore-plus
 
 from enum import Enum
-import numpy as np
-from pycromanager import multi_d_acquisition_events
 
-from pycromanager import JavaObject, Core as PycroManagerCore
+import numpy as np
+from pycromanager import Core as PycroManagerCore
+from pycromanager import JavaObject, multi_d_acquisition_events
 from pymmcore import CMMCore as PymmcoreCore
 from pymmcore_plus import CMMCorePlus as PymmcorePlusCore
 

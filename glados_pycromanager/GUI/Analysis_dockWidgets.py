@@ -1,22 +1,24 @@
-import appdirs
-import os,sys
 import json
-import matplotlib
 import logging
+import os
+import sys
+
+import appdirs
+import matplotlib
 from PyQt5.QtWidgets import QMainWindow
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.GUI.AnalysisClass import *
-import glados_pycromanager.GUI.napariGlados
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.GUI.utils import CustomMainWindow
-from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-from glados_pycromanager.GUI.MMcontrols import *
+import glados_pycromanager.GUI.napariGlados
 from glados_pycromanager.Core.MDAGlados import *
-from glados_pycromanager.GUI.FlowChart_dockWidgets import * 
+from glados_pycromanager.GUI.AnalysisClass import *
+from glados_pycromanager.GUI.FlowChart_dockWidgets import *
+from glados_pycromanager.GUI.MMcontrols import *
+from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
+from glados_pycromanager.GUI.utils import CustomMainWindow
 
 #For drawing
 matplotlib.use('Qt5Agg')
@@ -70,13 +72,13 @@ def MDAGlados_plugin(parent):
     """
     appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
     if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
+        raise OSError("APPDATA environment variable not found")
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
     os.makedirs(app_specific_folder, exist_ok=True)
     
     if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
         #Load the mda state
-        with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+        with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
             gladosInfo = json.load(file)
             mdaInfo = gladosInfo['MDA']
         

@@ -2,7 +2,8 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph import PlotWidget
 
-class Ui_CustomDockWidget(object):
+
+class Ui_CustomDockWidget:
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         # MainWindow.resize(728, 902)

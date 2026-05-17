@@ -7,24 +7,24 @@ Contains the Scanning/Decision/Variables/Logger widgets encapsulated in the auto
 """
 
 #region imports
-import sys
-import os
 import json
-import time
-import random
 import logging
-from datetime import datetime
+import os
+import random
 import re
+import sys
 import tempfile
+import time
 import webbrowser
-import appdirs
-import numpy as np
-import tifffile
-from PIL import Image
-import pyperclip
-import napari
-from ndtiff import NDTiffDataset
+from datetime import datetime
 
+import appdirs
+import napari
+import numpy as np
+import pyperclip
+import tifffile
+from ndtiff import NDTiffDataset
+from PIL import Image
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import (
     QObject,
@@ -49,8 +49,8 @@ from PyQt5.QtWidgets import (
     QGraphicsDropShadowEffect,
     QGridLayout,
     QGroupBox,
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMenu,
@@ -62,9 +62,9 @@ from PyQt5.QtWidgets import (
     QSpacerItem,
     QSpinBox,
     QSplitter,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -77,20 +77,23 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
-from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-import glados_pycromanager.GUI.utils as utils
-from glados_pycromanager.GUI.nodz import nodz_utils
 import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
-from glados_pycromanager.GUI.MMcontrols import MMConfigUI, ConfigInfo
-from glados_pycromanager.Core.MDAGlados import MDAGlados
 import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
+from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
+from glados_pycromanager.Core.MDAGlados import MDAGlados
+from glados_pycromanager.GUI.MMcontrols import ConfigInfo, MMConfigUI
+from glados_pycromanager.GUI.nodz import nodz_utils
 from glados_pycromanager.GUI.slack_settings_dialog import (
     SlackSettingsDialog,
+)
+from glados_pycromanager.GUI.slack_settings_dialog import (
     apply_to_shared_data as _apply_slack_settings,
 )
+
 #endregion
 
 #region Dialogs_Nodz
@@ -1327,7 +1330,7 @@ class CustomGraphicsView(QtWidgets.QGraphicsView):
         """
         nodz.setFixedSize(self.viewport().size())
 
-class GladosGraph():
+class GladosGraph:
     """ 
     Create a 'graph' in code-form of all connections in the scoring or acquisition flowchart. Basically gives information about what node is connected to what other nodes
     """
@@ -1706,7 +1709,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         
         # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
-        super(GladosNodzFlowChart_dockWidget, self).__init__(parent=self.graphics_view)
+        super().__init__(parent=self.graphics_view)
         self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.defineNodeInfo()
         
@@ -4539,7 +4542,7 @@ class GladosNodzFlowChart_dockWidget(NodzMain.Nodz):
         try:
             node.flowChart.globalVariables[variable]['type'] = [(type(eval(value)))]
         except: #This will effectively set it as a string.
-            node.flowChart.globalVariables[variable]['type'] = [(type((value)))]
+            node.flowChart.globalVariables[variable]['type'] = [(type(value))]
         node.flowChart.globalVariables[variable]['importance'] = 'informative'
         node.flowChart.globalVariables[variable]['lastUpdateTime'] = time.time()
         
@@ -5282,7 +5285,7 @@ class advScanGridLayout(QGroupBox):
         if self.mode == 'LoadPos':
             positions = {}
             #Read a JSON:
-            with open(self.scanningInfoGUI['LoadPos']['fileName'], 'r') as f:
+            with open(self.scanningInfoGUI['LoadPos']['fileName']) as f:
                 xypositionsRaw = json.load(f)
 
             positions['nrPositions'] = len(xypositionsRaw['map']['StagePositions']['array'])
@@ -6158,7 +6161,7 @@ class LoggerWidget(QPlainTextEdit):
         # Get the appdata folder
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
-            raise EnvironmentError("APPDATA environment variable not found")
+            raise OSError("APPDATA environment variable not found")
         self.app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
     
         #Find all log files
@@ -6189,7 +6192,7 @@ class LoggerWidget(QPlainTextEdit):
         if not self.most_recent_file:
             return
 
-        with open(os.path.join(self.app_specific_folder,self.most_recent_file), 'r') as log_file:
+        with open(os.path.join(self.app_specific_folder,self.most_recent_file)) as log_file:
             self.setPlainText(log_file.read())
             self.moveCursor(QTextCursor.End)  # Scroll to the bottom
 
@@ -6213,7 +6216,7 @@ class generalNodzCallActionWorker(QRunnable):
         """ 
         Init only passes nodzType and args to the super class.
         """
-        super(generalNodzCallActionWorker,self).__init__()
+        super().__init__()
         self.nodzType = nodzType
         self.args = args
         self.signals = WorkerSignals()

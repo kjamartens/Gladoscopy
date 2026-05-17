@@ -1,42 +1,37 @@
-import sys,os
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-import glados_pycromanager.GUI.utils as utils
+import inspect
+import logging
 
 # from shapely import Polygon, affinity
-import math
-import logging
-import numpy as np
-import inspect
-import dask.array as da
-import time
-from scipy import signal
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
-import dask.array as da
 import time
-from scipy.ndimage import gaussian_filter
-from skimage.feature.peak import peak_local_max
-# Load general dependencies
-from imageio.v2 import imread
-from bioimageio.spec.utils import download
 from pprint import pprint
+
+import dask.array as da
+import imageio
 import matplotlib.pyplot as plt
 import numpy as np
-from bioimageio.core import load_description
-from bioimageio.core import test_model
-from bioimageio.spec.utils import load_array
-from bioimageio.spec.model import v0_5
-from bioimageio.core import create_prediction_pipeline
+from bioimageio.core import Sample, Tensor, create_prediction_pipeline, load_description, test_model
 from bioimageio.core.digest_spec import create_sample_for_model
-from bioimageio.core import Sample
-from bioimageio.core import Tensor
-import imageio
+from bioimageio.spec.model import v0_5
+from bioimageio.spec.utils import download, load_array
+
+# Load general dependencies
+from imageio.v2 import imread
+from scipy import signal
+from scipy.ndimage import gaussian_filter
+from skimage.feature.peak import peak_local_max
+
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -160,7 +155,7 @@ def setupSample(model=None,input_image=None):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class BioImageModelZoo():
+class BioImageModelZoo:
     def __init__(self,core,**kwargs):
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore

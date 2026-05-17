@@ -1,50 +1,47 @@
 #region imports
-import shutil
-import os
-import appdirs
-import logging
-import warnings
-import inspect
-import importlib
-import re
-import numpy as np
-import time
-import datetime
-import json
-import sys
-import markdown
-from pycromanager import Core
-from typing import Any
-import webbrowser
 import collections
+import datetime
+import importlib
+import inspect
+import json
+import logging
+import os
+import re
+import shutil
+import sys
+import time
+import warnings
+import webbrowser
 from dataclasses import fields
+from typing import Any
+
+import appdirs
+import markdown
+import numpy as np
+from pycromanager import Core
+from PyQt5.QtCore import QSize, Qt
 
 #Imports for PyQt5 (GUI)
-from PyQt5.QtGui import (
-    QPainter,
-    QIcon,
-    QColor,
-    QFontMetrics,
-    QPen)
-from PyQt5.QtWidgets import (
-    QHBoxLayout,
-    QVBoxLayout,
-    QLayout, 
-    QMainWindow, 
-    QLabel, 
-    QPushButton,
-    QGroupBox,
-    QGridLayout,
-    QWidget,
-    QComboBox,
-    QLineEdit,
-    QFileDialog,
-    QCheckBox,
-    QSpacerItem,
-    QRadioButton,
-    QApplication)
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QColor, QFontMetrics, QIcon, QPainter, QPen
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLayout,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QRadioButton,
+    QSpacerItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 #TODO: Maybe sharedFunctions need to be in the pip-installed list?
 # from sharedFunctions import Shared_data
@@ -53,11 +50,12 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
 import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *  #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *  #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type: ignore
+
 #endregion
 
 def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
@@ -928,7 +926,7 @@ def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',icon
     """
     try:
         from PyQt5.QtCore import Qt
-        from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
+        from PyQt5.QtGui import QImage, QPixmap, qAlpha, qGray, qRgba
         
         if type == 'warning':
             iconLoc = iconFolder+os.sep+'WarningIcon.png'
@@ -974,7 +972,7 @@ def get_xy_position(core = None,shared_data=None):
     
     return position
 
-class XYGridManager():
+class XYGridManager:
     """  
     #Idea of XY grid: have methods to create a pop-up dialog, where users can set up the grid (top), setting up top/bottom/left/right/center and specifiy overlap. This then also includes a grid-flow (bottom) with options betwen e.g. normal grid, diagonal grid, spiral grid, etc
     #The class both includes the settings, the positions, and the GUI
@@ -1011,8 +1009,8 @@ class XYGridManager():
         """
         
         #Create a QDialog with OK/Cancel button:
-        from PyQt5.QtWidgets import QDialog, QDialogButtonBox
         from PyQt5.QtCore import Qt
+        from PyQt5.QtWidgets import QDialog, QDialogButtonBox
         
         self.dialog = QDialog()
         self.dialog.setWindowTitle("XY Grid Setup")
@@ -1296,8 +1294,8 @@ class XYGridManager():
         """
         #Create text of these positions with 2 dec places:
         if updateFromStage:
-            xx = "{:.2f}".format(self.core.get_xy_position()[0])
-            yy = "{:.2f}".format(self.core.get_xy_position()[1])
+            xx = f"{self.core.get_xy_position()[0]:.2f}"
+            yy = f"{self.core.get_xy_position()[1]:.2f}"
             text = f"{xx}, {yy}"
             
             if positionAttr == "pos_center":
@@ -1371,7 +1369,7 @@ class XYGridManager():
     def reject(self):
         self.dialog.close()
 
-class createGridFromCenterPopUpBox():
+class createGridFromCenterPopUpBox:
     
     def __init__(self,parent):
         #Idea: Create a quick pop-up box which asks the user for nr of rows, columns. Then use this to find the top/bottom left/right positions (given the overlap). Also flag the self.setFromCenter to True, and self.setFromCorners to False for good interactibility later.
@@ -1383,8 +1381,7 @@ class createGridFromCenterPopUpBox():
         layout = QVBoxLayout()
         #Add two of those rolling integer things to the layout:
         # Create a QSpinBox
-        from PyQt5.QtWidgets import QSpinBox
-        from PyQt5.QtWidgets import QLabel, QLineEdit, QHBoxLayout, QDialogButtonBox
+        from PyQt5.QtWidgets import QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QSpinBox
         self.SpinBoxRows = QSpinBox()
         self.SpinBoxRows.setRange(1,1000)
         self.SpinBoxRows.setValue(parent.grid_n_rows)
@@ -1453,8 +1450,8 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
             logging.error('Wrong entry!')
         
         #Create a random string of 10 characters:
-        import string
         import random
+        import string
         randomName2 = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
         
         #Create a new HBox:
@@ -1577,7 +1574,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     if checkAndShowWidget(curr_layout,label.objectName()) == False:
                         #TODO: actual tooltip
                         label.setToolTip("INPUT DATA")
-                        curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
+                        curr_layout.addWidget(label,2+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
                         
                     #This defaultValue is actually important later, leave it at DefaultInput.
                     defaultValue = 'DefaultInput'
@@ -1593,7 +1590,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     line_edit.setToolTip('TOOLTIP')
                     if defaultValue is not None:
                         line_edit.setText(str(defaultValue))
-                    curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                    curr_layout.addLayout(SingleVar_Variables_boxLayout,2+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                     #Add a on-change listener:
                     line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                     #Init the parent currentData storage:
@@ -1613,7 +1610,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                 # line_widget = QLabel('LINE')
                 label.setStyleSheet("background-color: black;")  # Set the line color
                 label.setFixedHeight(2)  # Set the line thickness
-                curr_layout.addWidget(label, 3+((k+labelposoffset))%maxNrRows, 0, 1, 10)  # Span one row and one column
+                curr_layout.addWidget(label, 3+(k+labelposoffset)%maxNrRows, 0, 1, 10)  # Span one row and one column
 
             reqKwargs = reqKwargsFromFunction(current_selected_function)
             
@@ -1625,7 +1622,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}")
                     if checkAndShowWidget(curr_layout,label.objectName()) == False:
                         label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                        curr_layout.addWidget(label,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
+                        curr_layout.addWidget(label,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
                     #Check if we want to add a fileLoc-input:
                     if typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc':
                         #Create a new qhboxlayout:
@@ -1648,7 +1645,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                             if defaultValue is not None:
                                 line_edit.setText(str(defaultValue))
-                            curr_layout.addLayout(hor_boxLayout,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                            curr_layout.addLayout(hor_boxLayout,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                             #Add a on-change listener:
                             line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                             
@@ -1711,7 +1708,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                             if defaultValue is not None:
                                 line_edit.setText(str(defaultValue))
-                            curr_layout.addLayout(SingleVar_Variables_boxLayout,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                            curr_layout.addLayout(SingleVar_Variables_boxLayout,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                             #Add a on-change listener:
                             line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                             #Init the parent currentData storage:
@@ -1732,7 +1729,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                 label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}")
                 if checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                    curr_layout.addWidget(label,4+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
+                    curr_layout.addWidget(label,4+(k+labelposoffset+len(reqKwargs))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
                 #Check if we want to add a fileLoc-input:
                 if typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc':
                     #Create a new qhboxlayout:
@@ -1755,7 +1752,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                         if defaultValue is not None:
                             line_edit.setText(str(defaultValue))
-                        curr_layout.addLayout(hor_boxLayout,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                        curr_layout.addLayout(hor_boxLayout,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                         #Add a on-change listener:
                         line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                         #Init the parent currentData storage:
@@ -1816,7 +1813,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                         if defaultValue is not None:
                             line_edit.setText(str(defaultValue))
-                        curr_layout.addLayout(SingleVar_Variables_boxLayout,4+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
+                        curr_layout.addLayout(SingleVar_Variables_boxLayout,4+(k+labelposoffset+len(reqKwargs))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
                         #Add a on-change listener:
                         line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                         #Init the parent currentData storage:
@@ -2864,7 +2861,7 @@ class SmallWindow(QMainWindow):
         htmlViewer.setFixedHeight(height)
         htmlViewer.setFixedWidth(width)
         html_file = htmlfile
-        with open(html_file, 'r', encoding='utf-8') as file:
+        with open(html_file, encoding='utf-8') as file:
             html_content = file.read()
         htmlViewer.setHtml(html_content)
         #Add the html viewer to the central widget:
@@ -2877,7 +2874,7 @@ class SmallWindow(QMainWindow):
         markdownViewer.setFixedHeight(height)
         markdownViewer.setFixedWidth(width)
         md_file = mdfile
-        with open(md_file, 'r', encoding='utf-8') as file:
+        with open(md_file, encoding='utf-8') as file:
             md_content = file.read()
         # Convert Markdown to HTML
         html_content = markdown.markdown(md_content, extensions=['markdown_captions','fenced_code', 'codehilite', 'toc', 'attr_list', 'meta'])
@@ -2915,7 +2912,7 @@ class SmallWindow(QMainWindow):
         newlayout.addWidget(markdownViewer)
         self.centralWidget().layout().addLayout(newlayout)
     
-class HelpGroupBox():
+class HelpGroupBox:
     def __init__(self,parent):
         self.parent = parent
         self.helpGroupBox = QGroupBox("Help")
@@ -3054,7 +3051,7 @@ class CustomMainWindow(QWidget):
     def save_state_globalData(self,filename):
         if os.path.exists(filename):
             #Load the mda state
-            with open(filename, 'r') as file:
+            with open(filename) as file:
                 state = json.load(file)
         else:
             state = {}
@@ -3087,7 +3084,7 @@ class CustomMainWindow(QWidget):
     def save_state_MMControls(self,filename):
         if os.path.exists(filename):
             #Load the mda state
-            with open(filename, 'r') as file:
+            with open(filename) as file:
                 state = json.load(file)
         else:
             state = {}
@@ -3172,12 +3169,12 @@ class CustomMainWindow(QWidget):
         self.save_state_globalData(filename)
             
     def save_state_MDA(self, filename):
-        import glados_pycromanager.GUI.napariGlados as napariGlados
         import glados_pycromanager.Core.MDAGlados as MDAGlados
+        import glados_pycromanager.GUI.napariGlados as napariGlados
         logging.debug('SAVING STATE')
         if os.path.exists(filename):
             #Load the mda state
-            with open(filename, 'r') as file:
+            with open(filename) as file:
                 state = json.load(file)
         else:
             state = {}
@@ -3307,7 +3304,7 @@ def storeSharedData_GlobalData(shared_data):
     """ Share the shared_data as JSON in the appdata folder"""
     appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
     if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
+        raise OSError("APPDATA environment variable not found")
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
     os.makedirs(app_specific_folder, exist_ok=True)
     tempCustomWindow = CustomMainWindow()
@@ -3372,7 +3369,7 @@ def openAdvancedSettings(shared_data):
     def rejectS(dialog):
         dialog.close()
     
-    from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QComboBox,  QDialogButtonBox
+    from PyQt5.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit
     #Create a QDialog with OK/Cancel button:
     dialog = QDialog()
     dialog.setWindowTitle("Advanced settings")
@@ -3635,11 +3632,10 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         #     errorIcon.setToolTip(errorToolTip)
         #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='grayscale')
 
+import atexit
 import logging
 import logging.handlers
 from queue import Queue
-import atexit
-
 
 
 class ColoredFormatter(logging.Formatter):
@@ -3677,7 +3673,7 @@ def set_up_logger():
     # Set up logging at correct level
     appdata_folder = appdirs.user_data_dir()
     if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
+        raise OSError("APPDATA environment variable not found")
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
     
     # Clear old log files older than a week
@@ -3763,7 +3759,7 @@ def set_up_logger_depracated():
     # Set up logging at correct level
     appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
     if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
+        raise OSError("APPDATA environment variable not found")
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
     
     # Clear old log files older than a week

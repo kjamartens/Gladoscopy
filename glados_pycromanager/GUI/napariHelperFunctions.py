@@ -1,8 +1,9 @@
-from PyQt5.QtGui import QIcon
-import logging
-import numpy as np
-import os
 import importlib.util
+import logging
+import os
+
+import numpy as np
+from PyQt5.QtGui import QIcon
 
 """ 
 General napari functions

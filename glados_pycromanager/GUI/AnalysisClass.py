@@ -2,31 +2,31 @@
 Handles the GUI display of Glados-pycromanager, as well as the structure for analysis (normal and real-time) to run on secondary threads.
 """
 
+import logging
+import os
 import sys
 import time
-import time
-import numpy as np
-import logging
 from collections import deque
-from typing import Union, Tuple, List
-from PyQt5.QtCore import pyqtSignal, QThread
 from threading import Event
-from threading import Event
-import os
+from typing import List, Tuple, Union
+
+import numpy as np
+from PyQt5.QtCore import QThread, pyqtSignal
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.GUI.utils as utils
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *  #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *  #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type: ignore
 
 
 #Class for overlays and their update and such
-class napariOverlay():
-    def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None):
+class napariOverlay:
+    def __init__(self,napariViewer,layer_name:str | None='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None):
         """
         Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
 
@@ -186,7 +186,7 @@ class napariOverlay():
         self.layer = self.napariViewer.add_shapes(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',name=self.layer_name,scale=self.layer_scale,opacity = self.opacity,visible=self.visible)
     
     #Update routine for an overlay that only has shapes
-    def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
+    def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: list[str | tuple[float, float, float]] = ['black']):
         """
         Running loop to draw/update and overlay with one or multiple rectangles. Requires shapesOverlay_init to be ran beforehand
 
@@ -212,7 +212,7 @@ class napariOverlay():
             self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
     
     #Update routine for an overlay that only has shapes
-    def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
+    def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: list[str | tuple[float, float, float]] = ['black']):
         """
         Running loop to draw arbitrary-shaped polygon shapes. Requires shapesOverlay_init to be ran beforehand
 
@@ -225,7 +225,7 @@ class napariOverlay():
         """
         #Update the shapes
         polygons = []
-        for p in range((shapePosList.shape[2])):
+        for p in range(shapePosList.shape[2]):
             polygons.append(shapePosList[:,:,p])
         #Remove the old polygon
         self.layer.data = []
@@ -285,7 +285,7 @@ class napariOverlay():
 
 class AnalysisThread_customFunction_Visualisation(QThread):
     finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,analysisObject,shared_data,analysisInfo: Union[str, None] = 'Random',delay=None):
+    def __init__(self,analysisObject,shared_data,analysisInfo: str | None = 'Random',delay=None):
         super().__init__()
         #Initiate some variables
         if delay==None:
@@ -351,7 +351,7 @@ class AnalysisThread_customFunction(QThread):
     # Create a signal to communicate between threads
     analysis_done_signal = pyqtSignal(object)
     finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=1,nodzInfo=None):
+    def __init__(self,shared_data,analysisInfo: str | None = 'Random',analysisQueue=None,sleepTimeMs=1,nodzInfo=None):
         """
         Initializes the AnalysisThread object.
 

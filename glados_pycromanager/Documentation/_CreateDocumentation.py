@@ -3,7 +3,8 @@
 
 import inspect
 import os
-from pdoc import import_module #type:ignore
+
+from pdoc import import_module  #type:ignore
 
 
 def generate_docs_and_central_index(modules_to_process: list[str],path) -> None:

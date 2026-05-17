@@ -4,33 +4,30 @@ The main function to call if running glados-napari from the python interface.
 
 #region imports
 
-import logging
 import argparse
-import napari
-import os
 import json
+import logging
+import os
 import sys
-from pycromanager import Core
-from pycromanager import start_headless
+
+import napari
+from pycromanager import Core, start_headless
 from pymmcore_plus import CMMCorePlus
-from PyQt5.QtWidgets import (
-    QApplication,
-    QWidget,
-    QLabel, 
-    QLineEdit,
-    QGridLayout,
-    QPushButton,
-    QRadioButton, 
-    QButtonGroup,
-    QFileDialog)
-from PyQt5.QtCore import (
-    QThread,
-    QObject,
-    pyqtSignal,
-    Qt)
+from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import (
     QIcon,
     QPixmap,
+)
+from PyQt5.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QFileDialog,
+    QGridLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QRadioButton,
+    QWidget,
 )
 
 #Napari optimizations
@@ -42,13 +39,15 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+
+#Obtain the helperfunctions
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *  #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type: ignore
 from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
 from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
 from glados_pycromanager.GUI.utils import *
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
-#Obtain the helperfunctions
-import glados_pycromanager.GUI.utils as utils
+
 #endregion
 
 def perform_post_closing_actions(shared_data:Shared_data):
@@ -298,7 +297,7 @@ def main():
     
     #Open JSON file with MM settings
     try:
-        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
+        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')) as f:
             MM_JSON = json.load(f)
     except Exception as e:
         logging.warning(f'Try/exception occured! {e}')

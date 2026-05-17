@@ -1,16 +1,20 @@
-import numpy as np
 import inspect
-import glados_pycromanager.GUI.utils as utils
 import logging
+import os
+import sys
 import time
-import sys, os
+
 import diplib as dip
+import numpy as np
+
+import glados_pycromanager.GUI.utils as utils
 
 # Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+
 
 def __function_metadata__():
     return { 
@@ -34,7 +38,7 @@ def __function_metadata__():
 # Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-class RealTimeFFT():
+class RealTimeFFT:
     def __init__(self, core, **kwargs):
         logging.info('INITIALISING REAL-TIME FFT ANALYSIS')
         

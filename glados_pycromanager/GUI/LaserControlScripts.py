@@ -1,24 +1,28 @@
 # Custom UI for Endefelder lab - deprecated, last used in 2022 or so
 
-import json
-from pycromanager import *
-#from pycromanager import Core
-import numpy as np
-import sys
-import os
-import time
 import asyncio
-import pyqtgraph as pg
+import json
+import os
+import sys
+import time
 
 #For drawing
 import matplotlib
+
+#from pycromanager import Core
+import numpy as np
+import pyqtgraph as pg
+from pycromanager import *
+
 matplotlib.use('Qt5Agg')
-from PyQt5 import QtCore, QtWidgets
+import logging
+import time
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-import time
-from PyQt5.QtCore import QTimer,QDateTime
-import logging
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import QDateTime, QTimer
+
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # General switching functions - MM hooks

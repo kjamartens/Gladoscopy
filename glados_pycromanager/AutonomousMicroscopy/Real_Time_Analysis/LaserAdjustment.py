@@ -1,16 +1,20 @@
-import sys,os
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import inspect
 
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
-import dask.array as da
 import time
+
+import dask.array as da
+import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 
 
 # Required function __function_metadata__
@@ -47,7 +51,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class laser_adjustment():
+class laser_adjustment:
     def __init__(self,core,**kwargs):
         print(core)
         #Check if we have the required kwargs
@@ -87,7 +91,7 @@ class laser_adjustment():
 
 
 
-class laser_adjustment_advanced():
+class laser_adjustment_advanced:
     def __init__(self,core,**kwargs):
         print(core)
         #Check if we have the required kwargs

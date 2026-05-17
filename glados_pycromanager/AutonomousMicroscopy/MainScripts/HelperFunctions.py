@@ -1,10 +1,11 @@
-import os
-import sys
-import warnings
-import inspect
 import importlib
+import inspect
+import os
+
 # from stardist import _draw_polygons, export_imagej_rois
 import re
+import sys
+import warnings
 
 # from stardist.models import StarDist2D
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

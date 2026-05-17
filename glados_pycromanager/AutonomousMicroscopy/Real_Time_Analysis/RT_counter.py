@@ -1,14 +1,19 @@
-import numpy as np
 import inspect
-import glados_pycromanager.GUI.utils as utils
 import logging
+import os
+import sys
 import time
-import sys,os
+
+import numpy as np
+
+import glados_pycromanager.GUI.utils as utils
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -36,7 +41,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class RealTimeCounter():
+class RealTimeCounter:
     def __init__(self,core,**kwargs):
         logging.info('INITIALISING COUNTER REAL-TIME ANALYSIS')
         # print(core)

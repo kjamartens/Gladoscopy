@@ -1,45 +1,44 @@
-import numpy as np
-import tempfile
-import zarr
-import napari
-import time
-import sys
+import gc
+import importlib
 import logging
 import os
-import useq
-from useq.pycromanager import to_pycromanager
-import appdirs
-import importlib
-from threading import Event
-from napari.qt import thread_worker
+import sys
+import tempfile
+import time
 from collections import deque
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt, pyqtSignal
-from qtpy.QtWidgets import (
-    QMainWindow, 
-    QVBoxLayout, 
-    QWidget, 
-    QScrollArea
-    )
+from threading import Event
+
+import appdirs
+import napari
+import numpy as np
+import useq
+import zarr
+from napari.qt import thread_worker
 from ndstorage import NDTiffDataset
-import gc
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QApplication
+from qtpy.QtWidgets import QMainWindow, QScrollArea, QVBoxLayout, QWidget
+from useq.pycromanager import to_pycromanager
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.GUI.LaserControlScripts import *
 import glados_pycromanager.GUI.napariGlados as napariGlados
-from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
-from glados_pycromanager.GUI.AnalysisClass import *
-from glados_pycromanager.GUI.Analysis_dockWidgets import *
-from glados_pycromanager.GUI.FlowChart_dockWidgets import *
-from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
 import glados_pycromanager.GUI.utils as utils
-from glados_pycromanager.GUI.custom_widget_ui import Ui_CustomDockWidget  # Import the generated UI module
 from glados_pycromanager.Core.MDAGlados import MDAGlados
+from glados_pycromanager.GUI.Analysis_dockWidgets import *
+from glados_pycromanager.GUI.AnalysisClass import *
+from glados_pycromanager.GUI.custom_widget_ui import (
+    Ui_CustomDockWidget,  # Import the generated UI module
+)
+from glados_pycromanager.GUI.FlowChart_dockWidgets import *
+from glados_pycromanager.GUI.LaserControlScripts import *
+from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
+from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
+from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
+
     # from glados_pycromanager.GUI.sharedFunctions import Shared_data #Gives circular import error in sharedFunctions
 
 #region real-time visualisation/analysis handling
@@ -57,12 +56,12 @@ def napariUpdateLive(DataStructure):
     display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
     
     if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
-        logging.debug('Updated live preview Hindered (due to display update time) at time {}'.format(time.time()))
+        logging.debug(f'Updated live preview Hindered (due to display update time) at time {time.time()}')
         return
     
     if time.time()-shared_data.last_display_update_time<min_delay_time and time.time()-shared_data.last_display_update_time>1/1000:
-        logging.debug('Updated live preview Delayed (due to display update time) val found {}'.format(time.time()-shared_data.last_display_update_time))
-        logging.debug('Updated live preview Delayed (due to display update time) by {}'.format(min_delay_time-(time.time()-shared_data.last_display_update_time)))
+        logging.debug(f'Updated live preview Delayed (due to display update time) val found {time.time()-shared_data.last_display_update_time}')
+        logging.debug(f'Updated live preview Delayed (due to display update time) by {min_delay_time-(time.time()-shared_data.last_display_update_time)}')
         #Sleep for the remainder, then continue
         time.sleep(max(0,min_delay_time-(time.time()-shared_data.last_display_update_time)))
         
@@ -314,7 +313,7 @@ def napariUpdateAnalysisThreads(DataStructure):
     core = DataStructure['core']
     image_queue_analysisA = DataStructure['image_queue_analysis']
     analysisThreads = DataStructure['analysisThreads']
-    logging.debug('NapariUpdateLive Ran at time {}'.format(time.time()))
+    logging.debug(f'NapariUpdateLive Ran at time {time.time()}')
     liveImage = DataStructure['data'][0]
     metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
     layerName = DataStructure['layer_name']
@@ -333,7 +332,7 @@ def napariUpdateAnalysisThreads(DataStructure):
                 logging.debug(f'starting analysis thread: {analysisThread}')
                 analysisThread.start()
 
-class napariHandler():
+class napariHandler:
     def __init__(self, shared_data,liveOrMda='live') -> None:
         logging.debug('#nH - ititalisation of napariHandler')
         self.shared_data = shared_data
@@ -403,7 +402,7 @@ class napariHandler():
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.debug('#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {}'.format(time.time()))
+        logging.debug(f'#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {time.time()}')
         if self.acqstate:
             self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
             #Give image and metadata back for storage done by pycromanager in case of MDA, NOT in case of live-viewing.
@@ -477,7 +476,7 @@ class napariHandler():
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.info('#nH - Updated preview requesting grab_image_liveVisualisation_and_liveAnalysis_savedFn at time {}'.format(time.time()))
+        logging.info(f'#nH - Updated preview requesting grab_image_liveVisualisation_and_liveAnalysis_savedFn at time {time.time()}')
         # shared_data.debugImageArrivalTimes.append(time.time())
         if self.acqstate:
             #Check if there is any reason to read the image:
@@ -936,12 +935,12 @@ class dockWidget_MDA(dockWidgets):
         #load from appdata
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
-            raise EnvironmentError("APPDATA environment variable not found")
+            raise OSError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
         os.makedirs(app_specific_folder, exist_ok=True)
         if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
             #Load the mda state
-            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+            with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
                 gladosInfo = json.load(file)
                 mdaInfo = gladosInfo['MDA']
             

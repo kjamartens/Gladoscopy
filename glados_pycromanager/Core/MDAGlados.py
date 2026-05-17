@@ -4,21 +4,24 @@ Main function of the multi-dimensional acquisitions in glados-pycromanager.
 Handles the GUI as well as the logic of the multi-dimensional acquisitions.
 Includes classes for Interactive Lists such as the Channels, XY positions.
 """
-import os,sys
-import time
-import logging
-from typing import List, Iterable
 import itertools
+import logging
+import os
+import sys
+import time
+from collections.abc import Iterable
+from typing import List
 
 import appdirs
+from pycromanager import multi_d_acquisition_events
 from PyQt5.QtCore import (
     QCoreApplication,
     QEvent,
     pyqtSignal,
 )
 from PyQt5.QtGui import (
-    QFont,
     QDoubleValidator,
+    QFont,
     QIntValidator,
 )
 from PyQt5.QtWidgets import (
@@ -40,7 +43,6 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from pycromanager import multi_d_acquisition_events
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -48,12 +50,13 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.utils
-from glados_pycromanager.GUI.utils import CustomMainWindow
-from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
+import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.AnalysisClass import *
 from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
-import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.MMcontrols import ConfigInfo
+from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
+from glados_pycromanager.GUI.utils import CustomMainWindow
+
 
 #region List Widgets
 class InteractiveListWidget(QTableWidget):
@@ -413,7 +416,7 @@ class MDAGlados(CustomMainWindow):
                 shared_data,
                 hasGUI=False,
                 num_time_points: int | None = 10, 
-                time_interval_s: float | List[float] = 0, 
+                time_interval_s: float | list[float] = 0, 
                 time_interval_s_or_ms: str = 'ms',
                 z_start: float | None = 0, 
                 z_end: float | None = 1, 
@@ -428,7 +431,7 @@ class MDAGlados(CustomMainWindow):
                 channel_exposures_ms: list | None = None, 
                 xy_positions: Iterable | None = None, 
                 xyz_positions: Iterable | None = None, 
-                position_labels: List[str] | None = None, 
+                position_labels: list[str] | None = None, 
                 order: str = 'tpcz', 
                 exposure_ms: float | None = 90, 
                 exposure_s_or_ms: str = 'ms',
@@ -1764,7 +1767,7 @@ class MDAGlados(CustomMainWindow):
                 #Store in appdata
                 appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
-                    raise EnvironmentError("APPDATA environment variable not found")
+                    raise OSError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
                 os.makedirs(app_specific_folder, exist_ok=True)
                 self.save_state_MDA(os.path.join(app_specific_folder, 'glados_state.json'))

@@ -1,12 +1,13 @@
 
 #region imports
-import napari
-import sys
-import os
-from pycromanager import Core
 import logging
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QSizePolicy, QScrollArea, QSpacerItem
+import os
+import sys
+
+import napari
+from pycromanager import Core
 from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QGridLayout, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1'
@@ -16,18 +17,24 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.GUI.AnalysisClass import * #type:ignore
-from glados_pycromanager.GUI.utils import CustomMainWindow #type:ignore
-from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
-from glados_pycromanager.GUI.napariGlados import * #type: ignore
-from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
-from glados_pycromanager.GUI.utils import * #type: ignore
+
 #Import all scripts in the custom script folders
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *  #type: ignore
+from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type: ignore
+from glados_pycromanager.GUI.AnalysisClass import *  #type:ignore
+from glados_pycromanager.GUI.napariGlados import *  #type: ignore
+
 # Obtain the helperfunctions
 # import glados_pycromanager.GUI.HelperFunctions #type: ignore
-from glados_pycromanager.GUI.napariHelperFunctions import showScaleBar #type: ignore
+from glados_pycromanager.GUI.napariHelperFunctions import (  #type:ignore
+    InitateNapariUI,
+    getLayerIdFromName,
+    showScaleBar,  #type: ignore
+)
+from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate  #type: ignore
+from glados_pycromanager.GUI.utils import *  #type: ignore
+from glados_pycromanager.GUI.utils import CustomMainWindow  #type:ignore
+
 #endregion
 
 #region Widget Definition
