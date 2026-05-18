@@ -254,3 +254,78 @@ def log_failures(failures: list[PluginLoadFailure]) -> None:
     """Emit a `warning` log line per failure. Phase 6.5 hookup."""
     for f in failures:
         logger.warning("Plugin load failed: %s", f)
+
+
+_NODE_PACKAGES = [
+    "glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements",
+    "glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis",
+    "glados_pycromanager.AutonomousMicroscopy.CustomFunctions",
+]
+
+
+def reload_all_node_modules() -> tuple[int, list[PluginLoadFailure]]:
+    """Re-import every node `.py` from source trees and AppData directories.
+
+    Designed for **developer hot-swap**: after editing or adding a node
+    file, call this to pick up the latest version without restarting the
+    app. Clears the function registry first so stale registrations from
+    removed or renamed nodes are cleaned up.
+
+    Returns:
+        ``(success_count, failures)`` — number of successfully (re)loaded
+        modules and a list of :class:`PluginLoadFailure` objects for any
+        that errored.
+    """
+    import sys
+
+    from glados_pycromanager.autonomous.registry import _REGISTRY
+
+    # Wipe old registrations so deleted/renamed nodes don't linger.
+    _REGISTRY.clear()
+    logger.info("Registry cleared; reloading all node modules…")
+
+    total_successes = 0
+    all_failures: list[PluginLoadFailure] = []
+
+    for pkg_name in _NODE_PACKAGES:
+        pkg = sys.modules.get(pkg_name)
+        if pkg is None:
+            logger.debug("Node package not yet imported, skipping: %s", pkg_name)
+            continue
+
+        # Drop every sub-module from sys.modules so _import_from_path
+        # re-executes the file (picks up edits, new files, deletions).
+        prefix = pkg_name + "."
+        for key in [k for k in list(sys.modules) if k.startswith(prefix)]:
+            del sys.modules[key]
+
+        # Reset package-level bookkeeping so _register() and _load_appdata()
+        # behave as if the package is being imported for the first time.
+        pkg.__all__ = []
+        pkg._appdata_loaded = False
+
+        # Re-load source-tree modules.
+        source_dir = getattr(pkg, "_SOURCE_DIR", None)
+        if source_dir:
+            mods, failures = load_node_modules(source_dir, prefix=pkg_name)
+            pkg._register(mods)
+            log_failures(failures)
+            total_successes += len(mods)
+            all_failures.extend(failures)
+
+        # Re-load AppData drop-in modules.
+        appdata_dir = getattr(pkg, "_APPDATA_DIR", None)
+        if appdata_dir:
+            a_mods, a_failures = load_node_modules(appdata_dir, prefix=f"{pkg_name}.appdata")
+            pkg._register(a_mods)
+            log_failures(a_failures)
+            total_successes += len(a_mods)
+            all_failures.extend(a_failures)
+            pkg._appdata_loaded = True
+
+    logger.info(
+        "Node reload complete: %d module(s) loaded, %d failure(s)",
+        total_successes,
+        len(all_failures),
+    )
+    return total_successes, all_failures
