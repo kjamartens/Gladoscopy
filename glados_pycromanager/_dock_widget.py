@@ -350,7 +350,8 @@ class MainWidget(QWidget):
         include_flowChart_automatedMicroscopy = True
         
         #Set up logging in the AppData folder, INFO and DEBUG
-        utils.set_up_logger()
+        from glados_pycromanager.observability.logger import set_up_logger
+        set_up_logger()
 
         logging.info("Main napari Glados-pycromanager plugin started")
         

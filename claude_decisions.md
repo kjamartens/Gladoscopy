@@ -619,4 +619,31 @@ gate. Total test count: 291. No production behaviour broken.
 
 ---
 
+## 2026-05-18 — Logger extracted to `observability/logger.py`; utils.py keeps a shim  [Phase 11.1]
+**Decision:** `ColoredFormatter` and `set_up_logger` are moved verbatim to
+`glados_pycromanager/observability/logger.py`. `utils.py` gets a thin shim
+(`from observability.logger import ... ; def set_up_logger(): warn + call`).
+The two actual call sites (`GUI_napari.py`, `_dock_widget.py`) are updated
+to import from the canonical path directly.
+**Alternatives:** (a) Move without shim — all callers break until updated.
+(b) Move and update all callers inline without a shim — identical outcome,
+but the shim is free insurance against unknown callers in a future session.
+**Reason:** The shim pattern is consistent with Phase 7's approach for
+`io/appdata.py` and `ui/widgets/builders.py`. The deprecated `set_up_logger_deprecated`
+function was dropped at the same time — it was already marked deprecated
+in its docstring and had zero callers.
+**Affects:** `glados_pycromanager/observability/logger.py` (new),
+`glados_pycromanager/observability/__init__.py` (re-exports added),
+`GUI/utils.py` (shim only), `GUI/GUI_napari.py` and `_dock_widget.py`
+(import updated).
+
+## 2026-05-18 — Phase 11.2 skip — no loguru imports exist  [Phase 11.2]
+**Decision:** Phase 11.2 ("remove loguru imports, one commit per file") is
+a no-op: `grep -r "from loguru\|import loguru" glados_pycromanager` returns
+zero matches. The codebase never adopted loguru in production code despite
+it being mentioned in the pain-points analysis.
+**Alternatives:** Verify once and declare done; author an empty commit.
+**Reason:** No code to change — skip is the correct status.
+**Affects:** `claude_project.md` row 11.2 only.
+
 *Append future decisions below this line, newest at the bottom.*

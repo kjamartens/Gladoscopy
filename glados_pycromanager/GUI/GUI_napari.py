@@ -338,7 +338,8 @@ def main():
     thread.finished.connect(thread.deleteLater)
 
     #Set up logging to files in appData folder - INFO and DEBUG
-    utils.set_up_logger()
+    from glados_pycromanager.observability.logger import set_up_logger
+    set_up_logger()
     
     #Run the app until closed
     sys.exit(app.exec_())
