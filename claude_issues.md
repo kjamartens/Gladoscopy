@@ -35,10 +35,10 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
-- [ ] **`MIL.create_mda` mutable-default trap** *(scheduled for Phase 10.8)* — defaults `xy_positions=[]` *and* `xyz_positions=[]` together which pycromanager rejects, and `position_labels=[]` + `xy_positions=[]` silently yields zero events. Captured by `tests/test_mda_event_builder.py::test_default_call_raises_due_to_mutex_defaults`. After the Phase 10.8 fix, update that test from "expects ValueError" to "raises typed MDAEventError" or "returns saner default events". See `glados_pycromanager/Core/microscopeInterfaceLayer.py:654`.
+*(none yet)*
 
 ---
 
 ## Resolved (history)
 
-*(populated as items get checked off; keep for traceability)*
+- [x] **`MIL.create_mda` mutable-default trap** — fixed in Phase 10.8. Mutable defaults replaced with `None`; bare `create_mda(num_time_points=N)` now yields a clean time-only event list. Bad plans (negative frames, zero-step z-stack, empty channel name, exposure/channel mismatch, channels without channel_group) raise `MDAEventError`. The regression test `test_default_call_raises_due_to_mutex_defaults` was renamed and inverted to `test_default_call_now_produces_time_only_events` and now asserts the saner default behaviour.

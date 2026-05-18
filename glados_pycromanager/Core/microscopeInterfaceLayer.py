@@ -15,7 +15,7 @@ from pycromanager import JavaObject, multi_d_acquisition_events
 from pymmcore import CMMCore as PymmcoreCore
 from pymmcore_plus import CMMCorePlus as PymmcorePlusCore
 
-from glados_pycromanager.errors import BackendError
+from glados_pycromanager.errors import BackendError, MDAEventError
 
 logger = logging.getLogger(__name__)
 
@@ -693,14 +693,73 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for wait_for_system.")
     
-    def create_mda(self, num_time_points:int=10, time_interval_s=0.0,z_start=0.0,z_end=0.0,z_step=0.0,channel_group='Channel',channels=[],channel_exposures_ms=[],xy_positions=[],xyz_positions=[],position_labels=[],order='t'):
+    def create_mda(self, num_time_points:int=10, time_interval_s=0.0,z_start=0.0,z_end=0.0,z_step=0.0,channel_group='Channel',channels=None,channel_exposures_ms=None,xy_positions=None,xyz_positions=None,position_labels=None,order='t'):
+        """Build a pycromanager MDA event list from a synthetic plan.
+
+        Validates the plan first and raises :class:`MDAEventError` on
+        any impossible combination — negative frame counts, a z range
+        with a zero step, channels named with empty strings, or a
+        ``channel_exposures_ms`` length that doesn't match ``channels``.
+
+        Mutable defaults have been replaced with ``None``; inside the
+        function the empty-list axes are then dropped (pycromanager
+        rejects ``xy_positions=[]`` *and* ``xyz_positions=[]`` together
+        as "incompatible arguments"). A bare ``create_mda(num_time_points=2)``
+        now produces a 2-event time-only plan instead of raising
+        ValueError from the pycromanager helper.
         """
-        Create MDA acquisition via multi_d_acquisition_events or via useq.
-        
-        For now, return in Pycromanager format, which is a dictionary. Possibly later TODO: change default output to a useq object.
-        """
+        # Plan-level validation — raise MDAEventError, never let nonsense
+        # silently propagate into the pycromanager helper.
+        if not isinstance(num_time_points, int) or num_time_points < 1:
+            raise MDAEventError(
+                f"num_time_points must be a positive int, got {num_time_points!r}"
+            )
+        if z_step == 0 and z_start != z_end:
+            raise MDAEventError(
+                f"z_step=0 with z_start={z_start!r} != z_end={z_end!r} would "
+                f"produce an infinite z-stack"
+            )
+        if channels:
+            for c in channels:
+                if not isinstance(c, str) or c == "":
+                    raise MDAEventError(
+                        f"channels must be non-empty strings; got {c!r}"
+                    )
+            if channel_exposures_ms is not None and len(channel_exposures_ms) and len(channel_exposures_ms) != len(channels):
+                raise MDAEventError(
+                    f"channel_exposures_ms length {len(channel_exposures_ms)} "
+                    f"does not match channels length {len(channels)}"
+                )
+        if not channel_group:
+            if channels:
+                raise MDAEventError(
+                    "channels supplied but channel_group is empty"
+                )
+
         if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA or self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON or self.MI() == MicroscopeInstance.MMCORE_PLUS:
-            self.mda = multi_d_acquisition_events(num_time_points=num_time_points, time_interval_s=time_interval_s,z_start=z_start,z_end=z_end,z_step=z_step,channel_group=channel_group,channels=channels,channel_exposures_ms=channel_exposures_ms,xy_positions=xy_positions,xyz_positions=xyz_positions,position_labels=position_labels,order=order)
+            # Forward None for any axis the caller didn't supply so the
+            # pycromanager helper's mutex check (xy vs xyz, channels vs
+            # exposures, etc.) sees genuine absence rather than empty-list
+            # presence.
+            try:
+                self.mda = multi_d_acquisition_events(
+                    num_time_points=num_time_points,
+                    time_interval_s=time_interval_s,
+                    z_start=z_start,
+                    z_end=z_end,
+                    z_step=z_step,
+                    channel_group=channel_group,
+                    channels=channels,
+                    channel_exposures_ms=channel_exposures_ms,
+                    xy_positions=xy_positions,
+                    xyz_positions=xyz_positions,
+                    position_labels=position_labels,
+                    order=order,
+                )
+            except ValueError as exc:
+                # Surface as MDAEventError so downstream callers can catch
+                # one type for "the plan was rejected".
+                raise MDAEventError(str(exc)) from exc
             return self.mda
         else:
             raise ValueError("Unsupported microscope interface type for create_mda.")

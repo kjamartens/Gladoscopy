@@ -6,22 +6,11 @@ can exercise the full event-construction path without a Micro-Manager
 core. These tests lock in the per-axis count and the per-event payload
 shape against representative synthetic acquisition plans.
 
-Phase 8 (MDAGlados split) and Phase 10.8 (MDA event validation) will
-add more tests against the higher-level `MDAGlados` path; for now this
-file pins the layer that MDAGlados ultimately routes through.
-
-**Latent bugs captured** in `MIL.create_mda` defaults (Phase 10.8 will
-fix these on the MIL side rather than relying on callers to know):
-
-  - `xy_positions=[]` *and* `xyz_positions=[]` together are rejected
-    by pycromanager ("incompatible arguments that cannot be passed
-    together"), so every test passes `xyz_positions=None`.
-  - `xy_positions=[]` + `position_labels=[]` (both mutable defaults)
-    silently produce zero events instead of raising. Tests pass
-    `xy_positions=None, position_labels=None` to bypass.
-  - `channels=[]` + `channel_exposures_ms=[]` similarly suppress event
-    generation. Tests pass `channels=None, channel_exposures_ms=None`
-    when channels are not the axis under test.
+Phase 10.8 fixes the mutable-default trap on the MIL side: the
+defaults are now ``None`` and a bare ``create_mda(num_time_points=2)``
+produces a 2-event time-only plan. Tests below still pass the
+``None`` overrides explicitly to keep the per-axis behaviour
+unambiguous.
 """
 from __future__ import annotations
 
@@ -31,6 +20,7 @@ from glados_pycromanager.Core.microscopeInterfaceLayer import (
     MicroscopeInstance,
     MicroscopeInterfaceLayer,
 )
+from glados_pycromanager.errors import MDAEventError
 
 
 @pytest.fixture
@@ -160,15 +150,74 @@ def test_every_real_backend_routes_through_multi_d_helper(monkeypatch, backend):
     assert len(events) == 1
 
 
-def test_default_call_raises_due_to_mutex_defaults(mil_python):
-    """Latent-bug regression test.
+def test_default_call_now_produces_time_only_events(mil_python):
+    """Regression: Phase 10.8 fixed the mutable-default trap.
 
-    Lock in the *current* surprising behavior: calling create_mda with
-    only `num_time_points` and letting the rest fall through to MIL's
-    mutable defaults (xy_positions=[] AND xyz_positions=[]) raises
-    `ValueError` from pycromanager. Phase 10.8 should either pre-empt
-    this with a typed MIL-side error or set saner defaults; this test
-    will be the regression target.
+    Previously ``create_mda(num_time_points=2)`` collapsed into the
+    pycromanager mutex check because both ``xy_positions`` and
+    ``xyz_positions`` defaulted to ``[]``. With Phase 10.8 the defaults
+    are ``None`` and the bare call yields a 2-event time-only plan.
     """
-    with pytest.raises(ValueError, match="xyz_positions"):
-        mil_python.create_mda(num_time_points=2, time_interval_s=0.5)
+    events = mil_python.create_mda(num_time_points=2, time_interval_s=0.5)
+    assert isinstance(events, list)
+    assert len(events) == 2
+    assert events[0]["axes"] == {"time": 0}
+    assert events[1]["axes"] == {"time": 1}
+
+
+def test_negative_num_time_points_raises(mil_python):
+    with pytest.raises(MDAEventError, match="num_time_points"):
+        mil_python.create_mda(num_time_points=-3)
+
+
+def test_zero_num_time_points_raises(mil_python):
+    with pytest.raises(MDAEventError, match="num_time_points"):
+        mil_python.create_mda(num_time_points=0)
+
+
+def test_zero_z_step_with_nonzero_range_raises(mil_python):
+    with pytest.raises(MDAEventError, match="z_step"):
+        mil_python.create_mda(
+            num_time_points=1,
+            z_start=0.0,
+            z_end=5.0,
+            z_step=0.0,
+            **SAFE_OVERRIDES,
+        )
+
+
+def test_empty_channel_name_raises(mil_python):
+    with pytest.raises(MDAEventError, match="channels"):
+        mil_python.create_mda(
+            num_time_points=1,
+            channels=["DAPI", ""],
+            channel_exposures_ms=[100, 200],
+            xy_positions=None,
+            xyz_positions=None,
+            position_labels=None,
+        )
+
+
+def test_channel_exposures_length_mismatch_raises(mil_python):
+    with pytest.raises(MDAEventError, match="channel_exposures_ms"):
+        mil_python.create_mda(
+            num_time_points=1,
+            channels=["DAPI", "FITC"],
+            channel_exposures_ms=[100],
+            xy_positions=None,
+            xyz_positions=None,
+            position_labels=None,
+        )
+
+
+def test_channels_supplied_without_channel_group_raises(mil_python):
+    with pytest.raises(MDAEventError, match="channel_group"):
+        mil_python.create_mda(
+            num_time_points=1,
+            channel_group="",
+            channels=["DAPI"],
+            channel_exposures_ms=[100],
+            xy_positions=None,
+            xyz_positions=None,
+            position_labels=None,
+        )
