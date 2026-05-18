@@ -1,0 +1,28 @@
+﻿=== Startup import-time baseline: 2026-05-18 11:07:25 ===
+Command: python -X importtime -c "import glados_pycromanager.GUI.GUI_napari"
+
+Top 20 slowest cumulative import times:
+self (us)  cumul (us)   module
+---------  ----------   ------
+4055       44638717     glados_pycromanager.GUI.GUI_napari
+9137       21465146     glados_pycromanager.GUI.napariGlados
+8973       18986897     glados_pycromanager.GUI.utils
+4228       16004723     napari.qt
+294        15994133     napari._qt.qt_event_loop
+4045       15993839     napari._qt
+46986      14351790     glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis
+7143       11132379     bioimageio.core
+8154       10291822     bioimageio.spec
+47698      10162547     napari._qt.qt_event_loop
+374        9020090      napari.components.viewer_model
+5312       9019716      napari.components
+7831       7718166      napari.components.layerlist
+7321       7710335      napari.layers
+6879       4323619      bioimageio.spec.application
+168422     4117971      bioimageio.spec.application.v0_2
+29968      4071919      glados_pycromanager.AutonomousMicroscopy.CustomFunctions
+4592       3802531      napari.layers.shapes
+25884      3797940      napari.layers.shapes._shapes_key_bindings
+8354       3796221      scipy.signal._support_alternative_backends
+
+Total import time (GUI_napari cumulative): 44638717 us
