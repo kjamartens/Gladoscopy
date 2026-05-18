@@ -1,6 +1,5 @@
-# Common developer tasks. Works on Windows via Git-Bash `make`, on macOS
-# / Linux via system `make`. Targets are thin wrappers so CI can call
-# the same commands.
+# Common developer tasks. Works on Windows (GnuWin32 make or Git-Bash make),
+# macOS, and Linux. Targets are thin wrappers so CI can call the same commands.
 #
 # Quick start (new contributor):
 #   make env      ← create / update GladosEnv conda environment
@@ -8,9 +7,8 @@
 #   make test     ← run the test suite
 #   make ci       ← full local gate: lint + bandit + tests
 #
-# Git-for-Windows note: `make` ships with Git Bash at
-#   C:\Program Files\Git\usr\bin\make.exe
-# Add that directory to PATH or invoke via Git Bash.
+# Windows: GnuWin32 make (C:\Program Files (x86)\GnuWin32\bin\make.exe)
+# works from PowerShell / cmd.  Git-Bash make also works.
 
 PYTHON  ?= python
 PIP     ?= $(PYTHON) -m pip
@@ -28,8 +26,7 @@ PACKAGE := glados_pycromanager
         clean
 
 help:  ## Show this help.
-	@echo "Targets:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  %-18s %s\n", $$1, $$2}'
+	@$(PYTHON) -c "import re; print('Targets:'); [print('  {:<18} {}'.format(*m.groups())) for l in open('Makefile',encoding='utf-8',errors='replace') for m in [re.match(r'^([a-zA-Z_-]+):.*?## (.*)', l)] if m]"
 
 # ── Environment & install ─────────────────────────────────────────────────────
 

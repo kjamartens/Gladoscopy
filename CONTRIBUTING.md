@@ -15,9 +15,9 @@ make dev
 make test
 ```
 
-Windows note: `make` ships with Git for Windows at
-`C:\Program Files\Git\usr\bin\make.exe`. Open a **Git Bash** terminal,
-or add that directory to your PATH, then the targets above work as-is.
+Windows note: `make` is available via **GnuWin32**
+(`C:\Program Files (x86)\GnuWin32\bin\make.exe`) — works from PowerShell
+and cmd.exe directly. Git Bash also works if you prefer that shell.
 
 Alternatively, use the all-in-one Windows batch file (creates env + does
 editable install in one shot):
