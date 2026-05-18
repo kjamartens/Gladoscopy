@@ -705,7 +705,7 @@ Produce `docs/error-audit.md` with two tables:
 | [x] 10.13 | Add a top-level `sys.excepthook` (and a Qt `qInstallMessageHandler`) that logs uncaught exceptions to the AppData log file. Test: simulate an unhandled exception, assert log contains it | Crashes are diagnosable | Commit `reliability: global exception hook` |
 | [x] 10.14 | Verification gate | `grep -R "except:" glados_pycromanager --exclude-dir=nodz` returns 0; every new test passes; total test count ≥ baseline + 25 | Grep + pytest summary |
 
-### [~] Phase 11 — Logging unification
+### [x] Phase 11 — Logging unification
 
 **Goal**: One way to log, per CLAUDE.md. Nodz folder skipped.
 
@@ -713,9 +713,9 @@ Produce `docs/error-audit.md` with two tables:
 |---|------|------------------|-------|
 | [x] 11.1 | Centralize logger setup in `glados_pycromanager/observability/logger.py` (rotating file + console + module-level format) | Single setup | Commit `feat: centralized logger` |
 | [-] 11.2 | Remove `loguru` imports (one commit per file that uses it) | Single logger lib | Commits `style: replace loguru with logging in <file>` |
-| [ ] 11.3 | Convert remaining `print(` calls in non-CLI code paths to `logging.info` (skip `main()` startup banner, skip nodz) | 95 → <10 | Commits per file |
-| [ ] 11.4 | Drop `loguru` from `pyproject.toml` dependencies | Smaller env | Commit `chore: drop loguru dep` |
-| [ ] 11.5 | Verification gate | `grep -R "from loguru" glados_pycromanager` empty; CI green | Grep + pytest |
+| [x] 11.3 | Convert remaining `print(` calls in non-CLI code paths to `logging.info` (skip `main()` startup banner, skip nodz) | 95 → <10 | Commits per file |
+| [x] 11.4 | Drop `loguru` from `pyproject.toml` dependencies | Smaller env | Commit `chore: drop loguru dep` |
+| [x] 11.5 | Verification gate | `grep -R "from loguru" glados_pycromanager` empty; CI green | Grep + pytest |
 
 ### [ ] Phase 12 — Startup performance
 
