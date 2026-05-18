@@ -29,32 +29,13 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Open issues
 
-- in the pymmcore backend (MIL), there need to be proper implementations for storing the data and calling it back. At the moment i get these errors: 2026-05-18 15:34:16 [INFO    ] Finished MDA! [napariGlados.py:679]
-2026-05-18 15:34:16 [INFO    ] MDA mode stopped from acqModeChanged [napariGlados.py:870]
-2026-05-18 15:34:16 [ERROR   ] pyMMCdataset.finish() failed (no MDA dataset returned): 'NDTiffDataset' object has no attribute '_index_file' [napariGlados.py:709]
-2026-05-18 15:34:16 [INFO    ] Visualization worker: Performing final cleanup [napariGlados.py:765]
-Traceback (most recent call last):
-  File "C:\Users\koen-\Documents\GitHub\Gladoscopy\glados_pycromanager\Core\MDAGlados.py", line 1377, in MDA_acq_finished
-    self.data = self.shared_data.mdaDatasets[-1]
-                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^
-IndexError: list index out of range
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\koen-\Documents\GitHub\Gladoscopy\glados_pycromanager\Core\MDAGlados.py", line 1380, in MDA_acq_finished
-    data = zarr.open(self.shared_data.mdaZarrData['MDA'])
-                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-KeyError: 'MDA'
-
-But more importantly, it never stored mda datasets. I want them to store as a zarr. In fact, make it so that I can change storage options (also for java and pycromanager backend) in the advanced settings window.
-
-- I would love to have an option to be able to hot-swap custom functions (e.g. those in customfunctions/real_time_analysis/analysis_measurements etc, and those in programdata), e.g. when developing to quickly see if something works. This is fine via some button somewhere - i guess in the napari menu at the top of the window?
+*(none — all resolved or scheduled)*
 
 ---
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
+- **pymmcore-plus MDA zarr storage** — crashes fixed (MDA_acq_finished and pyMMCdataset.finish() no longer crash); actual zarr storage for pymmcore-plus MDA + advanced-settings storage selector deferred to a future plan step.
 - **MDA black slices** — deferred by user until Phase 13 is fully complete; ask again then. Fast MDA (50 frames at 20 ms) leaves black slices in the napari stack because not all frames arrive in time.
 - **Napari layer thumbnail loading icon** — user suggested ignoring. The icon spins on every `layer.data =` assignment; suppressing it requires internal napari APIs. Defer unless user flags as priority.
 - **RT counter / FFT fps drops to ~2 fps** — user deferred until Phase 13 is fully done.
@@ -73,3 +54,5 @@ But more importantly, it never stored mda datasets. I want them to store as a za
 - [x] **Developer menu `No module named 'markdown_captions'`** — `markdown_view.py` now tries to import `markdown_captions` and silently skips it if absent; `markdown-captions>=2.1` added to `pyproject.toml`. Committed in `fix: add show_UserManualNapari widget + make markdown-captions optional dep`.
 - [x] **XY/Z position display stale after move** — `moveXYStage` and `moveOneDStage` now fire a `QTimer.singleShot(500 ms)` to schedule a second position read-back after the stage has had time to settle. Committed in `ux: delayed position read-back after XY/Z stage moves`.
 - [x] **After-close hang (10-20 s, then Error -1073741819)** — connected `os._exit(0)` to `app.aboutToQuit` so the process force-exits when the napari window closes, bypassing Python/C destructors that hang and then segfault. Committed in `fix: force-exit on napari close`.
+- [x] **pymmcore-plus MDA crash on completion** — `MDA_acq_finished` caught `IndexError` but the zarr fallback raised `KeyError('MDA')`, crashing the handler. Now catches both, sets `self.data = None`, logs warning. `pyMMCdataset.finish()` exception level lowered to DEBUG (expected until put_image is implemented). Committed in `fix: prevent MDA_acq_finished crash`.
+- [x] **Hot-swap custom nodes** — added `reload_all_node_modules()` to `discovery.py` and wired it to `Plugins > Reload Glados Custom Nodes` in the napari menu bar. Committed in `feat: hot-swap custom nodes`.
