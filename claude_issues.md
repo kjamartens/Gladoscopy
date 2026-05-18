@@ -29,8 +29,6 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Open issues
 
-- after closing napari, the make run is hanging for ~10-20 seconds, until finally giving make: *** [run] Error -1073741819. Can this be done more gracefully?
-
 - in the pymmcore backend (MIL), there need to be proper implementations for storing the data and calling it back. At the moment i get these errors: 2026-05-18 15:34:16 [INFO    ] Finished MDA! [napariGlados.py:679]
 2026-05-18 15:34:16 [INFO    ] MDA mode stopped from acqModeChanged [napariGlados.py:870]
 2026-05-18 15:34:16 [ERROR   ] pyMMCdataset.finish() failed (no MDA dataset returned): 'NDTiffDataset' object has no attribute '_index_file' [napariGlados.py:709]
@@ -60,7 +58,6 @@ But more importantly, it never stored mda datasets. I want them to store as a za
 - **MDA black slices** — deferred by user until Phase 13 is fully complete; ask again then. Fast MDA (50 frames at 20 ms) leaves black slices in the napari stack because not all frames arrive in time.
 - **Napari layer thumbnail loading icon** — user suggested ignoring. The icon spins on every `layer.data =` assignment; suppressing it requires internal napari APIs. Defer unless user flags as priority.
 - **RT counter / FFT fps drops to ~2 fps** — user deferred until Phase 13 is fully done.
-- **After-close hang (10-20 s then Error -1073741819)** — complex Qt/napari shutdown issue; moved to open issues until investigated.
 
 ---
 
@@ -75,3 +72,4 @@ But more importantly, it never stored mda datasets. I want them to store as a za
 - [x] **User manual napari command missing** — added `UserManualWidget` class to `GUI_napari.py` and aliased it as `show_UserManualNapari`; fixes the "module has no attribute" error on plugin load. Committed in `fix: add show_UserManualNapari widget`.
 - [x] **Developer menu `No module named 'markdown_captions'`** — `markdown_view.py` now tries to import `markdown_captions` and silently skips it if absent; `markdown-captions>=2.1` added to `pyproject.toml`. Committed in `fix: add show_UserManualNapari widget + make markdown-captions optional dep`.
 - [x] **XY/Z position display stale after move** — `moveXYStage` and `moveOneDStage` now fire a `QTimer.singleShot(500 ms)` to schedule a second position read-back after the stage has had time to settle. Committed in `ux: delayed position read-back after XY/Z stage moves`.
+- [x] **After-close hang (10-20 s, then Error -1073741819)** — connected `os._exit(0)` to `app.aboutToQuit` so the process force-exits when the napari window closes, bypassing Python/C destructors that hang and then segfault. Committed in `fix: force-exit on napari close`.
