@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -146,7 +147,7 @@ def testArray_report_sharpNess(core,position_array_test,zmovestage,waitTimeMs,me
     res_arr = []
     import time
     for n in range(len(position_array_test)):
-        print(f"n: {n}, abs_pos_arr[n]: {position_array_test[n]}")
+        logging.debug("n: %s, abs_pos_arr[n]: %s", n, position_array_test[n])
         core.set_position(zmovestage,position_array_test[n]) #type:ignore
         core.wait_for_system()
         time.sleep(waitTimeMs/1000)
@@ -187,7 +188,7 @@ def sharpnessScore_from_image(image,method='Redondo'):
         finalScore = tenengrad_score(image)
     elif method == 'Laplacian':
         finalScore = blur_laplace_score(image)
-    print(f"Sharpness score: {finalScore}")
+    logging.info("Sharpness score: %s", finalScore)
     return finalScore
 
 @register("AutoFocusBF.auto_focus_iter_rel_bf")

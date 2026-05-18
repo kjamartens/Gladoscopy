@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -80,7 +81,7 @@ def StarDistSegment_ImageVis(core,**kwargs):
 
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}, nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("prob_thresh changed to: %s, nms_thresh changed to %s", kwargs["prob_thresh"], kwargs["nms_thresh"])
         
         try:
             probThreshVal = float(kwargs["prob_thresh"])
@@ -97,10 +98,10 @@ def StarDistSegment_ImageVis(core,**kwargs):
                 except (TypeError, KeyError, ValueError):
                     labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
+        logging.info("prob_thresh changed to: %s", kwargs["prob_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
     elif "prob_thresh" not in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("nms_thresh changed to: %s", kwargs["nms_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
     else:
         labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
@@ -129,7 +130,6 @@ def StarDistGeneralVis(datastruct,core,**kwargs):
     if core.get_pixel_size_um() != 0:
         layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
     else:
-        import logging
         logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
         layer.scale = [1,1]
     layer.opacity = 0.6
@@ -156,7 +156,7 @@ def StarDistSegment_preLoadedModel_use(core,**kwargs):
     
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}, nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("prob_thresh changed to: %s, nms_thresh changed to %s", kwargs["prob_thresh"], kwargs["nms_thresh"])
         
         try:
             probThreshVal = float(kwargs["prob_thresh"])
@@ -173,10 +173,10 @@ def StarDistSegment_preLoadedModel_use(core,**kwargs):
                 except (TypeError, KeyError, ValueError):
                     labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
+        logging.info("prob_thresh changed to: %s", kwargs["prob_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
     elif "prob_thresh" not in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("nms_thresh changed to: %s", kwargs["nms_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
     else:
         labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore

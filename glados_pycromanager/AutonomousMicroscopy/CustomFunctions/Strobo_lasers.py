@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -92,8 +93,8 @@ def set_strobo_lasers(core,**kwargs):
     power_pct_750 = float(kwargs['power_pct_750'])
     
     def TS_Response_verbose():
-        core.get_property('TriggerScopeMM-Hub', 'Serial Receive');
-        print(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
+        response = core.get_property('TriggerScopeMM-Hub', 'Serial Receive')
+        logging.debug("TriggerScope serial receive: %s", response)
     
     wavelength_arr = [405,488,561,638,750]
     #Loop over each of the laser IDs:
@@ -106,7 +107,7 @@ def set_strobo_lasers(core,**kwargs):
         
         
         #Loop over number of frames after which it repeats
-        if printStatements: print('PAC'+str(laser_id+1))
+        if printStatements: logging.debug("PAC%s", laser_id + 1)
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(laser_id+1))
         TS_Response_verbose();
 
@@ -115,13 +116,13 @@ def set_strobo_lasers(core,**kwargs):
                 if pulse_len>0: #type:ignore
                     power_level = 65535*0.01*power_pct
                     if laser_id == 2: #Exception for the 561 laser:
-                        if printStatements: print('Power level exception for 561 laser succes')
+                        if printStatements: logging.debug("Power level exception for 561 laser success")
                         power_level = 65535*0.01*power_pct*(12/100)
-                    if printStatements: print('PAO'+str(laser_id+1)+'-0-' + str(round(power_level)))
+                    if printStatements: logging.debug("PAO%s-0-%s", laser_id + 1, round(power_level))
                     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-0-' + str(round(power_level)))
                     TS_Response_verbose();
                 else:
-                    if printStatements: print('PAO'+str(laser_id+1)+'-0-' + str(round(0)))
+                    if printStatements: logging.debug("PAO%s-0-0", laser_id + 1)
                     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-0-' + str(round(0)))
                     TS_Response_verbose();
             else:
@@ -130,14 +131,14 @@ def set_strobo_lasers(core,**kwargs):
                 core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-'+str(k)+'-0')
                 TS_Response_verbose();
 
-            if printStatements: print('PAS'+str(laser_id+1)+'-1-1')
+            if printStatements: logging.debug("PAS%s-1-1", laser_id + 1)
             core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAS'+str(laser_id+1)+'-1-1')
             TS_Response_verbose();
 
-        if printStatements: print('BAD'+str(laser_id+1)+'-'+str(pulse_delay))
+        if printStatements: logging.debug("BAD%s-%s", laser_id + 1, pulse_delay)
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAD'+str(laser_id+1)+'-'+str(pulse_delay)) 
         TS_Response_verbose();
-        if printStatements: print('BAL'+str(laser_id+1)+'-'+str(pulse_len))
+        if printStatements: logging.debug("BAL%s-%s", laser_id + 1, pulse_len)
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(laser_id+1)+'-'+str(pulse_len)) 
         TS_Response_verbose();
     

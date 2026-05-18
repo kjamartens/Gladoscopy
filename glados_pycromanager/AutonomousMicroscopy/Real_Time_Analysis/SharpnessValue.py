@@ -6,6 +6,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import inspect
+import logging
 
 # from shapely import Polygon, affinity
 import math
@@ -86,7 +87,7 @@ class SharpnessValue:
         elif kwargs['FilterType'] == 'Laplacian':
             self.currentValue = (np.mean(blur_laplace(image)**2))
         else:
-            print('FilterType not recognized')
+            logging.warning("FilterType not recognized")
             self.currentValue = 0
     
     def end(self,core,**kwargs):

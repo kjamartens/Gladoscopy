@@ -6,6 +6,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import inspect
+import logging
 
 # from shapely import Polygon, affinity
 import math
@@ -47,7 +48,7 @@ def __function_metadata__():
 @register("EndAtFrame.EndAtFrame")
 class EndAtFrame:
     def __init__(self,core,**kwargs):
-        print(core)
+        logging.debug("EndAtFrame init, core: %s", core)
         self.initDone = 'Yea'
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
@@ -65,7 +66,7 @@ class EndAtFrame:
             shared_data._mdaModeAcqData.abort()
             shared_data._mdaModeAcqData.mark_finished()
             #Print a statement
-            print(f"Ended at frame {self.metadata['Axes']['time']}")
+            logging.info("Ended at frame %s", self.metadata['Axes']['time'])
     
     def end(self,core,**kwargs):
         return

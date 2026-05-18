@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -49,7 +50,7 @@ def AvgImage(core,**kwargs):
 
     # print(NDTIFFStack._summary_metadata)
     # print(NDTIFFStack.as_array())
-    print(kwargs)
+    logging.debug("kwargs: %s", kwargs)
     NDTIFFStack = kwargs['Image']
     
     # Compute the average image

@@ -68,7 +68,7 @@ def getModel(model_id="",model_doi="",model_url=""):
     elif model_url != "":
         model = load_description(model_url)
     else:
-        print("\nPlease specify a model ID, DOI or URL")
+        logging.warning("Please specify a model ID, DOI or URL")
     return model
 
 def getOutputImages(prediction,modelSample):
@@ -85,10 +85,10 @@ def getOutputImages(prediction,modelSample):
 
 def setupSample(model=None,input_image=None):
     if model == None:
-        print('Model input required!')
+        logging.warning("Model input required!")
         return
     if type(input_image) == type(None):
-        print('Input image required!')
+        logging.warning("Input image required!")
         return
     if hasattr(model.inputs[0],'name'):
         model_tensor_inputName = model.inputs[0].name
@@ -121,12 +121,12 @@ def setupSample(model=None,input_image=None):
             input_image = input_image[:, :,np.newaxis]
         elif bc < 2:
             input_image = input_image[np.newaxis,:, :]
-    print(f"array shape: {input_image.shape}")
+    logging.debug("array shape: %s", input_image.shape)
 
     #Check if it requires 3d == color input, if so, simply repeat the grayscale for now.
     if model.inputs[0].shape[1] == 3:
         input_image = np.repeat(input_image, 3, axis=1)
-        print(f"Expanded input_image to shape: {input_image.shape}")
+        logging.debug("Expanded input_image to shape: %s", input_image.shape)
 
     shapev = model.inputs[0].axes
     if type(shapev) != str:
@@ -190,7 +190,7 @@ class BioImageModelZoo:
         return
     
     def visualise_init(self): 
-        print('Visualise_init')
+        logging.debug("Visualise_init")
         layerName = 'BioImageModelZoo'
         layerType = 'image' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
         self.firstLayerInit = True

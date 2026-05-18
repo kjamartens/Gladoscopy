@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -52,7 +53,7 @@ def AvgGrayValue(core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
-    print(kwargs)
+    logging.debug("kwargs: %s", kwargs)
     NDTIFFStack = kwargs['Image']
     
     # Compute the average intensity of each slice
