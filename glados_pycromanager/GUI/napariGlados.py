@@ -1251,8 +1251,19 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
         from PyQt5.QtWidgets import QAction
         _reload_action = QAction("Reload Glados Custom Nodes", napariViewer.window._qt_window)
         _reload_action.triggered.connect(_reload_custom_nodes)
-        napariViewer.window.plugins_menu.addSeparator()
-        napariViewer.window.plugins_menu.addAction(_reload_action)
+        # Place action inside the "Glados-PycroManager" plugin sub-menu that napari
+        # creates from napari.yaml, falling back to the top-level Plugins menu.
+        _glados_submenu = None
+        for _act in napariViewer.window.plugins_menu.actions():
+            if _act.menu() is not None and 'Glados-PycroManager' in _act.text():
+                _glados_submenu = _act.menu()
+                break
+        if _glados_submenu is not None:
+            _glados_submenu.addSeparator()
+            _glados_submenu.addAction(_reload_action)
+        else:
+            napariViewer.window.plugins_menu.addSeparator()
+            napariViewer.window.plugins_menu.addAction(_reload_action)
     except Exception as _menu_exc:
         logging.debug("Could not add 'Reload Custom Nodes' menu item: %s", _menu_exc)
     # -------------------------------------------------------------------------
