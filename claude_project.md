@@ -731,6 +731,23 @@ Produce `docs/error-audit.md` with two tables:
 | [x] 12.6 | Capture post-change import time → append to `docs/perf-baseline.txt` | Numbers comparable | Commit `docs: post-optimization startup numbers` |
 | [x] 12.7 | Verification gate — 44.6 s → 5.0 s (≈89 % faster); 291 tests pass | New numbers strictly faster; CI green | Diff in baseline file |
 
+### [ ] Phase 12b — Developer workflow completeness
+
+**Goal**: Every common dev action covered by a reliable `make <target>`; a new
+contributor can go from zero to green tests in ≤ 3 commands.
+
+| # | Step | Expected outcome | Proof |
+|---|------|------------------|-------|
+| [ ] 12b.1 | Audit existing `Makefile`: `install` does editable+dev (wrong semantics); `clean` uses `rm -rf` (Unix-only); `profile-startup` writes to `startup.log` in CWD (inconsistent with ps1 script that writes to `docs/`); `verify` covers only lint+tests (no bandit); no `env`, `dev`, `build`, `test-fast`, `test-cov`, `ci` targets | Gap list drives subsequent steps | Document in commit message |
+| [ ] 12b.2 | Add `pytest-cov>=4.0` to `[project.optional-dependencies].dev` in `pyproject.toml` (needed for `test-cov` target) | Dep available | Commit `build: add pytest-cov dev dep` |
+| [ ] 12b.3 | Fix `install`/`dev` semantics: `make install` → non-editable prod (`pip install .`); `make dev` → editable + dev extras (`pip install -e ".[dev]"`); add `make env` — idempotent conda env bootstrap (`conda env create` or `conda env update` on conflict); add `make build` — `uv build` to produce wheel + sdist | Semantics match convention | Commit `build: fix install/dev semantics and add env/build targets` |
+| [ ] 12b.4 | Fix `make clean` for Windows — replace `rm -rf` with a cross-platform Python one-liner (`shutil.rmtree` + `glob`) that also removes any stale `startup.log` | `make clean` works in PowerShell and Git Bash | Commit `build: cross-platform clean target` |
+| [ ] 12b.5 | Add `make test-fast` (`pytest -x -q`) and `make test-cov` (`pytest --cov --cov-report=term-missing`) | Fast feedback + coverage loop available | Commit `build: add test-fast and test-cov targets` |
+| [ ] 12b.6 | Add `make ci` that chains `lint bandit test`; make `verify` an alias for `ci` for backwards compat | `make ci` is the one-command local gate | Commit `build: add ci target and keep verify as alias` |
+| [ ] 12b.7 | Fix `make profile-startup` — delegate to `pwsh -File scripts/profile_startup.ps1` so output goes consistently to `docs/perf-baseline.txt` (the PS1 already does this correctly) | Output path consistent | Commit `build: profile-startup delegates to ps1` |
+| [ ] 12b.8 | Update `CONTRIBUTING.md` — reflect new targets (`env`, `dev`, `install`, `build`, `test-fast`, `test-cov`, `ci`); add Git-for-Windows `make` path note; update quick-start to `make env && make dev` | Docs current | Commit `docs: update CONTRIBUTING for new Makefile targets` |
+| [ ] 12b.9 | Verification gate — `make help` lists all targets; `make ci` exits 0; `make clean` works; `pytest-cov` import succeeds | All green | Commit `chore: phase 12b verification gate` |
+
 ### [ ] Phase 13 — Runtime performance (live loop) + napari visualization
 
 **Goal**: Address the 2-second hot-path TODO, parallelize scoring, and optimize napari visualization for all MIL backends.
@@ -783,24 +800,51 @@ The skeleton directories were created in Phase 0; this phase fills them.
 | [ ] 16.4 | Pre-allow `pytest`, `ruff`, `mypy`, `git status`, `git diff`, `git log`, `make test`, `make lint` in `.claude/settings.json` | Fewer permission prompts | Commit `claude: preapprove safe commands` |
 | [ ] 16.5 | Verification gate | CI green; slash commands listed in `/help` when run locally | Local run note |
 
-### [ ] Phase 17 — Documentation regeneration
+### [ ] Phase 17 — Win64 standalone executable
+
+**Goal**: Package the application as a self-contained `glados.exe` for
+Windows x64 that is a drop-in replacement for running `glados` from a
+conda/venv, ships the full Python runtime and all scientific dependencies,
+and is automatically built by CI on tag pushes.
+
+**Bundler choice rationale (record in `claude_decisions.md`)**:
+PyInstaller `--onedir` is the pragmatic choice — mature, tested with PyQt5
+and napari, and produces a folder layout that avoids the cold-start penalty
+of `--onefile` extraction.  Nuitka would give a faster binary but requires
+a full C compile toolchain and has known gaps with tensorflow and napari
+plugin wiring.  Decision: PyInstaller `--onedir`.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| [ ] 17.1 | Convert `Documentation/index.html` to a markdown source under `docs/dev/` and have `_CreateDocumentation.py` emit the HTML as a build step | Source-of-truth in markdown | Commit `docs: markdownize developer docs` |
-| [ ] 17.2 | Regenerate HTML; commit only the regenerated artifact | Docs match code | Commit `docs: regenerated developer docs` |
-| [ ] 17.3 | Update `UserManual.md` to match the new tooling (Makefile, CI) | User docs current | Commit `docs: refresh UserManual for new tooling` |
-| [ ] 17.4 | Verification gate | All docs render; CI green | Screenshot or grep |
+| [ ] 17.1 | Add `pyinstaller` to `[project.optional-dependencies].dev`; record bundler decision in `claude_decisions.md` | Dep available; decision logged | Commit `build: add pyinstaller dev dep` |
+| [ ] 17.2 | Author `glados.spec` — PyInstaller spec with `Analysis` entry point at `glados_pycromanager/GUI/GUI_napari.py`, `--onedir`, `hiddenimports` for every lazy-loaded library (`tensorflow`, `keras`, `stardist`, `csbdeep`, `bioimageio.core`, `diplib`, `cv2`, `napari`, `napari.plugins`), and `datas` for `napari.yaml`, `Documentation/`, recipe JSON files, and any other non-`.py` package data | Spec file ready | Commit `build: add glados.spec` |
+| [ ] 17.3 | Add `scripts/build_exe.ps1` — one-command local build: `pyinstaller glados.spec --distpath dist --workpath build/pyinstaller`; prints the path of the produced `.exe` on success | Reproducible local build | Commit `build: add build_exe.ps1 script` |
+| [ ] 17.4 | Add `build-exe` target to `Makefile` (calls `scripts/build_exe.ps1`) | `make build-exe` works | Commit `build: Makefile build-exe target` |
+| [ ] 17.5 | Add `dist/` and `build/pyinstaller/` to `.gitignore` | Build artifacts not tracked | Commit `chore: gitignore exe build output` |
+| [ ] 17.6 | Perform a local build, resolve any missing hidden imports or data files, and iterate the spec until `dist/glados/glados.exe` launches the headless dialog without errors | Exe runs locally | Commit `build: fix spec after local smoke test` (amend spec + decisions entry for each gap found) |
+| [ ] 17.7 | Verify that AppData plugin discovery works in the frozen context — add a `sys.frozen` guard in `plugins/discovery.py` if needed so the AppData walk uses the correct path under the extracted bundle | User-dropped nodes load from `.exe` | Commit `build: frozen-context AppData path fix` |
+| [ ] 17.8 | Add `.github/workflows/release.yml` — triggers on `push: tags: ['v*']`; runs on `windows-latest` / Python 3.13; installs `[dev]`, calls `make build-exe`, zips `dist/glados/` as `glados-win64.zip`, and uploads it as a GitHub Release asset via `softprops/action-gh-release` | Tagged release produces a downloadable zip | Commit `ci: release workflow builds win64 exe` |
+| [ ] 17.9 | Smoke-test the CI workflow on a local `act` dry-run or a test tag (e.g. `v0.0.0-exe-test`) and confirm the artifact uploads; delete the test tag afterwards | Workflow is green | Note in commit or `claude_decisions.md` |
+| [ ] 17.10 | Verification gate | `make build-exe` succeeds locally; `dist/glados/glados.exe` launches to the headless dialog; `.github/workflows/release.yml` exists and is parseable by `act`; CI green | Manual run + `yamllint` pass |
 
-### [ ] Phase 18 — Final cleanup and release prep
+### [ ] Phase 18 — Documentation regeneration
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| [ ] 18.1 | Delete the temporary `utils.py` shim once all imports point to new homes (grep first) | No legacy shim | Commit `refactor: drop utils.py shim` |
-| [ ] 18.2 | Bump version in `pyproject.toml` (e.g. `0.0.2 → 0.1.0`); update `CHANGELOG.md` "Unreleased" → `0.1.0` with date | Release ready | Commit `release: bump to 0.1.0` |
-| [ ] 18.3 | Tag candidate `v0.1.0-rc1` locally | Tag exists | `git tag` shows |
-| [ ] 18.4 | Final verification: `pytest -q`, `ruff check`, `mypy`, `python -m build`, manual run of `glados` and the napari plugin, manual run of `Showcase_Basic1.json` end-to-end | All green | Commit `chore: final verification` with notes |
-| [ ] 18.5 | Open PR `claude_optimization → main` (or `Code-cleanup`, per `claude_decisions.md`) with a summary linking each phase | PR exists | PR URL recorded |
+| [ ] 18.1 | Convert `Documentation/index.html` to a markdown source under `docs/dev/` and have `_CreateDocumentation.py` emit the HTML as a build step | Source-of-truth in markdown | Commit `docs: markdownize developer docs` |
+| [ ] 18.2 | Regenerate HTML; commit only the regenerated artifact | Docs match code | Commit `docs: regenerated developer docs` |
+| [ ] 18.3 | Update `UserManual.md` to match the new tooling (Makefile, CI) | User docs current | Commit `docs: refresh UserManual for new tooling` |
+| [ ] 18.4 | Verification gate | All docs render; CI green | Screenshot or grep |
+
+### [ ] Phase 19 — Final cleanup and release prep
+
+| # | Step | Expected outcome | Proof |
+|---|------|------------------|-------|
+| [ ] 19.1 | Delete the temporary `utils.py` shim once all imports point to new homes (grep first) | No legacy shim | Commit `refactor: drop utils.py shim` |
+| [ ] 19.2 | Bump version in `pyproject.toml` (e.g. `0.0.2 → 0.1.0`); update `CHANGELOG.md` "Unreleased" → `0.1.0` with date | Release ready | Commit `release: bump to 0.1.0` |
+| [ ] 19.3 | Tag candidate `v0.1.0-rc1` locally | Tag exists | `git tag` shows |
+| [ ] 19.4 | Final verification: `pytest -q`, `ruff check`, `mypy`, `python -m build`, manual run of `glados` and the napari plugin, manual run of `Showcase_Basic1.json` end-to-end | All green | Commit `chore: final verification` with notes |
+| [ ] 19.5 | Open PR `claude_optimization → main` (or `Code-cleanup`, per `claude_decisions.md`) with a summary linking each phase | PR exists | PR URL recorded |
 
 ### How to prove progress at any time
 
