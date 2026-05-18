@@ -259,6 +259,9 @@ class Shared_data(QObject):
     def liveMode(self, new_value):
         if new_value != self._liveMode:
             self._liveMode = new_value
+            if not new_value:
+                import traceback as _tb
+                logging.debug("liveMode→False stack:\n%s", "".join(_tb.format_stack()))
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
         logging.info("LIVE mode changed!")

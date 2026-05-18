@@ -495,6 +495,11 @@ def main():
                 milcore.set_exposure(50.0)
             except Exception as exc:
                 logging.warning('profile_runtime: set_exposure(50) failed: %r', exc)
+            if getattr(shared_data, 'mdaMode', False):
+                logging.warning('profile_runtime: mdaMode is True at start — cannot start live mode safely; aborting')
+                _dump_profile('mdaMode-conflict')
+                QTimer.singleShot(0, app.quit)
+                return
             _profiler.enable()
             try:
                 shared_data.liveMode = True
@@ -506,8 +511,11 @@ def main():
             QTimer.singleShot(int(_secs * 1000), _profile_stop_and_dump)
             # Watchdog: dump as soon as live mode self-terminates so we don't
             # lose frames if the worker dies before the timer fires. Give the
-            # worker 500 ms to actually flip liveMode on first.
-            QTimer.singleShot(500, _profile_poll_livemode)
+            # worker 1500 ms to flip liveMode on first (was 500 ms — increased
+            # to reduce false-positive dumps when the demo cam completes its
+            # first 999-frame batch and the worker briefly has acqstate=True
+            # while the next batch restarts).
+            QTimer.singleShot(1500, _profile_poll_livemode)
 
         # 5 s grace lets the worker construct napariHandler, MILcore, the
         # napari viewer, and wire up the dock widgets — flipping liveMode

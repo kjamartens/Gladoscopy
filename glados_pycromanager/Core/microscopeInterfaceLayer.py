@@ -664,6 +664,11 @@ class MicroscopeInterfaceLayer:
             self.core.stop_sequence_acquisition()
         elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
             self.core.stopSequenceAcquisition()
+            try:
+                if self.core.mda.is_running():
+                    self.core.mda.cancel()
+            except Exception as exc:  # pragma: no cover — defensive
+                logging.warning("mda.cancel() failed during stop_sequence_acquisition: %s", exc)
         else:
             raise ValueError("Unsupported microscope interface type for stop_sequence_acquisition.")
 
