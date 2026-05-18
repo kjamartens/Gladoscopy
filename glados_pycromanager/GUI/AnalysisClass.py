@@ -284,7 +284,8 @@ class napariOverlay:
         del self
 
 class AnalysisThread_customFunction_Visualisation(QThread):
-    finished = pyqtSignal()# signal to indicate that the thread has finished
+    finished = pyqtSignal()
+    _do_visualise = pyqtSignal(object)
     def __init__(self,analysisObject,shared_data,analysisInfo: str | None = 'Random',delay=None):
         super().__init__()
         #Initiate some variables
@@ -305,37 +306,28 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.visualisation_queue = deque(maxlen=10)#queue.Queue()
         self.shared_data = shared_data
         
-        #And start  the thread
         self.running = True
-        self._new_image = Event() #Event when a new image is put in the queue
-        self._new_image = Event() #Event when a new image is put in the queue
-        # self.process_queue()
+        self._new_image = Event()
+        self._do_visualise.connect(self._visualise_on_main_thread)
     
     def new_image(self):
         self._new_image.set()
-        
-    
-    def new_image(self):
-        self._new_image.set()
-        
+
+    def _visualise_on_main_thread(self, data):
+        """Slot executed on the main (GUI) thread via Qt queued connection."""
+        RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data
+        self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+
     def run(self):
         while self.running:
-            # tic = time.time()
-            # #Only check the vis queue if live or mda is ongoing
-            # if self.shared_data.liveMode or self.shared_data.mdaMode:
-            #     logging.debug(f'#aC - running analysisThread_customFunction_Visualisation, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
-            #     if self.visualisation_queue:
-            self._new_image.wait()#Wait for a new image
+            self._new_image.wait()
             self._new_image.clear()
-            
+            if not self.visualisation_queue:
+                continue
             data = self.visualisation_queue.popleft()
-            RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
-            self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
-                    # self.visualisation_queue.task_done()
-            #Always sleep while running
+            # Emit to main thread so napari layer ops run on GUI thread (not here).
+            self._do_visualise.emit(data)
             self.msleep(max(1,self.sleepTimeMs))
-            
-            # print(f'Time spend in analysisclass-run; {time.time()-tic}')
             
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
@@ -378,10 +370,8 @@ class AnalysisThread_customFunction(QThread):
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
         self.initAnalysis()
         self.running = True
-        self._activity_event = Event() #Event when MDA/LIVE is started/stopped.
-        self._new_image = Event() #Event when a new image is put in the queue
-        self._activity_event = Event() #Event when MDA/LIVE is started/stopped.
-        self._new_image = Event() #Event when a new image is put in the queue
+        self._activity_event = Event()
+        self._new_image = Event()
     
     def run(self):
         """
@@ -404,36 +394,12 @@ class AnalysisThread_customFunction(QThread):
             #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
             #     #Run analysis on the image from the queue
             
-            self._new_image.wait()#Wait for a new image
+            self._new_image.wait()
             self._new_image.clear()
-            #Analyse it.
             if self.image_queue_analysis:
                 self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
                 self.analysis_done_signal.emit(self.analysis_result)
-                # self.image_queue_analysis.task_done() #type:ignore
-            #Always sleep while running - at least 1 ms
             self.msleep(max(1,self.sleepTimeMs))
-            # print(f'Time spend in analysisclass-run; {time.time()-tic}')
-            
-            # # tic = time.time()
-            # # Wait until liveMode or mdaMode is active
-            # self._activity_event.wait()
-            
-            # #Only check the vis queue if live or mda is ongoing
-            # if self.shared_data.liveMode or self.shared_data.mdaMode:
-            #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
-            #     #Run analysis on the image from the queue
-            
-            self._new_image.wait()#Wait for a new image
-            self._new_image.clear()
-            #Analyse it.
-            if self.image_queue_analysis:
-                self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
-                self.analysis_done_signal.emit(self.analysis_result)
-                # self.image_queue_analysis.task_done() #type:ignore
-            #Always sleep while running - at least 1 ms
-            self.msleep(max(1,self.sleepTimeMs))
-            # print(f'Time spend in analysisclass-run; {time.time()-tic}')
             
         # Thread has finished, emit the finished signal
         self.finished.emit()
@@ -452,7 +418,6 @@ class AnalysisThread_customFunction(QThread):
         """
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         self.is_running = False
-        self._activity_event.set()
         self._activity_event.set()
         #Also remove the image queue requestion from live mode
         # if self.image_queue_analysis in self.shared_data.RTAnalysisQueues:
@@ -502,21 +467,7 @@ class AnalysisThread_customFunction(QThread):
     
     def new_image(self):
         self._new_image.set()
-        # print('setting self.new_image')
-            
-    
-    def set_activity(self, is_active):
-        if is_active:
-            self._activity_event.set()
-            # print('setting self._activity_event')
-        else:
-            self._activity_event.clear()
-            # print('clearing self._activity_event')
-    
-    def new_image(self):
-        self._new_image.set()
-        # print('setting self.new_image')
-            
+
     #Get corresponding layer of napariOverlay
     def getLayer(self):
         """
