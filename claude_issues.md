@@ -29,8 +29,11 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Open issues
 
-- [ ] **Live mode self-aborts on PyMMCorePlus backend when started without user click** — When `shared_data.liveMode = True` is set programmatically (Phase 13.1 `--profile-runtime` orchestration), the MDA delivers ~100–600 of the 999 requested frames and pymmcore-plus logs `Unexpected number of images returned from sequence. Expected 999, got <N>`, then the worker hits the `liveMode = False` line at `napariGlados.py:597`, "Live mode stopped" is logged, and the process exits with `STATUS_STACK_BUFFER_OVERRUN` during teardown. The user confirms that with the same backend, live mode is stable for hours when toggled via the LiveModeButton click. Click-path sets exposure (which I mirror) and goes through `MMcontrols.changeLiveMode` — there is some other piece of state the click path sets that the programmatic path does not. Reproduce: `make profile-runtime PROFILE_SECS=8` against `--auto-demo`.
-  - Profile data is still being captured before the abort (the watchdog dumps on `liveMode-auto-stop`), so this does not block Phase 13.1 — but it does block fully unattended longer profiling and should be resolved before 13.5/13.6 measurements.
+- [ ] **`liveMode` flips back to False ~1 s after being set programmatically** — When `shared_data.liveMode = True` is set from the Phase 13.1 `--profile-runtime` orchestration, the log shows `LIVE mode changed!` immediately followed (within ~250 ms) by `Live mode stopped` (the False branch of `acqModeChanged`, `napariGlados.py:821`). User confirmed the demo cam + PyMMCorePlus is stable for hours when live is toggled via the LiveModeButton, so the issue is in the programmatic path, not the backend. The pymmcore-plus warning `Expected 999, got N` after the stop is intended behaviour (`stop_sequence_acquisition()` cancels the in-flight MDA at frame N). What we still need to find: who sets `liveMode=False`. Candidates to investigate:
+  - The outer `while self.acqstate:` loop in `run_MILCoreAcquisition_worker` (`napariGlados.py:528`) exits — its only exit path is `acqstate` flipping False, which is set in `acqModeChanged` when `liveMode=False`. Circular ⇒ someone else writes to `shared_data.liveMode` externally.
+  - Reproduce: `make profile-runtime PROFILE_SECS=8` against `--auto-demo`.
+  - Investigation idea: temporarily put a `traceback.print_stack()` inside the `liveMode` setter when `new_value is False` and re-run.
+  - Note: profile data is still being captured before the abort (watchdog dumps on `liveMode-auto-stop`), so this does not block Phase 13.1 — but it does block fully unattended longer profiling and should be resolved before 13.5/13.6 measurements.
 
 ---
 
