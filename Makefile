@@ -1,28 +1,65 @@
 # Common developer tasks. Works on Windows via Git-Bash `make`, on macOS
-# / Linux via system `make`. Targets are intentionally thin wrappers so
-# CI can call the same commands.
+# / Linux via system `make`. Targets are thin wrappers so CI can call
+# the same commands.
+#
+# Quick start (new contributor):
+#   make env      ← create / update GladosEnv conda environment
+#   make dev      ← editable install with dev extras (inside GladosEnv)
+#   make test     ← run the test suite
+#   make ci       ← full local gate: lint + bandit + tests
+#
+# Git-for-Windows note: `make` ships with Git Bash at
+#   C:\Program Files\Git\usr\bin\make.exe
+# Add that directory to PATH or invoke via Git Bash.
 
-PYTHON ?= python
-PIP ?= $(PYTHON) -m pip
-PYTEST ?= $(PYTHON) -m pytest
-RUFF ?= $(PYTHON) -m ruff
-MYPY ?= $(PYTHON) -m mypy
-BANDIT ?= $(PYTHON) -m bandit
+PYTHON  ?= python
+PIP     ?= $(PYTHON) -m pip
+PYTEST  ?= $(PYTHON) -m pytest
+RUFF    ?= $(PYTHON) -m ruff
+MYPY    ?= $(PYTHON) -m mypy
+BANDIT  ?= $(PYTHON) -m bandit
 PACKAGE := glados_pycromanager
 
-.PHONY: help install test lint lint-fix format mypy bandit run profile-startup verify clean
+.PHONY: help env install dev build \
+        test test-fast test-cov \
+        lint lint-fix format mypy bandit \
+        run profile-startup \
+        ci verify \
+        clean
 
 help:  ## Show this help.
 	@echo "Targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  %-18s %s\n", $$1, $$2}'
 
-install:  ## Editable install with dev extras.
+# ── Environment & install ─────────────────────────────────────────────────────
+
+env:  ## Create or update the GladosEnv conda env from environment.yaml.
+	conda env create --name GladosEnv -f environment.yaml 2>/dev/null \
+	    || conda env update --name GladosEnv -f environment.yaml
+
+install:  ## Non-editable production install (no dev extras).
+	$(PIP) install .
+
+dev:  ## Editable install with dev extras (typical day-to-day command).
 	$(PIP) install -e ".[dev]"
 
-test:  ## Run the pytest suite.
+build:  ## Build wheel + sdist into dist/.
+	uv build
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+
+test:  ## Run the full pytest suite.
 	$(PYTEST) -q
 
-lint:  ## Run ruff (check) + mypy (informational) across the package.
+test-fast:  ## Stop on first failure, quiet output.
+	$(PYTEST) -x -q
+
+test-cov:  ## Run tests with branch coverage report.
+	$(PYTEST) --cov=$(PACKAGE) --cov-report=term-missing -q
+
+# ── Code quality ──────────────────────────────────────────────────────────────
+
+lint:  ## ruff check + mypy (informational) across the package.
 	$(RUFF) check $(PACKAGE) tests
 	-$(MYPY) $(PACKAGE)
 
@@ -38,16 +75,25 @@ mypy:  ## Run mypy only.
 bandit:  ## Run bandit security scan (informational).
 	$(BANDIT) -r $(PACKAGE) --exclude $(PACKAGE)/GUI/nodz
 
+# ── Run ───────────────────────────────────────────────────────────────────────
+
 run:  ## Launch the standalone Glados-PycroManager GUI.
 	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
 
-profile-startup:  ## Capture cold-import timings into startup.log.
-	$(PYTHON) -X importtime -c "import glados_pycromanager.GUI.GUI_napari" 2> startup.log
-	@echo "wrote startup.log"
+profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.txt.
+	pwsh -File scripts/profile_startup.ps1
 
-verify:  ## Full pre-push gate: lint + tests.
-	$(MAKE) lint
-	$(MAKE) test
+# ── Gates ─────────────────────────────────────────────────────────────────────
 
-clean:  ## Remove build / cache artefacts.
-	rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .mypy_cache
+ci: lint bandit test  ## Full local CI gate (lint + bandit + tests).
+
+verify: ci  ## Alias for ci (backwards compat).
+
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+
+clean:  ## Remove build / cache artefacts (works on Windows and Unix).
+	$(PYTHON) -c "import shutil,glob,os; \
+	    [shutil.rmtree(p,True) for p in \
+	        ['build','dist','.pytest_cache','.ruff_cache','.mypy_cache'] \
+	        + glob.glob('*.egg-info')]; \
+	    [os.remove(f) for f in glob.glob('startup.log') if os.path.isfile(f)]"
