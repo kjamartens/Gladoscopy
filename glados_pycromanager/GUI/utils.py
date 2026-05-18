@@ -3290,14 +3290,12 @@ def openAdvancedSettings(shared_data):
                         editField.setText(str(currentValue))
                         editField.setObjectName(f.name)
                         layout.addWidget(editField,currentRow,1)
-                        label.setToolTip(editField)
                     elif typeV == 'dropdown':
                         editField = QComboBox()
                         editField.addItems(f.metadata['options'])
                         editField.setObjectName(f.name)
                         editField.setCurrentText(str(currentValue))
                         layout.addWidget(editField,currentRow,1)
-                        label.setToolTip(editField)
                 except (AttributeError, RuntimeError):
                     pass
 
