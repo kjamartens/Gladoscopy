@@ -353,6 +353,8 @@ class napariHandler:
         self.mda_acq_done_signal = pyqtSignal(bool)
         #Event when a new image is put in the queue
         self._new_image = Event() #Event when a new image is put in the queue
+        # Worker handle – set by startMDA/LiveVisualisation, cleared on stop
+        self.visualisation_worker = None
 
         #Sleep time to keep responsiveness
         self.sleep_time = 1/shared_data.config.visualisation_config.fps #in sec
@@ -1124,7 +1126,7 @@ def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
 
 def _on_worker_fully_stopped_mda():
     logging.debug("MDA worker is confirmed DEAD.")
-    shared_data._mdamodeNapariHandler.visualisation_worker.visualisation_worker = None
+    shared_data._mdamodeNapariHandler.visualisation_worker = None
 
 def stopMDAVisualisation(shared_data,layerName='Live'):
     if shared_data._mdamodeNapariHandler.visualisation_worker is not None:
