@@ -705,4 +705,26 @@ if the process crashes during teardown (the runs do exit with
 STATUS_STACK_BUFFER_OVERRUN; the profile is on disk by then).
 **Affects:** `glados_pycromanager/GUI/GUI_napari.py` only.
 
+## 2026-05-18 — Phase 13.4: no concurrent.futures change needed — executor already parallel  [Phase 13.4]
+**Decision:** Skip Phase 13.4 (`perf: parallel scoring stage`) without a code
+change. Mark as `[-]` in `claude_project.md`.
+**Alternatives:** Add a `concurrent.futures.ThreadPoolExecutor` wrapper around
+independent scoring nodes as originally sketched in the plan.
+**Reason:** Full audit of the executor shows it is already parallel for
+independent nodes:
+- Every analysis/custom-function node's `callAction` creates a
+  `generalNodzCallActionWorker(QRunnable)` and calls
+  `QThreadPool.globalInstance().start(worker)`.
+- When a parent node emits `customFinishedEmits`, the signal fires
+  `oneConnectionAtStartIsFinished()` on ALL connected children (sequential on
+  the UI thread, but each immediately starts a new QRunnable). Multiple
+  QRunnables in the pool run simultaneously if threads are available.
+- Adding `concurrent.futures` would be a redundant second layer of threading
+  around a system that already uses `QThreadPool`, increasing complexity with
+  no benefit.
+- Typical scoring recipes form a sequential data chain
+  (measurement → metric → score → scoringEnd), not a parallel fan-out, so
+  there is limited opportunity for parallelism in practice regardless.
+**Affects:** `claude_project.md` (checkbox only).
+
 *Append future decisions below this line, newest at the bottom.*
