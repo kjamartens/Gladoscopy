@@ -30,7 +30,7 @@ PACKAGE := glados_pycromanager
         clean
 
 help:  ## Show this help.
-	@$(PYTHON) -c "import re; print('Targets:'); [print('  {:<18} {}'.format(*m.groups())) for l in open('Makefile',encoding='utf-8',errors='replace') for m in [re.match(r'^([a-zA-Z_-]+):.*?## (.*)', l)] if m]"
+	@$(PYTHON) -c "import re; print('NOTE: run \"conda activate GladosEnv\" before any target that installs, tests, or runs code.\n\nTargets:'); [print('  {:<18} {}'.format(*m.groups())) for l in open('Makefile',encoding='utf-8',errors='replace') for m in [re.match(r'^([a-zA-Z_-]+):.*?## (.*)', l)] if m]"
 
 # ── Environment & install ─────────────────────────────────────────────────────
 
