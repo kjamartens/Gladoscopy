@@ -2,6 +2,8 @@
 import collections
 import datetime
 import importlib
+import importlib.machinery
+import importlib.util
 import inspect
 import json
 import logging
@@ -90,14 +92,23 @@ def function_exists(obj):
 def subfunction_exists(module_name, subfunction_name):
     try:
         if module_name.endswith('.py'):
-            # Reuse an already-loaded module (matched by __file__) to avoid
-            # re-executing module-level @register decorators a second time.
+            # Reuse an already-loaded module to avoid re-executing module-level
+            # @register decorators. __file__ may point to a .pyc in __pycache__,
+            # so normalise both sides to the source path before comparing.
             abs_path = os.path.abspath(module_name)
-            module = next(
-                (m for m in sys.modules.values()
-                 if getattr(m, '__file__', None) and os.path.abspath(m.__file__) == abs_path),
-                None,
-            )
+            module = None
+            for m in sys.modules.values():
+                mfile = getattr(m, '__file__', None)
+                if not mfile:
+                    continue
+                if mfile.endswith('.pyc'):
+                    try:
+                        mfile = importlib.util.source_from_cache(mfile)
+                    except (NotImplementedError, ValueError):
+                        continue
+                if os.path.abspath(mfile) == abs_path:
+                    module = m
+                    break
             if module is None:
                 loader = importlib.machinery.SourceFileLoader('', module_name)  # type:ignore
                 module = loader.load_module()
