@@ -122,11 +122,24 @@ class MicroManagerConfig:
 
 
 @dataclass
+class LoggingConfig:
+    log_level: str = setting(
+        "INFO",
+        "Log level",
+        "Console/file log verbosity. DEBUG shows all internal trace messages; INFO is the normal level. Takes effect immediately.",
+        input_type="dropdown",
+        options=["INFO", "DEBUG", "WARNING", "ERROR"],
+        hidden=False,
+    )
+
+
+@dataclass
 class Config:
     mda_config:           MDAConfig           = dataclasses.field(default_factory=MDAConfig)
     visualisation_config: VisualisationConfig = dataclasses.field(default_factory=VisualisationConfig)
     micromanager_config: MicroManagerConfig  = dataclasses.field(default_factory=MicroManagerConfig)
     webhook_config: WebhookConfig  = dataclasses.field(default_factory=WebhookConfig)
+    logging_config:       LoggingConfig       = dataclasses.field(default_factory=LoggingConfig)
 
 
 # Phase 7.1 moved the JSON load/save bodies to
@@ -260,9 +273,6 @@ class Shared_data(QObject):
     def liveMode(self, new_value):
         if new_value != self._liveMode:
             self._liveMode = new_value
-            if not new_value:
-                import traceback as _tb
-                logging.debug("liveMode→False stack:\n%s", "".join(_tb.format_stack()))
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
         logging.info("LIVE mode changed!")
@@ -383,7 +393,8 @@ class Shared_data(QObject):
                 from utils import updateAutonousErrorWarningInfo
                 updateAutonousErrorWarningInfo(self,updateInfo='All')
         except (AttributeError, ImportError, RuntimeError) as exc:
-            logging.debug('updateAutonousErrorWarningInfo not available yet: %s', exc)
+            pass
+            # logging.debug('updateAutonousErrorWarningInfo not available yet: %s', exc)
     
 class Dict_Specific_WarningErrorInfo(dict):
     def __init__(self, *args, **kwargs):

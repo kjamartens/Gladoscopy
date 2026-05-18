@@ -118,6 +118,7 @@ def napariUpdateLive(DataStructure):
             layer = napariViewer.layers[liveImageLayer[0]]
             if layer.data.shape == liveImage.shape and layer.data.dtype == liveImage.dtype:
                 layer.data[:] = liveImage
+                layer.refresh()  # in-place mutation doesn't trigger napari's setter; must refresh manually
             else:
                 layer.data = liveImage
             logging.debug('Put liveImage in the live layer')
