@@ -3255,7 +3255,14 @@ def openAdvancedSettings(shared_data):
         
         #Store in appdata
         storeSharedData_GlobalData(shared_data)
-        
+
+        # Apply log-level change immediately (no restart needed)
+        try:
+            from glados_pycromanager.observability.logger import set_log_level
+            set_log_level(shared_data.config.logging_config.log_level)
+        except Exception as exc:
+            logging.warning("Could not apply log level: %s", exc)
+
         logging.info('advanced settings stored!')
         dialog.close()
         pass

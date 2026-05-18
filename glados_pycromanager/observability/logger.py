@@ -26,6 +26,8 @@ import appdirs
 
 _APP_NAME = "Glados-PycroManager"
 
+_console_handler: logging.StreamHandler | None = None
+
 
 class ColoredFormatter(logging.Formatter):
     """ANSI-colored formatter for terminal output."""
@@ -95,11 +97,13 @@ def set_up_logger() -> None:
         handler_info.setLevel(logging.INFO)
         handler_info.setFormatter(file_formatter)
 
+        global _console_handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(
             ColoredFormatter() if sys.stdout.isatty() else file_formatter
         )
+        _console_handler = console_handler
 
         log_queue: Queue[logging.LogRecord] = Queue(-1)
         queue_handler = logging.handlers.QueueHandler(log_queue)
@@ -121,3 +125,17 @@ def set_up_logger() -> None:
 
     except (OSError, ValueError, RuntimeError) as exc:
         logging.error("Error setting up loggers: %s", exc)
+
+
+def set_log_level(level_str: str) -> None:
+    """Change the root logger level at runtime (e.g. "DEBUG", "INFO").
+
+    The root logger gates what reaches the QueueHandler; the console handler
+    inside the QueueListener must also be updated so DEBUG messages are visible
+    in the terminal, not just in the debug log file.
+    """
+    level = getattr(logging, level_str.upper(), logging.INFO)
+    logging.getLogger().setLevel(level)
+    if _console_handler is not None:
+        _console_handler.setLevel(level)
+    logging.info("Log level changed to %s", level_str.upper())

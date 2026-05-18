@@ -329,29 +329,29 @@ class MainWidget(QWidget):
         self._viewer = viewer
         global shared_data
         
-        # Create an instance of the shared_data class
-        shared_data = Shared_data()
-        
-        core = Core()
-        shared_data.core = core
-        shared_data._headless = False
-        
-        MM_JSON = None
-        livestate = False
-        
-        self.core = core
-        self.shared_data = shared_data
-        self.napariViewer = viewer
-        
-        self.MM_JSON = MM_JSON
-        self.livestate = livestate
-    
-        includecustomUI = False
-        include_flowChart_automatedMicroscopy = True
-        
         #Set up logging in the AppData folder, INFO and DEBUG
         from glados_pycromanager.observability.logger import set_up_logger
         set_up_logger()
+
+        # Create an instance of the shared_data class
+        shared_data = Shared_data()
+
+        core = Core()
+        shared_data.core = core
+        shared_data._headless = False
+
+        MM_JSON = None
+        livestate = False
+
+        self.core = core
+        self.shared_data = shared_data
+        self.napariViewer = viewer
+
+        self.MM_JSON = MM_JSON
+        self.livestate = livestate
+
+        includecustomUI = False
+        include_flowChart_automatedMicroscopy = True
 
         logging.info("Main napari Glados-pycromanager plugin started")
         

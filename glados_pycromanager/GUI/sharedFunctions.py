@@ -217,7 +217,14 @@ class Shared_data(QObject):
         
         self.config = Config()
         load_config_from_json(self.config)
-        
+
+        # Apply the persisted log level immediately after config is loaded
+        try:
+            from glados_pycromanager.observability.logger import set_log_level
+            set_log_level(self.config.logging_config.log_level)
+        except Exception as exc:
+            logging.warning("Could not apply saved log level: %s", exc)
+
         #Overwrite all values that can be found from the .JSON:x
         #load from appdata
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')

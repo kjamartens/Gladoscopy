@@ -705,6 +705,7 @@ class MMConfigUI(CustomMainWindow):
         """
         Function that's called when an image is snapped (i.e. get a single image), uses the float(self.exposureTimeInputField.text()) as time in ms
         """
+        logging.debug("snapImage: exposure=%.1f ms, backend=%s", float(self.exposureTimeInputField.text()), shared_data.MILcore.MI())
         #Set the correct exposure time
         shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
         #Snap an image

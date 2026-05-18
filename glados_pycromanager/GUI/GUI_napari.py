@@ -312,6 +312,10 @@ def main():
     if args.config and not (args.backend or args.auto_demo):
         parser.error('--config requires --backend (or use --auto-demo)')
 
+    #Set up logging to files in appData folder - INFO and DEBUG
+    from glados_pycromanager.observability.logger import set_up_logger
+    set_up_logger()
+
     # Create an instance of the shared_data class
     print('Creating shared data.')
     shared_data = Shared_data()
@@ -450,10 +454,6 @@ def main():
     worker.finished.connect(thread.quit)
     worker.finished.connect(worker.deleteLater)
     thread.finished.connect(thread.deleteLater)
-
-    #Set up logging to files in appData folder - INFO and DEBUG
-    from glados_pycromanager.observability.logger import set_up_logger
-    set_up_logger()
 
     # --- Optional auto-profile (Phase 13.1) ----------------------------------
     # When --profile-runtime SECS is set, we wait for the napari live-mode
