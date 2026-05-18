@@ -558,11 +558,20 @@ class napariHandler:
                         logging.info("Started MDA sequence")
                         #Give some time to understand that it's running
                         time.sleep(0.1)
-                        #Continuously update the app to process events while the MDA is running:
+                        # Wait for the MDA to finish.
+                        # processEvents() was disabled here (Phase 13.2) because calling it
+                        # from a @thread_worker is unsafe — Qt forbids cross-thread event
+                        # dispatch and it was responsible for ~8 s of overhead per live session
+                        # (see docs/perf-runtime.txt, run 2). The main Qt event loop on the
+                        # main thread continues to run independently.
+                        logging.info(
+                            "live-mode MMCORE_PLUS wait loop: processEvents() disabled "
+                            "(was called ~17 ms per iteration from worker thread — unsafe + slow)"
+                        )
                         while self.shared_data.MILcore.core.mda.is_running():
-                            time.sleep(0.01)     # Give Qt a tiny moment (optional, sometimes helps)
-                            shared_data.mainApp.processEvents() # Process events (main napari thread)
-                        
+                            time.sleep(0.01)
+                            # shared_data.mainApp.processEvents()  # DISABLED Phase 13.2
+
                         #When it's done, disconnect the callback
                         self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
                         logging.info('Finished live!')
@@ -652,11 +661,16 @@ class napariHandler:
                     logging.info("Started MDA sequence")
                     #Give some time to understand that it's running
                     time.sleep(0.1)
-                    #Continuously update the app to process events while the MDA is running:
+                    # processEvents() was disabled here (Phase 13.2) — same reason as live-mode
+                    # loop above: unsafe from @thread_worker, ~8 s overhead (docs/perf-runtime.txt).
+                    logging.info(
+                        "MDA-mode MMCORE_PLUS wait loop: processEvents() disabled "
+                        "(was called ~17 ms per iteration from worker thread — unsafe + slow)"
+                    )
                     while self.shared_data.MILcore.core.mda.is_running():
                         time.sleep(0.01)
-                        shared_data.mainApp.processEvents() # Process events (main napari thread)
-                    
+                        # shared_data.mainApp.processEvents()  # DISABLED Phase 13.2
+
                     #When it's done, disconnect the callback
                     self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
                     self.shared_data.MILcore.core.mda.events.sequenceStarted.disconnect(connected_callback_startedAcq)

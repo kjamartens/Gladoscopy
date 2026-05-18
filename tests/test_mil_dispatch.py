@@ -198,6 +198,46 @@ def test_get_pixel_size_um_unknown_returns_one(mil):
 @pytest.mark.skipif(
     PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
 )
+def test_get_pixel_size_um_caches_after_first_call(mil):
+    core = MagicMock(spec=PymmcorePlusCore)
+    core.getPixelSizeUm.return_value = 0.65
+    mil.set_core(core)
+    assert mil.get_pixel_size_um() == 0.65
+    assert mil.get_pixel_size_um() == 0.65
+    core.getPixelSizeUm.assert_called_once()  # only one hardware hit
+
+
+@pytest.mark.skipif(
+    PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
+)
+def test_invalidate_pixel_size_cache_forces_rehit(mil):
+    core = MagicMock(spec=PymmcorePlusCore)
+    core.getPixelSizeUm.return_value = 0.65
+    mil.set_core(core)
+    mil.get_pixel_size_um()
+    mil.invalidate_pixel_size_cache()
+    mil.get_pixel_size_um()
+    assert core.getPixelSizeUm.call_count == 2
+
+
+@pytest.mark.skipif(
+    PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
+)
+def test_set_core_resets_pixel_size_cache(mil):
+    core = MagicMock(spec=PymmcorePlusCore)
+    core.getPixelSizeUm.return_value = 0.65
+    mil.set_core(core)
+    mil.get_pixel_size_um()  # populates cache
+    core2 = MagicMock(spec=PymmcorePlusCore)
+    core2.getPixelSizeUm.return_value = 1.0
+    mil.set_core(core2)
+    assert mil.get_pixel_size_um() == 1.0
+    core2.getPixelSizeUm.assert_called_once()  # cache was cleared by set_core
+
+
+@pytest.mark.skipif(
+    PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
+)
 def test_image_width_and_height_derive_from_roi(mil):
     core = MagicMock(spec=PymmcorePlusCore)
     core.getROI.return_value = (0, 0, 123, 456)

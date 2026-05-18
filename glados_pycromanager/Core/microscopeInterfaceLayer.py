@@ -33,6 +33,10 @@ class MicroscopeInterfaceLayer:
         # doesn't re-run the isinstance + Java-bridge attribute chain.
         # Phase 6.1 of claude_project.md.
         self._mi: MicroscopeInstance = MicroscopeInstance.UNKNOWN
+        # Phase 13.2: cache pixel size so repeated calls in napariUpdateLive
+        # don't hit the Java bridge or CMMCore on every layer-creation event.
+        # Reset in set_core() so objective/config changes are picked up.
+        self._pixel_size_um_cache: float | None = None
         self.mda: dict | None = None
 
     def set_core(self, core):
@@ -51,6 +55,7 @@ class MicroscopeInterfaceLayer:
             raise BackendError("MIL.set_core(None) is not allowed")
         self.core = core
         self._mi = self._detect_microscope_instance(core)
+        self._pixel_size_um_cache = None  # invalidate on core change
         if self._mi is MicroscopeInstance.UNKNOWN:
             logger.warning(
                 "MIL.set_core: backend type %r not recognised as Pycromanager/"
@@ -338,18 +343,28 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_loaded_devices.")
         
-    def get_pixel_size_um(self):
+    def get_pixel_size_um(self, *, use_cache: bool = True) -> float:
+        """Return the pixel size in µm, caching after the first call.
+
+        Pass ``use_cache=False`` to force a fresh hardware query (e.g. after
+        an objective change).
         """
-        Get the pixel size of the camera.
-        """
+        if use_cache and self._pixel_size_um_cache is not None:
+            return self._pixel_size_um_cache
         if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
-            return self.core.get_pixel_size_um()
+            value = self.core.get_pixel_size_um()
         elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
-            return self.core.get_pixel_size_um()
+            value = self.core.get_pixel_size_um()
         elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
-            return self.core.getPixelSizeUm()
+            value = self.core.getPixelSizeUm()
         else:
-            return 1.0
+            value = 1.0
+        self._pixel_size_um_cache = value
+        return value
+
+    def invalidate_pixel_size_cache(self) -> None:
+        """Force the next :meth:`get_pixel_size_um` call to query the hardware."""
+        self._pixel_size_um_cache = None
     
     def get_position(self, device_name: str) -> tuple:
         """
