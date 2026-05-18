@@ -938,8 +938,8 @@ class FlowchartExecutorMixin:
                         data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
                         attrs.append(attr)
                         logging.debug(f"Data found for {attr}: {data[attr]}")
-        except:
-            pass
+        except (KeyError, AttributeError, TypeError) as exc:
+            logging.debug('Scoring data gather skipped: %s', exc)
         
         try:
             testPassed = self.decisionWidget.testCurrentDecision()
@@ -979,7 +979,8 @@ class FlowchartExecutorMixin:
                         logging.info('All done!')
             logging.info('----------------------')
 
-        except:
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            logging.error('Scoring decision evaluation failed: %s', exc)
             testPassed = False
             node.status = 'error'
             testPassedText = 'Error when assessing test'
@@ -1127,7 +1128,8 @@ class FlowchartExecutorMixin:
         #Try to find the type of the variable automatically, else just set it as str
         try:
             node.flowChart.globalVariables[variable]['type'] = [(type(eval(value)))]
-        except: #This will effectively set it as a string.
+        except (SyntaxError, NameError, ValueError, TypeError, AttributeError):
+            #This will effectively set it as a string.
             node.flowChart.globalVariables[variable]['type'] = [(type(value))]
         node.flowChart.globalVariables[variable]['importance'] = 'informative'
         node.flowChart.globalVariables[variable]['lastUpdateTime'] = time.time()

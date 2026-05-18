@@ -214,6 +214,6 @@ class pSMLM:
             napariLayer.size = 0.5
             napariLayer.edge_color='red'
             napariLayer.face_color = [0,0,0,0]
-        except:
-            logging.info(f"Issue with pSMLM layer update")
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            logging.info('Issue with pSMLM layer update: %s', exc)
         return napariLayer

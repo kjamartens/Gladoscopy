@@ -86,15 +86,15 @@ def StarDistSegment_ImageVis(core,**kwargs):
             probThreshVal = float(kwargs["prob_thresh"])
             nmsThreshVal = float(kwargs["nms_thresh"])
             labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"]),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-        except:
+        except (TypeError, KeyError, ValueError):
             try:
                 probThreshVal = float(kwargs["prob_thresh"])
                 labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
-            except:
+            except (TypeError, KeyError, ValueError):
                 try:
                     nmsThreshVal = float(kwargs["nms_thresh"])
                     labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-                except:
+                except (TypeError, KeyError, ValueError):
                     labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
@@ -162,15 +162,15 @@ def StarDistSegment_preLoadedModel_use(core,**kwargs):
             probThreshVal = float(kwargs["prob_thresh"])
             nmsThreshVal = float(kwargs["nms_thresh"])
             labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"]),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-        except:
+        except (TypeError, KeyError, ValueError):
             try:
                 probThreshVal = float(kwargs["prob_thresh"])
                 labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
-            except:
+            except (TypeError, KeyError, ValueError):
                 try:
                     nmsThreshVal = float(kwargs["nms_thresh"])
                     labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-                except:
+                except (TypeError, KeyError, ValueError):
                     labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
         print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')

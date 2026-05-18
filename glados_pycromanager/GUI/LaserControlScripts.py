@@ -45,8 +45,8 @@ def getFrameTimeInfo(frameduration):
     try:
         if frameduration_new != frameduration:
             drawplot(frameduration_new)
-    except:
-        logging.warning('No plot drawn')
+    except (AttributeError, RuntimeError, ValueError, TypeError) as exc:
+        logging.warning('No plot drawn: %s', exc)
     return frameduration_new
 
 def SwitchOffLaser(laserID):
@@ -153,8 +153,8 @@ def ChangeIntensityLaserEditField(laserID):
         ChangeIntensityLaser(laserID, ValIntPerc); #type:ignore
         #Update labels
         InitLaserSliders(MM_JSON)
-    except:
-        #Do nothing
+    except (RuntimeError, OSError, AttributeError, ValueError):
+        #Do nothing - this can fire mid-typing on the slider
         pass
 
 def InitFilterWheelRadioCheckbox():
@@ -181,7 +181,7 @@ def InitBFRadioCheckbox():
     #Get the current BF state from MM
     try:
         curBFstate = float(core.get_property('TIDiaLamp','Intensity')) #Get the intensity of the BF lamp
-    except:
+    except (RuntimeError, OSError, AttributeError, ValueError, TypeError):
         curBFstate = 0
     
     #Set a certain BF state
@@ -455,8 +455,8 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         InitLaserButtonLabels(MM_JSON)
         InitLaserSliders(MM_JSON)
         InitFilterWheelRadioCheckbox()
-    except:
-        logging.debug('Error in InitLaserButtonLabels or InitLaserSliders')
+    except (RuntimeError, OSError, AttributeError, KeyError) as exc:
+        logging.debug('Error in InitLaserButtonLabels or InitLaserSliders: %s', exc)
         criticalErrors=True
     #Get frametimeinfo
     InitBFRadioCheckbox()
@@ -502,8 +502,8 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
             exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
             exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
             exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-    except:
-        logging.error("error in execing forms")
+    except (AttributeError, NameError, SyntaxError, RuntimeError) as exc:
+        logging.error('error in execing forms: %s', exc)
         criticalErrors=True
     #Arm lasers button
     form.ARMlaserTriggerPushButton.clicked.connect(lambda: armLaserTriggering());
@@ -549,8 +549,8 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         ResetLasersTrigger();
         #Initialise laser trigger edit buttons
         initLaserTrigEditBoxes();
-    except:
-        logging.error("error in resetting laser boxes")
+    except (RuntimeError, OSError, AttributeError) as exc:
+        logging.error('error in resetting laser boxes: %s', exc)
         criticalErrors=True
     
     return form, criticalErrors

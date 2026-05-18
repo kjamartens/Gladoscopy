@@ -474,7 +474,8 @@ class MicroscopeInterfaceLayer:
                 return self.core.getXYPosition(xy_stage_name)
             else:
                 raise ValueError("Unsupported microscope interface type for get_xy_position.")
-        except:
+        except (RuntimeError, OSError, AttributeError) as exc:
+            logger.warning('get_xy_position(%s) failed: %s', xy_stage_name, exc)
             return [0,0]
 
     def get_xy_stage_device(self) -> str:
@@ -505,7 +506,8 @@ class MicroscopeInterfaceLayer:
                 return self.core.getXYPosition(xy_stage_name)
             else:
                 raise ValueError("Unsupported microscope interface type for get_xy_stage_position.")
-        except:
+        except (RuntimeError, OSError, AttributeError) as exc:
+            logger.warning('get_xy_stage_position(%s) failed: %s', xy_stage_name, exc)
             return [0,0]
         
     def set_auto_shutter(self, auto_shutter: bool) -> None:

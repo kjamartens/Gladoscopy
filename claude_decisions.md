@@ -576,4 +576,47 @@ will reference rows by file:line.
 
 ---
 
+## 2026-05-17 — Phase 10.14 swept up files beyond the 10.2 list  [Phase 10.14]
+**Decision:** The 10.14 verification gate requires zero bare `except:`
+in `.py` source under `glados_pycromanager/` (excluding `nodz/`). The
+plan's 10.2 sub-step only enumerated six god-files
+(`sharedFunctions.py`, `napariGlados.py`, `MMcontrols.py`,
+`MDAGlados.py`, `FlowChart_dockWidgets.py`, `utils.py`). Closing the
+gate therefore needed a sweep-up commit covering every remaining
+file with a bare except site: `Core/microscopeInterfaceLayer.py`,
+`autonomous/executor.py`, the four autonomous-node files
+(`Analysis_Measurements/checkAgainstList.py`, `StarDist_image.py`,
+`Real_Time_Analysis/BioImageModelZoo.py`, `pSMLM.py`), and the GUI
+helpers (`AnalysisClass.py`, `Analysis_dockWidgets.py`, `GUI.py`,
+`LaserControlScripts.py`, `napariHelperFunctions.py`). These follow
+the same audit categories — no new patterns were introduced.
+**Alternatives:** (a) Rewrite the 10.2 plan entry to list these
+files explicitly. (b) Treat the unlisted files as out-of-scope and
+amend the gate. Both would let the audit and the gate diverge from
+each other.
+**Reason:** The audit itself enumerated every site across these
+files, with proposed narrowed exceptions per category. The gate's
+"grep returns 0" condition is the cleaner contract; better to honour
+it with one consolidated sweep-up commit than to re-litigate scope.
+**Affects:** ~12 small edits in one commit, no new behaviour
+except more specific exception types and consistent log levels.
+
+---
+
+## 2026-05-17 — Phase 10 completed in one continue-stretch  [Phase 10]
+**Decision:** Phase 10 (sub-phases 10.0 → 10.14) was executed in a
+single user-driven "continue till 10 is complete" pass rather than
+stopping after the usual phase verification gate. The phase ends
+with the test count at 291 (up from baseline ~119 at start of
+Phase 5) and zero bare `except:` in the project's `.py` source.
+**Alternatives:** Stop at each phase boundary per the standard
+"continue" protocol.
+**Reason:** Explicit user instruction to run the full phase
+unblocked the per-phase wait. Atomic per-sub-step commits were
+preserved so each step remains bisectable.
+**Affects:** 14 commits between `4256c04` (10.0) and the verification
+gate. Total test count: 291. No production behaviour broken.
+
+---
+
 *Append future decisions below this line, newest at the bottom.*

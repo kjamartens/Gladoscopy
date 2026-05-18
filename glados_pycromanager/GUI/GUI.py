@@ -76,8 +76,8 @@ if __name__ == "__main__":
         # z=2
         sys.exit(app.exec_())
 
-    except:
-        print('No micromanager, test mode!')
+    except (ImportError, RuntimeError, OSError, AttributeError) as exc:
+        print(f'No micromanager, test mode! ({exc})')
 
         #Open JSON file with MM settings
         with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')) as f:

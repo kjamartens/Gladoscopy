@@ -652,7 +652,7 @@ Nodz itself (`glados_pycromanager/GUI/nodz/`) stays untouched.
 | [x] 9.7 | Update `tests/test_helper_functions.py` and add `tests/test_registry.py` | Coverage on the new path | Commit `test: registry dispatch` |
 | [x] 9.8 | Verification gate | CI green; manual: run the example recipe end-to-end | Pytest + run note |
 
-### [~] Phase 10 — Error-handling: tighten existing **and** add new checks
+### [x] Phase 10 — Error-handling: tighten existing **and** add new checks
 
 **Goal**: Two complementary jobs in this phase:
   (a) drive the 131 bare/broad `except:` count down to near zero by
@@ -690,20 +690,20 @@ Produce `docs/error-audit.md` with two tables:
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
 | [x] 10.0 | Write `docs/error-audit.md` (Tables A and B above) | Audit complete | Commit `docs: error-handling audit` |
-| [ ] 10.1 | Add `glados_pycromanager/errors.py` (`BackendError`, `RecipeError`, `NodeLoadError`, `ConfigError`, `NodeDispatchError`, `MDAEventError`) | Typed exceptions exist | Commit `feat: typed exceptions module` |
-| [ ] 10.2 | **Tighten** bare-except sites one file at a time (one commit per file): `sharedFunctions.py`, `napariGlados.py`, `MMcontrols.py`, `MDAGlados.py`, `FlowChart_dockWidgets.py`, `utils.py` (nodz/* excluded). Each commit pairs with a regression test if the previously-swallowed error was reachable | Narrower excepts, error-level logs, re-raise where appropriate | 6 commits `reliability: tighten except blocks in <file>` |
-| [ ] 10.3 | **Add** check + tests: `Shared_data` JSON load — corrupted JSON, missing version, future version. Tests: `tests/test_errors_shared_data_load.py` (3 negative cases + 1 positive round-trip) | New defensive boundary | Commit `reliability: validate shared_data JSON on load` |
-| [ ] 10.4 | **Add** check + tests: atomic JSON write (write to `*.tmp`, `os.replace`). Test: kill-mid-write simulation via monkeypatched `json.dump` raising halfway | Crash mid-write no longer corrupts state | Commit `reliability: atomic shared_data write` |
-| [ ] 10.5 | **Add** check + tests: plugin loader rejects malformed `__function_metadata__` with `NodeLoadError`. Tests: drop a malformed `.py` into tmp AppData, assert `NodeLoadError` raised and logged | Bad plugins fail loudly | Commit `reliability: validate plugin metadata` |
-| [ ] 10.6 | **Add** check + tests: `recipe_io.load` validates schema version, required region keys, and node-id references resolve. Tests: 4 negative cases + happy-path on `Showcase_Basic1.json` | Recipes fail fast | Commit `reliability: validate recipe schema on load` |
-| [ ] 10.7 | **Add** check + tests: `MIL.set_core(None)` raises `BackendError`; UNKNOWN backend logs once. Tests: parameterized over each backend type + None + bogus object | Backend probe stricter | Commit `reliability: stricter MIL.set_core` |
-| [ ] 10.8 | **Add** check + tests: MDA event builder rejects impossible plans. Tests: negative frame count, missing channel, zero step interval | MDA construction safe | Commit `reliability: validate MDA event inputs` |
-| [ ] 10.9 | **Add** check: headless dialog validates MM path + config file (file exists, .cfg suffix); Start button disabled otherwise. Test: `pytest-qt` smoke | Fewer bad starts | Commit `reliability: validate headless dialog inputs` |
-| [ ] 10.10 | **Add** check + tests: Slack send guards empty token (log info, no-op), wraps network errors in `BackendError`. Tests: empty creds, mocked `requests` raising | Slack failure isolated | Commit `reliability: defensive slack send` |
-| [ ] 10.11 | **Add** check + tests: AppData plugin walk on missing/unreadable directory logs and continues. Test: pass nonexistent path | Loader robust | Commit `reliability: tolerant AppData walk` |
-| [ ] 10.12 | **Add** check + tests: registry `dispatch` raises `NodeDispatchError` on unknown name. Test: `dispatch("nope")` | Hard failure on bad recipe | Commit `reliability: NodeDispatchError on unknown function` |
-| [ ] 10.13 | Add a top-level `sys.excepthook` (and a Qt `qInstallMessageHandler`) that logs uncaught exceptions to the AppData log file. Test: simulate an unhandled exception, assert log contains it | Crashes are diagnosable | Commit `reliability: global exception hook` |
-| [ ] 10.14 | Verification gate | `grep -R "except:" glados_pycromanager --exclude-dir=nodz` returns 0; every new test passes; total test count ≥ baseline + 25 | Grep + pytest summary |
+| [x] 10.1 | Add `glados_pycromanager/errors.py` (`BackendError`, `RecipeError`, `NodeLoadError`, `ConfigError`, `NodeDispatchError`, `MDAEventError`) | Typed exceptions exist | Commit `feat: typed exceptions module` |
+| [x] 10.2 | **Tighten** bare-except sites one file at a time (one commit per file): `sharedFunctions.py`, `napariGlados.py`, `MMcontrols.py`, `MDAGlados.py`, `FlowChart_dockWidgets.py`, `utils.py` (nodz/* excluded). Each commit pairs with a regression test if the previously-swallowed error was reachable | Narrower excepts, error-level logs, re-raise where appropriate | 6 commits `reliability: tighten except blocks in <file>` |
+| [x] 10.3 | **Add** check + tests: `Shared_data` JSON load — corrupted JSON, missing version, future version. Tests: `tests/test_errors_shared_data_load.py` (3 negative cases + 1 positive round-trip) | New defensive boundary | Commit `reliability: validate shared_data JSON on load` |
+| [x] 10.4 | **Add** check + tests: atomic JSON write (write to `*.tmp`, `os.replace`). Test: kill-mid-write simulation via monkeypatched `json.dump` raising halfway | Crash mid-write no longer corrupts state | Commit `reliability: atomic shared_data write` |
+| [x] 10.5 | **Add** check + tests: plugin loader rejects malformed `__function_metadata__` with `NodeLoadError`. Tests: drop a malformed `.py` into tmp AppData, assert `NodeLoadError` raised and logged | Bad plugins fail loudly | Commit `reliability: validate plugin metadata` |
+| [x] 10.6 | **Add** check + tests: `recipe_io.load` validates schema version, required region keys, and node-id references resolve. Tests: 4 negative cases + happy-path on `Showcase_Basic1.json` | Recipes fail fast | Commit `reliability: validate recipe schema on load` |
+| [x] 10.7 | **Add** check + tests: `MIL.set_core(None)` raises `BackendError`; UNKNOWN backend logs once. Tests: parameterized over each backend type + None + bogus object | Backend probe stricter | Commit `reliability: stricter MIL.set_core` |
+| [x] 10.8 | **Add** check + tests: MDA event builder rejects impossible plans. Tests: negative frame count, missing channel, zero step interval | MDA construction safe | Commit `reliability: validate MDA event inputs` |
+| [x] 10.9 | **Add** check: headless dialog validates MM path + config file (file exists, .cfg suffix); Start button disabled otherwise. Test: `pytest-qt` smoke | Fewer bad starts | Commit `reliability: validate headless dialog inputs` |
+| [x] 10.10 | **Add** check + tests: Slack send guards empty token (log info, no-op), wraps network errors in `BackendError`. Tests: empty creds, mocked `requests` raising | Slack failure isolated | Commit `reliability: defensive slack send` |
+| [x] 10.11 | **Add** check + tests: AppData plugin walk on missing/unreadable directory logs and continues. Test: pass nonexistent path | Loader robust | Commit `reliability: tolerant AppData walk` |
+| [x] 10.12 | **Add** check + tests: registry `dispatch` raises `NodeDispatchError` on unknown name. Test: `dispatch("nope")` | Hard failure on bad recipe | Commit `reliability: NodeDispatchError on unknown function` |
+| [x] 10.13 | Add a top-level `sys.excepthook` (and a Qt `qInstallMessageHandler`) that logs uncaught exceptions to the AppData log file. Test: simulate an unhandled exception, assert log contains it | Crashes are diagnosable | Commit `reliability: global exception hook` |
+| [x] 10.14 | Verification gate | `grep -R "except:" glados_pycromanager --exclude-dir=nodz` returns 0; every new test passes; total test count ≥ baseline + 25 | Grep + pytest summary |
 
 ### [ ] Phase 11 — Logging unification
 

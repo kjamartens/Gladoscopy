@@ -126,8 +126,7 @@ def MDAGlados_plugin(parent):
                         GUI_xy_pos_fullInfo = mdaInfo['xy_positions_saveInfo'],
                         GUI_acquire_button = True,
                         autoSaveLoad=True).getGui()
-        except:
-            
+        except (KeyError, AttributeError, TypeError):
             dockWidget = MDAGlados(core,None,parent.layout,shared_data,
                         hasGUI=True,
                         GUI_acquire_button = True,

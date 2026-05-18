@@ -199,6 +199,6 @@ class BioImageModelZoo:
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
         try:
             napariLayer.data = self.outputImage[0,self.imageLayerId,:,:]
-        except:
-            logging.info(f"Issue with bioimagemodelzoo layer update")
+        except (AttributeError, RuntimeError, IndexError, TypeError) as exc:
+            logging.info('Issue with bioimagemodelzoo layer update: %s', exc)
         return napariLayer

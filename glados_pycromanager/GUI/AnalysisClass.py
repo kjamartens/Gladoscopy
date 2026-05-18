@@ -51,7 +51,7 @@ class napariOverlay:
         self.layerType = layerType
         try:
             self.layer_scale = napariViewer.layers[0].scale
-        except:
+        except (AttributeError, IndexError, TypeError):
             self.layer_scale = [1,1]
         
         #Get info from a RT analysis object (i.e. outside-based-analysis)
@@ -466,7 +466,7 @@ class AnalysisThread_customFunction(QThread):
             #and remove it
             self.shared_data.skipAnalysisThreadDeletion = True
             # self.shared_data.napariViewer.layers.remove(layer)
-        except:
+        except (AttributeError, RuntimeError):
             pass
         
     def destroy(self):
@@ -482,7 +482,7 @@ class AnalysisThread_customFunction(QThread):
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         try:
             logging.debug('Destroying '+str(self.analysisInfo))
-        except:
+        except (AttributeError, TypeError):
             logging.debug('Destroying some analysis thread')
         #Wait for the thread to be finished
         self.stop()
