@@ -649,7 +649,7 @@ class napariHandler:
                     mda_sequence_useq = shared_data._mdaModeParams_useq
                     #Actually start the MDA
                     self.shared_data.MILcore.core.run_mda(mda_sequence_useq)
-                    print('Started MDA sequence')
+                    logging.info("Started MDA sequence")
                     #Give some time to understand that it's running
                     time.sleep(0.1)
                     #Continuously update the app to process events while the MDA is running:

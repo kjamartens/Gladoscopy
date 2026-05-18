@@ -127,7 +127,7 @@ def set_strobo_lasers(core,**kwargs):
                     TS_Response_verbose();
             else:
                 time.sleep(0.1)
-                if printStatements: print('PAO'+str(laser_id+1)+'-0-' + str(round(0)))
+                if printStatements: logging.debug("PAO%s-0-0", laser_id + 1)
                 core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAO'+str(laser_id+1)+'-'+str(k)+'-0')
                 TS_Response_verbose();
 
