@@ -29,16 +29,13 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Open issues
 
-*(none — all resolved or scheduled)*
-
 ---
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
 - **pymmcore-plus MDA zarr storage** — crashes fixed (MDA_acq_finished and pyMMCdataset.finish() no longer crash); actual zarr storage for pymmcore-plus MDA + advanced-settings storage selector deferred to a future plan step.
-- **MDA black slices** — deferred by user until Phase 13 is fully complete; ask again then. Fast MDA (50 frames at 20 ms) leaves black slices in the napari stack because not all frames arrive in time.
 - **Napari layer thumbnail loading icon** — user suggested ignoring. The icon spins on every `layer.data =` assignment; suppressing it requires internal napari APIs. Defer unless user flags as priority.
-- **RT counter / FFT fps drops to ~2 fps** — user deferred until Phase 13 is fully done.
+
 
 ---
 
@@ -56,3 +53,6 @@ Add longer context underneath as a nested bullet if needed.
 - [x] **After-close hang (10-20 s, then Error -1073741819)** — connected `os._exit(0)` to `app.aboutToQuit` so the process force-exits when the napari window closes, bypassing Python/C destructors that hang and then segfault. Committed in `fix: force-exit on napari close`.
 - [x] **pymmcore-plus MDA crash on completion** — `MDA_acq_finished` caught `IndexError` but the zarr fallback raised `KeyError('MDA')`, crashing the handler. Now catches both, sets `self.data = None`, logs warning. `pyMMCdataset.finish()` exception level lowered to DEBUG (expected until put_image is implemented). Committed in `fix: prevent MDA_acq_finished crash`.
 - [x] **Hot-swap custom nodes** — added `reload_all_node_modules()` to `discovery.py` and wired it to `Plugins > Reload Glados Custom Nodes` in the napari menu bar. Committed in `feat: hot-swap custom nodes`.
+- [x] **RT counter / FFT fps drops to ~2 fps** — root cause: `AnalysisThread_customFunction_Visualisation.run()` called napari layer ops directly from a background QThread, blocking ~400 ms/frame. Fix: added `_do_visualise = pyqtSignal(object)` connected to `_visualise_on_main_thread` slot; `run()` now emits (non-blocking queued connection) instead of calling napari ops directly. Also removed duplicate code blocks and duplicate method/Event definitions in the same file. Committed in `fix: dispatch RT visualisation updates to main thread, remove dup code`.
+- [x] **MDA black slices (MMCORE_PLUS fast MDA)** — root cause: vis queue only captures ~fps frames/s; MMCORE_PLUS has no NDTiff store to recover dropped frames, and the finalisation procedure threw uncaught `AttributeError` on `None._dataset`. Fix: `_try_write_frame_to_zarr` writes every frame directly to zarr from the `frameReady` callback for multiDstack mode; finalisation except now also catches `AttributeError`. Committed in `fix: prevent MDA black slices for fast MMCORE_PLUS acquisitions`.
+- [x] **Reload Custom Nodes in wrong menu position** — action was in the top-level Plugins menu; now placed inside the "Glados-PycroManager" plugin sub-menu (created by napari from napari.yaml), with fallback to top-level. Committed in `ux: place Reload Custom Nodes action in Glados-PycroManager plugin sub-menu`.
