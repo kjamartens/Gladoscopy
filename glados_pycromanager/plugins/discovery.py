@@ -43,16 +43,34 @@ class PluginLoadFailure:
 
 
 def _iter_module_files(folder: Path) -> list[Path]:
-    """Return every `.py` in `folder` that isn't `__init__.py` or a dir."""
+    """Return every `.py` in `folder` that isn't `__init__.py` or a dir.
+
+    A missing or unreadable folder logs a single warning and returns
+    an empty list — the AppData plugin walk must not bring the app
+    down because the user's home folder has odd permissions.
+    """
+    if not folder.exists():
+        logger.debug("Plugin folder %s does not exist; skipping", folder)
+        return []
     if not folder.is_dir():
+        logger.warning("Plugin path %s is not a directory; skipping", folder)
+        return []
+    try:
+        entries = sorted(folder.iterdir())
+    except (PermissionError, OSError) as exc:
+        logger.warning("Plugin folder %s is unreadable: %s", folder, exc)
         return []
     out: list[Path] = []
-    for entry in sorted(folder.iterdir()):
+    for entry in entries:
         if entry.name == "__init__.py":
             continue
         if entry.suffix != ".py":
             continue
-        if not entry.is_file():
+        try:
+            if not entry.is_file():
+                continue
+        except OSError as exc:
+            logger.warning("Plugin entry %s is unstatable: %s", entry, exc)
             continue
         out.append(entry)
     return out
@@ -207,10 +225,17 @@ def user_appdata_dir_for(subfolder_pair: tuple[str, str]) -> Path:
     `("AutonomousMicroscopy", "Analysis_Measurements")`. Creates the
     directory if it doesn't exist so first-run can drop a `.py` into
     a known path.
+
+    Tolerant of permission / I/O failures: logs a warning and returns
+    the (still meaningful) path. Callers route through
+    :func:`load_node_modules` which itself tolerates a missing folder.
     """
     parent, leaf = subfolder_pair
     root = Path(appdirs.user_data_dir()) / "Glados-PycroManager" / parent / leaf
-    root.mkdir(parents=True, exist_ok=True)
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except (PermissionError, OSError) as exc:
+        logger.warning("Could not create AppData plugin dir %s: %s", root, exc)
     return root
 
 
