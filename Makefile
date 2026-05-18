@@ -3,6 +3,8 @@
 #
 # Quick start (new contributor — no conda needed):
 #   make dev      ← creates .venv if absent, then editable install with dev extras
+#   make run-dev  ← dev install + launch in one step
+#   make run-prod ← non-editable (production) install + launch in one step
 #   make test     ← run the test suite
 #   make ci       ← full local gate: lint + bandit + tests
 #
@@ -17,16 +19,15 @@
 # Override by setting PYTHON explicitly: make test PYTHON=python3.13
 ifeq ($(OS),Windows_NT)
     _VENV_PYTHON := .venv/Scripts/python.exe
+    _VENV_PIP    := .venv\Scripts\pip
+    PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(subst /,\,$(_VENV_PYTHON)),python)
 else
     _VENV_PYTHON := .venv/bin/python
-endif
-ifneq ($(wildcard $(_VENV_PYTHON)),)
-    PYTHON ?= $(_VENV_PYTHON)
-else
-    PYTHON ?= python
+    _VENV_PIP    := .venv/bin/pip
+    PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(_VENV_PYTHON),python)
 endif
 
-PIP    ?= $(PYTHON) -m pip
+PIP    ?= $(PYTHON) -m uv pip
 PYTEST ?= $(PYTHON) -m pytest
 RUFF   ?= $(PYTHON) -m ruff
 MYPY   ?= $(PYTHON) -m mypy
@@ -36,7 +37,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run profile-startup \
+        run run-dev run-prod profile-startup \
         ci verify \
         clean
 
@@ -47,7 +48,8 @@ help:  ## Show this help.
 
 .venv:
 	python -m venv .venv
-	@echo ".venv created — run 'make dev' to install."
+	$(_VENV_PIP) install --quiet uv
+	@echo ".venv created with uv — run 'make dev' to install."
 
 venv: .venv  ## Create .venv using the system Python (skipped if already present).
 
@@ -96,6 +98,13 @@ bandit:  ## Run bandit security scan (informational).
 # ── Run ───────────────────────────────────────────────────────────────────────
 
 run:  ## Launch the standalone Glados-PycroManager GUI.
+	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
+
+run-dev: dev  ## Editable install (dev extras) then launch Glados — one-shot dev workflow.
+	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
+
+run-prod: .venv  ## Non-editable (production) install then launch Glados — simulate end-user install.
+	$(PIP) install .
 	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
 
 profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.txt.

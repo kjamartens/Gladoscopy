@@ -29,7 +29,7 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Open issues
 
-*(none yet)*
+*(none)*
 
 ---
 
@@ -41,4 +41,5 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Resolved (history)
 
+- [x] **`make run-dev` / `make run-prod`** — added `run-dev` (editable dev install then launch) and `run-prod` (non-editable production install then launch) combined targets to `Makefile`. Updated `.PHONY` list and top-of-file quick-start comment. Committed in `build: add run-dev and run-prod combined targets`.
 - [x] **`MIL.create_mda` mutable-default trap** — fixed in Phase 10.8. Mutable defaults replaced with `None`; bare `create_mda(num_time_points=N)` now yields a clean time-only event list. Bad plans (negative frames, zero-step z-stack, empty channel name, exposure/channel mismatch, channels without channel_group) raise `MDAEventError`. The regression test `test_default_call_raises_due_to_mutex_defaults` was renamed and inverted to `test_default_call_now_produces_time_only_events` and now asserts the saner default behaviour.
