@@ -26,3 +26,41 @@ self (us)  cumul (us)   module
 8354       3796221      scipy.signal._support_alternative_backends
 
 Total import time (GUI_napari cumulative): 44638717 us
+
+=== Post-optimization measurement: 2026-05-18 (Phase 12.4+12.5) ===
+Command: python -X importtime -c "import glados_pycromanager.GUI.GUI_napari"
+Changes applied: deferred bioimageio/diplib/csbdeep/stardist/cv2 to first use
+                 in node __init__() / function bodies; AppData walk deferred
+                 to dock construction.
+
+Top 20 slowest cumulative import times:
+self (us)  cumul (us)   module
+---------  ----------   ------
+939        4989894      glados_pycromanager.GUI.GUI_napari
+1402       2394099      glados_pycromanager.GUI.napariGlados
+396        1912729      napari.qt
+24         1911797      napari._qt.qt_event_loop
+398        1911774      napari._qt
+4038       1284644      napari._qt.qt_event_loop (second load)
+767        1148515      pycromanager
+21         1147206      napari.components.viewer_model
+464        1147185      napari.components
+850        1141012      pycromanager.acquisition.java_backend_acquisitions
+808        986287       napari.components.layerlist
+588        985479       napari.layers
+676        958988       pycromanager.acquisition.RAMStorage_java
+30         958312       ndstorage.ndstorage_base
+987        958283       ndstorage
+846        952837       ndstorage.ndstorage_base (second load)
+1946       931244       glados_pycromanager.GUI.utils
+1071       780085       dask.array
+891        602113       dask.array.backends
+8734       598583       dask.array.core
+
+Total import time (GUI_napari cumulative): 4989894 us
+Speedup vs baseline: ~44.6 s → ~5.0 s  (≈ 89 % faster cold start)
+
+Remaining slow modules: napari.qt (~1.9 s cumul) and pycromanager (~1.1 s
+cumul) dominate and are third-party — not addressable by this project.
+bioimageio.core, bioimageio.spec, Real_Time_Analysis, and CustomFunctions
+are no longer in the top 20.
