@@ -257,62 +257,127 @@ def main():
     #Create parser
     parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
-    args=parser.parse_args()
-    
-    
+    parser.add_argument('--backend', choices=['JAVA', 'Python', 'PyMMCorePlus'],
+                        help='MM backend to start headlessly. Combined with --config, '
+                             'bypasses the startup popup (useful for testing/profiling).')
+    parser.add_argument('--config', help='Path to the Micro-Manager .cfg file (skips popup when set with --backend).')
+    parser.add_argument('--mm-path', help='Path to the Micro-Manager install directory (defaults to the config in Shared_data).')
+    parser.add_argument('--buffer-mb', type=int, help='Circular buffer size in MB (overrides Shared_data default).')
+    parser.add_argument('--max-memory-mb', type=int, help='Max Java memory in MB (overrides Shared_data default; ignored by PyMMCorePlus).')
+    parser.add_argument('--auto-demo', action='store_true',
+                        help='Use the pymmcore-plus bundled demo install + MMConfig_demo.cfg. '
+                             'Equivalent to --backend PyMMCorePlus with the bundled paths resolved at runtime.')
+    args = parser.parse_args()
+
+    # Validate CLI override combos before any heavy work.
+    if args.backend and not (args.config or args.auto_demo):
+        parser.error('--backend requires --config (or use --auto-demo)')
+    if args.config and not (args.backend or args.auto_demo):
+        parser.error('--config requires --backend (or use --auto-demo)')
+
     # Create an instance of the shared_data class
     print('Creating shared data.')
     shared_data = Shared_data()
     print('Cleaning up temporary files.')
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
-        
+
+    # --- CLI overrides for the headless popup --------------------------------
+    # If the user passed --auto-demo or (--backend AND --config), we resolve
+    # the MM install path and config now and skip the popup entirely. Anything
+    # not overridden falls back to Shared_data defaults.
+    cli_backend = args.backend
+    cli_config = args.config
+    cli_mm_path = args.mm_path
+    if args.auto_demo:
+        from pymmcore_plus import find_micromanager
+        mm_paths = find_micromanager(return_first=False) or []
+        if not mm_paths:
+            parser.error('--auto-demo: no Micro-Manager install found by pymmcore_plus.find_micromanager(). '
+                         'Run `python -m pymmcore_plus install` first.')
+        cli_mm_path = cli_mm_path or str(mm_paths[0])
+        cli_backend = cli_backend or 'PyMMCorePlus'
+        if not cli_config:
+            cli_config = os.path.join(cli_mm_path, 'MMConfig_demo.cfg')
+    cli_override = bool(cli_backend and cli_config)
+    if cli_override:
+        # Push overrides into shared_data so downstream code sees a consistent view.
+        shared_data.config.micromanager_config.headless_backend = cli_backend
+        shared_data.config.micromanager_config.config_path = cli_config
+        if cli_mm_path:
+            shared_data.config.micromanager_config.path = cli_mm_path
+        if args.buffer_mb is not None:
+            shared_data.config.micromanager_config.buffer_mb = args.buffer_mb
+        if args.max_memory_mb is not None:
+            shared_data.config.micromanager_config.max_memory_mb = args.max_memory_mb
+    # -------------------------------------------------------------------------
+
     #Some QT attributes
     print('Setting QT attributes.')
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
     QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
-    
+
     napariSettings = napari.settings.get_settings() #type: ignore
     if napariSettings.application.playback_fps < shared_data.config.visualisation_config.fps:
         napariSettings.application.playback_fps = shared_data.config.visualisation_config.fps
         print(f'Set the napari Playback FPS to {shared_data.config.visualisation_config.fps}!')
-    
+
     # get object representing MMCore, used throughout
     #try to open a running instance:
     print('Finding or creating micromanager instance.')
-    try:
-        core = Core()
-        # shared_data.core = core
-        shared_data._headless = False
-        shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
-        shared_data.MILcore.set_core(core)
-    except Exception as e:
-        logging.warning(f'Try/exception occured! {e}')
-        #Create a small GUI for settings
-        appSmall = QApplication([])
-        headlessGUIv = headlessGUI(shared_data)
-        appSmall.exec_()
-        
-        if headlessGUIv.javaRadio.isChecked() or headlessGUIv.pythonRadio.isChecked():
-            logging.info('Headless PycroManager started')
-            
-            #Get those settings and use to start headless
-            start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
-            
-            #Also store some settings in shared_data
+    if cli_override:
+        # CLI override: go straight to the requested headless backend, no popup,
+        # no Core() probe — the override is explicit intent to run headless.
+        mm_cfg = shared_data.config.micromanager_config
+        if cli_backend in ('JAVA', 'Python'):
+            logging.info('Headless PycroManager started (CLI override, backend=%s)', cli_backend)
+            start_headless(mm_app_path=mm_cfg.path, config_file=mm_cfg.config_path,
+                           python_backend=cli_backend == 'Python',
+                           buffer_size_mb=int(mm_cfg.buffer_mb), max_memory_mb=int(mm_cfg.max_memory_mb))
             shared_data._headless = True
-            shared_data.backend = headlessGUIv.backend
-            # shared_data.core = core
+            shared_data.backend = cli_backend
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
             shared_data.MILcore.set_core(Core())
-        elif headlessGUIv.pyMMCorePlusRadio.isChecked():
-            logging.info('Headless PyMMCorePlus started')
-            
+        else:  # PyMMCorePlus
+            logging.info('Headless PyMMCorePlus started (CLI override)')
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
-            shared_data.MILcore.set_core(CMMCorePlus(mm_path=headlessGUIv.mm_app_path))
-            shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
-            shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
-            #Max memory MB is not settable in PyMMCorePlus, so we don't set it
+            shared_data.MILcore.set_core(CMMCorePlus(mm_path=mm_cfg.path))
+            shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
+            shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
+    else:
+        try:
+            core = Core()
+            # shared_data.core = core
+            shared_data._headless = False
+            shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
+            shared_data.MILcore.set_core(core)
+        except Exception as e:
+            logging.warning(f'Try/exception occured! {e}')
+            #Create a small GUI for settings
+            appSmall = QApplication([])
+            headlessGUIv = headlessGUI(shared_data)
+            appSmall.exec_()
+
+            if headlessGUIv.javaRadio.isChecked() or headlessGUIv.pythonRadio.isChecked():
+                logging.info('Headless PycroManager started')
+
+                #Get those settings and use to start headless
+                start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
+
+                #Also store some settings in shared_data
+                shared_data._headless = True
+                shared_data.backend = headlessGUIv.backend
+                # shared_data.core = core
+                shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
+                shared_data.MILcore.set_core(Core())
+            elif headlessGUIv.pyMMCorePlusRadio.isChecked():
+                logging.info('Headless PyMMCorePlus started')
+
+                shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
+                shared_data.MILcore.set_core(CMMCorePlus(mm_path=headlessGUIv.mm_app_path))
+                shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
+                shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
+                #Max memory MB is not settable in PyMMCorePlus, so we don't set it
     
     #Open JSON file with MM settings
     try:

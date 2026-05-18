@@ -754,6 +754,7 @@ contributor can go from zero to green tests in ≤ 3 commands.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
+| [x] 13.0 | (Side-quest, requested mid-phase) Add CLI overrides to `GUI_napari.main()` (`--backend`, `--config`, `--mm-path`, `--buffer-mb`, `--max-memory-mb`, `--auto-demo`) so headless tests/profiles bypass the startup popup. Add Makefile `run-mm` (parameterised by `BACKEND`/`CONFIG`/…) and `run-demo` (pymmcore-plus bundled demo). Argparse rejects bad combos. New tests in `tests/test_gui_napari_cli.py` | Headless launch without clicking | Commit `feat: CLI overrides for headless launch (run-mm / run-demo)` |
 | [ ] 13.1 | Profile `napariGlados.py` live loop with `cProfile` in a smoke session against the demo config; store top-20 in `docs/perf-runtime.txt` | Bottleneck identified | Commit `perf: runtime profile baseline` |
 | [ ] 13.2 | Fix the 2-second stall (line 97); the fix is profile-dependent (likely cache a Java-bridge attribute) | Live FPS up | Commit `perf: fix 2s stall in live update loop` |
 | [ ] 13.3 | Audit each `@thread_worker` site — anything blocking the UI thread? Move to a worker | Smoother UI | Commit `perf: move <X> off UI thread` (per site) |

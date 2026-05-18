@@ -2,11 +2,14 @@
 # macOS, and Linux. Targets are thin wrappers so CI can call the same commands.
 #
 # Quick start (new contributor — no conda needed):
-#   make dev      ← creates .venv if absent, then editable install with dev extras
-#   make run-dev  ← dev install + launch in one step
-#   make run-prod ← non-editable (production) install + launch in one step
-#   make test     ← run the test suite
-#   make ci       ← full local gate: lint + bandit + tests
+#   make dev       ← creates .venv if absent, then editable install with dev extras
+#   make run-dev   ← dev install + launch in one step
+#   make run-prod  ← non-editable (production) install + launch in one step
+#   make run-mm    ← launch with pre-set backend/config (bypasses popup; for testing)
+#                    BACKEND=PyMMCorePlus CONFIG=/path/to/MMConfig.cfg [MM_PATH=...]
+#   make run-demo  ← launch against the pymmcore-plus bundled demo (no popup, no hardware)
+#   make test      ← run the test suite
+#   make ci        ← full local gate: lint + bandit + tests
 #
 # Conda alternative (existing GladosEnv users):
 #   make env      ← create / update GladosEnv conda env
@@ -37,7 +40,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run run-dev run-prod profile-startup \
+        run run-dev run-prod run-mm run-demo profile-startup \
         ci verify \
         clean
 
@@ -106,6 +109,25 @@ run-dev: dev  ## Editable install (dev extras) then launch Glados — one-shot d
 run-prod: .venv  ## Non-editable (production) install then launch Glados — simulate end-user install.
 	$(PIP) install .
 	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
+
+# run-mm: launch with pre-set MM backend / config — bypasses the startup popup.
+# Override on cmdline: make run-mm BACKEND=PyMMCorePlus CONFIG=/path/to/MMConfig.cfg MM_PATH=/path/to/mm
+BACKEND       ?=
+CONFIG        ?=
+MM_PATH       ?=
+BUFFER_MB     ?=
+MAX_MEMORY_MB ?=
+
+run-mm:  ## Launch Glados with pre-set MM backend/config (bypasses popup). Vars: BACKEND CONFIG [MM_PATH BUFFER_MB MAX_MEMORY_MB].
+	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari \
+	    $(if $(BACKEND),--backend "$(BACKEND)") \
+	    $(if $(CONFIG),--config "$(CONFIG)") \
+	    $(if $(MM_PATH),--mm-path "$(MM_PATH)") \
+	    $(if $(BUFFER_MB),--buffer-mb $(BUFFER_MB)) \
+	    $(if $(MAX_MEMORY_MB),--max-memory-mb $(MAX_MEMORY_MB))
+
+run-demo:  ## Launch Glados against the pymmcore-plus bundled demo install + MMConfig_demo.cfg (no popup).
+	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari --auto-demo
 
 profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.txt.
 	pwsh -File scripts/profile_startup.ps1

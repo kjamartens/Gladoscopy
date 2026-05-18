@@ -646,4 +646,28 @@ it being mentioned in the pain-points analysis.
 **Reason:** No code to change — skip is the correct status.
 **Affects:** `claude_project.md` row 11.2 only.
 
+## 2026-05-18 — CLI overrides for headless launch added as Phase 13.0  [Phase 13.0]
+**Decision:** Added `--backend / --config / --mm-path / --buffer-mb /
+--max-memory-mb / --auto-demo` to `GUI_napari.main()` and matching Makefile
+targets `run-mm` (parameterised by `BACKEND/CONFIG/MM_PATH/BUFFER_MB/
+MAX_MEMORY_MB` vars) and `run-demo` (resolves the pymmcore-plus bundled MM
++ MMConfig_demo.cfg via `pymmcore_plus.find_micromanager()`). This is a
+new sub-step inserted at the very top of Phase 13 because it unblocks
+13.1 — the profiling step needs to drive a real backend without a human
+clicking through the popup.
+**Alternatives:** (a) defer to a separate phase; (b) bypass the popup via
+env vars only; (c) run profiles via a separate pytest fixture instead of
+the real entry-point.
+**Reason:** User explicitly requested this mid-phase as the right way to
+"have a `make run` with parameters … esp. for testing". Argparse
+validation is preferred over Make-side shell checks so the same diagnostics
+fire whether the entry point is invoked from PowerShell, cmd, Git-Bash, or
+the `glados` console script. Skipping `Core()` probe when CLI override is
+set keeps `make run-demo` deterministic — no flaky fallback to Java bridge
+when one is unintentionally running locally.
+**Affects:** `glados_pycromanager/GUI/GUI_napari.py` (new flags + validation
++ override branch), `Makefile` (new `run-mm` / `run-demo` targets, .PHONY,
+help comment), `tests/test_gui_napari_cli.py` (new), `claude_project.md`
+(13.0 row).
+
 *Append future decisions below this line, newest at the bottom.*
