@@ -18,11 +18,6 @@ import dask.array as da
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
-from bioimageio.core import Sample, Tensor, create_prediction_pipeline, load_description, test_model
-from bioimageio.core.digest_spec import create_sample_for_model
-from bioimageio.spec.model import v0_5
-from bioimageio.spec.utils import download, load_array
-
 # Load general dependencies
 from imageio.v2 import imread
 from scipy import signal
@@ -61,6 +56,7 @@ def __function_metadata__():
 
 
 def getModel(model_id="",model_doi="",model_url=""):
+    from bioimageio.core import load_description
     if model_id != "":
         model = load_description(model_id)
     elif model_doi != "":
@@ -84,6 +80,8 @@ def getOutputImages(prediction,modelSample):
     return outputImages
 
 def setupSample(model=None,input_image=None):
+    from bioimageio.core import Tensor
+    from bioimageio.core.digest_spec import create_sample_for_model
     if model == None:
         logging.warning("Model input required!")
         return
@@ -167,6 +165,8 @@ class BioImageModelZoo:
         self.outputImage = []
         self.modelId = kwargs['model_id']
         self.imageLayerId = int(kwargs['imageLayerId'])
+        logging.info("Loading bioimageio for BioImageModelZoo (first use — may take a few seconds)…")
+        from bioimageio.core import create_prediction_pipeline
         self.model = getModel(model_id=self.modelId)
         self.modelSample = setupSample(model=self.model,input_image=np.zeros((64,64)))
         self.prediction_pipeline = create_prediction_pipeline(
@@ -181,7 +181,7 @@ class BioImageModelZoo:
         self.lastImage = image
         self.modelSample = setupSample(model=self.model,input_image=image)
         #Finally, predict
-        prediction: Sample = self.prediction_pipeline.predict_sample_without_blocking(self.modelSample['sample'])
+        prediction = self.prediction_pipeline.predict_sample_without_blocking(self.modelSample['sample'])
 
         #Get the output images
         self.outputImage = getOutputImages(prediction,self.modelSample)

@@ -13,7 +13,6 @@ import math
 import os
 import time
 
-import cv2
 import dask.array as da
 import ndtiff
 import numpy as np
@@ -103,6 +102,7 @@ def redondo_score(image):
     return 1/score
 
 def blur_laplace_score(image):
+    logging.info("Loading cv2 for AutoFocusBF (first use — may take a few seconds)…")
     import cv2
     blurrad = 3
     blurim = cv2.GaussianBlur(image, (blurrad,blurrad), 1)

@@ -12,9 +12,6 @@ import dask.array as da
 import ndtiff
 import numpy as np
 
-# from stardist.models import StarDist2D
-from csbdeep.utils import normalize
-
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 from glados_pycromanager.autonomous.registry import register
 
@@ -72,9 +69,12 @@ def StarDistSegment_ImageVis(core,**kwargs):
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     
     NDTIFFStack = kwargs['Image']
-    
-    mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
+
+    logging.info("Loading csbdeep/stardist for StarDistSegment_ImageVis (first use — may take a few seconds)…")
+    from csbdeep.utils import normalize
     from stardist.models import StarDist2D
+
+    mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
     modelDirectory = kwargs["modelStorageLoc"].rsplit('/', 1)
     #Load the model - better to do this out of the loop for time reasons
     stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
@@ -147,8 +147,11 @@ def StarDistSegment_preLoadedModel_use_visualise(datastruct,core,**kwargs):
 @register("StarDist_image.StarDistSegment_preLoadedModel_use")
 def StarDistSegment_preLoadedModel_use(core,**kwargs):
     NDTIFFStack = kwargs['Image']
+
+    logging.info("Loading csbdeep/stardist for StarDistSegment_preLoadedModel_use (first use — may take a few seconds)…")
+    from csbdeep.utils import normalize
+
     mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
-    from stardist.models import StarDist2D
     #Load the model - better to do this out of the loop for time reasons
     stardistModel = kwargs["model"] #type:ignore
 

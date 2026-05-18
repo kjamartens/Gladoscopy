@@ -11,9 +11,6 @@ import dask.array as da
 import ndtiff
 import numpy as np
 
-# from stardist.models import StarDist2D
-from csbdeep.utils import normalize
-
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 from glados_pycromanager.autonomous.registry import register
 

@@ -4,7 +4,6 @@ import os
 import sys
 import time
 
-import diplib as dip
 import numpy as np
 
 import glados_pycromanager.GUI.utils as utils
@@ -43,11 +42,15 @@ def __function_metadata__():
 class RealTimeFFT:
     def __init__(self, core, **kwargs):
         logging.info('INITIALISING REAL-TIME FFT ANALYSIS')
-        
+
         # Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(), class_name, kwargs) #type:ignore
-        
+
+        logging.info("Loading diplib for RealTimeFFT (first use — may take a few seconds)…")
+        import diplib as dip
+        self._dip = dip
+
         self.fft_display = np.zeros((512, 512)) # Placeholder
         self.log_scale = kwargs.get('LogScale', True)
         
@@ -64,9 +67,9 @@ class RealTimeFFT:
             # 1. Compute 2D FFT
             # fft_data = np.fft.fft2(image)
             
-            img_dip = dip.Image(image)
-            fft_dip = dip.FourierTransform(img_dip)
-            magnitude = dip.Abs(fft_dip)
+            img_dip = self._dip.Image(image)
+            fft_dip = self._dip.FourierTransform(img_dip)
+            magnitude = self._dip.Abs(fft_dip)
             magnitude = np.array(magnitude)
             # fft_data = dip.FourierTransform(image)
             
