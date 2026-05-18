@@ -6,18 +6,26 @@ Please read the relevant section before you open a PR.
 
 ## Quick start
 
-```pwsh
-# 1. Clone, then create the conda env (Windows one-shot):
-.\win_create_env.bat
-# 2. ...or manually:
-conda activate GladosEnv
-pip install -e ".[dev]"
-# 3. Optional but recommended:
-pre-commit install
+```bash
+# 1. Bootstrap the conda environment (creates GladosEnv — idempotent):
+make env
+# 2. Editable install with all dev extras:
+make dev
+# 3. Verify everything works:
+make test
 ```
 
-`make help` lists the common dev tasks (test, lint, format, run, …).
-The `Makefile` works under Git-Bash on Windows.
+Windows note: `make` ships with Git for Windows at
+`C:\Program Files\Git\usr\bin\make.exe`. Open a **Git Bash** terminal,
+or add that directory to your PATH, then the targets above work as-is.
+
+Alternatively, use the all-in-one Windows batch file (creates env + does
+editable install in one shot):
+```pwsh
+.\win_create_env.bat
+```
+
+Run `make help` to list every available target.
 
 ## Where things live
 
@@ -43,10 +51,21 @@ If you are adding a new autonomous-microscopy node, read both:
 - Keep commits small and atomic. The optimization plan does one commit
   per step; treat that as the project norm.
 
+## Install targets
+
+| Target | What it does |
+|--------|-------------|
+| `make env` | Create or update the `GladosEnv` conda env from `environment.yaml` (idempotent) |
+| `make dev` | Editable install with dev extras — use this for day-to-day development |
+| `make install` | Non-editable production install (no dev extras) |
+| `make build` | Build wheel + sdist into `dist/` via `uv build` |
+
 ## Tests
 
-```pwsh
-make test          # equivalent to: python -m pytest -q
+```bash
+make test          # full suite (python -m pytest -q)
+make test-fast     # stop on first failure (-x -q)
+make test-cov      # with branch coverage report
 ```
 
 Tests live under `tests/`. They must run **without** real hardware —
@@ -57,10 +76,11 @@ test that hits a Qt widget, use `pytest-qt`. The pytest config in
 
 ## Lint, format, types
 
-```pwsh
+```bash
 make lint          # ruff check + mypy (informational)
 make format        # ruff format
 make lint-fix      # ruff check --fix
+make ci            # full gate: lint + bandit + tests (run before pushing)
 ```
 
 The vendored Nodz editor at `glados_pycromanager/GUI/nodz/` is
