@@ -187,19 +187,22 @@ def napariUpdateLive(DataStructure):
                     logging.debug(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
                     
                     shape = n_entries_in_dims
-                    # Hold the TemporaryDirectory object in shared_data so it is not
-                    # GC'd (and the directory deleted) while zarr is still writing.
-                    # Previously the object was discarded immediately after .name was read.
-                    _tmpdir = tempfile.TemporaryDirectory()
-                    shared_data.mdaZarrTempDir = _tmpdir
-                    shared_data.mdaZarrData[layerName] = zarr.open(
-                            str(_tmpdir.name),
-                            shape = shape+[latestImage.shape[0],latestImage.shape[1]],
-                            chunks = tuple([1] * len(shape) + [latestImage.shape[0],latestImage.shape[1]]),
-                            )
-                    #Changing the first image to the latest acquired image
-                    shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
-                    shared_data.allMDAslicesRendered = {}
+                    # Zarr may have been pre-created by _preinit_mda_zarr before run_mda()
+                    # started (MMCORE_PLUS fast acquisitions). Reuse it so frameReady writes
+                    # are not lost.
+                    if shared_data.mdaZarrData.get(layerName) is None:
+                        # Hold the TemporaryDirectory object in shared_data so it is not
+                        # GC'd (and the directory deleted) while zarr is still writing.
+                        _tmpdir = tempfile.TemporaryDirectory()
+                        shared_data.mdaZarrTempDir = _tmpdir
+                        shared_data.mdaZarrData[layerName] = zarr.open(
+                                str(_tmpdir.name),
+                                shape = shape+[latestImage.shape[0],latestImage.shape[1]],
+                                chunks = tuple([1] * len(shape) + [latestImage.shape[0],latestImage.shape[1]]),
+                                )
+                        shared_data.allMDAslicesRendered = {}
+                        #Seed position 0 with the current frame
+                        shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
                     
                     layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
@@ -468,7 +471,43 @@ class napariHandler:
             zarr_data[sliceTuple + (slice(None), slice(None))] = np.ascontiguousarray(image)
         except Exception as exc:
             logging.debug('_try_write_frame_to_zarr skipped: %s', exc)
-    
+
+    def _preinit_mda_zarr(self, shared_data) -> bool:
+        """Pre-create the zarr backing store before run_mda() fires.
+
+        On fast cameras (demo cam) all frameReady callbacks complete before the
+        vis worker creates the zarr array, causing _try_write_frame_to_zarr to
+        return early (zarr_data is None) for every frame. Creating zarr here,
+        while still on the background worker thread, fixes that race.
+        """
+        layerName = shared_data.newestLayerName
+        if not layerName or layerName == 'Live':
+            return False
+        if shared_data.mdaZarrData.get(layerName) is not None:
+            return False
+        try:
+            dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = \
+                utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+            h = int(self.shared_data.MILcore.core.getImageHeight())
+            w = int(self.shared_data.MILcore.core.getImageWidth())
+            bytes_per_pixel = self.shared_data.MILcore.core.getBytesPerPixel()
+            dtype = np.uint8 if bytes_per_pixel <= 1 else np.uint16
+            shape = n_entries_in_dims
+            _tmpdir = tempfile.TemporaryDirectory()
+            shared_data.mdaZarrTempDir = _tmpdir
+            shared_data.mdaZarrData[layerName] = zarr.open(
+                str(_tmpdir.name),
+                shape=shape + [h, w],
+                chunks=tuple([1] * len(shape) + [h, w]),
+                dtype=dtype,
+            )
+            shared_data.allMDAslicesRendered = {}
+            logging.debug('_preinit_mda_zarr: shape=%s dtype=%s', shape + [h, w], dtype)
+            return True
+        except Exception as exc:
+            logging.warning('_preinit_mda_zarr failed: %s', exc)
+            return False
+
     def PyMMCore_finishedAcqCallback(self,sequence: useq.MDASequence):
         logging.info("MDA sequence finished: %s", sequence)
         self.shared_data.tempData = sequence
@@ -680,6 +719,11 @@ class napariHandler:
                     connected_callback_finishedAcq = self.shared_data.MILcore.core.mda.events.sequenceFinished.connect(self.PyMMCore_finishedAcqCallback)
                     connected_callback_cancelledAcq = self.shared_data.MILcore.core.mda.events.sequenceCanceled.connect(self.PyMMCore_cancelledAcqCallback)
                     connected_callback_startedAcq = self.shared_data.MILcore.core.mda.events.sequenceStarted.connect(self.PyMMCore_startedAcqCallback)
+                    # Pre-create zarr so frameReady callbacks can write immediately.
+                    # Without this, on fast cameras all frames arrive before the vis
+                    # worker creates the zarr, leaving every slice as zeros (black).
+                    if self.shared_data.config.mda_config.vis_method == 'multiDstack':
+                        self._preinit_mda_zarr(shared_data)
                     #Get the MDA plan
                     mda_sequence_useq = shared_data._mdaModeParams_useq
                     #Actually start the MDA
