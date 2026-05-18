@@ -8,6 +8,7 @@ import argparse
 import json
 import logging
 import os
+import socket
 import sys
 
 import napari
@@ -381,15 +382,27 @@ def main():
             shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
             shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
     else:
+        # Fast socket probe: avoids spawning a pyjavaz bridge thread (and the
+        # resulting 1-second timeout + thread-exception traceback) when MM isn't up.
+        _java_mm_up = False
         try:
-            core = Core()
-            # shared_data.core = core
-            shared_data._headless = False
-            shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
-            shared_data.MILcore.set_core(core)
-        except Exception as e:
-            logging.warning(f'Try/exception occured! {e}')
-            #Create a small GUI for settings
+            with socket.create_connection(("127.0.0.1", 4827), timeout=0.2):
+                _java_mm_up = True
+        except OSError:
+            pass
+
+        if _java_mm_up:
+            try:
+                core = Core()
+                shared_data._headless = False
+                shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
+                shared_data.MILcore.set_core(core)
+            except Exception as e:
+                logging.warning(f'Java MM detected but Core() failed: {e}')
+                _java_mm_up = False  # fall through to dialog
+
+        if not _java_mm_up:
+            logging.info('No Java MM server on port 4827 — opening headless dialog')
             appSmall = QApplication([])
             headlessGUIv = headlessGUI(shared_data)
             appSmall.exec_()
