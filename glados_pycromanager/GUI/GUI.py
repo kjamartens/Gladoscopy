@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -77,7 +78,7 @@ if __name__ == "__main__":
         sys.exit(app.exec_())
 
     except (ImportError, RuntimeError, OSError, AttributeError) as exc:
-        print(f'No micromanager, test mode! ({exc})')
+        logging.warning("No micromanager, test mode! (%s)", exc)
 
         #Open JSON file with MM settings
         with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')) as f:

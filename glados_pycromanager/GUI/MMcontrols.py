@@ -725,7 +725,7 @@ class MMConfigUI(CustomMainWindow):
         import numpy as np
         from bioio.writers import OmeTiffWriter  # with bioio-ome-tiff installed
         tempdataloc = os.path.join(str(tempfile.TemporaryDirectory().name))+"_glmic.zarr"
-        print(tempdataloc)
+        logging.debug("tempdataloc: %s", tempdataloc)
 
 
         image = np.random.rand(10, 3, 512, 512)

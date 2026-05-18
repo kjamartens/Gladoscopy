@@ -261,7 +261,7 @@ class Shared_data(QObject):
             self._liveMode = new_value
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
-        print('LIVE mode changed!')
+        logging.info("LIVE mode changed!")
         time.sleep(0.1)
         self._livemodeNapariHandler.acqModeChanged(newSharedData=self)
         
