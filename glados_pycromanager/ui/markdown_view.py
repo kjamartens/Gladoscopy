@@ -15,16 +15,14 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QVBoxLayout
 
-# Markdown → HTML extension set kept identical to the original to avoid
-# rendering differences for existing User-Manual pages.
-_MARKDOWN_EXTENSIONS = [
-    "markdown_captions",
-    "fenced_code",
-    "codehilite",
-    "toc",
-    "attr_list",
-    "meta",
-]
+# Markdown → HTML extension set.  markdown-captions is optional; rendering
+# works without it (figure captions simply don't appear).
+_MARKDOWN_EXTENSIONS = ["fenced_code", "codehilite", "toc", "attr_list", "meta"]
+try:
+    import markdown_captions  # noqa: F401
+    _MARKDOWN_EXTENSIONS.insert(0, "markdown_captions")
+except ImportError:
+    pass
 
 
 def _wrap_html(body_html: str) -> str:

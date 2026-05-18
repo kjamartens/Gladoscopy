@@ -31,7 +31,7 @@ dependencies = [
     "h5py==3.14.0",
     "xarray==2025.1.2",
     "dask==2025.7.0",
-    "pycromanager==1.0.2",
+    "pycromanager @ git+https://github.com/micro-manager/pycro-manager.git",
     "pymmcore-plus==0.18.1",
     "bioimageio-core", #0.8.0
     "bioio",
@@ -53,6 +53,8 @@ dependencies = [
     "opencv-python==4.13.0.92",
     "pydantic==2.12.5",
     "diplib==3.6.0",
+    "markdown>=3.7",
+    "markdown-captions>=2.1",
 ]
 
 [project.optional-dependencies]

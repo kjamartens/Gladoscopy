@@ -242,6 +242,37 @@ class headlessGUI(QWidget):
         
         self.close()
 
+
+class UserManualWidget(QWidget):
+    """Napari dock widget that renders the Glados user manual as HTML."""
+
+    def __init__(self, viewer=None):
+        super().__init__()
+        import glados_pycromanager
+        from PyQt5.QtCore import QUrl
+        from PyQt5.QtWebEngineWidgets import QWebEngineView
+        from PyQt5.QtWidgets import QVBoxLayout
+        from glados_pycromanager.ui.markdown_view import markdown_to_html
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        view = QWebEngineView()
+        view.setMinimumSize(680, 800)
+
+        pkg_root = os.path.dirname(glados_pycromanager.__file__)
+        md_path = os.path.join(pkg_root, "Documentation", "UserManual.md")
+        base_dir = os.path.dirname(os.path.abspath(md_path))
+        try:
+            view.setHtml(markdown_to_html(md_path), QUrl.fromLocalFile(base_dir + "/"))
+        except Exception as exc:
+            view.setHtml(f"<p>Could not load user manual: {exc}</p>")
+        layout.addWidget(view)
+
+
+# napari.yaml widget contribution points here
+show_UserManualNapari = UserManualWidget
+
+
 def main():
     """
     Run the main function to start Glados-PycroManager-Napari interface for autonomous microscopy.
