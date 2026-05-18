@@ -90,13 +90,19 @@ def function_exists(obj):
 def subfunction_exists(module_name, subfunction_name):
     try:
         if module_name.endswith('.py'):
-            # Module path is provided
-            loader = importlib.machinery.SourceFileLoader('', module_name) #type:ignore
-            module = loader.load_module()
+            # Reuse an already-loaded module (matched by __file__) to avoid
+            # re-executing module-level @register decorators a second time.
+            abs_path = os.path.abspath(module_name)
+            module = next(
+                (m for m in sys.modules.values()
+                 if getattr(m, '__file__', None) and os.path.abspath(m.__file__) == abs_path),
+                None,
+            )
+            if module is None:
+                loader = importlib.machinery.SourceFileLoader('', module_name)  # type:ignore
+                module = loader.load_module()
         else:
             module = importlib.import_module(module_name)
-        a = hasattr(module, subfunction_name)
-        b = callable(getattr(module, subfunction_name))
         return hasattr(module, subfunction_name) and callable(getattr(module, subfunction_name))
     except (ImportError, AttributeError):
         return False
