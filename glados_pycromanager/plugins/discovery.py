@@ -82,7 +82,18 @@ def _import_from_path(qualname: str, path: Path) -> ModuleType:
     if spec is None or spec.loader is None:
         raise ImportError(f"could not build spec for {path}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Register in sys.modules *before* exec_module so that:
+    # (a) circular imports within the plugin resolve correctly, and
+    # (b) subsequent sys.modules lookups (e.g. subfunction_exists) find the
+    #     already-loaded module and skip re-execution — preventing @register
+    #     decorators from firing a second time.
+    import sys as _sys
+    _sys.modules[qualname] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        _sys.modules.pop(qualname, None)
+        raise
     return module
 
 
