@@ -40,7 +40,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run run-dev run-prod run-mm run-demo profile-startup \
+        run run-dev run-prod run-mm run-demo profile-runtime profile-startup \
         ci verify \
         clean
 
@@ -128,6 +128,12 @@ run-mm:  ## Launch Glados with pre-set MM backend/config (bypasses popup). Vars:
 
 run-demo:  ## Launch Glados against the pymmcore-plus bundled demo install + MMConfig_demo.cfg (no popup).
 	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari --auto-demo
+
+# Default sample window for `make profile-runtime`. Override: make profile-runtime PROFILE_SECS=12
+PROFILE_SECS ?= 8
+
+profile-runtime:  ## Auto-launch demo, profile live mode for PROFILE_SECS seconds, append top-25 to docs/perf-runtime.txt.
+	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari --auto-demo --profile-runtime $(PROFILE_SECS)
 
 profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.txt.
 	pwsh -File scripts/profile_startup.ps1

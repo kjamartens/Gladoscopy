@@ -670,4 +670,39 @@ when one is unintentionally running locally.
 help comment), `tests/test_gui_napari_cli.py` (new), `claude_project.md`
 (13.0 row).
 
+## 2026-05-18 — Phase 13.1 profile harness is in-main, not a standalone script  [Phase 13.1]
+**Decision:** The `--profile-runtime SECS` flag lives directly in
+`GUI_napari.main()` (≈70 lines, dev-only path), not in a separate
+`scripts/profile_runtime.py`.
+**Alternatives:** (a) standalone wrapper script that monkey-patches
+`Shared_data.__init__` and `QApplication.exec_`; (b) Profile the whole
+process with `python -m cProfile -o` and post-filter.
+**Reason:** The wrapper-script approach was tried first and **segfaulted
+pymmcore-plus inside `CMMCorePlus(mm_path=…)`** — almost certainly because
+the wrapper imported `PyQt5.QtWidgets.QApplication` *before* GUI_napari's
+module-level `os.environ['NAPARI_ASYNC']=1` / `NAPARI_OCTREE=1` had run,
+upsetting Qt-via-pymmcore-plus signal init order. Moving the orchestration
+into `main()` shares the GUI's import order and removes that whole class
+of breakage. Process-wide `cProfile -o` mixes the 15 s startup into the
+top of the cumulative chart and buries the live-loop hot paths.
+**Affects:** `glados_pycromanager/GUI/GUI_napari.py` (new `--profile-runtime`
+branch); `Makefile` (`profile-runtime` target + `PROFILE_SECS` knob); no
+new script file.
+
+## 2026-05-18 — Profile harness emits on liveMode-auto-stop, not only on its own timer  [Phase 13.1]
+**Decision:** A watchdog QTimer polls `shared_data.liveMode` every 250 ms
+during the sample window. If live mode self-terminates before SECS elapse
+(the demo cam + headless PyMMCorePlus does this — see open issue), the
+watchdog dumps whatever frames cProfile has captured and quits. Three
+dump triggers: `timer`, `liveMode-auto-stop`, `aboutToQuit`.
+**Alternatives:** Only dump on the SECS timer; require live mode to stay
+up for the full window.
+**Reason:** First two sample runs showed live mode aborts at 126–615
+frames (≈1 s), not the requested 999 — so a fixed-window dump would write
+nothing useful. The watchdog rescues the sample (got 433 frames once,
+99 another). Three independent triggers ensure we never lose data even
+if the process crashes during teardown (the runs do exit with
+STATUS_STACK_BUFFER_OVERRUN; the profile is on disk by then).
+**Affects:** `glados_pycromanager/GUI/GUI_napari.py` only.
+
 *Append future decisions below this line, newest at the bottom.*

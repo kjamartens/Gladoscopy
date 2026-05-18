@@ -267,6 +267,11 @@ def main():
     parser.add_argument('--auto-demo', action='store_true',
                         help='Use the pymmcore-plus bundled demo install + MMConfig_demo.cfg. '
                              'Equivalent to --backend PyMMCorePlus with the bundled paths resolved at runtime.')
+    parser.add_argument('--profile-runtime', type=float, metavar='SECS', default=None,
+                        help='Dev only: after the GUI is up, auto-enable cProfile, toggle live mode '
+                             'on for SECS seconds, then dump top-25 cumulative stats to '
+                             'docs/perf-runtime.txt and quit. Requires a working backend (use '
+                             '--auto-demo for a hardware-free run).')
     args = parser.parse_args()
 
     # Validate CLI override combos before any heavy work.
@@ -389,7 +394,7 @@ def main():
         
         
     app = QApplication(sys.argv)
-    
+
     shared_data.mainApp = app
 
     worker = Worker()
@@ -397,7 +402,7 @@ def main():
     worker.moveToThread(thread)
     thread.started.connect(lambda: worker.runNapariPycroManagerWrap(MM_JSON, shared_data))
     thread.start()
-    
+
     worker.finished.connect(thread.quit)
     worker.finished.connect(worker.deleteLater)
     thread.finished.connect(thread.deleteLater)
@@ -405,7 +410,113 @@ def main():
     #Set up logging to files in appData folder - INFO and DEBUG
     from glados_pycromanager.observability.logger import set_up_logger
     set_up_logger()
-    
+
+    # --- Optional auto-profile (Phase 13.1) ----------------------------------
+    # When --profile-runtime SECS is set, we wait for the napari live-mode
+    # handler to be initialised by the worker thread, then enable cProfile,
+    # toggle live mode on for SECS seconds, dump top-25 cumulative stats to
+    # docs/perf-runtime.txt, and quit. Designed for unattended profiling
+    # against `--auto-demo`; not used in normal operation.
+    if args.profile_runtime is not None and args.profile_runtime > 0:
+        import cProfile as _cprof
+        import io as _io
+        import pstats as _pstats
+        import time as _time
+        from PyQt5.QtCore import QTimer  # safe: QApplication already exists
+
+        _profiler = _cprof.Profile()
+        _state = {'started': False}
+        _secs = float(args.profile_runtime)
+
+        def _dump_profile(reason: str) -> None:
+            if _state.get('dumped'):
+                return
+            _state['dumped'] = True
+            _profiler.disable()
+            buf = _io.StringIO()
+            _pstats.Stats(_profiler, stream=buf).sort_stats('cumulative').print_stats(25)
+            n_frames = 0
+            for entry in _profiler.getstats():
+                code = getattr(entry, 'code', None)
+                if code is not None and getattr(code, 'co_name', '') == 'napariUpdateLive':
+                    n_frames = entry.callcount
+                    break
+            from pathlib import Path as _Path
+            out_file = _Path(__file__).resolve().parents[2] / 'docs' / 'perf-runtime.txt'
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+            elapsed = _time.time() - _state.get('t_started', _time.time())
+            header = (
+                f"\n=== Runtime profile {_time.strftime('%Y-%m-%d %H:%M:%S')} "
+                f"({elapsed:.2f}s sample, ended via {reason}, --auto-demo) ===\n"
+                f"napariUpdateLive calls observed: {n_frames}\n\n"
+            )
+            with out_file.open('a', encoding='utf-8') as f:
+                f.write(header)
+                f.write(buf.getvalue())
+            print(f'[profile_runtime] wrote {out_file} ({n_frames} frames, {elapsed:.2f}s, reason={reason})')
+
+        def _profile_stop_and_dump():
+            # Best-effort: turn live mode off so the worker shuts cleanly. If
+            # it's already off (crash), the setter is a no-op.
+            try:
+                shared_data.liveMode = False
+            except Exception as exc:
+                logging.warning('profile_runtime: stop liveMode failed: %r', exc)
+            _dump_profile('timer')
+            QTimer.singleShot(0, app.quit)
+
+        def _profile_poll_livemode():
+            """Watchdog: if live mode self-terminates (crash, MDA exhaustion),
+            dump immediately and quit — we keep whatever frames we captured."""
+            if _state.get('dumped'):
+                return
+            if not getattr(shared_data, 'liveMode', False):
+                _dump_profile('liveMode-auto-stop')
+                QTimer.singleShot(0, app.quit)
+                return
+            QTimer.singleShot(250, _profile_poll_livemode)
+
+        def _profile_try_start():
+            handler = getattr(shared_data, '_livemodeNapariHandler', None)
+            milcore = getattr(shared_data, 'MILcore', None)
+            viewer = getattr(shared_data, 'napariViewer', None)
+            if handler is None or milcore is None or viewer is None:
+                QTimer.singleShot(250, _profile_try_start)
+                return
+            if _state['started']:
+                return
+            _state['started'] = True
+            _state['t_started'] = _time.time()
+            print(f'[profile_runtime] handler ready; profiling live mode for up to {_secs:.1f}s')
+            # Mirror the LiveModeButton click path (MMcontrols.changeLiveMode):
+            # exposure must be applied to the core BEFORE liveMode flips, else
+            # the demo cam races and the MDA can crash. 50 ms is a benign default.
+            try:
+                milcore.set_exposure(50.0)
+            except Exception as exc:
+                logging.warning('profile_runtime: set_exposure(50) failed: %r', exc)
+            _profiler.enable()
+            try:
+                shared_data.liveMode = True
+            except Exception as exc:
+                logging.warning('profile_runtime: start liveMode failed: %r', exc)
+                _dump_profile('start-failed')
+                QTimer.singleShot(0, app.quit)
+                return
+            QTimer.singleShot(int(_secs * 1000), _profile_stop_and_dump)
+            # Watchdog: dump as soon as live mode self-terminates so we don't
+            # lose frames if the worker dies before the timer fires. Give the
+            # worker 500 ms to actually flip liveMode on first.
+            QTimer.singleShot(500, _profile_poll_livemode)
+
+        # 5 s grace lets the worker construct napariHandler, MILcore, the
+        # napari viewer, and wire up the dock widgets — flipping liveMode
+        # earlier can race the GUI setup and crash the demo cam thread.
+        QTimer.singleShot(5000, _profile_try_start)
+        # Final safety net: dump on app teardown, in case neither path fired.
+        app.aboutToQuit.connect(lambda: _dump_profile('aboutToQuit'))
+    # -------------------------------------------------------------------------
+
     #Run the app until closed
     sys.exit(app.exec_())
 
