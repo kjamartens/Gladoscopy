@@ -125,14 +125,12 @@ class MicroscopeInterfaceLayer:
                     for i in range(size):
                         python_list.append(str(str_vector_obj.get(i)))
                 except Exception as e:
-                    print(f"Warning: Could not convert Java object to list using .size() and .get(): {e}")
-                    # Fallback: If it's still not a list, maybe it's a single string
-                    # or something else unexpected.
-                    print(f"Attempting direct conversion of unexpected type: {type(str_vector_obj)}")
+                    logging.warning("Could not convert Java object to list using .size()/.get(): %s", e)
+                    logging.debug("Attempting direct conversion of unexpected type: %s", type(str_vector_obj))
                     python_list = [str(str_vector_obj)] if isinstance(str_vector_obj, (str, bytes)) else []
             else:
                 # If it's not a Java object or simple iterable, treat as single item or error
-                print(f"Warning: Unexpected object type for conversion: {type(str_vector_obj)}. Attempting direct conversion.")
+                logging.warning("Unexpected object type for conversion: %s. Attempting direct conversion.", type(str_vector_obj))
                 python_list = [str(str_vector_obj)] if isinstance(str_vector_obj, (str, bytes)) else []
 
         # Convert the Python list to a NumPy array
@@ -498,7 +496,7 @@ class MicroscopeInterfaceLayer:
         #TODO: Catch if no xy stage present
         try:
             if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
-                print('TODO: get_xy_stage_position not implemented for PYCROMANAGER_JAVA')
+                logging.info("get_xy_stage_position not fully implemented for PYCROMANAGER_JAVA; attempting fallback")
                 return self.core.get_xy_stage_position(xy_stage_name)
             elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
                 return self.core.get_xy_position(xy_stage_name)
