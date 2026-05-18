@@ -169,6 +169,12 @@ class headlessGUI(QWidget):
 
         self.startButton = QPushButton('Start', self)
         self.startButton.clicked.connect(self.start)
+        # Phase 10.9: gate Start on real filesystem state for the MM path
+        # and config file. Wire the textChanged signals so the button
+        # reflects validity live as the user types or browses.
+        self.mm_app_pathLineEdit.textChanged.connect(self._refresh_start_enabled)
+        self.config_fileLineEdit.textChanged.connect(self._refresh_start_enabled)
+        self._refresh_start_enabled()
 
         layout = QGridLayout()
         layout.addWidget(self.splash_label,1,0,1,4)
@@ -203,6 +209,19 @@ class headlessGUI(QWidget):
         file_name, _ = QFileDialog.getOpenFileName(self, "Select Micro-Manager Config File", self.config_fileLineEdit.text(), "Config Files (*.cfg);;All Files (*)", options=options)
         if file_name:
             self.config_fileLineEdit.setText(file_name)
+
+    def _refresh_start_enabled(self) -> None:
+        """Enable Start only when the MM path and config file resolve."""
+        from glados_pycromanager.GUI.headless_validation import (
+            validate_headless_inputs,
+        )
+
+        errors = validate_headless_inputs(
+            self.mm_app_pathLineEdit.text(),
+            self.config_fileLineEdit.text(),
+        )
+        self.startButton.setEnabled(not errors)
+        self.startButton.setToolTip("\n".join(errors) if errors else "")
 
         
     def start(self):
