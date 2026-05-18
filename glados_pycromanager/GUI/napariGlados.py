@@ -90,13 +90,19 @@ def napariUpdateLive(DataStructure):
             return
         if acqstate == False:
             return
+        # Guarantee C-contiguous memory before handing to napari; avoids a
+        # hidden copy inside napari's layer setter when the array is F-order
+        # or non-contiguous (e.g. a strided slice from some camera drivers).
+        liveImage = np.ascontiguousarray(liveImage)
         liveImageLayer = getLayerIdFromName(layerName,napariViewer)
 
         #If it's the first liveImageLayer
         if not liveImageLayer:
             nrLayersBefore = len(napariViewer.layers)
             #The following line takes 2 seconds to run: #TODO: optimize
-            layer = napariViewer.add_image(liveImage, rendering='attenuated_mip', colormap=DataStructure['layer_color_map'],name = layerName)
+            # rendering='attenuated_mip' is a 3-D volumetric mode; for 2-D
+            # live images use the default 2-D renderer (omit the kwarg).
+            layer = napariViewer.add_image(liveImage, colormap=DataStructure['layer_color_map'],name = layerName)
             #Set correct scale - in nm
             if shared_data.MILcore.get_pixel_size_um() != 0:
                 layer.scale = [shared_data.MILcore.get_pixel_size_um(),shared_data.MILcore.get_pixel_size_um()] #type:ignore
@@ -107,18 +113,14 @@ def napariUpdateLive(DataStructure):
             napariViewer.reset_view()
         #Else if the layer already exists, replace it!
         else:
-            # layer is present, replace its data
+            # layer is present; update in-place to avoid reallocating the
+            # layer's internal data pointer when shape and dtype match.
             layer = napariViewer.layers[liveImageLayer[0]]
-            
-            # Store reference to old data
-            old_data = layer.data
-    
-            layer.data = liveImage
+            if layer.data.shape == liveImage.shape and layer.data.dtype == liveImage.dtype:
+                layer.data[:] = liveImage
+            else:
+                layer.data = liveImage
             logging.debug('Put liveImage in the live layer')
-            
-            #Explicitly remove old data:
-            del old_data
-            # gc.collect()
             
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames
     elif shared_data.config.mda_config.vis_method == 'multiDstack':
@@ -129,6 +131,8 @@ def napariUpdateLive(DataStructure):
                 return
             if acqstate == False:
                 return
+            # Guarantee C-contiguous memory for zarr writes (same reason as frameByFrame).
+            latestImage = np.ascontiguousarray(latestImage)
             liveImageLayer = getLayerIdFromName(layerName,napariViewer)
         
             if layerName != 'Live':
@@ -182,8 +186,13 @@ def napariUpdateLive(DataStructure):
                     logging.debug(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
                     
                     shape = n_entries_in_dims
+                    # Hold the TemporaryDirectory object in shared_data so it is not
+                    # GC'd (and the directory deleted) while zarr is still writing.
+                    # Previously the object was discarded immediately after .name was read.
+                    _tmpdir = tempfile.TemporaryDirectory()
+                    shared_data.mdaZarrTempDir = _tmpdir
                     shared_data.mdaZarrData[layerName] = zarr.open(
-                            str(tempfile.TemporaryDirectory().name),
+                            str(_tmpdir.name),
                             shape = shape+[latestImage.shape[0],latestImage.shape[1]],
                             chunks = tuple([1] * len(shape) + [latestImage.shape[0],latestImage.shape[1]]),
                             )

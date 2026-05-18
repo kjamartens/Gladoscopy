@@ -190,6 +190,7 @@ class Shared_data(QObject):
         self.pyMMCdataset: NDTiffDataset = NDTiffDataset('./',summary_metadata={})
         self.activeMDAobject = None
         self.mdaZarrData = {}
+        self.mdaZarrTempDir = None  # holds the TemporaryDirectory object for the active zarr store
         self.nodzInstance = None
         self.backend='JAVA' #JAVA or Python, if running headlessly
         self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.
