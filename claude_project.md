@@ -725,8 +725,8 @@ Produce `docs/error-audit.md` with two tables:
 |---|------|------------------|-------|
 | [ ] 12.1 | Add `scripts/profile_startup.ps1` (and `make profile-startup`) — wraps `python -X importtime` | Reproducible measurement | Commit `tool: startup profile script` |
 | [ ] 12.2 | Capture baseline import time → `docs/perf-baseline.txt` | Numbers locked | Commit `docs: startup baseline numbers` |
-| [ ] 12.3 | Lazy-import tensorflow/keras (move imports inside the node functions that use them) | Faster cold start | Commit `perf: lazy import tensorflow in <node>` (one per file) |
-| [ ] 12.4 | Lazy-import csbdeep / stardist / bioimageio / diplib / opencv | Faster cold start | Commits per dep |
+| [x] 12.3 | Author `docs/lazy-import-strategy.md` — defines the deferred-import contract for node files: (a) class-based RT nodes defer heavy libs to `__init__()`, not `run()`; (b) function-based analysis nodes defer to top of function; (c) a `logging.info("Loading X...")` message always precedes the first local import so the user sees feedback during the run-start pause. | Methodology documented | Commit `docs: lazy-import strategy for autonomous nodes` |
+| [ ] 12.4 | Implement the strategy throughout: remove heavy deps from module scope in all node files; add deferred imports + feedback messages per the methodology doc (`bioimageio`, `diplib`, `csbdeep/stardist`, `cv2`; drop the dead `csbdeep` import in ExampleCustomFunction_DiceRoll). tensorflow/keras are absent from module scope already. | Faster cold start, no per-frame hangs | Commits per node file |
 | [ ] 12.5 | Defer the AppData plugin walk until the autonomous dock is constructed | Faster cold start | Commit `perf: defer AppData plugin scan` |
 | [ ] 12.6 | Capture post-change import time → append to `docs/perf-baseline.txt` | Numbers comparable | Commit `docs: post-optimization startup numbers` |
 | [ ] 12.7 | Verification gate | New numbers strictly faster; CI green | Diff in baseline file |
