@@ -6,6 +6,7 @@
 #Pycromanager - Python
 #MMCore-plus
 
+import logging
 from enum import Enum
 
 import numpy as np
@@ -13,6 +14,10 @@ from pycromanager import Core as PycroManagerCore
 from pycromanager import JavaObject, multi_d_acquisition_events
 from pymmcore import CMMCore as PymmcoreCore
 from pymmcore_plus import CMMCorePlus as PymmcorePlusCore
+
+from glados_pycromanager.errors import BackendError
+
+logger = logging.getLogger(__name__)
 
 
 class MicroscopeInstance(Enum):
@@ -31,8 +36,28 @@ class MicroscopeInterfaceLayer:
         self.mda: dict | None = None
 
     def set_core(self, core):
+        """Bind a backend core object and cache its :class:`MicroscopeInstance`.
+
+        Raises:
+            BackendError: If ``core`` is ``None``. Callers can no longer
+                accidentally bind an empty core that would silently
+                short-circuit every subsequent MIL call.
+
+        Logs a single ``warning`` (not error — some test fixtures pass
+        custom mock objects on purpose) when the backend type cannot be
+        classified, so an UNKNOWN backend is visible in the log file.
+        """
+        if core is None:
+            raise BackendError("MIL.set_core(None) is not allowed")
         self.core = core
         self._mi = self._detect_microscope_instance(core)
+        if self._mi is MicroscopeInstance.UNKNOWN:
+            logger.warning(
+                "MIL.set_core: backend type %r not recognised as Pycromanager/"
+                "MMCore-Plus; downstream calls will raise. core=%r",
+                type(core).__name__,
+                core,
+            )
 
     def get_core(self):
         return self.core
