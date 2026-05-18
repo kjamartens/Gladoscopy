@@ -10,6 +10,7 @@ import numpy as np
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import (
     Qt,
+    QTimer,
 )
 from PyQt5.QtGui import (
     QDoubleValidator,
@@ -1575,6 +1576,8 @@ class MMConfigUI(CustomMainWindow):
         elif abs(amount) == 1:
             self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
         self.updateOneDstageLayout()
+        # Second read-back after the stage has had time to settle.
+        QTimer.singleShot(500, self.updateOneDstageLayout)
     
     
     def oneDstageRelLayout(self):
@@ -1670,11 +1673,10 @@ class MMConfigUI(CustomMainWindow):
         """
         Move XY stage with um positions in relx, rely:
         """
-        #Set the position
-        self.shared_data.MILcore.set_relative_xy_position([relX,relY]) 
-        
-        #Update the XYStageInfoWidget
+        self.shared_data.MILcore.set_relative_xy_position([relX,relY])
         self.updateXYStageInfoWidget()
+        # Second read-back after the stage has had time to complete the move.
+        QTimer.singleShot(500, self.updateXYStageInfoWidget)
     #endregion
     
     #region MM-configs
