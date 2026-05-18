@@ -93,32 +93,31 @@ class SharpnessValue:
     def end(self,core,**kwargs):
         return
     
-    def visualise_init(self): 
+    def visualise_init(self):
         layerName = 'SharpnessMetric'
         layerType = 'points' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
+        self.firstLayerInit = True
         return layerName,layerType
-    
+
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        # create features for each point
+        # Only the feature value changes each frame
         features = {
             'outputval': self.currentValue
         }
-        textv = {
-            'string': 'Current sharpness: {outputval:.3f}',
-            'size': 15,
-            'color': 'red',
-            'translation': np.array([0, 0]),
-            'anchor': 'upper_left',
-        }
-        napariLayer.data = [0,0]
         napariLayer.features = features
-        napariLayer.text = textv
-        # napariLayer.size = 0
-        
-        # napariLayer.data = np.array([[100,100]])
-        # napariLayer.text = text
-        napariLayer.symbol = 'disc'
-        napariLayer.size = 10
-        napariLayer.edge_color='red'
-        napariLayer.face_color = 'blue'
-        napariLayer.selected_data = []
+        if self.firstLayerInit:
+            napariLayer.data = np.array([[0, 0]])
+            textv = {
+                'string': 'Current sharpness: {outputval:.3f}',
+                'size': 15,
+                'color': 'red',
+                'translation': np.array([0, 0]),
+                'anchor': 'upper_left',
+            }
+            napariLayer.text = textv
+            napariLayer.symbol = 'disc'
+            napariLayer.size = 10
+            napariLayer.edge_color = 'red'
+            napariLayer.face_color = 'blue'
+            napariLayer.selected_data = []
+            self.firstLayerInit = False

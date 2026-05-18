@@ -84,13 +84,13 @@ class RealTimeCounter:
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
         vis_time = time.time()
-        napariLayer.data = np.array([[0, 0]])
         properties = {
             'outputval': [self.currentValue],
         }
         #Only the properties need to be changed
         napariLayer.properties = properties
         if self.firstLayerInit:
+            napariLayer.data = np.array([[0, 0]])
             #The text data of the napariLayer need to be changed only on init.
             textv = {
                 'string': 'Current frame: {outputval:0.0f}',
