@@ -717,23 +717,23 @@ Produce `docs/error-audit.md` with two tables:
 | [x] 11.4 | Drop `loguru` from `pyproject.toml` dependencies | Smaller env | Commit `chore: drop loguru dep` |
 | [x] 11.5 | Verification gate | `grep -R "from loguru" glados_pycromanager` empty; CI green | Grep + pytest |
 
-### [ ] Phase 12 — Startup performance
+### [x] Phase 12 — Startup performance
 
 **Goal**: Measurable startup speedup.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
-| [ ] 12.1 | Add `scripts/profile_startup.ps1` (and `make profile-startup`) — wraps `python -X importtime` | Reproducible measurement | Commit `tool: startup profile script` |
-| [ ] 12.2 | Capture baseline import time → `docs/perf-baseline.txt` | Numbers locked | Commit `docs: startup baseline numbers` |
+| [x] 12.1 | Add `scripts/profile_startup.ps1` (and `make profile-startup`) — wraps `python -X importtime` | Reproducible measurement | Commit `tool: startup profile script` |
+| [x] 12.2 | Capture baseline import time → `docs/perf-baseline.txt` | Numbers locked | Commit `docs: startup baseline numbers` |
 | [x] 12.3 | Author `docs/lazy-import-strategy.md` — defines the deferred-import contract for node files: (a) class-based RT nodes defer heavy libs to `__init__()`, not `run()`; (b) function-based analysis nodes defer to top of function; (c) a `logging.info("Loading X...")` message always precedes the first local import so the user sees feedback during the run-start pause. | Methodology documented | Commit `docs: lazy-import strategy for autonomous nodes` |
-| [ ] 12.4 | Implement the strategy throughout: remove heavy deps from module scope in all node files; add deferred imports + feedback messages per the methodology doc (`bioimageio`, `diplib`, `csbdeep/stardist`, `cv2`; drop the dead `csbdeep` import in ExampleCustomFunction_DiceRoll). tensorflow/keras are absent from module scope already. | Faster cold start, no per-frame hangs | Commits per node file |
-| [ ] 12.5 | Defer the AppData plugin walk until the autonomous dock is constructed | Faster cold start | Commit `perf: defer AppData plugin scan` |
-| [ ] 12.6 | Capture post-change import time → append to `docs/perf-baseline.txt` | Numbers comparable | Commit `docs: post-optimization startup numbers` |
-| [ ] 12.7 | Verification gate | New numbers strictly faster; CI green | Diff in baseline file |
+| [x] 12.4 | Implement the strategy throughout: remove heavy deps from module scope in all node files; add deferred imports + feedback messages per the methodology doc (`bioimageio`, `diplib`, `csbdeep/stardist`, `cv2`; drop the dead `csbdeep` import in ExampleCustomFunction_DiceRoll). tensorflow/keras are absent from module scope already. | Faster cold start, no per-frame hangs | Commits per node file |
+| [x] 12.5 | Defer the AppData plugin walk until the autonomous dock is constructed | Faster cold start | Commit `perf: defer AppData plugin scan` |
+| [x] 12.6 | Capture post-change import time → append to `docs/perf-baseline.txt` | Numbers comparable | Commit `docs: post-optimization startup numbers` |
+| [x] 12.7 | Verification gate — 44.6 s → 5.0 s (≈89 % faster); 291 tests pass | New numbers strictly faster; CI green | Diff in baseline file |
 
-### [ ] Phase 13 — Runtime performance (live loop)
+### [ ] Phase 13 — Runtime performance (live loop) + napari visualization
 
-**Goal**: Address the 2-second hot-path TODO and parallelize scoring.
+**Goal**: Address the 2-second hot-path TODO, parallelize scoring, and optimize napari visualization for all MIL backends.
 
 | # | Step | Expected outcome | Proof |
 |---|------|------------------|-------|
@@ -741,7 +741,9 @@ Produce `docs/error-audit.md` with two tables:
 | [ ] 13.2 | Fix the 2-second stall (line 97); the fix is profile-dependent (likely cache a Java-bridge attribute) | Live FPS up | Commit `perf: fix 2s stall in live update loop` |
 | [ ] 13.3 | Audit each `@thread_worker` site — anything blocking the UI thread? Move to a worker | Smoother UI | Commit `perf: move <X> off UI thread` (per site) |
 | [ ] 13.4 | Evaluate parallel scoring in the autonomous executor (independent score nodes can run via `concurrent.futures`) | Scoring speedup | Commit `perf: parallel scoring stage` |
-| [ ] 13.5 | Verification gate | Runtime profile after < before; CI green | Diff in perf file |
+| [ ] 13.5 | **Napari visualization audit & strategy** — Fully read `napariGlados.py` and all MIL-backend image-delivery paths (`PYCROMANAGER_JAVA`, `PYCROMANAGER_PYTHON`, `MMCORE_PLUS`). Understand: how images arrive (callbacks, polling, queue), how they reach napari layers, what dtype/shape conversions happen, whether contiguous memory and `layer.data =` vs in-place updates are used, and whether NAPARI_ASYNC/NAPARI_OCTREE are being used effectively. Produce `docs/napari-vis-strategy.md` with: current state per backend, identified bottlenecks (copy overhead, GUI-thread vs worker, refresh rate), and a ranked list of optimizations to implement | Strategy documented; no code change | Commit `docs: napari visualization strategy` |
+| [ ] 13.6 | **Implement napari visualization optimizations** — Apply the highest-priority items from the strategy doc across all three MIL backends: e.g. in-place ndarray updates (`layer.data[:] = …`), ensuring contiguous C-order arrays before assignment, moving frame decode off the GUI thread if any decode is still happening there, reducing unnecessary layer refreshes. Touch `napariGlados.py` and any backend-specific delivery code | Measurably fewer dropped frames; no regressions | Commit `perf: optimize napari layer updates for all MIL backends` |
+| [ ] 13.7 | Verification gate | Runtime profile after < before; CI green; no visual regressions in napari | Diff in perf file |
 
 ### [ ] Phase 14 — UX polish
 
