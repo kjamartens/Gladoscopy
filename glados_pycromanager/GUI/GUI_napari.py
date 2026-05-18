@@ -569,8 +569,14 @@ def main():
         app.aboutToQuit.connect(lambda: _dump_profile('aboutToQuit'))
     # -------------------------------------------------------------------------
 
+    # Force-exit to avoid the ~10-20 s hang + STATUS_ACCESS_VIOLATION that
+    # happens when pyjavaz bridge threads or the CMMCorePlus destructor try
+    # to clean up after the Qt event loop ends.  The OS reclaims all resources,
+    # so skipping Python's atexit / C-extension destructors is safe here.
+    app.aboutToQuit.connect(lambda: os._exit(0))
+
     #Run the app until closed
-    sys.exit(app.exec_())
+    app.exec_()
 
 
 if __name__ == "__main__":
