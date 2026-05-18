@@ -1001,8 +1001,14 @@ class FlowchartExecutorMixin:
                     slackReadableText = slackReadableText.replace('</b>','*')
                     slackReadableText = "New Score: \n" + slackReadableText
                     cfg = self.shared_data.config.webhook_config
-                    cfg.slack_client.chat_postMessage(channel=cfg.slack_channel, text=slackReadableText) #type:ignore
-                    node.status = 'finished'
+                    from glados_pycromanager.errors import BackendError
+                    from glados_pycromanager.notify.slack import send_slack_message
+                    try:
+                        send_slack_message(cfg, slackReadableText)
+                        node.status = 'finished'
+                    except BackendError as exc:
+                        logging.warning('Slack reporting send failed: %s', exc)
+                        node.status = 'error'
                 else:
                     node.status = 'error'
 
@@ -1232,7 +1238,8 @@ class FlowchartExecutorMixin:
                     slackReadableText = slackReadableText.replace('</i>','_')
                     slackReadableText = slackReadableText.replace('<b>','*')
                     slackReadableText = slackReadableText.replace('</b>','*')
-                    cfg.slack_client.chat_postMessage(channel=cfg.slack_channel, text=slackReadableText)
+                    from glados_pycromanager.notify.slack import send_slack_message
+                    send_slack_message(cfg, slackReadableText)
                 else: #we have an image!
                     #Extract the text between img tags:
                     imgInfo = re.findall('<img>(.*?)</img>',node.slackReportInfo)[0]
@@ -1266,9 +1273,9 @@ class FlowchartExecutorMixin:
                         content=open(tempFile, 'rb').read(),
                         initial_comment = restText,
                     )
-        except Exception as e:
-            logging.warning(f'Slack gave an unexpected error: {e}')
-                    
+        except Exception as e:  # noqa: BLE001 — wide net for any Slack/image error
+            logging.warning('Slack report failed: %s', e)
+
         self.finishedEmits(node)
 
     def fullAutonomousRunStart(self):
