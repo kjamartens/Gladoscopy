@@ -705,10 +705,12 @@ class napariHandler:
                 if acq is not None:
                     self.shared_data.appendNewMDAdataset(acq.get_dataset())
                 else:
+                    # pymmcore-plus backend: pyMMCdataset may be uninitialized or
+                    # have received no images (put_image is not yet implemented).
                     try:
                         self.shared_data.pyMMCdataset.finish()
-                    except (AttributeError, RuntimeError, OSError) as exc:
-                        logging.error('pyMMCdataset.finish() failed (no MDA dataset returned): %s', exc)
+                    except Exception as exc:
+                        logging.debug('pyMMCdataset.finish() skipped (pymmcore-plus backend, no images stored yet): %s', exc)
                         
             logging.debug('#nH - Stopping the acquisition from napariHandler')
             #Now we're after the acquisition

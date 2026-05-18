@@ -1375,10 +1375,19 @@ class MDAGlados(CustomMainWindow):
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
         try:
             self.data = self.shared_data.mdaDatasets[-1]
-        except (IndexError, AttributeError, KeyError) as exc:
-            import zarr
-            data = zarr.open(self.shared_data.mdaZarrData['MDA'])
-            logging.error('No MDA data found in shared_data.mdaDatasets (%s); falling back to zarr MDA store.', exc)
+        except (IndexError, AttributeError):
+            # pymmcore-plus backend: data lives in mdaZarrData, not mdaDatasets
+            try:
+                import zarr
+                self.data = zarr.open(self.shared_data.mdaZarrData['MDA'])
+                logging.info('MDA data loaded from zarr store')
+            except (KeyError, Exception) as zarr_exc:
+                logging.warning(
+                    'MDA dataset not available in mdaDatasets or zarr store (%s); '
+                    'data not accessible for downstream analysis nodes.',
+                    zarr_exc,
+                )
+                self.data = None
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
         
