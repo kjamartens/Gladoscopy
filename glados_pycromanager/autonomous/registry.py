@@ -12,10 +12,12 @@ The decorator is a no-op at call time — it just records the function in
 the module-level ``_REGISTRY`` dict and returns it unchanged. Functions
 remain importable / callable / testable in the usual way.
 
-Phase 10.1 introduces a typed ``NodeDispatchError`` in
-``glados_pycromanager.errors``; this module defines a local ``KeyError``
-subclass with the same name so Phase 9 can land first and Phase 10.1
-re-points the import without churn.
+Phase 10.12 re-points :class:`NodeDispatchError` to the typed exception
+in :mod:`glados_pycromanager.errors`. The previous local class subclassed
+``KeyError``; an audit confirmed no code in the project catches the
+registry exception via ``except KeyError`` (those blocks all catch
+genuine dict-access errors), so promoting it to ``GladosError`` is
+safe.
 """
 
 from __future__ import annotations
@@ -23,14 +25,17 @@ from __future__ import annotations
 import ast
 from typing import Any, Callable, Mapping
 
+from glados_pycromanager.errors import NodeDispatchError
 
-class NodeDispatchError(KeyError):
-    """Raised when ``dispatch()`` cannot resolve a node-function name.
-
-    Subclasses ``KeyError`` so existing ``except KeyError`` blocks keep
-    catching it. Phase 10.1 moves this exception into a dedicated
-    ``glados_pycromanager.errors`` module.
-    """
+__all__ = [
+    "NodeDispatchError",
+    "register",
+    "dispatch",
+    "dispatch_from_eval_text",
+    "get",
+    "is_registered",
+    "registered_names",
+]
 
 
 _REGISTRY: dict[str, Callable] = {}
