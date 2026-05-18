@@ -62,8 +62,10 @@ def napariUpdateLive(DataStructure):
     if time.time()-shared_data.last_display_update_time<min_delay_time and time.time()-shared_data.last_display_update_time>1/1000:
         logging.debug(f'Updated live preview Delayed (due to display update time) val found {time.time()-shared_data.last_display_update_time}')
         logging.debug(f'Updated live preview Delayed (due to display update time) by {min_delay_time-(time.time()-shared_data.last_display_update_time)}')
-        #Sleep for the remainder, then continue
-        time.sleep(max(0,min_delay_time-(time.time()-shared_data.last_display_update_time)))
+        # Skip this frame rather than sleeping on the UI thread. napariUpdateLive is called
+        # from the main thread (napari dispatches yielded-worker signals there), so sleeping
+        # here freezes the entire UI. Dropping the frame is always safer than blocking.
+        return
         
     #shared_data.debugImageDisplayTimes.append(time.time())
     napariViewer = DataStructure['napariViewer']
