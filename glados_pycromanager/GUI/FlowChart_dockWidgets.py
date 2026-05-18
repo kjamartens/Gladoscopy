@@ -1446,10 +1446,13 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 logging.warning('shared_data.napariViewer not set: %s', exc)
         
         self.parent = parent
-        
+
+        from glados_pycromanager.AutonomousMicroscopy import load_appdata_plugins
+        load_appdata_plugins()
+
         #Create a QGridLayout:
         self.mainLayout = QGridLayout()
-        
+
         self.fullRunOngoing = False
         
         self.iconFolder = utils.findIconFolder()

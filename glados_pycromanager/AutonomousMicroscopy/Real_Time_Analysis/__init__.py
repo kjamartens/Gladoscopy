@@ -30,8 +30,17 @@ _register(_source_mods)
 log_failures(_source_failures)
 
 _APPDATA_DIR = user_appdata_dir_for(_HERE)
-_appdata_mods, _appdata_failures = load_node_modules(
-    _APPDATA_DIR, prefix=f"{__name__}.appdata"
-)
-_register(_appdata_mods)
-log_failures(_appdata_failures)
+_appdata_loaded: bool = False
+
+
+def _load_appdata() -> None:
+    """Load user AppData drop-in modules. Called lazily when the autonomous dock is built."""
+    global _appdata_loaded
+    if _appdata_loaded:
+        return
+    _appdata_loaded = True
+    _appdata_mods, _appdata_failures = load_node_modules(
+        _APPDATA_DIR, prefix=f"{__name__}.appdata"
+    )
+    _register(_appdata_mods)
+    log_failures(_appdata_failures)

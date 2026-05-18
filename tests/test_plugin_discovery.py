@@ -69,6 +69,10 @@ def test_dropin_plugin_loads_from_appdata(isolated_appdata):
 
     pkg = _clean_reimport("glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements")
 
+    # AppData walk is now deferred — must call _load_appdata() explicitly
+    # (mirrors what GladosNodzFlowChart_dockWidget.__init__ does at dock construction).
+    pkg._load_appdata()
+
     # The discovery loader appends every discovered module to __all__ and
     # injects it into the package's globals dict.
     assert "DropInNode" in pkg.__all__
@@ -87,6 +91,7 @@ def test_dropin_works_in_realtime_subfolder(isolated_appdata):
     pkg = _clean_reimport(
         "glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis"
     )
+    pkg._load_appdata()
     assert "DropInRT" in pkg.__all__
 
 
@@ -95,6 +100,7 @@ def test_dropin_works_in_customfunctions(isolated_appdata):
     pkg = _clean_reimport(
         "glados_pycromanager.AutonomousMicroscopy.CustomFunctions"
     )
+    pkg._load_appdata()
     assert "DropInCustom" in pkg.__all__
 
 
