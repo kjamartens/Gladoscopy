@@ -2,10 +2,14 @@
 # macOS, and Linux. Targets are thin wrappers so CI can call the same commands.
 #
 # Quick start (new contributor):
-#   make env      ← create / update GladosEnv conda environment
-#   make dev      ← editable install with dev extras (inside GladosEnv)
-#   make test     ← run the test suite
-#   make ci       ← full local gate: lint + bandit + tests
+#   make env               ← create / update GladosEnv conda environment
+#   conda activate GladosEnv   ← must be active before any other target
+#   make dev               ← editable install with dev extras
+#   make test              ← run the test suite
+#   make ci                ← full local gate: lint + bandit + tests
+#
+# IMPORTANT: activate GladosEnv before running any target that installs,
+# tests, or runs code — otherwise PYTHON resolves to the system Python.
 #
 # Windows: GnuWin32 make (C:\Program Files (x86)\GnuWin32\bin\make.exe)
 # works from PowerShell / cmd.  Git-Bash make also works.
