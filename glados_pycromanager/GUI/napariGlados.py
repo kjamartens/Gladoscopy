@@ -305,7 +305,7 @@ def napariUpdateLive(DataStructure):
                         #Put it in
                         shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage
                         logging.debug(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
-                    except (KeyError, IndexError, TypeError, ValueError) as exc:
+                    except (AttributeError, KeyError, IndexError, TypeError, ValueError) as exc:
                         logging.debug('Entry %s tried, but not acquired: %s', expectedEntry, exc)
             
             logging.debug('Finalised up visualisation...')
@@ -433,29 +433,41 @@ class napariHandler:
             return None
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
-        
-        # image_coordinates = event
-        # self.shared_data.pyMMCdataset.put_image(image_coordinates,image,metadata)
-        
         if self.acqstate:
-            # #Check if there is any reason to read the image:
-            # reasonToReadImage = False
-            # #Check if it should be put in the visualisation queue
-            # if len(self.visualisation_queue) < 5:
-            #     reasonToReadImage = True
-            # #Check if it should be put in any of the analysis queues
-            # for queue in [item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads]:
-            #     if len(queue) < 2:
-            #         reasonToReadImage = True
-            # if len(self.image_queue_analysis) < 5:
-            #     reasonToReadImage = True
-                
-            # if reasonToReadImage:
             metadata = utils.metadata_refactor(metadata, self.shared_data)
+            # For multiDstack MDA: write every frame directly to zarr so fast acquisitions
+            # don't leave black slices (vis queue only passes ~fps frames/s, rest are dropped).
+            if self.shared_data.config.mda_config.vis_method == 'multiDstack':
+                self._try_write_frame_to_zarr(image, metadata)
             self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
         else:
             logging.info('Need to break off!')
             self.shared_data.MILcore.stop_sequence_acquisition()
+
+    def _try_write_frame_to_zarr(self, image: np.ndarray, metadata: dict):
+        """Write a single frame to the multiDstack zarr array, bypassing the vis queue.
+
+        Called from the frameReady callback thread; zarr supports concurrent writes to
+        non-overlapping chunks so this is safe alongside the vis worker.
+        """
+        layerName = self.shared_data.newestLayerName
+        if not layerName:
+            return
+        zarr_data = self.shared_data.mdaZarrData.get(layerName)
+        if zarr_data is None:
+            return
+        try:
+            dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = \
+                utils.getDimensionsFromAcqData(self.shared_data._mdaModeParams)
+            sliceTuple = ()
+            for dim_name in dimensionOrder:
+                current_val = metadata['Axes'][dim_name]
+                unique_vals = uniqueEntriesAllDims[dim_name].tolist()
+                slice_id = unique_vals.index(current_val)
+                sliceTuple += (int(slice_id),)
+            zarr_data[sliceTuple + (slice(None), slice(None))] = np.ascontiguousarray(image)
+        except Exception as exc:
+            logging.debug('_try_write_frame_to_zarr skipped: %s', exc)
     
     def PyMMCore_finishedAcqCallback(self,sequence: useq.MDASequence):
         logging.info("MDA sequence finished: %s", sequence)
