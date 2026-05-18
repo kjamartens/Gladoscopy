@@ -7,20 +7,24 @@ Please read the relevant section before you open a PR.
 ## Quick start
 
 ```bash
-# 1. Bootstrap the conda environment (creates GladosEnv — idempotent):
-make env
-# 2. Editable install with all dev extras:
-make dev
-# 3. Verify everything works:
-make test
+make dev      # creates .venv, then editable install with dev extras
+make test     # verify everything works
 ```
 
-Windows note: `make` is available via **GnuWin32**
-(`C:\Program Files (x86)\GnuWin32\bin\make.exe`) — works from PowerShell
-and cmd.exe directly. Git Bash also works if you prefer that shell.
+That's it — no conda, no manual activation. `make dev` creates a `.venv`
+in the repo root on first run and uses it automatically from then on.
 
-Alternatively, use the all-in-one Windows batch file (creates env + does
-editable install in one shot):
+**Windows**: `make` is available via **GnuWin32**
+(`C:\Program Files (x86)\GnuWin32\bin\make.exe`) — works from PowerShell
+and cmd.exe directly. Git Bash also works.
+
+**Conda alternative** (if you prefer conda or already have GladosEnv):
+```bash
+make env                    # create / update GladosEnv
+conda activate GladosEnv
+make dev PYTHON=python      # install into the active conda env
+```
+Or use the all-in-one Windows batch file:
 ```pwsh
 .\win_create_env.bat
 ```

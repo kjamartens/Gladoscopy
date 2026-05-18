@@ -1,28 +1,39 @@
 # Common developer tasks. Works on Windows (GnuWin32 make or Git-Bash make),
 # macOS, and Linux. Targets are thin wrappers so CI can call the same commands.
 #
-# Quick start (new contributor):
-#   make env               ← create / update GladosEnv conda environment
-#   conda activate GladosEnv   ← must be active before any other target
-#   make dev               ← editable install with dev extras
-#   make test              ← run the test suite
-#   make ci                ← full local gate: lint + bandit + tests
+# Quick start (new contributor — no conda needed):
+#   make dev      ← creates .venv if absent, then editable install with dev extras
+#   make test     ← run the test suite
+#   make ci       ← full local gate: lint + bandit + tests
 #
-# IMPORTANT: activate GladosEnv before running any target that installs,
-# tests, or runs code — otherwise PYTHON resolves to the system Python.
+# Conda alternative (existing GladosEnv users):
+#   make env      ← create / update GladosEnv conda env
+#   conda activate GladosEnv && make dev
 #
 # Windows: GnuWin32 make (C:\Program Files (x86)\GnuWin32\bin\make.exe)
 # works from PowerShell / cmd.  Git-Bash make also works.
 
-PYTHON  ?= python
-PIP     ?= $(PYTHON) -m pip
-PYTEST  ?= $(PYTHON) -m pytest
-RUFF    ?= $(PYTHON) -m ruff
-MYPY    ?= $(PYTHON) -m mypy
-BANDIT  ?= $(PYTHON) -m bandit
+# Auto-detect .venv so no manual activation is ever needed.
+# Override by setting PYTHON explicitly: make test PYTHON=python3.13
+ifeq ($(OS),Windows_NT)
+    _VENV_PYTHON := .venv/Scripts/python.exe
+else
+    _VENV_PYTHON := .venv/bin/python
+endif
+ifneq ($(wildcard $(_VENV_PYTHON)),)
+    PYTHON ?= $(_VENV_PYTHON)
+else
+    PYTHON ?= python
+endif
+
+PIP    ?= $(PYTHON) -m pip
+PYTEST ?= $(PYTHON) -m pytest
+RUFF   ?= $(PYTHON) -m ruff
+MYPY   ?= $(PYTHON) -m mypy
+BANDIT ?= $(PYTHON) -m bandit
 PACKAGE := glados_pycromanager
 
-.PHONY: help env install dev build \
+.PHONY: help env venv install dev build \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
         run profile-startup \
@@ -30,18 +41,24 @@ PACKAGE := glados_pycromanager
         clean
 
 help:  ## Show this help.
-	@$(PYTHON) -c "import re; print('NOTE: run \"conda activate GladosEnv\" before any target that installs, tests, or runs code.\n\nTargets:'); [print('  {:<18} {}'.format(*m.groups())) for l in open('Makefile',encoding='utf-8',errors='replace') for m in [re.match(r'^([a-zA-Z_-]+):.*?## (.*)', l)] if m]"
+	@$(PYTHON) -c "import re; print('Targets:'); [print('  {:<18} {}'.format(*m.groups())) for l in open('Makefile',encoding='utf-8',errors='replace') for m in [re.match(r'^([a-zA-Z_-]+):.*?## (.*)', l)] if m]"
 
 # ── Environment & install ─────────────────────────────────────────────────────
 
-env:  ## Create or update the GladosEnv conda env from environment.yaml.
+.venv:
+	python -m venv .venv
+	@echo ".venv created — run 'make dev' to install."
+
+venv: .venv  ## Create .venv using the system Python (skipped if already present).
+
+env:  ## Create or update the GladosEnv conda env from environment.yaml (conda users).
 	conda env create --name GladosEnv -f environment.yaml 2>/dev/null \
 	    || conda env update --name GladosEnv -f environment.yaml
 
-install:  ## Non-editable production install (no dev extras).
+install:  ## Non-editable production install into the active env (no dev extras).
 	$(PIP) install .
 
-dev:  ## Editable install with dev extras (typical day-to-day command).
+dev: .venv  ## Editable install with dev extras into .venv (creates .venv if absent).
 	$(PIP) install -e ".[dev]"
 
 build:  ## Build wheel + sdist into dist/.
@@ -92,9 +109,9 @@ verify: ci  ## Alias for ci (backwards compat).
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
-clean:  ## Remove build / cache artefacts (works on Windows and Unix).
+clean:  ## Remove build / cache artefacts and .venv (works on Windows and Unix).
 	$(PYTHON) -c "import shutil,glob,os; \
 	    [shutil.rmtree(p,True) for p in \
-	        ['build','dist','.pytest_cache','.ruff_cache','.mypy_cache'] \
+	        ['build','dist','.pytest_cache','.ruff_cache','.mypy_cache','.venv'] \
 	        + glob.glob('*.egg-info')]; \
 	    [os.remove(f) for f in glob.glob('startup.log') if os.path.isfile(f)]"
