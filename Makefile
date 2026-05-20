@@ -22,15 +22,17 @@
 # Override by setting PYTHON explicitly: make test PYTHON=python3.13
 ifeq ($(OS),Windows_NT)
     _VENV_PYTHON := .venv/Scripts/python.exe
-    _VENV_PIP    := .venv\Scripts\pip
+    # Bootstrap uv via Anaconda pip, then let uv fetch Python 3.13 if needed.
+    # uv venv does not install pip, so PIP uses the base-env uv (auto-detects .venv).
+    _VENV_CREATE  = python -m pip install --quiet uv && python -m uv venv --python 3.13 --seed .venv
     PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(subst /,\,$(_VENV_PYTHON)),python)
+    PIP    ?= $(PYTHON) -m pip
 else
     _VENV_PYTHON := .venv/bin/python
-    _VENV_PIP    := .venv/bin/pip
+    _VENV_CREATE := uv venv --python 3.13 .venv
     PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(_VENV_PYTHON),python)
+    PIP    ?= uv pip
 endif
-
-PIP    ?= $(PYTHON) -m uv pip
 PYTEST ?= $(PYTHON) -m pytest
 RUFF   ?= $(PYTHON) -m ruff
 MYPY   ?= $(PYTHON) -m mypy
@@ -50,8 +52,7 @@ help:  ## Show this help.
 # ── Environment & install ─────────────────────────────────────────────────────
 
 .venv:
-	python -m venv .venv
-	$(_VENV_PIP) install --quiet uv
+	$(_VENV_CREATE)
 	@echo ".venv created with uv — run 'make dev' to install."
 
 venv: .venv  ## Create .venv using the system Python (skipped if already present).
