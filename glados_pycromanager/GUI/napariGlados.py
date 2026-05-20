@@ -69,14 +69,16 @@ def napariUpdateLive(DataStructure):
     min_delay_time = np.min(((50/1000),(float(shared_data.MILcore.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
     
     display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
-    
-    if time.time() - shared_data.last_display_update_time < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
-        logging.debug(f'Updated live preview Hindered (due to display update time) at time {time.time()}')
+
+    now = time.time()  # cache once — used multiple times below
+    elapsed = now - shared_data.last_display_update_time
+    if elapsed < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
+        logging.debug(f'Updated live preview Hindered (due to display update time) at time {now}')
         return
-    
-    if time.time()-shared_data.last_display_update_time<min_delay_time and time.time()-shared_data.last_display_update_time>1/1000:
-        logging.debug(f'Updated live preview Delayed (due to display update time) val found {time.time()-shared_data.last_display_update_time}')
-        logging.debug(f'Updated live preview Delayed (due to display update time) by {min_delay_time-(time.time()-shared_data.last_display_update_time)}')
+
+    if elapsed < min_delay_time and elapsed > 1/1000:
+        logging.debug(f'Updated live preview Delayed (due to display update time) val found {elapsed}')
+        logging.debug(f'Updated live preview Delayed (due to display update time) by {min_delay_time - elapsed}')
         # Skip this frame rather than sleeping on the UI thread. napariUpdateLive is called
         # from the main thread (napari dispatches yielded-worker signals there), so sleeping
         # here freezes the entire UI. Dropping the frame is always safer than blocking.
@@ -827,7 +829,8 @@ class napariHandler:
                     break
                 
                 # get elements from queue while there is more than one element
-                self._new_image.wait(timeout=0.1)#Wait for a new image
+                # self._new_image.wait(timeout=0.1)  # old: woke up 10x/s spuriously
+                self._new_image.wait(timeout=1.0)  # 1s deadman; acqModeChanged sets this on stop
                 self._new_image.clear()
                 
                 if visualisation_queue:
@@ -907,6 +910,7 @@ class napariHandler:
                 self.shared_data.MILcore.stop_sequence_acquisition()
                 #Signal that there is no acquisition ongoing
                 self.acqstate = False
+                self._new_image.set()  # unblock visualization worker immediately
                 self.stop_continuous_task = True
                 #Clear the image queue
                 self.visualisation_queue.clear()
@@ -941,6 +945,7 @@ class napariHandler:
             #Hook the live mode into the scripts here
             if self.shared_data.mdaMode == False:
                 self.acqstate = False
+                self._new_image.set()  # unblock visualization worker immediately
                 self.stop_continuous_task = True
                 #Clear the image queue
                 self.visualisation_queue.clear()
