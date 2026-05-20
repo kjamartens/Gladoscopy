@@ -728,3 +728,19 @@ independent nodes:
 **Affects:** `claude_project.md` (checkbox only).
 
 *Append future decisions below this line, newest at the bottom.*
+
+## 2026-05-20 — Skipped H2 (mode-change sleep) and H4 (MDA debounce) in Phase 13 perf pass  [Phase 13.8-13.14]
+**Decision:** H2 (`time.sleep(0.1)` in `liveMode`/`mdaMode` setters) and H4 (debouncing
+`get_MDA_events_from_GUI`) were identified in the scan but explicitly excluded at user request.
+**Alternatives:** Implement H2 with `QTimer.singleShot` replacement; implement H4 with 150ms QTimer debounce.
+**Reason:** User judged both as too risky or out of scope for this pass. H2 has a subtle
+race condition if callers expect synchronous mode change; H4 would change existing GUI behaviour.
+**Affects:** `claude_project.md` (steps noted as skipped in scan findings table).
+
+## 2026-05-20 — Replaced self.MI() with self._mi throughout MIL  [Phase 13.11]
+**Decision:** Replace all 121 `self.MI()` calls with direct `self._mi` attribute access.
+**Alternatives:** Cache as `mi = self._mi` at the top of each hot-path method only.
+**Reason:** `MI()` is a trivial getter (`return self._mi`). Direct access is simpler and applies
+uniformly; a full file-level replacement was cleaner than selective per-method caching.
+Test helpers that patched `mil.MI()` were updated to also set `mil._mi` directly.
+**Affects:** `microscopeInterfaceLayer.py`, `tests/test_mil_dispatch.py`, `tests/test_mda_event_builder.py`.
