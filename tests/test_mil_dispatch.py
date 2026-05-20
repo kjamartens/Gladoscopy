@@ -43,7 +43,8 @@ def mil():
 
 
 def _force_backend(mil_obj, monkeypatch, backend: MicroscopeInstance):
-    """Stub `MI()/get_MI()/get_microscope_interface()` to return `backend`."""
+    """Force backend by setting _mi directly (methods read it via self._mi)."""
+    monkeypatch.setattr(mil_obj, "_mi", backend)
     monkeypatch.setattr(mil_obj, "MI", lambda: backend)
     monkeypatch.setattr(mil_obj, "get_MI", lambda: backend)
     monkeypatch.setattr(mil_obj, "get_microscope_interface", lambda: backend)

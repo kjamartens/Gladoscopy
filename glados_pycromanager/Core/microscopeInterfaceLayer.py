@@ -147,11 +147,11 @@ class MicroscopeInterfaceLayer:
         """
         Clear the region of interest (ROI) for the camera.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.clear_roi()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.clear_roi()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.clearROI()
         else:
             raise ValueError("Unsupported microscope interface type for clear_roi.")
@@ -160,11 +160,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the current state of the auto shutter.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_auto_shutter()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_auto_shutter()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getAutoShutter()
         else:
             raise ValueError("Unsupported microscope interface type for get_auto_shutter.")
@@ -173,11 +173,11 @@ class MicroscopeInterfaceLayer:
         """
         Get a list of available configuration groups.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.java_arr_to_numpy(self.core.get_available_config_groups())
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return np.array(self.core.get_available_config_groups())
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getAvailableConfigGroups()
         else:
             raise ValueError("Unsupported microscope interface type for get_available_config_group.")
@@ -187,11 +187,11 @@ class MicroscopeInterfaceLayer:
         Get a list of available configurations for a given configuration group.
         """
         
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.java_arr_to_numpy(self.core.get_available_configs(config_group))
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_available_configs(config_group)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getAvailableConfigs(config_group)
         else:
             raise ValueError("Unsupported microscope interface type for get_available_configs.")
@@ -200,11 +200,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the configuration data for a specific configuration group and name.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_config_data(config_group, config_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_config_data(config_group, config_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getConfigData(config_group, config_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_config_data.")
@@ -213,11 +213,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return config_data.getSetting(0).get_device_label()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return config_data.getSetting(0).getDeviceLabel()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return config_data.getSetting(0).getDeviceLabel()
         else:
             raise ValueError("Unsupported microscope interface type for get_config_device_label.")
@@ -226,11 +226,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the current state of a configuration group.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_config_group_state(config_group)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_config_group_state(config_group)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getConfigGroupState(config_group)
         else:
             raise ValueError("Unsupported microscope interface type for get_config_group_state.")
@@ -239,11 +239,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return config_data.getSetting(0).get_property_name()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return config_data.getSetting(0).getPropertyName()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return config_data.getSetting(0).getPropertyName()
         else:
             raise ValueError("Unsupported microscope interface type for get_config_device_label.")
@@ -252,11 +252,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the current configuration for a specific configuration group.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_current_config(config_group)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_current_config(config_group)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getCurrentConfig(config_group)
         else:
             raise ValueError("Unsupported microscope interface type for get_current_config.")
@@ -266,11 +266,11 @@ class MicroscopeInterfaceLayer:
         Get the type of a device by its name.
         """
         #TODO: currently we're returning a SWIG value, 1-15, see MMcontrols line 1404-1422 for interpretation of these. Probably just change this to a string in the future.
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_device_type(device_name).swig_value()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_device_type(device_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getDeviceType(device_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_device_type.")
@@ -279,11 +279,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the exposure time for the microscope camera.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_exposure()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_exposure()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getExposure()
         else:
             raise ValueError("Unsupported microscope interface type for getting exposure.")
@@ -291,11 +291,11 @@ class MicroscopeInterfaceLayer:
     def get_focus_device(self) -> str:
         if self.core is None:
             raise RuntimeError("Microscope core is not set.")
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_focus_device()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_focus_device()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getFocusDevice()
         else:
             # This case should ideally not be reached if all types are covered by the initial union
@@ -308,13 +308,13 @@ class MicroscopeInterfaceLayer:
         Return a NumPy array representing the image (Height x Width).
         The image is returned as a 2D array for grayscale images.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             newImage = self.core.get_tagged_image()
             return np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
-            return np.array(self.core.get_image())
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
-            return np.array(self.core.getImage())
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return np.asarray(self.core.get_image())
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            return np.asarray(self.core.getImage())
         else:
             raise ValueError("Unsupported microscope interface type for getting image.")
     
@@ -334,11 +334,11 @@ class MicroscopeInterfaceLayer:
         """
         Get a list of loaded devices in the microscope core.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.java_arr_to_numpy(self.core.get_loaded_devices())
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_loaded_devices()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getLoadedDevices()
         else:
             raise ValueError("Unsupported microscope interface type for get_loaded_devices.")
@@ -351,11 +351,11 @@ class MicroscopeInterfaceLayer:
         """
         if use_cache and self._pixel_size_um_cache is not None:
             return self._pixel_size_um_cache
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             value = self.core.get_pixel_size_um()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             value = self.core.get_pixel_size_um()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             value = self.core.getPixelSizeUm()
         else:
             value = 1.0
@@ -370,11 +370,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the current position of a device.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_position(device_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_position(device_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getPosition(device_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_position.")
@@ -383,11 +383,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the value of a property for a specific device.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_property(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_property(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getProperty(device_name, property_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_property.")
@@ -396,11 +396,11 @@ class MicroscopeInterfaceLayer:
         """
         Check if a property has limits.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.has_property_limits(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.has_property_limits(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.hasPropertyLimits(device_name, property_name)
         else:
             raise ValueError("Unsupported microscope interface type for has_property_limits.")
@@ -409,11 +409,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the lower limit of a property.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_property_lower_limit(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_property_lower_limit(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getPropertyLowerLimit(device_name, property_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_property_lower_limit.")
@@ -422,11 +422,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the upper limit of a property.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_property_upper_limit(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_property_upper_limit(device_name, property_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getPropertyUpperLimit(device_name, property_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_property_upper_limit.")
@@ -435,11 +435,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the current ROI.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return np.array(self.core.get_roi())
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_roi()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getROI()
         else:
             raise ValueError("Unsupported microscope interface type for get_roi.")
@@ -448,11 +448,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the current shutter device.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_shutter_device()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_shutter_device()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getShutterDevice()
         else:
             raise ValueError("Unsupported microscope interface type for get_shutter_device.")
@@ -461,11 +461,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the current state of the shutter (open or closed).
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_shutter_open()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_shutter_open()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getShutterOpen()
         else:
             raise ValueError("Unsupported microscope interface type for get_shutter_open.")
@@ -479,11 +479,11 @@ class MicroscopeInterfaceLayer:
             if xy_stage_name is None:
                 xy_stage_name = self.get_xy_stage_device()
                 
-            if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 return self.core.get_xy_position(xy_stage_name)
-            elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
                 return self.core.get_xy_position(xy_stage_name)
-            elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
                 return self.core.getXYPosition(xy_stage_name)
             else:
                 raise ValueError("Unsupported microscope interface type for get_xy_position.")
@@ -495,11 +495,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the name of the X-Y stage device.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.get_xy_stage_device()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.get_xy_stage_device()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.getXYStageDevice()
         else:
             raise ValueError("Unsupported microscope interface type for get_xy_stage_device.")
@@ -510,12 +510,12 @@ class MicroscopeInterfaceLayer:
         """
         #TODO: Catch if no xy stage present
         try:
-            if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 logging.info("get_xy_stage_position not fully implemented for PYCROMANAGER_JAVA; attempting fallback")
                 return self.core.get_xy_stage_position(xy_stage_name)
-            elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
                 return self.core.get_xy_position(xy_stage_name)
-            elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
                 return self.core.getXYPosition(xy_stage_name)
             else:
                 raise ValueError("Unsupported microscope interface type for get_xy_stage_position.")
@@ -527,11 +527,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the auto shutter state.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_auto_shutter(auto_shutter)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_auto_shutter(auto_shutter)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setAutoShutter(auto_shutter)
         else:
             raise ValueError("Unsupported microscope interface type for set_auto_shutter.")
@@ -540,11 +540,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the configuration for a specific configuration group.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_config(config_group, config_name)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_config(config_group, config_name)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setConfig(config_group, config_name)
         else:
             raise ValueError("Unsupported microscope interface type for set_config.")
@@ -553,11 +553,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the exposure time for the microscope camera.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_exposure(exposure_time)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_exposure(exposure_time)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setExposure(exposure_time)
         else:
             raise ValueError("Unsupported microscope interface type for setting exposure.")
@@ -569,11 +569,11 @@ class MicroscopeInterfaceLayer:
         if self.core is None:
             raise RuntimeError("Microscope core is not set.")
         
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_focus_device(focus_device)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_focus_device(focus_device)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setFocusDevice(focus_device)
         else:
             raise ValueError("Unsupported microscope interface type for setting focus device.")
@@ -582,11 +582,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the value of a property for a specific device.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return self.core.set_property(device_name, property_name, newval)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return self.core.set_property(device_name, property_name, newval)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return self.core.setProperty(device_name, property_name, newval)
         else:
             raise ValueError("Unsupported microscope interface type for get_property.")
@@ -595,11 +595,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the relative position of a device.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_relative_position(device_name, pos_change)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_relative_position(device_name, pos_change)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setRelativePosition(device_name, pos_change)
         else:
             raise ValueError("Unsupported microscope interface type for set_relative_position.")
@@ -608,11 +608,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the relative position of the X-Y stage.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_relative_xy_position(pos_change[0], pos_change[1])
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_relative_xy_position(pos_change[0], pos_change[1])
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setRelativeXYPosition(pos_change[0], pos_change[1])
         else:
             raise ValueError("Unsupported microscope interface type for set_relative_xy_position.")        
@@ -621,11 +621,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the region of interest (ROI) for the camera.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_roi(roi[0], roi[1], roi[2], roi[3])
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_roi(roi[0], roi[1], roi[2], roi[3])
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setROI(roi[0], roi[1], roi[2], roi[3])
         else:
             raise ValueError("Unsupported microscope interface type for set_roi.")
@@ -634,11 +634,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the shutter device.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_shutter_device(shutter_device)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_shutter_device(shutter_device)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setShutterDevice(shutter_device)
         else:
             raise ValueError("Unsupported microscope interface type for set_shutter_device.")
@@ -647,11 +647,11 @@ class MicroscopeInterfaceLayer:
         """
         Set the state of the shutter (open or closed).
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.set_shutter_open(open_shutter)
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.set_shutter_open(open_shutter)
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.setShutterOpen(open_shutter)
         else:
             raise ValueError("Unsupported microscope interface type for set_shutter_open.")
@@ -660,11 +660,11 @@ class MicroscopeInterfaceLayer:
         """
         Snap an image using the microscope camera.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.snap_image()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.snap_image()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.snapImage()
         else:
             raise ValueError("Unsupported microscope interface type for snapping image.")
@@ -673,11 +673,11 @@ class MicroscopeInterfaceLayer:
         """
         Stop the sequence acquisition of images.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.stop_sequence_acquisition()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.stop_sequence_acquisition()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.stopSequenceAcquisition()
             try:
                 if self.core.mda.is_running():
@@ -691,11 +691,11 @@ class MicroscopeInterfaceLayer:
         """
         Get the verbose information from a configuration group state.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             return config_group_state.get_verbose()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return config_group_state.getVerbose()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return config_group_state.getVerbose()
         else:
             raise ValueError("Unsupported microscope interface type for verbose_info_from_config_group_state.")
@@ -704,11 +704,11 @@ class MicroscopeInterfaceLayer:
         """
         Wait for the microscope system to be ready.
         """
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
             self.core.wait_for_system()
-        elif self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON:
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             self.core.wait_for_system()
-        elif self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             self.core.waitForSystem()
         else:
             raise ValueError("Unsupported microscope interface type for wait_for_system.")
@@ -756,7 +756,7 @@ class MicroscopeInterfaceLayer:
                     "channels supplied but channel_group is empty"
                 )
 
-        if self.MI() == MicroscopeInstance.PYCROMANAGER_JAVA or self.MI() == MicroscopeInstance.PYCROMANAGER_PYTHON or self.MI() == MicroscopeInstance.MMCORE_PLUS:
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA or self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON or self._mi == MicroscopeInstance.MMCORE_PLUS:
             # Forward None for any axis the caller didn't supply so the
             # pycromanager helper's mutex check (xy vs xyz, channels vs
             # exposures, etc.) sees genuine absence rather than empty-list

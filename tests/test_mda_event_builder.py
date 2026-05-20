@@ -31,6 +31,7 @@ def mil_python(monkeypatch):
     `self._core`. So we can skip wiring a real/mock core entirely.
     """
     mil = MicroscopeInterfaceLayer()
+    monkeypatch.setattr(mil, "_mi", MicroscopeInstance.PYCROMANAGER_PYTHON)
     monkeypatch.setattr(mil, "MI", lambda: MicroscopeInstance.PYCROMANAGER_PYTHON)
     return mil
 
@@ -144,6 +145,7 @@ def test_unknown_backend_raises():
 )
 def test_every_real_backend_routes_through_multi_d_helper(monkeypatch, backend):
     mil = MicroscopeInterfaceLayer()
+    monkeypatch.setattr(mil, "_mi", backend)
     monkeypatch.setattr(mil, "MI", lambda: backend)
     events = mil.create_mda(num_time_points=1, **SAFE_OVERRIDES)
     assert isinstance(events, list)
