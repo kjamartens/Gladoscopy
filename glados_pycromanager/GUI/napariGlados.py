@@ -258,7 +258,7 @@ def napariUpdateLive(DataStructure):
                     sliceTuple = ()
                     for dim_id in range(len(n_entries_in_dims)):
                         currentSlice = metadata['Axes'][dimensionOrder[dim_id]]
-                        currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                        currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
                         logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
                         sliceTuple += (int(currentSliceID),)
                         
@@ -267,7 +267,7 @@ def napariUpdateLive(DataStructure):
                     #set the napariViewer to the correct slice:
                     for dim_id in range(len(n_entries_in_dims)):
                         currentSlice = metadata['Axes'][dimensionOrder[dim_id]]
-                        currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                        currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
                         napariViewer.dims.set_current_step(dim_id,int(currentSliceID))
                     
                     #Store exactly which axes is rendered
@@ -318,7 +318,7 @@ def napariUpdateLive(DataStructure):
                         sliceTuple = ()
                         for dim_id in range(len(n_entries_in_dims)):
                             currentSlice = expectedEntry['axes'][dimensionOrder[dim_id]]
-                            currentSliceID = uniqueEntriesAllDims[dimensionOrder[dim_id]].tolist().index(currentSlice)
+                            currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
                             sliceTuple += (int(currentSliceID),)
                         #Put it in
                         shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage
@@ -480,8 +480,7 @@ class napariHandler:
             sliceTuple = ()
             for dim_name in dimensionOrder:
                 current_val = metadata['Axes'][dim_name]
-                unique_vals = uniqueEntriesAllDims[dim_name].tolist()
-                slice_id = unique_vals.index(current_val)
+                slice_id = int(np.searchsorted(uniqueEntriesAllDims[dim_name], current_val))
                 sliceTuple += (int(slice_id),)
             zarr_data[sliceTuple + (slice(None), slice(None))] = np.ascontiguousarray(image)
         except Exception as exc:
