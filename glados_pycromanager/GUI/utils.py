@@ -3318,29 +3318,20 @@ def openAdvancedSettings(shared_data):
     pass
 
 def getDimensionsFromAcqData(acqData):
-    # time_getdimfromacqdata = time.time()
-    # logging.info(f'acData: {acqData}')
-    # logging.info(f'metadata: {acqData[0]}')
     try:
-        alldims = acqData[0]['axes']
-        num_dims = len(alldims)
-        dimOrder = [None] * num_dims
-        n_entries_in_dims = [None] * num_dims
-        uniqueEntriesAllDims = {}
+        # Single pass: accumulate unique values per dimension using sets.
+        # Previous implementation made one full pass per dimension (O(n_dims × n_events)).
+        seen: dict = {}
+        for event in acqData:
+            for dim, val in event['axes'].items():
+                seen.setdefault(dim, set()).add(val)
 
-        for i, dim in enumerate(alldims):
-            uniqueEntries = []
-            for j in range(0, len(acqData)):
-                uniqueEntries.append(acqData[j]['axes'][dim])
-            uniqueEntries = np.unique(uniqueEntries)
-            nEntries = len(uniqueEntries)
-            n_entries_in_dims[i] = nEntries
-            dimOrder[i] = dim
-            uniqueEntriesAllDims[dim] = uniqueEntries
-            
-            
+        # Preserve dimension order from the first event (matches np.unique contract).
+        dimOrder = list(acqData[0]['axes'].keys())
+        uniqueEntriesAllDims = {d: np.array(sorted(seen[d])) for d in dimOrder}
+        n_entries_in_dims = [len(uniqueEntriesAllDims[d]) for d in dimOrder]
+
         logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
-        # print(f'Time to get dimensions from acq data: {time.time()-time_getdimfromacqdata}')
         return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
     except Exception as e:
         logging.warning("Problem with get Dimensions: %s", e)
