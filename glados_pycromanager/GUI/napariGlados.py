@@ -41,6 +41,21 @@ from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
 
     # from glados_pycromanager.GUI.sharedFunctions import Shared_data #Gives circular import error in sharedFunctions
 
+def _get_cached_dimensions(shared_data):
+    """Return getDimensionsFromAcqData result, recomputing only when _mdaModeParams changes.
+
+    Uses object identity (id()) as cache key — _mdaModeParams is always fully
+    replaced on a new acquisition, never mutated in-place.
+    """
+    params = shared_data._mdaModeParams
+    cache_key = id(params)
+    cached = getattr(shared_data, '_dims_cache', None)
+    if cached is None or cached[0] != cache_key:
+        result = utils.getDimensionsFromAcqData(params)
+        shared_data._dims_cache = (cache_key, result)
+    return shared_data._dims_cache[1]
+
+
 #region real-time visualisation/analysis handling
 #These need to be functions outside of any class due to Yield-calling
 def napariUpdateLive(DataStructure):
@@ -139,7 +154,7 @@ def napariUpdateLive(DataStructure):
             if layerName != 'Live':
                 #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
                 if liveImageLayer:
-                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
                     
                     #Assume the dimensions are correct
                     correctDimensions = True
@@ -183,7 +198,7 @@ def napariUpdateLive(DataStructure):
             if not liveImageLayer:
                 if layerName != 'Live':
                     logging.debug(f'creating layer with name {layerName} via multiDstack method')
-                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
                     logging.debug(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
                     
                     shape = n_entries_in_dims
@@ -237,7 +252,7 @@ def napariUpdateLive(DataStructure):
             else:
                 if layerName != 'Live':
                     # logging.debug(f'updating layer with name {layerName} via multiDstack method')
-                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
                     
                     #Determine in which multi-D slice the image should be added:
                     sliceTuple = ()
@@ -268,7 +283,7 @@ def napariUpdateLive(DataStructure):
             #Render the missing images in the MDA acquisition
             shared_data._busy = True
             renderedSlices = shared_data.allMDAslicesRendered
-            dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+            dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
             for expectedEntry in shared_data._mdaModeParams:
                 #check in the rendered sclies if this is in there:
                 entry_found = any(expectedEntry['axes'].items() <= item.items() for item in renderedSlices.values())
@@ -461,7 +476,7 @@ class napariHandler:
             return
         try:
             dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = \
-                utils.getDimensionsFromAcqData(self.shared_data._mdaModeParams)
+                _get_cached_dimensions(self.shared_data)
             sliceTuple = ()
             for dim_name in dimensionOrder:
                 current_val = metadata['Axes'][dim_name]
@@ -487,7 +502,7 @@ class napariHandler:
             return False
         try:
             dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = \
-                utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+                _get_cached_dimensions(shared_data)
             h = int(self.shared_data.MILcore.core.getImageHeight())
             w = int(self.shared_data.MILcore.core.getImageWidth())
             bytes_per_pixel = self.shared_data.MILcore.core.getBytesPerPixel()
