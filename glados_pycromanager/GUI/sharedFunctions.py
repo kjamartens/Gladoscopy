@@ -264,7 +264,8 @@ class Shared_data(QObject):
         
         
     def __setattr__(self, name, value):
-        logging.debug(f"Setting attribute {name} to {value}")
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug("Setting attribute %s", name)  # omit value — may be large array
         super().__setattr__(name, value)
     
     def mdaacqdonefunction(self):
