@@ -27,6 +27,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QSlider,
@@ -1288,19 +1289,110 @@ class MMConfigUI(CustomMainWindow):
                     break
         
         
+        def testRealTimeAnalysisFromDockWidget(self):
+            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
+            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
+            current_config['__realTimeVisualisation__'] = False
+
+            viewer = self.shared_data.napariViewer
+            if viewer is None or len(viewer.layers) == 0:
+                QMessageBox.warning(self, "No image", "No napari layers are open.")
+                return
+
+            active_layer = viewer.layers.selection.active or viewer.layers[-1]
+            image = np.asarray(active_layer.data)
+            logging.info("RT test: layer '%s', full data shape=%s, viewer.dims.current_step=%s",
+                         active_layer.name, image.shape, viewer.dims.current_step)
+            if image.ndim > 2:
+                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
+                image = image[step]
+                logging.info("RT test: sliced at step=%s, resulting image shape=%s", step, image.shape)
+
+            metadata = {'ImageNumber': 0}
+            try:
+                rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
+                result = utils.realTimeAnalysis_run(rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
+                overlay = napariOverlay(viewer, RT_analysisObject=rt_object, layer_name='RTtest_VIS')
+                utils.realTimeAnalysis_visualisation(rt_object, current_config, image, metadata, None, overlay.layer)
+                QMessageBox.information(self, "Result", f"Analysis complete.\nResult: {result}")
+            except Exception as exc:
+                logging.exception("Test on current image failed")
+                QMessageBox.critical(self, "Error", f"Analysis failed:\n{exc}")
+
+        def _auto_slice_callback(self, event=None):
+            if not getattr(self, '_auto_slice_active', False):
+                return
+            viewer = self.shared_data.napariViewer
+            if viewer is None or len(viewer.layers) == 0:
+                return
+            active_layer = viewer.layers.selection.active or viewer.layers[-1]
+            image = np.asarray(active_layer.data)
+            if image.ndim > 2:
+                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
+                image = image[step]
+            metadata = {'ImageNumber': 0}
+            try:
+                current_config = self._auto_slice_config
+                utils.realTimeAnalysis_run(self._auto_slice_rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
+                utils.realTimeAnalysis_visualisation(self._auto_slice_rt_object, current_config, image, metadata, None, self._auto_slice_overlay.layer)
+            except Exception:
+                logging.exception("Auto-slice RT analysis failed")
+
+        def enableAutoSliceAnalysis(self):
+            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
+            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
+            current_config['__realTimeVisualisation__'] = False
+            viewer = self.shared_data.napariViewer
+            if viewer is None:
+                self.rtAnalysisAutoSliceButton.setChecked(False)
+                return
+            self._auto_slice_config = current_config
+            self._auto_slice_rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
+            self._auto_slice_overlay = napariOverlay(viewer, RT_analysisObject=self._auto_slice_rt_object, layer_name='RT_AutoSlice_VIS')
+            self._auto_slice_active = True
+            self._auto_slice_cb = lambda event: _auto_slice_callback(self, event)
+            viewer.dims.events.current_step.connect(self._auto_slice_cb)
+
+        def disableAutoSliceAnalysis(self):
+            self._auto_slice_active = False
+            viewer = self.shared_data.napariViewer
+            if viewer is not None and hasattr(self, '_auto_slice_cb'):
+                try:
+                    viewer.dims.events.current_step.disconnect(self._auto_slice_cb)
+                except Exception:
+                    pass
+            if hasattr(self, '_auto_slice_overlay') and self._auto_slice_overlay is not None:
+                try:
+                    viewer.layers.remove(self._auto_slice_overlay.layer.name)
+                except Exception:
+                    pass
+            self._auto_slice_rt_object = None
+            self._auto_slice_overlay = None
+
+        def toggleAutoSliceAnalysis(self):
+            if self.rtAnalysisAutoSliceButton.isChecked():
+                enableAutoSliceAnalysis(self)
+            else:
+                disableAutoSliceAnalysis(self)
+
         self.rtAnalysisActivateButton = QPushButton('Activate')
         #add a clicked-call:
         self.rtAnalysisActivateButton.clicked.connect(lambda: activateRealTimeAnalysisFromDockWidget(self))
         self.rtAnalysisDeactivateButton = QPushButton('Deactivate')
         self.rtAnalysisDeactivateButton.clicked.connect(lambda: deactivateRealTimeAnalysisFromDockWidget(self))
+        self.rtAnalysisTestButton = QPushButton('Test on current napari image')
+        self.rtAnalysisTestButton.clicked.connect(lambda: testRealTimeAnalysisFromDockWidget(self))
+        self.rtAnalysisAutoSliceButton = QPushButton('Auto-update on slice change')
+        self.rtAnalysisAutoSliceButton.setCheckable(True)
+        self.rtAnalysisAutoSliceButton.clicked.connect(lambda: toggleAutoSliceAnalysis(self))
         self.rtAnalysisLayout.addWidget(self.rtAnalysisActivateButton,1,0,1,1)
         self.rtAnalysisLayout.addWidget(self.rtAnalysisDeactivateButton,1,1,1,1)
-        
-        
-        
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisTestButton,2,0,1,2)
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisAutoSliceButton,3,0,1,2)
+
         #Add a spacer at the bottom:
         expandingspacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.rtAnalysisLayout.addItem(expandingspacer,2,0,1,2)
+        self.rtAnalysisLayout.addItem(expandingspacer,4,0,1,2)
         return self.rtAnalysisLayout
     
     def XYstageLayout(self):

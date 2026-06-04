@@ -349,7 +349,7 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
         if 'real_time_analysis_currentData' in vars(currentNode):
             if '__realTimeVisualisation__' in currentNode.real_time_analysis_currentData and currentNode.real_time_analysis_currentData['__realTimeVisualisation__']: #type:ignore
                 self.visualisationBox.setChecked(True)
-            
+
             utils.preLoadOptions_realtime(self.mainLayout,currentNode.real_time_analysis_currentData) #type:ignore
 
 class nodz_analysisMeasurementDialog(nodz_analysisDialog):

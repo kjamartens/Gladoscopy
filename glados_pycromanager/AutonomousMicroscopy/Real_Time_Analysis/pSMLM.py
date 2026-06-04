@@ -125,9 +125,10 @@ class pSMLM:
         self.dummyValue = 0
         self.metadatav = []
         self.currentFrame = 0
-        if core.get_pixel_size_um() != 0:
-            self.pxsizeum = core.get_pixel_size_um()
-        else:
+        try:
+            px = core.get_pixel_size_um()
+            self.pxsizeum = px if px != 0 else 1
+        except Exception:
             self.pxsizeum = 1
         return None
 
@@ -135,20 +136,31 @@ class pSMLM:
         # logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
         self.dummyValue = np.random.randint(0, 101)
         locPeaks = getLocalPeaks_rawIm(image, int(kwargs['ROIradius']),stdmult=int(kwargs['stdmult']))
+        logging.debug("pSMLM: image min/max/mean=%.1f/%.1f/%.1f, peaks found=%d (ROIradius=%s, stdmult=%s)",
+                     image.min(), image.max(), image.mean(), len(locPeaks),
+                     kwargs['ROIradius'], kwargs['stdmult'])
         self.SMLMlocs = getLocalizationList(locPeaks, image, 4)*self.pxsizeum
+        logging.debug("pSMLM: localizations after phasor fit=%d", len(self.SMLMlocs))
+        if len(self.SMLMlocs) > 0:
+            logging.debug("pSMLM: loc x range=[%.1f, %.1f], y range=[%.1f, %.1f]",
+                         self.SMLMlocs[:, 0].min(), self.SMLMlocs[:, 0].max(),
+                         self.SMLMlocs[:, 1].min(), self.SMLMlocs[:, 1].max())
+            logging.debug("pSMLM: first 3 locs: %s", self.SMLMlocs[:3])
         
         #Append to full list with frame info
-        self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-        #Get the headers
-        column_headers = np.hstack([list(self.uniqueEntriesAllDims.keys()), ['x_pos', 'y_pos']])
-        mda_values = []
-        for v in list(self.uniqueEntriesAllDims.keys()):
-            mda_values = np.hstack((mda_values,metadata['Axes'][v]))
-        #Get the columns for the MDA values and append to the current localizations
-        mda_val_column = np.full((self.SMLMlocs.shape[0], 1), mda_values)
-        new_locs_with_mdaVals = np.hstack((mda_val_column, self.SMLMlocs))
-        
         import pandas as pd
+        _dims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+        if _dims is not None:
+            self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = _dims
+            column_headers = np.hstack([list(self.uniqueEntriesAllDims.keys()), ['x_pos', 'y_pos']])
+            mda_values = []
+            for v in list(self.uniqueEntriesAllDims.keys()):
+                mda_values = np.hstack((mda_values, metadata.get('Axes', {}).get(v, 0)))
+            mda_val_column = np.full((self.SMLMlocs.shape[0], 1), mda_values)
+            new_locs_with_mdaVals = np.hstack((mda_val_column, self.SMLMlocs))
+        else:
+            column_headers = ['x_pos', 'y_pos']
+            new_locs_with_mdaVals = self.SMLMlocs
         if len(self.fullSMLMlocs) == 0:
             self.fullSMLMlocs = pd.DataFrame(new_locs_with_mdaVals, columns=column_headers)
         else:
@@ -198,22 +210,55 @@ class pSMLM:
         #     'anchor': 'upper_left',
         # }
         try:
-            # logging.info(f'Starting Updating pSMLM layer at time: {time.time()}')
-            # logging.info(f"SMLM locs: {self.SMLMlocs}")
-                # napariLayer.size = 0
-            # napariLayer.data = np.array([[100,100]])
-            # napariLayer.text = text
+            logging.debug("pSMLM visualise: called, SMLMlocs len=%d, napariLayer type=%s",
+                         len(self.SMLMlocs), type(napariLayer).__name__)
             if len(self.SMLMlocs) > 1:
-                # logging.info('Actually SMLM loc vissing')
-                napariLayer.data = self.SMLMlocs[:, [1, 0]].copy() #Needs to be transposed
-                time.sleep(0.005)
-            # napariLayer.features = features
-            # napariLayer.text = textv
+                coords = self.SMLMlocs[:, [1, 0]].copy()  # (N,2): row, col for napari
+                ndim = getattr(napariLayer, 'ndim', 2)
+                if ndim > 2:
+                    try:
+                        import napari
+                        _viewer = napari.current_viewer()
+                        current_step = _viewer.dims.current_step
+                        extra = np.array(current_step[:ndim - 2], dtype=float)
+                        logging.debug("pSMLM visualise: viewer.dims.current_step=%s, using extra dims=%s",
+                                     current_step, extra)
+                    except Exception as e:
+                        extra = np.zeros(ndim - 2)
+                        logging.debug("pSMLM visualise: could not get current_step (%s), using zeros", e)
+                    extra_cols = np.tile(extra, (coords.shape[0], 1))
+                    coords = np.hstack([extra_cols, coords])
+                logging.debug("pSMLM visualise: assigning coords shape=%s, row=[%.1f,%.1f] col=[%.1f,%.1f], ndim=%d",
+                             coords.shape, coords[:,-2].min(), coords[:,-2].max(),
+                             coords[:,-1].min(), coords[:,-1].max(), ndim)
+                napariLayer.data = coords
+                logging.debug("pSMLM visualise: data assigned, layer.data.shape=%s, first 3:\n%s",
+                             napariLayer.data.shape, napariLayer.data[:3])
             napariLayer.selected_data = []
-            napariLayer.symbol = 'disc'
-            napariLayer.size = 0.5
-            napariLayer.edge_color='red'
-            napariLayer.face_color = [0,0,0,0]
-        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
-            logging.info('Issue with pSMLM layer update: %s', exc)
+            try:
+                napariLayer.symbol = 'disc'
+            except Exception as e:
+                logging.debug("pSMLM: symbol failed: %s", e)
+            try:
+                napariLayer.size = 8
+            except Exception as e:
+                logging.debug("pSMLM: size failed: %s", e)
+            try:
+                napariLayer.face_color = [0, 0, 0, 0]  # transparent fill
+            except Exception as e:
+                logging.debug("pSMLM: face_color failed: %s", e)
+            for _attr in ('border_color', 'edge_color'):
+                try:
+                    setattr(napariLayer, _attr, 'red')
+                    break
+                except Exception as e:
+                    logging.debug("pSMLM: %s failed: %s", _attr, e)
+            for _attr in ('border_width', 'edge_width'):
+                try:
+                    setattr(napariLayer, _attr, 0.05)
+                    break
+                except Exception as e:
+                    logging.debug("pSMLM: %s failed: %s", _attr, e)
+        except Exception as exc:
+            logging.debug('Issue with pSMLM layer update: %s', exc)
         return napariLayer

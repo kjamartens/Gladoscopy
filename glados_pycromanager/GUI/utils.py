@@ -3318,6 +3318,8 @@ def openAdvancedSettings(shared_data):
     pass
 
 def getDimensionsFromAcqData(acqData):
+    if not acqData:
+        return None
     try:
         # Single pass: accumulate unique values per dimension using sets.
         # Previous implementation made one full pass per dimension (O(n_dims × n_events)).
