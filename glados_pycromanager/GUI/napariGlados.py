@@ -45,7 +45,7 @@ from glados_pycromanager.GUI.custom_widget_ui import (
     Ui_CustomDockWidget,  # Import the generated UI module
 )
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
-from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
+from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName, moveLayerToTop
 from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
 
     # from glados_pycromanager.GUI.sharedFunctions import Shared_data #Gives circular import error in sharedFunctions
