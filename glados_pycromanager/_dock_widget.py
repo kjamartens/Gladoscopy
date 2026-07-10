@@ -18,10 +18,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 
-#Import all scripts in the custom script folders
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *  #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type: ignore
-from glados_pycromanager.GUI.AnalysisClass import *  #type:ignore
 from glados_pycromanager.GUI.napariGlados import *  #type: ignore
 
 # Obtain the helperfunctions
@@ -208,6 +204,7 @@ class MMConfigWidget(GladosWidget):
         logging.info(f"Default focus device set to {self.shared_data._defaultFocusDevice}")
         
         #Start docwidget
+        from glados_pycromanager.GUI.Analysis_dockWidgets import microManagerControlsUI_plugin
         self.MMconfigPlugin = microManagerControlsUI_plugin(self) #type:ignore
         self.dockWidget = self.MMconfigPlugin
         self.setLayout(self.dockWidget)
@@ -240,9 +237,10 @@ class MDAWidget(GladosWidget):
         super().__init__(viewer = viewer, parent=parent)
         self.type = "MDA"
         
+        from glados_pycromanager.GUI.Analysis_dockWidgets import MDAGlados_plugin
         self.dockWidget = MDAGlados_plugin(self) #type:ignore
         self.setLayout(self.dockWidget)
-        
+
         #Init a few things
         self.getFirstOrderWidgets()
         self.setMinimumSize(200, 200)

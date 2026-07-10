@@ -16,7 +16,6 @@ from pprint import pprint
 
 import dask.array as da
 import imageio
-import matplotlib.pyplot as plt
 import numpy as np
 # Load general dependencies
 from imageio.v2 import imread

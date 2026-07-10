@@ -12,11 +12,9 @@ import appdirs
 import napari
 import numpy as np
 import useq
-import zarr
 from napari.qt import thread_worker
-from ndstorage import NDTiffDataset
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import Qt, QSize, pyqtSignal
+from PyQt5.QtWidgets import QApplication, QGridLayout
 from qtpy.QtWidgets import QMainWindow, QScrollArea, QVBoxLayout, QWidget
 from useq.pycromanager import to_pycromanager
 
@@ -28,13 +26,9 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.napariGlados as napariGlados
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.Core.MDAGlados import MDAGlados
-from glados_pycromanager.GUI.Analysis_dockWidgets import *
-from glados_pycromanager.GUI.AnalysisClass import *
 from glados_pycromanager.GUI.custom_widget_ui import (
     Ui_CustomDockWidget,  # Import the generated UI module
 )
-from glados_pycromanager.GUI.FlowChart_dockWidgets import *
-from glados_pycromanager.GUI.LaserControlScripts import *
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
 from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
@@ -208,6 +202,7 @@ def napariUpdateLive(DataStructure):
                     # started (MMCORE_PLUS fast acquisitions). Reuse it so frameReady writes
                     # are not lost.
                     if shared_data.mdaZarrData.get(layerName) is None:
+                        import zarr
                         # Hold the TemporaryDirectory object in shared_data so it is not
                         # GC'd (and the directory deleted) while zarr is still writing.
                         _tmpdir = tempfile.TemporaryDirectory()
@@ -509,6 +504,7 @@ class napariHandler:
             bytes_per_pixel = self.shared_data.MILcore.core.getBytesPerPixel()
             dtype = np.uint8 if bytes_per_pixel <= 1 else np.uint16
             shape = n_entries_in_dims
+            import zarr
             _tmpdir = tempfile.TemporaryDirectory()
             shared_data.mdaZarrTempDir = _tmpdir
             shared_data.mdaZarrData[layerName] = zarr.open(
@@ -543,6 +539,7 @@ class napariHandler:
         
         # print('storing temp data in : ', tempdataloc)
         summary_metadata = {'name_1': 123, 'name_2': 'something else'} # make this whatever you want
+        from ndstorage import NDTiffDataset
         shared_data.pyMMCdataset = NDTiffDataset(tempdataloc, summary_metadata=summary_metadata, writable=True)
         
         #TODO: summary metadata
@@ -1099,11 +1096,10 @@ class dockWidget_MDA(dockWidgets):
         self.sizeChanged.connect(self.dockWidget.handleSizeChange)
 
 class dockWidget_flowChart(dockWidgets):
-    def __init__(self): 
+    def __init__(self):
         logging.debug("dockWidget_flowchart started")
         super().__init__()
-        
-        #Add the full micro manager controls UI
+        from glados_pycromanager.GUI.FlowChart_dockWidgets import flowChart_dockWidgets
         self.dockWidget = flowChart_dockWidgets(shared_data.MILcore,MM_JSON,self.layout,shared_data)
 
 class dockWidget_fullGladosUI(dockWidgets):
@@ -1121,6 +1117,7 @@ class dockWidget_fullGladosUI(dockWidgets):
         with open(MM_JSON_path) as f:
             MM_JSON = json.load(f)
             
+        from glados_pycromanager.GUI.LaserControlScripts import runlaserControllerUI
         form, self.criticalErrors = runlaserControllerUI(shared_data.MILcore,MM_JSON,ui,shared_data)
         #Run the laserController UI        
         #

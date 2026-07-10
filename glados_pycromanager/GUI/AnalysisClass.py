@@ -19,9 +19,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.utils as utils
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *  #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *  #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type: ignore
 
 
 #Class for overlays and their update and such

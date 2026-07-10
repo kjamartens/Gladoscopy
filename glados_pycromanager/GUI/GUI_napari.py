@@ -12,8 +12,6 @@ import socket
 import sys
 
 import napari
-from pycromanager import Core, start_headless
-from pymmcore_plus import CMMCorePlus
 from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import (
     QIcon,
@@ -43,8 +41,6 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 
 #Obtain the helperfunctions
 import glados_pycromanager.GUI.utils as utils
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *  #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *  #type: ignore
 from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
 from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
 from glados_pycromanager.GUI.utils import *
@@ -371,6 +367,7 @@ def main():
         # no Core() probe — the override is explicit intent to run headless.
         mm_cfg = shared_data.config.micromanager_config
         if cli_backend in ('JAVA', 'Python'):
+            from pycromanager import Core, start_headless
             logging.info('Headless PycroManager started (CLI override, backend=%s)', cli_backend)
             start_headless(mm_app_path=mm_cfg.path, config_file=mm_cfg.config_path,
                            python_backend=cli_backend == 'Python',
@@ -380,6 +377,7 @@ def main():
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
             shared_data.MILcore.set_core(Core())
         else:  # PyMMCorePlus
+            from pymmcore_plus import CMMCorePlus
             logging.info('Headless PyMMCorePlus started (CLI override)')
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
             shared_data.MILcore.set_core(CMMCorePlus(mm_path=mm_cfg.path))
@@ -397,6 +395,7 @@ def main():
 
         if _java_mm_up:
             try:
+                from pycromanager import Core
                 core = Core()
                 shared_data._headless = False
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
@@ -412,6 +411,7 @@ def main():
             appSmall.exec_()
 
             if headlessGUIv.javaRadio.isChecked() or headlessGUIv.pythonRadio.isChecked():
+                from pycromanager import Core, start_headless
                 logging.info('Headless PycroManager started')
 
                 #Get those settings and use to start headless
@@ -424,6 +424,7 @@ def main():
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
                 shared_data.MILcore.set_core(Core())
             elif headlessGUIv.pyMMCorePlusRadio.isChecked():
+                from pymmcore_plus import CMMCorePlus
                 logging.info('Headless PyMMCorePlus started')
 
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()

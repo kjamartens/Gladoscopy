@@ -51,8 +51,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.utils
 import glados_pycromanager.GUI.utils as utils
-from glados_pycromanager.GUI.AnalysisClass import *
-from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
 from glados_pycromanager.GUI.MMcontrols import ConfigInfo
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
 from glados_pycromanager.GUI.utils import CustomMainWindow
@@ -1493,6 +1491,7 @@ class MDAGlados(CustomMainWindow):
                     rt_analysis_connected_node = node
                     rt_analysis_info = rt_analysis_connected_node.real_time_analysis_currentData
                     
+                    from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
                     new_analysis_thread = create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None,nodzInfo=nodeInfo.flowChart)
                     self.nodz_analysis_threads.append(new_analysis_thread)
                     rt_analysis_connected_node.status = 'running'

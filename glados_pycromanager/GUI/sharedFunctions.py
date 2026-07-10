@@ -9,8 +9,6 @@ from dataclasses import dataclass, fields
 from typing import Optional
 
 import appdirs
-import slack
-from ndstorage import NDTiffDataset
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 #Sys insert to allow for proper importing from module via debug
@@ -200,7 +198,7 @@ class Shared_data(QObject):
         self._mdaModeSaveLoc = ['','']
         self._mdaModeNapariViewer = None
         self.mdaDatasets = []
-        self.pyMMCdataset: NDTiffDataset = NDTiffDataset('./',summary_metadata={})
+        self.pyMMCdataset = None
         self.activeMDAobject = None
         self.mdaZarrData = {}
         self.mdaZarrTempDir = None  # holds the TemporaryDirectory object for the active zarr store
@@ -249,6 +247,7 @@ class Shared_data(QObject):
         
         if self.config.webhook_config.slack_token is not None and not len(self.config.webhook_config.slack_token) == 0:
             try:
+                import slack
                 self.config.webhook_config.slack_client = slack.WebClient(token=self.config.webhook_config.slack_token)
                 logging.debug('Slack client initialised')
             except (ValueError, TypeError, AttributeError, OSError) as exc:
