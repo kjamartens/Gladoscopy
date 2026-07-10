@@ -115,6 +115,26 @@ def subfunction_exists(module_name, subfunction_name):
     except (ImportError, AttributeError):
         return False
     
+def _resolve_node_obj(name_str):
+    """Resolve a dotted node name (e.g. 'BioImageModelZoo' or 'BioImageModelZoo.BioImageModelZoo')
+    to the named object without using eval. Looks up the stem in sys.modules."""
+    import sys as _sys
+    parts = str(name_str).split('.')
+    stem = parts[0]
+    mod = _sys.modules.get(stem)
+    if mod is None:
+        for key, m in list(_sys.modules.items()):
+            if m is not None and key.rsplit('.', 1)[-1] == stem:
+                mod = m
+                break
+    if mod is None:
+        raise NameError(f"No loaded module with stem '{stem}' (name_str={name_str!r})")
+    obj = mod
+    for part in parts[1:]:
+        obj = getattr(obj, part)
+    return obj
+
+
 # Return all functions that are found in a specific directory
 def functionNamesFromDir(dirname):
     #initialise empty array
@@ -253,13 +273,13 @@ def kwargsFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
@@ -307,13 +327,13 @@ def inputFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
@@ -331,13 +351,13 @@ def outputFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
@@ -360,7 +380,7 @@ def infoFromMetadata(functionname,**kwargs):
         skipfinalline = False
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
             finaltext = f"""\
             --------------------------------------------------------------------------------------
             {functionname} contains {len(functionMetadata)} callable functions: {", ".join(str(singlefunctiondata) for singlefunctiondata in functionMetadata)}
@@ -372,7 +392,7 @@ def infoFromMetadata(functionname,**kwargs):
             if specificKwarg == False:
                 #get the parent info
                 functionparent = functionname.split('.')[0]
-                functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+                functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
                 #sub-select the looprange
                 loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
                 looprange = range(loopv,loopv+1) #type:ignore
@@ -382,7 +402,7 @@ def infoFromMetadata(functionname,**kwargs):
                 #get the parent info
                 functionparent = functionname.split('.')[0]
                 #Get the full function metadata
-                functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+                functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
                 #Get the help string of a single kwarg
                 
                 #Find the help text of a single kwarg
@@ -524,7 +544,7 @@ def defaultValueFromKwarg(functionname,kwargname):
     defaultEntry=None
     functionparent = functionname.split('.')[0]
     #Get the full function metadata
-    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+    functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
     if 'optional_kwargs'  in functionMetadata[functionname.split('.')[1]]:
         for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
             if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
@@ -608,7 +628,7 @@ def displayNamesFromFunctionNames(functionName, polval):
         subroutineName = function.split('.')[0]
         singlefunctiondata = function.split('.')[1]
         #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
-        functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
+        functionMetadata = _resolve_node_obj(str(subroutineName)).__function_metadata__()
         if 'display_name' in functionMetadata[singlefunctiondata]:
             displayName = functionMetadata[singlefunctiondata]['display_name']
             #Add the polarity info between brackets if required
@@ -639,7 +659,7 @@ def typeFromKwarg(functionname,kwargname):
     try:
         functionparent = functionname.split('.')[0]
         #Get the full function metadata
-        functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+        functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
         for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
             if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
                 #check if this has a default value:
@@ -2679,7 +2699,7 @@ def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
     indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
     
     wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
-    functionMetadata = eval(wrapperName+".__function_metadata__()")
+    functionMetadata = _resolve_node_obj(wrapperName).__function_metadata__()
     functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
     if runOrVis == 'run':
         if 'run_delay' not in functionMetadata2:
