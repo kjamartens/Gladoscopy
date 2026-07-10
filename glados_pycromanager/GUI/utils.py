@@ -119,6 +119,22 @@ def subfunction_exists(module_name, subfunction_name):
 def functionNamesFromDir(dirname):
     #initialise empty array
     functionnamearr = []
+    def _load_module(functionName, file_path):
+        """Return the already-loaded module or load it fresh from its file path."""
+        import sys
+        abs_file = os.path.abspath(file_path)
+        for mod in sys.modules.values():
+            mfile = getattr(mod, '__file__', None)
+            if mfile and os.path.abspath(mfile) == abs_file:
+                return mod
+        spec = importlib.util.spec_from_file_location(functionName, file_path)
+        if spec is None or spec.loader is None:
+            return None
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[functionName] = mod
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
     def addFilesToAbsolutePath(functionnamearr,absolute_path):
         #Loop over all files
         for file in os.listdir(absolute_path):
@@ -128,9 +144,13 @@ def functionNamesFromDir(dirname):
                 if not file.startswith("_") and not file == "utils.py" and not file == "utilsHelper.py":
                     #Get the function name
                     functionName = file[:-3]
+                    file_path = os.path.join(absolute_path, file)
+                    mod = _load_module(functionName, file_path)
+                    if mod is None:
+                        continue
                     #Get the metadata from this function and from there obtain
                     try:
-                        functionMetadata = eval(f'{str(functionName)}.__function_metadata__()')
+                        functionMetadata = mod.__function_metadata__()
                         for singlefunctiondata in functionMetadata:
                             #Also check this against the actual sub-routines and raise an error (this should also be present in the __init__ of the folders)
                             subroutineName = f"{functionName}.{singlefunctiondata}"
@@ -142,7 +162,7 @@ def functionNamesFromDir(dirname):
                     except AttributeError:
                         #Get all callable subroutines and store those
                         subroutines = []
-                        for subroutineName, obj in inspect.getmembers(eval(f'{functionName}')):
+                        for subroutineName, obj in inspect.getmembers(mod):
                             if function_exists(obj):
                                 subroutines.append(subroutineName)
                                 functionnamearr.append(subroutineName)
