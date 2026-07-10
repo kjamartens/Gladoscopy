@@ -1,5 +1,6 @@
 import gc
 import importlib
+import json
 import logging
 import os
 import sys
@@ -14,13 +15,27 @@ import numpy as np
 import useq
 from napari.qt import thread_worker
 from PyQt5.QtCore import Qt, QSize, pyqtSignal
-from PyQt5.QtWidgets import QApplication, QGridLayout
+from PyQt5.QtWidgets import (
+    QAbstractButton,
+    QAction,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QStyle,
+)
 from qtpy.QtWidgets import QMainWindow, QScrollArea, QVBoxLayout, QWidget
 from useq.pycromanager import to_pycromanager
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+from pycromanager import Acquisition, multi_d_acquisition_events
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.napariGlados as napariGlados

@@ -7,7 +7,7 @@ import sys
 import napari
 from pycromanager import Core
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QGridLayout, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QGridLayout, QGroupBox, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1'
