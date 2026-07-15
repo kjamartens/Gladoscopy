@@ -103,6 +103,63 @@ def test_worker_exits_cleanly_on_stop_sentinel_without_pending_work(mp_ctx):
         stop_event.set()
 
 
+def test_worker_runs_the_real_fft_node_end_to_end(mp_ctx):
+    """Regression test for two bugs found only via live GUI testing (not caught
+    by the fake-based tests above), see
+    https://github.com/kjamartens/Gladoscopy/issues/16:
+
+    1. The child process never imported the RT-analysis plugin package, so
+       `_resolve_node_obj` couldn't find FFT_im.RealTimeFFT (NameError).
+    2. A hand-built minimal rt_analysis_info dict without a matching
+       "LineEdit#<function>#<kwarg>" entry hits an UnboundLocalError inside
+       getFunctionEvalTextFromCurrentData_RTAnalysis_init -- this is what the
+       real GUI-built dict always includes (see
+       GUI/utils.py's `line_edit.setObjectName(f"LineEdit#{function}#{kwarg}")`
+       and FlowChart_dockWidgets.py's currentData population from that
+       objectName), so the dict shape here must match production, not a
+       hand-picked minimal subset.
+
+    Uses the real utils.realTimeAnalysis_init/run/end (init_fn/run_fn/end_fn
+    left at their defaults) against the real FFT_im.RealTimeFFT node.
+    """
+    pytest.importorskip("diplib")
+    in_queue, out_queue, stop_event = _make_channels(mp_ctx)
+    rt_analysis_info = {
+        "__selectedDropdownEntryRTAnalysis__": "Real-Time FFT",
+        "__displayNameFunctionNameMap__": [("Real-Time FFT", "FFT_im.RealTimeFFT")],
+        "LineEdit#FFT_im.RealTimeFFT#LogScale": "True",
+    }
+    proc = mp_ctx.Process(
+        target=_subprocess_analysis_worker,
+        args=(rt_analysis_info, in_queue, out_queue, stop_event),
+        daemon=True,
+    )
+    proc.start()
+    try:
+        image = np.random.rand(64, 64).astype(np.uint16)
+        in_queue.put((image, {"frame": 0}))
+        result, metadata, state_snapshot = out_queue.get(timeout=30)
+
+        assert metadata == {"frame": 0}
+        fft_display = state_snapshot["fft_display"]
+        assert fft_display.shape == (64, 64)
+        # GUI-sourced kwarg values always arrive as quoted strings through the
+        # eval-text mechanism (LogScale="True"), not Python bools -- this is
+        # pre-existing behaviour of getEvalTextFromGUIFunction, not something
+        # introduced by subprocess isolation.
+        assert state_snapshot["log_scale"] == "True"
+
+        # A second frame must also work (init isn't re-run per frame).
+        in_queue.put((image, {"frame": 1}))
+        _result2, metadata2, _snapshot2 = out_queue.get(timeout=30)
+        assert metadata2 == {"frame": 1}
+    finally:
+        stop_event.set()
+        in_queue.put(None)
+        proc.join(timeout=20)
+        assert not proc.is_alive()
+
+
 def test_worker_survives_a_run_fn_exception_without_crashing(mp_ctx):
     in_queue, out_queue, stop_event = _make_channels(mp_ctx)
     proc = mp_ctx.Process(

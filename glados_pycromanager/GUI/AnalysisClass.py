@@ -5,6 +5,7 @@ Handles the GUI display of Glados-pycromanager, as well as the structure for ana
 import logging
 import multiprocessing as mp
 import os
+import pickle
 import queue as std_queue
 import sys
 import time
@@ -377,6 +378,13 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
                 item = in_queue.get(timeout=0.5)
             except std_queue.Empty:
                 continue
+            except Exception:
+                # A malformed/partially-received item (e.g. an unpickling error
+                # on this end) must not kill the whole worker process -- that
+                # would silently strand every subsequent frame in a "worker
+                # never responds" state indistinguishable from a hang.
+                logging.exception('AnalysisProcess worker: failed to receive a queued item, skipping')
+                continue
             if item is None:  # stop sentinel
                 break
             image, metadata = item
@@ -445,6 +453,7 @@ class AnalysisProcess_customFunction(QThread):
         self.sleepTimeMs = sleepTimeMs
         self.nodzInfo = nodzInfo
         self._new_image = Event()
+        self._activity_event = Event()
         self.visualisationObject = None
         self.RT_analysis_object = None
 
@@ -469,6 +478,17 @@ class AnalysisProcess_customFunction(QThread):
     def new_image(self):
         self._new_image.set()
 
+    def set_activity(self, is_active):
+        """Matches AnalysisThread_customFunction's interface -- napariGlados.py
+        calls this on every live/MDA mode toggle for every RT-analysis thread.
+        Currently inert (like the QThread version it mirrors: the run() loop
+        doesn't gate on this event either), kept only so callers that iterate
+        shared_data.RTAnalysisQueuesThreads don't AttributeError."""
+        if is_active:
+            self._activity_event.set()
+        else:
+            self._activity_event.clear()
+
     def run(self):
         while self.is_running:
             self._new_image.wait()
@@ -477,6 +497,18 @@ class AnalysisProcess_customFunction(QThread):
             if self.image_queue_analysis:
                 analysis_start = time.time()
                 image, metadata = self.image_queue_analysis.popleft() #type:ignore
+                # multiprocessing.Queue.put() hands off to a background feeder
+                # thread that pickles asynchronously -- an unpicklable metadata
+                # object (e.g. a live Java/SWIG-backed handle from the
+                # pycromanager bridge) fails silently there with no exception
+                # raised here, which otherwise looks identical to "the worker
+                # never responded". Validate proactively so that failure mode
+                # degrades (drop metadata, keep the frame) instead of hanging.
+                try:
+                    pickle.dumps(metadata)
+                except Exception:
+                    logging.warning('AnalysisProcess: frame metadata is not picklable, forwarding without it', exc_info=True)
+                    metadata = {}
                 try:
                     self._in_queue.put_nowait((image, metadata))
                 except std_queue.Full:
@@ -485,7 +517,11 @@ class AnalysisProcess_customFunction(QThread):
                     try:
                         result, out_metadata, state_snapshot = self._out_queue.get(timeout=5)
                     except std_queue.Empty:
-                        logging.warning('AnalysisProcess: worker did not respond within 5s, skipping frame')
+                        if self._process.is_alive():
+                            logging.warning('AnalysisProcess: worker did not respond within 5s, skipping frame')
+                        else:
+                            logging.error('AnalysisProcess: worker process is no longer alive, stopping this analysis thread')
+                            self.is_running = False
                     else:
                         analysis_elapsed_ms = (time.time() - analysis_start) * 1000
                         self.analysis_result = [result, out_metadata]
