@@ -456,6 +456,14 @@ class AnalysisProcess_customFunction(QThread):
         self._activity_event = Event()
         self.visualisationObject = None
         self.RT_analysis_object = None
+        # The child process re-imports the *entire* glados_pycromanager package
+        # tree from scratch (spawn shares nothing with the parent) plus whatever
+        # heavy library the node itself needs (e.g. diplib, "may take a few
+        # seconds" per FFT_im.py) before it's ready to process its first frame --
+        # observed up to ~10s in practice. Give that one-time cold start a much
+        # longer grace period than the steady-state per-frame timeout, and don't
+        # log it as a warning (it's expected, not a stall).
+        self._worker_warmed_up = False
 
         mp_ctx = mp.get_context('spawn')
         self._in_queue = mp_ctx.Queue(maxsize=2)
@@ -514,15 +522,19 @@ class AnalysisProcess_customFunction(QThread):
                 except std_queue.Full:
                     logging.debug('AnalysisProcess: worker still busy with a previous frame, dropping this one')
                 else:
+                    get_timeout = 5 if self._worker_warmed_up else 30
                     try:
-                        result, out_metadata, state_snapshot = self._out_queue.get(timeout=5)
+                        result, out_metadata, state_snapshot = self._out_queue.get(timeout=get_timeout)
                     except std_queue.Empty:
-                        if self._process.is_alive():
-                            logging.warning('AnalysisProcess: worker did not respond within 5s, skipping frame')
-                        else:
+                        if not self._process.is_alive():
                             logging.error('AnalysisProcess: worker process is no longer alive, stopping this analysis thread')
                             self.is_running = False
+                        elif self._worker_warmed_up:
+                            logging.warning('AnalysisProcess: worker did not respond within %ss, skipping frame', get_timeout)
+                        else:
+                            logging.info('AnalysisProcess: worker still starting up (importing its dependencies), skipping frame')
                     else:
+                        self._worker_warmed_up = True
                         analysis_elapsed_ms = (time.time() - analysis_start) * 1000
                         self.analysis_result = [result, out_metadata]
                         self.analysis_done_signal.emit(self.analysis_result)
