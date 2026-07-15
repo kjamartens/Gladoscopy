@@ -393,10 +393,17 @@ class AnalysisThread_customFunction(QThread):
             
             self._new_image.wait()
             self._new_image.clear()
+            analysis_elapsed_ms = 0
             if self.image_queue_analysis:
+                analysis_start = time.time()
                 self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
+                analysis_elapsed_ms = (time.time() - analysis_start) * 1000
                 self.analysis_done_signal.emit(self.analysis_result)
-            self.msleep(max(1,self.sleepTimeMs))
+            # Cap this thread's GIL-holding duty cycle: give the rest of the app at
+            # least as much wall-clock time as the analysis call just took, so a
+            # slow/GIL-heavy analysis (e.g. a diplib-based FFT) can't starve the Qt
+            # main thread continuously when frames arrive faster than analysis keeps up.
+            self.msleep(max(1, self.sleepTimeMs, int(analysis_elapsed_ms)))
             
         # Thread has finished, emit the finished signal
         self.finished.emit()
