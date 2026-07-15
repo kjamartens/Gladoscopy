@@ -357,6 +357,15 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
     node needing nodzInfo (e.g. to read another graph node's data) at init time
     is not compatible with subprocess isolation (see class docstring).
     """
+    if init_fn is None and run_fn is None and end_fn is None:
+        # Node classes (e.g. FFT_im.RealTimeFFT) are resolved via a sys.modules
+        # stem lookup (_resolve_node_obj), not a fresh import. The spawned child
+        # process only imports what's needed to unpickle this function, so the
+        # RT-analysis plugin package -- built-ins plus anything dropped into the
+        # AppData plugin folder, see CLAUDE.md's plugin-discovery section --
+        # must be imported explicitly here to populate sys.modules.
+        import glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis  # noqa: F401
+
     init_fn = init_fn or utils.realTimeAnalysis_init
     run_fn = run_fn or utils.realTimeAnalysis_run
     end_fn = end_fn or utils.realTimeAnalysis_end
