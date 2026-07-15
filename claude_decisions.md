@@ -744,3 +744,61 @@ race condition if callers expect synchronous mode change; H4 would change existi
 uniformly; a full file-level replacement was cleaner than selective per-method caching.
 Test helpers that patched `mil.MI()` were updated to also set `mil._mi` directly.
 **Affects:** `microscopeInterfaceLayer.py`, `tests/test_mil_dispatch.py`, `tests/test_mda_event_builder.py`.
+
+## 2026-07-15 — Fixed live/MDA mode showing no image on MMCORE_PLUS (regression from Phase 13.2)
+**Decision:** Connect all `core.mda.events.*` callbacks (`frameReady`,
+`sequenceStarted`, `sequenceFinished`, `sequenceCanceled`) via a new
+`_connect_mda_signal_direct()` helper that passes `type=Qt.DirectConnection`
+explicitly, instead of relying on the default `Qt.AutoConnection`.
+**Root cause:** pymmcore-plus auto-selects a Qt-backed (PyQt5) signaler for
+`core.mda.events` whenever a `QApplication` is running — always true in this
+GUI app (confirmed empirically: `type(core.mda.events.frameReady)` is
+`PyQt5.QtCore.pyqtBoundSignal`, not a psygnal `SignalInstance`, once a real
+napari session is up — a bare `python -c` probe without a QApplication
+misleadingly shows psygnal, which is what mislabeled the original Phase 13.2
+comment). `connect()` for these signals happens inside
+`run_MILCoreAcquisition_worker`, a napari `@thread_worker`-decorated method
+that executes on a QThreadPool worker thread with no Qt event loop of its
+own. Under `Qt.AutoConnection`, the callback invocation is queued for that
+thread and is never dispatched — nothing pumps it. Phase 13.2 removed the
+`shared_data.mainApp.processEvents()` call inside the `while
+core.mda.is_running(): ...` wait loop (same thread), believing it was
+pointless cross-thread event-loop pumping; it was actually the only thing
+draining that queue. Removing it silently broke frame delivery: the MDA
+hardware sequence ran to completion independently (frame counts in the log
+looked completely normal — e.g. "got 21"), but `grab_image_liveVis_PyMMCore`
+and the three `PyMMCore_*AcqCallback` handlers never ran at all, so the live
+layer stayed blank and MDA-mode never populated `pyMMCdataset`/`tempData`.
+Confirmed via unconditional `print()` diagnostics that bypassed the logging
+framework entirely (ruling out a logging-plumbing issue) — the callback
+genuinely never fired, with zero exceptions anywhere in the chain (psygnal
+would have surfaced one via `EmitLoopError`; here there simply was no
+delivery to fail).
+**Alternatives:** (1) Restore the polled `processEvents()` call — rejected,
+it's exactly the ~17 ms/iteration, ~8 s/session overhead Phase 13.2 was
+trying to remove, and DirectConnection eliminates the need for polling
+entirely rather than trading correctness back for speed. (2) Move the
+`connect()` calls to the main thread — rejected, `run_mda()` spawns its own
+plain `threading.Thread` regardless, so the emitting thread is never the
+main thread anyway; DirectConnection is the correct fix regardless of which
+thread calls `connect()`.
+**Result:** confirmed by the user as fixed and faster than before Phase 13.2
+(no polling overhead at all). All 4 signal connections in
+`run_MILCoreAcquisition_worker` (2× `frameReady`, plus
+`sequenceStarted`/`sequenceFinished`/`sequenceCanceled` in the MDA-mode
+branch) now go through the same helper — codebase-wide grep for
+`core.mda.events` / `core.events` confirms these were the only Qt-signal
+connect sites affected; napari's own `EventEmitter`-based signals
+(`viewer.dims.events`, `layer.events`, etc.) are unaffected since they're
+psygnal-based (always synchronous) and connected from the main thread during
+widget `__init__`, not inside a worker.
+**Affects:** `glados_pycromanager/GUI/napariGlados.py` only. Also added
+permanent defensive diagnostics along the way (kept, not reverted): a
+`try/finally` around `napariUpdateLive`'s `liveModeUpdateOngoing` reentrancy
+guard (an unrelated real bug found during triage — early returns on
+`None`-image/`acqstate=False` frames left the guard stuck `True`, freezing
+the display for the rest of the session), plus `logging.exception` wrapping
+in `grab_image_liveVis_PyMMCore`/`napariUpdateLive` and one-time INFO
+confirmations (first frame received, first yielded call, layer creation) so
+a future silent failure in this pipeline is diagnosable from the log file
+alone.

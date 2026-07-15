@@ -50,6 +50,31 @@ from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
 
     # from glados_pycromanager.GUI.sharedFunctions import Shared_data #Gives circular import error in sharedFunctions
 
+def _connect_mda_signal_direct(mda_signal, slot):
+    """Connect a core.mda.events.* callback with an explicit Qt.DirectConnection.
+
+    pymmcore-plus auto-selects a Qt-based (PyQt5) signaler for core.mda.events
+    whenever a QApplication is running, which is always true in this GUI app.
+    These connect() calls happen inside a napari @thread_worker (a QThreadPool
+    worker thread with no Qt event loop of its own), so under the default
+    Qt.AutoConnection the slot invocation is queued for that thread and is
+    never dispatched — nothing pumps it, and it silently never fires (the
+    MDA/hardware acquisition proceeds independently regardless, so nothing in
+    the log looks wrong). DirectConnection makes the callback run synchronously
+    on the emitting thread instead, which is both correct and avoids any
+    polling overhead. Applies equally to frameReady, sequenceStarted,
+    sequenceFinished, sequenceCanceled, etc. — all live on the same signaler.
+
+    Falls back to a plain connect() for the psygnal backend (used when no Qt
+    app is running, e.g. in tests), which doesn't accept a `type` kwarg and
+    already invokes synchronously in the emitting thread.
+    """
+    try:
+        return mda_signal.connect(slot, type=Qt.DirectConnection)
+    except TypeError:
+        return mda_signal.connect(slot)
+
+
 def _get_cached_dimensions(shared_data):
     """Return getDimensionsFromAcqData result, recomputing only when _mdaModeParams changes.
 
@@ -68,16 +93,19 @@ def _get_cached_dimensions(shared_data):
 #region real-time visualisation/analysis handling
 #These need to be functions outside of any class due to Yield-calling
 def napariUpdateLive(DataStructure):
-    """ 
+    """
     Function that finally shows the  image in napari
-    
+
     Basically the core visualisation method
     """
-    
     #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
     min_delay_time = np.min(((50/1000),(float(shared_data.MILcore.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
     
     display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
+
+    if not getattr(shared_data, '_napariUpdateLive_first_call_logged', False):
+        logging.info('napariUpdateLive: first yielded call received (layer=%s)', DataStructure.get('layer_name'))
+        shared_data._napariUpdateLive_first_call_logged = True
 
     now = time.time()  # cache once — used multiple times below
     elapsed = now - shared_data.last_display_update_time
@@ -92,7 +120,7 @@ def napariUpdateLive(DataStructure):
         # from the main thread (napari dispatches yielded-worker signals there), so sleeping
         # here freezes the entire UI. Dropping the frame is always safer than blocking.
         return
-        
+
     #shared_data.debugImageDisplayTimes.append(time.time())
     napariViewer = DataStructure['napariViewer']
     acqstate = DataStructure['acqState']
@@ -107,7 +135,23 @@ def napariUpdateLive(DataStructure):
         return
     
     shared_data.liveModeUpdateOngoing = True
-    
+    try:
+        _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_queue_analysisA, analysisThreads, layerName)
+    except Exception:
+        # napariUpdateLive runs as a napari thread_worker 'yielded' slot; an
+        # uncaught exception here goes to Qt's default exception hook (stderr),
+        # NOT this app's log file, so it's invisible in a windowed GUI session.
+        # Log it explicitly so a silently-failing frame update is diagnosable.
+        logging.exception('napariUpdateLive: display update failed (frame dropped)')
+    finally:
+        # Must always release the guard, even on early returns/exceptions above —
+        # otherwise a single failed frame permanently freezes the live layer for
+        # the rest of the session (every later call bails out at the
+        # liveModeUpdateOngoing check above).
+        shared_data.liveModeUpdateOngoing = False
+
+
+def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_queue_analysisA, analysisThreads, layerName):
     #Visualise the MDA data on a frame-by-frame method - i.e. not a 'stack', but simply a single image which is replaced every frame update
     if shared_data.config.mda_config.vis_method == 'frameByFrame' or DataStructure['layer_name']=='Live':
         liveImage = DataStructure['data'][0]
@@ -124,6 +168,7 @@ def napariUpdateLive(DataStructure):
 
         #If it's the first liveImageLayer
         if not liveImageLayer:
+            logging.info('napariUpdateLive: creating "%s" layer, shape=%s dtype=%s', layerName, liveImage.shape, liveImage.dtype)
             nrLayersBefore = len(napariViewer.layers)
             #The following line takes 2 seconds to run: #TODO: optimize
             # rendering='attenuated_mip' is a 3-D volumetric mode; for 2-D
@@ -344,8 +389,7 @@ def napariUpdateLive(DataStructure):
             shared_data._busy = False
     
     shared_data.last_display_update_time = time.time()
-    shared_data.liveModeUpdateOngoing = False
-    
+
 def napariUpdateAnalysisThreads(DataStructure):
     """ 
     
@@ -464,12 +508,25 @@ class napariHandler:
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
         if self.acqstate:
-            metadata = utils.metadata_refactor(metadata, self.shared_data)
-            # For multiDstack MDA: write every frame directly to zarr so fast acquisitions
-            # don't leave black slices (vis queue only passes ~fps frames/s, rest are dropped).
-            if self.shared_data.config.mda_config.vis_method == 'multiDstack':
-                self._try_write_frame_to_zarr(image, metadata)
-            self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+            # This callback is connected with Qt.DirectConnection (see
+            # _connect_mda_signal_direct), so it runs synchronously on
+            # pymmcore-plus's own MDA thread. An uncaught exception here would
+            # otherwise vanish silently — the MDA sequence keeps running/
+            # completing (frame count in the log looks normal) but no frame
+            # would reach the vis queue. Catch + log loudly so that failure
+            # mode stays visible instead of silent.
+            try:
+                if not getattr(self, '_first_frame_logged', False):
+                    logging.info('grab_image_liveVis_PyMMCore: first frame received, shape=%s dtype=%s', image.shape, image.dtype)
+                    self._first_frame_logged = True
+                metadata = utils.metadata_refactor(metadata, self.shared_data)
+                # For multiDstack MDA: write every frame directly to zarr so fast acquisitions
+                # don't leave black slices (vis queue only passes ~fps frames/s, rest are dropped).
+                if self.shared_data.config.mda_config.vis_method == 'multiDstack':
+                    self._try_write_frame_to_zarr(image, metadata)
+                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+            except Exception:
+                logging.exception('grab_image_liveVis_PyMMCore: frame processing failed (frame dropped)')
         else:
             logging.info('Need to break off!')
             self.shared_data.MILcore.stop_sequence_acquisition()
@@ -638,7 +695,7 @@ class napariHandler:
                         
                         
                         #Connect the live update to this upcoming MDA
-                        connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
+                        connected_callback = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.frameReady, self.grab_image_liveVis_PyMMCore)
                         #Create the MDA plan
                         mda_sequence_useq = useq.MDASequence(
                             time_plan={"interval": 0.0, "loops": shared_data.config.mda_config.live_mode_nr_frames} #type: ignore
@@ -651,19 +708,18 @@ class napariHandler:
                         logging.info("Started MDA sequence")
                         #Give some time to understand that it's running
                         time.sleep(0.1)
-                        # Wait for the MDA to finish.
-                        # processEvents() was disabled here (Phase 13.2) because calling it
-                        # from a @thread_worker is unsafe — Qt forbids cross-thread event
-                        # dispatch and it was responsible for ~8 s of overhead per live session
-                        # (see docs/perf-runtime.txt, run 2). The main Qt event loop on the
-                        # main thread continues to run independently.
-                        logging.info(
-                            "live-mode MMCORE_PLUS wait loop: processEvents() disabled "
-                            "(was called ~17 ms per iteration from worker thread — unsafe + slow)"
-                        )
+                        # Wait for the MDA to finish. processEvents() used to be polled here
+                        # (Phase 13.2 removed it for being slow) — it turned out to be load-
+                        # bearing: core.mda.events is a Qt-backed signaler in this GUI app
+                        # (pymmcore-plus auto-selects Qt over psygnal whenever a QApplication
+                        # is running), and this loop runs on a QThreadPool worker thread with
+                        # no event loop of its own, so a Qt.AutoConnection frameReady delivery
+                        # would just queue forever undelivered without something pumping it.
+                        # Fixed properly at the connect() call above via
+                        # _connect_mda_signal_direct (Qt.DirectConnection — synchronous
+                        # dispatch on the emitting thread, no polling needed).
                         while self.shared_data.MILcore.core.mda.is_running():
                             time.sleep(0.01)
-                            # shared_data.mainApp.processEvents()  # DISABLED Phase 13.2
 
                         #When it's done, disconnect the callback
                         self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
@@ -743,10 +799,10 @@ class napariHandler:
                     acq=None
                     
                     #Connect the live update to this upcoming MDA
-                    connected_callback = self.shared_data.MILcore.core.mda.events.frameReady.connect(self.grab_image_liveVis_PyMMCore)
-                    connected_callback_finishedAcq = self.shared_data.MILcore.core.mda.events.sequenceFinished.connect(self.PyMMCore_finishedAcqCallback)
-                    connected_callback_cancelledAcq = self.shared_data.MILcore.core.mda.events.sequenceCanceled.connect(self.PyMMCore_cancelledAcqCallback)
-                    connected_callback_startedAcq = self.shared_data.MILcore.core.mda.events.sequenceStarted.connect(self.PyMMCore_startedAcqCallback)
+                    connected_callback = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.frameReady, self.grab_image_liveVis_PyMMCore)
+                    connected_callback_finishedAcq = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.sequenceFinished, self.PyMMCore_finishedAcqCallback)
+                    connected_callback_cancelledAcq = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.sequenceCanceled, self.PyMMCore_cancelledAcqCallback)
+                    connected_callback_startedAcq = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.sequenceStarted, self.PyMMCore_startedAcqCallback)
                     # Pre-create zarr so frameReady callbacks can write immediately.
                     # Without this, on fast cameras all frames arrive before the vis
                     # worker creates the zarr, leaving every slice as zeros (black).
@@ -759,15 +815,11 @@ class napariHandler:
                     logging.info("Started MDA sequence")
                     #Give some time to understand that it's running
                     time.sleep(0.1)
-                    # processEvents() was disabled here (Phase 13.2) — same reason as live-mode
-                    # loop above: unsafe from @thread_worker, ~8 s overhead (docs/perf-runtime.txt).
-                    logging.info(
-                        "MDA-mode MMCORE_PLUS wait loop: processEvents() disabled "
-                        "(was called ~17 ms per iteration from worker thread — unsafe + slow)"
-                    )
+                    # See the matching comment in the live-mode wait loop above: frameReady
+                    # delivery is now fixed via Qt.DirectConnection at connect() time, so no
+                    # processEvents() polling is needed here either.
                     while self.shared_data.MILcore.core.mda.is_running():
                         time.sleep(0.01)
-                        # shared_data.mainApp.processEvents()  # DISABLED Phase 13.2
 
                     #When it's done, disconnect the callback
                     self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
@@ -938,6 +990,8 @@ class napariHandler:
             else:
                 self.acqstate = True
                 self.stop_continuous_task = False
+                self._first_frame_logged = False
+                self.shared_data._napariUpdateLive_first_call_logged = False
                 #Always start live-mode visualisation:
                 napariGlados.startLiveModeVisualisation(self.shared_data)
                 #Move layer to top - if it isn't created yet, it will fail
