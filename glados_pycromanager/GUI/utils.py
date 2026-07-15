@@ -2711,8 +2711,25 @@ def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
             delay = 200 #Default value for vis
         else:
             delay = functionMetadata2['visualise_delay']
-    
+
     return delay
+
+def realTimeAnalysis_runInSubprocess(rt_analysis_info) -> bool:
+    """Return whether the selected RT-analysis node opted into subprocess isolation.
+
+    See https://github.com/kjamartens/Gladoscopy/issues/16 — a node whose
+    ``__function_metadata__`` sets ``"__runInSubprocess__": True`` runs its
+    init/run/end in a separate OS process (AnalysisProcess_customFunction)
+    instead of a QThread, so a GIL-heavy compute can't starve the Qt main
+    thread. Defaults to False (existing QThread behaviour) for every node
+    that doesn't explicitly opt in.
+    """
+    indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
+
+    wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
+    functionMetadata = _resolve_node_obj(wrapperName).__function_metadata__()
+    functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
+    return bool(functionMetadata2.get('__runInSubprocess__', False))
 
 class SmallWindow(QMainWindow):
     """ 

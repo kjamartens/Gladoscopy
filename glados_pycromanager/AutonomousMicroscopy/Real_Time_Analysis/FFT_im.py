@@ -31,6 +31,13 @@ def __function_metadata__():
             "visualisation_type": "image", # Changed to 'image' for FFT display
             "input":[],
             "output":[],
+            # diplib's FourierTransform holds the Python GIL for most of its
+            # runtime (benchmarked ~80%+), which starves the Qt main thread when
+            # frames arrive faster than the FFT can keep up -- see
+            # https://github.com/kjamartens/Gladoscopy/issues/16. Run this node's
+            # init/run/end in a separate process instead of a QThread so it can
+            # never block the UI regardless of exposure time.
+            "__runInSubprocess__": True,
         }
     }
 

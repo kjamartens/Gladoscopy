@@ -3,7 +3,9 @@ Handles the GUI display of Glados-pycromanager, as well as the structure for ana
 """
 
 import logging
+import multiprocessing as mp
 import os
+import queue as std_queue
 import sys
 import time
 from collections import deque
@@ -332,9 +334,195 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
         # print(f'Time spend in updateVisualisation; {time.time()-tic}')
 
+
+# Snapshot-safe attribute types forwarded from the analysis subprocess back to the
+# main-process visualisation shadow instance (see AnalysisProcess_customFunction).
+# Deliberately excludes anything that could be a live handle (core, Qt objects,
+# open files, etc.) which wouldn't survive/be meaningful across a process boundary.
+_SUBPROCESS_SNAPSHOT_TYPES = (int, float, bool, str, bytes, type(None), np.ndarray, list, dict, tuple)
+
+
+def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
+                                 init_fn=None, run_fn=None, end_fn=None):
+    """Entry point for the child process spawned by AnalysisProcess_customFunction.
+
+    Kept as a free module-level function (not a method/closure) so it's picklable
+    for multiprocessing's 'spawn' start method (required on Windows). init_fn/
+    run_fn/end_fn default to the real utils.realTimeAnalysis_* functions; tests
+    override them with lightweight picklable stand-ins to avoid depending on the
+    GUI-widget-derived rt_analysis_info dict format.
+
+    core and nodzInfo are always passed as None here -- RT-analysis run() is
+    already documented as not allowed to touch the live hardware core, and a
+    node needing nodzInfo (e.g. to read another graph node's data) at init time
+    is not compatible with subprocess isolation (see class docstring).
+    """
+    init_fn = init_fn or utils.realTimeAnalysis_init
+    run_fn = run_fn or utils.realTimeAnalysis_run
+    end_fn = end_fn or utils.realTimeAnalysis_end
+
+    RT_analysis_object = init_fn(rt_analysis_info, core=None, nodzInfo=None)
+    try:
+        while not stop_event.is_set():
+            try:
+                item = in_queue.get(timeout=0.5)
+            except std_queue.Empty:
+                continue
+            if item is None:  # stop sentinel
+                break
+            image, metadata = item
+            try:
+                result = run_fn(RT_analysis_object, rt_analysis_info, image, metadata, None, None, nodzInfo=None)
+            except Exception:
+                logging.exception('AnalysisProcess worker: run_fn failed')
+                continue
+            state_snapshot = {
+                k: v for k, v in vars(RT_analysis_object).items()
+                if isinstance(v, _SUBPROCESS_SNAPSHOT_TYPES)
+            }
+            try:
+                out_queue.put([result, metadata, state_snapshot])
+            except Exception:
+                logging.exception('AnalysisProcess worker: failed to enqueue result')
+    finally:
+        try:
+            end_fn(RT_analysis_object, rt_analysis_info, None, nodzInfo=None)
+        except Exception:
+            logging.exception('AnalysisProcess worker: end_fn failed')
+
+
+class AnalysisProcess_customFunction(QThread):
+    """Drop-in alternative to AnalysisThread_customFunction that runs a node's
+    init/run/end in a separate OS process instead of on this QThread.
+
+    Why: CPython's GIL serialises all threads within one process. A node whose
+    compute holds the GIL for most of its runtime (e.g. diplib's FourierTransform
+    -- benchmarked at ~80%+ GIL-held during a single call) starves the Qt main
+    thread when it runs back-to-back on a QThread, which happens whenever frames
+    arrive faster than the analysis can keep up (see
+    https://github.com/kjamartens/Gladoscopy/issues/16). A separate OS process has
+    its own GIL, so its compute can never block this process's main thread,
+    regardless of what the underlying library does internally.
+
+    Opt-in only: a node opts in via `"__runInSubprocess__": True` in its
+    __function_metadata__ (see utils.realTimeAnalysis_runInSubprocess). Every
+    node not opting in keeps using AnalysisThread_customFunction unchanged.
+
+    v1 limitations (documented, not solved here):
+      * `run()` always receives core=None and nodzInfo=None in the child process
+        (see _subprocess_analysis_worker) -- a node relying on nodzInfo at init
+        time (to read another graph node's data) is not compatible.
+      * `shared_data` is not available inside the child process either -- a node
+        reading shared_data inside run() will see None there.
+      * Visualisation: `.visualise()` needs a live napari layer object, which
+        cannot cross a process boundary, so a second node instance is created in
+        this process purely to serve visualisation. Its plain-data attributes are
+        refreshed from a snapshot the child sends back after every run() call, so
+        a node that stores its result on `self` (e.g. `self.fft_display`) for
+        `visualise()` to read keeps working unmodified. This duplicates any
+        one-time init cost (e.g. importing diplib) once per process.
+    """
+    analysis_done_signal = pyqtSignal(object)
+    finished = pyqtSignal()
+
+    def __init__(self, shared_data, analysisInfo: str | None = 'Random', analysisQueue=None, sleepTimeMs=1, nodzInfo=None):
+        super().__init__()
+        logging.debug('#aC - started AnalysisProcess_customFunction')
+        self.is_running = True
+        self.shared_data = shared_data
+        self.analysisInfo = analysisInfo
+        self.napariViewer = shared_data.napariViewer
+        self.image_queue_analysis = analysisQueue
+        self.sleepTimeMs = sleepTimeMs
+        self.nodzInfo = nodzInfo
+        self._new_image = Event()
+        self.visualisationObject = None
+        self.RT_analysis_object = None
+
+        mp_ctx = mp.get_context('spawn')
+        self._in_queue = mp_ctx.Queue(maxsize=2)
+        self._out_queue = mp_ctx.Queue(maxsize=2)
+        self._stop_event = mp_ctx.Event()
+        self._process = mp_ctx.Process(
+            target=_subprocess_analysis_worker,
+            args=(analysisInfo, self._in_queue, self._out_queue, self._stop_event),
+            daemon=True,
+        )
+        self._process.start()
+
+        # Visualisation shadow instance -- see class docstring. Constructed in
+        # this (main) process only when the node wants real-time visualisation.
+        if analysisInfo is not None and '__realTimeVisualisation__' in analysisInfo and analysisInfo['__realTimeVisualisation__']: #type:ignore
+            self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
+            self.visualisationObject = AnalysisThread_customFunction_Visualisation(self.RT_analysis_object, shared_data, analysisInfo=analysisInfo)
+            self.visualisationObject.start()
+
+    def new_image(self):
+        self._new_image.set()
+
+    def run(self):
+        while self.is_running:
+            self._new_image.wait()
+            self._new_image.clear()
+            analysis_elapsed_ms = 0
+            if self.image_queue_analysis:
+                analysis_start = time.time()
+                image, metadata = self.image_queue_analysis.popleft() #type:ignore
+                try:
+                    self._in_queue.put_nowait((image, metadata))
+                except std_queue.Full:
+                    logging.debug('AnalysisProcess: worker still busy with a previous frame, dropping this one')
+                else:
+                    try:
+                        result, out_metadata, state_snapshot = self._out_queue.get(timeout=5)
+                    except std_queue.Empty:
+                        logging.warning('AnalysisProcess: worker did not respond within 5s, skipping frame')
+                    else:
+                        analysis_elapsed_ms = (time.time() - analysis_start) * 1000
+                        self.analysis_result = [result, out_metadata]
+                        self.analysis_done_signal.emit(self.analysis_result)
+                        if self.visualisationObject is not None and self.RT_analysis_object is not None:
+                            self.RT_analysis_object.__dict__.update(state_snapshot)
+                            if len(self.visualisationObject.visualisation_queue) < 1:
+                                data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core)
+                                self.visualisationObject.visualisation_queue.append(data)
+                                self.visualisationObject.new_image()
+            # Same duty-cycle cap as AnalysisThread_customFunction: never sleep less
+            # than the round-trip just took, so a persistently backlogged worker
+            # can't monopolise this thread's requests either.
+            self.msleep(max(1, self.sleepTimeMs, int(analysis_elapsed_ms)))
+        self.finished.emit()
+
+    def stop(self):
+        self.is_running = False
+        self._stop_event.set()
+        try:
+            self._in_queue.put_nowait(None)
+        except Exception:
+            pass
+        self._new_image.set()  # unblock run() if it's currently waiting
+        if self.visualisationObject is not None:
+            self.visualisationObject.running = False
+        self._process.join(timeout=3)
+        if self._process.is_alive():
+            self._process.terminate()
+
+    def destroy(self):
+        logging.debug('Destroying AnalysisProcess_customFunction for %s', self.analysisInfo)
+        self.stop()
+        self.requestInterruption()
+        self.quit()
+
+
 #This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
 
 #Has to be a QThread and not e.g. multiprocessing because we rely on pickyyable objects - mostly the pycromanager core that we send around to influence the run during RT analysis
+#
+#UPDATE (see https://github.com/kjamartens/Gladoscopy/issues/16 and
+#AnalysisProcess_customFunction above): nodes that don't need a live core/
+#nodzInfo inside run() can now opt into subprocess isolation via
+#`"__runInSubprocess__": True` in their __function_metadata__, specifically to
+#avoid the GIL-starvation problem multiprocessing here would otherwise solve.
 class AnalysisThread_customFunction(QThread):
     # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
     # Create a signal to communicate between threads
@@ -590,8 +778,14 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
         delay = utils.realTimeAnalysis_getDelay(analysisInfo,runOrVis='run')
     
     # image_queue_analysis = image_queue_transfer
-    #Instantiate an analysis thread and add a signal
-    analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
+    #Instantiate an analysis thread (or, for nodes opting into subprocess
+    #isolation via "__runInSubprocess__" -- see
+    #https://github.com/kjamartens/Gladoscopy/issues/16 -- an analysis
+    #process) and add a signal
+    if utils.realTimeAnalysis_runInSubprocess(analysisInfo):
+        analysis_thread = AnalysisProcess_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
+    else:
+        analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
     
     
     analysis_thread.start()
