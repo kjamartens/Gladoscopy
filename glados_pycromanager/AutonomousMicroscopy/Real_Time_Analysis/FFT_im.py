@@ -48,28 +48,21 @@ def __function_metadata__():
 @register("FFT_im.RealTimeFFT")
 class RealTimeFFT:
     def __init__(self, core, **kwargs):
-        logging.info('INITIALISING REAL-TIME FFT ANALYSIS')
-
         # Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(), class_name, kwargs) #type:ignore
 
-        logging.info("Loading diplib for RealTimeFFT (first use — may take a few seconds)…")
         import diplib as dip
         self._dip = dip
 
         self.fft_display = np.zeros((512, 512)) # Placeholder
         self.log_scale = kwargs.get('LogScale', True)
-        
-        logging.info('FFT Initialised')
         return None
 
     def run(self, image, metadata, shared_data, core, **kwargs):
         """
         Performs the 2D FFT on the incoming image buffer.
         """
-        run_start = time.time()
-        
         try:
             # 1. Compute 2D FFT
             # fft_data = np.fft.fft2(image)
@@ -95,8 +88,6 @@ class RealTimeFFT:
 
         except Exception as e:
             logging.error(f"FFT Calculation failed: {e}")
-
-        logging.info(f"FFT processing time: {time.time() - run_start:.4f}s")
     
     def end(self, core, **kwargs):
         logging.info('ENDING REAL-TIME FFT ANALYSIS')

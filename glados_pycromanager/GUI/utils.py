@@ -2321,8 +2321,7 @@ def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2
             methodKwargTypes_method.append('Advanced')
         else:
             methodKwargTypes_method.append('Value')
-    
-    logging.debug(f'RTeval: {methodKwargTypes_method}')
+
     #Now we create evaluation-texts:
     moduleMethodEvalTexts = []
     if methodName_method != '':
@@ -2651,8 +2650,7 @@ def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,
         if function[0] == functionDispName:
             className = function[1]
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','vshared_data','v3')
-    logging.debug(f'RTanalysistext:{evalText}')
-    
+
     if nodzInfo is not None:
         nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
     else:
