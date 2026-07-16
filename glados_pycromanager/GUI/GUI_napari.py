@@ -463,13 +463,13 @@ def main():
     # docs/perf-runtime.txt, and quit. Designed for unattended profiling
     # against `--auto-demo`; not used in normal operation.
     if args.profile_runtime is not None and args.profile_runtime > 0:
-        import cProfile as _cprof
-        import io as _io
-        import pstats as _pstats
         import time as _time
+
         from PyQt5.QtCore import QTimer  # safe: QApplication already exists
 
-        _profiler = _cprof.Profile()
+        from glados_pycromanager.observability.perf_capture import PerformanceCapture
+
+        _capture = PerformanceCapture(get_thread_registry=lambda: dict(shared_data.perfThreadLabels))
         _state = {'started': False}
         _secs = float(args.profile_runtime)
 
@@ -477,28 +477,22 @@ def main():
             if _state.get('dumped'):
                 return
             _state['dumped'] = True
-            _profiler.disable()
-            buf = _io.StringIO()
-            _pstats.Stats(_profiler, stream=buf).sort_stats('cumulative').print_stats(25)
-            n_frames = 0
-            for entry in _profiler.getstats():
-                code = getattr(entry, 'code', None)
-                if code is not None and getattr(code, 'co_name', '') == 'napariUpdateLive':
-                    n_frames = entry.callcount
-                    break
+            if not _state.get('started'):
+                print(f'[profile_runtime] quit before capture started (reason={reason}), nothing to dump')
+                return
+            report = _capture.stop()
             from pathlib import Path as _Path
             out_file = _Path(__file__).resolve().parents[2] / 'docs' / 'perf-runtime.txt'
             out_file.parent.mkdir(parents=True, exist_ok=True)
-            elapsed = _time.time() - _state.get('t_started', _time.time())
             header = (
                 f"\n=== Runtime profile {_time.strftime('%Y-%m-%d %H:%M:%S')} "
-                f"({elapsed:.2f}s sample, ended via {reason}, --auto-demo) ===\n"
-                f"napariUpdateLive calls observed: {n_frames}\n\n"
+                f"({report.duration_s:.2f}s sample, ended via {reason}, --auto-demo) ===\n"
+                f"napariUpdateLive calls observed: {report.frames_rendered}\n\n"
             )
             with out_file.open('a', encoding='utf-8') as f:
                 f.write(header)
-                f.write(buf.getvalue())
-            print(f'[profile_runtime] wrote {out_file} ({n_frames} frames, {elapsed:.2f}s, reason={reason})')
+                f.write(report.hotspots_text)
+            print(f'[profile_runtime] wrote {out_file} ({report.frames_rendered} frames, {report.duration_s:.2f}s, reason={reason})')
 
         def _profile_stop_and_dump():
             # Best-effort: turn live mode off so the worker shuts cleanly. If
@@ -532,6 +526,7 @@ def main():
                 return
             _state['started'] = True
             _state['t_started'] = _time.time()
+            _capture.start()
             print(f'[profile_runtime] handler ready; profiling live mode for up to {_secs:.1f}s')
             # Mirror the LiveModeButton click path (MMcontrols.changeLiveMode):
             # exposure must be applied to the core BEFORE liveMode flips, else
@@ -545,7 +540,6 @@ def main():
                 _dump_profile('mdaMode-conflict')
                 QTimer.singleShot(0, app.quit)
                 return
-            _profiler.enable()
             try:
                 shared_data.liveMode = True
             except Exception as exc:

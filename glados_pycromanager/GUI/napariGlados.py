@@ -7,7 +7,7 @@ import sys
 import tempfile
 import time
 from collections import deque
-from threading import Event
+from threading import Event, get_native_id
 
 import appdirs
 import napari
@@ -469,7 +469,13 @@ class napariHandler:
         #                 queue.append([image,metadata])
         #                 #Signal the thread we have a new entry
         #                 thread.new_image()
-        start = time.perf_counter()
+        # Timed with perf_counter() only when DEBUG is actually enabled -- this
+        # runs once per popped hardware frame (Qt.DirectConnection callback on
+        # pymmcore-plus's own MDA thread), which can be tens of thousands of
+        # times per second with hardware-sequenced acquisition; an f-string
+        # here would format eagerly on every call regardless of log level.
+        debug_enabled = logging.getLogger(__name__).isEnabledFor(logging.DEBUG)
+        start = time.perf_counter() if debug_enabled else None
 
         for queue in analysis_queues:
             for item in self.shared_data.RTAnalysisQueuesThreads:
@@ -480,8 +486,8 @@ class napariHandler:
                         thread.new_image()
                     break
 
-        end = time.perf_counter()
-        logging.debug(f"Loop (no intermediate logs): {(end-start)*1000:.4f}ms")
+        if debug_enabled:
+            logging.debug("Loop (no intermediate logs): %.4fms", (time.perf_counter() - start) * 1000)
         
     def grab_image_liveVisualisation_and_liveAnalysis(self,image,metadata, event_queue):
         """ 
@@ -490,7 +496,11 @@ class napariHandler:
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.debug(f'#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {time.time()}')
+        # Called once per popped hardware frame -- same hot-path concern as
+        # put_data_in_visualisation_and_analysis_queues below; avoid the
+        # eager f-string when DEBUG isn't enabled.
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug('#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time %s', time.time())
         if self.acqstate:
             self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
             #Give image and metadata back for storage done by pycromanager in case of MDA, NOT in case of live-viewing.
@@ -664,6 +674,7 @@ class napariHandler:
         
         """
         from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
+        shared_data.register_perf_thread_label(get_native_id(), 'MDA/acquisition worker')
         visualisation_queue = parent.visualisation_queue
         shared_data.debugImageArrivalTimes=[]
         shared_data.debugImageDisplayTimes=[]
@@ -884,7 +895,8 @@ class napariHandler:
         
         # Get a reference to the worker object itself to check for .quit() signals
         current_worker = getattr(self, 'visualisation_worker', None) # Get reference to itself
-        
+        self.shared_data.register_perf_thread_label(get_native_id(), 'Visualisation worker (frame queue -> napariUpdateLive)')
+
         visualisation_queue = parent.visualisation_queue
         try:
             while self.acqstate:
@@ -1171,6 +1183,14 @@ class dockWidget_flowChart(dockWidgets):
         from glados_pycromanager.GUI.FlowChart_dockWidgets import flowChart_dockWidgets
         self.dockWidget = flowChart_dockWidgets(shared_data.MILcore,MM_JSON,self.layout,shared_data)
 
+class dockWidget_PerformanceMode(dockWidgets):
+    def __init__(self):
+        logging.debug("dockWidget_PerformanceMode started")
+        super().__init__()
+        from glados_pycromanager.GUI.performance_mode_widget import PerformanceModeWidget
+        self.dockWidget = PerformanceModeWidget(shared_data)
+        self.layout.addWidget(self.dockWidget, 0, 0) #type:ignore
+
 class dockWidget_fullGladosUI(dockWidgets):
     def __init__(self): 
         logging.debug("dockWidget_fullGladosUI started")
@@ -1333,7 +1353,8 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     MM_JSON = sMM_JSON
     livestate = False
     shared_data = sshared_data
-    
+    shared_data.register_perf_thread_label(get_native_id(), 'GUI main thread')
+
     if shared_data.MILcore is not None:
         #Get some info from core to put in shared_data
         shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
@@ -1526,6 +1547,13 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
             napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI")
         else:
             logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
+
+    #Performance Mode (diagnostic tool; must never block app startup)
+    try:
+        custom_widget_performanceMode = dockWidget_PerformanceMode()
+        napariViewer.window.add_dock_widget(custom_widget_performanceMode, area="right", name="Performance", tabify=True)
+    except Exception as e:
+        logging.error(f"Error loading Performance Mode widget: {e}")
 
     # Force the "Controls" widget to the front
     custom_widget_MMcontrols.parent().raise_()

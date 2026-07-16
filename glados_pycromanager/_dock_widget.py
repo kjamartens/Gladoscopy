@@ -310,6 +310,29 @@ class GladosSlidersWidget(GladosWidget):
         We don't want the GladosWidget resizeEvent for AutonomousMicroscopy
         """
         return super().resizeEvent(event)
+
+
+class PerformanceModeWidget(GladosWidget):
+    """
+    Dock widget hosting the Performance Mode start/stop toggle + report.
+    See glados_pycromanager/GUI/performance_mode_widget.py.
+    """
+    def __init__(self, viewer: napari.viewer.Viewer, parent=None): #type:ignore
+        super().__init__(viewer=viewer, parent=parent)
+
+        from glados_pycromanager.GUI.performance_mode_widget import PerformanceModeWidget as _PerformanceModePanel
+        self.dockWidget = _PerformanceModePanel(self.shared_data) #type:ignore
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.dockWidget) # type: ignore
+        self.setLayout(layout)
+        logging.debug("dockWidget_PerformanceMode started")
+
+    def resizeEvent(self, event):
+        """"
+        We don't want the GladosWidget resizeEvent for PerformanceMode
+        """
+        return super().resizeEvent(event)
 #endregion
 
 #region Main Call
@@ -377,6 +400,13 @@ class MainWidget(QWidget):
         #Autonomous microscopy
         autonomousMicroscopyWidget = AutonomousMicroscopyWidget(viewer, parent=self)
         napariViewer.window.add_dock_widget(autonomousMicroscopyWidget, area="top", name="Glados",tabify=True)
+
+        #Performance Mode (diagnostic tool; must never block app startup)
+        try:
+            performanceModeWidget = PerformanceModeWidget(viewer, parent=self)
+            napariViewer.window.add_dock_widget(performanceModeWidget, area="right", name="Performance", tabify=True)
+        except Exception as e:
+            logging.error(f"Error loading PerformanceModeWidget: {e}")
 
         logging.info('Napari-glados-pycromanager plugin fully loaded')
 

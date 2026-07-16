@@ -158,6 +158,23 @@ class RealTimeAnalysisConfig:
 
 
 @dataclass
+class PerformanceConfig:
+    default_capture_seconds: int = setting(
+        5,
+        "Performance Mode: default capture window (s)",
+        "Default duration for a Performance Mode capture; adjustable per-run "
+        "via the spinbox in the Performance panel.",
+    )
+    hotspot_top_n: int = setting(
+        25,
+        "Performance Mode: hotspot rows shown",
+        "How many top cumulative-time functions to show per cProfile table "
+        "(main process and each subprocess-isolated RT-analysis node).",
+        hidden=True,
+    )
+
+
+@dataclass
 class Config:
     mda_config:           MDAConfig           = dataclasses.field(default_factory=MDAConfig)
     visualisation_config: VisualisationConfig = dataclasses.field(default_factory=VisualisationConfig)
@@ -165,6 +182,7 @@ class Config:
     webhook_config: WebhookConfig  = dataclasses.field(default_factory=WebhookConfig)
     logging_config:       LoggingConfig       = dataclasses.field(default_factory=LoggingConfig)
     rt_analysis_config:   RealTimeAnalysisConfig = dataclasses.field(default_factory=RealTimeAnalysisConfig)
+    performance_config:   PerformanceConfig   = dataclasses.field(default_factory=PerformanceConfig)
 
 
 # Phase 7.1 moved the JSON load/save bodies to
@@ -239,6 +257,12 @@ class Shared_data(QObject):
         self.liveModeVisualisationThreadRunning=False
         self.debugImageArrivalTimes = []
         self.debugImageDisplayTimes = []
+
+        # Performance Mode (glados_pycromanager/observability/perf_capture.py):
+        # native OS thread id -> human label, refreshed as threads come and go
+        # (acquisition/visualisation workers, one per active RT-analysis node).
+        # Read fresh on every capture window, not cached at app start.
+        self.perfThreadLabels: dict = {}
         
         self.config = Config()
         load_config_from_json(self.config)
@@ -297,6 +321,15 @@ class Shared_data(QObject):
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)
+
+    def register_perf_thread_label(self, native_id, label: str) -> None:
+        """Performance Mode: record a human label for a native OS thread id
+        (threading.get_native_id()) so a capture can attribute CPU time to
+        e.g. "MDA/acquisition worker" instead of a bare thread number."""
+        self.perfThreadLabels[native_id] = label
+
+    def unregister_perf_thread_label(self, native_id) -> None:
+        self.perfThreadLabels.pop(native_id, None)
     
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.

@@ -2,15 +2,18 @@
 Handles the GUI display of Glados-pycromanager, as well as the structure for analysis (normal and real-time) to run on secondary threads.
 """
 
+import cProfile
+import io
 import logging
 import multiprocessing as mp
 import os
 import pickle
+import pstats
 import queue as std_queue
 import sys
 import time
 from collections import deque
-from threading import Event
+from threading import Event, get_native_id
 from typing import List, Tuple, Union
 
 import numpy as np
@@ -319,15 +322,20 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
 
     def run(self):
-        while self.running:
-            self._new_image.wait()
-            self._new_image.clear()
-            if not self.visualisation_queue:
-                continue
-            data = self.visualisation_queue.popleft()
-            # Emit to main thread so napari layer ops run on GUI thread (not here).
-            self._do_visualise.emit(data)
-            self.msleep(max(1,self.sleepTimeMs))
+        node_label = self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node') if isinstance(self.analysisInfo, dict) else str(self.analysisInfo)
+        self.shared_data.register_perf_thread_label(get_native_id(), f'RT-analysis visualisation: {node_label}')
+        try:
+            while self.running:
+                self._new_image.wait()
+                self._new_image.clear()
+                if not self.visualisation_queue:
+                    continue
+                data = self.visualisation_queue.popleft()
+                # Emit to main thread so napari layer ops run on GUI thread (not here).
+                self._do_visualise.emit(data)
+                self.msleep(max(1,self.sleepTimeMs))
+        finally:
+            self.shared_data.unregister_perf_thread_label(get_native_id())
             
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
@@ -344,7 +352,8 @@ _SUBPROCESS_SNAPSHOT_TYPES = (int, float, bool, str, bytes, type(None), np.ndarr
 
 
 def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
-                                 init_fn=None, run_fn=None, end_fn=None):
+                                 init_fn=None, run_fn=None, end_fn=None,
+                                 control_in_queue=None, control_out_queue=None):
     """Entry point for the child process spawned by AnalysisProcess_customFunction.
 
     Kept as a free module-level function (not a method/closure) so it's picklable
@@ -357,6 +366,14 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
     already documented as not allowed to touch the live hardware core, and a
     node needing nodzInfo (e.g. to read another graph node's data) at init time
     is not compatible with subprocess isolation (see class docstring).
+
+    control_in_queue/control_out_queue (Performance Mode, see
+    glados_pycromanager/observability/perf_capture.py): a *separate* pair of
+    queues used only for "start/stop profiling this worker" signaling. Kept
+    deliberately apart from in_queue/out_queue (the per-frame pipeline) so
+    Performance Mode can never be confused with a malformed frame and never
+    delays/derails normal frame processing. Both default to None so existing
+    callers/tests that don't pass them are unaffected.
     """
     if init_fn is None and run_fn is None and end_fn is None:
         # Node classes (e.g. FFT_im.RealTimeFFT) are resolved via a sys.modules
@@ -372,8 +389,29 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
     end_fn = end_fn or utils.realTimeAnalysis_end
 
     RT_analysis_object = init_fn(rt_analysis_info, core=None, nodzInfo=None)
+    _child_profiler = cProfile.Profile()
     try:
         while not stop_event.is_set():
+            if control_in_queue is not None:
+                try:
+                    ctrl = control_in_queue.get_nowait()
+                except std_queue.Empty:
+                    ctrl = None
+                except Exception:
+                    logging.exception('AnalysisProcess worker: failed to read control queue, ignoring')
+                    ctrl = None
+                if ctrl == '__perf_profile_start__':
+                    _child_profiler.enable()
+                elif ctrl == '__perf_profile_stop__':
+                    _child_profiler.disable()
+                    buf = io.StringIO()
+                    pstats.Stats(_child_profiler, stream=buf).sort_stats('cumulative').print_stats(25)
+                    if control_out_queue is not None:
+                        try:
+                            control_out_queue.put({'__perf_report__': True, 'hotspots': buf.getvalue(), 'pid': os.getpid()})
+                        except Exception:
+                            logging.exception('AnalysisProcess worker: failed to enqueue profile report')
+                    _child_profiler = cProfile.Profile()
             try:
                 item = in_queue.get(timeout=0.5)
             except std_queue.Empty:
@@ -475,9 +513,20 @@ class AnalysisProcess_customFunction(QThread):
         self._in_queue = mp_ctx.Queue(maxsize=2)
         self._out_queue = mp_ctx.Queue(maxsize=2)
         self._stop_event = mp_ctx.Event()
+        # Separate queue pair used only by Performance Mode (see
+        # glados_pycromanager/observability/perf_capture.py) to start/stop
+        # cProfile inside this worker and get its hotspot report back --
+        # kept apart from _in_queue/_out_queue so profiling control traffic
+        # can never be mistaken for a frame/result and never delays one.
+        self._control_in_queue = mp_ctx.Queue(maxsize=2)
+        self._control_out_queue = mp_ctx.Queue(maxsize=2)
         self._process = mp_ctx.Process(
             target=_subprocess_analysis_worker,
             args=(analysisInfo, self._in_queue, self._out_queue, self._stop_event),
+            kwargs={
+                'control_in_queue': self._control_in_queue,
+                'control_out_queue': self._control_out_queue,
+            },
             daemon=True,
         )
         self._process.start()
@@ -503,7 +552,70 @@ class AnalysisProcess_customFunction(QThread):
         else:
             self._activity_event.clear()
 
+    def _node_label(self) -> str:
+        if isinstance(self.analysisInfo, dict):
+            return str(self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node'))
+        return str(self.analysisInfo)
+
+    def start_profiling(self) -> None:
+        """Performance Mode: tell the child process to start cProfile."""
+        try:
+            self._control_in_queue.put_nowait('__perf_profile_start__')
+        except std_queue.Full:
+            logging.warning('AnalysisProcess: could not signal profiling start (control queue full)')
+
+    def stop_profiling(self, timeout: float = 3.0):
+        """Performance Mode: tell the child to stop cProfile and dump its
+        hotspot table, plus psutil-based CPU%%/RSS/thread-count for the child
+        PID. Returns a perf_capture.SubprocessReport, never raises."""
+        from glados_pycromanager.observability.perf_capture import SubprocessReport
+        pid = self._process.pid
+        cpu_percent = None
+        rss_mb = None
+        thread_count = None
+        try:
+            import psutil
+            if pid is not None and self._process.is_alive():
+                child_proc = psutil.Process(pid)
+                # cpu_percent() on a freshly-constructed Process object has no
+                # baseline and always returns 0.0 on its first call -- block
+                # briefly here (rare, user-initiated action, not a hot path)
+                # to get a real instantaneous reading instead of a bogus 0.0.
+                cpu_percent = child_proc.cpu_percent(interval=0.1)
+                rss_mb = child_proc.memory_info().rss / (1024 * 1024)
+                thread_count = child_proc.num_threads()
+        except Exception as exc:  # noqa: BLE001 - profiling must never crash
+            logging.warning('AnalysisProcess: could not read subprocess psutil stats: %r', exc)
+
+        try:
+            self._control_in_queue.put_nowait('__perf_profile_stop__')
+        except std_queue.Full:
+            return SubprocessReport(node_label=self._node_label(), pid=pid, cpu_percent=cpu_percent,
+                                     rss_mb=rss_mb, thread_count=thread_count,
+                                     error='could not signal profiling stop (control queue full)')
+        try:
+            report = self._control_out_queue.get(timeout=timeout)
+        except std_queue.Empty:
+            return SubprocessReport(node_label=self._node_label(), pid=pid, cpu_percent=cpu_percent,
+                                     rss_mb=rss_mb, thread_count=thread_count,
+                                     error=f'child did not respond within {timeout}s')
+        return SubprocessReport(
+            node_label=self._node_label(),
+            pid=report.get('pid', pid),
+            cpu_percent=cpu_percent,
+            rss_mb=rss_mb,
+            thread_count=thread_count,
+            hotspots=report.get('hotspots'),
+        )
+
     def run(self):
+        self.shared_data.register_perf_thread_label(get_native_id(), f'RT-analysis (subprocess proxy): {self._node_label()}')
+        try:
+            self._run_loop()
+        finally:
+            self.shared_data.unregister_perf_thread_label(get_native_id())
+
+    def _run_loop(self):
         while self.is_running:
             self._new_image.wait()
             self._new_image.clear()
@@ -632,16 +744,25 @@ class AnalysisThread_customFunction(QThread):
             None
         """
         
+        node_label = self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node') if isinstance(self.analysisInfo, dict) else str(self.analysisInfo)
+        self.shared_data.register_perf_thread_label(get_native_id(), f'RT-analysis (in-process): {node_label}')
+        try:
+            self._run_loop()
+        finally:
+            self.shared_data.unregister_perf_thread_label(get_native_id())
+        self.finished.emit()
+
+    def _run_loop(self):
         while self.is_running:
             # # tic = time.time()
             # # Wait until liveMode or mdaMode is active
             # self._activity_event.wait()
-            
+
             # #Only check the vis queue if live or mda is ongoing
             # if self.shared_data.liveMode or self.shared_data.mdaMode:
             #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
             #     #Run analysis on the image from the queue
-            
+
             self._new_image.wait()
             self._new_image.clear()
             analysis_elapsed_ms = 0
@@ -655,11 +776,7 @@ class AnalysisThread_customFunction(QThread):
             # slow/GIL-heavy analysis (e.g. a diplib-based FFT) can't starve the Qt
             # main thread continuously when frames arrive faster than analysis keeps up.
             self.msleep(max(1, self.sleepTimeMs, int(analysis_elapsed_ms)))
-            
-        # Thread has finished, emit the finished signal
-        self.finished.emit()
-    
-        
+
         # while self.running:
         #     if not self.image_queue_analysis.empty():
         #         data = self.image_queue_analysis.get_nowait()
