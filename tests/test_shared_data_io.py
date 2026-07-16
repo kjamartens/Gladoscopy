@@ -153,6 +153,7 @@ def test_save_overwrites_only_global_data(tmp_appdata: Path):
         ("webhook_config", "slack_token", "tok"),
         ("webhook_config", "slack_secret", "sec"),
         ("webhook_config", "slack_channel", "ch"),
+        ("rt_analysis_config", "subprocess_isolation", "False"),
     ],
 )
 def test_each_field_round_trips(tmp_appdata: Path, group_name, field_name, sentinel):

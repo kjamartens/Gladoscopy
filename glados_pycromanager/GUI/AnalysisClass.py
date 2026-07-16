@@ -424,6 +424,12 @@ class AnalysisProcess_customFunction(QThread):
     Opt-in only: a node opts in via `"__runInSubprocess__": True` in its
     __function_metadata__ (see utils.realTimeAnalysis_runInSubprocess). Every
     node not opting in keeps using AnalysisThread_customFunction unchanged.
+    Users can also force every node back onto the plain QThread path
+    regardless of its own opt-in via Adv. settings -> "RT-analysis: use a
+    separate CPU core (subprocess)" (shared_data.config.rt_analysis_config.
+    subprocess_isolation, "True"/"False") -- useful for troubleshooting.
+    Read fresh on every create_real_time_analysis_thread() call, so no
+    restart is needed for a changed setting to take effect.
 
     v1 limitations (documented, not solved here):
       * `run()` always receives core=None and nodzInfo=None in the child process
@@ -836,10 +842,11 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
     
     # image_queue_analysis = image_queue_transfer
     #Instantiate an analysis thread (or, for nodes opting into subprocess
-    #isolation via "__runInSubprocess__" -- see
-    #https://github.com/kjamartens/Gladoscopy/issues/16 -- an analysis
-    #process) and add a signal
-    if utils.realTimeAnalysis_runInSubprocess(analysisInfo):
+    #isolation via "__runInSubprocess__", unless overridden by the global
+    #Adv. settings kill switch shared_data.config.rt_analysis_config.
+    #subprocess_isolation -- see https://github.com/kjamartens/Gladoscopy/
+    #issues/16 -- an analysis process) and add a signal
+    if utils.realTimeAnalysis_runInSubprocess(analysisInfo, shared_data):
         analysis_thread = AnalysisProcess_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
     else:
         analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore

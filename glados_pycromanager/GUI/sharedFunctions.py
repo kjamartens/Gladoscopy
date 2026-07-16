@@ -132,12 +132,39 @@ class LoggingConfig:
 
 
 @dataclass
+class RealTimeAnalysisConfig:
+    # See https://github.com/kjamartens/Gladoscopy/issues/16: nodes whose
+    # __function_metadata__ sets "__runInSubprocess__" (e.g. Real-Time FFT)
+    # normally run in a separate OS process (AnalysisProcess_customFunction)
+    # to avoid Python GIL contention with the UI thread. This is a global
+    # kill switch: set to "False" to force every RT-analysis node back onto
+    # the older same-process QThread execution (AnalysisThread_customFunction)
+    # regardless of its own opt-in -- useful for troubleshooting (e.g. under
+    # an IDE debugger that doesn't like subprocess.spawn) or on a system
+    # where multiprocessing itself is problematic.
+    subprocess_isolation: str = setting(
+        "True",
+        "RT-analysis: use a separate CPU core (subprocess)",
+        "Nodes that opt into it (e.g. Real-Time FFT) run their compute in a "
+        "separate OS process, so a slow/GIL-heavy analysis can't freeze the "
+        "UI ('True', recommended). Set to 'False' to force the older "
+        "same-process/same-thread execution for every node instead (legacy "
+        "behaviour, useful for troubleshooting). Read fresh each time you "
+        "(re)activate real-time analysis -- no restart required.",
+        input_type="dropdown",
+        options=["True", "False"],
+        hidden=False,
+    )
+
+
+@dataclass
 class Config:
     mda_config:           MDAConfig           = dataclasses.field(default_factory=MDAConfig)
     visualisation_config: VisualisationConfig = dataclasses.field(default_factory=VisualisationConfig)
     micromanager_config: MicroManagerConfig  = dataclasses.field(default_factory=MicroManagerConfig)
     webhook_config: WebhookConfig  = dataclasses.field(default_factory=WebhookConfig)
     logging_config:       LoggingConfig       = dataclasses.field(default_factory=LoggingConfig)
+    rt_analysis_config:   RealTimeAnalysisConfig = dataclasses.field(default_factory=RealTimeAnalysisConfig)
 
 
 # Phase 7.1 moved the JSON load/save bodies to

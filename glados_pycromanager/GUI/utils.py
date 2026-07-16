@@ -2712,16 +2712,28 @@ def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
 
     return delay
 
-def realTimeAnalysis_runInSubprocess(rt_analysis_info) -> bool:
-    """Return whether the selected RT-analysis node opted into subprocess isolation.
+def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool:
+    """Return whether the selected RT-analysis node should run in a subprocess.
 
     See https://github.com/kjamartens/Gladoscopy/issues/16 — a node whose
-    ``__function_metadata__`` sets ``"__runInSubprocess__": True`` runs its
-    init/run/end in a separate OS process (AnalysisProcess_customFunction)
-    instead of a QThread, so a GIL-heavy compute can't starve the Qt main
-    thread. Defaults to False (existing QThread behaviour) for every node
-    that doesn't explicitly opt in.
+    ``__function_metadata__`` sets ``"__runInSubprocess__": True`` normally
+    runs its init/run/end in a separate OS process
+    (AnalysisProcess_customFunction) instead of a QThread, so a GIL-heavy
+    compute can't starve the Qt main thread. Defaults to False (existing
+    QThread behaviour) for every node that doesn't explicitly opt in.
+
+    ``shared_data.config.rt_analysis_config.subprocess_isolation`` (Adv.
+    settings, "RT-analysis: use a separate CPU core (subprocess)") is a
+    global kill switch on top of the per-node opt-in: when set to "False" it
+    forces every node back onto the same-process QThread path regardless of
+    its own metadata flag. ``shared_data`` is optional so existing/test call
+    sites that don't have it keep the pure per-node behaviour.
     """
+    if shared_data is not None:
+        global_setting = getattr(shared_data.config.rt_analysis_config, 'subprocess_isolation', 'True')
+        if str(global_setting) == 'False':
+            return False
+
     indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
 
     wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
