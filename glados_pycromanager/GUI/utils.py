@@ -3127,34 +3127,38 @@ class CustomMainWindow(QWidget):
         for key, value in vars(self).items():
             saveState = None
             if isinstance(value, QWidget):
-                maxParentInst = 10
-                currentParent = value
-                for _ in range(maxParentInst):
-                    if currentParent == None:
-                        break
-                    if currentParent.parent == None:
-                        break
-                    #Rather difficult method to figure out if we're in MDA or MMControls savestate
-                    if callable(currentParent.parent):
-                        currentParent = currentParent.parent()
-                        if isinstance(currentParent, napariGlados.dockWidget_MDA):
-                            saveState = 'MDA'
+                try:
+                    maxParentInst = 10
+                    currentParent = value
+                    for _ in range(maxParentInst):
+                        if currentParent == None:
                             break
-                    else:
-                        try:
-                            currentParent = currentParent.parent
+                        if currentParent.parent == None:
+                            break
+                        #Rather difficult method to figure out if we're in MDA or MMControls savestate
+                        if callable(currentParent.parent):
+                            currentParent = currentParent.parent()
                             if isinstance(currentParent, napariGlados.dockWidget_MDA):
                                 saveState = 'MDA'
                                 break
-                        except AttributeError:
-                            break
-                    
-                if saveState is not None:
-                    state[saveState][key] = {
-                        'text': value.text() if hasattr(value, 'text') else None,
-                        'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
-                        # Add more properties as needed
-                    }
+                        else:
+                            try:
+                                currentParent = currentParent.parent
+                                if isinstance(currentParent, napariGlados.dockWidget_MDA):
+                                    saveState = 'MDA'
+                                    break
+                            except AttributeError:
+                                break
+
+                    if saveState is not None:
+                        state[saveState][key] = {
+                            'text': value.text() if hasattr(value, 'text') else None,
+                            'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
+                            # Add more properties as needed
+                        }
+                except RuntimeError as exc:
+                    #Widget was deleted (e.g. mid-rebuild teardown) - skip it.
+                    logging.debug('Skipping deleted widget %s while saving state: %s', key, exc)
             else:
                 if isinstance(self, MDAGlados.MDAGlados):
                     saveState = 'MDA'
