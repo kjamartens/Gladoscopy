@@ -101,6 +101,24 @@ os.environ["NAPARI_OCTREE"] = "1"
 Never import `CMMCorePlus` at the top level; import it inside the function that
 needs it so that napari's Qt import has already resolved.
 
+### Qt import ordering vs plain pymmcore (headless Python backend) — inverted
+
+The opposite ordering constraint applies to plain `pymmcore.CMMCore` (used by
+`pycromanager.headless.start_headless(python_backend=True)` via
+`mmpycorex.launcher._create_pymmcore_instance`, i.e. the "Python" radio button
+in the headless backend dialog): if `PyQt5`/napari has already been imported
+when that `CMMCore()` instance is constructed, the process crashes with a
+Windows access violation (`STATUS_ACCESS_VIOLATION`, exit code
+`-1073741819`) right inside the constructor — reproducible outside the app
+with nothing more than `import PyQt5.QtWidgets` followed by
+`start_headless(python_backend=True, ...)`. The fix is to force `pymmcore`'s
+native extension to load before Qt: `GUI_napari.py` now does `import pymmcore`
+as the very first import, ahead of `import napari` and the `PyQt5` imports
+(wrapped in `# isort: off` / `# isort: on` so isort doesn't "helpfully"
+alphabetize `pymmcore` back after `napari`). This does not conflict with the
+`CMMCorePlus` rule above — `pymmcore_plus.CMMCorePlus` is still imported
+lazily, after Qt, elsewhere.
+
 ### Why in-process cProfile, not a wrapper script
 
 The straightforward approach (wrap the launch with `python -m cProfile`) does

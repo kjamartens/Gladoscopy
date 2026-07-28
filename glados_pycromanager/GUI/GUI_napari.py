@@ -11,7 +11,15 @@ import os
 import socket
 import sys
 
+# isort: off
+# Must be imported before napari/PyQt5: loading Qt first and then constructing
+# a pymmcore.CMMCore later (headless Python backend) crashes with an access
+# violation on Windows (see docs/perf-runtime-recipe.md "Known gotchas").
+# Importing pymmcore here first avoids it.
+import pymmcore  # noqa: F401
+
 import napari
+# isort: on
 from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import (
     QIcon,
