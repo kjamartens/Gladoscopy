@@ -102,10 +102,10 @@ bandit:  ## Run bandit security scan (informational).
 # ── Run ───────────────────────────────────────────────────────────────────────
 
 run:  ## Launch the standalone Glados-PycroManager GUI.
-	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
+	$(PYTHON) -X faulthandler -m glados_pycromanager.GUI.GUI_napari
 
 run-dev: dev  ## Editable install (dev extras) then launch Glados — one-shot dev workflow.
-	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
+	$(PYTHON) -X faulthandler -m glados_pycromanager.GUI.GUI_napari
 
 run-prod: .venv  ## Non-editable (production) install then launch Glados — simulate end-user install.
 	$(PIP) install .
