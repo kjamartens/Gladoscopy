@@ -498,11 +498,13 @@ class MicroscopeInterfaceLayer:
         """
         Get the current X-Y position of a stage.
         """
-        #TODO: Catch if no xy stage is present
         try:
             if xy_stage_name is None:
                 xy_stage_name = self.get_xy_stage_device()
-                
+            if not xy_stage_name:
+                #No XY stage configured in the MM config - nothing to query.
+                return [0,0]
+
             if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 return self.core.get_xy_position(xy_stage_name)
             elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
@@ -532,8 +534,10 @@ class MicroscopeInterfaceLayer:
         """
         Get the current position of the X-Y stage.
         """
-        #TODO: Catch if no xy stage present
         try:
+            if not xy_stage_name:
+                #No XY stage configured in the MM config - nothing to query.
+                return [0,0]
             if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 logging.info("get_xy_stage_position not fully implemented for PYCROMANAGER_JAVA; attempting fallback")
                 return self.core.get_xy_stage_position(xy_stage_name)
