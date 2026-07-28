@@ -3,7 +3,14 @@
     "allow": [
       "Bash(.venv/Scripts/ruff check *)",
       "Bash(.venv/Scripts/mypy *)",
-      "Bash(make verify)"
+      "Bash(make verify)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(make --version)",
+      "Bash(make bench-live-display *)",
+      "Bash(.venv/Scripts/python.exe -m pytest -q)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
