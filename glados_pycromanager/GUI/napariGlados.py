@@ -1347,12 +1347,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #TODO: add fullscreen flag
     # if config.ui.FULLSCREEN:
     napariViewer.window._qt_window.showMaximized()
-    
-    #Set QT attributes here for some reason...
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
-    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
-    QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
-    
+
     # napariViewer._window._qt_viewer.canvas.view._transform.scale=[2,2,2,2]
     #Add a connect event if a layer is removed - to stop background processes
     napariViewer.layers.events.removing.connect(lambda event: layer_removed_event_callback(event,shared_data))
