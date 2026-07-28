@@ -1093,14 +1093,16 @@ class MDAGlados(CustomMainWindow):
             letters_to_include += 'z'
         #Now we create an array with all possible combinations of these letters:
         permuatations = [''.join(comb) for comb in itertools.permutations(letters_to_include, len(letters_to_include))]
+        #Create a label first, so a stale reference to the previous (possibly
+        #already-deleted) label can't be read if addItem() below fires the
+        #currentTextChanged signal synchronously.
+        self.orderLabel = QLabel("Order:")
         self.orderDropdown = QComboBox()
-        self.orderDropdown.currentTextChanged.connect(lambda: self.get_MDA_events_from_GUI())
         #add the options to the dropdown:
         for option in permuatations:
             self.orderDropdown.addItem(option)
-        #Create a label:
-        self.orderLabel = QLabel("Order:")
-        
+        self.orderDropdown.currentTextChanged.connect(lambda: self.get_MDA_events_from_GUI())
+
         #Show the widgets.
         orderLayout.addWidget(self.orderLabel)
         orderLayout.addWidget(self.orderDropdown)
