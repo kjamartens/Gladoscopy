@@ -3488,7 +3488,12 @@ def getCoreDevicesOfDeviceType(core,devicetype):
     #Get devices
     devices = core.get_loaded_devices() #type:ignore
     try:
-        devices = [devices.get(i) for i in range(devices.size())]
+        #Java-proxy StrVector (has .size()/.get()) vs a plain list/tuple of names
+        #(e.g. PYCROMANAGER_PYTHON backend) - normalize to a plain list either way.
+        if hasattr(devices, 'size') and hasattr(devices, 'get'):
+            devices = [devices.get(i) for i in range(devices.size())]
+        else:
+            devices = list(devices)
         devicesOfType = []
         #Loop over devices
         for device in devices:
