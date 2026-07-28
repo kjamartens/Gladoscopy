@@ -147,6 +147,16 @@ def functionNamesFromDir(dirname):
             mfile = getattr(mod, '__file__', None)
             if mfile and os.path.abspath(mfile) == abs_file:
                 return mod
+        #For files that live inside the glados_pycromanager package tree, prefer
+        #importing via their real dotted package path so this shares the same
+        #sys.modules entry (and node registration) as glados_pycromanager.plugins.discovery,
+        #regardless of which mechanism happens to run first.
+        if not os.path.isabs(dirname):
+            qualified_name = 'glados_pycromanager.' + dirname.replace('\\', '.').replace('/', '.') + '.' + functionName
+            try:
+                return importlib.import_module(qualified_name)
+            except ImportError:
+                pass
         spec = importlib.util.spec_from_file_location(functionName, file_path)
         if spec is None or spec.loader is None:
             return None
