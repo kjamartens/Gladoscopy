@@ -110,12 +110,14 @@ def napariUpdateLive(DataStructure):
     now = time.time()  # cache once — used multiple times below
     elapsed = now - shared_data.last_display_update_time
     if elapsed < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
-        logging.debug(f'Updated live preview Hindered (due to display update time) at time {now}')
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug(f'Updated live preview Hindered (due to display update time) at time {now}')
         return
 
     if elapsed < min_delay_time and elapsed > 1/1000:
-        logging.debug(f'Updated live preview Delayed (due to display update time) val found {elapsed}')
-        logging.debug(f'Updated live preview Delayed (due to display update time) by {min_delay_time - elapsed}')
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug(f'Updated live preview Delayed (due to display update time) val found {elapsed}')
+            logging.debug(f'Updated live preview Delayed (due to display update time) by {min_delay_time - elapsed}')
         # Skip this frame rather than sleeping on the UI thread. napariUpdateLive is called
         # from the main thread (napari dispatches yielded-worker signals there), so sleeping
         # here freezes the entire UI. Dropping the frame is always safer than blocking.
@@ -230,7 +232,8 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                             #     correctDimensions = False
                             #     break
                             #Check it has the correct length:
-                            logging.debug(f'range: {layerData.shape[dim_id]} vs {n_entries_in_dims[dim_id]}')
+                            if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+                                logging.debug(f'range: {layerData.shape[dim_id]} vs {n_entries_in_dims[dim_id]}')
                             if int(layerData.shape[dim_id]) != n_entries_in_dims[dim_id]:
                                 correctDimensions = False
                                 break
@@ -316,7 +319,8 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     for dim_id in range(len(n_entries_in_dims)):
                         currentSlice = metadata['Axes'][dimensionOrder[dim_id]]
                         currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
-                        logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
+                        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+                            logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
                         sliceTuple += (int(currentSliceID),)
                         
                     shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = latestImage 
@@ -481,16 +485,18 @@ class napariHandler:
                     break
 
         end = time.perf_counter()
-        logging.debug(f"Loop (no intermediate logs): {(end-start)*1000:.4f}ms")
-        
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug(f"Loop (no intermediate logs): {(end-start)*1000:.4f}ms")
+
     def grab_image_liveVisualisation_and_liveAnalysis(self,image,metadata, event_queue):
-        """ 
+        """
         Function that runs on every frame obtained in live mode and puts it in the image queue(s)
-        
+
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.debug(f'#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {time.time()}')
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug(f'#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {time.time()}')
         if self.acqstate:
             self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
             #Give image and metadata back for storage done by pycromanager in case of MDA, NOT in case of live-viewing.
@@ -624,7 +630,8 @@ class napariHandler:
         Inputs: array image: image from micromanager
                 metadata: metadata from micromanager
         """
-        logging.info(f'#nH - Updated preview requesting grab_image_liveVisualisation_and_liveAnalysis_savedFn at time {time.time()}')
+        if logging.getLogger(__name__).isEnabledFor(logging.INFO):
+            logging.info(f'#nH - Updated preview requesting grab_image_liveVisualisation_and_liveAnalysis_savedFn at time {time.time()}')
         # shared_data.debugImageArrivalTimes.append(time.time())
         if self.acqstate:
             #Check if there is any reason to read the image:
