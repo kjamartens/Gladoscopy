@@ -415,8 +415,12 @@ def main():
                 logging.info('Headless PycroManager started')
 
                 #Get those settings and use to start headless
-                start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
-
+                try:
+                    start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
+                except Exception as e:
+                    print("Error!")
+                    print(e)
+                    
                 #Also store some settings in shared_data
                 shared_data._headless = True
                 shared_data.backend = headlessGUIv.backend

@@ -444,6 +444,30 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_roi.")
     
+    def get_sensor_size(self) -> tuple:
+        """Return (width, height) of the full camera sensor independent of any active ROI.
+
+        Implemented by temporarily clearing the ROI, reading the full-frame dimensions,
+        then restoring the original ROI.  Safe to call from any thread that is not
+        actively running an acquisition; the caller is responsible for pausing live
+        mode beforehand if needed (the same pattern used by setROI()).
+        """
+        original_roi = self.get_roi()
+        try:
+            self.clear_roi()
+            full = self.get_roi()
+            return (int(full[2]), int(full[3]))
+        except Exception as exc:
+            import logging as _logging
+            _logging.warning("get_sensor_size: could not determine sensor size: %s", exc)
+            # Fallback: treat current ROI extent as the sensor limit.
+            return (int(original_roi[2]), int(original_roi[3]))
+        finally:
+            try:
+                self.set_roi(original_roi)
+            except Exception:
+                pass  # best-effort restore
+
     def get_shutter_device(self) -> str:
         """
         Get the current shutter device.
