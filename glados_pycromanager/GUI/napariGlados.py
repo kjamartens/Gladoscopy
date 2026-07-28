@@ -90,6 +90,37 @@ def _get_cached_dimensions(shared_data):
     return shared_data._dims_cache[1]
 
 
+def _get_contrast_frame_counters(shared_data):
+    """Per-layer-name frame counters backing the throttled auto-contrast
+    refresh (see _maybe_refresh_contrast). Lazily initialized on shared_data,
+    same pattern as _dims_cache.
+    """
+    counters = getattr(shared_data, '_contrast_frame_counters', None)
+    if counters is None:
+        counters = {}
+        shared_data._contrast_frame_counters = counters
+    return counters
+
+
+def _maybe_refresh_contrast(shared_data, layer, layerName):
+    """Recompute contrast limits every Nth frame instead of every frame.
+
+    bench_live_display measured napari's per-frame auto-contrast recompute
+    (`_keep_auto_contrast = True`) as the single largest recurring cost in
+    the live-display path (~25-30% of steady-state frame time). Recomputing
+    on a throttle keeps the preview's brightness adapting to the data
+    without paying the full min/max-scan cost on every frame. N is
+    configurable via visualisation_config.contrast_refresh_every_n_frames
+    (default 10); set to 1 to recompute every frame (previous behavior).
+    """
+    counters = _get_contrast_frame_counters(shared_data)
+    n = max(1, int(shared_data.config.visualisation_config.contrast_refresh_every_n_frames))
+    count = counters.get(layerName, 0) + 1
+    counters[layerName] = count
+    if count % n == 0:
+        layer.reset_contrast_limits()
+
+
 #region real-time visualisation/analysis handling
 #These need to be functions outside of any class due to Yield-calling
 def napariUpdateLive(DataStructure):
@@ -182,7 +213,14 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             else:
                 logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
                 layer.scale = [1,1]
-            layer._keep_auto_contrast = True #type:ignore
+            # `_keep_auto_contrast = True` recomputes contrast limits (a full
+            # min/max scan) on every single frame update below -- bench_live_display
+            # measured this as the single largest recurring per-frame cost in the
+            # display path (~25-30% of steady-state frame time at 512-2048px).
+            # Recompute periodically instead (see contrast_refresh_every_n_frames)
+            # so brightness still adapts, just not on every frame.
+            layer._keep_auto_contrast = False #type:ignore
+            _get_contrast_frame_counters(shared_data)[layerName] = 0
             napariViewer.reset_view()
         #Else if the layer already exists, replace it!
         else:
@@ -192,8 +230,15 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             if layer.data.shape == liveImage.shape and layer.data.dtype == liveImage.dtype:
                 layer.data[:] = liveImage
                 layer.refresh()  # in-place mutation doesn't trigger napari's setter; must refresh manually
+                _maybe_refresh_contrast(shared_data, layer, layerName)
             else:
+                # Shape/dtype changed (e.g. ROI or binning changed mid-session) --
+                # force an immediate contrast recompute rather than waiting for the
+                # throttle, since limits fitted to the old shape/range would
+                # otherwise look wrong until the next scheduled refresh.
                 layer.data = liveImage
+                layer.reset_contrast_limits()
+                _get_contrast_frame_counters(shared_data)[layerName] = 0
             logging.debug('Put liveImage in the live layer')
             
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames

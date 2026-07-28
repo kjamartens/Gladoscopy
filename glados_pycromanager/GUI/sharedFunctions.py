@@ -103,6 +103,14 @@ class WebhookConfig:
 @dataclass
 class VisualisationConfig:
     fps: int = setting(60, "Visualisation FPS", "Update speed of napari visualisation (in frames per second)")
+    contrast_refresh_every_n_frames: int = setting(
+        10,
+        "Auto-contrast refresh interval (frames)",
+        "How often (in displayed live-preview frames) to recompute contrast "
+        "limits from the image data. Recomputing every frame is expensive "
+        "(a full min/max scan); higher values trade brightness-adjustment "
+        "responsiveness for throughput. Set to 1 to recompute every frame.",
+    )
 
 
 @dataclass
