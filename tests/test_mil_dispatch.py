@@ -239,6 +239,60 @@ def test_set_core_resets_pixel_size_cache(mil):
 @pytest.mark.skipif(
     PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
 )
+def test_get_exposure_caches_after_first_call(mil):
+    core = MagicMock(spec=PymmcorePlusCore)
+    core.getExposure.return_value = 42.0
+    mil.set_core(core)
+    assert mil.get_exposure() == 42.0
+    assert mil.get_exposure() == 42.0
+    core.getExposure.assert_called_once()  # only one hardware hit
+
+
+@pytest.mark.skipif(
+    PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
+)
+def test_invalidate_exposure_cache_forces_rehit(mil):
+    core = MagicMock(spec=PymmcorePlusCore)
+    core.getExposure.return_value = 42.0
+    mil.set_core(core)
+    mil.get_exposure()
+    mil.invalidate_exposure_cache()
+    mil.get_exposure()
+    assert core.getExposure.call_count == 2
+
+
+@pytest.mark.skipif(
+    PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
+)
+def test_set_exposure_invalidates_cache(mil):
+    core = MagicMock(spec=PymmcorePlusCore)
+    core.getExposure.return_value = 42.0
+    mil.set_core(core)
+    mil.get_exposure()  # populates cache
+    mil.set_exposure(100.0)
+    core.getExposure.return_value = 100.0
+    assert mil.get_exposure() == 100.0
+    assert core.getExposure.call_count == 2  # cache was cleared by set_exposure
+
+
+@pytest.mark.skipif(
+    PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
+)
+def test_set_core_resets_exposure_cache(mil):
+    core = MagicMock(spec=PymmcorePlusCore)
+    core.getExposure.return_value = 42.0
+    mil.set_core(core)
+    mil.get_exposure()  # populates cache
+    core2 = MagicMock(spec=PymmcorePlusCore)
+    core2.getExposure.return_value = 10.0
+    mil.set_core(core2)
+    assert mil.get_exposure() == 10.0
+    core2.getExposure.assert_called_once()  # cache was cleared by set_core
+
+
+@pytest.mark.skipif(
+    PymmcorePlusCore is None, reason="pymmcore-plus not installed in test env"
+)
 def test_image_width_and_height_derive_from_roi(mil):
     core = MagicMock(spec=PymmcorePlusCore)
     core.getROI.return_value = (0, 0, 123, 456)
