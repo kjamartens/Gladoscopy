@@ -20,7 +20,6 @@ from PyQt5.QtGui import (
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -275,10 +274,10 @@ class MMConfigUI(CustomMainWindow):
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.changes_update_MM = changes_update_MM
-        if self.config_groups is not None:
-            self.core = self.config_groups[0].core
+        if self.config_groups:
+            self.core = next(iter(self.config_groups.values())).core
         else:
-            self.core = None
+            self.core = self.shared_data.MILcore
         self.dropDownBoxes = {}
         self.sliders = {}
         self.editFields = {}
@@ -1037,117 +1036,185 @@ class MMConfigUI(CustomMainWindow):
         except (RuntimeError, OSError, ValueError, AttributeError) as exc:
             logging.error('setROI(%s) failed: %s', ROIpos, exc)
     
-    def shape_drawn_callback(self, event):
-        if len(self.drawROIlayer.data) > 0:
-            if not event.source._is_moving and not event.source._is_selecting and not event.source._is_creating and len(event.source._mouse_drag_gen) > 0 and event.source.name != 'Draw ROI_':
-                logging.debug('Finished drawing an area for the ROI size!')
-                
-                def acceptFun(dialogV):
-                    self.setROItoDrawn()
-                    #Close the dialog:
-                    dialogV.done(QDialog.Accepted)
-                
-                
-                
-                def reDoFun(dialogV,layer):
-                    #Remove the layer
-                    shared_data.napariViewer.layers.remove(layer)
-                    #Restart the drawROI:
-                    self.drawROI()
-                    #Close the dialog:
-                    dialogV.done(QDialog.Rejected)
-                
-                def cancelFun(dialogV,layer):
-                    #Remove the layer
-                    shared_data.napariViewer.layers.remove(layer)
-                    #Close the dialog:
-                    dialogV.done(QDialog.Rejected)
-                
-                #Change the layer name so this won't pop up again after dialog is closed.
-                event.source.name = 'Draw ROI_'
-                #Pop up a dialog box to ask if they like it or not:
-                #Create a dialog box
-                dialog =  QDialog()
-                dialog.setWindowTitle('Draw ROI')
-                #Add 3 buttons: 
-                QButtonOk = QPushButton('OK')
-                QButtonRedraw = QPushButton('Redraw')
-                QButtonCancel = QPushButton('Cancel')
-                #add the box to dialog:
-                layout = QVBoxLayout()
-                layout.addWidget(
-                    QLabel('ROI drawn correctly?')
-                )
-                buttonBox = QHBoxLayout()
-                buttonBox.addWidget(QButtonOk)
-                buttonBox.addWidget(QButtonRedraw)
-                buttonBox.addWidget(QButtonCancel)
-                layout.addLayout(buttonBox)
-                dialog.setLayout(layout)
-                #Connect the buttons to the dialog:
-                QButtonOk.clicked.connect(lambda: acceptFun(dialog))
-                QButtonRedraw.clicked.connect(lambda: reDoFun(dialog,event.source))
-                QButtonCancel.clicked.connect(lambda: cancelFun(dialog,event.source))
-                #Show the dialog:
-                dialog.exec_()
-            
-            
-    def drawROI(self):
-        """
-        Draw a ROI. Idea is to create a new layer, let the user draw a rectangle, and ask if they like it or not. Then a small popup window with 'OK', 'Let me draw again', 'Stop this futile attempt'
-        """
-        
-            
-        # Create a shapes layer
-        self.drawROIlayer = shared_data.napariViewer.add_shapes(name='Draw ROI')
-        self.drawROIlayer.events.set_data.connect(self.shape_drawn_callback)
-
-
-        # Set the shapes layer mode to 'add_rectangle'
-        self.drawROIlayer.mode = 'add_rectangle'
-        
-        #Changes the button to a different method, which should be pressed once the rectangle is drawn:
-        # self.ROIoptionsButtons['drawROI'].setText('ROI drawn')
-        # self.ROIoptionsButtons['drawROI'].clicked.disconnect()
-        # self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.setROItoDrawn())
-    
-    def setROItoDrawn(self):
-        """
-        The setROItoDrawn function is used to set the ROI of the microscope to a drawn shape.
-        The function first checks if there are any shapes in self.drawROIlayer, and if so, it gets the vertices of the last added shape (which should be a rectangle). It then sets the ROI using these vertices as top left and bottom right corners.
-        It also removes self.drawROIlayer from shared_data.napariViewer
-        """
-        # Get the type of the last added shape
-        if len(self.drawROIlayer.data) > 0:
-            shape_type = self.drawROIlayer.shape_type[-1]
-            if shape_type == 'rectangle':
-                vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
-                #Get the topleft, bottomright position from the drawn rectangle
-                topleftxy = np.floor(vertices[0][::-1])
-                bottomrightxy = np.ceil(vertices[2][::-1])
-                #Set the boundaries based on the camera
-                mintopleft = [0,0]
-                #TODO: Fix this (at least in pymmc backend)
-                maxbottomright = [shared_data.MILcore.get_roi().width, shared_data.MILcore.get_roi().height]
-                #Find the bounded positions
-                topleftpos = np.maximum(topleftxy,mintopleft)
-                bottomrightpos = np.minimum(bottomrightxy,maxbottomright)
-                #Set the ROI correclty
-                shared_data.core.set_roi(int(topleftpos[0]),int(topleftpos[1]),int(bottomrightpos[0]-topleftpos[0]),int(bottomrightpos[1]-topleftpos[1]))
-                logging.info(f"Set ROI to {topleftpos[0]},{topleftpos[1]},{bottomrightpos[0]},{bottomrightpos[1]} px")
-        else:
-            logging.warning('Attempted to set ROI to drawn, but no shape was added')
-        
-        #remove the self.drawROIlayer:
+    def _restore_draw_roi_button(self):
+        """Restore the 'Draw ROI' button to its default state."""
         try:
-            shared_data.napariViewer.layers.remove(self.drawROIlayer)
-        except (AttributeError, RuntimeError, KeyError, ValueError) as exc:
-            logging.warning('Failed to remove the drawROIlayer: %s', exc)
-        
-        #Reset the Draw ROI button
+            self.ROIoptionsButtons['drawROI'].clicked.disconnect()
+        except (RuntimeError, TypeError):
+            pass
         self.ROIoptionsButtons['drawROI'].setText('Draw ROI')
-        self.ROIoptionsButtons['drawROI'].clicked.disconnect()
         self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.drawROI())
+
+    def _cancel_roi_draw(self):
+        """Cancel an in-progress ROI draw: remove the overlay layer and drag callback."""
+        roi_layer = getattr(self, '_roi_draw_layer', None)
+        if roi_layer is not None:
+            try:
+                shared_data.napariViewer.layers.remove(roi_layer)
+            except (ValueError, RuntimeError, KeyError, AttributeError):
+                pass
+            self._roi_draw_layer = None
+
+        cb_ref = getattr(self, '_roi_drag_callback_ref', None)
+        if cb_ref is not None:
+            try:
+                shared_data.napariViewer.mouse_drag_callbacks.remove(cb_ref)
+            except ValueError:
+                pass
+            self._roi_drag_callback_ref = None
+
+        try:
+            shared_data.napariViewer.cursor.style = 'standard'
+        except Exception:
+            pass
+
+        self._restore_draw_roi_button()
+
+    def drawROI(self):
+        """Draw a ROI on the napari canvas via an interactive left-mouse drag.
+
+        Uses napari's public ``mouse_drag_callbacks`` yield pattern for robust
+        drag-start / move / release detection without relying on any private
+        napari internals.  A semi-transparent yellow rectangle overlays the
+        canvas in real time while the user drags.  The ROI is applied
+        immediately on mouse-release via ``setROI()`` (which handles
+        live-mode pausing); no confirmation dialog is shown.
+
+        The button label changes to 'Cancel Draw' during the interaction so
+        the user can abort at any time.
+        """
+        # ------------------------------------------------------------------
+        # 1.  Determine the display scale from the first Image layer present
+        # ------------------------------------------------------------------
+        scale = [1.0, 1.0]
+        for lyr in shared_data.napariViewer.layers:
+            if type(lyr).__name__ == 'Image':
+                lyr_scale = list(lyr.scale)
+                if len(lyr_scale) >= 2:
+                    scale = [float(lyr_scale[-2]), float(lyr_scale[-1])]
+                break
+
+        # ------------------------------------------------------------------
+        # 2.  Obtain full sensor dimensions for ROI upper-bound clamping
+        # ------------------------------------------------------------------
+        sensor_w, sensor_h = 65535, 65535  # generous fallback; microscope will enforce its own limits
+        try:
+            if not shared_data.liveMode:
+                sensor_w, sensor_h = shared_data.MILcore.get_sensor_size()
+            else:
+                # Brief live-mode pause (same pattern as setROI())
+                shared_data.liveMode = False
+                try:
+                    sensor_w, sensor_h = shared_data.MILcore.get_sensor_size()
+                finally:
+                    time.sleep(0.2)
+                    shared_data.liveMode = True
+        except Exception as exc:
+            logging.warning('drawROI: could not determine sensor size, using fallback: %s', exc)
+
+        # ------------------------------------------------------------------
+        # 3.  Visual overlay layer (scale matches live image for correct overlay)
+        # ------------------------------------------------------------------
+        roi_layer = shared_data.napariViewer.add_shapes(
+            data=[],
+            name='ROI Selection',
+            face_color=[1.0, 1.0, 0.0, 0.15],
+            edge_color='yellow',
+            edge_width=2,
+        )
+        roi_layer.scale = scale
+        self._roi_draw_layer = roi_layer
+
+        # ------------------------------------------------------------------
+        # 4.  Switch button to cancel mode
+        # ------------------------------------------------------------------
+        try:
+            self.ROIoptionsButtons['drawROI'].clicked.disconnect()
+        except (RuntimeError, TypeError):
+            pass
+        self.ROIoptionsButtons['drawROI'].setText('Cancel Draw')
+        self.ROIoptionsButtons['drawROI'].clicked.connect(lambda: self._cancel_roi_draw())
+
+        # ------------------------------------------------------------------
+        # 5.  Crosshair cursor
+        # ------------------------------------------------------------------
+        try:
+            shared_data.napariViewer.cursor.style = 'cross'
+        except Exception:
+            pass
+
+        # ------------------------------------------------------------------
+        # 6.  One-shot mouse drag callback (closures capture local variables)
+        # ------------------------------------------------------------------
+        arr_scale = np.array(scale, dtype=float)
+
+        def _cleanup_layer():
+            """Remove overlay and restore button — called on success or cancel."""
+            self._roi_draw_layer = None
+            try:
+                shared_data.napariViewer.layers.remove(roi_layer)
+            except (ValueError, RuntimeError, KeyError, AttributeError) as exc:
+                logging.debug('Draw ROI: layer cleanup: %s', exc)
+            self._restore_draw_roi_button()
+
+        def _apply_and_cleanup(start_px, end_px):
+            """Convert pixel drag coords to (x, y, w, h) and apply via setROI()."""
+            r0, c0 = np.floor(np.minimum(start_px, end_px)).astype(int)
+            r1, c1 = np.ceil(np.maximum(start_px, end_px)).astype(int)
+            x  = int(np.clip(c0, 0, sensor_w))
+            y  = int(np.clip(r0, 0, sensor_h))
+            x2 = int(np.clip(c1, 0, sensor_w))
+            y2 = int(np.clip(r1, 0, sensor_h))
+            w, h = x2 - x, y2 - y
+            if w > 0 and h > 0:
+                self.setROI([x, y, w, h])
+                logging.info('Draw ROI: applied x=%d y=%d w=%d h=%d', x, y, w, h)
+            else:
+                logging.warning('Draw ROI: degenerate rectangle ignored (w=%d h=%d)', w, h)
+            _cleanup_layer()
+
+        def _roi_drag_callback(viewer, event):
+            if event.button != 1:
+                # Not left-click — leave callback registered; ignore event
+                return
+            # Prevent canvas panning while drawing the ROI rectangle
+            event.handled = True
+
+            start_px = np.array(event.position[-2:], dtype=float) / arr_scale
+
+            yield  # ---------- move phase ----------
+
+            while event.type == 'mouse_move':
+                curr_px = np.array(event.position[-2:], dtype=float) / arr_scale
+                r0, c0 = np.minimum(start_px, curr_px)
+                r1, c1 = np.maximum(start_px, curr_px)
+                if r1 > r0 and c1 > c0:
+                    rect_verts = np.array([[r0, c0], [r0, c1], [r1, c1], [r1, c0]])
+                    try:
+                        roi_layer.data = [rect_verts]
+                        roi_layer.shape_type = ['rectangle']
+                    except Exception:
+                        pass
+                yield
+
+            # ---------- mouse released ----------
+            viewer.mouse_drag_callbacks.remove(_roi_drag_callback)
+            self._roi_drag_callback_ref = None
+            try:
+                viewer.cursor.style = 'standard'
+            except Exception:
+                pass
+
+            end_px = np.array(event.position[-2:], dtype=float) / arr_scale
+
+            if np.any(np.abs(end_px - start_px) > 1):
+                _apply_and_cleanup(start_px, end_px)
+            else:
+                logging.debug('Draw ROI: drag too small, ignoring')
+                _cleanup_layer()
+
+        self._roi_drag_callback_ref = _roi_drag_callback
+        shared_data.napariViewer.mouse_drag_callbacks.append(_roi_drag_callback)
     #endregion
     
     #region Stages
@@ -1639,7 +1706,14 @@ class MMConfigUI(CustomMainWindow):
         """
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
-        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.shared_data.MILcore.get_position(self.oneDstageDropdown.currentText()):.1f}") #type:ignore
+        stage_name = self.oneDstageDropdown.currentText()
+        if not stage_name:
+            return
+        try:
+            pos = self.shared_data.MILcore.get_position(stage_name)
+        except Exception:
+            return
+        self.oneDinfoWidget.setText(f"{stage_name}\r\n {pos:.1f}") #type:ignore
         
         for widget_id in range(0,self.oneDStackedWidget.count()):
             widget = self.oneDStackedWidget.widget(widget_id)

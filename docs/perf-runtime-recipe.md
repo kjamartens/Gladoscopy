@@ -101,6 +101,24 @@ os.environ["NAPARI_OCTREE"] = "1"
 Never import `CMMCorePlus` at the top level; import it inside the function that
 needs it so that napari's Qt import has already resolved.
 
+### Qt import ordering vs plain pymmcore (headless Python backend) — inverted
+
+The opposite ordering constraint applies to plain `pymmcore.CMMCore` (used by
+`pycromanager.headless.start_headless(python_backend=True)` via
+`mmpycorex.launcher._create_pymmcore_instance`, i.e. the "Python" radio button
+in the headless backend dialog): if `PyQt5`/napari has already been imported
+when that `CMMCore()` instance is constructed, the process crashes with a
+Windows access violation (`STATUS_ACCESS_VIOLATION`, exit code
+`-1073741819`) right inside the constructor — reproducible outside the app
+with nothing more than `import PyQt5.QtWidgets` followed by
+`start_headless(python_backend=True, ...)`. The fix is to force `pymmcore`'s
+native extension to load before Qt: `GUI_napari.py` now does `import pymmcore`
+as the very first import, ahead of `import napari` and the `PyQt5` imports
+(wrapped in `# isort: off` / `# isort: on` so isort doesn't "helpfully"
+alphabetize `pymmcore` back after `napari`). This does not conflict with the
+`CMMCorePlus` rule above — `pymmcore_plus.CMMCorePlus` is still imported
+lazily, after Qt, elsewhere.
+
 ### Why in-process cProfile, not a wrapper script
 
 The straightforward approach (wrap the launch with `python -m cProfile`) does
@@ -169,9 +187,35 @@ and napari's own internals (`_iter_exec_output`, `exec_sequenced_event`,
 patches to upstream dependencies.  The next productive perf pass should focus
 on:
 
-1. Reducing the number of `useq.MDAEvent` Pydantic validations per frame
-   (currently ~3–4 validation calls per frame visible in the profile).
+1. ~~Reducing the number of `useq.MDAEvent` Pydantic validations per frame~~
+   **Done** — the remaining *per-frame* validation calls are inside
+   pymmcore-plus/useq's own internals (`_iter_exec_output`, `_advance`,
+   `useq._mda_sequence.__iter__`) and not reachable without patching those
+   libraries, but a genuine *redundant* validation pass was found and fixed
+   on our side: `napariGlados.py`'s live-mode branch was eagerly calling
+   `to_pycromanager(mda_sequence_useq)` (full iteration + validation of
+   every `MDAEvent`, ~60ms for a 999-event batch) purely to populate
+   `shared_data._mdaModeParams`, immediately before `core.run_mda()`
+   iterated + validated the *same* sequence again internally to actually
+   drive acquisition. `_mdaModeParams` is now lazily converted (and
+   cached) only if something actually reads it. See
+   `docs/bench-live-display.md` candidate 7.
 2. Profiling with a real hardware camera (demo cam uses a software sleep per
    frame that dominates the `time.sleep` tottime).
 3. Evaluating whether `NAPARI_ASYNC=1` + `NAPARI_OCTREE=1` help with tiled
    large-sensor images (> 4 k × 4 k).
+
+**Investigated (see `docs/bench-live-display.md`):** a standalone,
+hardware-free micro-benchmark (`scripts/bench_live_display.py`,
+`make bench-live-display`) was built to A/B test further candidates without
+needing this profile-runtime harness. Landed: caching `get_exposure()`
+(same pattern as the pixel-size cache above), guarding remaining hot-path
+`logging.debug`/`.info` f-strings, and throttling the per-frame
+auto-contrast recompute (was the single largest recurring per-frame cost).
+Investigated and rejected: caching the `getLayerIdFromName` lookup (the
+lookup itself is negligible — but a real finding surfaced instead: total
+per-frame cost scales heavily with total layer count in the viewer via
+napari/Qt's redraw machinery, not fixed in this pass, worth a deeper look);
+increasing the visualisation queue depth (no throughput change when the UI
+thread is the bottleneck); and swapping the live-preview widget from napari
+to a bare pyqtgraph `ImageItem` (napari measured over 2x faster).

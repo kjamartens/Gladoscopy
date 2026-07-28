@@ -915,7 +915,7 @@ class AnalysisThread_customFunction(QThread):
         #We are absolutely not allowed to access the core during the real-time analysis running.
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,shared_data,None,nodzInfo=self.nodzInfo)
         
-        logging.info(f"Analysis on Image done with result: {result}")
+        logging.debug(f"Analysis on Image done with result: {result}")
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             logging.debug('Attempting RT visualisation!')

@@ -9,6 +9,7 @@ from dataclasses import dataclass, fields
 from typing import Optional
 
 import appdirs
+import useq
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 #Sys insert to allow for proper importing from module via debug
@@ -103,6 +104,14 @@ class WebhookConfig:
 @dataclass
 class VisualisationConfig:
     fps: int = setting(60, "Visualisation FPS", "Update speed of napari visualisation (in frames per second)")
+    contrast_refresh_every_n_frames: int = setting(
+        10,
+        "Auto-contrast refresh interval (frames)",
+        "How often (in displayed live-preview frames) to recompute contrast "
+        "limits from the image data. Recomputing every frame is expensive "
+        "(a full min/max scan); higher values trade brightness-adjustment "
+        "responsiveness for throughput. Set to 1 to recompute every frame.",
+    )
 
 
 @dataclass
@@ -331,6 +340,38 @@ class Shared_data(QObject):
     def unregister_perf_thread_label(self, native_id) -> None:
         self.perfThreadLabels.pop(native_id, None)
     
+    @property
+    def _mdaModeParams(self):
+        """The current MDA event list, in pycromanager event-dict form.
+
+        Live mode (MMCORE_PLUS backend, `napariGlados.run_MILCoreAcquisition_worker`)
+        assigns a raw `useq.MDASequence` here instead of eagerly converting it.
+        Converting via `useq.pycromanager.to_pycromanager()` fully iterates and
+        pydantic-validates every `MDAEvent` in the sequence (999 events for the
+        default `live_mode_nr_frames`) -- wasted work in the common case, since
+        `core.run_mda()` iterates+validates the same sequence again, internally,
+        to actually drive acquisition (bench_live_display / docs/bench-live-display.md
+        traced this to the "~3-4 useq.MDAEvent validations per frame" entry in
+        docs/perf-runtime-recipe.md's "Next perf passes"). The conversion here
+        only runs -- and is cached -- if something actually reads this property:
+        `_get_cached_dimensions` and the RT-analysis dimension bookkeeping in
+        pSMLM.py/RT_counter.py, which a plain live-preview session (no RT-analysis
+        node, no multiDstack live layer) never triggers.
+
+        MDA mode (`MDAGlados.MDA_acq_from_GUI`) still assigns an already-converted
+        list directly here, unaffected -- the getter passes lists through as-is.
+        """
+        value = self._mdaModeParams_raw
+        if isinstance(value, useq.MDASequence):
+            from useq.pycromanager import to_pycromanager
+            value = to_pycromanager(value)
+            self._mdaModeParams_raw = value  # cache the converted list
+        return value
+
+    @_mdaModeParams.setter
+    def _mdaModeParams(self, value):
+        self._mdaModeParams_raw = value
+
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.
     @property

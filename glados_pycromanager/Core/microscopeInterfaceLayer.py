@@ -37,6 +37,13 @@ class MicroscopeInterfaceLayer:
         # don't hit the Java bridge or CMMCore on every layer-creation event.
         # Reset in set_core() so objective/config changes are picked up.
         self._pixel_size_um_cache: float | None = None
+        # bench_live_display measured ~257ms/call for a PYCROMANAGER_JAVA
+        # bridge round trip (matching the pixel-size cost before it was
+        # cached); napariUpdateLive's rate-limit gate calls get_exposure()
+        # on every candidate frame, so an uncached call there is a
+        # per-displayed-frame Java-bridge round trip. Invalidated in
+        # set_exposure() so a user-changed exposure is picked up immediately.
+        self._exposure_cache: float | None = None
         self.mda: dict | None = None
 
     def set_core(self, core):
@@ -56,6 +63,7 @@ class MicroscopeInterfaceLayer:
         self.core = core
         self._mi = self._detect_microscope_instance(core)
         self._pixel_size_um_cache = None  # invalidate on core change
+        self._exposure_cache = None  # invalidate on core change
         if self._mi is MicroscopeInstance.UNKNOWN:
             logger.warning(
                 "MIL.set_core: backend type %r not recognised as Pycromanager/"
@@ -275,18 +283,33 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_device_type.")
     
-    def get_exposure(self) -> float:
+    def get_exposure(self, *, use_cache: bool = True) -> float:
+        """Return the camera exposure time, caching after the first call.
+
+        napariUpdateLive's rate-limit gate calls this on every candidate
+        displayed frame; bench_live_display measured a ~257ms/call cost for
+        an uncached PYCROMANAGER_JAVA round trip at that call frequency
+        (matching the pixel-size cost before Phase 13.2 cached it), so this
+        mirrors get_pixel_size_um's cache pattern. Pass ``use_cache=False``
+        to force a fresh hardware query; the cache is also invalidated
+        automatically by set_exposure().
         """
-        Get the exposure time for the microscope camera.
-        """
+        if use_cache and self._exposure_cache is not None:
+            return self._exposure_cache
         if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            return self.core.get_exposure()
+            value = self.core.get_exposure()
         elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
-            return self.core.get_exposure()
+            value = self.core.get_exposure()
         elif self._mi == MicroscopeInstance.MMCORE_PLUS:
-            return self.core.getExposure()
+            value = self.core.getExposure()
         else:
             raise ValueError("Unsupported microscope interface type for getting exposure.")
+        self._exposure_cache = value
+        return value
+
+    def invalidate_exposure_cache(self) -> None:
+        """Force the next :meth:`get_exposure` call to query the hardware."""
+        self._exposure_cache = None
     
     def get_focus_device(self) -> str:
         if self.core is None:
@@ -444,6 +467,30 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_roi.")
     
+    def get_sensor_size(self) -> tuple:
+        """Return (width, height) of the full camera sensor independent of any active ROI.
+
+        Implemented by temporarily clearing the ROI, reading the full-frame dimensions,
+        then restoring the original ROI.  Safe to call from any thread that is not
+        actively running an acquisition; the caller is responsible for pausing live
+        mode beforehand if needed (the same pattern used by setROI()).
+        """
+        original_roi = self.get_roi()
+        try:
+            self.clear_roi()
+            full = self.get_roi()
+            return (int(full[2]), int(full[3]))
+        except Exception as exc:
+            import logging as _logging
+            _logging.warning("get_sensor_size: could not determine sensor size: %s", exc)
+            # Fallback: treat current ROI extent as the sensor limit.
+            return (int(original_roi[2]), int(original_roi[3]))
+        finally:
+            try:
+                self.set_roi(original_roi)
+            except Exception:
+                pass  # best-effort restore
+
     def get_shutter_device(self) -> str:
         """
         Get the current shutter device.
@@ -474,11 +521,13 @@ class MicroscopeInterfaceLayer:
         """
         Get the current X-Y position of a stage.
         """
-        #TODO: Catch if no xy stage is present
         try:
             if xy_stage_name is None:
                 xy_stage_name = self.get_xy_stage_device()
-                
+            if not xy_stage_name:
+                #No XY stage configured in the MM config - nothing to query.
+                return [0,0]
+
             if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 return self.core.get_xy_position(xy_stage_name)
             elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
@@ -508,8 +557,10 @@ class MicroscopeInterfaceLayer:
         """
         Get the current position of the X-Y stage.
         """
-        #TODO: Catch if no xy stage present
         try:
+            if not xy_stage_name:
+                #No XY stage configured in the MM config - nothing to query.
+                return [0,0]
             if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 logging.info("get_xy_stage_position not fully implemented for PYCROMANAGER_JAVA; attempting fallback")
                 return self.core.get_xy_stage_position(xy_stage_name)
@@ -561,6 +612,7 @@ class MicroscopeInterfaceLayer:
             self.core.setExposure(exposure_time)
         else:
             raise ValueError("Unsupported microscope interface type for setting exposure.")
+        self.invalidate_exposure_cache()
 
     def set_focus_device(self,focus_device) -> None:
         """

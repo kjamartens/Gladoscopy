@@ -82,12 +82,14 @@ class RealTimeFFT:
             # 4. Apply Log Scaling for visualization (standard practice)
             if self.log_scale:
                 # log1p(x) is log(1+x), avoids log(0) and handles small values better
-                self.fft_display = np.log1p(magnitude)
+                self.fft_display = np.log(magnitude)
             else:
                 self.fft_display = magnitude
 
         except Exception as e:
             logging.error(f"FFT Calculation failed: {e}")
+
+        logging.debug(f"FFT processing time: {time.time() - run_start:.4f}s")
     
     def end(self, core, **kwargs):
         logging.info('ENDING REAL-TIME FFT ANALYSIS')
@@ -116,4 +118,4 @@ class RealTimeFFT:
             napariLayer.contrast_limits = [np.min(self.fft_display), np.max(self.fft_display)]
             self.firstLayerInit = False
             
-        logging.info(f"Visualising FFT: {time.time() - vis_time:.4f}s")
+        logging.debug(f"Visualising FFT: {time.time() - vis_time:.4f}s")

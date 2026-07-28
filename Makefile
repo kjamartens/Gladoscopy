@@ -42,7 +42,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run run-dev run-prod run-mm run-demo profile-runtime profile-startup \
+        run run-dev run-prod run-mm run-demo profile-runtime profile-startup bench-live-display \
         ci verify \
         clean
 
@@ -102,10 +102,10 @@ bandit:  ## Run bandit security scan (informational).
 # ── Run ───────────────────────────────────────────────────────────────────────
 
 run:  ## Launch the standalone Glados-PycroManager GUI.
-	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
+	$(PYTHON) -X faulthandler -m glados_pycromanager.GUI.GUI_napari
 
 run-dev: dev  ## Editable install (dev extras) then launch Glados — one-shot dev workflow.
-	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
+	$(PYTHON) -X faulthandler -m glados_pycromanager.GUI.GUI_napari
 
 run-prod: .venv  ## Non-editable (production) install then launch Glados — simulate end-user install.
 	$(PIP) install .
@@ -138,6 +138,12 @@ profile-runtime:  ## Auto-launch demo, profile live mode for PROFILE_SECS second
 
 profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.txt.
 	pwsh -File scripts/profile_startup.ps1
+
+BENCH_FRAMES ?= 60
+
+bench-live-display:  ## Hardware-free live-display micro-benchmark; appends to docs/bench-live-display.txt.
+	$(PYTHON) -m scripts.bench_live_display --mode layer-update --frames $(BENCH_FRAMES)
+	$(PYTHON) -m scripts.bench_live_display --mode queue-depth
 
 # ── Gates ─────────────────────────────────────────────────────────────────────
 

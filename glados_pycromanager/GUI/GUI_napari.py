@@ -11,7 +11,15 @@ import os
 import socket
 import sys
 
+# isort: off
+# Must be imported before napari/PyQt5: loading Qt first and then constructing
+# a pymmcore.CMMCore later (headless Python backend) crashes with an access
+# violation on Windows (see docs/perf-runtime-recipe.md "Known gotchas").
+# Importing pymmcore here first avoids it.
+import pymmcore  # noqa: F401
+
 import napari
+# isort: on
 from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import (
     QIcon,
@@ -415,8 +423,12 @@ def main():
                 logging.info('Headless PycroManager started')
 
                 #Get those settings and use to start headless
-                start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
-
+                try:
+                    start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
+                except Exception as e:
+                    print("Error!")
+                    print(e)
+                    
                 #Also store some settings in shared_data
                 shared_data._headless = True
                 shared_data.backend = headlessGUIv.backend
@@ -435,7 +447,7 @@ def main():
     
     #Open JSON file with MM settings
     try:
-        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')) as f:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MM_PycroManager_JSON.json')) as f:
             MM_JSON = json.load(f)
     except Exception as e:
         logging.warning(f'Try/exception occured! {e}')
