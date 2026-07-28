@@ -29,7 +29,6 @@ from PyQt5.QtWidgets import (
     QStyle,
 )
 from qtpy.QtWidgets import QMainWindow, QScrollArea, QVBoxLayout, QWidget
-from useq.pycromanager import to_pycromanager
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -752,9 +751,15 @@ class napariHandler:
                         mda_sequence_useq = useq.MDASequence(
                             time_plan={"interval": 0.0, "loops": shared_data.config.mda_config.live_mode_nr_frames} #type: ignore
                         )
-                        #Set proper expected mda:
-                        shared_data._mdaModeParams = to_pycromanager(mda_sequence_useq)
-                        
+                        #Set proper expected mda. Store the raw useq.MDASequence rather
+                        #than eagerly calling to_pycromanager() here: that fully iterates
+                        #and pydantic-validates every MDAEvent up front, which run_mda()
+                        #below then does again internally to actually drive acquisition --
+                        #wasted work in the common case where nothing ever reads
+                        #_mdaModeParams this session. Shared_data._mdaModeParams is a
+                        #property that converts lazily (and caches) on first read.
+                        shared_data._mdaModeParams = mda_sequence_useq
+
                         #Actually start the MDA
                         self.shared_data.MILcore.core.run_mda(mda_sequence_useq)
                         logging.info("Started MDA sequence")

@@ -169,8 +169,19 @@ and napari's own internals (`_iter_exec_output`, `exec_sequenced_event`,
 patches to upstream dependencies.  The next productive perf pass should focus
 on:
 
-1. Reducing the number of `useq.MDAEvent` Pydantic validations per frame
-   (currently ~3–4 validation calls per frame visible in the profile).
+1. ~~Reducing the number of `useq.MDAEvent` Pydantic validations per frame~~
+   **Done** — the remaining *per-frame* validation calls are inside
+   pymmcore-plus/useq's own internals (`_iter_exec_output`, `_advance`,
+   `useq._mda_sequence.__iter__`) and not reachable without patching those
+   libraries, but a genuine *redundant* validation pass was found and fixed
+   on our side: `napariGlados.py`'s live-mode branch was eagerly calling
+   `to_pycromanager(mda_sequence_useq)` (full iteration + validation of
+   every `MDAEvent`, ~60ms for a 999-event batch) purely to populate
+   `shared_data._mdaModeParams`, immediately before `core.run_mda()`
+   iterated + validated the *same* sequence again internally to actually
+   drive acquisition. `_mdaModeParams` is now lazily converted (and
+   cached) only if something actually reads it. See
+   `docs/bench-live-display.md` candidate 7.
 2. Profiling with a real hardware camera (demo cam uses a software sleep per
    frame that dominates the `time.sleep` tottime).
 3. Evaluating whether `NAPARI_ASYNC=1` + `NAPARI_OCTREE=1` help with tiled

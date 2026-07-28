@@ -5,7 +5,10 @@ independent of `claude_project.md` Phase 13 (which already covers the same
 pipeline but was driven entirely by one-off `cProfile` dumps from a full
 end-to-end app run, with no repeatable, hardware-free way to A/B test
 competing fixes). This doc covers the harness built for that, the six
-candidates it was used to test, and what was actually implemented.
+candidates it was used to test, what was actually implemented, plus a
+follow-up (candidate 7) that landed the "reduce `useq.MDAEvent` Pydantic
+validations per frame" item from `docs/perf-runtime-recipe.md`'s "Next perf
+passes" list.
 
 See also: `docs/napari-vis-strategy.md` (Phase 13.5's pipeline/bottleneck
 writeup), `docs/perf-runtime-recipe.md` (the existing end-to-end `cProfile`
@@ -56,6 +59,7 @@ is a real, unmodeled measurement.
 | 4 | Contrast strategy: auto (every frame) vs. fixed vs. throttled | Auto 20.7ms vs. fixed 15.25ms vs. throttled-every-10 15.3ms @ 2048² — throttled gets ~all of the fixed-contrast win while still adapting brightness | **Implemented** (throttled) |
 | 5 | Visualisation queue depth (`maxlen` 1 vs. 2 vs. 3) | Simulated at render-bound rates (render slower than arrival): identical rendered/dropped counts regardless of `maxlen` — a deeper queue only adds latency, not throughput, when the UI thread is the bottleneck | **Rejected**, no change |
 | 6 | Bare pyqtgraph `ImageItem` vs. napari `Image` layer | napari (fixed contrast) 16.1ms vs. bare pyqtgraph `ImageItem` 38.8ms @ 2048² — napari wins by >2x | **Rejected**, keep napari |
+| 7 | Lazy-convert `useq.MDASequence` → pycromanager events for `_mdaModeParams` instead of eagerly at live-mode batch start | Eager `to_pycromanager()` on a 999-event live-mode sequence measured ~60ms, entirely duplicated work since `run_mda()` re-iterates+re-validates the same sequence internally to drive acquisition | **Implemented** |
 
 ### 1 — Exposure caching (implemented)
 
@@ -191,6 +195,49 @@ already documented in `docs/perf-runtime-recipe.md` for napari vs.
 pymmcore-plus. `scripts/bench_pyqtgraph_vs_napari.py` imports `QApplication`
 first for this reason; keep that order if this script is ever extended.
 
+### 7 — Lazy MDASequence → pycromanager conversion (implemented)
+
+Direct follow-up on `docs/perf-runtime-recipe.md`'s "Next perf passes"
+item 1 ("reducing the number of `useq.MDAEvent` Pydantic validations per
+frame"), found by reading the actual live-mode MMCORE_PLUS code path
+(`napariGlados.py:run_MILCoreAcquisition_worker`) rather than benchmarking:
+
+```python
+mda_sequence_useq = useq.MDASequence(time_plan={"interval": 0.0, "loops": live_mode_nr_frames})
+shared_data._mdaModeParams = to_pycromanager(mda_sequence_useq)  # (was) eager, full iteration
+self.shared_data.MILcore.core.run_mda(mda_sequence_useq)          # iterates+validates again, internally
+```
+
+`to_pycromanager(sequence)` for a `MDASequence` eagerly does
+`[_event_to_pycromanager(event) for event in obj]` — a full iteration that
+pydantic-validates every `MDAEvent` in the sequence immediately (999 events
+for the default `live_mode_nr_frames`). `core.run_mda()` then iterates the
+*same* sequence again, lazily, internally, to actually drive acquisition —
+so every live-mode batch restart paid for validating each event twice.
+Measured directly:
+
+```
+to_pycromanager(999-event sequence): 59.70ms, 999 events validated
+list(sequence) (bare useq iteration): 64.95ms, 999 events
+```
+
+i.e. the eager conversion cost ~60ms per batch restart, entirely
+duplicated. `shared_data._mdaModeParams` is only read by
+`_get_cached_dimensions` (never called for the plain `layer_name == 'Live'`
+display path) and by RT-analysis dimension bookkeeping in
+`pSMLM.py`/`RT_counter.py` (only when such a node is actually running) — so
+the eager conversion was pure waste in the common plain-live-preview case.
+
+Made `Shared_data._mdaModeParams` a property: live mode now assigns the raw
+`useq.MDASequence` directly; the property's getter converts (and caches)
+only on first actual read. MDA mode's existing assignment (an
+already-converted pycromanager event list) passes straight through the
+getter unchanged. Implemented in
+`glados_pycromanager/GUI/sharedFunctions.py`
+(`Shared_data._mdaModeParams` property) and
+`glados_pycromanager/GUI/napariGlados.py` (live-mode assignment site).
+Locked in by `tests/test_shared_data_mda_params_lazy.py`.
+
 ## What could not be verified end-to-end
 
 `make profile-runtime` (the existing full-app `cProfile` harness against
@@ -203,13 +250,15 @@ the Qt/pymmcore-plus DLL-ordering fragility already documented in
 `docs/perf-runtime-recipe.md`, just triggering earlier/differently than in
 whatever environment produced the existing `docs/perf-runtime.txt` entries.
 
-All three implemented changes were instead validated by:
+All four implemented changes were instead validated by:
 - The `bench_live_display` micro-benchmark, which exercises the real
   production functions directly (not a reimplementation).
-- The full `pytest -q` suite (306 passed, no regressions).
+- The full `pytest -q` suite (308 passed, no regressions).
 - New unit tests for the exposure cache
   (`tests/test_mil_dispatch.py::test_get_exposure_caches_after_first_call`
-  and siblings), mirroring the existing pixel-size cache test coverage.
+  and siblings), mirroring the existing pixel-size cache test coverage, and
+  for the lazy MDASequence conversion
+  (`tests/test_shared_data_mda_params_lazy.py`).
 
 **Recommended follow-up for whoever has a working interactive session**:
 run `make profile-runtime PROFILE_SECS=15` before/after this branch and
