@@ -115,6 +115,31 @@ def subfunction_exists(module_name, subfunction_name):
     except (ImportError, AttributeError):
         return False
     
+
+# Plugin node modules (e.g. FFT_im) are registered in sys.modules under their
+# full dotted path (glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.FFT_im),
+# never under their bare stem -- so the sys.modules.get(stem) fast path below
+# always misses for them, and every call falls through to the linear scan.
+# That scan is called once per RT-analysis run() invocation (see
+# realTimeAnalysis_run -> kwargsFromFunction -> _resolve_node_obj), so with a
+# few thousand modules loaded (napari/torch/tensorflow et al. easily import
+# that many), one real-time-analysis frame could cost 5000+ rsplit() calls --
+# directly observed via Performance Mode as a major CPU cost inside an
+# RT-analysis subprocess. Caching the stem->module resolution avoids re-scanning
+# sys.modules on every call; reload_all_node_modules() (dev hot-reload) clears
+# this cache since it deletes/re-adds the exact sys.modules entries this looks up.
+_resolve_node_obj_module_cache: dict[str, object] = {}
+
+
+def clear_resolve_node_obj_cache() -> None:
+    """Invalidate the stem->module cache used by _resolve_node_obj().
+
+    Call this whenever sys.modules entries for node packages are added,
+    removed, or replaced (see plugins/discovery.py's reload_all_node_modules).
+    """
+    _resolve_node_obj_module_cache.clear()
+
+
 def _resolve_node_obj(name_str):
     """Resolve a dotted node name (e.g. 'BioImageModelZoo' or 'BioImageModelZoo.BioImageModelZoo')
     to the named object without using eval. Looks up the stem in sys.modules."""
@@ -123,9 +148,12 @@ def _resolve_node_obj(name_str):
     stem = parts[0]
     mod = _sys.modules.get(stem)
     if mod is None:
+        mod = _resolve_node_obj_module_cache.get(stem)
+    if mod is None:
         for key, m in list(_sys.modules.items()):
             if m is not None and key.rsplit('.', 1)[-1] == stem:
                 mod = m
+                _resolve_node_obj_module_cache[stem] = m
                 break
     if mod is None:
         raise NameError(f"No loaded module with stem '{stem}' (name_str={name_str!r})")

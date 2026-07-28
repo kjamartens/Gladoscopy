@@ -279,9 +279,15 @@ def reload_all_node_modules() -> tuple[int, list[PluginLoadFailure]]:
     import sys
 
     from glados_pycromanager.autonomous.registry import _REGISTRY
+    from glados_pycromanager.GUI.utils import clear_resolve_node_obj_cache
 
     # Wipe old registrations so deleted/renamed nodes don't linger.
     _REGISTRY.clear()
+    # utils._resolve_node_obj() caches stem->module lookups (Performance Mode
+    # perf fix); the sys.modules entries it points at are about to be deleted
+    # and re-created below, so drop the cache or it would keep returning the
+    # now-orphaned pre-reload module objects.
+    clear_resolve_node_obj_cache()
     logger.info("Registry cleared; reloading all node modules…")
 
     total_successes = 0
