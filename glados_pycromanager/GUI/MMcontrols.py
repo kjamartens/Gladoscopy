@@ -1706,7 +1706,14 @@ class MMConfigUI(CustomMainWindow):
         """
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
-        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.shared_data.MILcore.get_position(self.oneDstageDropdown.currentText()):.1f}") #type:ignore
+        stage_name = self.oneDstageDropdown.currentText()
+        if not stage_name:
+            return
+        try:
+            pos = self.shared_data.MILcore.get_position(stage_name)
+        except Exception:
+            return
+        self.oneDinfoWidget.setText(f"{stage_name}\r\n {pos:.1f}") #type:ignore
         
         for widget_id in range(0,self.oneDStackedWidget.count()):
             widget = self.oneDStackedWidget.widget(widget_id)
