@@ -175,3 +175,18 @@ on:
    frame that dominates the `time.sleep` tottime).
 3. Evaluating whether `NAPARI_ASYNC=1` + `NAPARI_OCTREE=1` help with tiled
    large-sensor images (> 4 k × 4 k).
+
+**Investigated (see `docs/bench-live-display.md`):** a standalone,
+hardware-free micro-benchmark (`scripts/bench_live_display.py`,
+`make bench-live-display`) was built to A/B test further candidates without
+needing this profile-runtime harness. Landed: caching `get_exposure()`
+(same pattern as the pixel-size cache above), guarding remaining hot-path
+`logging.debug`/`.info` f-strings, and throttling the per-frame
+auto-contrast recompute (was the single largest recurring per-frame cost).
+Investigated and rejected: caching the `getLayerIdFromName` lookup (the
+lookup itself is negligible — but a real finding surfaced instead: total
+per-frame cost scales heavily with total layer count in the viewer via
+napari/Qt's redraw machinery, not fixed in this pass, worth a deeper look);
+increasing the visualisation queue depth (no throughput change when the UI
+thread is the bottleneck); and swapping the live-preview widget from napari
+to a bare pyqtgraph `ImageItem` (napari measured over 2x faster).

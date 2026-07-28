@@ -802,3 +802,46 @@ in `grab_image_liveVis_PyMMCore`/`napariUpdateLive` and one-time INFO
 confirmations (first frame received, first yielded call, layer creation) so
 a future silent failure in this pipeline is diagnosable from the log file
 alone.
+
+---
+
+## 2026-07-28 — Standalone live-display benchmark pass (not a claude_project.md phase)  [ad hoc]
+**Decision:** User asked for a fresh, standalone push on live-video-feed
+display throughput and explicitly chose (via clarifying question) to treat
+it as independent of Phase 13's row numbering, while still building on its
+existing docs/harness. Delivered a new hardware-free micro-benchmark
+(`scripts/bench_live_display.py`, `make bench-live-display`) exercising the
+real `napariUpdateLive`/`_napariUpdateLive_locked` production functions
+directly, used it to A/B test six candidates, and landed the three that
+measured a real win: caching `MILcore.get_exposure()` (mirrors the existing
+pixel-size cache), guarding remaining hot-path `logging.debug`/`.info`
+f-strings behind `isEnabledFor`, and throttling the per-frame auto-contrast
+recompute (new `visualisation_config.contrast_refresh_every_n_frames`,
+default 10) instead of disabling it outright. Full writeup, numbers, and
+the three rejected candidates (layer-lookup caching — negligible, but
+surfaced a real layer-count-scaling finding instead; deeper queue depth —
+no throughput change; pyqtgraph instead of napari — napari measured >2x
+faster) are in `docs/bench-live-display.md`.
+**Alternatives considered per candidate:** see `docs/bench-live-display.md`
+section per candidate; not duplicated here.
+**Reason:** Matches this session's operating principle throughout — only
+land a change that measured a real win via direct measurement, not on
+faith. The contrast throttle in particular was chosen over the simpler
+"just disable auto-contrast" because the latter measured almost identically
+fast but loses real UX value (brightness no longer adapts at all).
+**Verification gap:** `make profile-runtime` (the existing end-to-end
+`cProfile` harness) segfaults in this sandboxed dev environment at
+CMMCorePlus/demo-camera startup, confirmed pre-existing and unrelated to
+this work (reproduces identically on the commit immediately before these
+changes, `684dbbb`). Validated instead via the new micro-benchmark
+(exercises the real production functions) plus the full `pytest -q` suite
+(306 passed) and new unit tests for the exposure cache. Recommended
+follow-up for a session with a working interactive display: re-run
+`make profile-runtime` before/after and diff against `docs/perf-runtime.txt`.
+**Affects:** `scripts/bench_live_display.py`, `scripts/bench_pyqtgraph_vs_napari.py`
+(new), `docs/bench-live-display.md`, `docs/bench-live-display.txt` (new),
+`docs/perf-runtime-recipe.md` (cross-reference added), `Makefile`
+(`bench-live-display` target), `glados_pycromanager/Core/microscopeInterfaceLayer.py`
+(exposure cache), `glados_pycromanager/GUI/napariGlados.py` (logging
+guards, throttled contrast), `glados_pycromanager/GUI/sharedFunctions.py`
+(new config field), `tests/test_mil_dispatch.py` (new exposure-cache tests).
