@@ -439,7 +439,7 @@ def main():
     
     #Open JSON file with MM settings
     try:
-        with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')) as f:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MM_PycroManager_JSON.json')) as f:
             MM_JSON = json.load(f)
     except Exception as e:
         logging.warning(f'Try/exception occured! {e}')
