@@ -391,6 +391,13 @@ def main():
             shared_data.MILcore.set_core(CMMCorePlus(mm_path=mm_cfg.path))
             shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
             shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
+            # Max memory MB is not settable in PyMMCorePlus; only buffer_mb (the
+            # circular buffer footprint) applies to this backend. Warn instead of
+            # silently no-op'ing the setting, since an unbounded acquisition could
+            # otherwise grow memory usage further than the user expects.
+            logging.warning('max_memory_mb (%s MB) has no effect on the MMCORE_PLUS backend; '
+                             'only buffer_mb (%s MB, circular buffer) is applied.',
+                             mm_cfg.max_memory_mb, mm_cfg.buffer_mb)
     else:
         # Fast socket probe: avoids spawning a pyjavaz bridge thread (and the
         # resulting 1-second timeout + thread-exception traceback) when MM isn't up.
@@ -444,6 +451,9 @@ def main():
                 shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
                 shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
                 #Max memory MB is not settable in PyMMCorePlus, so we don't set it
+                logging.warning('max_memory_mb (%s MB) has no effect on the MMCORE_PLUS backend; '
+                                 'only buffer_mb (%s MB, circular buffer) is applied.',
+                                 headlessGUIv.max_memory_mb, headlessGUIv.buffer_size_mb)
     
     #Open JSON file with MM settings
     try:
