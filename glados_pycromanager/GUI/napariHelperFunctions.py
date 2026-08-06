@@ -9,11 +9,32 @@ from PyQt5.QtGui import QIcon
 General napari functions
 """
 
-def getLayerIdFromName(layer_name,napariViewer):
-    """ 
-    Get the layer ID from the layer name in napari.
+def getLayerIdFromName(layer_name,napariViewer,shared_data=None):
     """
+    Get the layer ID from the layer name in napari.
+
+    When `shared_data` is passed, a per-viewer name->index cache is kept on it
+    so repeated lookups for the same layer name (the live/MDA per-frame hot
+    path calls this once or more per frame) don't need a full linear rescan
+    of every layer. The cached index is validated with an O(1) name check
+    before being trusted; a mismatch (layer removed/reordered/recreated)
+    falls back to the full scan and refreshes the cache. Callers that don't
+    pass shared_data get the previous unconditional-scan behavior.
+    """
+    if shared_data is not None:
+        cache = getattr(shared_data, '_layer_id_cache', None)
+        if cache is None:
+            cache = {}
+            shared_data._layer_id_cache = cache
+        cached_idx = cache.get(layer_name)
+        if cached_idx is not None and 0 <= cached_idx < len(napariViewer.layers):
+            layer = napariViewer.layers[cached_idx]
+            if getattr(layer, '_name', None) == layer_name:
+                return [cached_idx]
+
     ImageLayer = [i for i, layer in enumerate(napariViewer.layers) if hasattr(layer, '_name') and layer._name == layer_name]
+    if shared_data is not None and ImageLayer:
+        cache[layer_name] = ImageLayer[0]
     return ImageLayer
 
 def showScaleBar(napariViewer):
