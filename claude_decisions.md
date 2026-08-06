@@ -845,3 +845,84 @@ follow-up for a session with a working interactive display: re-run
 (exposure cache), `glados_pycromanager/GUI/napariGlados.py` (logging
 guards, throttled contrast), `glados_pycromanager/GUI/sharedFunctions.py`
 (new config field), `tests/test_mil_dispatch.py` (new exposure-cache tests).
+
+---
+
+## 2026-08-06 — Fresh throughput audit against Pycromanager/pymmcore-plus docs (ad hoc, not a claude_project.md phase)
+**Decision:** User asked for a fresh read of the codebase plus Pycromanager/
+pymmcore-plus documentation to find remaining throughput opportunities,
+independent of Phase 13's row numbering (13.0-13.13 already landed; only the
+13.14 verification gate is open). Three parallel research passes (acquisition/
+backend layer, real-time display/analysis loop, official docs) produced a
+ranked findings list; user picked items to implement after reviewing it
+(all seven picked). Landed:
+- **F1** `perf(pSMLM)` (`900d5f7`): `pSMLM.run()`'s per-frame
+  `pd.concat([self.fullSMLMlocs, new_df], ...)` copied the entire
+  accumulated localization history every frame (O(n^2) over a session).
+  Replaced with a list of per-frame DataFrames, concatenated lazily via a
+  `fullSMLMlocs` property. New tests in `tests/test_psmlm_locs_accumulation.py`.
+- **F2** `docs(napariGlados)` (`54c7e9e`): investigated as a suspected bug
+  (multiDstack-mode `'Live'`-named layer branches never got the Phase 13
+  contrast throttle). Tracing the dispatch showed these branches are
+  actually unreachable — the frameByFrame branch's
+  `or DataStructure['layer_name'] == 'Live'` condition intercepts every
+  `'Live'`-named frame before the `vis_method == 'multiDstack'` elif is
+  even considered, regardless of the configured vis_method. No fix needed;
+  landed a comment documenting the invariant instead of a throttle change,
+  so a future reader doesn't re-chase the same false lead.
+- **F3** `perf(RT_counter)` (`40971bb`): gated `RealTimeCounter`'s
+  unconditional per-frame `logging.info()` calls behind `isEnabledFor`,
+  matching the rest of the codebase post-Phase-13.8.
+- **F4** `perf(napariGlados)` (`24982ac` + two hunks folded into `900d5f7`,
+  see slip note below): `getLayerIdFromName` did a full linear scan of every
+  napari layer on every per-frame call; added an optional `shared_data`
+  parameter that caches the last known index per layer name, validated with
+  an O(1) name check (self-heals on layer removal/reorder/recreation).
+  Callers that don't pass `shared_data` are unaffected. New tests in
+  `tests/test_get_layer_id_from_name_cache.py`.
+- **F5** `perf(utils)` (`fa99ecc`): the literal "double ROI round-trip"
+  framing in the original finding was minor, but tracing callers of
+  `get_image_width()`/`get_image_height()` found the real instance —
+  `updateGridInfo()`'s tile-position loops called both up to 4x per grid
+  tile (each a `get_roi()` round trip to the core). Cached both once per
+  `updateGridInfo()` call.
+- **F6** `docs(claude)` (`82444fc`): documented in `CLAUDE.md` that
+  `PYCROMANAGER_JAVA` crosses a Java/Python bridge (~100 MB/s cap per
+  Pycromanager's own docs; ~257ms/call measured in this codebase) and that
+  `PYCROMANAGER_PYTHON`/`MMCORE_PLUS` avoid it — prefer the latter two when
+  live frame rate matters most. Config guidance, not a code change.
+- **F7** `reliability` (`b658a3c`): `max_memory_mb` silently has no effect
+  on the `MMCORE_PLUS` backend (already commented in code); added a
+  `logging.warning` at both headless-startup paths so this doesn't look
+  like a working memory bound during a long high-speed acquisition.
+
+**Alternatives considered:** For F2, actually removing the confirmed-dead
+branches (~90 lines) was considered and rejected — pure documentation is
+lower-risk and sufficient; the dead-code removal is a separate cleanup
+call, not required by the throughput audit's scope. For F5, adding a
+general cache to `MIL.get_roi()` itself (mirroring the existing
+`get_exposure`/`get_pixel_size_um` cache pattern) was considered and
+rejected — no per-frame call site needing it was found (ROI isn't
+reconfigured mid-acquisition), so a session-scoped local cache at the one
+real hot spot (the grid-setup loop) was lower-risk than a persistent cache
+requiring invalidation.
+
+**Commit-scope slip:** `git add -p` was used to split `napariGlados.py`'s
+three hunks (two F4 call-site updates, one F2 comment) so they could land
+in separate commits. The two F4 hunks were correctly isolated via
+`git add -p`, but the follow-up `git commit` for F1 (pSMLM) was run without
+scoping to just the pSMLM files, and picked up the whole index — including
+the two already-staged F4 hunks in `napariGlados.py`. Both changes are
+correct and reviewable; they just landed in `900d5f7` (F1's commit) instead
+of `24982ac` (F4's commit) alongside the `napariHelperFunctions.py` cache
+helper. Not re-split via history rewrite — same precedent as the
+2026-05-17 "Phase 9.4 split 3-files into 2 commits, not 3" entry (harmless
+grouping slip, not a content issue).
+
+**Affects:** `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM.py`,
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/RT_counter.py`,
+`glados_pycromanager/GUI/napariGlados.py`, `glados_pycromanager/GUI/napariHelperFunctions.py`,
+`glados_pycromanager/GUI/utils.py`, `glados_pycromanager/GUI/GUI_napari.py`,
+`CLAUDE.md`, `tests/test_psmlm_locs_accumulation.py`,
+`tests/test_get_layer_id_from_name_cache.py`. Full suite: 341 passed
+(334 baseline + 7 new).
