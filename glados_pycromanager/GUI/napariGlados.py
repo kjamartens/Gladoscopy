@@ -196,7 +196,7 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
         # hidden copy inside napari's layer setter when the array is F-order
         # or non-contiguous (e.g. a strided slice from some camera drivers).
         liveImage = np.ascontiguousarray(liveImage)
-        liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+        liveImageLayer = getLayerIdFromName(layerName,napariViewer,shared_data)
 
         #If it's the first liveImageLayer
         if not liveImageLayer:
@@ -251,7 +251,7 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                 return
             # Guarantee C-contiguous memory for zarr writes (same reason as frameByFrame).
             latestImage = np.ascontiguousarray(latestImage)
-            liveImageLayer = getLayerIdFromName(layerName,napariViewer)
+            liveImageLayer = getLayerIdFromName(layerName,napariViewer,shared_data)
         
             if layerName != 'Live':
                 #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer

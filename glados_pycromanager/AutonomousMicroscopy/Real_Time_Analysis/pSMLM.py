@@ -15,6 +15,7 @@ import time
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 from scipy import signal
 from scipy.ndimage import gaussian_filter
 from skimage.feature.peak import peak_local_max
@@ -121,7 +122,10 @@ class pSMLM:
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
 
         self.SMLMlocs = []
-        self.fullSMLMlocs = []
+        # Per-frame localization DataFrames, concatenated lazily via the fullSMLMlocs
+        # property instead of every frame - pd.concat on every run() copies the whole
+        # accumulated history each time, making a long session O(n^2) in frame count.
+        self._smlm_frames = []
         self.dummyValue = 0
         self.metadatav = []
         self.currentFrame = 0
@@ -131,6 +135,12 @@ class pSMLM:
         except Exception:
             self.pxsizeum = 1
         return None
+
+    @property
+    def fullSMLMlocs(self):
+        if not self._smlm_frames:
+            return pd.DataFrame()
+        return pd.concat(self._smlm_frames, ignore_index=True)
 
     def run(self,image,metadata,shared_data,core,**kwargs):
         # logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
@@ -148,7 +158,6 @@ class pSMLM:
             logging.debug("pSMLM: first 3 locs: %s", self.SMLMlocs[:3])
         
         #Append to full list with frame info
-        import pandas as pd
         _dims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
         if _dims is not None:
             self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = _dims
@@ -161,11 +170,8 @@ class pSMLM:
         else:
             column_headers = ['x_pos', 'y_pos']
             new_locs_with_mdaVals = self.SMLMlocs
-        if len(self.fullSMLMlocs) == 0:
-            self.fullSMLMlocs = pd.DataFrame(new_locs_with_mdaVals, columns=column_headers)
-        else:
-            new_df = pd.DataFrame(new_locs_with_mdaVals, columns=column_headers)
-            self.fullSMLMlocs = pd.concat([self.fullSMLMlocs, new_df], ignore_index=True)
+        # Stash this frame's localizations; fullSMLMlocs concatenates them lazily on read.
+        self._smlm_frames.append(pd.DataFrame(new_locs_with_mdaVals, columns=column_headers))
         
         self.lastImage = image
         self.lastMetadata = metadata
