@@ -57,19 +57,23 @@ class RealTimeCounter:
 
     def run(self,image,metadata,shared_data,core,**kwargs):
         run_time = time.time()
+        info_enabled = logging.getLogger(__name__).isEnabledFor(logging.INFO)
         if 'ImageNumber' in metadata:
             self.currentValue = float(metadata['ImageNumber'])
-            logging.info("At frame: "+metadata['ImageNumber']+" (metadata-ImageNumber)")
+            if info_enabled:
+                logging.info("At frame: "+metadata['ImageNumber']+" (metadata-ImageNumber)")
         else:
             #Append to full list with frame info
             self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
             mda_values = []
             for v in list(self.uniqueEntriesAllDims.keys()):
                 mda_values = np.hstack((mda_values,metadata['Axes'][v]))
-                
+
             self.currentValue = float(metadata['Axes'][v])
-            logging.info("At frame: "+str(metadata['Axes'][v])+" (metadata-Axes)")
-        logging.info(f"Running time counter rta: {time.time()-run_time}")
+            if info_enabled:
+                logging.info("At frame: "+str(metadata['Axes'][v])+" (metadata-Axes)")
+        if info_enabled:
+            logging.info(f"Running time counter rta: {time.time()-run_time}")
     
     def end(self,core,**kwargs):
         logging.info('ENDING COUNTER REAL-TIME ANALYSIS')
@@ -111,4 +115,5 @@ class RealTimeCounter:
             napariLayer.size = 0
             napariLayer.selected_data = []
             self.firstLayerInit = False
-        logging.info(f"Visualising time counter rta: {time.time()-vis_time}")
+        if logging.getLogger(__name__).isEnabledFor(logging.INFO):
+            logging.info(f"Visualising time counter rta: {time.time()-vis_time}")
