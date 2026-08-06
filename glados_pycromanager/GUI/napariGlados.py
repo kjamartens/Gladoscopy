@@ -242,6 +242,14 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames
     elif shared_data.config.mda_config.vis_method == 'multiDstack':
+        # NOTE: layerName is guaranteed != 'Live' anywhere in this branch. The
+        # frameByFrame branch above already intercepts every DataStructure with
+        # layer_name == 'Live' via its `or DataStructure['layer_name'] == 'Live'`
+        # condition, regardless of vis_method - so a 'Live'-named frame always gets
+        # routed (and contrast-throttled, see _maybe_refresh_contrast) there first
+        # and never reaches this elif. The `layerName == 'Live'` sub-cases below are
+        # therefore unreachable under the current dispatch; left in place rather than
+        # removed to avoid a speculative behavior change outside this audit's scope.
         if DataStructure['finalisationProcedure'] == False:
             latestImage = DataStructure['data'][0]
             metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
