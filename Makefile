@@ -66,6 +66,11 @@ install:  ## Non-editable production install into the active env (no dev extras)
 
 dev: .venv  ## Editable install with dev extras into .venv (creates .venv if absent).
 	$(PIP) install -e ".[dev]"
+	@$(PYTHON) -c "import diplib" || ( \
+		echo "diplib failed to import after install -- this is usually a Windows locked-file pip reinstall (a stale python.exe, VSCode's Pylance, or an AV scan held PyDIP_bin*.pyd open, so pip renamed the old folder to '~iplib' and left diplib/ a stale/new mix); forcing a clean reinstall..." && \
+		$(PIP) install --force-reinstall --no-cache-dir diplib==3.6.0 && \
+		$(PYTHON) -c "import diplib" \
+	)
 
 build:  ## Build wheel + sdist into dist/.
 	uv build
