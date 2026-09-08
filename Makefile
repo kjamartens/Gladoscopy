@@ -26,12 +26,21 @@ ifeq ($(OS),Windows_NT)
     # uv venv does not install pip, so PIP uses the base-env uv (auto-detects .venv).
     _VENV_CREATE  = python -m pip install --quiet uv && python -m uv venv --python 3.13 --seed .venv
     PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(subst /,\,$(_VENV_PYTHON)),python)
-    PIP    ?= $(PYTHON) -m pip
+    # Use the base-env's uv (not $(PYTHON), which is .venv's python once it
+    # exists and doesn't have uv installed in it). Target .venv explicitly
+    # via --python — relying on uv's auto-detection is unsafe when a conda
+    # env is active, since uv can prefer CONDA_PREFIX over .venv/, silently
+    # installing into the wrong environment (the one $(PYTHON) does NOT read).
+    PIP    ?= python -m uv pip install --python $(_VENV_PYTHON)
+    # Whatever "python" is on PATH (base conda env, GladosEnv, plain venv...)
+    # may never have had uv bootstrapped into it — ensure it before using PIP.
+    _ENSURE_UV = python -c "import importlib.util,sys,subprocess as s; sys.exit(0) if importlib.util.find_spec('uv') else s.check_call([sys.executable,'-m','pip','install','--quiet','uv'])"
 else
     _VENV_PYTHON := .venv/bin/python
     _VENV_CREATE := uv venv --python 3.13 .venv
     PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(_VENV_PYTHON),python)
-    PIP    ?= uv pip
+    PIP    ?= uv pip install --python $(_VENV_PYTHON)
+    _ENSURE_UV = command -v uv >/dev/null 2>&1 || python -m pip install --quiet uv
 endif
 PYTEST ?= $(PYTHON) -m pytest
 RUFF   ?= $(PYTHON) -m ruff
@@ -39,7 +48,7 @@ MYPY   ?= $(PYTHON) -m mypy
 BANDIT ?= $(PYTHON) -m bandit
 PACKAGE := glados_pycromanager
 
-.PHONY: help env venv install dev build \
+.PHONY: help env venv install dev build ensure-uv \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
         run run-dev run-prod run-mm run-demo profile-runtime profile-startup bench-live-display \
@@ -51,9 +60,13 @@ help:  ## Show this help.
 
 # ── Environment & install ─────────────────────────────────────────────────────
 
-.venv:
+# Real (file, not directory) target — so a corrupt/partial .venv left behind
+# by e.g. a locked python.exe during `make clean` gets rebuilt, not reused.
+.venv/pyvenv.cfg:
 	$(_VENV_CREATE)
 	@echo ".venv created with uv — run 'make dev' to install."
+
+.venv: .venv/pyvenv.cfg
 
 venv: .venv  ## Create .venv using the system Python (skipped if already present).
 
@@ -61,18 +74,21 @@ env:  ## Create or update the GladosEnv conda env from environment.yaml (conda u
 	conda env create --name GladosEnv -f environment.yaml 2>/dev/null \
 	    || conda env update --name GladosEnv -f environment.yaml
 
-install:  ## Non-editable production install into the active env (no dev extras).
-	$(PIP) install .
+ensure-uv:  ## Make sure uv is importable for the active interpreter (installs quietly if missing).
+	@$(_ENSURE_UV)
 
-dev: .venv  ## Editable install with dev extras into .venv (creates .venv if absent).
-	$(PIP) install -e ".[dev]"
+install: .venv ensure-uv  ## Non-editable production install into .venv (no dev extras).
+	$(PIP) .
+
+dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .venv if absent).
+	$(PIP) -e ".[dev]"
 	@$(PYTHON) -c "import diplib" || ( \
 		echo "diplib failed to import after install -- this is usually a Windows locked-file pip reinstall (a stale python.exe, VSCode's Pylance, or an AV scan held PyDIP_bin*.pyd open, so pip renamed the old folder to '~iplib' and left diplib/ a stale/new mix); forcing a clean reinstall..." && \
-		$(PIP) install --force-reinstall --no-cache-dir diplib==3.6.0 && \
+		$(PIP) --force-reinstall --no-cache-dir diplib==3.6.0 && \
 		$(PYTHON) -c "import diplib" \
 	)
 
-build:  ## Build wheel + sdist into dist/.
+build: ensure-uv  ## Build wheel + sdist into dist/.
 	uv build
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -112,8 +128,8 @@ run:  ## Launch the standalone Glados-PycroManager GUI.
 run-dev: dev  ## Editable install (dev extras) then launch Glados — one-shot dev workflow.
 	$(PYTHON) -X faulthandler -m glados_pycromanager.GUI.GUI_napari
 
-run-prod: .venv  ## Non-editable (production) install then launch Glados — simulate end-user install.
-	$(PIP) install .
+run-prod: .venv ensure-uv  ## Non-editable (production) install then launch Glados — simulate end-user install.
+	$(PIP) .
 	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari
 
 # run-mm: launch with pre-set MM backend / config — bypasses the startup popup.
@@ -159,8 +175,8 @@ verify: ci  ## Alias for ci (backwards compat).
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:  ## Remove build / cache artefacts and .venv (works on Windows and Unix).
-	$(PYTHON) -c "import shutil,glob,os; \
-	    [shutil.rmtree(p,True) for p in \
-	        ['build','dist','.pytest_cache','.ruff_cache','.mypy_cache','.venv'] \
-	        + glob.glob('*.egg-info')]; \
-	    [os.remove(f) for f in glob.glob('startup.log') if os.path.isfile(f)]"
+	python -c "import shutil,glob,os,sys; \
+	    paths=['build','dist','.pytest_cache','.ruff_cache','.mypy_cache','.venv']+glob.glob('*.egg-info'); \
+	    failed=[p for p in paths if os.path.exists(p) and (shutil.rmtree(p,ignore_errors=True) or os.path.exists(p))]; \
+	    [os.remove(f) for f in glob.glob('startup.log') if os.path.isfile(f)]; \
+	    (print('WARNING: could not fully remove:', ', '.join(failed), '-- a locked file (running process, AV scan, open shell/IDE) blocked deletion; close it and re-run make clean', file=sys.stderr), sys.exit(1)) if failed else None"
