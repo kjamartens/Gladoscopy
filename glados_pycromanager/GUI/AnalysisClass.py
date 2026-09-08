@@ -4,6 +4,7 @@ Handles the GUI display of Glados-pycromanager, as well as the structure for ana
 
 import cProfile
 import io
+import json
 import logging
 import multiprocessing as mp
 import os
@@ -459,6 +460,71 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
             logging.exception('AnalysisProcess worker: end_fn failed')
 
 
+def _rt_config_key(analysisInfo) -> Union[str, None]:
+    """Stable cache key for AnalysisProcess_customFunction's warm-restart
+    cache (see _park_subprocess_worker below) -- dict-equal configs hash
+    identically regardless of key order, so restarting a node with unchanged
+    kwargs reclaims its still-alive worker instead of a fresh spawn. Returns
+    None (uncacheable) for non-dict analysisInfo (e.g. the plain-string
+    sentinels used elsewhere, like 'LiveModeVisualisation') or anything that
+    isn't JSON-serialisable, in which case callers fall back to today's
+    always-fresh-spawn behaviour.
+    """
+    if not isinstance(analysisInfo, dict):
+        return None
+    try:
+        return json.dumps(analysisInfo, sort_keys=True, default=str)
+    except TypeError:
+        return None
+
+
+_RT_SUBPROCESS_CACHE_MAX_ENTRIES = 3
+_RT_SUBPROCESS_CACHE_IDLE_SECS = 600  # 10 min
+
+
+def _terminate_cached_worker(worker: dict) -> None:
+    try:
+        worker['process'].terminate()
+    except Exception:
+        logging.exception('AnalysisProcess: failed to terminate a parked subprocess')
+
+
+def _park_subprocess_worker(shared_data, key: str, worker: dict) -> None:
+    """Stashes a still-alive, already-warmed-up subprocess (+ its queues and
+    main-process visualisation shadow object) in shared_data._rt_subprocess_cache
+    so a later AnalysisProcess_customFunction.__init__ with the identical
+    config can reclaim it directly. Also opportunistically reaps stale/excess
+    entries so the cache doesn't need a dedicated periodic QTimer."""
+    cache = shared_data._rt_subprocess_cache
+    worker['last_used'] = time.time()
+
+    now = time.time()
+    for stale_key in [k for k, v in cache.items() if now - v['last_used'] > _RT_SUBPROCESS_CACHE_IDLE_SECS]:
+        _terminate_cached_worker(cache.pop(stale_key))
+    while len(cache) >= _RT_SUBPROCESS_CACHE_MAX_ENTRIES:
+        lru_key = min(cache, key=lambda k: cache[k]['last_used'])
+        _terminate_cached_worker(cache.pop(lru_key))
+
+    cache[key] = worker
+
+
+def terminate_all_rt_subprocesses(shared_data) -> None:
+    """Best-effort, non-blocking teardown of every parked RT-analysis
+    subprocess and the warm-pool's blank process. Call this right before
+    forcing app exit (see GUI_napari.py's os._exit(0)) -- idle cached workers
+    now outlive a single node's stop() call (that's the point of the cache),
+    so without this they'd otherwise be orphaned instead of dying with their
+    daemon-process parent."""
+    cache = getattr(shared_data, '_rt_subprocess_cache', None)
+    if cache:
+        for worker in cache.values():
+            _terminate_cached_worker(worker)
+        cache.clear()
+    pool = getattr(shared_data, '_rt_subprocess_pool', None)
+    if pool is not None:
+        pool.terminate()
+
+
 class AnalysisProcess_customFunction(QThread):
     """Drop-in alternative to AnalysisThread_customFunction that runs a node's
     init/run/end in a separate OS process instead of on this QThread.
@@ -495,6 +561,16 @@ class AnalysisProcess_customFunction(QThread):
         a node that stores its result on `self` (e.g. `self.fft_display`) for
         `visualise()` to read keeps working unmodified. This duplicates any
         one-time init cost (e.g. importing diplib) once per process.
+      * Warm restarts (_rt_config_key / _park_subprocess_worker /
+        subprocess_pool.py): stop() parks a still-alive worker (+ its
+        visualisation shadow object) instead of killing it, and __init__
+        reclaims it on an identical restart to skip spawn/import/model-load.
+        This means the node's Python-level state (self attributes set in
+        run(), e.g. a frame counter or accumulation buffer) now survives a
+        stop -> start of the *same* configuration, where previously every
+        start got a fresh instance. No current node is known to rely on
+        per-start-fresh state, so this isn't fixed with a reset hook -- if a
+        future node needs one, that's the place to add it.
     """
     analysis_done_signal = pyqtSignal(object)
     finished = pyqtSignal()
@@ -513,42 +589,77 @@ class AnalysisProcess_customFunction(QThread):
         self._activity_event = Event()
         self.visualisationObject = None
         self.RT_analysis_object = None
-        # The child process re-imports the *entire* glados_pycromanager package
-        # tree from scratch (spawn shares nothing with the parent) plus whatever
-        # heavy library the node itself needs (e.g. diplib, "may take a few
-        # seconds" per FFT_im.py) before it's ready to process its first frame --
-        # observed up to ~10s in practice. Give that one-time cold start a much
-        # longer grace period than the steady-state per-frame timeout, and don't
-        # log it as a warning (it's expected, not a stall).
-        self._worker_warmed_up = False
+        self._cache_key = _rt_config_key(analysisInfo)
+        wants_visualisation = bool(isinstance(analysisInfo, dict) and analysisInfo.get('__realTimeVisualisation__')) #type:ignore
 
-        mp_ctx = mp.get_context('spawn')
-        self._in_queue = mp_ctx.Queue(maxsize=2)
-        self._out_queue = mp_ctx.Queue(maxsize=2)
-        self._stop_event = mp_ctx.Event()
-        # Separate queue pair used only by Performance Mode (see
-        # glados_pycromanager/observability/perf_capture.py) to start/stop
-        # cProfile inside this worker and get its hotspot report back --
-        # kept apart from _in_queue/_out_queue so profiling control traffic
-        # can never be mistaken for a frame/result and never delays one.
-        self._control_in_queue = mp_ctx.Queue(maxsize=2)
-        self._control_out_queue = mp_ctx.Queue(maxsize=2)
-        self._process = mp_ctx.Process(
-            target=_subprocess_analysis_worker,
-            args=(analysisInfo, self._in_queue, self._out_queue, self._stop_event),
-            kwargs={
-                'control_in_queue': self._control_in_queue,
-                'control_out_queue': self._control_out_queue,
-                'log_level': shared_data.config.logging_config.log_level,
-            },
-            daemon=True,
-        )
-        self._process.start()
+        cached = shared_data._rt_subprocess_cache.pop(self._cache_key, None) if self._cache_key is not None else None
+        if cached is not None:
+            # A previous stop() of this exact node configuration parked its
+            # still-alive worker (see _park_subprocess_worker) instead of
+            # killing it -- its package imports/model weights/GPU context are
+            # already loaded, so this restart skips spawn + import + model-load
+            # entirely rather than paying it again.
+            logging.debug('AnalysisProcess: reusing warm cached subprocess for %s', self._node_label())
+            self._process = cached['process']
+            self._in_queue = cached['in_queue']
+            self._out_queue = cached['out_queue']
+            self._stop_event = cached['stop_event']
+            self._control_in_queue = cached['control_in_queue']
+            self._control_out_queue = cached['control_out_queue']
+            self.RT_analysis_object = cached['RT_analysis_object']
+            self._worker_warmed_up = True
+        else:
+            # The child process re-imports the *entire* glados_pycromanager package
+            # tree from scratch (spawn shares nothing with the parent) plus whatever
+            # heavy library the node itself needs (e.g. diplib, "may take a few
+            # seconds" per FFT_im.py) before it's ready to process its first frame --
+            # observed up to ~10s in practice. Give that one-time cold start a much
+            # longer grace period than the steady-state per-frame timeout, and don't
+            # log it as a warning (it's expected, not a stall). A pre-warmed pool
+            # process (below) can shortcut most of this.
+            self._worker_warmed_up = False
 
-        # Visualisation shadow instance -- see class docstring. Constructed in
-        # this (main) process only when the node wants real-time visualisation.
-        if analysisInfo is not None and '__realTimeVisualisation__' in analysisInfo and analysisInfo['__realTimeVisualisation__']: #type:ignore
-            self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
+            mp_ctx = mp.get_context('spawn')
+            self._in_queue = mp_ctx.Queue(maxsize=2)
+            self._out_queue = mp_ctx.Queue(maxsize=2)
+            self._stop_event = mp_ctx.Event()
+            # Separate queue pair used only by Performance Mode (see
+            # glados_pycromanager/observability/perf_capture.py) to start/stop
+            # cProfile inside this worker and get its hotspot report back --
+            # kept apart from _in_queue/_out_queue so profiling control traffic
+            # can never be mistaken for a frame/result and never delays one.
+            self._control_in_queue = mp_ctx.Queue(maxsize=2)
+            self._control_out_queue = mp_ctx.Queue(maxsize=2)
+
+            claimed = shared_data._rt_subprocess_pool.try_claim()
+            if claimed is not None:
+                # A blank process pre-spawned at app startup (subprocess_pool.py)
+                # already paid the spawn + package-tree (+ diplib) import cost --
+                # hand it this node's real work instead of spawning from scratch.
+                self._process, assign_queue = claimed
+                assign_queue.put((analysisInfo, self._in_queue, self._out_queue, self._stop_event,
+                                   self._control_in_queue, self._control_out_queue,
+                                   shared_data.config.logging_config.log_level))
+            else:
+                self._process = mp_ctx.Process(
+                    target=_subprocess_analysis_worker,
+                    args=(analysisInfo, self._in_queue, self._out_queue, self._stop_event),
+                    kwargs={
+                        'control_in_queue': self._control_in_queue,
+                        'control_out_queue': self._control_out_queue,
+                        'log_level': shared_data.config.logging_config.log_level,
+                    },
+                    daemon=True,
+                )
+                self._process.start()
+
+            # Visualisation shadow instance -- see class docstring. Constructed
+            # in this (main) process only when the node wants real-time
+            # visualisation.
+            if wants_visualisation:
+                self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
+
+        if wants_visualisation and self.RT_analysis_object is not None:
             self.visualisationObject = AnalysisThread_customFunction_Visualisation(self.RT_analysis_object, shared_data, analysisInfo=analysisInfo)
             self.visualisationObject.start()
 
@@ -694,14 +805,33 @@ class AnalysisProcess_customFunction(QThread):
 
     def stop(self):
         self.is_running = False
+        self._new_image.set()  # unblock run() if it's currently waiting
+        if self.visualisationObject is not None:
+            self.visualisationObject.running = False
+
+        if self._cache_key is not None and self._process.is_alive():
+            # Park this still-alive, already-warmed-up worker instead of
+            # tearing it down -- a later __init__() with the identical
+            # configuration reclaims it directly, skipping spawn + import +
+            # model-load entirely. The worker's run loop just idles on
+            # in_queue.get(timeout=0.5) with nothing arriving, so this costs
+            # ~0 CPU while parked (see _park_subprocess_worker).
+            _park_subprocess_worker(self.shared_data, self._cache_key, {
+                'process': self._process,
+                'in_queue': self._in_queue,
+                'out_queue': self._out_queue,
+                'stop_event': self._stop_event,
+                'control_in_queue': self._control_in_queue,
+                'control_out_queue': self._control_out_queue,
+                'RT_analysis_object': self.RT_analysis_object,
+            })
+            return
+
         self._stop_event.set()
         try:
             self._in_queue.put_nowait(None)
         except Exception:
             pass
-        self._new_image.set()  # unblock run() if it's currently waiting
-        if self.visualisationObject is not None:
-            self.visualisationObject.running = False
         self._process.join(timeout=3)
         if self._process.is_alive():
             self._process.terminate()

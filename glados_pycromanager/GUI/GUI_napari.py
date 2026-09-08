@@ -323,6 +323,13 @@ def main():
     # Create an instance of the shared_data class
     print('Creating shared data.')
     shared_data = Shared_data()
+    # Start pre-warming a blank RT-analysis subprocess as early as possible so
+    # its spawn + package-tree (+ diplib) import cost is hidden behind however
+    # long the user takes to reach the microscope/acquisition setup, instead of
+    # being paid on the critical path of the first subprocess-isolated node's
+    # start (see AnalysisClass.py's AnalysisProcess_customFunction and
+    # subprocess_pool.py).
+    shared_data._rt_subprocess_pool.start()
     print('Cleaning up temporary files.')
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
 
@@ -585,6 +592,20 @@ def main():
         # Final safety net: dump on app teardown, in case neither path fired.
         app.aboutToQuit.connect(lambda: _dump_profile('aboutToQuit'))
     # -------------------------------------------------------------------------
+
+    # Terminate any parked/warm RT-analysis subprocesses before the forced exit
+    # below -- they now outlive a single node's stop() call (that's the whole
+    # point of the warm-restart cache in AnalysisClass.py), so without this
+    # they'd otherwise be orphaned rather than dying with their daemon-process
+    # parent. Non-blocking (.terminate(), no .join()) to match the no-hang
+    # intent of the os._exit(0) below.
+    def _terminate_rt_subprocesses():
+        try:
+            from glados_pycromanager.GUI.AnalysisClass import terminate_all_rt_subprocesses
+            terminate_all_rt_subprocesses(shared_data)
+        except Exception:
+            logging.exception('Failed to terminate RT-analysis subprocesses on quit')
+    app.aboutToQuit.connect(_terminate_rt_subprocesses)
 
     # Force-exit to avoid the ~10-20 s hang + STATUS_ACCESS_VIOLATION that
     # happens when pyjavaz bridge threads or the CMMCorePlus destructor try

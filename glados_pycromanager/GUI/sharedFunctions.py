@@ -19,6 +19,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 from glados_pycromanager.Core import microscopeInterfaceLayer as MIL
 from glados_pycromanager.GUI.napariGlados import napariHandler
+from glados_pycromanager.GUI.subprocess_pool import WarmSubprocessPool
 from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
 
 """Shared data summary
@@ -257,7 +258,21 @@ class Shared_data(QObject):
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()
         # self._RTAnalysisQueues = []
-        
+
+        # RT-analysis subprocess startup speedups (see AnalysisClass.py's
+        # AnalysisProcess_customFunction and subprocess_pool.py):
+        # - _rt_subprocess_cache: still-alive subprocess+queues (+ the
+        #   main-process visualisation shadow object) parked on stop(), keyed
+        #   by a hash of the node's analysisInfo config, so restarting the
+        #   *same* node reclaims its already-warm worker instead of a cold
+        #   spawn + reimport + model reload.
+        # - _rt_subprocess_pool: one pre-spawned, pre-imported "blank" process
+        #   kept ready so the *first* subprocess-isolated node started in a
+        #   session isn't a cold spawn either. Started as early as possible
+        #   from GUI_napari.py's main().
+        self._rt_subprocess_cache = {}
+        self._rt_subprocess_pool = WarmSubprocessPool()
+
         self._mdaImageQueues = []
         self._defaultFocusDevice = ''
         self._mdaModeSaveLoc = ['','']
