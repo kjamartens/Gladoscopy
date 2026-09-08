@@ -572,7 +572,9 @@ class AnalysisProcess_customFunction(QThread):
         per-start-fresh state, so this isn't fixed with a reset hook -- if a
         future node needs one, that's the place to add it.
     """
-    analysis_done_signal = pyqtSignal(object)
+    # NOTE: no analysis_done_signal here. It was declared and emitted once per
+    # frame per node but had zero connect() sites anywhere in the repo -- a
+    # cross-thread Qt emission per frame for no receiver.
     finished = pyqtSignal()
 
     def __init__(self, shared_data, analysisInfo: str | None = 'Random', analysisQueue=None, sleepTimeMs=1, nodzInfo=None):
@@ -790,7 +792,6 @@ class AnalysisProcess_customFunction(QThread):
                         self._worker_warmed_up = True
                         analysis_elapsed_ms = (time.time() - analysis_start) * 1000
                         self.analysis_result = [result, out_metadata]
-                        self.analysis_done_signal.emit(self.analysis_result)
                         if self.visualisationObject is not None and self.RT_analysis_object is not None:
                             self.RT_analysis_object.__dict__.update(state_snapshot)
                             if len(self.visualisationObject.visualisation_queue) < 1:
@@ -853,9 +854,8 @@ class AnalysisProcess_customFunction(QThread):
 #`"__runInSubprocess__": True` in their __function_metadata__, specifically to
 #avoid the GIL-starvation problem multiprocessing here would otherwise solve.
 class AnalysisThread_customFunction(QThread):
-    # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
-    # Create a signal to communicate between threads
-    analysis_done_signal = pyqtSignal(object)
+    # NOTE: no analysis_done_signal here either -- see the note in
+    # AnalysisProcess_customFunction; it had no connect() sites.
     finished = pyqtSignal()# signal to indicate that the thread has finished
     def __init__(self,shared_data,analysisInfo: str | None = 'Random',analysisQueue=None,sleepTimeMs=1,nodzInfo=None):
         """
@@ -924,7 +924,6 @@ class AnalysisThread_customFunction(QThread):
                 analysis_start = time.time()
                 self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
                 analysis_elapsed_ms = (time.time() - analysis_start) * 1000
-                self.analysis_done_signal.emit(self.analysis_result)
             # Cap this thread's GIL-holding duty cycle: give the rest of the app at
             # least as much wall-clock time as the analysis call just took, so a
             # slow/GIL-heavy analysis (e.g. a diplib-based FFT) can't starve the Qt

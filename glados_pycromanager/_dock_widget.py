@@ -28,7 +28,7 @@ from glados_pycromanager.GUI.napariHelperFunctions import (  #type:ignore
     getLayerIdFromName,
     showScaleBar,  #type: ignore
 )
-from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate  #type: ignore
+from glados_pycromanager.GUI.sharedFunctions import Shared_data  #type: ignore
 from glados_pycromanager.GUI.utils import *  #type: ignore
 from glados_pycromanager.GUI.utils import CustomMainWindow  #type:ignore
 

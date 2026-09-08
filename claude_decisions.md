@@ -981,3 +981,40 @@ line of defence, per the task. It is idempotent: it only reads
 elapsed time only grows between the worker's check and the GUI's, so a frame that
 passes on the worker cannot be spuriously failed later for a *different* reason.
 
+---
+
+## 2026-09-08 — T-A5: delete `LoggingList` rather than wire it up
+
+**Context:** T-A5 item 5 is explicitly flagged as a judgement call:
+`sharedFunctions.LoggingList` is a `list` subclass whose `remove()` override was
+supposed to call `stop()`/`destroy()` on a removed RT-analysis entry, but it is
+never instantiated (`Shared_data.__init__` assigns a plain `[]`), so that teardown
+never ran. The task warns: don't delete it without replacing the teardown it was
+supposed to provide.
+
+**Finding on inspection:** there is no teardown to replace.
+
+1. All **four** `RTAnalysisQueuesThreads.remove(item)` call sites (the task says
+   three; `MMcontrols.py:~1417` is the fourth, alongside `napariGlados.py`
+   ~1431/~1473/~1519) *already* tear the thread down explicitly immediately
+   before removing — `item['Thread'].destroy()` at three of them,
+   `item['Thread'].stop_signal.set()` + `join(timeout=1)` at the MDA-visualisation
+   one — and drain the queue.
+2. Even if `LoggingList` had been wired up, it would not have worked: the removed
+   item is a `{'Queue':..., 'Thread':...}` **dict**, which has no `.stop()`. Its
+   `try/except (AttributeError, RuntimeError)` would have swallowed the
+   `AttributeError` and logged a warning on every removal.
+
+**Decision:** deleted the class, per the task's stated preference for explicit
+teardown at the call sites (which is what the code already does). Left a comment
+at the old location recording all of the above so a future reader does not
+"restore" it. No behaviour change.
+
+**Also deleted in this task, all confirmed zero-reference by repo-wide grep:**
+`AnalysisClass.analysis_done_signal` (2 declarations, 2 per-frame-per-node emits,
+0 `connect()` calls), `napariGlados.napariUpdateAnalysisThreads` (dead, and called
+`getLayerIdFromName` with the old 2-argument signature so it would have raised),
+`Shared_data.liveUpdateEvent` (never emitted), and `sharedFunctions.periodicallyUpdate`
+(imported in two modules, never instantiated — both imports dropped).
+`self.analysis_result` assignments were kept; only the emits were removed.
+

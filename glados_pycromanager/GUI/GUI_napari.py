@@ -50,7 +50,7 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 #Obtain the helperfunctions
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
-from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate
+from glados_pycromanager.GUI.sharedFunctions import Shared_data
 from glados_pycromanager.GUI.utils import *
 
 #endregion

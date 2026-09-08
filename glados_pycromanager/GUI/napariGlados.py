@@ -500,34 +500,6 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
     
     shared_data.last_display_update_time = time.time()
 
-def napariUpdateAnalysisThreads(DataStructure):
-    """ 
-    
-    """
-    napariViewer = DataStructure['napariViewer']
-    acqstate = DataStructure['acqState']
-    core = DataStructure['core']
-    image_queue_analysisA = DataStructure['image_queue_analysis']
-    analysisThreads = DataStructure['analysisThreads']
-    logging.debug(f'NapariUpdateLive Ran at time {time.time()}')
-    liveImage = DataStructure['data'][0]
-    metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
-    layerName = DataStructure['layer_name']
-    if liveImage is None:
-        return
-    if acqstate == False:
-        return
-    liveImageLayer = getLayerIdFromName(layerName,napariViewer)
-
-    # Check if the queue has any elements
-    if len(image_queue_analysisA) < 3:
-        image_queue_analysisA.append([liveImage,metadata,shared_data])
-        #Start all analysisthreads
-        for analysisThread in analysisThreads:
-            if not analysisThread.isRunning():
-                logging.debug(f'starting analysis thread: {analysisThread}')
-                analysisThread.start()
-
 class napariHandler:
     # Max time to wait, in acqModeChanged, for a previous acquisition worker to
     # fully stop before allowing a new one to start. Generous relative to normal

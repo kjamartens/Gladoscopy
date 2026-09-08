@@ -27,49 +27,16 @@ from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
     Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
 """
 
-class LoggingList(list):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.logger = logging.getLogger(__name__)
+# NOTE: there used to be a `LoggingList(list)` here whose remove() override was
+# meant to stop/destroy a removed RT-analysis entry. It was never instantiated
+# (RTAnalysisQueuesThreads is a plain list), so that teardown never ran -- and it
+# would not have worked anyway, since the removed item is a
+# {'Queue':..., 'Thread':...} dict with no .stop()/.destroy(). All four
+# RTAnalysisQueuesThreads.remove() call sites already tear the thread down
+# explicitly (item['Thread'].destroy() or stop_signal.set()+join()) and drain the
+# queue immediately before removing, so the class was deleted rather than wired
+# up. See claude_decisions.md (T-A5).
 
-    def append(self, item):
-        super().append(item)
-        self.on_analysisThreads_value_change()
-
-    def extend(self, items):
-        super().extend(items)
-        self.on_analysisThreads_value_change()
-
-    def insert(self, index, item):
-        super().insert(index, item)
-        self.on_analysisThreads_value_change()
-
-    def remove(self, item):
-        super().remove(item)
-        self.on_analysisThreads_value_change(removed_entry=item)
-
-    def pop(self, index=None):
-        v = super().pop(index)
-        self.on_analysisThreads_value_change()
-        return v
-    
-    
-    def on_analysisThreads_value_change(self,removed_entry=None):
-        logging.debug('Analysis Threads now: '+str(self))
-        # removed_entry = None
-        # if len(self) < len(self.prevSelf):
-        #     removed_entry = [entry for entry in self if entry not in self.prevSelf][0]
-        logging.debug('Analysis Threads now: ' + str(self))
-        if removed_entry is not None:
-            logging.debug('Removed entry: ' + str(removed_entry))
-            try:
-                removed_entry.stop()
-                removed_entry.destroy()
-                logging.debug('succesfully stopped/destroyed Analysis thread '+str(removed_entry))
-            except (AttributeError, RuntimeError) as exc:
-                logging.warning('Could not stop/destroy Analysis thread %s: %s', removed_entry, exc)
-    
-    
 
 def setting(default, display_name="", description="", input_type="lineEdit", options=None, hidden=False):
     return dataclasses.field(
@@ -242,7 +209,6 @@ def save_config_to_json(cfg):
 
 class Shared_data(QObject):
     mda_acq_done_signal = pyqtSignal(bool)
-    liveUpdateEvent = pyqtSignal(object)
     #Initialises the info of shared data
     def __init__(self):
         super().__init__()
@@ -566,12 +532,3 @@ class Dict_Specific_WarningErrorInfo(dict):
         if self.parent.loadingOngoing == False:
             updateAutonousErrorWarningInfo(self,updateInfo='All')
         pass
-
-class periodicallyUpdate:
-    def __init__(self,updateFunction,timing = 10000):
-        logging.debug('Initted periodically update with function %s', updateFunction)
-        # Create a QTimer to periodically update MM info
-        self.timer = QTimer()
-        self.timer.setInterval(timing)
-        self.timer.timeout.connect(updateFunction)
-        self.timer.start()
