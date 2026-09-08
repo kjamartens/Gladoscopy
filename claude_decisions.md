@@ -1018,3 +1018,42 @@ at the old location recording all of the above so a future reader does not
 (imported in two modules, never instantiated — both imports dropped).
 `self.analysis_result` assignments were kept; only the emits were removed.
 
+---
+
+## 2026-09-08 — T-B1: which MIL methods take the hardware lock, and where the tests live
+
+**Decision 1 — scope of `@_hardware_locked`.** Applied to the 43 public methods
+that actually touch `self.core` (or a Java object obtained from it, e.g.
+`verbose_info_from_config_group_state`, `java_arr_to_numpy`). Deliberately **not**
+applied to:
+
+- `__init__`, `get_core`, `get_microscope_interface` / `MI` / `get_MI`,
+  `invalidate_exposure_cache`, `invalidate_pixel_size_cache` — plain attribute
+  reads/writes, no hardware.
+- `_detect_microscope_instance` — a `@staticmethod`; its only caller (`set_core`)
+  is locked, so it runs under the lock anyway.
+- `create_mda` — pure event-list construction; it never touches `self.core`.
+  Locking it would hold the hardware lock across a non-hardware computation.
+
+**Decision 2 — the two cached getters keep a lock-free fast path.** `get_exposure`
+and `get_pixel_size_um` are *not* decorated. They return a cache hit before
+acquiring the lock (per the task's step 4) and take the lock only for the cache
+*miss*, with a double-check inside. Without this, the per-frame display
+rate-limit gate would serialize behind a slow stage move or config switch —
+exactly the stall this project exists to remove.
+
+**Decision 3 — new tests target the real MIL, not the fake.** The task suggests
+extending `tests/fakes/fake_mil.py` for the re-entrancy test. `FakeMicroscopeInterfaceLayer`
+is a **standalone class**, not a subclass of `MicroscopeInterfaceLayer`, so it has
+no `_hw_lock` and testing it would assert nothing about the real lock. New file
+`tests/test_mil_hardware_lock.py` instead drives the real MIL with a `MagicMock`
+core forced onto the MMCORE_PLUS branch, and covers: re-entrancy via
+`get_image_width() -> get_roi()`, re-entrancy from an already-held lock, mutual
+exclusion under 4 concurrent threads, the lock-free cache-hit path, that a cache
+*miss* still blocks, and that `functools.wraps` preserved signatures/docstrings.
+The fake is left untouched.
+
+**Not done here (needs hardware):** the task's real test — rapid Live/MDA toggling
+while moving a stage and switching config groups — could not be run in this
+environment. Flagged to the user.
+

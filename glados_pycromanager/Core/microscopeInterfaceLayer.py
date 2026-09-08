@@ -1,12 +1,37 @@
-#Goal: a common interface layer for multiple backends to control micromannager.
+"""Common interface layer for the three supported Micro-Manager backends
+(Pycromanager-Java, Pycromanager-Python, MMCore-plus).
 
-#Supported for now:
+**Thread safety.** Every public method that touches ``self.core`` is wrapped in
+``@_hardware_locked``, which takes a single per-instance ``threading.RLock``.
+This enforces threading invariant 2 of ``claude_throughput_project.md``: all
+microscope access is serialized, regardless of which thread calls it.
 
-#Pycromanager - JAVA
-#Pycromanager - Python
-#MMCore-plus
+The lock is not theoretical. Commit ``cd01032`` exists because two threads drove
+the same ``core.mda``/``Acquisition`` object concurrently and produced a **native
+access violation / JVM fatal crash**. Hardware is touched from at least five
+thread contexts today: the Qt/GUI thread (``MMcontrols.py``,
+``LaserControlScripts.py``), the acquisition worker, RT-analysis QThreads
+(``LaserAdjustment.py`` calls ``set_property()`` per frame), nodz executor
+``QRunnable``s (``AutoFocusBF.py``, ``Strobo_lasers.py``), and a
+``ThreadPoolExecutor`` in ``utils.forceReset``. Interleaving two threads' serial
+writes to a TriggerScope is a hardware-correctness bug, not just a performance
+one.
 
+On ``PYCROMANAGER_JAVA`` this serialization already existed implicitly —
+``pyjavaz``'s ``Bridge.send_and_receive`` holds one global ``_communication_lock``
+per round trip — but ``PYCROMANAGER_PYTHON`` and ``MMCORE_PLUS`` bind straight to
+CMMCore with no such lock.
+
+The lock is **re-entrant** because MIL methods compose: ``get_image_width()``
+calls ``get_roi()``. It is deliberately **untimed** — a deadlock here should be
+diagnosed, not silently skipped. The ``get_exposure`` / ``get_pixel_size_um``
+cache-hit fast paths return *before* acquiring it, so the per-frame display path
+is never serialized behind a slow stage move.
+"""
+
+import functools
 import logging
+import threading
 from enum import Enum
 
 import numpy as np
@@ -26,8 +51,24 @@ class MicroscopeInstance(Enum):
     MMCORE_PLUS = 'MMCorePlus'
     UNKNOWN = 'Unknown' # Add an unknown type for comprehensive handling
 
+def _hardware_locked(method):
+    """Serialize a MIL method against all other hardware access.
+
+    Applied to every public method that touches ``self.core``. See the module
+    docstring for why. Re-entrant, so composing MIL methods is safe.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._hw_lock:
+            return method(self, *args, **kwargs)
+    return wrapper
+
+
 class MicroscopeInterfaceLayer:
     def __init__(self):
+        # One re-entrant lock per MIL instance, guarding every method that
+        # touches self.core (see the module docstring and @_hardware_locked).
+        self._hw_lock = threading.RLock()
         self.core: PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None = None
         # Cached backend tag — computed once in `set_core` so each MIL call
         # doesn't re-run the isinstance + Java-bridge attribute chain.
@@ -46,6 +87,7 @@ class MicroscopeInterfaceLayer:
         self._exposure_cache: float | None = None
         self.mda: dict | None = None
 
+    @_hardware_locked
     def set_core(self, core):
         """Bind a backend core object and cache its :class:`MicroscopeInstance`.
 
@@ -112,6 +154,7 @@ class MicroscopeInterfaceLayer:
         return self._mi
 
     #Helper function
+    @_hardware_locked
     def java_arr_to_numpy(self, str_vector_obj)-> np.ndarray:
         """
         Converts a pyjavaz.bridge.mmcorej_StrVector object to a NumPy array.
@@ -151,6 +194,7 @@ class MicroscopeInterfaceLayer:
         return np.array(python_list, dtype=object) # Use dtype=object for mixed types or strings
 
     #Callables
+    @_hardware_locked
     def clear_roi(self) -> None:
         """
         Clear the region of interest (ROI) for the camera.
@@ -164,6 +208,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for clear_roi.")
 
+    @_hardware_locked
     def get_auto_shutter(self) -> bool:
         """
         Get the current state of the auto shutter.
@@ -177,6 +222,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_auto_shutter.")
     
+    @_hardware_locked
     def get_available_config_groups(self) -> list:
         """
         Get a list of available configuration groups.
@@ -190,6 +236,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_available_config_group.")
     
+    @_hardware_locked
     def get_available_configs(self, config_group) -> list:
         """
         Get a list of available configurations for a given configuration group.
@@ -204,6 +251,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_available_configs.")
     
+    @_hardware_locked
     def get_config_data(self, config_group, config_name):
         """
         Get the configuration data for a specific configuration group and name.
@@ -217,6 +265,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_config_data.")
     
+    @_hardware_locked
     def get_config_device_label(self,config_data):
         """
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
@@ -230,6 +279,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_config_device_label.")
     
+    @_hardware_locked
     def get_config_group_state(self, config_group):
         """
         Get the current state of a configuration group.
@@ -243,6 +293,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_config_group_state.")
         
+    @_hardware_locked
     def get_config_property_name(self,config_data):
         """
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
@@ -256,6 +307,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_config_device_label.")
     
+    @_hardware_locked
     def get_current_config(self, config_group) -> str:
         """
         Get the current configuration for a specific configuration group.
@@ -269,6 +321,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_current_config.")
     
+    @_hardware_locked
     def get_device_type(self, device_name) -> int:
         """
         Get the type of a device by its name.
@@ -294,23 +347,32 @@ class MicroscopeInterfaceLayer:
         to force a fresh hardware query; the cache is also invalidated
         automatically by set_exposure().
         """
+        # NOT @_hardware_locked: the cache-hit fast path must return *before*
+        # acquiring the hardware lock, so the per-frame display rate-limit gate
+        # is never serialized behind a slow stage move or config switch.
         if use_cache and self._exposure_cache is not None:
             return self._exposure_cache
-        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            value = self.core.get_exposure()
-        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
-            value = self.core.get_exposure()
-        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
-            value = self.core.getExposure()
-        else:
-            raise ValueError("Unsupported microscope interface type for getting exposure.")
-        self._exposure_cache = value
-        return value
+        with self._hw_lock:
+            # Re-check under the lock: another thread may have populated the
+            # cache while we were waiting for it.
+            if use_cache and self._exposure_cache is not None:
+                return self._exposure_cache
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+                value = self.core.get_exposure()
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                value = self.core.get_exposure()
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+                value = self.core.getExposure()
+            else:
+                raise ValueError("Unsupported microscope interface type for getting exposure.")
+            self._exposure_cache = value
+            return value
 
     def invalidate_exposure_cache(self) -> None:
         """Force the next :meth:`get_exposure` call to query the hardware."""
         self._exposure_cache = None
     
+    @_hardware_locked
     def get_focus_device(self) -> str:
         if self.core is None:
             raise RuntimeError("Microscope core is not set.")
@@ -324,6 +386,7 @@ class MicroscopeInterfaceLayer:
             # This case should ideally not be reached if all types are covered by the initial union
             raise TypeError(f"Unsupported core type: {type(self.core)}")
         
+    @_hardware_locked
     def get_image(self) -> np.ndarray:
         """
         Get the most recently snapped image from the microscope camera.
@@ -341,18 +404,21 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for getting image.")
     
+    @_hardware_locked
     def get_image_width(self) -> int:
         """
         Get the width of the image from the microscope camera.
         """
         return self.get_roi()[2]
     
+    @_hardware_locked
     def get_image_height(self) -> int:
         """
         Get the height of the image from the microscope camera.
         """
         return self.get_roi()[3]
     
+    @_hardware_locked
     def get_loaded_devices(self) -> list:
         """
         Get a list of loaded devices in the microscope core.
@@ -372,23 +438,29 @@ class MicroscopeInterfaceLayer:
         Pass ``use_cache=False`` to force a fresh hardware query (e.g. after
         an objective change).
         """
+        # NOT @_hardware_locked -- same reason as get_exposure(): the cache-hit
+        # fast path returns before acquiring the hardware lock.
         if use_cache and self._pixel_size_um_cache is not None:
             return self._pixel_size_um_cache
-        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            value = self.core.get_pixel_size_um()
-        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
-            value = self.core.get_pixel_size_um()
-        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
-            value = self.core.getPixelSizeUm()
-        else:
-            value = 1.0
-        self._pixel_size_um_cache = value
-        return value
+        with self._hw_lock:
+            if use_cache and self._pixel_size_um_cache is not None:
+                return self._pixel_size_um_cache
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+                value = self.core.get_pixel_size_um()
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                value = self.core.get_pixel_size_um()
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+                value = self.core.getPixelSizeUm()
+            else:
+                value = 1.0
+            self._pixel_size_um_cache = value
+            return value
 
     def invalidate_pixel_size_cache(self) -> None:
         """Force the next :meth:`get_pixel_size_um` call to query the hardware."""
         self._pixel_size_um_cache = None
     
+    @_hardware_locked
     def get_position(self, device_name: str) -> tuple:
         """
         Get the current position of a device.
@@ -402,6 +474,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_position.")
 
+    @_hardware_locked
     def get_property(self, device_name, property_name):
         """
         Get the value of a property for a specific device.
@@ -415,6 +488,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_property.")
     
+    @_hardware_locked
     def has_property_limits(self, device_name, property_name):
         """
         Check if a property has limits.
@@ -428,6 +502,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for has_property_limits.")
     
+    @_hardware_locked
     def get_property_lower_limit(self, device_name, property_name):
         """
         Get the lower limit of a property.
@@ -441,6 +516,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_property_lower_limit.")
     
+    @_hardware_locked
     def get_property_upper_limit(self, device_name, property_name):
         """
         Get the upper limit of a property.
@@ -454,6 +530,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_property_upper_limit.")
     
+    @_hardware_locked
     def get_roi(self):
         """
         Get the current ROI.
@@ -467,6 +544,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_roi.")
     
+    @_hardware_locked
     def get_sensor_size(self) -> tuple:
         """Return (width, height) of the full camera sensor independent of any active ROI.
 
@@ -491,6 +569,7 @@ class MicroscopeInterfaceLayer:
             except Exception:
                 pass  # best-effort restore
 
+    @_hardware_locked
     def get_shutter_device(self) -> str:
         """
         Get the current shutter device.
@@ -504,6 +583,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_shutter_device.")
     
+    @_hardware_locked
     def get_shutter_open(self) -> bool:
         """
         Get the current state of the shutter (open or closed).
@@ -517,6 +597,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_shutter_open.")
     
+    @_hardware_locked
     def get_xy_position(self, xy_stage_name: str | None = None) -> tuple:
         """
         Get the current X-Y position of a stage.
@@ -540,6 +621,7 @@ class MicroscopeInterfaceLayer:
             logger.warning('get_xy_position(%s) failed: %s', xy_stage_name, exc)
             return [0,0]
 
+    @_hardware_locked
     def get_xy_stage_device(self) -> str:
         """
         Get the name of the X-Y stage device.
@@ -553,6 +635,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_xy_stage_device.")
     
+    @_hardware_locked
     def get_xy_stage_position(self, xy_stage_name: str) -> tuple:
         """
         Get the current position of the X-Y stage.
@@ -574,6 +657,7 @@ class MicroscopeInterfaceLayer:
             logger.warning('get_xy_stage_position(%s) failed: %s', xy_stage_name, exc)
             return [0,0]
         
+    @_hardware_locked
     def set_auto_shutter(self, auto_shutter: bool) -> None:
         """
         Set the auto shutter state.
@@ -587,6 +671,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_auto_shutter.")
     
+    @_hardware_locked
     def set_config(self, config_group, config_name) -> None:
         """
         Set the configuration for a specific configuration group.
@@ -600,6 +685,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_config.")
     
+    @_hardware_locked
     def set_exposure(self,exposure_time: float) -> None:
         """
         Set the exposure time for the microscope camera.
@@ -614,6 +700,7 @@ class MicroscopeInterfaceLayer:
             raise ValueError("Unsupported microscope interface type for setting exposure.")
         self.invalidate_exposure_cache()
 
+    @_hardware_locked
     def set_focus_device(self,focus_device) -> None:
         """
         Set the focus device.
@@ -630,6 +717,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for setting focus device.")
     
+    @_hardware_locked
     def set_property(self, device_name, property_name, newval):
         """
         Get the value of a property for a specific device.
@@ -643,6 +731,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_property.")
     
+    @_hardware_locked
     def set_relative_position(self, device_name: str, pos_change: float) -> None:
         """
         Set the relative position of a device.
@@ -656,6 +745,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_relative_position.")
     
+    @_hardware_locked
     def set_relative_xy_position(self, pos_change: tuple) -> None:
         """
         Set the relative position of the X-Y stage.
@@ -669,6 +759,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_relative_xy_position.")        
     
+    @_hardware_locked
     def set_roi(self, roi: tuple) -> None:
         """
         Set the region of interest (ROI) for the camera.
@@ -682,6 +773,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_roi.")
     
+    @_hardware_locked
     def set_shutter_device(self, shutter_device: str) -> None:
         """
         Set the shutter device.
@@ -695,6 +787,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_shutter_device.")
     
+    @_hardware_locked
     def set_shutter_open(self, open_shutter: bool) -> None:
         """
         Set the state of the shutter (open or closed).
@@ -708,6 +801,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_shutter_open.")
     
+    @_hardware_locked
     def snap_image(self) -> None:
         """
         Snap an image using the microscope camera.
@@ -721,6 +815,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for snapping image.")
 
+    @_hardware_locked
     def stop_sequence_acquisition(self) -> None:
         """
         Stop the sequence acquisition of images.
@@ -739,6 +834,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for stop_sequence_acquisition.")
 
+    @_hardware_locked
     def verbose_info_from_config_group_state(self,config_group_state) -> str:
         """
         Get the verbose information from a configuration group state.
@@ -752,6 +848,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for verbose_info_from_config_group_state.")
     
+    @_hardware_locked
     def wait_for_system(self) -> None:
         """
         Wait for the microscope system to be ready.

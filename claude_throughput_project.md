@@ -165,7 +165,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 ### Tier B — Hardware ownership
 
-- [ ] **T-B1** Serialize all MIL access behind a re-entrant lock — M, no deps
+- [x] **T-B1** Serialize all MIL access behind a re-entrant lock — M, no deps
 - [ ] **T-B2** Mirror hardware constants into `shared_data`; display never calls MIL — M, needs B1
 - [ ] **T-B3** `MicroscopeService` owner thread — **L**, needs B1, B2, C3 — **stop point**
 - [ ] **T-B4** Migrate GUI slots to submit intents — L, incremental, needs B3
