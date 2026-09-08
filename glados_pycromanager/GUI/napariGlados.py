@@ -525,25 +525,25 @@ class napariHandler:
         logging.debug('#nH - mdaacqdonefunction called in napariHandler')
         self.shared_data.mdaacqdonefunction()
     
-    def put_data_in_visualisation_and_analysis_queues(self,visualisation_queue,analysis_queues,image,metadata):
+    def put_data_in_visualisation_and_analysis_queues(self,visualisation_queue,analysis_entries,image,metadata):
+        """Fan a single acquired frame out to the visualisation queue and to
+        every active RT-analysis queue.
+
+        `analysis_entries` is the `shared_data.RTAnalysisQueuesThreads` list
+        itself (dicts with 'Queue'/'Thread' keys), not a list of queues. The
+        previous signature took a freshly-built list of queues and then rescanned
+        RTAnalysisQueuesThreads by object identity to recover the thread that
+        owns each one -- O(n^2) plus a throwaway list allocation on every frame.
+
+        The `if len(queue) < 1` drop-gate is deliberate: deeper queueing was
+        benchmarked and rejected (see docs/bench-live-display.md). A frame is
+        dropped for any consumer that has not yet finished the previous one.
+        """
         #Queue for visualisation of the data
-        # print(f'#ac353 - current len of vis_queue: {len(visualisation_queue)}')
         if len(visualisation_queue) < 1:
             visualisation_queue.append([image,metadata]) 
             self.new_image() #give the signal that we have a new image ready to be visualised
-            # print(f'#ac356 - current len of vis_queue: {len(visualisation_queue)}')
-        
-        # #Queue(s) for RT analysis of the data:
-        # for queue in analysis_queues:
-        #     #Find the corresponding analysis thread
-        #     for item in self.shared_data.RTAnalysisQueuesThreads:
-        #         if 'Queue' in item and item['Queue'] is queue:
-        #             thread = item.get('Thread')
-                    
-        #             if len(queue) < 1:
-        #                 queue.append([image,metadata])
-        #                 #Signal the thread we have a new entry
-        #                 thread.new_image()
+
         # Timed with perf_counter() only when DEBUG is actually enabled -- this
         # runs once per popped hardware frame (Qt.DirectConnection callback on
         # pymmcore-plus's own MDA thread), which can be tens of thousands of
@@ -552,18 +552,21 @@ class napariHandler:
         debug_enabled = logging.getLogger(__name__).isEnabledFor(logging.DEBUG)
         start = time.perf_counter() if debug_enabled else None
 
-        for queue in analysis_queues:
-            for item in self.shared_data.RTAnalysisQueuesThreads:
-                if 'Queue' in item and item['Queue'] is queue:
-                    thread = item.get('Thread')
-                    if len(queue) < 1:
-                        queue.append([image,metadata])
-                        thread.new_image()
-                    break
+        #Queue(s) for RT analysis of the data -- single pass, thread read directly
+        #off the same entry rather than looked up by queue identity.
+        for entry in analysis_entries:
+            queue = entry.get('Queue') if hasattr(entry, 'get') else None
+            if queue is None:
+                continue
+            if len(queue) < 1:
+                queue.append([image,metadata])
+                thread = entry.get('Thread')
+                if thread is not None:
+                    thread.new_image()
 
-        end = time.perf_counter()
-        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
-            logging.debug(f"Loop (no intermediate logs): {(end-start)*1000:.4f}ms")
+        if debug_enabled:
+            end = time.perf_counter()
+            logging.debug("RT analysis fan-out: %.4fms", (end-start)*1000)
 
     def grab_image_liveVisualisation_and_liveAnalysis(self,image,metadata, event_queue):
         """
@@ -575,7 +578,7 @@ class napariHandler:
         if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
             logging.debug(f'#nH - Updated live preview requesting grab_image_liveVisualisation_and_liveAnalysis at time {time.time()}')
         if self.acqstate:
-            self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+            self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,self.shared_data.RTAnalysisQueuesThreads,image,metadata)
             #Give image and metadata back for storage done by pycromanager in case of MDA, NOT in case of live-viewing.
             if not self.shared_data.liveMode:
                 return image, metadata
@@ -607,7 +610,7 @@ class napariHandler:
                 # don't leave black slices (vis queue only passes ~fps frames/s, rest are dropped).
                 if self.shared_data.config.mda_config.vis_method == 'multiDstack':
                     self._try_write_frame_to_zarr(image, metadata)
-                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,self.shared_data.RTAnalysisQueuesThreads,image,metadata)
             except Exception:
                 logging.exception('grab_image_liveVis_PyMMCore: frame processing failed (frame dropped)')
         else:
@@ -728,7 +731,7 @@ class napariHandler:
                 metadata = {}
                 metadata['Axes']=axes
                 logging.debug("metadata: %s", metadata)
-                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,[item['Queue'] for item in self.shared_data.RTAnalysisQueuesThreads],image,metadata)
+                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,self.shared_data.RTAnalysisQueuesThreads,image,metadata)
             
         else:
             logging.info('Broke off live mode')

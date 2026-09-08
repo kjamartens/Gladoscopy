@@ -926,3 +926,27 @@ grouping slip, not a content issue).
 `CLAUDE.md`, `tests/test_psmlm_locs_accumulation.py`,
 `tests/test_get_layer_id_from_name_cache.py`. Full suite: 341 passed
 (334 baseline + 7 new).
+
+---
+
+## 2026-09-08 — T-A2: three call sites, not four; defensive `.get()` on entries
+
+**Context:** `claude_throughput_project.md` T-A2 says
+`put_data_in_visualisation_and_analysis_queues` has "four call sites". A repo-wide
+grep at commit `7dd453d` finds exactly **three**
+(`napariGlados.py` lines ~578, ~610, ~731 — the pycromanager live callback, the
+MMCORE_PLUS `frameReady` callback, and the MDA image-process callback).
+
+**Decision:** Updated all three; did not hunt for a fourth. The task's intent
+(no call site keeps building a throwaway queue list) is fully met.
+
+**Also:** the new single-pass loop reads `entry.get('Queue')` / `entry.get('Thread')`
+and skips entries that lack them, instead of the old `if 'Queue' in item` +
+unguarded `thread.new_image()`. The old code would raise `AttributeError` if an
+entry had a 'Queue' but a `None` 'Thread' (the latent bug the task refers to);
+skipping is the safe equivalent of the old `break`-without-action path.
+
+**Preserved exactly:** the `if len(queue) < 1` drop-gate (deeper queueing was
+measured and rejected, see `docs/bench-live-display.md`) and one-frame-per-queue
+semantics.
+
