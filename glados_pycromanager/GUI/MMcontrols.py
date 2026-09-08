@@ -1802,7 +1802,10 @@ class MMConfigUI(CustomMainWindow):
             requiredModifier = modifierKeyMap.get(modifierSetting)
             if requiredModifier is None or requiredModifier not in event.modifiers:
                 return
-            delta = event.delta[1] if event.delta else 0
+            eventDelta = event.delta
+            if eventDelta is None or len(eventDelta) < 2:
+                return
+            delta = eventDelta[1]
             if delta == 0:
                 return
             self.moveOneDStage(2 if delta > 0 else -2)
