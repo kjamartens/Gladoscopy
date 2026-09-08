@@ -187,7 +187,9 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
     #Visualise the MDA data on a frame-by-frame method - i.e. not a 'stack', but simply a single image which is replaced every frame update
     if shared_data.config.mda_config.vis_method == 'frameByFrame' or DataStructure['layer_name']=='Live':
         liveImage = DataStructure['data'][0]
-        metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
+        # NOTE: no metadata_refactor here -- the frameByFrame display path never
+        # reads the refactored metadata, and on MMCORE_PLUS the acquisition
+        # callback has already refactored it once. (multiDstack below does use it.)
         if liveImage is None:
             return
         if acqstate == False:
