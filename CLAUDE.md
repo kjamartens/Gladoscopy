@@ -40,6 +40,30 @@ pytest
 
 ## Architecture
 
+### Threading model
+
+Three invariants. They are not currently upheld everywhere — `claude_throughput_project.md`
+is the standalone plan that enforces them — but new code must follow them.
+
+- **The Qt/GUI thread is holy.** It paints, lays out, and handles input. It must not touch
+  hardware, block on I/O, or run analysis. Anything else belongs on a worker. Violations
+  that still exist: `MMcontrols.py` snaps images and moves stages directly in slots,
+  `LaserControlScripts.py` writes serial commands to a TriggerScope per keystroke, the log
+  widget re-reads the whole log file every ~500 ms, and `NodeItem.paint()` loads a PNG from
+  disk on every repaint.
+- **All microscope access goes through one owner.** `MILcore`/`core` must have a single
+  owning thread; other threads submit requests. Unsynchronized cross-thread `core.*` calls
+  are not theoretical: commit `cd01032` fixed a **native access violation / JVM fatal
+  crash** caused by two threads driving the same `core.mda`/`Acquisition` object. Note that
+  on the Java backend `pyjavaz`'s `Bridge.send_and_receive` already holds a single global
+  `_communication_lock` for each round trip, so all bridge traffic is serialized regardless
+  of caller — at the measured ~257 ms/call, a GUI-thread hardware call directly steals
+  bandwidth from the frame path. `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` have no such lock.
+- **Only the GUI thread touches napari.** Workers emit Qt signals to a GUI-thread receiver;
+  they never mutate `viewer.layers` or `viewer.dims` directly. `AnalysisClass.py`'s
+  `_do_visualise` signal into `_visualise_on_main_thread` is the reference pattern.
+  `autonomous/executor.py` and `utils.forceReset` currently violate this from pool threads.
+
 ### Backends — `Core/microscopeInterfaceLayer.py` (MIL)
 
 `MicroscopeInterfaceLayer` is the abstraction over three mutually exclusive backends, identified via the `MicroscopeInstance` enum: `PYCROMANAGER_JAVA`, `PYCROMANAGER_PYTHON`, `MMCORE_PLUS`. Code that needs to talk to the microscope should go through `MIL`, branching on `mil.get_microscope_interface()` (alias `MI()` / `get_MI()`). The user picks the backend in the headless start dialog (`headlessGUI` in `GUI_napari.py`) — this writes `shared_data.config.micromanager_config.headless_backend`.
@@ -135,6 +159,12 @@ Three companion files live alongside it:
   the documented format. This is the place to look when answering "why was
   it done this way?" in a future session.
 - **`claude_project.md`** — the plan itself.
+- **`claude_throughput_project.md`** — a *separate*, standalone plan targeting live/MDA
+  data throughput and the threading invariants above. It has its own operating protocol
+  and its own 51-task checklist; it is **not** advanced by "continue". Run it only when
+  the user asks for it by name (e.g. "work on claude_throughput_project.md"). It shares
+  the `claude_optimization` branch and logs to `claude_decisions.md` / `claude_issues.md`
+  like the main roadmap.
 
 When the user says **"continue"** (or any equivalent like "keep going",
 "resume", "next step"), follow this protocol exactly:
