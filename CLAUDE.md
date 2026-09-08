@@ -98,6 +98,8 @@ Keep it on new top-level modules under `glados_pycromanager/` if they're meant t
 
 `utils.set_up_logger()` writes log files into the AppData directory. Both stdlib `logging` and `loguru` are used; prefer `logging` for consistency with existing code.
 
+RT-analysis nodes that opt into subprocess isolation (`"__runInSubprocess__": True`, see `AnalysisProcess_customFunction` in `GUI/AnalysisClass.py`) run in a `multiprocessing` `spawn`ed child process with its own, separately-initialized root logger — `set_up_logger()`/`set_log_level()` in the main process cannot reach it. The child is given the Adv.-settings log level at spawn time (`log_level` kwarg into `_subprocess_analysis_worker`, applied via `logging.basicConfig`); a later change to the Adv. settings while such a node is running is pushed live through the same `control_in_queue` used for Performance Mode profiling (`__set_log_level__:<LEVEL>` sentinel, sent via `AnalysisProcess_customFunction.update_log_level()`, called from every entry in `shared_data.RTAnalysisQueuesThreads` in `utils.py`'s advanced-settings save handler).
+
 ## Documentation
 
 User-facing docs live at `glados_pycromanager/Documentation/UserManual.md`; the developer overview is at `glados_pycromanager/Documentation/index.html`. Images are in `glados_pycromanager/Documentation/Images/`.

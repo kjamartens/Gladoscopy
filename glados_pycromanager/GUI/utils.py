@@ -3410,6 +3410,15 @@ def openAdvancedSettings(shared_data):
         except Exception as exc:
             logging.warning("Could not apply log level: %s", exc)
 
+        # RT-analysis nodes running in a subprocess (see AnalysisClass.
+        # AnalysisProcess_customFunction) have their own, separately-spawned
+        # root logger, which set_log_level() above cannot reach -- push the
+        # new level to each running one explicitly.
+        for entry in shared_data.RTAnalysisQueuesThreads:
+            update_log_level = getattr(entry.get('Thread'), 'update_log_level', None)
+            if update_log_level is not None:
+                update_log_level(shared_data.config.logging_config.log_level)
+
         logging.info('advanced settings stored!')
         dialog.close()
         pass

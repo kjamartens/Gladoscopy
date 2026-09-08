@@ -353,7 +353,8 @@ _SUBPROCESS_SNAPSHOT_TYPES = (int, float, bool, str, bytes, type(None), np.ndarr
 
 def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
                                  init_fn=None, run_fn=None, end_fn=None,
-                                 control_in_queue=None, control_out_queue=None):
+                                 control_in_queue=None, control_out_queue=None,
+                                 log_level=None):
     """Entry point for the child process spawned by AnalysisProcess_customFunction.
 
     Kept as a free module-level function (not a method/closure) so it's picklable
@@ -374,7 +375,16 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
     Performance Mode can never be confused with a malformed frame and never
     delays/derails normal frame processing. Both default to None so existing
     callers/tests that don't pass them are unaffected.
+
+    log_level: the Adv. settings log level (e.g. "DEBUG"/"INFO") at the time
+    this process was spawned. A 'spawn'-started child gets a fresh, unconfigured
+    root logger (WARNING level, no handlers) -- without this, every logging.debug/
+    info call made by a node's init/run/end here would be silently dropped
+    regardless of what the user picked in Adv. settings. A later change to the
+    setting while this worker is already running arrives via control_in_queue
+    (see the '__set_log_level__:' branch below) rather than a restart.
     """
+    logging.basicConfig(level=getattr(logging, str(log_level or 'INFO').upper(), logging.INFO))
     if init_fn is None and run_fn is None and end_fn is None:
         # Node classes (e.g. FFT_im.RealTimeFFT) are resolved via a sys.modules
         # stem lookup (_resolve_node_obj), not a fresh import. The spawned child
@@ -412,6 +422,9 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
                         except Exception:
                             logging.exception('AnalysisProcess worker: failed to enqueue profile report')
                     _child_profiler = cProfile.Profile()
+                elif isinstance(ctrl, str) and ctrl.startswith('__set_log_level__:'):
+                    new_level = ctrl.split(':', 1)[1]
+                    logging.getLogger().setLevel(getattr(logging, new_level.upper(), logging.INFO))
             try:
                 item = in_queue.get(timeout=0.5)
             except std_queue.Empty:
@@ -526,6 +539,7 @@ class AnalysisProcess_customFunction(QThread):
             kwargs={
                 'control_in_queue': self._control_in_queue,
                 'control_out_queue': self._control_out_queue,
+                'log_level': shared_data.config.logging_config.log_level,
             },
             daemon=True,
         )
@@ -556,6 +570,16 @@ class AnalysisProcess_customFunction(QThread):
         if isinstance(self.analysisInfo, dict):
             return str(self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node'))
         return str(self.analysisInfo)
+
+    def update_log_level(self, level: str) -> None:
+        """Push a new Adv.-settings log level to the already-running child
+        process, so a change takes effect without restarting the analysis
+        (mirrors the main-process behaviour in utils.py's advanced-settings
+        save handler, which calls observability.logger.set_log_level directly)."""
+        try:
+            self._control_in_queue.put_nowait(f'__set_log_level__:{level}')
+        except std_queue.Full:
+            logging.warning('AnalysisProcess: could not push log level update (control queue full)')
 
     def start_profiling(self) -> None:
         """Performance Mode: tell the child process to start cProfile."""
