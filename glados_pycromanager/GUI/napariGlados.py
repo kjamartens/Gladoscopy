@@ -1604,12 +1604,8 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
         else:
             logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
 
-    #Performance Mode (diagnostic tool; must never block app startup)
-    try:
-        custom_widget_performanceMode = dockWidget_PerformanceMode()
-        napariViewer.window.add_dock_widget(custom_widget_performanceMode, area="right", name="Performance", tabify=True)
-    except Exception as e:
-        logging.error(f"Error loading Performance Mode widget: {e}")
+    #Performance Mode is a diagnostic tool, not opened by default. Users open it
+    #on demand via Plugins > Glados-PycroManager > Performance Mode.
 
     # Force the "Controls" widget to the front
     custom_widget_MMcontrols.parent().raise_()

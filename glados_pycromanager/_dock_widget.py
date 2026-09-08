@@ -7,7 +7,7 @@ import sys
 import napari
 from pycromanager import Core
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QGridLayout, QGroupBox, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QGridLayout, QGroupBox, QLabel, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1'
@@ -17,6 +17,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+import glados_pycromanager.GUI.napariGlados as napariGladosModule
 
 from glados_pycromanager.GUI.napariGlados import *  #type: ignore
 
@@ -316,15 +317,28 @@ class PerformanceModeWidget(GladosWidget):
     """
     Dock widget hosting the Performance Mode start/stop toggle + report.
     See glados_pycromanager/GUI/performance_mode_widget.py.
+
+    Not opened automatically by MainWidget - it's a hidden/opt-in entry in
+    napari's Plugins menu (see napari.yaml), so it needs to fall back to
+    whichever entry point's `shared_data` is live: this module's (set by
+    MainWidget, the napari-plugin path) or napariGlados.py's (set by
+    runNapariPycroManager, the standalone `glados` command path).
     """
     def __init__(self, viewer: napari.viewer.Viewer, parent=None): #type:ignore
         super().__init__(viewer=viewer, parent=parent)
 
-        from glados_pycromanager.GUI.performance_mode_widget import PerformanceModeWidget as _PerformanceModePanel
-        self.dockWidget = _PerformanceModePanel(self.shared_data) #type:ignore
+        if parent is None:
+            self.shared_data = shared_data or getattr(napariGladosModule, 'shared_data', None)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.dockWidget) # type: ignore
+        if self.shared_data is None:
+            layout.addWidget(QLabel(
+                "Open 'Run Glados-PycroManager' first, then reopen Performance Mode from the Plugins menu."
+            ))
+        else:
+            from glados_pycromanager.GUI.performance_mode_widget import PerformanceModeWidget as _PerformanceModePanel
+            self.dockWidget = _PerformanceModePanel(self.shared_data) #type:ignore
+            layout.addWidget(self.dockWidget) # type: ignore
         self.setLayout(layout)
         logging.debug("dockWidget_PerformanceMode started")
 
@@ -334,6 +348,11 @@ class PerformanceModeWidget(GladosWidget):
         """
         return super().resizeEvent(event)
 #endregion
+
+#Module-level handle to the running session's shared_data, set by MainWidget.
+#Lets standalone Plugins-menu entries (e.g. PerformanceModeWidget) reach the
+#live shared_data without being a dock added by MainWidget itself.
+shared_data = None
 
 #region Main Call
 class MainWidget(QWidget):
@@ -401,12 +420,8 @@ class MainWidget(QWidget):
         autonomousMicroscopyWidget = AutonomousMicroscopyWidget(viewer, parent=self)
         napariViewer.window.add_dock_widget(autonomousMicroscopyWidget, area="top", name="Glados",tabify=True)
 
-        #Performance Mode (diagnostic tool; must never block app startup)
-        try:
-            performanceModeWidget = PerformanceModeWidget(viewer, parent=self)
-            napariViewer.window.add_dock_widget(performanceModeWidget, area="right", name="Performance", tabify=True)
-        except Exception as e:
-            logging.error(f"Error loading PerformanceModeWidget: {e}")
+        #Performance Mode is a diagnostic tool, not opened by default. Users open it
+        #on demand via Plugins > Glados-PycroManager > Performance Mode.
 
         logging.info('Napari-glados-pycromanager plugin fully loaded')
 

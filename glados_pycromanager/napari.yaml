@@ -14,8 +14,13 @@ contributions:
     - id: glados-pycromanager.UserManual
       title: Open my widget
       python_name: glados_pycromanager.GUI.GUI_napari:show_UserManualNapari
+    - id: glados-pycromanager.performanceModeWidgetCall
+      title: Open Performance Mode
+      python_name: glados_pycromanager._dock_widget:PerformanceModeWidget
   widgets:
     - command: glados-pycromanager.mainWidgetCall
       display_name: Run Glados-PycroManager
     - command: glados-pycromanager.UserManual
       display_name: User Manual
+    - command: glados-pycromanager.performanceModeWidgetCall
+      display_name: Performance Mode
