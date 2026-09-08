@@ -950,3 +950,34 @@ skipping is the safe equivalent of the old `break`-without-action path.
 measured and rejected, see `docs/bench-live-display.md`) and one-frame-per-queue
 semantics.
 
+---
+
+## 2026-09-08 — T-A3: the shared display gate calls MIL from the worker thread
+
+**Context:** T-A3 extracts `napariUpdateLive`'s fps/exposure rate-limit into
+`_should_display_now(shared_data)` and calls it from the visualisation worker
+thread before marshalling a payload across the Qt signal boundary. That gate
+reads `shared_data.MILcore.get_exposure()`, so a *worker* thread now touches MIL
+once per queued frame, where previously only the GUI thread did.
+
+**Decision:** Accepted as an intentional intermediate state.
+
+- `get_exposure()` is served from MIL's cache (invalidated on `set_exposure`), so
+  this is a dict read, not a bridge round trip, on the overwhelming majority of
+  calls.
+- **T-B1** adds the re-entrant hardware lock but explicitly keeps the
+  `get_exposure` / `get_pixel_size_um` cache-hit fast path *outside* the lock, so
+  the display path is not serialized against a slow stage move.
+- **T-B2** then removes MIL from the display path entirely by mirroring
+  `hw_exposure_ms` onto `shared_data`; at that point `_should_display_now` reads a
+  plain attribute from both threads and the concern disappears.
+
+Doing B2's mirror early inside A3 would have widened A3 well past its "M, no deps"
+scope and duplicated B2's work.
+
+**Also:** the gate is deliberately left in place in `napariUpdateLive` as a second
+line of defence, per the task. It is idempotent: it only reads
+`last_display_update_time` (stamped after a successful display update), and
+elapsed time only grows between the worker's check and the GUI's, so a frame that
+passes on the worker cannot be spuriously failed later for a *different* reason.
+

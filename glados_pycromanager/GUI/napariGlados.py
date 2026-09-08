@@ -122,35 +122,60 @@ def _maybe_refresh_contrast(shared_data, layer, layerName):
 
 #region real-time visualisation/analysis handling
 #These need to be functions outside of any class due to Yield-calling
+def _should_display_now(shared_data, now=None):
+    """Rate-limit decision for the live/MDA display path.
+
+    Returns True if a frame arriving *now* would actually be drawn. Called from
+    two places:
+
+    * the visualisation worker thread, *before* it marshals a payload across the
+      Qt signal boundary -- so frames the GUI would drop anyway never pay the
+      cross-thread hand-off cost, and
+    * `napariUpdateLive` on the GUI thread, as a second line of defence (cheap,
+      and still correct if a frame was queued before the gate closed).
+
+    The decision only reads `shared_data.last_display_update_time`, which is
+    stamped at the end of a successful display update, so calling it twice for
+    the same frame is idempotent: elapsed time only grows between the two calls.
+    """
+    if now is None:
+        now = time.time()
+    #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
+    min_delay_time = np.min(((50/1000),(float(shared_data.MILcore.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
+    display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
+
+    elapsed = now - shared_data.last_display_update_time
+    if elapsed < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug('Updated live preview Hindered (due to display update time) at time %s', now)
+        return False
+
+    if elapsed < min_delay_time and elapsed > 1/1000:
+        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+            logging.debug('Updated live preview Delayed (due to display update time) val found %s', elapsed)
+            logging.debug('Updated live preview Delayed (due to display update time) by %s', min_delay_time - elapsed)
+        # Skip this frame rather than sleeping. napariUpdateLive is called from
+        # the main thread (napari dispatches yielded-worker signals there), so
+        # sleeping here would freeze the entire UI. Dropping is always safer.
+        return False
+
+    return True
+
+
 def napariUpdateLive(DataStructure):
     """
     Function that finally shows the  image in napari
 
     Basically the core visualisation method
     """
-    #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
-    min_delay_time = np.min(((50/1000),(float(shared_data.MILcore.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
-    
-    display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
-
     if not getattr(shared_data, '_napariUpdateLive_first_call_logged', False):
         logging.info('napariUpdateLive: first yielded call received (layer=%s)', DataStructure.get('layer_name'))
         shared_data._napariUpdateLive_first_call_logged = True
 
-    now = time.time()  # cache once — used multiple times below
-    elapsed = now - shared_data.last_display_update_time
-    if elapsed < display_update_time: #less than a 50-100ms ago already update live mode? wait a bit before displaying live then.
-        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
-            logging.debug(f'Updated live preview Hindered (due to display update time) at time {now}')
-        return
-
-    if elapsed < min_delay_time and elapsed > 1/1000:
-        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
-            logging.debug(f'Updated live preview Delayed (due to display update time) val found {elapsed}')
-            logging.debug(f'Updated live preview Delayed (due to display update time) by {min_delay_time - elapsed}')
-        # Skip this frame rather than sleeping on the UI thread. napariUpdateLive is called
-        # from the main thread (napari dispatches yielded-worker signals there), so sleeping
-        # here freezes the entire UI. Dropping the frame is always safer than blocking.
+    # Second line of defence: the visualisation worker already applied this same
+    # gate before marshalling the payload across the thread boundary, but a frame
+    # may still have been in flight when the gate closed.
+    if not _should_display_now(shared_data):
         return
 
     #shared_data.debugImageDisplayTimes.append(time.time())
@@ -988,6 +1013,19 @@ class napariHandler:
         self.shared_data.register_perf_thread_label(get_native_id(), 'Visualisation worker (frame queue -> napariUpdateLive)')
 
         visualisation_queue = parent.visualisation_queue
+        # Six of the eight payload keys are constant for the whole run; build them
+        # once and shallow-copy per yield instead of re-deriving them per frame.
+        # (A fresh dict per yield is required -- the payload crosses a queued Qt
+        # signal boundary and the receiver may lag behind the producer.)
+        base_payload = {
+            'napariViewer': self.shared_data.napariViewer,
+            'core': self.shared_data.core,
+            'image_queue_analysis': [],#self.image_queue_analysis#-doesn't seem to be required?
+            'analysisThreads': [],#self.shared_data.analysisThreads #-doesn't seem to be required?
+            'layer_name': layerName,
+            'layer_color_map': layerColorMap,
+            'finalisationProcedure': False,
+        }
         try:
             while self.acqstate:
                 # 1. Check if the user called .quit() from the outside
@@ -1000,18 +1038,16 @@ class napariHandler:
                 self._new_image.clear()
                 
                 if visualisation_queue:
-                    DataStructure = {}
-                    DataStructure['data'] = visualisation_queue.popleft()
-                    DataStructure['napariViewer'] = self.shared_data.napariViewer
+                    frame = visualisation_queue.popleft()
+                    # Apply the display rate-limit here, on the worker thread,
+                    # rather than paying the cross-thread signal marshalling for a
+                    # frame napariUpdateLive would immediately drop at the very
+                    # same gate.
+                    if not _should_display_now(self.shared_data):
+                        continue
+                    DataStructure = dict(base_payload)
+                    DataStructure['data'] = frame
                     DataStructure['acqState'] = self.acqstate
-                    DataStructure['core'] = self.shared_data.core
-                    DataStructure['image_queue_analysis'] = []#self.image_queue_analysis#-doesn't seem to be required?
-                    DataStructure['analysisThreads'] = []#self.shared_data.analysisThreads #-doesn't seem to be required?
-                    # # logging.info('adding analysisThread in run_napariVisualisation_worker 1')
-                    # logging.debug(str(self.shared_data.analysisThreads))
-                    DataStructure['layer_name'] = layerName
-                    DataStructure['layer_color_map'] = layerColorMap
-                    DataStructure['finalisationProcedure'] = False
                     logging.debug('live mode worker - yield DataStructure')
                     yield DataStructure
         finally:
