@@ -714,6 +714,38 @@ def typeFromKwarg(functionname,kwargname):
         typing=None
     return typing
 
+def createValueEditWidget(functionname,kwargname):
+    """
+    Build the 'Value'-mode widget for a kwarg. Bool-typed kwargs (declared as "type": bool
+    in __function_metadata__) get a QCheckBox instead of a free-text QLineEdit; everything
+    else is unchanged. The object name (LineEdit#function#kwarg) is kept identical for both
+    widget kinds, since hideAdvVariables()/getFunctionEvalTextFromCurrentData_* only ever key
+    off that name, not the widget class - see docs/rt_analysis_parameters.md.
+    """
+    if typeFromKwarg(functionname,kwargname) == bool:
+        widget = QCheckBox()
+    else:
+        widget = QLineEdit()
+    widget.setObjectName(f"LineEdit#{functionname}#{kwargname}")
+    return widget
+
+def wireValueEditWidget(line_edit,defaultValue):
+    """
+    Apply the default value and hook up the change-signal for a widget built by
+    createValueEditWidget(), branching on whether it's a QCheckBox (bool) or QLineEdit (everything else).
+    """
+    if isinstance(line_edit,QCheckBox):
+        if defaultValue is not None:
+            if isinstance(defaultValue,str):
+                line_edit.setChecked(defaultValue.strip().lower() in ('true','1'))
+            else:
+                line_edit.setChecked(bool(defaultValue))
+        line_edit.stateChanged.connect(lambda state,line_edit=line_edit: changeDataVarUponKwargChange(line_edit))
+    else:
+        if defaultValue is not None:
+            line_edit.setText(str(defaultValue))
+        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+
 def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap,parent=None):
     #Called whenever the dropdown is changed, hides everything and shows selectively only the chosen dropdown
     if current_dropdown == None:
@@ -1695,12 +1727,10 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         #Create a new HBox:
                         SingleVar_Variables_boxLayout = QHBoxLayout()
                         
-                        #Creating a line-edit...
-                        line_edit = QLineEdit()
-                        
-                        line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
+                        #Creating a line-edit (or, for bool-typed kwargs, a checkbox)...
+                        line_edit = createValueEditWidget(current_selected_function,reqKwargs[k])
                         defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
-                        
+
                         #Method for variables in Glados
                         if ShowVariablesOptions:
                             #Advanced - flow + var via maths
@@ -1744,11 +1774,9 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                                 comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
                             
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                            if defaultValue is not None:
-                                line_edit.setText(str(defaultValue))
                             curr_layout.addLayout(SingleVar_Variables_boxLayout,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                            #Add a on-change listener:
-                            line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                            #Set the default value and add a on-change listener (branches on QCheckBox vs QLineEdit):
+                            wireValueEditWidget(line_edit,defaultValue)
                             #Init the parent currentData storage:
                             changeDataVarUponKwargChange(line_edit)
                             if ShowVariablesOptions:
@@ -1803,10 +1831,9 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     #Create a new HBox:
                     SingleVar_Variables_boxLayout = QHBoxLayout()
                         
-                    line_edit = QLineEdit()
-                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
+                    line_edit = createValueEditWidget(current_selected_function,optKwargs[k])
                     defaultValue = defaultValueFromKwarg(current_selected_function,optKwargs[k])
-                    
+
                     #Method for variables in Glados
                     if ShowVariablesOptions:
                         #Advanced - flow + var via maths
@@ -1849,11 +1876,9 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
                         
                         line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                        if defaultValue is not None:
-                            line_edit.setText(str(defaultValue))
                         curr_layout.addLayout(SingleVar_Variables_boxLayout,4+(k+labelposoffset+len(reqKwargs))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
-                        #Add a on-change listener:
-                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                        #Set the default value and add a on-change listener (branches on QCheckBox vs QLineEdit):
+                        wireValueEditWidget(line_edit,defaultValue)
                         #Init the parent currentData storage:
                         changeDataVarUponKwargChange(line_edit)
                         if ShowVariablesOptions:
@@ -2047,7 +2072,16 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
                     
 def changeDataVarUponKwargChange(line_edit):
     #Idea: update the parent.currentData{} structure whenever a kwarg is changed, and this can be (re-)loaded when needed
-    if isinstance(line_edit,QLineEdit):
+    if isinstance(line_edit,QCheckBox):
+        #Bool-typed kwarg widget (see createValueEditWidget). Stored as the same "True"/"False"
+        #string a QLineEdit would hold, so every downstream consumer of currentData[...] is unaffected.
+        parentObject = line_edit.parent()
+        newValue = str(line_edit.isChecked())
+        if hasattr(parentObject, 'currentData'):
+            parentObject.currentData[line_edit.objectName()] = newValue
+            #To be sure, also do this routine:
+            updateCurrentDataUponDropdownChange(parentObject)
+    elif isinstance(line_edit,QLineEdit):
         parentObject = line_edit.parent()
         newValue = line_edit.text()
         if hasattr(parentObject, 'currentData'):

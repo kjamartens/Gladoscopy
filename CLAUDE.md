@@ -77,6 +77,14 @@ pytest
 
 So **users add new analysis/RT/custom nodes by dropping a `.py` into the AppData folder, not into the source tree.** When searching for a node implementation, check both locations. Adding a file to one of these folders without proper top-level functions will cause it to be imported but not appear as a node.
 
+**Node kwarg widgets and the Value/Variable/Advanced switch:** how a node's
+`__function_metadata__()` kwargs turn into parameter-panel widgets, how the
+per-kwarg Value/Variable/Advanced switch (`name@Origin` / `{name@Origin}`
+syntax) is wired, and how to add a new typed widget (e.g. the `QCheckBox` used
+for `"type": bool` kwargs) without breaking that switch, is documented in
+`glados_pycromanager/Documentation/rt_analysis_parameters.md`. Read it before
+touching kwarg-widget code in `GUI/utils.py`.
+
 ### Path / import conventions
 
 Most modules begin with this shim because the codebase supports both `pip install -e .` and "open the file in an IDE":
