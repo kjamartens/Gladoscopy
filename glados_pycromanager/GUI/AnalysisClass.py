@@ -61,7 +61,7 @@ class napariOverlay:
         #Get info from a RT analysis object (i.e. outside-based-analysis)
         if self.RT_analysisObject is not None:
             self.layer_name, self.layerType = self.RT_analysisObject.visualise_init()
-            logging.debug(f"#nO - Initialised napariOverlay with layer_name: {self.layer_name}, layerType: {self.layerType}")
+            logging.debug("#nO - Initialised napariOverlay with layer_name: %s, layerType: %s", self.layer_name, self.layerType)
             
         #Create the layer if layer_name is not none
         #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
@@ -90,7 +90,7 @@ class napariOverlay:
             else: #Fallback if no layer type is specified at all
                 self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
         
-            logging.debug(f"Using layer {self.layer}")
+            logging.debug("Using layer %s", self.layer)
         
     #Update the name of the overlay
     def changeName(self,new_name):
@@ -1068,7 +1068,10 @@ class AnalysisThread_customFunction(QThread):
         #We are absolutely not allowed to access the core during the real-time analysis running.
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,shared_data,None,nodzInfo=self.nodzInfo)
         
-        logging.debug(f"Analysis on Image done with result: {result}")
+        # Lazy %s formatting: this runs once per frame per RT-analysis node, and
+        # the eager f-string built a full numpy repr of the result array on every
+        # frame regardless of the active log level.
+        logging.debug("Analysis on Image done with result: %s", result)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
             logging.debug('Attempting RT visualisation!')
