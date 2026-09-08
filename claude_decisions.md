@@ -1057,3 +1057,60 @@ The fake is left untouched.
 while moving a stage and switching config groups — could not be run in this
 environment. Flagged to the user.
 
+
+---
+
+## 2026-09-08 — T-A7: ring-buffer scope, capacity, and who consumes it
+
+**Decision 1 — the ring covers the MMCORE_PLUS `frameReady` path only.** That is
+the one callback that runs synchronously on someone else's acquisition thread
+(`Qt.DirectConnection` on pymmcore-plus' MDA thread), which is what the task is
+about. The pycromanager paths cannot use it: `grab_image_liveVisualisation_and_liveAnalysis`
+is an `image_process_fn` and must *return* `(image, metadata)` on the calling
+thread for pycromanager to store the frame, so handing off asynchronously would
+break storage. `grab_image_liveVisualisation_and_liveAnalysis_savedFn` likewise
+stays as-is. Both keep calling `put_data_in_visualisation_and_analysis_queues`
+directly.
+
+**Decision 2 — a dedicated consumer thread, not the existing visualisation worker.**
+Reusing `run_napariVisualisation_worker` as the drain would have been less code,
+but it applies the display rate-limit (`_should_display_now`) and yields into
+napari; RT-analysis fan-out and the multiDstack zarr write must happen for *every*
+frame, not at display fps. So `napariHandler` gets its own
+`_frame_ring_consumer_loop` thread, started right before the `frameReady` connect
+and stopped right after the disconnect (plus an idempotent stop in the worker's
+outer `finally`, so an exception in `run_mda()` cannot leak the thread).
+
+**Decision 3 — two capacities, not the single default of 4.** The task specifies a
+default capacity of 4; `FrameRing`'s default is 4 and the live/display path uses
+it, since display and RT analysis both drop frames at their own gate anyway and a
+backlog there is worthless. But on the multiDstack MDA path the consumer also
+writes every frame into the zarr store, and a dropped frame there is a
+*permanently black slice* — the MMCORE_PLUS backend has no NDTiff store to
+backfill from (that is exactly the bug fixed by "MDA black slices" in
+`claude_issues.md`). That path therefore gets `FRAME_RING_CAPACITY_STORAGE = 256`
+so the ring absorbs a disk-write hiccup instead of silently losing data. T-D3
+(writer thread with amortized chunks) is what actually makes this path fast; the
+deep ring is the interim safety margin.
+
+**Decision 4 — the zarr write stays on the consumer thread.** Per the task's step 4:
+moved off the camera thread, but not yet onto a writer thread of its own. T-D3
+owns that.
+
+**Decision 5 — `dropped` is logged, not surfaced in Performance Mode.** Performance
+Mode has no counter registry today — `Shared_data` exposes only
+`register_perf_thread_label` / `unregister_perf_thread_label` — so adding a UI
+counter would mean building that plumbing inside a Tier-A task. Instead
+`_stop_frame_ring_consumer` logs the per-acquisition tally once (WARNING when
+frames were dropped, INFO otherwise), which is what the task allows as the
+alternative. The consumer thread does register a perf thread label
+("Frame-ring consumer"), so a capture still attributes its CPU time correctly.
+
+**Verification.** `pytest -q`: 361 passed (9 new in `tests/test_frame_ring.py`
+covering overwrite-oldest, drop counting, the empty case, event set/clear
+ordering, and a 2000-frame producer/consumer race). Manual check was run via
+`--auto-demo --profile-runtime 12` (the automated equivalent of `make run-demo` +
+live mode): live mode started, the "Live" layer was created and updated
+(126 `napariUpdateLive` calls), and teardown logged
+`Frame ring handed over 160 frames, none dropped`. Not tested: real hardware, and
+a multiDstack MDA with a slow disk (the case the 256-deep ring exists for).

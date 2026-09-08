@@ -7,7 +7,7 @@ import sys
 import tempfile
 import time
 from collections import deque
-from threading import Event, RLock, get_native_id
+from threading import Event, RLock, Thread, get_native_id
 
 import appdirs
 import napari
@@ -43,6 +43,8 @@ from glados_pycromanager.Core.MDAGlados import MDAGlados
 from glados_pycromanager.GUI.custom_widget_ui import (
     Ui_CustomDockWidget,  # Import the generated UI module
 )
+from glados_pycromanager.GUI.frame_ring import DEFAULT_CAPACITY as FRAME_RING_CAPACITY
+from glados_pycromanager.GUI.frame_ring import FrameRing
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName, moveLayerToTop
 from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
@@ -507,6 +509,19 @@ class napariHandler:
     # calling (usually GUI) thread indefinitely if teardown is genuinely stuck.
     ACQ_STOP_TIMEOUT_S = 10.0
 
+    # Frame-ring depth used when the ring only feeds the display + RT-analysis
+    # fan-out. Both of those drop frames at their own gate anyway, so a backlog
+    # buys nothing and a shallow ring turns a slow consumer into a visible
+    # `dropped` count instead of into latency.
+    FRAME_RING_CAPACITY_DISPLAY = FRAME_RING_CAPACITY
+    # Depth used when the consumer also has to write every frame into the
+    # multiDstack zarr store: a dropped frame there is a permanently black slice
+    # (the MMCORE_PLUS backend has no NDTiff store to recover it from), so the
+    # ring must absorb a disk-write hiccup rather than overwrite.
+    FRAME_RING_CAPACITY_STORAGE = 256
+    # How long _stop_frame_ring_consumer waits for the consumer to drain and exit.
+    FRAME_RING_DRAIN_TIMEOUT_S = 10.0
+
     def __init__(self, shared_data,liveOrMda='live') -> None:
         logging.debug('#nH - ititalisation of napariHandler')
         self.shared_data = shared_data
@@ -540,6 +555,15 @@ class napariHandler:
         self._worker_stopped_event = Event()
         self._worker_stopped_event.set()  # no worker running yet
         self.acquisition_worker = None  # handle to the in-flight worker, mirrors self.visualisation_worker
+        # Bounded hand-off between the frameReady callback (which runs
+        # synchronously on pymmcore-plus' MDA thread, see
+        # grab_image_liveVis_PyMMCore) and _frame_ring_consumer_loop, which does
+        # the actual per-frame work. Re-created with a mode-appropriate capacity
+        # in _start_frame_ring_consumer; a ring exists from construction so a
+        # stray late callback can never hit an AttributeError.
+        self.frame_ring = FrameRing(self.FRAME_RING_CAPACITY_DISPLAY)
+        self._frame_ring_thread = None
+        self._frame_ring_stop = Event()
 
         #Sleep time to keep responsiveness
         self.sleep_time = 1/shared_data.config.visualisation_config.fps #in sec
@@ -569,10 +593,10 @@ class napariHandler:
             self.new_image() #give the signal that we have a new image ready to be visualised
 
         # Timed with perf_counter() only when DEBUG is actually enabled -- this
-        # runs once per popped hardware frame (Qt.DirectConnection callback on
-        # pymmcore-plus's own MDA thread), which can be tens of thousands of
-        # times per second with hardware-sequenced acquisition; an f-string
-        # here would format eagerly on every call regardless of log level.
+        # runs once per acquired frame (on the frame-ring consumer thread, or on
+        # the pycromanager image_process_fn thread), which can be tens of
+        # thousands of times per second with hardware-sequenced acquisition; an
+        # f-string here would format eagerly on every call regardless of level.
         debug_enabled = logging.getLogger(__name__).isEnabledFor(logging.DEBUG)
         start = time.perf_counter() if debug_enabled else None
 
@@ -617,35 +641,120 @@ class napariHandler:
             return None
     
     def grab_image_liveVis_PyMMCore(self,image: np.ndarray, event: useq.MDAEvent, metadata: dict):
+        """frameReady callback — a pure hand-off, nothing else.
+
+        This is connected with Qt.DirectConnection (see
+        _connect_mda_signal_direct), so it runs *synchronously on
+        pymmcore-plus' own MDA thread*: everything done here happens in front
+        of the next camera frame. It therefore only pushes the frame into
+        `self.frame_ring` and returns; metadata refactoring, the zarr write and
+        the analysis fan-out all happen on the consumer thread
+        (_frame_ring_consumer_loop).
+
+        The broad try/except stays: an uncaught exception on a DirectConnection
+        callback otherwise vanishes silently — the MDA keeps running and the
+        frame count in the log looks normal, but no frame reaches the vis queue.
+        """
         if self.acqstate:
-            # This callback is connected with Qt.DirectConnection (see
-            # _connect_mda_signal_direct), so it runs synchronously on
-            # pymmcore-plus's own MDA thread. An uncaught exception here would
-            # otherwise vanish silently — the MDA sequence keeps running/
-            # completing (frame count in the log looks normal) but no frame
-            # would reach the vis queue. Catch + log loudly so that failure
-            # mode stays visible instead of silent.
             try:
                 if not getattr(self, '_first_frame_logged', False):
                     logging.info('grab_image_liveVis_PyMMCore: first frame received, shape=%s dtype=%s', image.shape, image.dtype)
                     self._first_frame_logged = True
-                metadata = utils.metadata_refactor(metadata, self.shared_data)
-                # For multiDstack MDA: write every frame directly to zarr so fast acquisitions
-                # don't leave black slices (vis queue only passes ~fps frames/s, rest are dropped).
-                if self.shared_data.config.mda_config.vis_method == 'multiDstack':
-                    self._try_write_frame_to_zarr(image, metadata)
-                self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,self.shared_data.RTAnalysisQueuesThreads,image,metadata)
+                self.frame_ring.push(image, metadata)
             except Exception:
-                logging.exception('grab_image_liveVis_PyMMCore: frame processing failed (frame dropped)')
+                logging.exception('grab_image_liveVis_PyMMCore: frame hand-off failed (frame dropped)')
         else:
             logging.info('Need to break off!')
             self.shared_data.MILcore.stop_sequence_acquisition()
 
+    def _process_ring_frame(self, image, metadata):
+        """Per-frame work, off the acquisition thread.
+
+        Was the body of grab_image_liveVis_PyMMCore until T-A7. The zarr write
+        deliberately stays on this consumer thread for now; T-D3 moves it to a
+        dedicated writer thread with amortized chunks.
+        """
+        metadata = utils.metadata_refactor(metadata, self.shared_data)
+        # For multiDstack MDA: write every frame directly to zarr so fast acquisitions
+        # don't leave black slices (vis queue only passes ~fps frames/s, rest are dropped).
+        if self.shared_data.config.mda_config.vis_method == 'multiDstack':
+            self._try_write_frame_to_zarr(image, metadata)
+        self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,self.shared_data.RTAnalysisQueuesThreads,image,metadata)
+
+    def _frame_ring_consumer_loop(self):
+        """Drain `self.frame_ring` until stopped, then drain what is left.
+
+        Never touches the producer's timing: a slow frame here costs a ring
+        drop, not a stalled camera thread.
+        """
+        native_id = get_native_id()
+        self.shared_data.register_perf_thread_label(native_id, 'Frame-ring consumer (frameReady -> vis/RT queues)')
+        try:
+            while not self._frame_ring_stop.is_set():
+                # Short timeout rather than an untimed wait: the stop flag is set
+                # by another thread and must be noticed even if no frame follows.
+                self.frame_ring.wait(timeout=0.1)
+                self._drain_frame_ring()
+            # Post-stop drain: frames pushed between the last camera frame and
+            # the stop request still have to be written/displayed.
+            self._drain_frame_ring()
+        finally:
+            self.shared_data.unregister_perf_thread_label(native_id)
+
+    def _drain_frame_ring(self):
+        while True:
+            item = self.frame_ring.pop_next()
+            if item is None:
+                return
+            try:
+                self._process_ring_frame(item[0], item[1])
+            except Exception:
+                logging.exception('Frame-ring consumer: frame processing failed (frame dropped)')
+
+    def _start_frame_ring_consumer(self, needs_every_frame: bool):
+        """Start the consumer thread for one acquisition run.
+
+        `needs_every_frame` selects the ring depth: the multiDstack MDA path
+        writes each frame into zarr, where a drop is a permanently black slice.
+        """
+        self._stop_frame_ring_consumer()  # idempotent; also joins a stale thread
+        capacity = self.FRAME_RING_CAPACITY_STORAGE if needs_every_frame else self.FRAME_RING_CAPACITY_DISPLAY
+        self.frame_ring = FrameRing(capacity)
+        self._frame_ring_stop = Event()
+        self._frame_ring_thread = Thread(
+            target=self._frame_ring_consumer_loop,
+            name=f'GladosFrameRing-{self.liveOrMda}',
+            daemon=True,
+        )
+        self._frame_ring_thread.start()
+        logging.debug('Frame-ring consumer started (capacity=%d)', capacity)
+
+    def _stop_frame_ring_consumer(self):
+        """Stop the consumer, wait for it to drain, and report dropped frames."""
+        thread = self._frame_ring_thread
+        self._frame_ring_thread = None
+        if thread is None:
+            return
+        self._frame_ring_stop.set()
+        # Wake it out of frame_ring.wait() immediately instead of waiting out the
+        # poll timeout.
+        self.frame_ring.event.set()
+        thread.join(timeout=self.FRAME_RING_DRAIN_TIMEOUT_S)
+        if thread.is_alive():
+            logging.warning('Frame-ring consumer did not stop within %.0fs', self.FRAME_RING_DRAIN_TIMEOUT_S)
+        dropped = self.frame_ring.dropped
+        pushed = self.frame_ring.pushed
+        if dropped:
+            logging.warning('Frame ring dropped %d of %d frames this acquisition (consumer could not keep up)', dropped, pushed)
+        else:
+            logging.info('Frame ring handed over %d frames, none dropped', pushed)
+
     def _try_write_frame_to_zarr(self, image: np.ndarray, metadata: dict):
         """Write a single frame to the multiDstack zarr array, bypassing the vis queue.
 
-        Called from the frameReady callback thread; zarr supports concurrent writes to
-        non-overlapping chunks so this is safe alongside the vis worker.
+        Called from the frame-ring consumer thread (T-A7 moved it off the frameReady
+        callback, which runs on pymmcore-plus' own MDA thread); zarr supports concurrent
+        writes to non-overlapping chunks so this is safe alongside the vis worker.
         """
         layerName = self.shared_data.newestLayerName
         if not layerName:
@@ -811,6 +920,11 @@ class napariHandler:
                             logging.info('Connected to PymmCore!')
 
 
+                            #Frame-ring consumer first: the frameReady callback below is a
+                            #pure hand-off into the ring, so a consumer has to be draining it
+                            #before the first frame can arrive. Live mode is display-only, so
+                            #the shallow (drop-oldest) ring is the right one.
+                            self._start_frame_ring_consumer(needs_every_frame=False)
                             #Connect the live update to this upcoming MDA
                             connected_callback = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.frameReady, self.grab_image_liveVis_PyMMCore)
                             #Create the MDA plan
@@ -844,8 +958,10 @@ class napariHandler:
                             while self.shared_data.MILcore.core.mda.is_running():
                                 time.sleep(0.01)
 
-                            #When it's done, disconnect the callback
+                            #When it's done, disconnect the callback, then let the consumer
+                            #drain whatever the ring still holds before it exits.
                             self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
+                            self._stop_frame_ring_consumer()
                             logging.info('Finished live!')
                         else: #Pycromanager backend, either JAVA or Python
                             if shared_data.config.mda_config.backend_method == 'saved':
@@ -921,6 +1037,11 @@ class napariHandler:
                         logging.info('Connected to PymmCore!')
                         acq=None
 
+                        #Frame-ring consumer first — see the live-mode branch above. On the
+                        #multiDstack path the consumer also writes every frame into zarr, where
+                        #a dropped frame is a permanently black slice, so it gets the deep ring.
+                        self._start_frame_ring_consumer(
+                            needs_every_frame=self.shared_data.config.mda_config.vis_method == 'multiDstack')
                         #Connect the live update to this upcoming MDA
                         connected_callback = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.frameReady, self.grab_image_liveVis_PyMMCore)
                         connected_callback_finishedAcq = _connect_mda_signal_direct(self.shared_data.MILcore.core.mda.events.sequenceFinished, self.PyMMCore_finishedAcqCallback)
@@ -944,8 +1065,11 @@ class napariHandler:
                         while self.shared_data.MILcore.core.mda.is_running():
                             time.sleep(0.01)
 
-                        #When it's done, disconnect the callback
+                        #When it's done, disconnect the callback, then let the consumer drain
+                        #the ring — the multiDstack finalisation pass below must not run while
+                        #frames are still pending a zarr write.
                         self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
+                        self._stop_frame_ring_consumer()
                         self.shared_data.MILcore.core.mda.events.sequenceStarted.disconnect(connected_callback_startedAcq)
                         # self.shared_data.MILcore.core.mda.events.sequenceFinished.disconnect(connected_callback_finishedAcq)
                         # self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
@@ -994,6 +1118,10 @@ class napariHandler:
                 #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
                 cleanUpTemporaryFiles(shared_data=self.shared_data)
         finally:
+            # Safety net: if run_mda() or an Acquisition raised, the in-branch
+            # _stop_frame_ring_consumer() never ran and the consumer thread would
+            # outlive the acquisition. Idempotent when it already stopped.
+            self._stop_frame_ring_consumer()
             self._worker_stopped_event.set()
 
 
