@@ -142,6 +142,13 @@ addopts = "-ra -p no:napari -p no:npe2 -p no:napari_plugin_engine"
 # PyQt6 from napari[all]'s install and our tests then refuse to import
 # PyQt5 over the top.
 qt_api = "pyqt5"
+# The seven tests that spawn a real multiprocessing worker cost ~80s of the
+# suite's ~140s wall time on Windows -- inherent `spawn` re-import cost, not
+# waste. They are marked `slow`: `pytest -m "not slow"` runs the other 345 in
+# ~60s. Plain `pytest` still runs everything, so nothing rots silently.
+markers = [
+    "slow: spawns a real subprocess; several seconds each (deselect with -m 'not slow')",
+]
 
 [tool.setuptools.packages.find]
 # Auto-discover every subpackage (Core, GUI, AutonomousMicroscopy/*, …)

@@ -32,6 +32,7 @@ def _make_channels(mp_ctx):
     return in_queue, out_queue, stop_event
 
 
+@pytest.mark.slow
 def test_worker_without_control_queues_still_works(mp_ctx):
     """Regression guard: existing callers that don't pass control_in_queue/
     control_out_queue (default None) must be unaffected."""
@@ -56,6 +57,7 @@ def test_worker_without_control_queues_still_works(mp_ctx):
         assert not proc.is_alive()
 
 
+@pytest.mark.slow
 def test_profiling_start_stop_round_trip_does_not_disturb_frames(mp_ctx):
     in_queue, out_queue, stop_event = _make_channels(mp_ctx)
     control_in_queue = mp_ctx.Queue(maxsize=2)
