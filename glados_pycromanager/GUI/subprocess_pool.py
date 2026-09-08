@@ -31,6 +31,14 @@ def _blank_worker_bootstrap(assign_queue, ready_queue):
     # with their own heavy libraries, extend this list (or generalize via an
     # optional "__prewarm_imports__" key in a node's __function_metadata__).
     try:
+        # diplib.viewer assumes IPython.terminal.pt_inputhooks is already an
+        # attribute of IPython.terminal whenever 'IPython' is in sys.modules,
+        # but modern IPython only sets that attribute once the submodule has
+        # actually been imported -- pre-import it ourselves to dodge diplib's
+        # `terminal.pt_inputhooks.register(...)` AttributeError.
+        import sys
+        if 'IPython' in sys.modules:
+            import IPython.terminal.pt_inputhooks  # noqa: F401
         import diplib  # noqa: F401
     except ImportError:
         pass

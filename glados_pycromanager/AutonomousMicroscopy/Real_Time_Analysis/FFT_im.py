@@ -55,6 +55,13 @@ class RealTimeFFT:
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(), class_name, kwargs) #type:ignore
 
+        # diplib.viewer assumes IPython.terminal.pt_inputhooks is already an
+        # attribute of IPython.terminal whenever 'IPython' is in sys.modules,
+        # but modern IPython only sets that attribute once the submodule has
+        # actually been imported -- pre-import it ourselves to dodge diplib's
+        # `terminal.pt_inputhooks.register(...)` AttributeError.
+        if 'IPython' in sys.modules:
+            import IPython.terminal.pt_inputhooks  # noqa: F401
         import diplib as dip
         self._dip = dip
 
