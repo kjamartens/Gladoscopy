@@ -172,7 +172,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 ### Tier C — Live mode is a 999-frame MDA
 
-- [ ] **T-C1** Continuous-sequence primitives in MIL — M, needs B1
+- [x] **T-C1** Continuous-sequence primitives in MIL — M, needs B1
 - [ ] **T-C2** `live_mode_method` / `live_pull_policy` settings — S, needs C1
 - [ ] **T-C3** `run_liveSequence_worker` — **L**, needs C1, C2, A7 — **stop point**
 - [ ] **T-C4** Guard `multiDstack` + live — S, needs C3

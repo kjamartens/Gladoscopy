@@ -1114,3 +1114,68 @@ live mode): live mode started, the "Live" layer was created and updated
 (126 `napariUpdateLive` calls), and teardown logged
 `Frame ring handed over 160 frames, none dropped`. Not tested: real hardware, and
 a multiDstack MDA with a slow disk (the case the 256-deep ring exists for).
+
+---
+
+## 2026-09-08 — T-C1: verified backend APIs, one normalised return shape, ROI-derived shape cache
+
+**Context.** T-C1 adds the six circular-buffer primitives MIL was missing
+(`start_continuous_sequence_acquisition`, `is_sequence_running`,
+`get_remaining_image_count`, `pop_next_image_and_metadata`,
+`get_last_image_and_metadata`, `clear_circular_buffer`). Nothing calls them yet —
+T-C3 does.
+
+**Decision 1 — the plan's API table was re-verified, not trusted.** Against the
+installed stack (pymmcore 12.5.0.75.0, pymmcore-plus 0.18.1): `CMMCorePlus` has
+all six camelCase names including the `popNextImageAndMD` /`getLastImageAndMD`
+convenience pair (both return `tuple[np.ndarray, Metadata]`, both reshape via
+`fix=True`). Plain `pymmcore.CMMCore` has *no* snake_case at all — the snake_case
+surface comes from mmpycorex's generated `CMMCoreSnakeCase` subclass, and
+`_camel_to_snake` was run over each name to confirm the exact spelling
+(`getLastImageMD` -> `get_last_image_md`, `popNextImageMD` ->
+`pop_next_image_md`). `pop_next_tagged_image` / `get_tagged_image` are injected
+onto the *instance* by `launcher.py`, not inherited. The table held; no
+substitutions were needed.
+
+**Decision 2 — one normalised return shape, `(2-D ndarray, dict)`.** Three
+backends return three different things (a `(ndarray, Metadata)` tuple, a
+`TaggedImage`, and a flat SWIG buffer plus a `Metadata` out-parameter). Rather
+than let T-C3's live worker branch on the backend, MIL normalises: a shared
+`_metadata_to_dict()` handles the Mapping case (`pymmcore_plus.Metadata`, and a
+tagged image's `.tags`) and falls back to the `GetKeys()`/`GetSingleTag()` walk
+that mmpycorex's own shim uses for raw SWIG `Metadata`. It returns `{}` rather
+than raising on an unrecognised metadata object — a frame with no metadata is
+still a usable frame, and the live path must not die on one.
+
+**Decision 3 — reshape prefers the frame's own tags over the cached ROI.** The
+task asked for a `_image_shape_cache`; it is there and follows the existing
+`_exposure_cache`/`_pixel_size_um_cache` idiom exactly (init in `__init__`,
+invalidate in `set_core`, `set_roi` and `clear_roi`, plus a public
+`invalidate_image_shape_cache()`). But `_reshape_if_flat()` uses the frame's own
+`Height`/`Width` tags first when it carries them, and only falls back on the
+cache. A frame that arrived before an ROI change then still reshapes correctly
+instead of raising, and the cache stays a fallback rather than the sole source of
+truth.
+
+**Decision 4 — the caches are *not* the lock-free kind.** Unlike `get_exposure` /
+`get_pixel_size_um`, `_get_image_shape()` has no pre-lock fast path: it is only
+ever reached from inside an already-`@_hardware_locked` method, so a second
+acquisition of the re-entrant lock is free and a separate double-checked fast
+path would be dead code.
+
+**Decision 5 — `get_image`'s NumPy 2.1 bug fixed here as the task's step 3 asks.**
+`np.reshape(pix, newshape=[...])` on the Java branch had been raising since the
+numpy 2.2.6 pin (the `newshape` keyword was removed in 2.1), so that branch was
+dead. It now routes through `_reshape_if_flat` and takes **one** bridge attribute
+fetch (`.pix`) instead of three (`.pix`, `.tags["Height"]`, `.tags["Width"]`).
+
+**Verification.** `pytest -q`: 397 passed (up from 352; 45 new). New coverage in
+`tests/test_mil_dispatch.py`: the four one-liner primitives joined both existing
+parameterized dispatch tables (MMCore-Plus camelCase and the two snake_case
+backends) and the unknown-backend table; the two frame-pulling primitives got
+dedicated per-backend return-shape tests; the shape cache got read-once and
+invalidate-on-`set_roi`/`clear_roi`/`set_core` tests; `get_image` got a
+regression test that would have caught the `newshape=` bug. `tests/fakes/fake_mil.py`
+gained an in-memory circular buffer (`push_frame()` fills it) with FIFO-pop /
+LIFO-peek parity tests. No manual check: these methods have no caller until T-C3,
+and no hardware was available.

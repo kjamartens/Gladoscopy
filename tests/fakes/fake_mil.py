@@ -70,6 +70,14 @@ class FakeMicroscopeInterfaceLayer:
         self._snap_calls: int = 0
         self._image: np.ndarray = np.zeros((512, 512), dtype=np.uint16)
 
+        # Circular-buffer emulation for the continuous-sequence primitives
+        # (T-C1). Frames are pushed in with `push_frame()`; nothing here
+        # generates them, so a test decides exactly what the buffer holds.
+        self._seq_running: bool = False
+        self._continuous_starts: list[float] = []
+        self._circular_buffer: list[tuple[np.ndarray, dict]] = []
+        self._clear_buffer_calls: int = 0
+
     # ----- lifecycle -------------------------------------------------
 
     def set_core(self, core):
@@ -147,6 +155,13 @@ class FakeMicroscopeInterfaceLayer:
     def get_image_height(self) -> int:
         return int(self._image.shape[0])
 
+    def get_last_image_and_metadata(self) -> tuple[np.ndarray, dict]:
+        """Newest buffered frame, left in the buffer (`latest` pull policy)."""
+        if not self._circular_buffer:
+            raise IndexError("circular buffer is empty")
+        image, metadata = self._circular_buffer[-1]
+        return image.copy(), dict(metadata)
+
     def get_loaded_devices(self) -> list:
         return list(self._devices.keys())
 
@@ -178,6 +193,9 @@ class FakeMicroscopeInterfaceLayer:
     def get_property_upper_limit(self, device_name, property_name) -> float:
         return self._devices[device_name].properties[property_name].upper_limit or 0.0
 
+    def get_remaining_image_count(self) -> int:
+        return len(self._circular_buffer)
+
     def get_roi(self):
         return self._roi
 
@@ -199,6 +217,16 @@ class FakeMicroscopeInterfaceLayer:
 
     def get_device_type(self, device_name) -> int:
         return self._devices.get(device_name, _Device(device_name)).type
+
+    def is_sequence_running(self) -> bool:
+        return self._seq_running
+
+    def pop_next_image_and_metadata(self) -> tuple[np.ndarray, dict]:
+        """Oldest buffered frame, removed (`sequential` pull policy)."""
+        if not self._circular_buffer:
+            raise IndexError("circular buffer is empty")
+        image, metadata = self._circular_buffer.pop(0)
+        return image, metadata
 
     # ----- write methods ---------------------------------------------
 
@@ -245,11 +273,20 @@ class FakeMicroscopeInterfaceLayer:
     def set_shutter_open(self, open_shutter: bool) -> None:
         self._shutter_open = bool(open_shutter)
 
+    def clear_circular_buffer(self) -> None:
+        self._clear_buffer_calls += 1
+        self._circular_buffer.clear()
+
     def snap_image(self) -> None:
         self._snap_calls += 1
 
+    def start_continuous_sequence_acquisition(self, interval_ms: float = 0) -> None:
+        self._continuous_starts.append(float(interval_ms))
+        self._seq_running = True
+
     def stop_sequence_acquisition(self) -> None:
         self._stop_seq_calls += 1
+        self._seq_running = False
 
     def wait_for_system(self) -> None:
         self._wait_calls += 1
@@ -259,6 +296,14 @@ class FakeMicroscopeInterfaceLayer:
     def set_image(self, image: np.ndarray) -> None:
         """Pre-load the bytes that the next `get_image()` returns."""
         self._image = np.asarray(image)
+
+    def push_frame(self, image: np.ndarray, metadata: dict | None = None) -> None:
+        """Append one frame to the emulated circular buffer.
+
+        The real buffer is filled by the camera; here a test fills it
+        explicitly so pop/peek ordering can be asserted.
+        """
+        self._circular_buffer.append((np.asarray(image), dict(metadata or {})))
 
     # ----- explicit gap -----------------------------------------------
 

@@ -65,7 +65,7 @@ is the standalone plan that enforces them — but new code must follow them.
   bandwidth from the frame path. `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` have no such lock.
   **As of T-B1 this is enforced at the MIL level:** `MicroscopeInterfaceLayer` holds a
   per-instance `threading.RLock` (`_hw_lock`) and applies it via the `@_hardware_locked`
-  decorator to every public method that touches `self.core` (43 of them). Re-entrant
+  decorator to every public method that touches `self.core` (53 applications today). Re-entrant
   because MIL methods compose (`get_image_width()` → `get_roi()`), and deliberately
   untimed — a deadlock should be diagnosed, not skipped. `get_exposure` /
   `get_pixel_size_um` are the two exceptions: their cache-hit fast path returns *before*
@@ -83,6 +83,19 @@ is the standalone plan that enforces them — but new code must follow them.
 `MicroscopeInterfaceLayer` is the abstraction over three mutually exclusive backends, identified via the `MicroscopeInstance` enum: `PYCROMANAGER_JAVA`, `PYCROMANAGER_PYTHON`, `MMCORE_PLUS`. Code that needs to talk to the microscope should go through `MIL`, branching on `mil.get_microscope_interface()` (alias `MI()` / `get_MI()`). The user picks the backend in the headless start dialog (`headlessGUI` in `GUI_napari.py`) — this writes `shared_data.config.micromanager_config.headless_backend`.
 
 **Backend choice and throughput:** `PYCROMANAGER_JAVA` crosses a Java↔Python bridge (Py4J/PyJavaZ) for every call and every live-mode frame reaching `image_process_fn` — documented by Pycromanager as capped around ~100 MB/s, and this codebase independently measured ~257ms for an uncached Java-bridge round trip (see the `get_exposure`/`get_pixel_size_um` caching in `microscopeInterfaceLayer.py`). `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` both bind straight to MMCore (no Java/bridge hop) and are the faster choice when live frame rate matters most; prefer `PYCROMANAGER_JAVA` only when a feature specifically requires the Java Micro-Manager engine. Note `max_memory_mb` (headless-server memory cap) is not settable on `MMCORE_PLUS` — only `buffer_mb` (circular buffer footprint) applies there; `GUI_napari.py` logs a warning when this backend is selected.
+
+MIL also exposes the **circular-buffer / continuous-sequence primitives** (T-C1):
+`start_continuous_sequence_acquisition(interval_ms=0)`, `is_sequence_running()`,
+`get_remaining_image_count()`, `pop_next_image_and_metadata()`,
+`get_last_image_and_metadata()`, `clear_circular_buffer()`. These are the
+engine-free path a real live mode uses (MM's own live window, napari-micromanager)
+— no `MDAEvent`, no per-frame pydantic validation. The two frame-pulling methods
+normalise all three backends' return shapes to `(2-D np.ndarray, dict)` via
+`_metadata_to_dict()` / `_reshape_if_flat()`; the latter prefers the frame's own
+`Height`/`Width` tags and falls back on `_image_shape_cache` (ROI-derived,
+invalidated in `set_core`/`set_roi`/`clear_roi`, same idiom as the exposure and
+pixel-size caches). Nothing calls them yet — T-C3 of `claude_throughput_project.md`
+replaces the 999-frame-MDA live loop with them.
 
 `Core/MDAGlados.py` is the multi-dimensional acquisition layer that talks to MIL.
 

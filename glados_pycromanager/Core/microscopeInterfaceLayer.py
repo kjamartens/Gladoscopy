@@ -38,6 +38,7 @@ import numpy as np
 from pycromanager import Core as PycroManagerCore
 from pycromanager import JavaObject, multi_d_acquisition_events
 from pymmcore import CMMCore as PymmcoreCore
+from pymmcore import Metadata as PymmcoreMetadata
 from pymmcore_plus import CMMCorePlus as PymmcorePlusCore
 
 from glados_pycromanager.errors import BackendError, MDAEventError
@@ -85,6 +86,11 @@ class MicroscopeInterfaceLayer:
         # per-displayed-frame Java-bridge round trip. Invalidated in
         # set_exposure() so a user-changed exposure is picked up immediately.
         self._exposure_cache: float | None = None
+        # T-C1: the circular-buffer primitives reshape flat pixel buffers
+        # once per popped frame, so the (height, width) they reshape to
+        # cannot come from a per-frame get_roi() call. Invalidated wherever
+        # the frame geometry can change: set_core(), set_roi(), clear_roi().
+        self._image_shape_cache: tuple[int, int] | None = None
         self.mda: dict | None = None
 
     @_hardware_locked
@@ -106,6 +112,7 @@ class MicroscopeInterfaceLayer:
         self._mi = self._detect_microscope_instance(core)
         self._pixel_size_um_cache = None  # invalidate on core change
         self._exposure_cache = None  # invalidate on core change
+        self._image_shape_cache = None  # invalidate on core change
         if self._mi is MicroscopeInstance.UNKNOWN:
             logger.warning(
                 "MIL.set_core: backend type %r not recognised as Pycromanager/"
@@ -193,7 +200,90 @@ class MicroscopeInterfaceLayer:
         # If the vector contains strings, the dtype will be object or string
         return np.array(python_list, dtype=object) # Use dtype=object for mixed types or strings
 
+    # ---- circular-buffer normalisation helpers (T-C1) ----------------
+    #
+    # The continuous-sequence primitives below must hand every caller the
+    # same thing regardless of backend -- a 2-D ndarray plus a plain dict --
+    # so the normalisation lives here instead of being repeated in each
+    # dispatch method.
+
+    @staticmethod
+    def _metadata_to_dict(md) -> dict:
+        """Normalise a backend metadata object to a plain ``dict``.
+
+        ``pymmcore_plus``'s ``Metadata`` is already a ``Mapping`` and the
+        tagged-image backends hand back a dict-alike ``.tags``; the raw SWIG
+        ``pymmcore.Metadata`` is neither and needs the
+        ``GetKeys()``/``GetSingleTag()`` walk that mmpycorex's own
+        ``pop_next_tagged_image`` shim uses.
+        """
+        if md is None:
+            return {}
+        try:
+            return dict(md)
+        except (TypeError, ValueError):
+            pass
+        try:
+            return {key: md.GetSingleTag(key).GetValue() for key in md.GetKeys()}
+        except Exception as exc:  # pragma: no cover -- unknown metadata shape
+            logger.debug(
+                "Could not convert metadata object of type %r to dict: %s",
+                type(md).__name__, exc,
+            )
+            return {}
+
+    def _get_image_shape(self) -> tuple[int, int]:
+        """Return the cached ``(height, width)`` of one camera frame.
+
+        Read once per popped frame on the live path, so it must not hit the
+        hardware every time -- the same reasoning behind the exposure and
+        pixel-size caches.
+        """
+        if self._image_shape_cache is None:
+            roi = self.get_roi()
+            # ROI is (x, y, width, height); cf. get_image_width/get_image_height.
+            self._image_shape_cache = (int(roi[3]), int(roi[2]))
+        return self._image_shape_cache
+
+    def invalidate_image_shape_cache(self) -> None:
+        """Force the next frame reshape to re-read the ROI."""
+        self._image_shape_cache = None
+
+    def _reshape_if_flat(self, pix, tags: dict | None = None) -> np.ndarray:
+        """Return ``pix`` as a 2-D array, reshaping a flat buffer if needed.
+
+        ``popNextImageAndMD`` reshapes for us (``fix=True``), but the SWIG and
+        Java tagged-image paths hand back a flat buffer. Prefer the frame's
+        own Height/Width tags when it carries them, and fall back on the
+        cached ROI shape when it does not.
+        """
+        arr = np.asarray(pix)
+        if arr.ndim != 1:
+            return arr
+        if tags:
+            try:
+                return arr.reshape(int(tags["Height"]), int(tags["Width"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+        return arr.reshape(self._get_image_shape())
+
     #Callables
+    @_hardware_locked
+    def clear_circular_buffer(self) -> None:
+        """Discard every frame currently sitting in the circular buffer.
+
+        Called before starting a continuous sequence so the first displayed
+        frame is not a stale one left over from the previous run.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.clear_circular_buffer()
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.clear_circular_buffer()
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.clearCircularBuffer()
+        else:
+            raise ValueError("Unsupported microscope interface type for clear_circular_buffer.")
+
     @_hardware_locked
     def clear_roi(self) -> None:
         """
@@ -207,6 +297,7 @@ class MicroscopeInterfaceLayer:
             self.core.clearROI()
         else:
             raise ValueError("Unsupported microscope interface type for clear_roi.")
+        self.invalidate_image_shape_cache()
 
     @_hardware_locked
     def get_auto_shutter(self) -> bool:
@@ -395,8 +486,12 @@ class MicroscopeInterfaceLayer:
         The image is returned as a 2D array for grayscale images.
         """
         if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            newImage = self.core.get_tagged_image()
-            return np.reshape(newImage.pix, newshape=[newImage.tags["Height"], newImage.tags["Width"]])
+            # One bridge round trip for the pixels, then the cached ROI shape.
+            # The old code fetched .pix, .tags["Height"] and .tags["Width"]
+            # separately -- three Java-bridge attribute fetches per frame --
+            # and passed `newshape=`, a np.reshape keyword removed in NumPy
+            # 2.1 (this project pins 2.2.6, so that call always raised).
+            return self._reshape_if_flat(self.core.get_tagged_image().pix)
         elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return np.asarray(self.core.get_image())
         elif self._mi == MicroscopeInstance.MMCORE_PLUS:
@@ -418,6 +513,32 @@ class MicroscopeInterfaceLayer:
         """
         return self.get_roi()[3]
     
+    @_hardware_locked
+    def get_last_image_and_metadata(self) -> tuple[np.ndarray, dict]:
+        """Return the newest frame in the circular buffer without removing it.
+
+        This is the ``live_pull_policy == 'latest'`` primitive (T-C2): the
+        display wants the most recent frame and does not care how many it
+        skipped, so nothing is consumed and the buffer cannot overflow.
+
+        Returns a backend-blind ``(2-D ndarray, dict)``.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            tagged = self.core.get_last_tagged_image()
+            tags = self._metadata_to_dict(tagged.tags)
+            return self._reshape_if_flat(tagged.pix, tags), tags
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            md = PymmcoreMetadata()
+            pix = self.core.get_last_image_md(0, 0, md)
+            tags = self._metadata_to_dict(md)
+            return self._reshape_if_flat(pix, tags), tags
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            pix, md = self.core.getLastImageAndMD()
+            tags = self._metadata_to_dict(md)
+            return self._reshape_if_flat(pix, tags), tags
+        else:
+            raise ValueError("Unsupported microscope interface type for get_last_image_and_metadata.")
+
     @_hardware_locked
     def get_loaded_devices(self) -> list:
         """
@@ -530,6 +651,23 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for get_property_upper_limit.")
     
+    @_hardware_locked
+    def get_remaining_image_count(self) -> int:
+        """Number of frames waiting in the circular buffer.
+
+        Poll this before :meth:`pop_next_image_and_metadata` -- popping an
+        empty buffer raises on every backend. A count that keeps climbing
+        means the consumer is slower than the camera.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return self.core.get_remaining_image_count()
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return self.core.get_remaining_image_count()
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            return self.core.getRemainingImageCount()
+        else:
+            raise ValueError("Unsupported microscope interface type for get_remaining_image_count.")
+
     @_hardware_locked
     def get_roi(self):
         """
@@ -658,6 +796,46 @@ class MicroscopeInterfaceLayer:
             return [0,0]
         
     @_hardware_locked
+    def is_sequence_running(self) -> bool:
+        """Whether a (continuous or finite) sequence acquisition is running."""
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return self.core.is_sequence_running()
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return self.core.is_sequence_running()
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            return self.core.isSequenceRunning()
+        else:
+            raise ValueError("Unsupported microscope interface type for is_sequence_running.")
+
+    @_hardware_locked
+    def pop_next_image_and_metadata(self) -> tuple[np.ndarray, dict]:
+        """Remove and return the oldest frame in the circular buffer.
+
+        This is the ``live_pull_policy == 'sequential'`` primitive (T-C2):
+        every frame is delivered in order, at the cost of overflowing the
+        buffer if the consumer falls behind. Guard the call with
+        :meth:`get_remaining_image_count`.
+
+        Returns a backend-blind ``(2-D ndarray, dict)``.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            tagged = self.core.pop_next_tagged_image()
+            tags = self._metadata_to_dict(tagged.tags)
+            return self._reshape_if_flat(tagged.pix, tags), tags
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            # mmpycorex injects pop_next_tagged_image onto the snake_case
+            # CMMCore subclass (launcher.py) -- it is not a CMMCore method.
+            tagged = self.core.pop_next_tagged_image()
+            tags = self._metadata_to_dict(tagged.tags)
+            return self._reshape_if_flat(tagged.pix, tags), tags
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            pix, md = self.core.popNextImageAndMD()
+            tags = self._metadata_to_dict(md)
+            return self._reshape_if_flat(pix, tags), tags
+        else:
+            raise ValueError("Unsupported microscope interface type for pop_next_image_and_metadata.")
+
+    @_hardware_locked
     def set_auto_shutter(self, auto_shutter: bool) -> None:
         """
         Set the auto shutter state.
@@ -772,6 +950,7 @@ class MicroscopeInterfaceLayer:
             self.core.setROI(roi[0], roi[1], roi[2], roi[3])
         else:
             raise ValueError("Unsupported microscope interface type for set_roi.")
+        self.invalidate_image_shape_cache()
     
     @_hardware_locked
     def set_shutter_device(self, shutter_device: str) -> None:
@@ -814,6 +993,30 @@ class MicroscopeInterfaceLayer:
             self.core.snapImage()
         else:
             raise ValueError("Unsupported microscope interface type for snapping image.")
+
+    @_hardware_locked
+    def start_continuous_sequence_acquisition(self, interval_ms: float = 0) -> None:
+        """Start a free-running acquisition into the circular buffer.
+
+        The camera runs as fast as its exposure allows and drops frames into
+        the circular buffer; no acquisition engine, no ``MDAEvent``, no
+        per-frame pydantic validation. This is what MM's own live window,
+        napari-micromanager and any plain pycromanager script use, and it is
+        what T-C3's live worker will pull from. ``interval_ms=0`` means "as
+        fast as the camera allows".
+
+        Stop it with :meth:`stop_sequence_acquisition`.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.start_continuous_sequence_acquisition(interval_ms)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.start_continuous_sequence_acquisition(interval_ms)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.startContinuousSequenceAcquisition(interval_ms)
+        else:
+            raise ValueError(
+                "Unsupported microscope interface type for start_continuous_sequence_acquisition."
+            )
 
     @_hardware_locked
     def stop_sequence_acquisition(self) -> None:
