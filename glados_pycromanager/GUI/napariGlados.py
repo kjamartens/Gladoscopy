@@ -101,6 +101,32 @@ def _get_contrast_frame_counters(shared_data):
     return counters
 
 
+def _get_contrast_refresh_interval(shared_data):
+    """Cached `visualisation_config.contrast_refresh_every_n_frames`.
+
+    The raw config value can be a string (it comes back from a QLineEdit), so it
+    needs an int() parse + clamp; doing that on every displayed frame is pure
+    waste. Cached on shared_data and invalidated by
+    `invalidate_contrast_refresh_interval()`, which the Advanced Settings save
+    handler calls.
+    """
+    n = getattr(shared_data, '_contrast_refresh_interval_cache', None)
+    if n is None:
+        try:
+            n = max(1, int(shared_data.config.visualisation_config.contrast_refresh_every_n_frames))
+        except (TypeError, ValueError):
+            logging.warning('Invalid contrast_refresh_every_n_frames %r; falling back to 10',
+                            shared_data.config.visualisation_config.contrast_refresh_every_n_frames)
+            n = 10
+        shared_data._contrast_refresh_interval_cache = n
+    return n
+
+
+def invalidate_contrast_refresh_interval(shared_data):
+    """Drop the cached contrast-refresh interval so the next frame re-reads it."""
+    shared_data._contrast_refresh_interval_cache = None
+
+
 def _maybe_refresh_contrast(shared_data, layer, layerName):
     """Recompute contrast limits every Nth frame instead of every frame.
 
@@ -113,7 +139,7 @@ def _maybe_refresh_contrast(shared_data, layer, layerName):
     (default 10); set to 1 to recompute every frame (previous behavior).
     """
     counters = _get_contrast_frame_counters(shared_data)
-    n = max(1, int(shared_data.config.visualisation_config.contrast_refresh_every_n_frames))
+    n = _get_contrast_refresh_interval(shared_data)
     count = counters.get(layerName, 0) + 1
     counters[layerName] = count
     if count % n == 0:
@@ -141,7 +167,8 @@ def _should_display_now(shared_data, now=None):
     if now is None:
         now = time.time()
     #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
-    min_delay_time = np.min(((50/1000),(float(shared_data.MILcore.get_exposure())*0.99)/1000)) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
+    # builtin min() on two scalars -- np.min() here allocated a numpy array per call.
+    min_delay_time = min(50/1000, (float(shared_data.MILcore.get_exposure())*0.99)/1000) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
     display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
 
     elapsed = now - shared_data.last_display_update_time
@@ -404,11 +431,11 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                         
                     shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = latestImage 
                     
-                    #set the napariViewer to the correct slice:
-                    for dim_id in range(len(n_entries_in_dims)):
-                        currentSlice = metadata['Axes'][dimensionOrder[dim_id]]
-                        currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
-                        napariViewer.dims.set_current_step(dim_id,int(currentSliceID))
+                    #set the napariViewer to the correct slice: reuse the indices
+                    #already computed for sliceTuple above rather than re-running
+                    #the same searchsorted per dimension a second time.
+                    for dim_id, currentSliceID in enumerate(sliceTuple):
+                        napariViewer.dims.set_current_step(dim_id,currentSliceID)
                     
                     #Store exactly which axes is rendered
                     shared_data.allMDAslicesRendered[len(shared_data.allMDAslicesRendered)] = metadata['Axes']

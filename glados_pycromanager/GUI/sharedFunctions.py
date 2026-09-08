@@ -348,11 +348,13 @@ class Shared_data(QObject):
         self._RunningLocally = not self._RunningViaPIP
         
         
-    def __setattr__(self, name, value):
-        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
-            logging.debug("Setting attribute %s", name)  # omit value — may be large array
-        super().__setattr__(name, value)
-    
+    # NOTE: Shared_data deliberately does NOT override __setattr__. It used to,
+    # purely to log every attribute write at DEBUG -- which called
+    # logging.getLogger() 4-6 times per displayed frame on the GUI thread for no
+    # diagnostic value that the targeted log lines don't already provide.
+    # (The liveMode/mdaMode transitions, which are the writes worth tracing, have
+    # their own property setters with their own logging.)
+
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)

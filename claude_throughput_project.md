@@ -158,7 +158,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-A1** Delete unused per-frame `metadata_refactor` — S, no deps
 - [x] **T-A2** Remove the O(n^2) queue fan-out — S, no deps
 - [x] **T-A3** Gate frames before the thread hop — M, no deps
-- [ ] **T-A4** Display-path micro-fixes — S, no deps
+- [x] **T-A4** Display-path micro-fixes — S, no deps
 - [ ] **T-A5** Delete dead per-frame signals and helpers — S, no deps
 - [ ] **T-A6** Gate eager per-frame log formatting — S, no deps
 - [ ] **T-A7** Ring buffer; acquisition callback becomes a pure hand-off — **L**, needs A1-A3

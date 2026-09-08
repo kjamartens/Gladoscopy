@@ -3419,6 +3419,14 @@ def openAdvancedSettings(shared_data):
             if update_log_level is not None:
                 update_log_level(shared_data.config.logging_config.log_level)
 
+        # The live-display path caches the parsed contrast-refresh interval;
+        # drop it so a changed value takes effect on the next frame.
+        try:
+            from glados_pycromanager.GUI.napariGlados import invalidate_contrast_refresh_interval
+            invalidate_contrast_refresh_interval(shared_data)
+        except Exception as exc:
+            logging.warning("Could not invalidate contrast-refresh cache: %s", exc)
+
         logging.info('advanced settings stored!')
         dialog.close()
         pass
