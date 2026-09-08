@@ -94,6 +94,10 @@ Keep it on new top-level modules under `glados_pycromanager/` if they're meant t
 
 User-facing docs live at `glados_pycromanager/Documentation/UserManual.md`; the developer overview is at `glados_pycromanager/Documentation/index.html`. Images are in `glados_pycromanager/Documentation/Images/`.
 
+### Keep this file current
+
+Whenever you explore code in this repo and find a module, pattern, or behavior that isn't captured above, add a concise note to the relevant section here (or a new section if none fits) before finishing the task — don't wait to be asked. This applies any time it happens, not just during the optimization plan. Keep additions terse and factual (what/where/why-it-matters), matching the style already used above; prefer extending an existing bullet over adding a new subsection when the topic already has a home. The goal is for each session to leave this file slightly more complete than it found it, so future sessions ramp up faster.
+
 ## Optimization plan & "continue" protocol
 
 There is a long-form optimization roadmap at `claude_project.md`. It defines a
