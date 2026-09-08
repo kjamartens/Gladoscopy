@@ -1179,3 +1179,88 @@ regression test that would have caught the `newshape=` bug. `tests/fakes/fake_mi
 gained an in-memory circular buffer (`push_frame()` fills it) with FIFO-pop /
 LIFO-peek parity tests. No manual check: these methods have no caller until T-C3,
 and no hardware was available.
+
+---
+
+## 2026-09-08 — T-C3: where the dispatch lives, `latest` semantics, and what the A/B actually proves
+
+**Context.** Live mode stops being a `live_mode_nr_frames`-long MDA restarted in a
+loop and becomes a continuous sequence acquisition read out of the circular
+buffer, gated on `live_mode_method` (T-C2).
+
+**Decision 1 — dispatch as an `elif` inside the existing loop, not a re-indent.**
+The live branch of `run_MILCoreAcquisition_worker` is
+`while self.acqstate: if mdaMode: ... else: <150 lines>`. Wrapping that in a new
+`if live_mode_method == 'sequence': ... else:` would have re-indented every one
+of those lines, burying a three-line behaviour change in a whole-branch diff.
+Instead `run_liveSequence_worker` is an `elif` arm between the two, and it blocks
+until `self.acqstate` goes False so the enclosing `while` exits by itself. The
+legacy path is byte-for-byte untouched, which is what makes the `mda` escape
+hatch worth having.
+
+**Decision 2 — `latest` peeks and then clears; anything not `sequential` is `latest`.**
+`get_last_image_and_metadata()` consumes nothing, so without the following
+`clear_circular_buffer()` the frames the display skipped would accumulate until
+the buffer overflowed — the peek would be safe but the buffer would not. The
+policy check is `policy != 'sequential'` rather than `policy == 'latest'`: a
+hand-edited config JSON can hold any string, and the failure mode of an
+unrecognised value must be the one that cannot overflow. There is a test for it.
+
+**Decision 3 — hardware constants are read once per acquisition, not per frame.**
+`Exposure`, `PixelSize_um` and `ROI` are `@_hardware_locked` MIL calls; reading
+them per frame would put the live loop in lock contention with the GUI thread's
+stage and config calls (and, on PYCROMANAGER_JAVA, add three bridge round trips
+per frame). They are captured into a `constants` dict after the sequence starts
+and merged into each frame's metadata. Consequence: changing exposure mid-live
+does not update the metadata until live is restarted. Acceptable — the value is
+informational on this path, and `set_exposure()` already invalidates MIL's own
+exposure cache for everything that reads it live.
+
+**Decision 4 — the poll interval is a named constant, and it is not zero.**
+`LIVE_SEQUENCE_POLL_S = 0.0005`. Well inside one frame interval at any realistic
+exposure, so latency stays camera-bound, but non-zero because every poll is one
+`@_hardware_locked` `get_remaining_image_count()` — a bridge round trip on
+PYCROMANAGER_JAVA and a lock acquisition shared with the GUI thread everywhere.
+A busy-wait here would starve the very thread this task is trying to speed up.
+Proper fix is T-B3's single-owner dispatch, not a tighter loop.
+
+**Decision 5 — no `mda_event`, so `Axes` is synthesised.**
+`utils.metadata_refactor` only rewrites `Axes` when an `mda_event` key is
+present, so it is a pass-through here; `_live_sequence_metadata` therefore has to
+supply `Axes = {'time': n}` itself, with a monotonic counter, alongside `Time`,
+`Exposure`, `PixelSize_um` and `ROI`. The backend's own tags are kept alongside
+rather than replaced.
+
+**Verification — and what it does and does not show.** `pytest -q`: 412 passed
+(11 new in `tests/test_live_sequence_worker.py`, covering the clear-then-start
+order, `is_sequence_running()` False after stop, the `finally` still stopping the
+camera when the pull raises, both pull policies plus the unknown-value fallback,
+the synthesised metadata, the read-once constants, and both arms of the
+`live_mode_method` dispatch). `tests/fakes/fake_mil.py` also gained the `MI()`
+alias it was missing.
+
+Manual: `--auto-demo --profile-runtime 10` (the automated equivalent of
+`make run-demo` + live mode) was run **twice under identical conditions**, once
+per `live_mode_method`, and both are appended to `docs/perf-runtime.txt`:
+
+| | frames to ring | napariUpdateLive calls | engine machinery in top-25 |
+| --- | --- | --- | --- |
+| `mda` (legacy) | 142 | 107 | `_iter_exec_output` 17.1s cum, `exec_event` 10.6s, `exec_sequenced_event` 8.2s |
+| `sequence` (new) | 148 | 111 | **absent entirely** |
+
+So the per-frame acquisition-engine cost that `docs/perf-runtime-recipe.md` wrote
+off as *"not addressable without upstream patches"* is simply gone, which was the
+point of the task. The frame *rate* is unchanged here and that is expected, not a
+disappointment: a standalone benchmark of the same demo camera
+(10 ms exposure) measured ~82 frames/s available from `popNextImage` and ~28k/s
+from `getLastImageAndMD`, while the profiled app manages ~14 fps — both paths are
+bound by the profiler and the camera, not by the transport. The case this task
+actually targets (a camera faster than the engine, and PYCROMANAGER_JAVA's
+write-to-NDTiff-then-read-back-over-the-bridge live path) **was not measured**:
+no hardware, and the demo backend is MMCORE_PLUS only. `getLastImageAndMD` also
+did *not* need the `_reshape_if_flat` fallback on this backend — the SWIG and
+Java flat-buffer paths from T-C1 remain unexercised by a real backend.
+
+Also worth knowing for T-C4: the demo config has `vis_method='multiDstack'`, and
+live mode ran cleanly anyway only because `_try_write_frame_to_zarr` returns
+early when `shared_data.newestLayerName` is empty. That is luck, not a guard.

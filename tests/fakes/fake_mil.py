@@ -92,6 +92,9 @@ class FakeMicroscopeInterfaceLayer:
     def get_MI(self) -> MicroscopeInstance:  # alias used in the codebase
         return self._mi
 
+    def MI(self) -> MicroscopeInstance:  # the short alias most call sites use
+        return self._mi
+
     # ----- demo seeding ----------------------------------------------
 
     def populate_demo_state(self) -> None:

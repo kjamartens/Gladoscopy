@@ -1,3 +1,4 @@
+import datetime
 import gc
 import importlib
 import json
@@ -521,6 +522,14 @@ class napariHandler:
     FRAME_RING_CAPACITY_STORAGE = 256
     # How long _stop_frame_ring_consumer waits for the consumer to drain and exit.
     FRAME_RING_DRAIN_TIMEOUT_S = 10.0
+    # Idle back-off in run_liveSequence_worker when the circular buffer is empty.
+    # Short enough to stay well inside one frame interval at any realistic
+    # exposure (0.5 ms vs. >=1 ms/frame), so the displayed frame's latency is
+    # set by the camera rather than by this loop. Every poll is one
+    # @_hardware_locked MIL call, so it cannot be zero: on PYCROMANAGER_JAVA it
+    # is a bridge round trip, and the lock is shared with the GUI thread's
+    # stage/config calls.
+    LIVE_SEQUENCE_POLL_S = 0.0005
 
     def __init__(self, shared_data,liveOrMda='live') -> None:
         logging.debug('#nH - ititalisation of napariHandler')
@@ -877,6 +886,115 @@ class napariHandler:
 
         # return image, metadata
         
+    def _live_sequence_metadata(self, raw, frame_index, constants):
+        """Build the per-frame metadata dict for the sequence live path.
+
+        The continuous-sequence path produces no MDAEvent, so there is no
+        `mda_event` key and `utils.metadata_refactor` passes the dict straight
+        through (it only rewrites `Axes` when an mda_event is present). What
+        downstream code actually reads is `Axes`, so that has to be synthesised
+        here with a monotonic time counter; `Time`, `Exposure`, `ROI` and
+        `PixelSize_um` mirror the shape the MMCORE_PLUS frames carried.
+
+        `constants` is read once per acquisition, not per frame -- Exposure,
+        ROI and PixelSize_um are each an @_hardware_locked MIL call.
+        """
+        metadata = dict(raw) if raw else {}
+        metadata.setdefault(
+            'Time', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
+        )
+        metadata.update(constants)
+        metadata['Axes'] = {'time': frame_index}
+        return metadata
+
+    def run_liveSequence_worker(self, parent):
+        """Live mode as a continuous sequence acquisition (`live_mode_method='sequence'`).
+
+        Blocks until `self.acqstate` goes False, so the caller's `while
+        self.acqstate:` loop exits straight afterwards.
+
+        **Why this exists.** The legacy live path is not a live mode at all --
+        it is a `live_mode_nr_frames`-long MDA restarted in a loop, so every
+        preview frame is driven through an acquisition engine. On MMCORE_PLUS
+        that means a pydantic-validated `MDAEvent` per frame (`_iter_exec_output`
+        / `exec_sequenced_event` dominate the committed profiles); on
+        PYCROMANAGER_JAVA every frame is written into an NDTiff dataset and then
+        read back *over the Java bridge*; and on both, the whole acquisition
+        object is torn down and rebuilt every `live_mode_nr_frames` frames
+        (~17 s at 60 fps with the default 999).
+
+        This path does what MM's own live window, napari-micromanager and any
+        plain pycromanager script do instead: start a continuous sequence
+        acquisition and read the circular buffer. It is backend-blind because
+        it only calls the MIL primitives added in T-C1 -- no engine, no event,
+        no store.
+
+        Frames go into the same `frame_ring` the frameReady callback uses
+        (T-A7), so everything downstream of the ring is unchanged.
+        """
+        MILcore = self.shared_data.MILcore
+        policy = self.shared_data.config.mda_config.live_pull_policy
+        # Anything other than an explicit 'sequential' means 'latest'. Peeking
+        # cannot overflow the buffer no matter how far behind the display
+        # falls, which is the right default for a preview; 'sequential' is the
+        # opt-in for "I need every frame, in order".
+        pull_latest = policy != 'sequential'
+
+        self.shared_data.allMDAslicesRendered = {}
+        # Display-only path: the display and RT analysis each drop frames at
+        # their own gate, so a deep ring would buy latency, not throughput.
+        self._start_frame_ring_consumer(needs_every_frame=False)
+
+        frame_index = 0
+        try:
+            # Drop whatever a previous run left behind, so the first displayed
+            # frame is not a stale one.
+            MILcore.clear_circular_buffer()
+            MILcore.start_continuous_sequence_acquisition(0)
+            # Read once, not per frame -- see _live_sequence_metadata.
+            constants = {
+                'Exposure': MILcore.get_exposure(),
+                'PixelSize_um': MILcore.get_pixel_size_um(),
+                'ROI': MILcore.get_roi(),
+            }
+            logging.info(
+                'Live: continuous sequence acquisition started (pull policy=%s)', policy
+            )
+            while self.acqstate:
+                if MILcore.get_remaining_image_count() > 0:
+                    if pull_latest:
+                        image, raw = MILcore.get_last_image_and_metadata()
+                        # Peeking consumes nothing, so the frames we skipped
+                        # would sit there until the buffer overflowed.
+                        MILcore.clear_circular_buffer()
+                    else:
+                        image, raw = MILcore.pop_next_image_and_metadata()
+                    self.frame_ring.push(
+                        image, self._live_sequence_metadata(raw, frame_index, constants)
+                    )
+                    frame_index += 1
+                else:
+                    time.sleep(self.LIVE_SEQUENCE_POLL_S)
+        finally:
+            # stop first, then drain: the consumer must not be shut down while
+            # the camera is still filling the ring.
+            try:
+                MILcore.stop_sequence_acquisition()
+            except Exception:
+                logging.exception('Live: stop_sequence_acquisition() failed')
+            self._stop_frame_ring_consumer()
+            try:
+                if MILcore.is_sequence_running():
+                    logging.warning(
+                        'Live: sequence still running after stop_sequence_acquisition(); '
+                        'a later start may be refused'
+                    )
+            except Exception:
+                logging.exception('Live: is_sequence_running() check failed')
+            logging.info(
+                'Live: continuous sequence acquisition stopped after %d frames', frame_index
+            )
+
     @thread_worker
     def run_MILCoreAcquisition_worker(self,parent):
         """ 
@@ -905,6 +1023,12 @@ class napariHandler:
                     if self.shared_data.mdaMode:
                         logging.error('LIVE NOT STARTED! MDA IS RUNNING')
                         self.shared_data.liveMode = False
+                    elif shared_data.config.mda_config.live_mode_method == 'sequence':
+                        # T-C3: drive the camera directly instead of restarting a
+                        # 999-frame MDA. Blocks until self.acqstate goes False, so
+                        # this while loop then exits on its own. `mda` keeps the
+                        # legacy path below completely untouched.
+                        self.run_liveSequence_worker(parent)
                     else:
                         #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                         logging.debug('#nH - starting acq')

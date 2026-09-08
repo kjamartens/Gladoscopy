@@ -121,6 +121,22 @@ Advanced Settings; a config saved before they existed simply keeps the defaults
   - `GladosSlidersWidget` — laser controls (`gladosSliders_plugin`)
   Pattern: the parent `MainWidget` creates `core`, `shared_data`, `MM_JSON`, `livestate`, and child widgets read them off `parent.*` in their `__init__`.
 - `GUI/napariGlados.py` — `napariHandler` and the real-time visualisation/analysis loop (`napariUpdateLive`, etc.). Uses `napari.qt.thread_worker` and yield-based generators, which is why several update functions live at module scope rather than inside a class.
+  - **Live mode (T-C3):** `MDAConfig.live_mode_method` selects the path.
+    `sequence` (default) runs `napariHandler.run_liveSequence_worker` — a plain
+    continuous sequence acquisition (`MIL.start_continuous_sequence_acquisition`) whose
+    loop reads the circular buffer and pushes straight into the T-A7 frame ring. No
+    acquisition engine, no `MDAEvent`, no per-frame pydantic validation; an A/B profile
+    under `--auto-demo --profile-runtime` shows `_iter_exec_output` /
+    `exec_sequenced_event` disappearing from the top-25 entirely. It is backend-blind
+    (only T-C1 MIL primitives), blocks until `self.acqstate` goes False, and synthesises
+    the metadata dict itself (`Axes = {'time': n}` plus `Time`/`Exposure`/`PixelSize_um`/
+    `ROI`, the latter three read once per acquisition, not per frame) because there is no
+    `mda_event` for `utils.metadata_refactor` to derive `Axes` from. `live_pull_policy`
+    picks `get_last_image_and_metadata()` + `clear_circular_buffer()` (`latest`, cannot
+    overflow) or `pop_next_image_and_metadata()` (`sequential`, every frame in order);
+    anything that is not literally `'sequential'` is treated as `latest`. `mda` keeps the
+    legacy 999-frame-MDA-in-a-loop path completely untouched as an escape hatch.
+    Tests: `tests/test_live_sequence_worker.py`.
   - **Live/MDA stop→start race guard:** `napariHandler_liveMode`/`napariHandler_mdaMode` are constructed once per session and reused for every toggle, so rapid Live/MDA on-off-on toggling could previously start a new `run_MILCoreAcquisition_worker` (QThreadPool job) while the old one was still tearing down the same `core.mda`/`Acquisition` object (`stop_sequence_acquisition()` is fire-and-forget) — two threads driving the same native MMCore/Java engine concurrently, causing native access violations under stress testing. `napariHandler` now has `_acq_transition_lock` (an `RLock`, since the worker's own cleanup re-enters `acqModeChanged` from its own thread) and `_worker_stopped_event`: `acqModeChanged`'s ON path waits (`ACQ_STOP_TIMEOUT_S`, default 10s) for the previous worker to fully exit before starting a new one, refusing to start (and reverting the mode flag) rather than racing if the timeout is hit.
   - **Frame ring (MMCORE_PLUS `frameReady` path):** `grab_image_liveVis_PyMMCore` is connected with `Qt.DirectConnection`, so it runs synchronously on pymmcore-plus' own MDA thread — everything it does happens in front of the next camera frame. It is therefore a pure hand-off: `frame_ring.push(image, metadata)` and return. `GUI/frame_ring.py`'s `FrameRing` is a bounded, overwrite-oldest, stdlib-only buffer (drop-counting, with an `Event` the consumer waits on); `napariHandler._frame_ring_consumer_loop` (a plain daemon `Thread`, started just before the `frameReady` connect and stopped just after the disconnect, plus an idempotent stop in the acquisition worker's outer `finally`) does the real per-frame work: `metadata_refactor`, the multiDstack zarr write, and `put_data_in_visualisation_and_analysis_queues`. Two capacities: `FRAME_RING_CAPACITY_DISPLAY` (4) for live, since display and RT analysis drop frames at their own gate anyway, and `FRAME_RING_CAPACITY_STORAGE` (256) for multiDstack MDA, where a dropped frame is a permanently black slice with no NDTiff store to backfill from. The per-acquisition drop tally is logged at teardown (WARNING if non-zero). The pycromanager `image_process_fn` / `image_saved_fn` paths do **not** use the ring — `image_process_fn` must return `(image, metadata)` synchronously for pycromanager to store the frame.
 - `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `Showcase_Basic1.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
