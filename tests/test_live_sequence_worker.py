@@ -349,3 +349,124 @@ def test_mda_method_still_selects_the_legacy_acquisition_path(config, monkeypatc
 
     handler.run_MILCoreAcquisition_worker(parent=handler).work()
     assert taken == ["acquisition"]
+
+
+# ---- T-C4: multiDstack must not engage on the sequence live path -----
+
+
+def _record_zarr_writes(handler):
+    writes = []
+    handler._try_write_frame_to_zarr = lambda image, metadata: writes.append(metadata)
+    return writes
+
+
+def test_multidstack_is_overridden_to_framebyframe_during_live(config):
+    config.mda_config.vis_method = "multiDstack"
+    handler = _make_handler(_SeededFakeMIL(), config)
+
+    assert handler._effective_vis_method() == "multiDstack"  # not live yet
+    handler._live_sequence_active = True
+    assert handler._effective_vis_method() == "frameByFrame"
+
+
+def test_framebyframe_config_is_left_alone(config):
+    config.mda_config.vis_method = "frameByFrame"
+    handler = _make_handler(_SeededFakeMIL(), config)
+    handler._live_sequence_active = True
+    assert handler._effective_vis_method() == "frameByFrame"
+
+
+def test_no_zarr_write_for_live_frames_when_multidstack_configured(config):
+    """The black-slice failure mode: a store nothing can index back out."""
+    config.mda_config.vis_method = "multiDstack"
+    handler = _make_handler(_SeededFakeMIL(), config)
+    writes = _record_zarr_writes(handler)
+
+    handler._live_sequence_active = True
+    handler._process_ring_frame(np.zeros((4, 6), dtype=np.uint16), {"Axes": {"time": 0}})
+
+    assert writes == []
+    # The frame still reaches the display/RT queues -- this suppresses storage,
+    # not the preview itself.
+    assert len(handler.visualisation_queue) == 1
+
+
+def test_mda_frames_still_write_to_zarr_when_multidstack_configured(config):
+    config.mda_config.vis_method = "multiDstack"
+    handler = _make_handler(_SeededFakeMIL(), config)
+    writes = _record_zarr_writes(handler)
+
+    # Not the live sequence path -> MDA multiDstack behaviour is untouched.
+    handler._live_sequence_active = False
+    handler._process_ring_frame(np.zeros((4, 6), dtype=np.uint16), {"Axes": {"time": 0}})
+
+    assert len(writes) == 1
+
+
+def test_the_configured_setting_is_never_written_back(config):
+    """An override for the duration of live mode, not a settings change."""
+    config.mda_config.vis_method = "multiDstack"
+    mil = _SeededFakeMIL(_frames(1))
+    handler = _make_handler(mil, config)
+
+    _run_until_frames(handler, 1)
+
+    assert config.mda_config.vis_method == "multiDstack"
+    # ...and the override is lifted once live mode is over.
+    assert handler._live_sequence_active is False
+    assert handler._effective_vis_method() == "multiDstack"
+
+
+def test_override_is_lifted_even_when_the_pull_raises(config):
+    config.mda_config.vis_method = "multiDstack"
+    mil = _SeededFakeMIL(_frames(1))
+    handler = _make_handler(mil, config)
+    mil.get_last_image_and_metadata = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+
+    thread = Thread(target=handler.run_liveSequence_worker, args=(None,), daemon=True)
+    thread.start()
+    thread.join(timeout=JOIN_TIMEOUT_S)
+    assert not thread.is_alive()
+
+    assert handler._live_sequence_active is False
+
+
+def test_the_override_is_logged_once_with_a_reason(config, caplog):
+    config.mda_config.vis_method = "multiDstack"
+    handler = _make_handler(_SeededFakeMIL(_frames(1)), config)
+
+    with caplog.at_level("INFO"):
+        _run_until_frames(handler, 1)
+
+    forced = [r for r in caplog.records if "forced to 'frameByFrame'" in r.getMessage()]
+    assert len(forced) == 1
+    assert "multiDstack" in forced[0].getMessage()
+
+
+def test_no_override_logged_when_framebyframe_configured(config, caplog):
+    config.mda_config.vis_method = "frameByFrame"
+    handler = _make_handler(_SeededFakeMIL(_frames(1)), config)
+
+    with caplog.at_level("INFO"):
+        _run_until_frames(handler, 1)
+
+    assert not [r for r in caplog.records if "forced to 'frameByFrame'" in r.getMessage()]
+
+
+def test_override_is_lifted_when_the_ring_consumer_fails_to_start(config, monkeypatch):
+    """A stuck override would silently downgrade the *next* MDA's multiDstack."""
+    config.mda_config.vis_method = "multiDstack"
+    handler = _make_handler(_SeededFakeMIL(_frames(1)), config)
+    monkeypatch.setattr(
+        handler,
+        "_start_frame_ring_consumer",
+        lambda needs_every_frame: (_ for _ in ()).throw(RuntimeError("no thread")),
+    )
+
+    thread = Thread(target=handler.run_liveSequence_worker, args=(None,), daemon=True)
+    thread.start()
+    thread.join(timeout=JOIN_TIMEOUT_S)
+    assert not thread.is_alive()
+
+    assert handler._live_sequence_active is False
+    assert handler._effective_vis_method() == "multiDstack"

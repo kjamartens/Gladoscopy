@@ -1264,3 +1264,67 @@ Java flat-buffer paths from T-C1 remain unexercised by a real backend.
 Also worth knowing for T-C4: the demo config has `vis_method='multiDstack'`, and
 live mode ran cleanly anyway only because `_try_write_frame_to_zarr` returns
 early when `shared_data.newestLayerName` is empty. That is luck, not a guard.
+
+---
+
+## 2026-09-08 — T-C4: force `frameByFrame` during sequence live mode (not the legacy-worker fallback)
+
+**Context.** T-C4 required picking **one** of two strategies for
+`vis_method == 'multiDstack'` + live mode and implementing it consistently:
+(a) force `frameByFrame` for the duration of live mode, or (b) fall back to the
+legacy MDA-based worker.
+
+**Decision — (a), force `frameByFrame`.** Three reasons, in order of weight:
+
+1. **The display already does exactly this.** `_napariUpdateLive_locked` routes
+   any DataStructure whose `layer_name` is `'Live'` into its `frameByFrame`
+   branch *regardless of* `vis_method` (line 243's `or
+   DataStructure['layer_name']=='Live'`, and the existing comment at line 301
+   spelling out that the multiDstack branch is unreachable for 'Live' frames).
+   So the display side was already frameByFrame during live mode; only the
+   storage side (`_process_ring_frame` -> `_try_write_frame_to_zarr`) still read
+   the raw config and disagreed. Option (a) makes the two agree. Option (b)
+   would have left that disagreement in place and worked around it by not using
+   the new path at all.
+2. **`multiDstack` is the default**, so option (b) would silently disable T-C3
+   for most users — the new live path would be dead code out of the box, and the
+   `live_mode_method` setting would not mean what it says.
+3. **`multiDstack` is meaningless for a preview anyway.** It renders by indexing
+   a zarr array with an MDAEvent's acquisition axes; the sequence path has no
+   MDAEvents and its `Axes` is a synthesised `{'time': n}` counter. Writing into
+   a store nothing can index back out is precisely the black-slice failure mode
+   the task says not to produce.
+
+**Decision 2 — an override at the point of use, never a write-back.** The
+override lives in a new `napariHandler._effective_vis_method()` gated on
+`_live_sequence_active`; `self.shared_data.config.mda_config.vis_method` is
+never assigned to. Mutating the config would risk persisting `frameByFrame` into
+`glados_state.json` if live mode crashed mid-run, silently changing the user's
+MDA behaviour afterwards. There is a test asserting the configured value
+survives a live run unchanged.
+
+**Decision 3 — exactly one call site changed.** A grep for `vis_method` finds
+six reads. Lines 1168/1177 are the MDA branch (untouched, as the task requires);
+243/301/305 are the display path, which already special-cases 'Live' and which I
+deliberately did **not** rewrite to use `_effective_vis_method()` — it is a
+module-level function reading the global `shared_data`, not the handler, and
+changing it would be a behaviour change outside this task for no gain. Only line
+689, `_process_ring_frame`, actually needed the guard.
+
+**Decision 4 — flag ordering.** `_live_sequence_active` is set **before**
+`_start_frame_ring_consumer()` (the first frame the consumer processes already
+consults it) and cleared **after** `_stop_frame_ring_consumer()` (a frame still
+in flight must see the same visualisation method as every frame before it). It
+is a class attribute as well as an instance one, so a stray callback on a
+half-built or torn-down handler reads `False` rather than raising.
+
+**Verification.** `pytest -q`: 420 passed (8 new). Manual:
+`--auto-demo --profile-runtime 8` with the demo config's stock
+`vis_method='multiDstack'` — the override engaged and logged its reason once
+(`Live: visualisation forced to 'frameByFrame' ...`), the Live layer was created
+and updated, and 115 frames went through the ring with none dropped. **Not
+checked manually: that MDA-mode `multiDstack` still renders** — there is no CLI
+path to drive an MDA unattended. It is covered at the unit level
+(`test_mda_frames_still_write_to_zarr_when_multidstack_configured`), and the
+guard is gated solely on `_live_sequence_active`, which is only ever True inside
+`run_liveSequence_worker`.

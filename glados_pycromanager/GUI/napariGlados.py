@@ -522,6 +522,11 @@ class napariHandler:
     FRAME_RING_CAPACITY_STORAGE = 256
     # How long _stop_frame_ring_consumer waits for the consumer to drain and exit.
     FRAME_RING_DRAIN_TIMEOUT_S = 10.0
+    # True only while run_liveSequence_worker is driving the camera. A class
+    # attribute (not just an __init__ assignment) so a stray late callback on a
+    # half-built or torn-down handler reads False rather than raising.
+    _live_sequence_active = False
+
     # Idle back-off in run_liveSequence_worker when the circular buffer is empty.
     # Short enough to stay well inside one frame interval at any realistic
     # exposure (0.5 ms vs. >=1 ms/frame), so the displayed frame's latency is
@@ -573,6 +578,8 @@ class napariHandler:
         self.frame_ring = FrameRing(self.FRAME_RING_CAPACITY_DISPLAY)
         self._frame_ring_thread = None
         self._frame_ring_stop = Event()
+        # See _effective_vis_method(); set by run_liveSequence_worker.
+        self._live_sequence_active = False
 
         #Sleep time to keep responsiveness
         self.sleep_time = 1/shared_data.config.visualisation_config.fps #in sec
@@ -676,6 +683,31 @@ class napariHandler:
             logging.info('Need to break off!')
             self.shared_data.MILcore.stop_sequence_acquisition()
 
+    def _effective_vis_method(self) -> str:
+        """The visualisation method actually in force for the current frame.
+
+        T-C4. `multiDstack` renders by indexing a zarr array with the
+        acquisition axes of an MDAEvent. The sequence live path (T-C3) has no
+        MDAEvents and no real axes -- its `Axes` is a synthesised
+        `{'time': n}` counter -- so that rendering cannot work with it, and
+        letting it try would write frames into a store nothing can index back
+        out: silent black slices, exactly what T-C4 exists to prevent.
+
+        `frameByFrame` is the honest answer for a preview, and it is also what
+        the display already does: `_napariUpdateLive_locked` routes any
+        DataStructure named 'Live' to its frameByFrame branch regardless of
+        `vis_method`. This makes the storage side agree with the display side
+        instead of quietly disagreeing with it.
+
+        The user's configured value is never written back -- this is an
+        override for the duration of live mode, not a settings change, so a
+        crash mid-live cannot leave `frameByFrame` persisted.
+        """
+        configured = self.shared_data.config.mda_config.vis_method
+        if self._live_sequence_active and configured == 'multiDstack':
+            return 'frameByFrame'
+        return configured
+
     def _process_ring_frame(self, image, metadata):
         """Per-frame work, off the acquisition thread.
 
@@ -686,7 +718,9 @@ class napariHandler:
         metadata = utils.metadata_refactor(metadata, self.shared_data)
         # For multiDstack MDA: write every frame directly to zarr so fast acquisitions
         # don't leave black slices (vis queue only passes ~fps frames/s, rest are dropped).
-        if self.shared_data.config.mda_config.vis_method == 'multiDstack':
+        # _effective_vis_method (not the raw config) so the sequence live path, which
+        # has no real acquisition axes to index the store by, never gets here (T-C4).
+        if self._effective_vis_method() == 'multiDstack':
             self._try_write_frame_to_zarr(image, metadata)
         self.put_data_in_visualisation_and_analysis_queues(self.visualisation_queue,self.shared_data.RTAnalysisQueuesThreads,image,metadata)
 
@@ -940,13 +974,28 @@ class napariHandler:
         # opt-in for "I need every frame, in order".
         pull_latest = policy != 'sequential'
 
-        self.shared_data.allMDAslicesRendered = {}
-        # Display-only path: the display and RT analysis each drop frames at
-        # their own gate, so a deep ring would buy latency, not throughput.
-        self._start_frame_ring_consumer(needs_every_frame=False)
+        # T-C4: must be set before the ring consumer starts, since the very
+        # first frame it processes already consults _effective_vis_method().
+        self._live_sequence_active = True
+        if self.shared_data.config.mda_config.vis_method == 'multiDstack':
+            logging.info(
+                "Live: visualisation forced to 'frameByFrame' for the duration of live "
+                "mode (configured: 'multiDstack'). The sequence live path produces no "
+                "acquisition axes to index a multiDstack zarr store by; the configured "
+                "setting is unchanged and still applies to MDA."
+            )
 
+        self.shared_data.allMDAslicesRendered = {}
+        # Referenced by the finally block's log line, so it has to exist before
+        # anything inside the try can raise.
         frame_index = 0
         try:
+            # Display-only path: the display and RT analysis each drop frames at
+            # their own gate, so a deep ring would buy latency, not throughput.
+            # Inside the try so that a failure to start the consumer still clears
+            # _live_sequence_active -- a stuck override would silently downgrade
+            # the next MDA's multiDstack rendering.
+            self._start_frame_ring_consumer(needs_every_frame=False)
             # Drop whatever a previous run left behind, so the first displayed
             # frame is not a stale one.
             MILcore.clear_circular_buffer()
@@ -983,6 +1032,9 @@ class napariHandler:
             except Exception:
                 logging.exception('Live: stop_sequence_acquisition() failed')
             self._stop_frame_ring_consumer()
+            # Only after the consumer has drained: a frame still in flight must
+            # see the same visualisation method as every frame before it.
+            self._live_sequence_active = False
             try:
                 if MILcore.is_sequence_running():
                     logging.warning(

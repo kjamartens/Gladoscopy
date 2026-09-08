@@ -175,7 +175,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-C1** Continuous-sequence primitives in MIL — M, needs B1
 - [x] **T-C2** `live_mode_method` / `live_pull_policy` settings — S, needs C1
 - [x] **T-C3** `run_liveSequence_worker` — **L**, needs C1, C2, A7 — **stop point**
-- [ ] **T-C4** Guard `multiDstack` + live — S, needs C3
+- [x] **T-C4** Guard `multiDstack` + live — S, needs C3
 
 ### Tier D — Storage
 
