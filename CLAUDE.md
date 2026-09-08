@@ -99,6 +99,14 @@ replaces the 999-frame-MDA live loop with them.
 
 `Core/MDAGlados.py` is the multi-dimensional acquisition layer that talks to MIL.
 
+`MDAConfig.live_mode_method` (`sequence` | `mda`, default `sequence`) selects between
+the continuous-sequence live path and the legacy 999-frame-MDA loop;
+`MDAConfig.live_pull_policy` (`latest` | `sequential`, default `latest`) selects which
+frame that path takes from the circular buffer and applies only to `sequence`.
+`live_mode_nr_frames` applies only to `mda`. Both new settings appear as dropdowns in
+Advanced Settings; a config saved before they existed simply keeps the defaults
+(`load_config_from_json` only overwrites keys present in the JSON).
+
 ### Shared state — `GUI/sharedFunctions.py`
 
 `Shared_data` is the single object passed everywhere (UI, worker threads, napari plugins, autonomous microscopy nodes). It holds `core`, the MIL instance, config dataclasses, analysis-thread lists (`LoggingList` is a list subclass that emits Qt signals on mutation), and live/acquisition state flags. When adding cross-component state, add it as a field on `Shared_data` rather than a global.

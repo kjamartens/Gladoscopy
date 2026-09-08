@@ -58,7 +58,28 @@ class MDAConfig:
     backend_method: str = setting("process", "Backend transfer method",
                                 "Choose between the transfer method in the backend of the JAVA --> Python layer. Either directly grabs images via RAM (Can cause RAM issues), or performs a save-->load routine (limited by Disk write speed). Process is strongly recommended.",
                                 input_type="dropdown", options=["process", "saved"])
-    live_mode_nr_frames: int = setting(999,"Number of frames taken for live mode","The live mode here is basically just a MDA with many frames. Set how many frames here.")
+    live_mode_method: str = setting(
+        "sequence",
+        "Live mode method",
+        "How live mode drives the camera. 'sequence' runs a continuous "
+        "sequence acquisition straight into the circular buffer -- no "
+        "acquisition engine and no per-frame event validation -- which is "
+        "how Micro-Manager's own live window works and is the faster path. "
+        "'mda' is the legacy behaviour: a multi-dimensional acquisition of "
+        "live_mode_nr_frames frames, restarted in a loop. Switch to 'mda' "
+        "to rule the new path out if live mode misbehaves.",
+        input_type="dropdown", options=["sequence", "mda"])
+    live_pull_policy: str = setting(
+        "latest",
+        "Live frame pull policy",
+        "Which frame live mode takes from the circular buffer. 'latest' "
+        "shows the newest frame and consumes nothing, so the buffer cannot "
+        "overflow no matter how far behind the display falls -- correct for "
+        "a preview. 'sequential' delivers every frame in order and can "
+        "overflow the buffer if the consumer is slower than the camera. "
+        "Only applies when live_mode_method == 'sequence'.",
+        input_type="dropdown", options=["latest", "sequential"])
+    live_mode_nr_frames: int = setting(999,"Number of frames taken for live mode","Only applies when live_mode_method == 'mda', where live mode is a MDA with many frames. Set how many frames here.")
 
 @dataclass
 class WebhookConfig:

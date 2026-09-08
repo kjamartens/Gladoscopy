@@ -146,6 +146,8 @@ def test_save_overwrites_only_global_data(tmp_appdata: Path):
     [
         ("mda_config", "vis_method", "frameByFrame"),
         ("mda_config", "backend_method", "saved"),
+        ("mda_config", "live_mode_method", "mda"),
+        ("mda_config", "live_pull_policy", "sequential"),
         ("mda_config", "live_mode_nr_frames", 17),
         ("visualisation_config", "fps", 24),
         ("micromanager_config", "buffer_mb", 256),
@@ -164,3 +166,41 @@ def test_each_field_round_trips(tmp_appdata: Path, group_name, field_name, senti
     fresh = Config()
     load_config_from_json(fresh)
     assert getattr(getattr(fresh, group_name), field_name) == sentinel
+
+
+# ---- T-C2: live-mode method / pull-policy settings -------------------
+
+
+def test_live_mode_settings_defaults_and_options():
+    cfg = Config()
+    # `sequence` + `latest` is the new default path (T-C3); `mda` is the
+    # legacy 999-frame-MDA behaviour kept as an escape hatch.
+    assert cfg.mda_config.live_mode_method == "sequence"
+    assert cfg.mda_config.live_pull_policy == "latest"
+
+    by_name = {f.name: f for f in dataclasses.fields(MDAConfig)}
+    method = by_name["live_mode_method"].metadata
+    policy = by_name["live_pull_policy"].metadata
+    # Both must render as dropdowns in Advanced Settings, not free-text —
+    # a typo'd value here would silently fall through to the legacy path.
+    assert method["input_type"] == "dropdown"
+    assert method["options"] == ["sequence", "mda"]
+    assert policy["input_type"] == "dropdown"
+    assert policy["options"] == ["latest", "sequential"]
+    assert method["hidden"] is False
+    assert policy["hidden"] is False
+
+
+def test_live_mode_settings_absent_from_legacy_json_keep_defaults(tmp_appdata: Path):
+    """A config saved before T-C2 has neither key; both must fall back."""
+    state_dir = tmp_appdata / "Glados-PycroManager"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "glados_state.json").write_text(
+        json.dumps({"GlobalData": {"mda_config.live_mode_nr_frames": 500}})
+    )
+
+    cfg = Config()
+    load_config_from_json(cfg)
+    assert cfg.mda_config.live_mode_nr_frames == 500
+    assert cfg.mda_config.live_mode_method == "sequence"
+    assert cfg.mda_config.live_pull_policy == "latest"
