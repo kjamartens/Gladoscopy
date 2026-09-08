@@ -9,6 +9,7 @@ import appdirs
 import numpy as np
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import (
+    QEvent,
     Qt,
     QTimer,
 )
@@ -1290,9 +1291,9 @@ class MMConfigUI(CustomMainWindow):
         stageLayout = QHBoxLayout()
         # self.XYstageLayout()
         xyStageLayout = self.XYstageLayout()
-        oneDstageLayout = self.oneDstageLayout()
+        oneDstageWidget = self.oneDstageLayout()
         stageLayout.addLayout(xyStageLayout)
-        stageLayout.addLayout(oneDstageLayout)
+        stageLayout.addWidget(oneDstageWidget)
         #Add a horizontal spacer:
         stageLayout.addStretch(1)
         stageLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
@@ -1301,8 +1302,8 @@ class MMConfigUI(CustomMainWindow):
         for i in range(xyStageLayout.columnCount()):
             xyLayoutWidth += xyStageLayout.columnMinimumWidth(i)
         oneDstageLayoutWidth = 0
-        for i in range(oneDstageLayout.columnCount()):
-            oneDstageLayoutWidth += oneDstageLayout.columnMinimumWidth(i)
+        for i in range(self.oneDStageLayout.columnCount()):
+            oneDstageLayoutWidth += self.oneDStageLayout.columnMinimumWidth(i)
         
         containerWidget = QWidget()
         containerWidget.setLayout(stageLayout)
@@ -1761,12 +1762,68 @@ class MMConfigUI(CustomMainWindow):
         self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,0)
         #update the text
         self.updateOneDstageLayout()
-        
+
         #Store the values
         self.storeAllControlValues()
-        
-        return self.oneDStageLayout
-    
+
+        #Wrap the grid in a container widget so we can catch mouse-wheel events
+        #anywhere over the z-stage area (buttons, dropdown, step fields) and use
+        #them to move the currently selected 1D stage.
+        self.oneDStageContainerWidget = QWidget()
+        self.oneDStageContainerWidget.setLayout(self.oneDStageLayout)
+        #Wheel events go to whichever child widget is under the cursor (button,
+        #dropdown, line edit, ...), not to the container itself, so the filter
+        #needs to be installed on the container and every descendant widget.
+        self.oneDStageContainerWidget.installEventFilter(self)
+        for childWidget in self.oneDStageContainerWidget.findChildren(QWidget):
+            childWidget.installEventFilter(self)
+
+        #Also allow ctrl/shift-scroll (per the advanced-settings choice) over the
+        #napari image canvas to move the same stage.
+        self.registerImageScrollToZ()
+
+        return self.oneDStageContainerWidget
+
+    def registerImageScrollToZ(self):
+        """
+        Registers a mouse-wheel callback on the napari viewer that moves the
+        currently selected 1D (Z/focus) stage when the user scrolls over the
+        image canvas while holding the modifier key chosen in Advanced
+        Settings (Config.visualisation_config.image_scroll_z_modifier).
+        """
+        napariViewer = getattr(self.shared_data, 'napariViewer', None)
+        if napariViewer is None:
+            return
+
+        modifierKeyMap = {'Ctrl': 'Control', 'Shift': 'Shift'}
+
+        def _imageScrollToZ(viewer, event):
+            modifierSetting = self.shared_data.config.visualisation_config.image_scroll_z_modifier
+            requiredModifier = modifierKeyMap.get(modifierSetting)
+            if requiredModifier is None or requiredModifier not in event.modifiers:
+                return
+            delta = event.delta[1] if event.delta else 0
+            if delta == 0:
+                return
+            self.moveOneDStage(2 if delta > 0 else -2)
+
+        napariViewer.mouse_wheel_callbacks.append(_imageScrollToZ)
+
+    def eventFilter(self, obj, event):
+        """
+        Catches mouse-wheel events over the z-stage widget area (buttons,
+        dropdown, step-size fields) and uses them to move the currently
+        selected 1D stage, instead of e.g. scrolling the dropdown selection.
+        """
+        container = getattr(self, 'oneDStageContainerWidget', None)
+        if event.type() == QEvent.Wheel and container is not None and (obj is container or container.isAncestorOf(obj)):
+            delta = event.angleDelta().y()
+            if delta != 0:
+                self.moveOneDStage(2 if delta > 0 else -2)
+            event.accept()
+            return True
+        return super().eventFilter(obj, event)
+
     def updateOneDstageLayout(self):
         """
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage

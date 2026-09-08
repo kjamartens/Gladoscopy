@@ -112,6 +112,17 @@ class VisualisationConfig:
         "(a full min/max scan); higher values trade brightness-adjustment "
         "responsiveness for throughput. Set to 1 to recompute every frame.",
     )
+    image_scroll_z_modifier: str = setting(
+        "Ctrl",
+        "Scroll-to-move-Z modifier key (on image)",
+        "Modifier key that must be held while scrolling the mouse wheel over "
+        "the napari image canvas to move the current Z/focus stage. Choose "
+        "'Disabled' to turn this off. Scrolling directly over the Z-stage "
+        "buttons always moves the stage, regardless of this setting.",
+        input_type="dropdown",
+        options=["Ctrl", "Shift", "Disabled"],
+        hidden=False,
+    )
 
 
 @dataclass
