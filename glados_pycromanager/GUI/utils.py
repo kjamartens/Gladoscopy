@@ -3145,13 +3145,13 @@ class CustomMainWindow(QWidget):
                     
                 if saveState is not None:
                     try:
-                        if hasattr(value,'text'):
+                        if hasattr(value,'text') and callable(value.text):
                             textv = value.text()
-                        elif hasattr(value,'currentText'):
+                        elif hasattr(value,'currentText') and callable(value.currentText):
                             textv = value.currentText()
                         else:
                             textv = None
-                    except (AttributeError, RuntimeError):
+                    except (AttributeError, RuntimeError, TypeError):
                         textv = None
                     state[saveState][key] = {
                         'text': textv,

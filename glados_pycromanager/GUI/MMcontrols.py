@@ -898,7 +898,7 @@ class MMConfigUI(CustomMainWindow):
         """
         Set the shutter to the new choice if the dropdown is changed
         """ 
-        selected_item = self.shutterChoiceDropdown.currentText
+        selected_item = self.shutterChoiceDropdown.currentText()
         self.shared_data.MILcore.set_shutter_device(selected_item)
 
     def on_shutterAutoCheckboxChanged(self,state):
@@ -918,7 +918,7 @@ class MMConfigUI(CustomMainWindow):
         """
         #Set the current shutter device to the one in MM
         currentShutterDevice = self.shared_data.MILcore.get_shutter_device()
-        self.shutterChoiceDropdown.currentText = currentShutterDevice
+        self.shutterChoiceDropdown.setCurrentText(currentShutterDevice)
         #Set the auto-method to the one in MM:
         currentShutterAuto = self.shared_data.MILcore.get_auto_shutter()
         self.shutterAutoCheckbox.setChecked(currentShutterAuto)
