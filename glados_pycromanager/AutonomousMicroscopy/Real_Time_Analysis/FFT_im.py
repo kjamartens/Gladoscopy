@@ -5,6 +5,7 @@ import sys
 import time
 
 import numpy as np
+from scipy.signal.windows import tukey
 
 import glados_pycromanager.GUI.utils as utils
 
@@ -22,7 +23,9 @@ def __function_metadata__():
             "required_kwargs": [
             ],
             "optional_kwargs": [
-                {"name": "LogScale", "description": "Apply log scaling to FFT", "default": True, "type": bool}
+                {"name": "LogScale", "description": "Apply log scaling to FFT", "default": True, "type": bool},
+                {"name": "WindowTaper", "description": "Apply a Tukey window taper to the image before the FFT, to reduce edge/streaking artifacts", "default": False, "type": bool},
+                {"name": "WindowTaperStrength", "description": "Tukey window taper strength, 0-1 (0 = no taper/rectangular, 1 = full cosine taper across the whole image, like a Hann window)", "default": 0.25, "type": float},
             ],
             "help_string": "Calculates and displays the 2D FFT magnitude spectrum in real-time.",
             "display_name": "Real-Time FFT",
@@ -57,16 +60,33 @@ class RealTimeFFT:
 
         self.fft_display = np.zeros((512, 512)) # Placeholder
         self.log_scale = kwargs.get('LogScale', True)
+        self.window_taper = str(kwargs.get('WindowTaper', False)).lower() in ('true', '1')
+        self.window_taper_strength = min(max(float(kwargs.get('WindowTaperStrength', 0.25)), 0.0), 1.0)
+        self._taper_window = None
+        self._taper_window_shape = None
         return None
+
+    def _get_taper_window(self, shape):
+        """Builds (and caches) a separable 2D Tukey window matching `shape`."""
+        if self._taper_window is None or self._taper_window_shape != shape:
+            window_y = tukey(shape[0], self.window_taper_strength)
+            window_x = tukey(shape[1], self.window_taper_strength)
+            self._taper_window = np.outer(window_y, window_x)
+            self._taper_window_shape = shape
+        return self._taper_window
 
     def run(self, image, metadata, shared_data, core, **kwargs):
         """
         Performs the 2D FFT on the incoming image buffer.
         """
+        run_start = time.time()
         try:
             # 1. Compute 2D FFT
             # fft_data = np.fft.fft2(image)
-            
+
+            if self.window_taper:
+                image = image * self._get_taper_window(image.shape)
+
             img_dip = self._dip.Image(image)
             fft_dip = self._dip.FourierTransform(img_dip)
             magnitude = self._dip.Abs(fft_dip)

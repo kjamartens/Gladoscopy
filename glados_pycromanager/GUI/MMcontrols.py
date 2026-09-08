@@ -20,6 +20,7 @@ from PyQt5.QtGui import (
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -468,6 +469,9 @@ class MMConfigUI(CustomMainWindow):
             if 'exposureTimeInputField' in MMControlsInfo:
                 if hasattr(self, 'exposureTimeInputField'):
                     self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+            if 'scriptPathLineEdit' in MMControlsInfo:
+                if hasattr(self, 'scriptPathLineEdit'):
+                    self.scriptPathLineEdit.setText(MMControlsInfo['scriptPathLineEdit']['text'])
             if 'oneDstageDropdown' in MMControlsInfo:
                 if hasattr(self, 'oneDstageDropdown'):
                     self.oneDstageDropdown.setCurrentText(MMControlsInfo['oneDstageDropdown']['text'])
@@ -656,7 +660,12 @@ class MMConfigUI(CustomMainWindow):
             self.roiOptionsGroupBox = QGroupBox("ROI Options")
             self.roiOptionsGroupBox.setLayout(self.ROIoptionsLayout(orientation='horizontal'))
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
-        
+
+        #Now add the Scripts widget
+        self.scriptsGroupBox = QGroupBox("Scripts")
+        self.scriptsGroupBox.setLayout(self.scriptsOptionsLayout())
+        liveModeLayout.addWidget(self.scriptsGroupBox, 6,0,1,2)
+
         #Add one of those spacers at the bottom:
         verticalSpacer = QSpacerItem(2, 1, QSizePolicy.Minimum, QSizePolicy.Expanding)
         liveModeLayout.addItem(verticalSpacer)
@@ -1216,7 +1225,63 @@ class MMConfigUI(CustomMainWindow):
         self._roi_drag_callback_ref = _roi_drag_callback
         shared_data.napariViewer.mouse_drag_callbacks.append(_roi_drag_callback)
     #endregion
-    
+
+    #region Scripts
+    def scriptsOptionsLayout(self):
+        """
+        Create a layout with a path field and Browse/Run buttons for
+        executing an external Python script against the current core.
+
+        Returns
+        -------
+        scriptsLayout : QGridLayout
+            A layout with a path field and Browse/Run buttons
+        """
+        scriptsLayout = QGridLayout()
+        self.scriptPathLineEdit = QLineEdit()
+        self.scriptPathLineEdit.setPlaceholderText("Path to .py script")
+
+        self.scriptBrowseButton = QPushButton("Browse")
+        self.scriptBrowseButton.clicked.connect(lambda index: self.browseScript())
+
+        self.scriptRunButton = QPushButton("Run")
+        self.scriptRunButton.clicked.connect(lambda index: self.runScript())
+
+        scriptsLayout.addWidget(self.scriptPathLineEdit, 0, 0, 1, 2)
+        scriptsLayout.addWidget(self.scriptBrowseButton, 1, 0)
+        scriptsLayout.addWidget(self.scriptRunButton, 1, 1)
+        return scriptsLayout
+
+    def browseScript(self):
+        """
+        Open a file dialog to pick a .py script to run against the current core.
+        """
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Select script", self.scriptPathLineEdit.text(),
+            "Python scripts (*.py);;All Files (*)")
+        if file_name:
+            self.scriptPathLineEdit.setText(file_name)
+            self.storeAllControlValues()
+
+    def runScript(self):
+        """
+        Execute the script at the current path, exposing `core` (the
+        MicroscopeInterfaceLayer) and `shared_data` to it.
+        """
+        script_path = self.scriptPathLineEdit.text()
+        if not script_path or not os.path.isfile(script_path):
+            QMessageBox.warning(self, "No script", f"Script not found: {script_path!r}")
+            return
+        with open(script_path) as f:
+            scriptText = f.read()
+        try:
+            exec(scriptText, {'core': self.shared_data.MILcore, 'shared_data': self.shared_data, 'np': np})
+            logging.debug(f'Ran script succesfully: {script_path}')
+        except Exception as exc:
+            logging.exception(f'Error running script {script_path}')
+            QMessageBox.critical(self, "Error", f"Script failed:\n{exc}")
+    #endregion
+
     #region Stages
     def stagesLayout(self):
         """

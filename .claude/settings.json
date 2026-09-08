@@ -10,7 +10,23 @@
       "Bash(make bench-live-display *)",
       "Bash(.venv/Scripts/python.exe -m pytest -q)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_shared_data_mda_params_lazy.py -q)",
+      "Bash(.venv/Scripts/python.exe -X faulthandler -c ' *)",
+      "Bash(.venv/Scripts/python.exe -X faulthandler \"/c/Users/LOCALA~1.TUD/AppData/Local/Temp/claude/c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy/b8065c1e-5497-4c89-8d6d-d4cc214fc3c4/scratchpad/repro_crash.py\")",
+      "Bash(.venv/Scripts/python.exe -X faulthandler \"/c/Users/LOCALA~1.TUD/AppData/Local/Temp/claude/c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy/b8065c1e-5497-4c89-8d6d-d4cc214fc3c4/scratchpad/repro2_no_qapp.py\")",
+      "Bash(.venv/Scripts/python.exe -X faulthandler \"/c/Users/LOCALA~1.TUD/AppData/Local/Temp/claude/c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy/b8065c1e-5497-4c89-8d6d-d4cc214fc3c4/scratchpad/repro3_no_mil.py\")",
+      "Bash(.venv/Scripts/python.exe -X faulthandler \"/c/Users/LOCALA~1.TUD/AppData/Local/Temp/claude/c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy/b8065c1e-5497-4c89-8d6d-d4cc214fc3c4/scratchpad/repro4_no_napari.py\")",
+      "Bash(.venv/Scripts/python.exe -X faulthandler \"/c/Users/LOCALA~1.TUD/AppData/Local/Temp/claude/c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy/b8065c1e-5497-4c89-8d6d-d4cc214fc3c4/scratchpad/repro5_pymmcore_first.py\")",
+      "Bash(.venv/Scripts/python.exe -X faulthandler \"/c/Users/LOCALA~1.TUD/AppData/Local/Temp/claude/c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy/b8065c1e-5497-4c89-8d6d-d4cc214fc3c4/scratchpad/repro6_fix_candidate.py\")",
+      "Bash(.venv/Scripts/python.exe -m ruff check --select I glados_pycromanager/GUI/GUI_napari.py --diff)",
+      "Bash(timeout 40 .venv/Scripts/python.exe -X faulthandler -m glados_pycromanager.GUI.GUI_napari --backend Python --config MMConfig_demo.cfg --profile-runtime 3)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(rm -f \"/c/Users/LOCALA~1.TUD/AppData/Local/Temp/claude/c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy/b8065c1e-5497-4c89-8d6d-d4cc214fc3c4/scratchpad/repro\"*.py)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\LOCALA~1.TUD\\AppData\\Local\\Temp\\claude\\c--Users-LocalAdmin-TUD277807-Documents-GitHub-Gladoscopy\\b8065c1e-5497-4c89-8d6d-d4cc214fc3c4\\scratchpad"
     ]
   }
 }
