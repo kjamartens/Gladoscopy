@@ -34,7 +34,11 @@ A small pytest suite lives in `tests/`. Run it with:
 pytest
 ```
 
-(`pytest` is in `[project.optional-dependencies].dev`; install with `pip install -e ".[dev]"`.) Coverage is currently limited to pure-logic surfaces — backend detection on `MicroscopeInterfaceLayer`, the `java_arr_to_numpy` helper, and the `HelperFunctions` string builders. There is no GUI / hardware integration test.
+(`pytest` is in `[project.optional-dependencies].dev`; install with `pip install -e ".[dev]"`.) Coverage is currently limited to pure-logic surfaces — backend detection and the hardware lock on `MicroscopeInterfaceLayer`, the `java_arr_to_numpy` helper, and the `HelperFunctions` string builders. There is no GUI / hardware integration test.
+
+Seven tests spawn a real `multiprocessing` worker and account for ~80s of the suite's ~140s wall time on Windows (inherent `spawn` re-import cost). They carry the `slow` marker, so `pytest -m "not slow"` runs the other 345 in ~60s; plain `pytest` still runs everything. Two gotchas if you touch them: (1) a test whose spawned child dies must poll `proc.is_alive()` rather than waiting out a queue timeout, or a crash costs the full timeout in dead waiting (`_get_or_fail_fast` in `test_analysis_process.py`); (2) `pytest.importorskip("diplib")` is **not** enough — once an earlier test has pulled IPython into `sys.modules` (napari does), `import diplib` raises `AttributeError`, which `importorskip` does not catch, so the test fails in a full-suite run while passing in isolation. Apply the documented `import IPython.terminal.pt_inputhooks` guard first.
+
+Note the `Real_Time_Analysis` node kwarg dicts hand-built in tests (`rt_analysis_info`) must carry one `LineEdit#<function>#<kwarg>` entry **per kwarg** in the node's `__function_metadata__`: `getEvalTextFromGUIFunction` indexes `methodKwargValues` positionally, so a missing kwarg is an `IndexError` in the child, not a default-value fallback. Bool kwargs use the same `LineEdit#` objectName and are stored as `"True"`/`"False"` strings.
 
 `Test.py` and `test.ipynb` at the repo root are unrelated scratch files (DIPlib FFT benchmark, etc.), not part of the suite. There is no lint config.
 
@@ -59,6 +63,16 @@ is the standalone plan that enforces them — but new code must follow them.
   `_communication_lock` for each round trip, so all bridge traffic is serialized regardless
   of caller — at the measured ~257 ms/call, a GUI-thread hardware call directly steals
   bandwidth from the frame path. `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` have no such lock.
+  **As of T-B1 this is enforced at the MIL level:** `MicroscopeInterfaceLayer` holds a
+  per-instance `threading.RLock` (`_hw_lock`) and applies it via the `@_hardware_locked`
+  decorator to every public method that touches `self.core` (43 of them). Re-entrant
+  because MIL methods compose (`get_image_width()` → `get_roi()`), and deliberately
+  untimed — a deadlock should be diagnosed, not skipped. `get_exposure` /
+  `get_pixel_size_um` are the two exceptions: their cache-hit fast path returns *before*
+  acquiring the lock (double-checked inside), so the per-frame display gate never
+  serializes behind a slow stage move. `create_mda` is unlocked too — it is pure event-list
+  construction and never touches the core. Tests: `tests/test_mil_hardware_lock.py`.
+  Single-owner-thread dispatch (`MicroscopeService`) is still T-B3, not yet done.
 - **Only the GUI thread touches napari.** Workers emit Qt signals to a GUI-thread receiver;
   they never mutate `viewer.layers` or `viewer.dims` directly. `AnalysisClass.py`'s
   `_do_visualise` signal into `_visualise_on_main_thread` is the reference pattern.
