@@ -1695,9 +1695,30 @@ class NodeScene(QtWidgets.QGraphicsScene):
         self.regular_callAction()
 
 
-    def regular_callAction(self):
-        # This function will be called every second
-        self.parent().shared_data.warningErrorInfoInfo['Warnings'] = [] # type: ignore
+    def _acquisitionOngoing(self):
+        """True while live mode or an MDA is running (T-F4).
+
+        The periodic warning check is skipped for the duration: it is a
+        GUI-thread rebuild of icons and tooltips that nobody is looking at
+        mid-acquisition, and the frame path needs the GUI thread more.
+        """
+        try:
+            shared_data = self.parent().shared_data # type: ignore
+        except AttributeError:
+            return False
+        return bool(getattr(shared_data, 'liveMode', False)
+                    or getattr(shared_data, 'mdaMode', False))
+
+    def collectWarnings(self):
+        """Build the complete warning list for the current graph state.
+
+        Kept separate from `regular_callAction` so the list is assembled locally
+        and assigned to `warningErrorInfoInfo['Warnings']` exactly **once**
+        (T-F4). It used to be cleared and then `+=`'d up to three times, and
+        every one of those writes drove the full icon-rebuild chain.
+        """
+        warnings = []
+
         #Check whether we have init, score, acq start,end:
         allInitScoreAcqStartEndMissing = ['initStart','initEnd','scoringStart','scoringEnd','acqStart','acqEnd']
         for node in self.nodes:
@@ -1717,17 +1738,26 @@ class NodeScene(QtWidgets.QGraphicsScene):
             singleTextLine = 'Missing the following required nodes: '
             for node in allInitScoreAcqStartEndMissing:
                 singleTextLine += node + ', '
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += [singleTextLine] # type: ignore
-        
+            warnings.append(singleTextLine)
+
         #Check if we have a functioning decision widget:
         decisionRunnable = self.parent().decisionWidget.assessDecision() # type: ignore
         if decisionRunnable == False:
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Decision widget is missing information.'] # type: ignore
-        
+            warnings.append('Decision widget is missing information.')
+
         #Check if we have a functioning scanning widget
         scanRunnable = self.parent().scanningWidget.assessScan() # type: ignore
         if scanRunnable == False:
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Scanning widget is missing information.'] # type: ignore
+            warnings.append('Scanning widget is missing information.')
+
+        return warnings
+
+    def regular_callAction(self):
+        # This function will be called every second
+        if self._acquisitionOngoing():
+            return
+
+        self.parent().shared_data.warningErrorInfoInfo['Warnings'] = self.collectWarnings() # type: ignore
         
     def dragEnterEvent(self, event):
         """

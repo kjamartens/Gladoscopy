@@ -628,6 +628,15 @@ class Shared_data(QObject):
             # logging.debug('updateAutonousErrorWarningInfo not available yet: %s', exc)
     
 class Dict_Specific_WarningErrorInfo(dict):
+    # T-F4: `oldValue` is part of the notification signature but nothing reads
+    # it -- `on_warningErrorInfoInfo_changed` accepts and ignores it, and a grep
+    # of the codebase finds no other reader. It used to be a *full dict copy*
+    # taken on every `__setitem__`, on the GUI thread, several times a second.
+    oldValue = None
+
+    #: Set while a coalescing drain is already scheduled (see `_notify_change`).
+    _notifyPending = False
+
     def __init__(self, *args, **kwargs):
         self.parent = kwargs.pop('parent', None)
         self.errorType = kwargs.pop('errorType', None)
@@ -642,7 +651,6 @@ class Dict_Specific_WarningErrorInfo(dict):
                 self[key] = [Dict_Specific_WarningErrorInfo(item, parent=self, errorType=key) if isinstance(item, dict) else item for item in value]
 
     def __setitem__(self, key, value):
-        self.oldValue = self.copy()
         if isinstance(value, dict):
             value = Dict_Specific_WarningErrorInfo(value, parent=self, errorType=key)
         elif isinstance(value, list):
@@ -651,11 +659,50 @@ class Dict_Specific_WarningErrorInfo(dict):
         self._notify_change()
 
     def _notify_change(self):
+        """Schedule one rebuild per event-loop turn (T-F4).
+
+        A single logical update writes this dict several times -- the nodz timer
+        clears `Warnings` and then appends to it -- and each write used to drive
+        the full `updateAutonousErrorWarningInfo` chain: icon lookups, pixmap
+        builds and a loop over every node. Setting a dirty flag and draining it
+        from a zero-delay singleShot collapses those into one rebuild.
+
+        The deferral only happens on the GUI thread with a live application: a
+        zero-delay `QTimer` needs an event loop *in the calling thread*, so from
+        a worker thread (or in a headless test) the notification is delivered
+        synchronously, exactly as it was before.
+        """
+        if not self._can_defer_notification():
+            self._deliver_change()
+            return
+
+        if self._notifyPending:
+            return
+        self._notifyPending = True
+        QTimer.singleShot(0, self._drain_pending_notification)
+
+    @staticmethod
+    def _can_defer_notification():
+        try:
+            from PyQt5.QtCore import QThread
+            from PyQt5.QtWidgets import QApplication
+
+            app = QApplication.instance()
+            return app is not None and QThread.currentThread() == app.thread()
+        except (ImportError, RuntimeError):
+            return False
+
+    def _drain_pending_notification(self):
+        self._notifyPending = False
+        self._deliver_change()
+
+    def _deliver_change(self):
         if self.parent:
             self.parent.on_warningErrorInfoInfo_changed(oldValue=self.oldValue,errorType=self.errorType)
         else:
             self.on_warningErrorInfoInfo_changed(oldValue=self.oldValue,errorType=self.errorType)
-            
+
+    
     def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
         # This method will be overridden in the Shared_data class
         if self.parent.loadingOngoing == False:

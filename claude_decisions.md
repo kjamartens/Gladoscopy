@@ -2275,3 +2275,46 @@ contains `QPixmap(`, `QFontMetrics(` or `self.attrs =`.
 `pytest -q -m "not slow"` — 548 passed.
 **Affects:** `glados_pycromanager/GUI/nodz/nodz_main.py`,
 `tests/test_nodz_paint_caches.py`.
+
+## 2026-09-09 — Warning notifications coalesce only on the GUI thread; the periodic check keeps running every tick  [T-F4]
+**Decision:** Three separate changes, plus one thing deliberately *not* done.
+1. `NodeScene.regular_callAction` now builds the list in a new `collectWarnings()`
+   and assigns `warningErrorInfoInfo['Warnings']` **once**. It used to clear the
+   list and then append to it up to three more times — four `__setitem__` calls,
+   four full rebuild chains, per tick.
+2. `Dict_Specific_WarningErrorInfo.__setitem__` no longer takes
+   `self.oldValue = self.copy()`. A grep found no reader anywhere in the codebase:
+   `on_warningErrorInfoInfo_changed` accepts the kwarg and ignores it. `oldValue`
+   survives as a class attribute set to `None` so the notification signature is
+   unchanged and `_notify_change` still has something to pass.
+3. `_notify_change` sets a dirty flag and drains it from a zero-delay
+   `QTimer.singleShot`, so several mutations in one event-loop turn cause one
+   rebuild.
+4. `regular_callAction` returns immediately while `shared_data.liveMode` or
+   `mdaMode` is set.
+**Alternatives:** (a) coalesce unconditionally — rejected, a zero-delay `QTimer`
+needs an event loop *in the calling thread*, so a write from a worker thread would
+schedule a timer that never fires and the icons would silently stop updating.
+`_can_defer_notification()` therefore requires a live `QApplication` **and** that
+the caller is on its thread; otherwise the notification is delivered inline,
+exactly as before. That also keeps every headless test path synchronous.
+(b) Skip the assignment entirely when the freshly built warning list equals the
+current one — **rejected**, and this is the interesting one: the periodic
+assignment is also what keeps the *error* icon refreshed, because
+`updateAutonousErrorWarningInfo` rebuilds it from a loop over `node.errorInfo` on
+every call regardless of what changed. Suppressing no-op warning writes would have
+silently made error icons update only when `checkNodesOnErrors` happens to fire.
+The task says explicitly not to remove warning/error functionality, so the tick
+still assigns; the win comes from 4 rebuilds per tick becoming 1, and 0 during
+acquisition.
+**Reason:** The chain (icon-folder lookups, pixmap builds, a loop over every node)
+ran roughly twice a second on the GUI thread for the whole session, competing with
+the frame path exactly when it mattered least.
+**Verification:** `tests/test_warning_update_coalescing.py` — 15 tests covering the
+absent dict copy, ten writes in one turn collapsing to one rebuild, a later turn
+still notifying, the synchronous fallback, one write per check, unchanged warning
+wording, and the acquisition gate (including that it resumes on the next tick).
+`pytest -q -m "not slow"` — 563 passed.
+**Affects:** `glados_pycromanager/GUI/nodz/nodz_main.py` (`collectWarnings`,
+`_acquisitionOngoing`), `glados_pycromanager/GUI/sharedFunctions.py`
+(`Dict_Specific_WarningErrorInfo`), `tests/test_warning_update_coalescing.py`.
