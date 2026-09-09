@@ -95,16 +95,10 @@ def _get_cached_dimensions(shared_data):
     useq.MDASequence -> pycromanager-event-list conversion for a value already
     summarised here.
     """
-    generation = shared_data._mdaModeParamsGeneration
-    cached = getattr(shared_data, '_dims_cache', None)
-    # Compare rather than test for absence: getDimensionsFromAcqData legitimately
-    # returns None (empty event list, or a malformed one it warns about), so a
-    # cached None must not read as "nothing cached yet".
-    if cached is None or cached[0] != generation:
-        result = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-        shared_data._dims_cache = (generation, result)
-        return result
-    return cached[1]
+    # The cache itself lives in utils.getAcquisitionDimensions since T-G8, so that
+    # node code (pSMLM, RT_counter) can reach it too -- it used to call
+    # getDimensionsFromAcqData uncached, per frame, inside run().
+    return utils.getAcquisitionDimensions(shared_data)
 
 
 #: Metadata key stamped by `_try_write_frame_to_zarr` on a frame it has already

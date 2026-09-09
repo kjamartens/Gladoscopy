@@ -3773,6 +3773,36 @@ def openAdvancedSettings(shared_data):
     dialog.exec_()
     pass
 
+def getAcquisitionDimensions(shared_data):
+    """Cached `getDimensionsFromAcqData` for the current acquisition (T-G8).
+
+    Node code (`pSMLM`, `RT_counter`) used to call `getDimensionsFromAcqData`
+    uncached inside `run()`, which walks every event of the acquisition in pure
+    Python — all 999 of a live-mode plan — on every frame, holding the GIL.
+    Reading `_mdaModeParams` at all also triggers its lazy
+    `useq.MDASequence -> pycromanager event list` conversion on first access.
+
+    Keyed on `shared_data._mdaModeParamsGeneration`, the counter the
+    `_mdaModeParams` setter bumps on every assignment; the generation is read
+    first, so a cache hit never touches the property. Returns None when there is
+    no shared_data (a subprocess-isolated node is handed None) or no plan.
+    """
+    if shared_data is None:
+        return None
+    generation = getattr(shared_data, '_mdaModeParamsGeneration', None)
+    if generation is None:
+        #Not a Shared_data (a test double, say) - correct, just uncached.
+        return getDimensionsFromAcqData(getattr(shared_data, '_mdaModeParams', None))
+    cached = getattr(shared_data, '_dims_cache', None)
+    #Compare rather than test for absence: getDimensionsFromAcqData legitimately
+    #returns None, so a cached None must not read as "nothing cached yet".
+    if cached is None or cached[0] != generation:
+        result = getDimensionsFromAcqData(shared_data._mdaModeParams)
+        shared_data._dims_cache = (generation, result)
+        return result
+    return cached[1]
+
+
 def getDimensionsFromAcqData(acqData):
     if not acqData:
         return None

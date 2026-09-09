@@ -114,6 +114,12 @@ def phasor_fitting(ROI,ROIradius,localpeak):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+#: How many per-frame DataFrames `_smlm_frames` may hold before they are
+#: compacted into one (see pSMLM._append_smlm_frame). Bounds the object count,
+#: never the number of localizations.
+SMLM_FRAME_COMPACTION_THRESHOLD = 2000
+
+
 @register("pSMLM.pSMLM")
 class pSMLM:
     def __init__(self,core,**kwargs):
@@ -142,6 +148,25 @@ class pSMLM:
             return pd.DataFrame()
         return pd.concat(self._smlm_frames, ignore_index=True)
 
+    def _append_smlm_frame(self, frame):
+        """Accumulate one frame's localizations, compacting periodically (T-G8).
+
+        `_smlm_frames` grew one DataFrame per frame for the whole session. A
+        DataFrame costs a few KB of object overhead no matter how few
+        localizations it holds, so a long run's memory ends up dominated by the
+        container rather than the data, and `fullSMLMlocs` has to concatenate
+        tens of thousands of objects.
+
+        Compacting into a single DataFrame every
+        `SMLM_FRAME_COMPACTION_THRESHOLD` frames bounds the list length without
+        discarding a single localization -- which matters: these *are* the
+        measurement, so a maxlen-style cap would silently throw away data. The
+        concat is amortised O(1) per frame.
+        """
+        self._smlm_frames.append(frame)
+        if len(self._smlm_frames) >= SMLM_FRAME_COMPACTION_THRESHOLD:
+            self._smlm_frames = [pd.concat(self._smlm_frames, ignore_index=True)]
+
     def run(self,image,metadata,shared_data,core,**kwargs):
         # logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
         self.dummyValue = np.random.randint(0, 101)
@@ -158,7 +183,9 @@ class pSMLM:
             logging.debug("pSMLM: first 3 locs: %s", self.SMLMlocs[:3])
         
         #Append to full list with frame info
-        _dims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+        #Cached per acquisition (T-G8): this used to walk every event of the
+        #plan, in pure Python, on every frame.
+        _dims = utils.getAcquisitionDimensions(shared_data)
         if _dims is not None:
             self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = _dims
             column_headers = np.hstack([list(self.uniqueEntriesAllDims.keys()), ['x_pos', 'y_pos']])
@@ -171,7 +198,7 @@ class pSMLM:
             column_headers = ['x_pos', 'y_pos']
             new_locs_with_mdaVals = self.SMLMlocs
         # Stash this frame's localizations; fullSMLMlocs concatenates them lazily on read.
-        self._smlm_frames.append(pd.DataFrame(new_locs_with_mdaVals, columns=column_headers))
+        self._append_smlm_frame(pd.DataFrame(new_locs_with_mdaVals, columns=column_headers))
         
         self.lastImage = image
         self.lastMetadata = metadata

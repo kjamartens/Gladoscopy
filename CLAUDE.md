@@ -367,6 +367,19 @@ path that re-imports node modules. `reqKwargsFromFunction` /
 callers, but nothing per-frame goes through it. Tests:
 `tests/test_node_metadata_cache.py`.
 
+**Node code reads the acquisition dimension map through
+`utils.getAcquisitionDimensions(shared_data)` (T-G8).** `pSMLM` and `RT_counter`
+called `getDimensionsFromAcqData` uncached inside `run()` — a pure-Python walk of
+every event in the plan (999 of them in live mode), per frame, holding the GIL,
+and touching `_mdaModeParams` also triggers its lazy useq->pycromanager
+conversion. The cache is generation-keyed exactly as `_get_cached_dimensions` was
+(which now delegates to it) and tolerates `shared_data=None`, which is what a
+subprocess-isolated node's `run()` receives. `pSMLM._smlm_frames` also grew one
+DataFrame per frame for the whole session; `_append_smlm_frame` compacts them
+into one every `SMLM_FRAME_COMPACTION_THRESHOLD` frames — bounding the object
+count, never dropping a localization (those are the measurement). Tests:
+`tests/test_node_dimension_context.py`.
+
 **RT-analysis dispatch is bound once, not eval'ed per frame (T-G2/T-G3/T-G4).**
 `realTimeAnalysis_run` used to rebuild a Python call expression from the kwarg
 dict and `eval()` it on *every analysed frame*, and

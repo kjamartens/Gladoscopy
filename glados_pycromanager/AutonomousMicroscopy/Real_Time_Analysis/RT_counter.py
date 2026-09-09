@@ -64,7 +64,9 @@ class RealTimeCounter:
                 logging.info("At frame: "+metadata['ImageNumber']+" (metadata-ImageNumber)")
         else:
             #Append to full list with frame info
-            self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+            #Cached per acquisition (T-G8): this used to walk every event of
+            #the plan, in pure Python, on every frame.
+            self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getAcquisitionDimensions(shared_data)
             mda_values = []
             for v in list(self.uniqueEntriesAllDims.keys()):
                 mda_values = np.hstack((mda_values,metadata['Axes'][v]))

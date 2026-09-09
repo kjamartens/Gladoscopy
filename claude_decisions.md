@@ -2993,3 +2993,51 @@ needs a live FFT run and could not be performed here.
 
 **Affects:** `glados_pycromanager/GUI/AnalysisClass.py`, `CLAUDE.md`,
 `tests/test_subprocess_proxy_duty_cycle.py`.
+
+## 2026-09-09 — The dimension cache moves to utils (not shared_data), and pSMLM compacts rather than caps  [T-G8]
+
+**Where the accessor lives.** The task said to expose the map on `shared_data`.
+It is exposed *through* `shared_data` — the cache still lives on
+`shared_data._dims_cache`, keyed on `_mdaModeParamsGeneration` — but the accessor
+is `utils.getAcquisitionDimensions(shared_data)`, not a `Shared_data` method.
+Reason: the function needs `utils.getDimensionsFromAcqData`, and
+`GUI/sharedFunctions.py` does not import `GUI/utils.py` today (the import is
+commented out precisely because of the cycle risk). Node modules already
+`import glados_pycromanager.GUI.utils as utils`, so this adds no import edge at
+all. `napariGlados._get_cached_dimensions` is now a one-line delegate, so there
+is still exactly one cache and one invalidation rule.
+
+**It tolerates `shared_data=None`** — that is what a subprocess-isolated node's
+`run()` is handed, and T-G10 may make that the default for these very nodes.
+
+**pSMLM: compaction, not a cap.** `_smlm_frames` grew one `pandas.DataFrame` per
+frame for the whole session. The task allowed "bound it or flush it
+periodically"; a `deque(maxlen=...)` was rejected outright — these rows *are* the
+measurement, and silently discarding localizations mid-acquisition would corrupt
+a result rather than slow it down. `_append_smlm_frame` instead concatenates the
+accumulated frames into a single DataFrame every
+`SMLM_FRAME_COMPACTION_THRESHOLD` (2000) frames. That bounds the *object* count —
+which is what actually dominates memory here, since a DataFrame costs a few KB of
+overhead no matter how few localizations it holds — leaves the number of rows
+untouched, and is amortised O(1) per frame. Memory still grows with
+localizations found; that is data, not overhead.
+
+**`pSMLM_image.py` deliberately untouched.** It is an untracked work-in-progress
+file in the working tree, not part of the repo, and carries the same
+`getDimensionsFromAcqData` call. Editing it would either drag it into a commit or
+leave the user's WIP modified underneath them. `getDimensionsFromAcqData` still
+exists and behaves identically, so nothing there breaks.
+
+**Verification:** `tests/test_node_dimension_context.py` — 200 reads walk the plan
+once; a bumped generation re-walks; a cached `None` is not mistaken for a cold
+cache; `None` shared_data and a plain object without a generation are both
+tolerated; `napariGlados._get_cached_dimensions` returns the *same tuple object*;
+and 2005 appended pSMLM frames compact to a handful of objects with every row
+still present. `pytest -q` — 768 passed. The "run pSMLM on a live stream for a
+minute" check could not be performed here.
+
+**Affects:** `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM.py`,
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/RT_counter.py`,
+`CLAUDE.md`, `tests/test_node_dimension_context.py`.
