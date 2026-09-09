@@ -51,11 +51,12 @@ is the standalone plan that enforces them — but new code must follow them.
 
 - **The Qt/GUI thread is holy.** It paints, lays out, and handles input. It must not touch
   hardware, block on I/O, or run analysis. Anything else belongs on a worker. **Tier F of
-  `claude_throughput_project.md` is complete** and removed most of the standing violations
-  — see *GUI-thread work removed in Tier F* below. What remains: `MMcontrols.py` still
-  snaps images directly in slots, `LaserControlScripts.py` still writes serial commands to
-  a TriggerScope per keystroke (T-F8's laser half is a **decision** awaiting the user), and
-  `blinkUV` still sleeps on the GUI thread (needs T-B3/T-B4).
+  `claude_throughput_project.md` is complete** — both halves, including the two decision
+  gates the user approved on 2026-09-09 — and removed the standing violations it named;
+  see *GUI-thread work removed in Tier F* below. What remains: `MMcontrols.py` still snaps
+  images directly in slots, `LaserControlScripts.py`'s `ResetLasersTrigger` still issues
+  ~100 serial round-trips in one click, and `blinkUV` still sleeps on the GUI thread (all
+  three need T-B3/T-B4).
 - **All microscope access goes through one owner.** `MILcore`/`core` must have a single
   owning thread; other threads submit requests. Unsynchronized cross-thread `core.*` calls
   are not theoretical: commit `cd01032` fixed a **native access violation / JVM fatal
@@ -432,9 +433,15 @@ replaced it is what new code in these files should follow.
   Mouse-wheel notches over the z-stage widget *and* over the napari canvas
   accumulate and apply as one relative move of the same total distance, via a
   `steps` multiplier on `moveOneDStage` (default 1). `onEditFieldChanged` was
-  already on `editingFinished`. **The `LaserControlScripts.py` half is a decision
-  the user has not yet made** — per-keystroke serial writes still exist there.
-  Tests: `tests/test_hardware_edit_debounce.py`.
+  already on `editingFinished`. **Laser half (approved 2026-09-09):**
+  `ChangeIntensityLaserEditField` moved to `editingFinished` — on `textChanged` it
+  issued a serial write per keystroke, driving the laser through every partial
+  value — and skips a focus-out whose value is unchanged, tracked in
+  `ChangeIntensityLaser` because the slider writes through that same choke point.
+  The 15 laser-trigger fields deliberately **keep** `textChanged` (the plot is a
+  live preview; `editingFinished` would leave it stale) but go through
+  `scheduleDrawplot`'s 200 ms debounce. Tests:
+  `tests/test_hardware_edit_debounce.py`, `tests/test_mode_setter_no_sleep.py`.
 - **Live/MDA toggle (T-F10, part 1).** `acqModeChanged`'s up-to-10 s wait for the
   previous worker no longer runs on the GUI thread: when
   `_worker_stopped_event` is not already set and the caller is the GUI thread,
@@ -444,11 +451,19 @@ replaced it is what new code in these files should follow.
   `acqModeChanged` on the GUI thread** — so every napari and core touch stays on
   the thread it was on. `_acq_transition_lock` and the blocking wait remain: they
   exist because concurrent workers caused a JVM fatal crash, and the blocking wait
-  is still the correct path off the GUI thread and headless. Part 2 (the two
-  `time.sleep(0.1)` calls in the mode setters) is **still awaiting the user's
-  decision** — note `MMcontrols.setROI`/`drawROI` flip live mode off and on around a
-  hardware read and appear to depend on the mode change having settled on return.
-  Tests: `tests/test_acq_transition_nonblocking.py`.
+  is still the correct path off the GUI thread and headless.
+  **Part 2 (approved 2026-09-09, superseding decision item H2):** both
+  `time.sleep(0.1)` calls are gone from `on_liveMode_value_change` /
+  `on_mdaMode_value_change`. They never made anything synchronous —
+  `acqModeChanged` is called synchronously either side of them — so they only
+  delayed the dispatch while blocking the flipping thread. The audit found one
+  caller that depended on the delay: `MMcontrols.setROI` changes the ROI right
+  after stopping live mode and `stop_sequence_acquisition()` is fire-and-forget,
+  so its live branch now waits on the core explicitly (stop → wait → set → wait →
+  start) and its own `time.sleep(0.5)` is gone. `drawROI`'s pause surrounds a pure
+  query and needed nothing — **if it ever grows a `set_roi()`, give it the same
+  explicit wait.** Tests: `tests/test_acq_transition_nonblocking.py`,
+  `tests/test_mode_setter_no_sleep.py`.
 
 ### Logging
 
