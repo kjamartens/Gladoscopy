@@ -99,6 +99,31 @@ replaces the 999-frame-MDA live loop with them.
 
 `Core/MDAGlados.py` is the multi-dimensional acquisition layer that talks to MIL.
 
+### Acquisition storage and scratch directories
+
+Two backends, two data shapes. The pycromanager backends append an NDTiff `Dataset`
+to `shared_data.mdaDatasets`; `MMCORE_PLUS` has no NDTiff store and instead writes a
+`zarr.Array` into `shared_data.mdaZarrData`, **keyed by napari layer name** (`'MDA'`
+is only `startMDAVisualisation`'s default — a Nodz-driven acquisition names the layer
+after its node). `MDAGlados._resolve_finished_acquisition_data()` is the one place
+that resolves the two; `_acquisition_storage_path()` is the one place that turns
+either into a filesystem path. Note `zarr.Array.path` is the array's path *inside*
+its store (`''` for a root array), not a location — the real directory is
+`array.store.root`; and `zarr.open()` rejects an already-open `Array` outright
+(zarr 3.x `TypeError: Unsupported type for store_like`). Both traps were live bugs
+(T-D6). Tests: `tests/test_mda_acquisition_data.py`.
+
+Every scratch store lives in a `tempfile.TemporaryDirectory` whose *object* is the
+store's lifetime — its finalizer `rmtree`s the directory. `Shared_data` owns them
+all: `new_zarr_temp_dir(layer_name)` / `release_zarr_temp_dir(layer_name)` over the
+per-layer `mdaZarrTempDirs` dict, `new_pyMMC_temp_dir()` for the NDTiff scratch
+dataset, and `release_all_temp_dirs()` wired to `aboutToQuit` — needed because the
+app force-exits through `os._exit(0)` and runs no finalizers. Never construct a
+`TemporaryDirectory` inline and keep only `.name` (T-D7). Tests:
+`tests/test_temp_store_lifetimes.py`. Known gap, deliberately deferred: the
+`MMCORE_PLUS` MDA branch ignores the user's Storage folder entirely — see
+`claude_issues.md`.
+
 `MDAConfig.live_mode_method` (`sequence` | `mda`, default `sequence`) selects between
 the continuous-sequence live path and the legacy 999-frame-MDA loop;
 `MDAConfig.live_pull_policy` (`latest` | `sequential`, default `latest`) selects which
