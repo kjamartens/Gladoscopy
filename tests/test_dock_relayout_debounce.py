@@ -146,15 +146,36 @@ def test_a_resize_before_init_falls_back_to_a_direct_rebuild(scheduler):
     assert w.rebuilds == [("rows", 1)]
 
 
-def test_resize_event_classifies_sizes_the_same_way(glados_widget_cls, qapp):
-    """The four aspect-ratio buckets must be unchanged by the refactor."""
+def test_sizes_are_classified_the_same_way(glados_widget_cls, qapp):
+    """The four aspect-ratio buckets must be unchanged by the refactor.
+
+    T-F7 moved the classification out of `resizeEvent` into
+    `_layoutForCurrentSize` so `requestRelayout` can reuse it.
+    """
     import inspect
 
-    source = inspect.getsource(glados_widget_cls.resizeEvent)
+    source = inspect.getsource(glados_widget_cls._layoutForCurrentSize)
     assert "width > height * 1.25" in source and "('rows', 1)" in source
     assert "height > width * 1.25" in source and "('columns', 1)" in source
     assert "('rows', 2)" in source and "('columns', 2)" in source
-    assert "_scheduleGroupBoxLayout" in source
+    assert "_scheduleGroupBoxLayout" in inspect.getsource(
+        glados_widget_cls.resizeEvent
+    )
+
+
+def test_classification_matches_each_aspect_ratio(glados_widget_cls, qapp):
+    """Drive the real method rather than only reading its source."""
+    from PyQt5.QtCore import QSize
+
+    def _classify(w, h):
+        obj = type("FakeDock", (), {})()
+        obj.size = lambda: QSize(w, h)
+        return glados_widget_cls._layoutForCurrentSize(obj)
+
+    assert _classify(400, 100) == ("rows", 1)       # wide
+    assert _classify(100, 400) == ("columns", 1)    # tall
+    assert _classify(110, 100) == ("rows", 2)       # landscape
+    assert _classify(100, 110) == ("columns", 2)    # portrait
 
 
 # ---------------------------------------------------------- the scroll area

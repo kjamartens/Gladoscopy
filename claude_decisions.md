@@ -2394,3 +2394,48 @@ for 10 s while watching memory) could not be performed: no display or hardware i
 this environment.
 **Affects:** `glados_pycromanager/_dock_widget.py`,
 `tests/test_dock_relayout_debounce.py`.
+
+## 2026-09-09 — The synthetic resize becomes an explicit `requestRelayout()` seam, not just a deletion  [T-F7]
+**Decision:** `updateGUIwidgets` no longer synthesises a `QEvent.Resize` at the
+parent's current size, sends it, and calls `QCoreApplication.processEvents()`.
+Instead it schedules `QTimer.singleShot(0, mdawidget_object.requestRelayout)` —
+a new method on `GladosWidget` (T-F6's file) that clears `_appliedLayout` and
+re-schedules through the same debounced path.
+**Why a new method rather than a bare deletion:** after T-F6, a resize event at an
+*unchanged* size is dropped as a no-op, so simply deleting the synthetic resize
+would have left the dock's scroll area stale after a show/hide toggle — the geometry
+is the same but the widget tree underneath it is not. `requestRelayout()` names
+that case explicitly instead of expressing it as a fake input event. It honours the
+same `type is None or "AutonomousMicroscopy"` exclusion `resizeEvent` has. The
+aspect-ratio classification moved into `_layoutForCurrentSize()` so both callers
+share it (T-F6's source-guard test was updated to follow it, and gained a test that
+drives the method for all four buckets rather than only reading it).
+**Also fixed, beyond the task text:** the wrapper widgets. The task names the
+per-call `QPushButton("Acquire")` leak, but the button is only reusable if the
+`QWidget` wrappers it gets parented into are cleaned up — every call added a fresh
+`optionsBGroupBox` at grid cell (0,0) and a fresh `orderexposuretimegroupbox` at
+(0,1) without removing the previous ones, so they stacked. `_discardPreviousGUIWrappers()`
+now removes and `deleteLater()`s them, after everything persistent has been
+re-parented out. Without it, reusing the button would have moved it out of a stale
+wrapper that is still stacked in the grid.
+**On the Acquire button handle:** the widget lives on a new `_acquireButton`, not on
+`GUI_acquire_button`. That attribute starts life in `__init__` as the *boolean*
+flag and `updateShowHideGUI` passes it straight back in as the flag argument, so it
+cannot serve as the "already built?" test — checking it would have skipped
+construction on the very first call and then added a `bool` to a layout.
+`self.GUI_acquire_button` is still assigned the widget afterwards, preserving the
+existing (odd) contract exactly.
+**Removed imports:** `QApplication`, `QCoreApplication` and `QEvent` had no other
+user in `MDAGlados.py` once the synthetic resize went.
+**Verification:** `tests/test_mda_gui_rebuild.py` — 13 tests covering the absent
+`processEvents`/`sendEvent`, the deferred relayout, `self.gui.update()` being kept
+(the task's `Don't`), the dropped imports, `requestRelayout` forcing a rebuild at
+an unchanged size and no-op'ing for the excluded widget types, one `QPushButton`
+construction, a reused button firing its handler exactly once after three
+rebuilds, and the wrapper discard being safe both on the first rebuild and against
+an already-destroyed wrapper. `pytest -q -m "not slow"` — 604 passed. The manual
+check (toggling the six MDA checkboxes) could not be performed: no display in this
+environment.
+**Affects:** `glados_pycromanager/Core/MDAGlados.py`,
+`glados_pycromanager/_dock_widget.py`, `tests/test_mda_gui_rebuild.py`,
+`tests/test_dock_relayout_debounce.py`.

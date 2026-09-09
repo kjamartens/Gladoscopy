@@ -15,8 +15,7 @@ from typing import List
 import appdirs
 from pycromanager import multi_d_acquisition_events
 from PyQt5.QtCore import (
-    QCoreApplication,
-    QEvent,
+    QTimer,
     pyqtSignal,
 )
 from PyQt5.QtGui import (
@@ -25,7 +24,6 @@ from PyQt5.QtGui import (
     QIntValidator,
 )
 from PyQt5.QtWidgets import (
-    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -1201,10 +1199,23 @@ class MDAGlados(CustomMainWindow):
         else:
             self.storageGroupBox.setEnabled(False)
         if GUI_acquire_button:
-            
-            self.GUI_acquire_button = QPushButton("Acquire")
-            self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
-            self.GUI_acquire_button.setEnabled(True)
+            # T-F7: built once and reused. This used to construct a fresh
+            # QPushButton (and a fresh `clicked` connection) on every call, and
+            # the previous button stayed parented to the wrapper discarded below
+            # -- so a session's worth of checkbox toggles accumulated dead
+            # buttons, each still connected to MDA_acq_from_GUI.
+            #
+            # The widget is held on `_acquireButton`: `self.GUI_acquire_button`
+            # starts life as the *boolean* set in __init__ and is only replaced
+            # by the widget here, and callers (updateShowHideGUI) pass it back in
+            # as the flag, so it cannot double as the "already built?" test.
+            if getattr(self, '_acquireButton', None) is None:
+                self._acquireButton = QPushButton("Acquire")
+                self._acquireButton.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
+            else:
+                self._acquireButton.setParent(None)
+            self._acquireButton.setEnabled(True)
+            self.GUI_acquire_button = self._acquireButton
         # else:
         #     self.GUI_acquire_button.setEnabled(False)
         
@@ -1249,9 +1260,16 @@ class MDAGlados(CustomMainWindow):
         if GUI_acquire_button:
             optionsBLayout.addWidget(self.GUI_acquire_button) # type: ignore
         
+        # T-F7: the previous wrappers are dropped rather than left stacked in the
+        # same grid cells. Everything they held (the persistent group boxes, the
+        # reused Acquire button) has already been re-parented out above.
+        self._discardPreviousGUIWrappers()
+
         self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
         
         self.gui.addWidget(orderexposuretimegroupbox, 1//gridWidth, 1%gridWidth) # type: ignore
+
+        self._guiWrappers = [optionsBGroupBox, orderexposuretimegroupbox]
         
         #Add XY, Z, Channel, groupboxes as individual groupboxes
         curindex = 2
@@ -1264,24 +1282,34 @@ class MDAGlados(CustomMainWindow):
         self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
         self.gui.setRowStretch(99,gridWidth+1) # type: ignore
         
-        #try to trigger a dock widget resize event at this point.
+        # T-F7: ask the parent dock to relayout, *after* this rebuild returns.
+        #
+        # This used to synthesise a QEvent.Resize at the parent's current size,
+        # send it, and then call QCoreApplication.processEvents(). Pumping the
+        # event loop from inside a widget-tree rebuild allowed re-entrant
+        # delivery of showOptionChanged / currentTextChanged straight back into
+        # updateGUIwidgets, and could run napariUpdateLive slots mid-rebuild.
+        # A zero-delay singleShot gets the relayout without ever re-entering.
         mdawidget_object = self.gui.parent() #type:ignore
-        if mdawidget_object is not None:
-            if hasattr(mdawidget_object,'size'):
-                logging.debug('attempting to update parent')
-                current_size = mdawidget_object.size() #type:ignore
-                resize_event = QEvent(QEvent.Resize) #type:ignore
-                resize_event.oldSize = lambda: current_size #type:ignore
-                resize_event.size = lambda: current_size #type:ignore
-                QApplication.sendEvent(mdawidget_object, resize_event)
-            else:
-                logging.debug('did not attempt to update parent')
-        
-        
-        QCoreApplication.processEvents()
-        
+        if mdawidget_object is not None and hasattr(mdawidget_object, 'requestRelayout'):
+            logging.debug('scheduling parent relayout')
+            QTimer.singleShot(0, mdawidget_object.requestRelayout)
+        else:
+            logging.debug('did not attempt to update parent')
+
         #redraw the self.gui:
         self.gui.update()
+
+    def _discardPreviousGUIWrappers(self):
+        """Remove and destroy the wrapper widgets from the previous rebuild."""
+        for wrapper in getattr(self, '_guiWrappers', []):
+            try:
+                self.gui.removeWidget(wrapper) #type:ignore
+                wrapper.setParent(None)
+                wrapper.deleteLater()
+            except RuntimeError:  # already destroyed by Qt
+                logging.debug('wrapper already gone')
+        self._guiWrappers = []
     
     def printText(self):
         """

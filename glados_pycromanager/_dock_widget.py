@@ -116,19 +116,39 @@ class GladosWidget(QWidget):
             width = self.size().width()
             height = self.size().height()
             
-            # Determine the layout based on the window size
-            if width > height * 1.25:  # Wide window
-                wanted = ('rows', 1)
-            elif height > width * 1.25:  # Tall window
-                wanted = ('columns', 1)
-            elif width > height:  # Landscape
-                wanted = ('rows', 2)
-            else:  # Portrait
-                wanted = ('columns', 2)
-
-            self._scheduleGroupBoxLayout(wanted)
+            self._scheduleGroupBoxLayout(self._layoutForCurrentSize())
 
             super().resizeEvent(event)
+
+    def _layoutForCurrentSize(self):
+        """Classify the current size into one of the four layout buckets."""
+        width = self.size().width()
+        height = self.size().height()
+
+        # Determine the layout based on the window size
+        if width > height * 1.25:  # Wide window
+            return ('rows', 1)
+        elif height > width * 1.25:  # Tall window
+            return ('columns', 1)
+        elif width > height:  # Landscape
+            return ('rows', 2)
+        else:  # Portrait
+            return ('columns', 2)
+
+    def requestRelayout(self):
+        """Force a relayout even though the size bucket has not changed (T-F7).
+
+        `_scheduleGroupBoxLayout` drops a layout identical to the applied one,
+        which is right for a resize but wrong for a caller whose *widget tree*
+        changed underneath the same geometry -- `MDAGlados.updateGUIwidgets`
+        rebuilding its group boxes, for instance. That used to be expressed by
+        synthesising a `QEvent.Resize` at the current size and sending it, then
+        pumping the event loop.
+        """
+        if self.type is None or self.type == "AutonomousMicroscopy":
+            return
+        self._appliedLayout = None
+        self._scheduleGroupBoxLayout(self._layoutForCurrentSize())
 
     def _scheduleGroupBoxLayout(self, wanted):
         """Queue a relayout, coalescing a whole drag into one rebuild (T-F6).
