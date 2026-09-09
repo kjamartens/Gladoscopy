@@ -369,6 +369,26 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 ```
 Keep it on new top-level modules under `glados_pycromanager/` if they're meant to be runnable directly.
 
+### Persisted GUI state — `utils.CustomMainWindow.save_state_*`
+
+`save_state_MDA` iterates `vars(self)` and writes every attribute into
+`glados_state.json`: a *bare* `QWidget` becomes `{'text':..., 'checked':...}`,
+and **everything else is written verbatim** unless its name is in
+`self.storingExceptions`. So an attribute holding widgets in a container — a
+list, a dict — passes the `isinstance(value, QWidget)` check and then raises
+`TypeError: Object of type QWidget is not JSON serializable` inside the encoder.
+**Any new attribute on `MDAGlados` that holds widgets, or anything else not
+JSON-encodable, must be added to `storingExceptions`** (this bit `_guiWrappers`
+from T-F7). The generic branch now skips un-encodable values with a warning
+naming the key and type, and the state is encoded with `json.dumps` *before* the
+file is opened — `open(..., 'w')` truncates first, so an encoder failure used to
+destroy the user's entire settings file, not just the offending key. Watch the
+log for "Not saving MDA state key" and fix the exclusion list rather than leaving
+it warning every save. `save_state_MMControls` has no such generic branch (it
+stores only values passing the `QWidget` check), which is why the QTimers T-F8
+added to `MMConfigUI` are harmless there. Tests:
+`tests/test_state_save_widget_attrs.py`.
+
 ### GUI-thread work removed in Tier F
 
 Tier F of `claude_throughput_project.md` is complete. Each item below was work the
