@@ -3075,10 +3075,31 @@ def PushButtonAddVariableCallBack(line_edit,nodzInfo):
     else:
         logging.warning("Dialog rejected (Cancel pressed or closed)")
 
+def _is_json_serializable(value):
+    """True when `value` can go into the state JSON as-is.
+
+    `save_state_MDA` iterates `vars(self)` and writes anything that is not a bare
+    QWidget straight into the state dict. A *container* of widgets -- a list, a
+    dict -- passes that check and then blows up inside `json.dump`, which by then
+    has already truncated the file, so the user loses every other setting too.
+    """
+    try:
+        json.dumps(value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager']
+        # Attributes never written to the state JSON. Note the QWidget branch in
+        # save_state_MDA only catches a *bare* QWidget attribute -- a container of
+        # widgets (list, dict) falls through to the generic branch and would be
+        # dumped verbatim, so anything holding widgets belongs here.
+        # `_guiWrappers` is MDAGlados' list of the current rebuild's wrapper
+        # widgets (T-F7); it crashed the whole save until it was listed.
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','_guiWrappers']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):
@@ -3260,10 +3281,24 @@ class CustomMainWindow(QWidget):
                     saveState = 'MDA'
                 if saveState is not None:
                     if key not in self.storingExceptions:
-                        state[saveState][key] = value
+                        # One un-encodable attribute must not cost the user every
+                        # other setting in the file: json.dump writes nothing at
+                        # all when it raises partway through. Check each value as
+                        # it goes in, and skip (loudly) what cannot be stored.
+                        if _is_json_serializable(value):
+                            state[saveState][key] = value
+                        else:
+                            logging.warning(
+                                'Not saving MDA state key %r: %s is not JSON '
+                                'serializable. Add it to storingExceptions.',
+                                key, type(value).__name__)
 
+        # Encode before opening the file: `open(..., 'w')` truncates immediately,
+        # so a json.dump that raises partway through would leave the user with a
+        # half-written or empty state file and no settings at all.
+        encoded = json.dumps(state, indent=4)
         with open(filename, 'w') as file:
-            json.dump(state, file, indent=4)
+            file.write(encoded)
 
         #Also save global data:
         self.save_state_globalData(filename)
