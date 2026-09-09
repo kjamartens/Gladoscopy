@@ -120,10 +120,17 @@ kwargModes)`. Two consumers take it from there:
   expression as *text*, which `autonomous/registry.py`'s
   `dispatch_from_eval_text()` re-parses and evaluates. Still used by the
   Analysis-measurement / recipe paths.
-- **`bindKwargsFromGUIFunction()`** (T-G2) — returns a **typed kwargs dict**
-  instead, with each value coerced by `coerceKwargValue()` to the `"type"` its
-  metadata declares. This is what the RT-analysis path uses (node construction
-  as of T-G2; `run`/`visualise`/`end` as of T-G4).
+- **`bindKwargsFromGUIFunction()`** (T-G2/T-G3) — returns a `BoundKwargs`
+  instead: the constants, each coerced by `coerceKwargValue()` to the `"type"` its
+  metadata declares, plus one zero-arg closure per Variable-mode kwarg.
+  `.resolve()` gives the dict to splat into the node, re-reading every Variable
+  kwarg so one changed mid-run is seen. This is what the RT-analysis path uses
+  (node construction as of T-G2; `run`/`visualise`/`end` as of T-G4).
+
+  A Variable closure captures the *container mapping* — `nodzInfo.globalVariables`
+  / `nodzInfo.coreVariables` / the origin node's `variablesNodz` — never the value
+  and never the per-variable dict, because writers replace that dict wholesale
+  (`globalVariables[name] = {}`, then `['data'] = value`).
 
 ### What coercion changed
 

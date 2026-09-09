@@ -66,6 +66,12 @@ def fake_node():
         utils.clear_resolve_node_obj_cache()
 
 
+def _bind(*args, **kwargs):
+    """bindKwargsFromGUIFunction(...).resolve() -- the dict the node is called with."""
+    bound = utils.bindKwargsFromGUIFunction(*args, **kwargs)
+    return None if bound is None else bound.resolve()
+
+
 def _current_data(**overrides):
     data = {
         "__selectedDropdownEntryRTAnalysis__": "Fake node",
@@ -117,7 +123,7 @@ def test_non_strings_pass_through_untouched():
 
 def test_bound_kwargs_carry_declared_types(fake_node):
     names, values = ["Count", "Enabled", "Strength", "Label", "Untyped"], ["7", "False", "0.75", "hello", "42"]
-    bound = utils.bindKwargsFromGUIFunction(NODE, names, values, skipInput=True)
+    bound = _bind(NODE, names, values, skipInput=True)
     assert bound == {"Count": 7, "Enabled": False, "Strength": 0.75,
                      "Label": "hello", "Untyped": "42"}
     assert bound["Enabled"] is False
@@ -125,7 +131,7 @@ def test_bound_kwargs_carry_declared_types(fake_node):
 
 
 def test_missing_required_value_returns_none(fake_node):
-    bound = utils.bindKwargsFromGUIFunction(NODE, ["Count"], [""], skipInput=True)
+    bound = _bind(NODE, ["Count"], [""], skipInput=True)
     assert bound is None
 
 
@@ -133,12 +139,12 @@ def test_optional_kwarg_the_gui_never_supplied_is_simply_absent(fake_node):
     """The eval-text path indexes methodKwargValues positionally here, so a
     kwarg missing from the GUI dict is an IndexError rather than a fallback to
     the node's own default. The binder looks kwargs up by name."""
-    bound = utils.bindKwargsFromGUIFunction(NODE, ["Count", "Enabled"], ["7", "True"], skipInput=True)
+    bound = _bind(NODE, ["Count", "Enabled"], ["7", "True"], skipInput=True)
     assert bound == {"Count": 7, "Enabled": True}
 
 
 def test_empty_optional_value_is_skipped(fake_node):
-    bound = utils.bindKwargsFromGUIFunction(
+    bound = _bind(
         NODE, ["Count", "Strength"], ["7", ""], skipInput=True)
     assert bound == {"Count": 7}
 
@@ -152,7 +158,7 @@ def test_variable_mode_values_are_resolved_not_coerced(fake_node):
         globalVariables = {"gvar": {"data": 99}}
         coreVariables = {}
 
-    bound = utils.bindKwargsFromGUIFunction(
+    bound = _bind(
         NODE, ["Count", "Strength"], ["7", "gvar@Global"],
         methodKwargTypes=["Value", "Variable"], skipInput=True,
         nodzInfo=_NodzInfo(), nodeDict={"OtherNode": _Node()})
@@ -163,7 +169,7 @@ def test_variable_from_another_node_is_read_live(fake_node):
     class _Node:
         variablesNodz = {"myvar": {"data": 12.5}}
 
-    bound = utils.bindKwargsFromGUIFunction(
+    bound = _bind(
         NODE, ["Count", "Strength"], ["7", "myvar@OtherNode"],
         methodKwargTypes=["Value", "Variable"], skipInput=True,
         nodzInfo=None, nodeDict={"OtherNode": _Node()})
@@ -208,7 +214,7 @@ def test_real_fft_node_binds_its_declared_types():
     }
     _method, names, values, modes = utils._rtAnalysisKwargsFromCurrentData(
         "FFT_im.RealTimeFFT", rt_info)
-    bound = utils.bindKwargsFromGUIFunction("FFT_im.RealTimeFFT", names, values,
+    bound = _bind("FFT_im.RealTimeFFT", names, values,
                                             methodKwargTypes=modes, skipInput=True)
     assert bound == {"LogScale": False, "WindowTaper": True, "WindowTaperStrength": 0.4}
 
@@ -217,8 +223,53 @@ def test_unresolvable_variable_falls_back_to_the_reference_text(fake_node, caplo
     """An RT node started outside the graph (nodzInfo=None) must not crash on a
     Variable-mode kwarg -- it gets the raw reference text, as before."""
     with caplog.at_level("WARNING"):
-        bound = utils.bindKwargsFromGUIFunction(
+        bound = _bind(
             NODE, ["Count", "Strength"], ["7", "gvar@Global"],
             methodKwargTypes=["Value", "Variable"], skipInput=True, nodzInfo=None)
     assert bound == {"Count": 7, "Strength": "gvar@Global"}
     assert "Strength" in caplog.text
+
+
+# --- T-G3: Variable kwargs are closures, not values captured at bind time ---
+
+class _LiveNodz:
+    def __init__(self):
+        self.nodes = []
+        self.globalVariables = {"gvar": {"data": 1}}
+        self.coreVariables = {}
+
+
+def test_variable_kwargs_are_read_live_not_captured(fake_node):
+    nodz = _LiveNodz()
+    bound = utils.bindKwargsFromGUIFunction(
+        NODE, ["Count", "Strength"], ["7", "gvar@Global"],
+        methodKwargTypes=["Value", "Variable"], skipInput=True, nodzInfo=nodz)
+    assert bound.resolve()["Strength"] == 1
+    # The writer replaces the whole per-variable dict, then fills it in --
+    # capturing one level deeper than the container would go stale here.
+    nodz.globalVariables["gvar"] = {}
+    nodz.globalVariables["gvar"]["data"] = 42
+    assert bound.resolve()["Strength"] == 42
+
+
+def test_a_node_variable_is_read_live_too(fake_node):
+    class _Node:
+        def __init__(self):
+            self.variablesNodz = {"myvar": {"data": 1.5}}
+
+    origin = _Node()
+    bound = utils.bindKwargsFromGUIFunction(
+        NODE, ["Count", "Strength"], ["7", "myvar@OtherNode"],
+        methodKwargTypes=["Value", "Variable"], skipInput=True,
+        nodzInfo=None, nodeDict={"OtherNode": origin})
+    assert bound.resolve()["Strength"] == 1.5
+    origin.variablesNodz["myvar"] = {"data": 9.5}
+    assert bound.resolve()["Strength"] == 9.5
+
+
+def test_resolve_without_variables_avoids_a_copy(fake_node):
+    """The per-frame path resolves on every call; with no Variable kwargs that
+    must not allocate a fresh dict each time."""
+    bound = utils.bindKwargsFromGUIFunction(NODE, ["Count"], ["7"], skipInput=True)
+    assert bound.variableGetters == {}
+    assert bound.resolve() is bound.resolve()

@@ -2798,3 +2798,44 @@ possible here.
 **Affects:** `glados_pycromanager/GUI/utils.py`,
 `glados_pycromanager/Documentation/rt_analysis_parameters.md`,
 `tests/test_rt_kwarg_binding.py`, `tests/test_analysis_process.py`.
+
+## 2026-09-09 — Variable closures capture the container mapping, not the value or the per-variable dict  [T-G3]
+
+**Decision:** `makeNodzVariableGetter(reference, nodzInfo, nodeDict)` returns
+`lambda: container[variableName]['data']`, where `container` is
+`nodzInfo.globalVariables`, `nodzInfo.coreVariables`, or the origin node's
+`variablesNodz`.
+
+**Why that level and no deeper.** Capturing the value is wrong outright (Variable
+kwargs must stay live). Capturing the *per-variable* dict
+(`globalVariables['x']`) looks equivalent and is not: `autonomous/executor.py`
+writes a variable with `globalVariables[name] = {}` followed by
+`['data'] = value`, i.e. it replaces that dict, so a closure holding the old one
+would silently freeze at the previous value. The containers themselves are built
+once — `FlowChart_dockWidgets.__init__` for the graph's two, `nodz_main`'s
+`NodeItem` for each node's — so capturing them is stable and costs one dict
+lookup per read instead of rebuilding `createNodeDictFromNodes` per frame.
+
+**Node origins capture the node object at bind time** (via the `nodeDict` built
+once), rather than re-resolving the name per call. The graph is static for the
+duration of an acquisition; re-resolving would reintroduce exactly the per-frame
+`createNodeDictFromNodes` rebuild this task removes.
+
+**API change to T-G2's binder:** `bindKwargsFromGUIFunction` now returns a
+`BoundKwargs` (frozen dataclass: `values`, `variableGetters`, `.resolve()`)
+rather than a plain dict. `resolve()` returns `values` *itself* when there are no
+Variable kwargs — the overwhelmingly common case, and the caller splats it into
+`**kwargs` anyway, so the copy would be pure per-frame waste.
+
+**Still eval-based until T-G4:** `realTimeAnalysis_run`/`_end`/`_visualisation`
+keep building eval text and keep rebuilding `nodeDict` per frame, because the
+eval text references `nodeDict[...]` in its local frame. T-G4 deletes both.
+
+**Verification:** `tests/test_rt_kwarg_binding.py` — a variable rewritten via the
+replace-the-dict pattern is seen by a bound node, both for `@Global` and for a
+node origin; `resolve()` allocates nothing when there are no Variable kwargs.
+`pytest -q` — 737 passed.
+
+**Affects:** `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/Documentation/rt_analysis_parameters.md`,
+`tests/test_rt_kwarg_binding.py`.

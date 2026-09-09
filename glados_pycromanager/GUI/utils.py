@@ -14,7 +14,7 @@ import sys
 import time
 import warnings
 import webbrowser
-from dataclasses import fields
+from dataclasses import dataclass, fields
 from typing import Any
 
 import appdirs
@@ -2356,21 +2356,60 @@ def kwargTypesFromFunction(functionname):
     return declaredTypes
 
 
-def resolveNodzVariable(reference, nodzInfo, nodeDict=None):
-    """Read the current value of a `name@Origin` Glados-variable reference.
+def makeNodzVariableGetter(reference, nodzInfo, nodeDict=None):
+    """Return a zero-arg callable reading the **current** value of `name@Origin`.
 
-    Origin is `Global`, `Core`, or another node's name. This is the direct
-    equivalent of the source text `getEvalTextFromGUIFunction` used to emit
-    (`nodeDict['X'].variablesNodz['y']['data']`), evaluated instead of eval'ed.
+    Origin is `Global`, `Core`, or another node's name. This replaces the source
+    text `getEvalTextFromGUIFunction` used to emit
+    (`nodeDict['X'].variablesNodz['y']['data']`) — which is the only reason
+    `eval()` needed a live local frame holding `nodeDict`, and therefore the only
+    reason `createNodeDictFromNodes` was rebuilt on every frame (T-G3).
+
+    What is captured is the *container mapping* (`nodzInfo.globalVariables`, or
+    the origin node's `variablesNodz`), never the value and never the per-variable
+    dict: writers replace the per-variable dict wholesale
+    (`globalVariables[name] = {}` then `['data'] = value`, see
+    `autonomous/executor.py`), so capturing one level deeper would silently go
+    stale. The containers themselves are built once, per graph and per node.
     """
     variableName, _, originNodeName = str(reference).partition('@')
     if originNodeName == 'Global':
-        return nodzInfo.globalVariables[variableName]['data']
-    if originNodeName == 'Core':
-        return nodzInfo.coreVariables[variableName]['data']
-    if nodeDict is None:
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
-    return nodeDict[originNodeName].variablesNodz[variableName]['data']
+        container = nodzInfo.globalVariables
+    elif originNodeName == 'Core':
+        container = nodzInfo.coreVariables
+    else:
+        if nodeDict is None:
+            nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
+        container = nodeDict[originNodeName].variablesNodz
+    return lambda: container[variableName]['data']
+
+
+def resolveNodzVariable(reference, nodzInfo, nodeDict=None):
+    """Read the current value of a `name@Origin` Glados-variable reference once."""
+    return makeNodzVariableGetter(reference, nodzInfo, nodeDict)()
+
+
+@dataclass(frozen=True)
+class BoundKwargs:
+    """A node's kwargs, resolved once at bind time (T-G2/T-G3).
+
+    `values` holds the constants, already coerced to their declared metadata
+    types. `variableGetters` holds one zero-arg callable per Variable-mode kwarg,
+    called on each `resolve()` so a Glados variable changed mid-run is seen.
+    """
+    values: dict
+    variableGetters: dict
+
+    def resolve(self) -> dict:
+        """Return the kwargs dict to call the node with."""
+        if not self.variableGetters:
+            #Overwhelmingly the common case; no per-call copy needed since the
+            #caller splats this into **kwargs anyway.
+            return self.values
+        resolved = dict(self.values)
+        for kwargName, getter in self.variableGetters.items():
+            resolved[kwargName] = getter()
+        return resolved
 
 
 def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
@@ -2390,8 +2429,9 @@ def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
     Advanced mode is still unimplemented and falls back to the raw text, exactly
     as the eval-text path does.
 
-    Returns None when a required kwarg has no value (logging the same error the
-    eval-text path logs), so callers can keep their existing failure handling.
+    Returns a :class:`BoundKwargs` (call ``.resolve()`` for the dict to splat into
+    the node), or None when a required kwarg has no value — logging the same error
+    the eval-text path logs, so callers can keep their existing failure handling.
     """
     if methodKwargTypes is None:
         methodKwargTypes = ['Value'] * len(methodKwargNames)
@@ -2413,13 +2453,15 @@ def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
         return None
 
     declaredTypes = kwargTypesFromFunction(methodName)
-    boundKwargs = {}
+    boundValues = {}
+    variableGetters = {}
 
     def _bind(kwargName, rawValue, mode):
         if mode == 'Variable':
-            #Live reference, not a literal - never coerced, never quoted.
+            #Live reference, not a literal - never coerced, never quoted, and
+            #re-read on every resolve() so a variable changed mid-run is seen.
             try:
-                boundKwargs[kwargName] = resolveNodzVariable(rawValue, nodzInfo, nodeDict)
+                variableGetters[kwargName] = makeNodzVariableGetter(rawValue, nodzInfo, nodeDict)
             except (AttributeError, KeyError, TypeError) as exc:
                 #No graph to resolve against (e.g. an RT node started from the
                 #live view, nodzInfo=None), or a stale reference. Hand the raw
@@ -2428,12 +2470,12 @@ def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
                 logging.warning("Could not resolve Variable kwarg %s.%s = %r (%s); "
                                 "passing the reference through as text",
                                 methodName, kwargName, rawValue, exc)
-                boundKwargs[kwargName] = rawValue
+                boundValues[kwargName] = rawValue
         elif mode == 'Advanced':
             logging.error('To implement!')
-            boundKwargs[kwargName] = rawValue
+            boundValues[kwargName] = rawValue
         else:
-            boundKwargs[kwargName] = coerceKwargValue(
+            boundValues[kwargName] = coerceKwargValue(
                 rawValue, declaredTypes.get(kwargName), kwargName, methodName)
 
     for reqKwarg in reqKwargs:
@@ -2458,9 +2500,9 @@ def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
     #Distribution/time-fit choices come from combo boxes and stay text.
     for extraKwarg in ('dist_kwarg', 'time_kwarg'):
         if extraKwarg in methodKwargNames:
-            boundKwargs[extraKwarg] = methodKwargValues[methodKwargNames.index(extraKwarg)]
+            boundValues[extraKwarg] = methodKwargValues[methodKwargNames.index(extraKwarg)]
 
-    return boundKwargs
+    return BoundKwargs(boundValues, variableGetters)
 #endregion
 
 def _rtAnalysisKwargsFromCurrentData(function, currentData, modeAware=True):
@@ -2781,7 +2823,7 @@ def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
         )
 
     from glados_pycromanager.autonomous import registry as _registry
-    return _registry.dispatch(className, core=core, **boundKwargs)
+    return _registry.dispatch(className, core=core, **boundKwargs.resolve())
 
 
 def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
