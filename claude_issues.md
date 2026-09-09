@@ -33,13 +33,16 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
-- **Live view during an MDA is slow on MMCORE_PLUS only** (256x256 @ ~5 ms frametime,
-  reported 2026-09-09, still open after T-E1/T-E2/T-F3) — scheduled as **T-E6** in
-  `claude_throughput_project.md`, deliberately sequenced after Tier E and Tier F because
-  those touch the same code and the GUI thread has already proven to be the dominant
-  cost. Leading hypothesis is display *lag*, not display *rate*: the writer queue is
-  sized in bytes, so 128 KB frames give a 2048-frame queue, and the reported
-  `peak queue depth 437/2048` is ~2.2 s of lag behind the camera at 200 fps.
+- **Live view during an MDA repaints only 2-3x/s on MMCORE_PLUS only** (256x256 @ ~5 ms
+  frametime, reported 2026-09-09, still open after T-E1/T-E2/T-F3) — scheduled as **T-E6**
+  in `claude_throughput_project.md`, sequenced after Tier E and Tier F because those touch
+  the same code. Confirmed by the user to be a *rate* problem, not display lag. Measured:
+  the scratch display store costs ~3.2 ms/frame at 256x256 (41 MB/s — per-file overhead,
+  one file per frame), so at a 5 ms frametime the writer thread uses ~64% of the frame
+  budget doing ~200 file creations/s. Chunking and sharding were re-measured at this frame
+  size and are 5-6x worse, so there is nothing to tune in zarr. Note the scratch store may
+  now be redundant entirely, since the MDA writes its real archive via
+  `run_mda(output=...)`.
 
 - **A JVM is loaded even on the MMCORE_PLUS backend** — `hs_err_pid49512.log` shows 17
   JavaThreads in a session whose selected backend was pymmcore-plus, which needs no Java
