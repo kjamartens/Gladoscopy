@@ -464,7 +464,13 @@ class MMConfigUI(CustomMainWindow):
             #Load the file
             with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
                 gladosInfo = json.load(file)
-                MMControlsInfo = gladosInfo['MMControls']
+                # The state file's sections are written independently and any of
+                # them can be absent -- a fresh install has none, and a corrupt
+                # file that save_config_to_json had to overwrite comes back with
+                # only GlobalData. Indexing this directly used to crash startup
+                # with KeyError: 'MMControls'. Every read below is already
+                # guarded by an `if key in MMControlsInfo`, so {} is a no-op.
+                MMControlsInfo = gladosInfo.get('MMControls', {})
         
             #Hand-set the values that I want:
             if 'exposureTimeInputField' in MMControlsInfo:

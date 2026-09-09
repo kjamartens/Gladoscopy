@@ -80,7 +80,9 @@ def MDAGlados_plugin(parent):
         #Load the mda state
         with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
             gladosInfo = json.load(file)
-            mdaInfo = gladosInfo['MDA']
+            # See dockWidget_MDA in napariGlados.py: a missing section must fall
+            # through to the default MDA, not crash the plugin's construction.
+            mdaInfo = gladosInfo.get('MDA', {})
         
         global core, livestate, napariViewer, shared_data, MM_JSON
         core = parent.core

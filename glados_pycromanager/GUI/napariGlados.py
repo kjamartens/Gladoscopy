@@ -2138,7 +2138,11 @@ class dockWidget_MDA(dockWidgets):
             #Load the mda state
             with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
                 gladosInfo = json.load(file)
-                mdaInfo = gladosInfo['MDA']
+                # A section can legitimately be missing (fresh install, or a
+                # corrupt file that save_config_to_json had to overwrite). {}
+                # makes the field reads below raise KeyError, which the
+                # `except KeyError` already handles by building a default MDA.
+                mdaInfo = gladosInfo.get('MDA', {})
             
             try:
                 #Add the full micro manager controls UI

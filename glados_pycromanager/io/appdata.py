@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import shutil
+import time
 from typing import TYPE_CHECKING
 
 import appdirs
@@ -49,6 +50,35 @@ def appdata_root() -> str:
 def glados_state_path() -> str:
     """Full path to the `glados_state.json` file in the per-user AppData dir."""
     return os.path.join(appdata_root(), STATE_FILENAME)
+
+
+def load_glados_state() -> dict:
+    """Read `glados_state.json` and return it, or `{}` if it cannot be used.
+
+    The GUI's state file holds independent top-level sections (`MDA`,
+    `MMControls`, `GlobalData`) written by different code paths at different
+    times, so **any of them can legitimately be absent** — a fresh install has
+    none, and a section is only created once its widgets have been saved at
+    least once. Callers must therefore never index a section directly; use
+    `load_glados_state().get('MDA', {})`.
+
+    A missing, unreadable or corrupt file is not an error worth stopping
+    startup for: the user loses saved widget values, not data. It is logged and
+    treated as "no saved state".
+    """
+    path = glados_state_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path) as fh:
+            loaded = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Could not read %s; continuing with defaults: %s", path, exc)
+        return {}
+    if not isinstance(loaded, dict):
+        logger.warning("%s does not contain a JSON object; ignoring it", path)
+        return {}
+    return loaded
 
 
 def load_config_from_json(cfg: "Config", *, strict: bool = False) -> "Config":
@@ -144,10 +174,21 @@ def save_config_to_json(cfg: "Config") -> None:
             with open(json_path) as fh:
                 loaded = json.load(fh)
         except (OSError, json.JSONDecodeError) as exc:
+            # Overwriting drops every other section (MDA, MMControls) with it,
+            # so keep a copy the user can inspect or hand back rather than
+            # destroying their settings silently.
+            backup = "%s.corrupt-%s" % (json_path, time.strftime("%Y%m%d-%H%M%S"))
+            try:
+                shutil.copyfile(json_path, backup)
+                kept = "; previous contents kept at %s" % backup
+            except OSError as copy_exc:  # noqa: BLE001 -- best effort
+                kept = " (could not be backed up: %s)" % copy_exc
             logger.warning(
-                "Existing %s could not be read while saving; will overwrite: %s",
+                "Existing %s could not be read while saving; will overwrite "
+                "and its MDA/MMControls sections will be lost: %s%s",
                 json_path,
                 exc,
+                kept,
             )
         else:
             if isinstance(loaded, dict):
