@@ -2940,3 +2940,29 @@ pool-claimed FFT run. `pytest -q` — 753 passed.
 `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/FFT_im.py`,
 `tests/fakes/fake_rt_analysis.py`, `tests/test_analysis_process.py`,
 `tests/test_subprocess_snapshot_optin.py`, `CLAUDE.md`.
+
+## 2026-09-09 — The picklability verdict is cached per metadata *type*, not per instance  [T-G6]
+
+**Decision:** `AnalysisProcess_customFunction._picklable_metadata()` probes once
+and caches `(type(metadata) -> verdict)`. A frame whose metadata is a different
+type re-probes; same type reuses the verdict.
+
+**Why keyed by type rather than a plain one-shot flag.** The task says to
+"re-probe only if a later frame raises", but there is nothing to raise: the only
+statement that could is `pickle.dumps` itself (the real failure happens
+asynchronously on `multiprocessing.Queue`'s feeder thread, silently — which is
+the whole reason the probe exists). The metadata type changing is the one
+observable signal that a later frame's answer could legitimately differ, so that
+is the invalidation key. It costs one `is` comparison per frame.
+
+**The degradation is unchanged:** an unpicklable metadata is replaced with `{}`,
+logged at WARNING with the traceback, and the *frame* still goes through.
+
+**Verification:** `tests/test_metadata_picklability_probe.py` — 100 frames of the
+same metadata type cost one `pickle.dumps`; an unpicklable type is dropped and
+not re-probed; switching types re-probes each way. The method is exercised
+through a `SimpleNamespace` carrying only the probe state, so no QThread is
+constructed and no worker process spawned. `pytest -q` — 757 passed.
+
+**Affects:** `glados_pycromanager/GUI/AnalysisClass.py`,
+`tests/test_metadata_picklability_probe.py`.

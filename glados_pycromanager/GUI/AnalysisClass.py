@@ -626,6 +626,10 @@ class AnalysisProcess_customFunction(QThread):
         self.nodzInfo = nodzInfo
         self._new_image = Event()
         self._activity_event = Event()
+        #Cached verdict of the metadata picklability probe (T-G6), keyed by the
+        #metadata type so a changed shape is re-probed rather than assumed.
+        self._metadata_probe_type = None
+        self._metadata_picklable = True
         self.visualisationObject = None
         self.RT_analysis_object = None
         self._cache_key = _rt_config_key(analysisInfo)
@@ -709,6 +713,35 @@ class AnalysisProcess_customFunction(QThread):
         if wants_visualisation and self.RT_analysis_object is not None:
             self.visualisationObject = AnalysisThread_customFunction_Visualisation(self.RT_analysis_object, shared_data, analysisInfo=analysisInfo)
             self.visualisationObject.start()
+
+    def _picklable_metadata(self, metadata):
+        """Return `metadata`, or {} if it cannot cross the process boundary.
+
+        multiprocessing.Queue.put() hands off to a background feeder thread that
+        pickles asynchronously -- an unpicklable metadata object (e.g. a live
+        Java/SWIG-backed handle from the pycromanager bridge) fails silently
+        there with no exception raised here, which otherwise looks identical to
+        "the worker never responded". So it is validated proactively, and that
+        failure mode degrades (drop metadata, keep the frame) instead of hanging.
+
+        The verdict is invariant for a given backend, so a full `pickle.dumps`
+        used to run on every frame purely as a probe with its result discarded
+        (T-G6). It is now cached per metadata *type*: a different type re-probes,
+        which is the only way a later frame's answer can legitimately differ.
+        """
+        metadata_type = type(metadata)
+        if metadata_type is self._metadata_probe_type:
+            return metadata if self._metadata_picklable else {}
+        try:
+            pickle.dumps(metadata)
+        except Exception:
+            logging.warning('AnalysisProcess: frame metadata is not picklable, forwarding without it', exc_info=True)
+            self._metadata_probe_type = metadata_type
+            self._metadata_picklable = False
+            return {}
+        self._metadata_probe_type = metadata_type
+        self._metadata_picklable = True
+        return metadata
 
     def new_image(self):
         self._new_image.set()
@@ -805,18 +838,7 @@ class AnalysisProcess_customFunction(QThread):
             if self.image_queue_analysis:
                 analysis_start = time.time()
                 image, metadata = self.image_queue_analysis.popleft() #type:ignore
-                # multiprocessing.Queue.put() hands off to a background feeder
-                # thread that pickles asynchronously -- an unpicklable metadata
-                # object (e.g. a live Java/SWIG-backed handle from the
-                # pycromanager bridge) fails silently there with no exception
-                # raised here, which otherwise looks identical to "the worker
-                # never responded". Validate proactively so that failure mode
-                # degrades (drop metadata, keep the frame) instead of hanging.
-                try:
-                    pickle.dumps(metadata)
-                except Exception:
-                    logging.warning('AnalysisProcess: frame metadata is not picklable, forwarding without it', exc_info=True)
-                    metadata = {}
+                metadata = self._picklable_metadata(metadata)
                 try:
                     self._in_queue.put_nowait((image, metadata))
                 except std_queue.Full:
