@@ -2318,3 +2318,37 @@ wording, and the acquisition gate (including that it resumes on the next tick).
 **Affects:** `glados_pycromanager/GUI/nodz/nodz_main.py` (`collectWarnings`,
 `_acquisitionOngoing`), `glados_pycromanager/GUI/sharedFunctions.py`
 (`Dict_Specific_WarningErrorInfo`), `tests/test_warning_update_coalescing.py`.
+
+## 2026-09-09 — Only the signal path into checkNodesOnErrors is debounced; direct callers stay immediate  [T-F5]
+**Decision:** The eight graph signals now connect to a new
+`scheduleCheckNodesOnErrors(*args)`, which restarts a single-shot 100 ms
+`QTimer` (`ERROR_CHECK_DEBOUNCE_MS`). The six existing direct
+`self.checkNodesOnErrors()` call sites are left connected to the synchronous
+method. Inside the check, `evaluateGraph()` is hoisted out of the per-node loop
+and the loop assigns `node._errorInfo` directly, leaving the one
+`updateAutonousErrorWarningInfo(self.shared_data)` call already at the end of the
+method as the single refresh.
+**Alternatives:** (a) debounce inside `checkNodesOnErrors` itself — rejected, it
+would delay the six direct callers too, and those exist precisely because
+something just changed and the caller wants the result now; (b) disconnect
+`signal_NodeMoved` altogether, since a move cannot change connectivity — tempting
+and probably true, but it is a behaviour change the task did not ask for, and the
+signal is emitted on drops as well as moves; the debounce gets the same win
+without reasoning about which emissions matter.
+**Reason:** `signal_NodeMoved` fires per mouse-move event of a drag. Each firing
+ran an O(nodes x scene items) sweep in which *every* `node.errorInfo` assignment
+(up to 2N of them) re-entered the full icon-rebuild chain — which loops over every
+node and, before T-F1/T-F2, reloaded PNGs from disk each time.
+**On `node._errorInfo`:** the task explicitly sanctions bypassing the setter here
+and only here. The property is initialised in `NodeItem.__init__` before any check
+runs, so the private attribute always exists.
+**Verification:** `tests/test_node_error_check_batching.py` — 17 tests pinning one
+`evaluateGraph()` and one icon refresh per check at 1/5/25 nodes, the unchanged
+error text (including that `findConnectedToNode(downstream=True)` matches the node
+as connection *destination* — the naming is inverted, the behaviour is what the
+test encodes), stale errors clearing on recheck, the loading guard, all eight
+signals routed through the debounced slot, a 50-emission drag producing zero
+sweeps, and the immediate fallback when the timer does not exist yet.
+`pytest -q -m "not slow"` — 580 passed.
+**Affects:** `glados_pycromanager/GUI/FlowChart_dockWidgets.py`,
+`tests/test_node_error_check_batching.py`.

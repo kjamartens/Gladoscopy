@@ -1730,14 +1730,22 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         self.signal_SocketConnected.connect(self.SocketConnected)
         
         
-        self.signal_NodeMoved.connect(self.checkNodesOnErrors)
-        self.signal_NodeEdited.connect(self.checkNodesOnErrors)
-        self.signal_PlugConnectedStartConnection.connect(self.checkNodesOnErrors)
-        self.signal_SocketConnectedStartConnection.connect(self.checkNodesOnErrors)
-        self.signal_AttrEdited.connect(self.checkNodesOnErrors)
-        self.signal_NodeFullyInitialisedNodeItself.connect(self.checkNodesOnErrors)
-        self.signal_PlugDisconnected.connect(self.checkNodesOnErrors)
-        self.signal_SocketDisconnected.connect(self.checkNodesOnErrors)
+        # T-F5: these eight signals include signal_NodeMoved, which fires on every
+        # mouse-move of a drag. They go through a coalescing timer so a drag costs
+        # one error check when it settles, not one per mouse-move event.
+        self._errorCheckTimer = QTimer(self)
+        self._errorCheckTimer.setSingleShot(True)
+        self._errorCheckTimer.setInterval(self.ERROR_CHECK_DEBOUNCE_MS)
+        self._errorCheckTimer.timeout.connect(self.checkNodesOnErrors)
+
+        self.signal_NodeMoved.connect(self.scheduleCheckNodesOnErrors)
+        self.signal_NodeEdited.connect(self.scheduleCheckNodesOnErrors)
+        self.signal_PlugConnectedStartConnection.connect(self.scheduleCheckNodesOnErrors)
+        self.signal_SocketConnectedStartConnection.connect(self.scheduleCheckNodesOnErrors)
+        self.signal_AttrEdited.connect(self.scheduleCheckNodesOnErrors)
+        self.signal_NodeFullyInitialisedNodeItself.connect(self.scheduleCheckNodesOnErrors)
+        self.signal_PlugDisconnected.connect(self.scheduleCheckNodesOnErrors)
+        self.signal_SocketDisconnected.connect(self.scheduleCheckNodesOnErrors)
         
         
         #Handling of the CallAction threads belonging to nodes is done via a QThreadPool
@@ -3552,6 +3560,29 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             if node.name not in nodeNamesOnScreen:
                 self.nodes.remove(node)
     
+    #: Debounce window for the signal-driven error check (T-F5). Long enough
+    #: that a drag produces one check when it settles, short enough to feel
+    #: immediate after a connection or an edit.
+    ERROR_CHECK_DEBOUNCE_MS = 100
+
+    def scheduleCheckNodesOnErrors(self, *args):
+        """Coalesce error checks driven by graph signals (T-F5).
+
+        `signal_NodeMoved` fires on every mouse-move event of a node drag, and
+        `checkNodesOnErrors` is an O(nodes x scene items) sweep that used to
+        rebuild every icon from disk once per node. Restarting a single-shot
+        timer collapses a whole drag into one check. Direct callers still get an
+        immediate check -- only the signal path is debounced.
+
+        Accepts and ignores the signals' payloads; the eight of them have three
+        different signatures.
+        """
+        timer = getattr(self, '_errorCheckTimer', None)
+        if timer is None:
+            self.checkNodesOnErrors()
+            return
+        timer.start(self.ERROR_CHECK_DEBOUNCE_MS)
+
     def checkNodesOnErrors(self):
         #Idea: check all nodes for errors, alongside unconnected nodes. If so, update the warning. If not, reset the warning to none.
         
@@ -3559,18 +3590,26 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             #Check that all nodes have connections where required.
             #Effectively, this means that all nodes should have a downstream connector
             self.cleanupNodeList()
-            
+
+            # T-F5: evaluateGraph() walks every item in the QGraphicsScene and is
+            # invariant across this loop -- it used to be called once per node.
+            graph = self.evaluateGraph()
+
             for node in self.nodes:
-                #Init all nodes with no error:
-                node.errorInfo = ''
-                
+                # T-F5: assign the private attribute. The `errorInfo` *setter*
+                # calls updateAutonousErrorWarningInfo, which reloads icons and
+                # loops over every node, so going through it per node made this
+                # quadratic with disk I/O. The single refresh after the loop
+                # below covers every node at once.
+                node._errorInfo = ''
+
                 #check fo downstream connections
-                downstreamNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[],upstream=False,downstream=True)
+                downstreamNodes = nodz_utils.findConnectedToNode(graph,node.name,[],upstream=False,downstream=True)
                 if len(downstreamNodes) == 0:
                     #Check if it requires one...
                     if len(node.sockets) > 0:
-                        node.errorInfo = 'No downstream connections found.'
-            
+                        node._errorInfo = 'No downstream connections found.'
+
             utils.updateAutonousErrorWarningInfo(self.shared_data)
         
         # self.shared_data.warningErrorInfoInfo['Errors'] = totalNodeErrorMessage
