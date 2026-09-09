@@ -2243,3 +2243,35 @@ still painting every widget, an empty cache at import, and a missing icon stayin
 retryable. `pytest -q -m "not slow"` — 535 passed.
 **Affects:** `glados_pycromanager/ui/widgets/builders.py`,
 `tests/test_icon_cache.py`.
+
+## 2026-09-09 — Attribute ordering moves to the mutation sites, not a paint-time dirty flag  [T-F2]
+**Decision:** The bottom/top attribute partition that `NodeItem.paint()` used to
+recompute and reassign on every repaint is now `NodeItem._reorderAttrs()`, called
+from the three places `attrs` actually changes: `_createAttribute`,
+`_deleteAttribute`, and `Nodz.editAttribute` (which both renames in place and
+re-indexes via `_swapListIndices`). The method skips the assignment when the order
+is already correct, so a defensive call costs one O(n) scan and no allocation.
+**Alternatives:** (a) a dirty flag drained at the top of `paint()` — rejected, it
+keeps model mutation inside the render pass, which is the actual defect the task
+names; (b) leave the rebuild in `paint()` but only assign when the order changed —
+rejected for the same reason, and it still allocates two lists per repaint per
+node; (c) maintain the ordering as an invariant of `attrs` via a custom list
+subclass — rejected as far more surface area than the problem warrants.
+**Reason:** The partition is a pure function of `attrsData`, so it can only change
+when the attribute list does. Doing it at those points is also *earlier* than
+before — previously the order was only settled at the first paint, while
+`PlugItem`/`SocketItem` geometry already indexes into `attrs` — so this makes the
+ordering more consistent, not less.
+**Also decided:** status pixmaps, `QFontMetrics` objects and text extents are held
+in module-level dicts rather than per-item attributes, so they are shared across
+every node in the scene (a graph paints many nodes with the same font and status).
+`_textExtent` additionally collapses the *two* `boundingRect()` calls the original
+made per string — one for `.width()`, one for `.height()` — into one measurement.
+A null pixmap is not cached, same rule as T-F1.
+**Verification:** `tests/test_nodz_paint_caches.py` — 13 tests covering the caches,
+the unknown-status fallback to the error icon (the original `else` branch), the
+ordering semantics, and two source-level guards asserting `paint()` no longer
+contains `QPixmap(`, `QFontMetrics(` or `self.attrs =`.
+`pytest -q -m "not slow"` — 548 passed.
+**Affects:** `glados_pycromanager/GUI/nodz/nodz_main.py`,
+`tests/test_nodz_paint_caches.py`.
