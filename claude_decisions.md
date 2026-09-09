@@ -2684,3 +2684,53 @@ the thing to watch on the next hardware run.
 **Affects:** `glados_pycromanager/GUI/sharedFunctions.py`,
 `glados_pycromanager/GUI/MMcontrols.py`, `tests/test_mode_setter_no_sleep.py`,
 `tests/test_acq_transition_nonblocking.py`.
+
+## 2026-09-09 — The metadata cache lives in the registry, keyed by module stem  [T-G1]
+
+**Context:** T-G1 offered two shapes — an optional `metadata=` argument on
+`@register`, or a cached `registry.get_metadata(name)`. The decorator variant was
+rejected: `@register` decorates *functions*, while `__function_metadata__()` is a
+*module-level* dict covering every function in the file, so the decorator would
+have to carry the same dict once per function in the module and each node file
+would need editing.
+
+**Decision:** `registry.get_metadata(name)` with a plain dict cache keyed by the
+module **stem** (`"FFT_im"`), since the dict is a module-level constant and every
+caller already resolves the stem first. `name` accepts either the stem or the
+dotted `Module.Function` form. Resolution delegates to `utils._resolve_node_obj`
+via a lazy import, so registry.py keeps its Qt-free import graph while there is
+still exactly one sys.modules stem-scan implementation.
+
+**Not cached: failures.** An `AttributeError` (module without
+`__function_metadata__`) is propagated and not memoized, so a module that grows
+one later is picked up. `clear_metadata_cache()` is wired into
+`reload_all_node_modules()` next to the existing `_REGISTRY.clear()` and
+`clear_resolve_node_obj_cache()`, and into `_reset_for_tests()`.
+
+**Blob removal is partial, deliberately.** `reqKwargsFromFunction`,
+`optKwargsFromFunction` and `displayNameFromKwarg` now read the metadata dict
+directly. `kwargsFromFunction` **keeps** building its `"key: value\n"` text blob —
+it is a public helper whose blob shape other code (and the parallel copy in
+`AutonomousMicroscopy/MainScripts/HelperFunctions.py`) may depend on; it merely
+sources the metadata from the cache now. Nothing on the per-frame path calls it
+any more.
+
+**Behaviour deltas, both improvements in degenerate cases only:**
+- `displayNameFromKwarg` returns the raw kwarg name when the function or kwarg
+  cannot be found; the old code could return the literal string
+  `'Shouldnt be shown'` or leak a value from the previous loop iteration.
+- The old `name:\s*(\S+)` regex would also have matched a *value* containing the
+  text `name:`; reading the dict cannot.
+
+**Verification:** `tests/test_node_metadata_cache.py` — a counting fake node module
+proves the metadata is built once across repeated helper calls, that
+`clear_metadata_cache()` forces a rebuild, and that real nodes (`FFT_im`,
+`Strobo_lasers`) still report the same kwarg names and `display_text` values,
+including one containing spaces. `pytest -q -m "not slow"` — 699 passed. Manual
+GUI check (RT-analysis dropdown, node parameter panel, Reload Custom Nodes) could
+not be performed in this environment.
+
+**Affects:** `glados_pycromanager/autonomous/registry.py`,
+`glados_pycromanager/autonomous/executor.py`,
+`glados_pycromanager/plugins/discovery.py`,
+`glados_pycromanager/GUI/utils.py`, `tests/test_node_metadata_cache.py`.

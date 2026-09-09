@@ -472,7 +472,7 @@ class FlowchartExecutorMixin:
                     #Figure out which visualisation we want to do
                     chosenLayerType = None
                     try:
-                        fnctmetadata = eval(f"{selectedFunction.split('.')[0]}.__function_metadata__()")
+                        fnctmetadata = registry.get_metadata(selectedFunction)
                         visType = fnctmetadata[selectedFunction.split('.')[1]]['visualisation_type']
                         
                         if visType == 'value' or visType == 'points' or visType == 'Value' or visType == 'Points' or visType == 'Values' or visType == 'values':
@@ -583,7 +583,7 @@ class FlowchartExecutorMixin:
                     #Figure out which visualisation we want to do
                     chosenLayerType = None
                     try:
-                        fnctmetadata = eval(f"{selectedFunction.split('.')[0]}.__function_metadata__()")
+                        fnctmetadata = registry.get_metadata(selectedFunction)
                         visType = fnctmetadata[selectedFunction.split('.')[1]]['visualisation_type']
                         
                         if visType == 'value' or visType == 'points' or visType == 'Value' or visType == 'Points' or visType == 'Values' or visType == 'values':

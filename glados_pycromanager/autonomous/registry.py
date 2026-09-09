@@ -35,10 +35,21 @@ __all__ = [
     "get",
     "is_registered",
     "registered_names",
+    "get_metadata",
+    "clear_metadata_cache",
 ]
 
 
 _REGISTRY: dict[str, Callable] = {}
+
+# T-G1: every node module rebuilds a fresh nested dict literal each time its
+# module-level ``__function_metadata__()`` is called, and the GUI/dispatch code
+# called it several times *per analysed frame* (twice for ``run``, four times
+# for ``visualise``). The dict is a constant for a given loaded module, so it is
+# cached here, keyed by the module stem ("FFT_im"), which is what every caller
+# resolves against. Cleared by plugins.discovery.reload_all_node_modules(), the
+# only supported way a node module's source changes at runtime.
+_METADATA_CACHE: dict[str, dict] = {}
 
 
 def register(name: str) -> Callable[[Callable], Callable]:
@@ -122,6 +133,54 @@ def get(name: str) -> Callable:
         ) from exc
 
 
+def _resolve_node_module(stem: str):
+    """Resolve a node-module stem ("FFT_im") to the loaded module object.
+
+    Delegates to ``GUI.utils._resolve_node_obj`` — the sys.modules stem scan
+    that every other node lookup already goes through — imported lazily so
+    this module stays importable without Qt.
+    """
+    from glados_pycromanager.GUI.utils import _resolve_node_obj
+
+    return _resolve_node_obj(stem)
+
+
+def get_metadata(name: str) -> dict:
+    """Return the cached ``__function_metadata__()`` dict for a node.
+
+    Args:
+        name: Either a module stem (``"FFT_im"``) or a dotted node-function
+            name (``"FFT_im.RealTimeFFT"``); only the stem is used, since
+            ``__function_metadata__`` is a module-level function keyed by
+            function name.
+
+    Returns:
+        The metadata dict, as returned by the node module. **Callers must not
+        mutate it** — it is shared.
+
+    Raises:
+        AttributeError: If the module has no ``__function_metadata__``. Not
+            cached, so a module that grows one later is picked up.
+        NameError: If no loaded module matches the stem.
+    """
+    stem = str(name).split('.')[0]
+    metadata = _METADATA_CACHE.get(stem)
+    if metadata is None:
+        metadata = _resolve_node_module(stem).__function_metadata__()
+        _METADATA_CACHE[stem] = metadata
+    return metadata
+
+
+def clear_metadata_cache() -> None:
+    """Drop every cached ``__function_metadata__()`` dict.
+
+    Call whenever node modules are re-imported (see
+    ``plugins.discovery.reload_all_node_modules``) — the cached dicts belong
+    to the pre-reload module objects.
+    """
+    _METADATA_CACHE.clear()
+
+
 def dispatch_from_eval_text(eval_text: str, scope: Mapping[str, Any] | None = None) -> Any:
     """Parse a ``Module.Function(args)`` source string and dispatch via the registry.
 
@@ -183,3 +242,4 @@ def dispatch_from_eval_text(eval_text: str, scope: Mapping[str, Any] | None = No
 def _reset_for_tests() -> None:
     """Clear the registry. Test-only — never call from production code."""
     _REGISTRY.clear()
+    _METADATA_CACHE.clear()

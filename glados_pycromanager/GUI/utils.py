@@ -54,6 +54,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.autonomous import registry as _node_registry
 
 #endregion
 
@@ -163,6 +164,36 @@ def _resolve_node_obj(name_str):
     return obj
 
 
+def _node_metadata(name_str):
+    """Cached ``__function_metadata__()`` dict for a node module (T-G1).
+
+    Thin wrapper over :func:`registry.get_metadata` so every metadata read in
+    this module goes through one cache. The returned dict is *shared* — never
+    mutate it.
+    """
+    return _node_registry.get_metadata(name_str)
+
+
+def _nodeFunctionEntry(functionname):
+    """Return the metadata sub-dict of a single node function.
+
+    ``functionname`` is either ``"Module.Function"`` or a bare module stem; a
+    bare stem resolves to the module's *first* declared function, which is what
+    the blob-and-regex helpers this replaced did (they always regexed entry 0).
+
+    Returns None when the module has no usable metadata for that name, so
+    callers degrade to an empty kwarg list exactly as the regex path did.
+    """
+    try:
+        metadata = _node_metadata(functionname)
+        parts = str(functionname).split('.')
+        if len(parts) > 1:
+            return metadata[parts[1]]
+        return next(iter(metadata.values()))
+    except (AttributeError, TypeError, KeyError, NameError, StopIteration):
+        return None
+
+
 # Return all functions that are found in a specific directory
 def functionNamesFromDir(dirname):
     #initialise empty array
@@ -245,60 +276,34 @@ def functionNamesFromDir(dirname):
 
 #Returns the 'names' of the required kwargs of a function
 def reqKwargsFromFunction(functionname):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    #Perform a regex match on 'name'
-    name_pattern = r"name:\s*(\S+)"
-    #Get the names of the req_kwargs (allkwarginfo[0])
-    names = re.findall(name_pattern, allkwarginfo[0][0])
-    return names
+    #Read the (cached) metadata directly - this used to serialise the kwarg
+    #dicts into a "key: value" text blob and regex the names back out (T-G1).
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
+        return []
+    return [kwarg['name'] for kwarg in entry.get('required_kwargs', [])]
 
 #Returns a display name (if available) of an individual kwarg name, from a specific function:
 def displayNameFromKwarg(functionname,name):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    
-    #Look through optional args first, then req. kwargs (so that req. kwargs have priority in case something weirdi s happening):
-    for optOrReq in range(1,-1,-1):
-    
-        #Perform a regex match on 'name'
-        name_pattern = r"name:\s*(\S+)"
-        
-        if len(allkwarginfo[optOrReq]) > 0: #Check if we have at least one opt/req kwarg:
-            names = re.findall(name_pattern, allkwarginfo[optOrReq][0])
-            instances = re.split(r'(?=name: )', allkwarginfo[optOrReq][0])[1:]
-
-            #Find which instance this name belongs to:
-            name_id = -1
-            for i,namef in enumerate(names):
-                if namef == name:
-                    name_id = i
-            
-            if name_id > -1:
-                curr_instance = instances[name_id]
-                displayText_pattern = r"display_text: (.*?)\n"
-                displaytext = re.findall(displayText_pattern, curr_instance)
-                if len(displaytext) > 0:
-                    displayName = displaytext[0]
-                else:
-                    displayName = name
-        else:
-            displayName = 'Shouldnt be shown'
-    
+    #Look through optional args first, then req. kwargs (so that req. kwargs
+    #have priority in case something weird is happening).
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
+        return name
+    displayName = name
+    for kwargListName in ('optional_kwargs', 'required_kwargs'):
+        for kwarg in entry.get(kwargListName, []):
+            if kwarg.get('name') == name:
+                displayName = kwarg.get('display_text', name)
     return displayName
 
 #Returns the 'names' of the optional kwargs of a function
 def optKwargsFromFunction(functionname):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    if allkwarginfo[1] != []: #Check if there are any opt kwargs at all
-        #Perform a regex match on 'name'
-        name_pattern = r"name:\s*(\S+)"
-        #Get the names of the optional kwargs (allkwarginfo[1])
-        names = re.findall(name_pattern, allkwarginfo[1][0])
-        return names
-    else:
+    #Read the (cached) metadata directly rather than regexing a text blob (T-G1).
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
         return []
+    return [kwarg['name'] for kwarg in entry.get('optional_kwargs', [])]
 
 def classKwargValuesFromFittingFunction(functionname, class_type):
     #Get all kwarg info
@@ -311,13 +316,13 @@ def kwargsFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
+            functionMetadata = _node_metadata(functionname)
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
+            functionMetadata = _node_metadata(functionparent)
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
@@ -365,13 +370,13 @@ def inputFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
+            functionMetadata = _node_metadata(functionname)
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
+            functionMetadata = _node_metadata(functionparent)
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
@@ -389,13 +394,13 @@ def outputFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
+            functionMetadata = _node_metadata(functionname)
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
+            functionMetadata = _node_metadata(functionparent)
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
@@ -418,7 +423,7 @@ def infoFromMetadata(functionname,**kwargs):
         skipfinalline = False
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = _resolve_node_obj(str(functionname)).__function_metadata__()
+            functionMetadata = _node_metadata(functionname)
             finaltext = f"""\
             --------------------------------------------------------------------------------------
             {functionname} contains {len(functionMetadata)} callable functions: {", ".join(str(singlefunctiondata) for singlefunctiondata in functionMetadata)}
@@ -430,7 +435,7 @@ def infoFromMetadata(functionname,**kwargs):
             if specificKwarg == False:
                 #get the parent info
                 functionparent = functionname.split('.')[0]
-                functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
+                functionMetadata = _node_metadata(functionparent)
                 #sub-select the looprange
                 loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
                 looprange = range(loopv,loopv+1) #type:ignore
@@ -440,7 +445,7 @@ def infoFromMetadata(functionname,**kwargs):
                 #get the parent info
                 functionparent = functionname.split('.')[0]
                 #Get the full function metadata
-                functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
+                functionMetadata = _node_metadata(functionparent)
                 #Get the help string of a single kwarg
                 
                 #Find the help text of a single kwarg
@@ -582,7 +587,7 @@ def defaultValueFromKwarg(functionname,kwargname):
     defaultEntry=None
     functionparent = functionname.split('.')[0]
     #Get the full function metadata
-    functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
+    functionMetadata = _node_metadata(functionparent)
     if 'optional_kwargs'  in functionMetadata[functionname.split('.')[1]]:
         for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
             if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
@@ -609,7 +614,7 @@ def createGridFromFunction(functionname):
     #Idea: get all arg and kwarg info, and create a QGridLayout that contains these info, and line-edits, or dropdowns, or checkboxes, etc.
     
     #Create a gridLayout with labels and line-edits, dropdowns or checkboxes based on the function's metadata:
-    motherFunctionMetadata = eval(f'{str(motherFunctionFromFunctionName(functionname))}.__function_metadata__()')
+    motherFunctionMetadata = _node_metadata(motherFunctionFromFunctionName(functionname))
     functionMetadata = motherFunctionMetadata[daughterFunctionsFromFunctionName(functionname)]
     gridLayout = QGridLayout()
     current_row = 0
@@ -666,7 +671,7 @@ def displayNamesFromFunctionNames(functionName, polval):
         subroutineName = function.split('.')[0]
         singlefunctiondata = function.split('.')[1]
         #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
-        functionMetadata = _resolve_node_obj(str(subroutineName)).__function_metadata__()
+        functionMetadata = _node_metadata(subroutineName)
         if 'display_name' in functionMetadata[singlefunctiondata]:
             displayName = functionMetadata[singlefunctiondata]['display_name']
             #Add the polarity info between brackets if required
@@ -697,7 +702,7 @@ def typeFromKwarg(functionname,kwargname):
     try:
         functionparent = functionname.split('.')[0]
         #Get the full function metadata
-        functionMetadata = _resolve_node_obj(str(functionparent)).__function_metadata__()
+        functionMetadata = _node_metadata(functionparent)
         for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
             if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
                 #check if this has a default value:
@@ -2776,7 +2781,7 @@ def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
     indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
     
     wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
-    functionMetadata = _resolve_node_obj(wrapperName).__function_metadata__()
+    functionMetadata = _node_metadata(wrapperName)
     functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
     if runOrVis == 'run':
         if 'run_delay' not in functionMetadata2:
@@ -2816,7 +2821,7 @@ def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool
     indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
 
     wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
-    functionMetadata = _resolve_node_obj(wrapperName).__function_metadata__()
+    functionMetadata = _node_metadata(wrapperName)
     functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
     return bool(functionMetadata2.get('__runInSubprocess__', False))
 

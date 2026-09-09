@@ -352,6 +352,21 @@ acquisition, just materialised.
 
 So **users add new analysis/RT/custom nodes by dropping a `.py` into the AppData folder, not into the source tree.** When searching for a node implementation, check both locations. Adding a file to one of these folders without proper top-level functions will cause it to be imported but not appear as a node.
 
+**Node metadata is cached (T-G1).** `__function_metadata__()` rebuilds a fresh
+nested dict literal on every call, and the GUI/dispatch path called it several
+times *per analysed frame*. Read it through
+`autonomous/registry.py`'s `get_metadata(name)` — cached per module **stem**
+(`"FFT_im"`; `name` may be the stem or the dotted `Module.Function`), resolved via
+a lazy import of `utils._resolve_node_obj`. `utils._node_metadata()` /
+`utils._nodeFunctionEntry()` are the in-module wrappers; the returned dict is
+shared, so never mutate it. `clear_metadata_cache()` is called by
+`reload_all_node_modules()` alongside `_REGISTRY.clear()` — clear it from any new
+path that re-imports node modules. `reqKwargsFromFunction` /
+`optKwargsFromFunction` / `displayNameFromKwarg` now read that dict directly;
+`kwargsFromFunction` still builds its `"key: value"` text blob for other
+callers, but nothing per-frame goes through it. Tests:
+`tests/test_node_metadata_cache.py`.
+
 **Node kwarg widgets and the Value/Variable/Advanced switch:** how a node's
 `__function_metadata__()` kwargs turn into parameter-panel widgets, how the
 per-kwarg Value/Variable/Advanced switch (`name@Origin` / `{name@Origin}`

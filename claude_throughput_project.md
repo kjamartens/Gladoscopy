@@ -215,7 +215,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 ### Tier G — Analysis dispatch
 
-- [ ] **T-G1** Cache `__function_metadata__()` on the registry — M, no deps
+- [x] **T-G1** Cache `__function_metadata__()` on the registry — M, no deps
 - [ ] **T-G2** Coerce kwarg values at bind time — M, needs G1
 - [ ] **T-G3** Resolve Variable kwargs to closures — M, needs G1
 - [ ] **T-G4** `BoundNode`; delete the three per-frame `eval()` sites — **L**, needs G1-G3

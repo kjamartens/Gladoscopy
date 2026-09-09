@@ -278,11 +278,15 @@ def reload_all_node_modules() -> tuple[int, list[PluginLoadFailure]]:
     """
     import sys
 
-    from glados_pycromanager.autonomous.registry import _REGISTRY
+    from glados_pycromanager.autonomous.registry import _REGISTRY, clear_metadata_cache
     from glados_pycromanager.GUI.utils import clear_resolve_node_obj_cache
 
     # Wipe old registrations so deleted/renamed nodes don't linger.
     _REGISTRY.clear()
+    # registry.get_metadata() caches each module's __function_metadata__() dict
+    # (T-G1); those dicts belong to the module objects about to be replaced, so
+    # an edited node's new kwargs would otherwise never show up.
+    clear_metadata_cache()
     # utils._resolve_node_obj() caches stem->module lookups (Performance Mode
     # perf fix); the sys.modules entries it points at are about to be deleted
     # and re-created below, so drop the cache or it would keep returning the
