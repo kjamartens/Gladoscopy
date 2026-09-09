@@ -124,6 +124,16 @@ used to get upcast on write (T-D1). The helper also registers the array into
 `mdaZarrData[layer_name]`, resets `allMDAslicesRendered`, and owns the
 `new_zarr_temp_dir` call. Tests: `tests/test_mda_zarr_store_creation.py`.
 
+Dimension steps are set with **one** batched call (T-E1):
+`napariViewer.dims.set_current_step(list_of_axes, list_of_values)`. napari's
+`set_current_step` accepts sequences and that form routes through a single
+`set_point`, which assigns `Dims.point` once; the scalar form assigns it per call and
+each assignment emits a `point` event forcing a complete re-slice (chunk fetch,
+decompress, contrast rescan, GPU upload). Measured on the pinned napari 0.7.0: 4 point
+events for a 4-D per-axis loop, 1 for the batched call, identical resulting
+`current_step`. Tests: `tests/test_dims_batched_update.py` (which also pins the
+per-axis behaviour, so a future napari that stops coalescing fails loudly).
+
 Auto-contrast is throttled on **both** display paths (T-E2): the layer gets
 `_keep_auto_contrast = False` and `_maybe_refresh_contrast` recomputes limits every
 `visualisation_config.contrast_refresh_every_n_frames` (default 10) displayed frames,

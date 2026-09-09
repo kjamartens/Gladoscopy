@@ -1639,3 +1639,39 @@ already records why it is kept.
 multiDstack MDA, confirm brightness adapts within ~10 frames and the frame rate
 improves) was **not** performed: no hardware or demo backend in this
 environment.
+
+---
+
+## 2026-09-09 — T-E1: the sequence form of `set_current_step`, measured not assumed
+
+**The task said measure which API coalesces; it is the sequence form.** napari
+0.7.0's `Dims.set_current_step` accepts `int | Sequence[int]` for both `axis`
+and `value`, and the sequence form builds the full point tuple in `set_point`
+and assigns `Dims.point` **once**. Verified empirically against a headless
+`Dims(ndim=4)`: the per-axis loop emits 4 `point` events, the batched call emits
+1, and both land on the same `current_step`. That measurement is now a test
+(`tests/test_dims_batched_update.py`) rather than a note, and it pins the
+per-axis count too, so a future napari that stops coalescing fails loudly
+instead of quietly restoring the cost.
+
+**Chosen over the event-blocker option** the task also offered
+(`layer.events.blocker()` / `dims.events.blocker()` around the loop, then a
+manual refresh). It needs no suppression and no manual refresh — so it cannot
+violate the task's "don't suppress the final refresh" constraint by
+construction — and it is one line of public API instead of a blocker context
+plus a hand-rolled refresh.
+
+**Both loops in the branch were batched**, the per-frame one and the
+creation-time "set every step to 0" one. The adjacent `set_axis_label` loop
+takes sequences too but was left alone: it runs once per layer creation, not per
+frame, and it is outside this task.
+
+**Empty acquisitions are safe:** `set_current_step([], [])` is a no-op on the
+pinned napari (asserted), so a zero-dimension event list does not raise where
+the old loop simply did not execute.
+
+**Verification.** `pytest -q` — 467 passed (8 new). The manual check (3+
+dimension MDA, sliders track correctly, frame rate improves) was **not**
+performed: no hardware or demo backend in this environment. The event-count
+tests substitute for the re-slice-count half of that claim, not the frame-rate
+half.

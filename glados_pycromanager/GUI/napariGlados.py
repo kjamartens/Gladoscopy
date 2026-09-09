@@ -483,10 +483,12 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                         logging.info(f"Setting axis label {dim_id} to {dimensionOrder[dim_id]}")
                     napariViewer.reset_view()
                     
-                    #set the napariViewer to the correct slices:
-                    for dim_id in range(len(n_entries_in_dims)):
-                        napariViewer.dims.set_current_step(dim_id,0)
-                        logging.info(f"Setting current step {dim_id} to 0")
+                    #set the napariViewer to the correct slices, in one update
+                    #(see the per-frame call below for why the sequence form).
+                    napariViewer.dims.set_current_step(
+                        list(range(len(n_entries_in_dims))),
+                        [0] * len(n_entries_in_dims))
+                    logging.info("Set all %d current steps to 0", len(n_entries_in_dims))
                 else:
                     nrLayersBefore = len(napariViewer.layers)
                     layer = napariViewer.add_image(latestImage, colormap=DataStructure['layer_color_map'],name = layerName)
@@ -529,8 +531,19 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     #set the napariViewer to the correct slice: reuse the indices
                     #already computed for sliceTuple above rather than re-running
                     #the same searchsorted per dimension a second time.
-                    for dim_id, currentSliceID in enumerate(sliceTuple):
-                        napariViewer.dims.set_current_step(dim_id,currentSliceID)
+                    #
+                    #One batched call, not one per dimension (T-E1). Each scalar
+                    #call assigns napari's `Dims.point` separately, emitting a
+                    #`point` event and forcing a complete re-slice -- chunk fetch,
+                    #decompress, contrast rescan, GPU upload -- so a 4-D plan cost
+                    #four full re-slices per displayed frame. `set_current_step`
+                    #also accepts sequences, and that form routes through a single
+                    #`set_point`, which builds the whole tuple and assigns `point`
+                    #once. Measured against the pinned napari 0.7.0: 4 point events
+                    #for the per-axis loop, 1 for the batched call, same resulting
+                    #`current_step`.
+                    napariViewer.dims.set_current_step(list(range(len(sliceTuple))),
+                                                       list(sliceTuple))
 
                     # Throttled auto-contrast (T-E2), after the sliders have moved so
                     # the limits are fitted to the slice now on screen. Replaces

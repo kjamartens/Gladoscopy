@@ -189,7 +189,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 ### Tier E — Napari visualisation
 
-- [ ] **T-E1** Batch per-dimension `set_current_step` calls — M, no deps
+- [x] **T-E1** Batch per-dimension `set_current_step` calls — M, no deps
 - [x] **T-E2** Throttle auto-contrast on the multiDstack path — S, no deps
 - [ ] **T-E3** Stop per-frame layer teardown/rebuild — M, no deps
 - [ ] **T-E4** Preallocate album-mode layers — M, no deps
