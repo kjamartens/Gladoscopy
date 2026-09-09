@@ -586,6 +586,20 @@ RT-analysis nodes that opt into subprocess isolation (`"__runInSubprocess__": Tr
 - `GUI/subprocess_pool.py`'s `WarmSubprocessPool` pre-spawns one blank child at app startup (`shared_data._rt_subprocess_pool.start()`, called right after `Shared_data()` in `GUI_napari.py`'s `main()`) that pre-imports the package tree and (best-effort, since it's the only node opted in today) `diplib`, then idles waiting to be handed a real node's `analysisInfo` — shortcutting the first-ever subprocess-node start in a session. **The pool, not the claiming caller, creates the worker's channels** (frame in/out queues, stop event, control pair): a `multiprocessing` Queue/Event can only cross a process boundary by *inheritance*, so they are built in `start()` and passed as `Process` args, and `try_claim()` returns them as a `channels` dict for `AnalysisProcess_customFunction.__init__` to adopt. Sending them through `assign_queue` instead raises `RuntimeError: Queue objects should only be shared between processes through inheritance` on the parent's queue-feeder *thread* — the parent continues unaware while the child blocks forever on `assign_queue.get()`, so the node silently never processes a frame (that was the shipped bug; the cold-spawn path was unaffected, which is why only pool-claimed starts broke). `assign_queue` now carries only `(analysisInfo, log_level)`. Tests: `tests/test_subprocess_pool.py`. Extend its pre-imported-library list (or generalize via an optional `"__prewarm_imports__"` metadata key) if more nodes opt into `__runInSubprocess__`.
 - `shared_data._rt_subprocess_cache` (a dict keyed by `AnalysisClass._rt_config_key(analysisInfo)`, a stable hash of the node's config) lets `stop()`/`destroy()` park a still-alive, already-warmed-up worker (+ its visualisation shadow object) instead of killing it — `_park_subprocess_worker` handles the cap/idle-timeout eviction opportunistically on each park, no dedicated QTimer needed. A later `__init__` with the identical config reclaims it directly (`_worker_warmed_up = True` immediately, no spawn/import/model-load). Trade-off: a node's Python-level state (e.g. a counter set on `self` in `run()`) now survives a stop→restart of the same config instead of getting a fresh instance — undocumented per-node reset behavior would need a reset hook if this ever matters (see the class docstring's "v1 limitations"). `AnalysisClass.terminate_all_rt_subprocesses()` is wired into `GUI_napari.py`'s `aboutToQuit` (before the forced `os._exit(0)`) so parked/warm processes don't get orphaned.
 
+**Stopping an RT-analysis node stops its threads (T-G9).** Every RT loop waits
+on a `threading.Event` with `RT_THREAD_WAIT_TIMEOUT_S` (1 s) rather than
+indefinitely, and every `stop()` **sets** that event after clearing the running
+flag — `AnalysisThread_customFunction.stop()` used to clear `is_running` without
+waking `run()`, and `destroy()`'s `quit()` only exits a Qt event loop, not an
+overridden `run()`, so each start/stop cycle leaked one or two blocked threads
+plus their frame deques. `destroy()` now joins with `RT_THREAD_JOIN_TIMEOUT_MS`
+(1 s, short because it runs on the GUI thread), logs a warning if the thread did
+not exit, and tears the visualisation thread down too. `stop()` is idempotent:
+`destroy()` calls it, and both used to run `endAnalysis`, so a node's `end()` ran
+twice per teardown. Stop the visualisation thread via its `stop()`, never by
+assigning `running = False` — that does not wake it. Tests:
+`tests/test_rt_thread_teardown.py`.
+
 **The two RT-analysis loops sleep differently, on purpose (T-G7).**
 `AnalysisThread_customFunction._run_loop` keeps
 `msleep(max(1, sleepTimeMs, analysis_elapsed_ms))` — sleeping for as long as the

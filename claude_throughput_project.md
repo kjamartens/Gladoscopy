@@ -223,7 +223,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-G6** Probe metadata picklability once, not per frame — S, no deps
 - [x] **T-G7** Drop the duty-cycle sleep in the subprocess proxy — S, no deps
 - [x] **T-G8** Pass the dimension map as init context — M, no deps
-- [ ] **T-G9** Fix the thread leak on RT-node stop — M, no deps
+- [x] **T-G9** Fix the thread leak on RT-node stop — M, no deps
 - [ ] **T-G10** **(decision)** Invert the subprocess default — needs G5, G7 — **stop point**
 
 ### Tier H — MDA GUI

@@ -3041,3 +3041,43 @@ minute" check could not be performed here.
 `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM.py`,
 `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/RT_counter.py`,
 `CLAUDE.md`, `tests/test_node_dimension_context.py`.
+
+## 2026-09-09 — Wake-on-stop plus a 1 s deadman, and `end()` runs exactly once  [T-G9]
+
+**Three changes, all in `AnalysisClass.py`:**
+
+1. **Every `stop()` sets the wake event** after clearing the running flag — the
+   pattern `AnalysisProcess_customFunction.stop()` already had. The
+   visualisation thread gained a real `stop()`; its two callers (which assigned
+   `running = False` directly, which does not wake anything) now call it.
+2. **Every `wait()` is timed** (`RT_THREAD_WAIT_TIMEOUT_S`, 1 s). This is a
+   deadman, not the mechanism: a healthy stop wakes the loop immediately, and a
+   test asserts a stop that somehow never sets the event still lands within a few
+   timeouts. Cost when idle is one wake per thread per second.
+3. **`destroy()` joins with `RT_THREAD_JOIN_TIMEOUT_MS`** (1 s) and logs a
+   warning naming the node if the thread has not exited, then destroys the
+   visualisation thread the same way. 1 s deliberately, not 5: `destroy()` runs
+   on the GUI thread, and the loop now wakes immediately, so a timeout here means
+   something is genuinely wrong and should be reported rather than waited out.
+
+**The old "seems to start an infinite loop somewhere" comment on the commented-out
+`self.wait()` is now explained**: `run()` never woke, so waiting for it hung. The
+wait is re-enabled with that cause removed.
+
+**Teardown made idempotent (T-A5 item 5).** `destroy()` called `endAnalysis` and
+then `stop()`, which called `endAnalysis` again — every node's `end()` ran twice
+per teardown. `stop()` now guards on `_teardown_done` and `destroy()` no longer
+calls `endAnalysis` itself.
+
+**Verification:** `tests/test_rt_thread_teardown.py` (11 tests). The real
+`_run_loop` and `stop` are exercised against a `SimpleNamespace` carrying only
+the state they touch, run on a plain `threading.Thread` — the repo has no Qt
+event-loop test harness, and this tests the actual loop rather than a copy of it.
+Both exit paths are covered (flag+event, and flag-only via the deadman), plus
+source-level guards that no loop waits untimed and that both `destroy()`s join,
+warn and tear down their visualisation thread. `pytest -q` — 779 passed.
+Confirming the thread count returns to baseline over ten start/stop cycles in
+Performance Mode needs the GUI and could not be done here.
+
+**Affects:** `glados_pycromanager/GUI/AnalysisClass.py`, `CLAUDE.md`,
+`tests/test_rt_thread_teardown.py`.

@@ -287,6 +287,16 @@ class napariOverlay:
         """
         del self
 
+#: How long a wait() on an RT-analysis thread's "new image" Event may block
+#: before re-checking its running flag. Purely a deadman: every stop() sets the
+#: event, so a healthy thread wakes immediately (T-G9).
+RT_THREAD_WAIT_TIMEOUT_S = 1.0
+
+#: How long destroy() waits for an RT-analysis thread to actually exit before
+#: logging that it did not. Runs on the GUI thread, so it is deliberately short.
+RT_THREAD_JOIN_TIMEOUT_MS = 1000
+
+
 class AnalysisThread_customFunction_Visualisation(QThread):
     finished = pyqtSignal()
     _do_visualise = pyqtSignal(object)
@@ -327,7 +337,10 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.shared_data.register_perf_thread_label(get_native_id(), f'RT-analysis visualisation: {node_label}')
         try:
             while self.running:
-                self._new_image.wait()
+                #Timed wait: stop() sets the event, so this is only a deadman for
+                #a stop that never reached us (T-G9). Without it a stopped
+                #visualisation thread blocked here forever.
+                self._new_image.wait(RT_THREAD_WAIT_TIMEOUT_S)
                 self._new_image.clear()
                 if not self.visualisation_queue:
                     continue
@@ -338,6 +351,21 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         finally:
             self.shared_data.unregister_perf_thread_label(get_native_id())
             
+    def stop(self):
+        """Ask run() to return. Sets the wake event, or the loop would only
+        notice at its next timeout (and, before T-G9, never)."""
+        self.running = False
+        self.is_running = False
+        self._new_image.set()
+
+    def destroy(self):
+        self.stop()
+        self.requestInterruption()
+        self.quit()
+        if not self.wait(RT_THREAD_JOIN_TIMEOUT_MS):
+            logging.warning('RT-analysis visualisation thread did not exit within %sms',
+                            RT_THREAD_JOIN_TIMEOUT_MS)
+
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
         # tic = time.time()
@@ -832,7 +860,7 @@ class AnalysisProcess_customFunction(QThread):
 
     def _run_loop(self):
         while self.is_running:
-            self._new_image.wait()
+            self._new_image.wait(RT_THREAD_WAIT_TIMEOUT_S)
             self._new_image.clear()
             if self.image_queue_analysis:
                 image, metadata = self.image_queue_analysis.popleft() #type:ignore
@@ -876,7 +904,7 @@ class AnalysisProcess_customFunction(QThread):
         self.is_running = False
         self._new_image.set()  # unblock run() if it's currently waiting
         if self.visualisationObject is not None:
-            self.visualisationObject.running = False
+            self.visualisationObject.stop()
 
         if self._cache_key is not None and self._process.is_alive():
             # Park this still-alive, already-warmed-up worker instead of
@@ -910,6 +938,11 @@ class AnalysisProcess_customFunction(QThread):
         self.stop()
         self.requestInterruption()
         self.quit()
+        if not self.wait(RT_THREAD_JOIN_TIMEOUT_MS):
+            logging.warning('RT-analysis subprocess proxy for %s did not exit within %sms',
+                            self.analysisInfo, RT_THREAD_JOIN_TIMEOUT_MS)
+        if self.visualisationObject is not None:
+            self.visualisationObject.destroy()
 
 
 #This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
@@ -950,6 +983,7 @@ class AnalysisThread_customFunction(QThread):
         self.napariOverlay = None
         self.nodzInfo=nodzInfo
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
+        self._teardown_done = False
         self.initAnalysis()
         self.running = True
         self._activity_event = Event()
@@ -985,7 +1019,11 @@ class AnalysisThread_customFunction(QThread):
             #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
             #     #Run analysis on the image from the queue
 
-            self._new_image.wait()
+            #Timed wait: stop() sets the event, so this is only a deadman (T-G9).
+            #Before that, stop() cleared is_running but never woke this thread,
+            #so run() blocked here forever and every start/stop cycle leaked a
+            #QThread plus its frame deque.
+            self._new_image.wait(RT_THREAD_WAIT_TIMEOUT_S)
             self._new_image.clear()
             analysis_elapsed_ms = 0
             if self.image_queue_analysis:
@@ -1009,9 +1047,18 @@ class AnalysisThread_customFunction(QThread):
         """
         Stops the execution of the function
         """
+        if self._teardown_done:
+            #destroy() calls stop(), and both used to run endAnalysis - so a
+            #node's end() ran twice per teardown (T-A5 item 5, T-G9).
+            return
+        self._teardown_done = True
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         self.is_running = False
+        self.running = False
         self._activity_event.set()
+        #Wake run() so it re-checks is_running instead of blocking on the next
+        #frame that will never arrive.
+        self._new_image.set()
         #Also remove the image queue requestion from live mode
         # if self.image_queue_analysis in self.shared_data.RTAnalysisQueues:
         #     self.shared_data.RTAnalysisQueues.remove(self.image_queue_analysis)
@@ -1037,18 +1084,23 @@ class AnalysisThread_customFunction(QThread):
         Returns:
             None
         """
-        self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         try:
             logging.debug('Destroying '+str(self.analysisInfo))
         except (AttributeError, TypeError):
             logging.debug('Destroying some analysis thread')
-        #Wait for the thread to be finished
+        #Wait for the thread to be finished. stop() runs endAnalysis (once) and
+        #wakes run(); waiting here used to hang because run() never woke, which
+        #is what the old "seems to start an infinite loop somewhere" comment was
+        #describing.
         self.stop()
         self.requestInterruption()
         self.quit()
-        #Officially we'd need to wait here, but that seems to start an infinite loop somewhere
-        # self.wait()
-        # self.deleteLater()
+        if not self.wait(RT_THREAD_JOIN_TIMEOUT_MS):
+            logging.warning('RT-analysis thread for %s did not exit within %sms',
+                            self.analysisInfo, RT_THREAD_JOIN_TIMEOUT_MS)
+        visualisationObject = getattr(self, 'visualisationObject', None)
+        if visualisationObject is not None:
+            visualisationObject.destroy()
     
     def set_activity(self, is_active):
         if is_active:
@@ -1160,8 +1212,8 @@ class AnalysisThread_customFunction(QThread):
         result = utils.realTimeAnalysis_end(self.RT_analysis_object,analysisInfo,core,nodzInfo=self.nodzInfo)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
-            #End the visualisation
-            self.visualisationObject.running=False
+            #End the visualisation - through stop(), which also wakes it (T-G9).
+            self.visualisationObject.stop()
         return result
 
 
