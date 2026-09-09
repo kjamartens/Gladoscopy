@@ -11,9 +11,8 @@ serialization itself did not: the guard, the lock and the timeout are all still
 there, and the transition resumes on the GUI thread once the previous worker has
 gone.
 
-The two `time.sleep(0.1)` calls in the mode setters are deliberately untouched --
-they were excluded at the user's request (claude_decisions.md, item H2) and
-removing them needs a separate decision.
+The two `time.sleep(0.1)` calls in the mode setters were removed separately, once
+the user approved part 2; `tests/test_mode_setter_no_sleep.py` covers that.
 """
 from __future__ import annotations
 
@@ -213,13 +212,21 @@ def test_headless_callers_still_block(handler, monkeypatch):
     assert h._defer_transition_until_worker_stops() is False
 
 
-def test_the_mode_setter_sleeps_are_untouched(qapp):
-    """Excluded at the user's request; removing them is a separate decision."""
+def test_the_mode_setter_sleeps_are_gone(qapp):
+    """Part 2, approved 2026-09-09 -- see tests/test_mode_setter_no_sleep.py.
+
+    This test previously asserted the opposite: the two sleeps were excluded on
+    2026-05-20 (claude_decisions.md item H2) and needed the user's call before
+    being removed. That call has been made and the callers audited.
+    """
     from glados_pycromanager.GUI import sharedFunctions
 
     for name in ("on_liveMode_value_change", "on_mdaMode_value_change"):
         source = inspect.getsource(getattr(sharedFunctions.Shared_data, name))
-        assert "time.sleep(0.1)" in source
+        body = [
+            line for line in source.splitlines() if not line.strip().startswith("#")
+        ]
+        assert not any("time.sleep" in line for line in body)
 
 
 # ------------------------------------------------------------- the button

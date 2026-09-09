@@ -142,8 +142,9 @@ T-0.1
 - after **T-A7** (the frame transport changes shape)
 - after **T-C3** (live mode stops using the MDA engine; wants a real-hardware smoke test)
 - before **T-B3** (largest single refactor in the plan)
-- before **T-G10** and before the `LaserControlScripts.py` half of **T-F8** (both are
-  behaviour changes needing the user's call)
+- before **T-G10** (a behaviour change needing the user's call). The
+  `LaserControlScripts.py` half of **T-F8** was also a stop point; the user
+  approved it on 2026-09-09 and it is done.
 
 ---
 
@@ -208,9 +209,9 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-F5** Fix O(nodes x scene items) `checkNodesOnErrors` on mouse-move — M, needs F1
 - [x] **T-F6** Debounce resize rebuilds; fix the `QScrollArea` leak — M, no deps
 - [x] **T-F7** Remove the synthetic resize + `processEvents()` — S, no deps
-- [ ] **T-F8** `textChanged` to `editingFinished` + debounce — M, no deps — **partly a decision**
+- [x] **T-F8** `textChanged` to `editingFinished` + debounce — M, no deps — *both halves done; laser half approved by the user 2026-09-09*
 - [x] **T-F9** `NapariBridge` for worker-to-GUI layer updates — **L**, no deps
-- [x] **T-F10** Make the live/MDA toggle non-blocking — M, no deps — *part 1 done; the two `time.sleep(0.1)` calls still need the user's call*
+- [x] **T-F10** Make the live/MDA toggle non-blocking — M, no deps — *both parts done; sleep removal approved by the user 2026-09-09*
 
 ### Tier G — Analysis dispatch
 

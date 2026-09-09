@@ -1071,9 +1071,17 @@ class MMConfigUI(CustomMainWindow):
                 self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
                 self.shared_data.MILcore.wait_for_system() #type:ignore
             else:
+                # T-F10 part 2: this is the one caller that genuinely depended on
+                # the `time.sleep(0.1)` the mode setter used to do -- it changes
+                # the ROI immediately after stopping live mode, and
+                # `stop_sequence_acquisition()` is fire-and-forget on the Java
+                # side. Now that the setter no longer sleeps, wait on the core
+                # explicitly instead: once for the camera to finish stopping,
+                # once for the ROI change to take effect before restarting.
                 shared_data.liveMode = False
+                self.shared_data.MILcore.wait_for_system() #type:ignore
                 self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
-                time.sleep(0.5)
+                self.shared_data.MILcore.wait_for_system() #type:ignore
                 shared_data.liveMode = True
         except (RuntimeError, OSError, ValueError, AttributeError) as exc:
             logging.error('setROI(%s) failed: %s', ROIpos, exc)

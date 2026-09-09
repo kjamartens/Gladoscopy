@@ -111,6 +111,12 @@ def GetIntensityLaser(MM_JSON,laserID):
     return MMJSON_to_ValIntPerc(MM_JSON,laserID);
 
 
+#: Last intensity actually sent per laser, recorded here because this is the one
+#: choke point every path goes through (slider and edit field alike). Used by
+#: ChangeIntensityLaserEditField to skip a focus-out that changed nothing (T-F8).
+_lastWrittenLaserIntensity = {}
+
+
 def ChangeIntensityLaser(laserID, ValIntPerc):
     #Get relevant names from JSON
     propertyname = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
@@ -120,6 +126,7 @@ def ChangeIntensityLaser(laserID, ValIntPerc):
     ValIntMM = ValIntPerc*float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_slope"])-float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_offset"])
     #Set value in Micromanager
     (core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM)))
+    _lastWrittenLaserIntensity[laserID] = ValIntPerc
 
     #Change the PAC of the laser if it's triggering and such
     if form.advancedLasers_RadioButton.isChecked():
@@ -146,15 +153,29 @@ def ChangeIntensityLaser_Slider(laserID):
 
 
 def ChangeIntensityLaserEditField(laserID):
+    """Apply a typed laser intensity.
+
+    T-F8: wired to `editingFinished`, not `textChanged`. On `textChanged` this
+    issued a **serial write per keystroke**, so typing "150" briefly drove the
+    laser to 1 and then 15 on the way to 150 -- the bare `except: pass` below
+    was there precisely to swallow the half-typed values. `editingFinished`
+    fires once, on Enter or focus-out, and (unlike `textChanged`) is not emitted
+    by a programmatic `setText`, so the slider updating this field no longer
+    loops back into a write.
+    """
     try:
         #Create ValIntPerc variable and extract
         exec("global ValIntPerc; ValIntPerc = int(form.EditIntensity_Laser_"+str(laserID)+".text())");
-        #Change the intensity
-        ChangeIntensityLaser(laserID, ValIntPerc); #type:ignore
+        newIntensity = ValIntPerc #type:ignore # noqa: F821 -- defined by the exec above
+        #A focus-out that changed nothing must not repeat the serial write.
+        if _lastWrittenLaserIntensity.get(laserID) == newIntensity:
+            return
+        #Change the intensity (which records it in _lastWrittenLaserIntensity)
+        ChangeIntensityLaser(laserID, newIntensity); #type:ignore
         #Update labels
         InitLaserSliders(MM_JSON)
     except (RuntimeError, OSError, AttributeError, ValueError):
-        #Do nothing - this can fire mid-typing on the slider
+        #Do nothing - an empty or non-numeric field is not a value to send
         pass
 
 def InitFilterWheelRadioCheckbox():
@@ -236,6 +257,36 @@ def TS_Response_verbose():
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Laser trigger drawing functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#: Idle window before a laser-trigger edit redraws the plot (T-F8).
+DRAWPLOT_DEBOUNCE_MS = 200
+
+_drawplotTimer = None
+
+
+def scheduleDrawplot(frameduration):
+    """Coalesce laser-trigger edits into one plot rebuild (T-F8).
+
+    `drawplot` clears the graph widget and rebuilds roughly a hundred pyqtgraph
+    items. It was wired to `textChanged` on fifteen line edits, so every
+    keystroke in any of them paid for a full rebuild on the GUI thread.
+
+    The trigger stays `textChanged` rather than moving to `editingFinished`:
+    the plot is a live preview of what the user is typing, and leaving it stale
+    until focus-out would change what the control does. Debouncing changes only
+    when it fires.
+    """
+    global _drawplotTimer
+    if _drawplotTimer is None:
+        _drawplotTimer = QTimer()
+        _drawplotTimer.setSingleShot(True)
+    try:
+        _drawplotTimer.timeout.disconnect()
+    except TypeError:  # nothing connected yet
+        pass
+    _drawplotTimer.timeout.connect(lambda: drawplot(frameduration))
+    _drawplotTimer.start(DRAWPLOT_DEBOUNCE_MS)
+
+
 def drawplot(frameduration):
     #logging.debug('CallingDrawPlot')
     #We're changing something, so warning user that it's not yet armed
@@ -488,7 +539,9 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         exec("form.SliderLaser_" + str(i) + ".sliderReleased.connect(lambda: ChangeIntensityLaser_Slider(" + str(i) + "));")
         exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser_Slider_onlySimple(" + str(i) + "));")
         #Change intensity when intensity edit field is changed
-        exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
+        #T-F8: editingFinished, not textChanged -- one serial write per commit
+        #instead of one per keystroke.
+        exec("form.EditIntensity_Laser_" + str(i) + ".editingFinished.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
 
     #Initialise the laser triggering boxes
     initLaserTrigEditBoxes();
@@ -499,9 +552,11 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
 
         #Change laser trigger scheme when values in boxes are changed
         for i in range(0,5):
-            exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-            exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
+            #T-F8: still textChanged (the plot is a live preview), but debounced
+            #so a burst of keystrokes costs one rebuild instead of one each.
+            exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: scheduleDrawplot(frameduration));")
+            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: scheduleDrawplot(frameduration));")
+            exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: scheduleDrawplot(frameduration));")
     except (AttributeError, NameError, SyntaxError, RuntimeError) as exc:
         logging.error('error in execing forms: %s', exc)
         criticalErrors=True

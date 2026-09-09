@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 import tempfile
-import time
 from dataclasses import dataclass, fields
 from typing import Optional
 
@@ -507,7 +506,13 @@ class Shared_data(QObject):
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
         logging.info("LIVE mode changed!")
-        time.sleep(0.1)
+        # T-F10 part 2: the `time.sleep(0.1)` that used to sit here is gone. It
+        # blocked whichever thread flipped the flag -- usually the GUI thread --
+        # and it did not make anything more synchronous: `acqModeChanged` was
+        # (and is) called synchronously either side of it, so the only effect was
+        # to *delay* the dispatch by 100 ms. What it papered over was callers
+        # that touch hardware immediately after flipping the mode; the one that
+        # genuinely did, `MMcontrols.setROI`, now waits on the core explicitly.
         self._livemodeNapariHandler.acqModeChanged(newSharedData=self)
         
         
@@ -522,7 +527,7 @@ class Shared_data(QObject):
             self.on_mdaMode_value_change()
     def on_mdaMode_value_change(self):
         logging.debug('shared_data.mdaMode changed to '+str(self._mdaMode))
-        time.sleep(0.1)
+        # T-F10 part 2: see on_liveMode_value_change above.
         self._mdamodeNapariHandler.acqModeChanged(newSharedData=self)
     
     #NapariViewer property   

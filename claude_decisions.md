@@ -2591,3 +2591,96 @@ toggles against hardware) could not be performed here.
 **Affects:** `glados_pycromanager/GUI/napariGlados.py` (`_AcqTransitionSignals`,
 `_defer_transition_until_worker_stops`), `glados_pycromanager/GUI/MMcontrols.py`,
 `tests/test_acq_transition_nonblocking.py`.
+
+## 2026-09-09 — T-F8 laser half approved: editingFinished for intensity, debounced textChanged for the plot  [T-F8]
+**User decision (asked and answered 2026-09-09):** do both halves.
+**Decision:** `EditIntensity_Laser_*` moves from `textChanged` to
+`editingFinished`; the 15 laser-trigger fields keep `textChanged` but go through
+a new `scheduleDrawplot()` with a 200 ms single-shot timer
+(`DRAWPLOT_DEBOUNCE_MS`).
+**Why the two triggers differ.** The task text says to move *both* to
+`editingFinished`. For the intensity field that is exactly right: it was issuing a
+**serial write per keystroke**, so typing "150" drove the laser to 1, then 15, then
+150 — the bare `except: pass` in the handler existed precisely to swallow the
+half-typed values, which is the code admitting the bug. `editingFinished` also is
+not emitted by a programmatic `setText`, which additionally breaks the feedback
+loop where the slider updating this field looped back into a write.
+For `drawplot` it is not: that plot is a **live preview of what the user is
+typing**, and `editingFinished` would leave it stale until focus-out — a change to
+what the control does, which the task's own `Don't` forbids ("only when they
+fire"). Debouncing `textChanged` removes the per-keystroke rebuild of ~100
+pyqtgraph items while keeping the preview live.
+**No debounce on the intensity field.** `editingFinished` already fires once per
+commit, so a 200 ms timer on top would only delay a hardware command the user
+explicitly issued. Instead the redundancy that *does* remain — `editingFinished`
+fires on every focus-out, changed or not — is handled by skipping a write whose
+value matches the last one sent.
+**That bookkeeping lives in `ChangeIntensityLaser`, not in the edit-field
+handler**, because the slider path (`ChangeIntensityLaser_Slider`) writes through
+the same function. Recording it in the handler only would let slider-driven writes
+go unrecorded, and a later typed value equal to the last *typed* one would be
+skipped even though the slider had moved the laser since. A test pins that the
+assignment appears in the choke point and *not* in the handler.
+**Context:** this file's header says "Custom UI for Endefelder lab - deprecated,
+last used in 2022 or so", and it is reached only through the `'SMIPC' in
+platform.node()` hostname gate. Low blast radius, but the change is small and the
+per-keystroke serial write was a real defect.
+**Not touched:** `ResetLasersTrigger`'s ~100 serial round-trips per click and
+`blinkUV`'s GUI-thread `time.sleep` — the task explicitly defers the latter to
+T-B3/T-B4, and the former is a single deliberate button press, not a per-input
+cost.
+**Affects:** `glados_pycromanager/GUI/LaserControlScripts.py`,
+`tests/test_mode_setter_no_sleep.py`.
+
+## 2026-09-09 — T-F10 part 2 approved: both mode-setter sleeps removed, callers audited  [T-F10]
+**User decision (asked and answered 2026-09-09):** remove and audit callers. This
+**supersedes item H2 of 2026-05-20**, which excluded these two sleeps.
+**What the sleeps actually did.** Neither made anything more synchronous — the
+claimed race in H2 does not hold up. `acqModeChanged` is called synchronously by
+the setter both before and after the sleep, so the mode change had already taken
+effect by the time the assignment returned, with or without it. The only effect
+was to *delay the dispatch by 100 ms* while blocking whichever thread flipped the
+flag, which for a button click is the GUI thread.
+**The audit.** Every assignment site was checked:
+- `MMcontrols.changeLiveMode`, `LaserControlScripts.buttonPressliveStateToggle` —
+  plain toggles, no following hardware call. Unaffected.
+- `GUI_napari.py`'s two `--profile-runtime` flips — timing only.
+- `MDAGlados` (two `mdaMode = True` sites) — the work that follows
+  (`startMDAVisualisation`, button relabelling) does not depend on the acquisition
+  having started; ordering is unchanged, only timing.
+- `napariGlados`' internal `= False` flips from worker cleanup — these run off the
+  GUI thread, where the sleep was pure latency.
+- `utils.forceReset_actual` — has its own `time.sleep(0.1)` before
+  `stop_sequence_acquisition()`; untouched.
+- `MMcontrols.drawROI` — the live-mode pause surrounds `get_sensor_size()`, a pure
+  query. Safe. A test now asserts it contains no `set_roi(`, so if that ever
+  changes the omission is caught.
+- **`MMcontrols.setROI` — the one genuine dependency.** It calls `set_roi()`
+  immediately after `liveMode = False`, and `stop_sequence_acquisition()` is
+  fire-and-forget on the Java side, so without a delay the ROI change can race the
+  camera still sequencing. Note the non-live branch already called
+  `wait_for_system()` and the live branch called *none* — it was relying entirely
+  on the setter's blind sleep plus its own `time.sleep(0.5)`.
+**Fix:** `setROI`'s live branch now waits on the core explicitly — once after the
+stop, once after the ROI change — and its `time.sleep(0.5)` is gone. That is
+strictly better than the sleep it replaces: `wait_for_system()` waits for the
+actual condition rather than a guessed duration, and does not over-wait when the
+device is ready sooner. A test pins the resulting order:
+stop → wait → set → wait → start.
+**Side effect worth noting:** the test suite went from ~74 s to ~43 s. The sleeps
+were being paid by every test that flips a mode, which is a decent proxy for how
+often a user pays them.
+**Also:** `import time` was dropped from `sharedFunctions.py` — nothing else there
+used it.
+**Verification:** `tests/test_mode_setter_no_sleep.py` — 15 tests covering the
+absent sleeps, the dispatch still happening synchronously with `self`, 100
+dispatches costing under a second, the dropped import, `setROI`'s three
+`wait_for_system()` calls and their exact ordering, `drawROI` being read-only, and
+the laser half above. `tests/test_acq_transition_nonblocking.py`'s
+`test_the_mode_setter_sleeps_are_untouched` was inverted to
+`test_the_mode_setter_sleeps_are_gone`. `pytest -q` — 685 passed. Manual hardware
+verification (an ROI change during live mode) could not be performed here and is
+the thing to watch on the next hardware run.
+**Affects:** `glados_pycromanager/GUI/sharedFunctions.py`,
+`glados_pycromanager/GUI/MMcontrols.py`, `tests/test_mode_setter_no_sleep.py`,
+`tests/test_acq_transition_nonblocking.py`.
