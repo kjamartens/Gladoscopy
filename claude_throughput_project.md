@@ -206,7 +206,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-F3** Tail-follow the log file instead of re-reading it — M, no deps
 - [x] **T-F4** Coalesce the nodz timer and gate it on acquisition — M, needs F1
 - [x] **T-F5** Fix O(nodes x scene items) `checkNodesOnErrors` on mouse-move — M, needs F1
-- [ ] **T-F6** Debounce resize rebuilds; fix the `QScrollArea` leak — M, no deps
+- [x] **T-F6** Debounce resize rebuilds; fix the `QScrollArea` leak — M, no deps
 - [ ] **T-F7** Remove the synthetic resize + `processEvents()` — S, no deps
 - [ ] **T-F8** `textChanged` to `editingFinished` + debounce — M, no deps — **partly a decision**
 - [ ] **T-F9** `NapariBridge` for worker-to-GUI layer updates — **L**, no deps

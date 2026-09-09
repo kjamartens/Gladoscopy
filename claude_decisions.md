@@ -2352,3 +2352,45 @@ sweeps, and the immediate fallback when the timer does not exist yet.
 `pytest -q -m "not slow"` — 580 passed.
 **Affects:** `glados_pycromanager/GUI/FlowChart_dockWidgets.py`,
 `tests/test_node_error_check_batching.py`.
+
+## 2026-09-09 — Debounce + skip-if-unchanged + deleteLater, not an in-place grid reflow  [T-F6]
+**Decision:** Took the task's sanctioned "acceptable first step" (debounce plus
+`deleteLater()`) rather than its "better" option of repositioning widgets inside
+the existing grid, and **added a third mechanism the task did not list**:
+`resizeEvent` now only classifies the size into one of the four existing
+orientation buckets and hands the result to `_scheduleGroupBoxLayout`, which
+*drops it outright* when it equals the layout already applied.
+**Alternatives:** repositioning within the existing `QGridLayout` — rejected for
+now. `QGridLayout.addWidget` on a widget already in the layout is not a documented
+move operation, so a correct in-place reflow means remove-then-re-add per widget
+with the container's minimum-size recomputation still to redo; that is a real
+rewrite of `set_groupBoxLayout`'s geometry logic, and the task's `Don't` is
+explicit that the resulting geometry must not change. The skip-if-unchanged path
+captures most of the same benefit at a fraction of the risk: a splitter drag
+crosses an aspect-ratio boundary at most a couple of times, so the overwhelming
+majority of its resize events now cost one tuple comparison instead of a full
+teardown-and-rebuild. The in-place reflow remains available if profiling ever
+shows the remaining rebuilds matter.
+**On the leak:** the replaced `QScrollArea` was orphaned by `setParent(None)` and
+never destroyed — one leaked per resize event. It is now `deleteLater()`d, but
+**only when the orphaned child is actually a `QScrollArea`**. The blanket
+`widget.deleteLater()` the task implies would destroy any live control that turned
+up as a direct child of `self.dockWidget`; the group boxes are re-parented out by
+the loop above and so are safe either way, but narrowing the deletion costs
+nothing and removes the failure mode entirely.
+**On the other five `resizeEvent` overrides** in this file: checked, none repeats
+the scroll-area rebuild. `MMConfigWidget`'s and `MDAWidget`'s do font/margin work
+and then call `super().resizeEvent(event)`, so they inherit the debounce from
+`GladosWidget`; the remaining three delegate straight to `super()`.
+**Verification:** `tests/test_dock_relayout_debounce.py` — 10 tests covering a
+200-event drag collapsing to one rebuild, the last orientation winning, 500
+same-bucket events arming no timer at all, a later genuine change still
+rebuilding, the pre-`__init__` direct fallback, the four aspect-ratio buckets
+being unchanged, and Qt genuinely reclaiming a `deleteLater()`d orphaned scroll
+area (via `sip.isdeleted` after a `DeferredDelete`-typed
+`sendPostedEvents` — a general `processEvents` does not dispatch those).
+`pytest -q -m "not slow"` — 590 passed. The manual check (dragging a dock splitter
+for 10 s while watching memory) could not be performed: no display or hardware in
+this environment.
+**Affects:** `glados_pycromanager/_dock_widget.py`,
+`tests/test_dock_relayout_debounce.py`.

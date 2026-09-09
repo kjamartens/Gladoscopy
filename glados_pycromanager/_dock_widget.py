@@ -6,6 +6,7 @@ import sys
 
 import napari
 from pycromanager import Core
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QGridLayout, QGroupBox, QLabel, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
@@ -39,6 +40,11 @@ class GladosWidget(QWidget):
     """
     The main Class of glados-pycromanager widget that gets added to napari.
     """
+
+    #: Debounce window for the resize-driven relayout (T-F6). A splitter drag
+    #: delivers a QResizeEvent per pixel; the rebuild runs once at the end.
+    RELAYOUT_DEBOUNCE_MS = 150
+
     def __init__(self, viewer: napari.viewer.Viewer, parent=None): #type: ignore
         """
         Init a glados widget, mostly passing around parent variables to daughter (plugin) variables. Used to be global-specified, but doesn't work with napari plugins for some reason.
@@ -48,6 +54,17 @@ class GladosWidget(QWidget):
         self._viewer = viewer
         self.type = None
         self.layoutInfo = None
+
+        # T-F6: the relayout below tears down and rebuilds the whole scroll area,
+        # so it must not run per pixel of a splitter drag. `resizeEvent` records
+        # what layout the new size wants and restarts this timer; the rebuild
+        # happens once, when the drag settles.
+        self._pendingLayout = None
+        self._appliedLayout = None
+        self._relayoutTimer = QTimer(self)
+        self._relayoutTimer.setSingleShot(True)
+        self._relayoutTimer.setInterval(self.RELAYOUT_DEBOUNCE_MS)
+        self._relayoutTimer.timeout.connect(self._applyPendingLayout)
         
         if parent is not None:
             self.core = parent.core
@@ -101,15 +118,44 @@ class GladosWidget(QWidget):
             
             # Determine the layout based on the window size
             if width > height * 1.25:  # Wide window
-                self.set_groupBoxLayout(rowsOrColumns='rows', n_items=1)
+                wanted = ('rows', 1)
             elif height > width * 1.25:  # Tall window
-                self.set_groupBoxLayout(rowsOrColumns='columns', n_items=1)
+                wanted = ('columns', 1)
             elif width > height:  # Landscape
-                self.set_groupBoxLayout(rowsOrColumns='rows', n_items=2)
+                wanted = ('rows', 2)
             else:  # Portrait
-                self.set_groupBoxLayout(rowsOrColumns='columns', n_items=2)
-                
+                wanted = ('columns', 2)
+
+            self._scheduleGroupBoxLayout(wanted)
+
             super().resizeEvent(event)
+
+    def _scheduleGroupBoxLayout(self, wanted):
+        """Queue a relayout, coalescing a whole drag into one rebuild (T-F6).
+
+        Most resize events during a drag land in the *same* orientation bucket,
+        so a layout that matches what is already applied is dropped outright and
+        costs nothing at all.
+        """
+        if wanted == self._appliedLayout:
+            self._pendingLayout = None
+            return
+
+        self._pendingLayout = wanted
+        timer = getattr(self, '_relayoutTimer', None)
+        if timer is None:  # pre-__init__ resize; fall back to the direct call
+            self._applyPendingLayout()
+            return
+        timer.start(self.RELAYOUT_DEBOUNCE_MS)
+
+    def _applyPendingLayout(self):
+        pending = self._pendingLayout
+        if pending is None:
+            return
+        self._pendingLayout = None
+        rowsOrColumns, n_items = pending
+        self.set_groupBoxLayout(rowsOrColumns=rowsOrColumns, n_items=n_items)
+        self._appliedLayout = pending
         
     def set_groupBoxLayout(self, rowsOrColumns='rows', n_items=1):
         """"
@@ -137,14 +183,22 @@ class GladosWidget(QWidget):
                 widget.setParent(None)
         
         #remove all children of self.dockWidget:
+        # T-F6: these are orphaned by setParent(None) -- previously that was the
+        # end of it, so every relayout leaked a QScrollArea (plus its container
+        # and grid layout) that nothing ever destroyed. The group boxes are safe:
+        # the loop above already re-parented them out of the old container.
         for i in reversed(range(self.dockWidget.count())):
             widget = self.dockWidget.itemAt(i).widget()
             if widget is not None:
                 logging.debug(f"removing {widget}")
                 self.dockWidget.removeWidget(widget)
                 widget.setParent(None)
-                
-        
+                # Only the scroll area we built here is ours to destroy. Anything
+                # else that turns up as a direct child is left alone rather than
+                # risking the deletion of a live control.
+                if isinstance(widget, QScrollArea):
+                    widget.deleteLater()
+
         #Create the following structure: scrollArea --> container --> mainGridLayout
         #create a QScrollArea
         scrollArea = QScrollArea()
@@ -187,6 +241,7 @@ class GladosWidget(QWidget):
         
         #Finally add this scroll area to the dockWidget.
         self.dockWidget.addWidget(scrollArea,0,0)
+        self.scrollArea = scrollArea
     
 class MMConfigWidget(GladosWidget):
     """
