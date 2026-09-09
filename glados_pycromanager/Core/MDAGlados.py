@@ -1411,10 +1411,16 @@ class MDAGlados(CustomMainWindow):
         Falls back to the path the acquisition was *asked* to write to when there
         is no data object to ask.
 
-        Note: on MMCORE_PLUS that store root is a `TemporaryDirectory`, not the
-        user's configured Storage folder -- that branch ignores the folder
-        entirely. See T-D7.
+        `shared_data.mdaSavedPath` wins when set. On MMCORE_PLUS the data the
+        user keeps is what pymmcore-plus' output handler wrote to their Storage
+        folder; `self.data` there is the scratch display zarr, whose store root
+        is a `TemporaryDirectory` deleted on exit. Reporting that as the
+        acquisition's location would hand downstream nodes a path that stops
+        existing.
         """
+        saved_path = getattr(self.shared_data, 'mdaSavedPath', None)
+        if saved_path:
+            return str(saved_path)
         store_root = getattr(getattr(self.data, 'store', None), 'root', None)
         if store_root is not None:
             return str(store_root)

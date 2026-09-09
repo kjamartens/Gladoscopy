@@ -1815,3 +1815,101 @@ manual check T-D3 asks for (>=2000-frame MDA; file count; acquisition-thread
 frame rate) was **not** performed: no hardware or demo backend. The paced
 simulation against the real `FrameRing` substitutes for the frame-rate half; the
 file-count half no longer applies, since chunking was not changed.
+
+---
+
+## 2026-09-09 — Display must follow the disk, not the queue (T-D3 follow-up)
+
+**A regression T-D3 introduced, reported from a real run:** during an MMCORE_PLUS
+multiDstack MDA the live view was mostly black, while the finished stack was
+perfect. Cause: before T-D3 `_try_write_frame_to_zarr` wrote synchronously on the
+frame-ring consumer, so a frame was on disk *before* it reached the vis queue.
+T-D3 made the write asynchronous but left the display pointing at the frame that
+had just arrived — which can be a full writer queue (up to 128 frames) ahead of
+the disk. An unwritten slice of a freshly created store is zeros, so the viewer
+rendered black.
+
+**Fix: follow the writer.** `ZarrFrameWriter.submit()` takes an opaque `tag`
+(the slice tuple) and publishes it as `last_written_tag` **after** the write
+returns; `_slice_safe_to_display()` points napari there instead. Slightly behind
+live, never black — which is the trade the user asked for explicitly.
+
+An opaque tag rather than having the display derive an index from the stored key:
+the writer should not owe the display a key *format*, and `submit`'s key already
+carries two trailing `slice(None)`s that the display would have had to strip.
+
+**The writer is published on `shared_data`** (`shared_data.zarrFrameWriter`)
+because `_napariUpdateLive_locked` is a module-level function with no handler
+reference, and `Shared_data` is this codebase's documented home for
+cross-component state. Retracted in `_stop_zarr_writer`, guarded so a newer
+writer's registration is not cleared by a late stop of an older one.
+
+**Fallbacks preserved:** no writer (both pycromanager backends, and the
+inline-write fallback) returns the arrived slice, which is already on disk there.
+A `last_written_tag` whose length disagrees with the arrived tuple — a store that
+changed shape mid-run — also falls back, rather than indexing with the wrong
+rank.
+
+---
+
+## 2026-09-09 — pymmcore-plus MDAs now save, via pymmcore-plus' own writer
+
+Closes both deferred `claude_issues.md` entries ("pymmcore-plus MDA zarr
+storage" and "MMCORE_PLUS MDA ignores the user's Storage folder"), which wanted
+the same fix. Raised by the user against a real run: the MDA acquired but
+nothing was saved.
+
+**Root cause:** `run_mda(mda_sequence_useq)` was called with no `output=`.
+`savefolder`/`savename` were computed just above and never read, and the
+`pyMMCdataset` NDTiff store created in `PyMMCore_startedAcqCallback` was never
+written to. The only copy of the frames was the scratch display zarr, which lives
+in a `TemporaryDirectory` that `release_all_temp_dirs()` deletes on exit. The
+pycromanager branches beside it were fine because they have an NDTiff engine;
+this backend has none.
+
+**Chosen fix: let pymmcore-plus record.** `run_mda(..., output=<path>)` picks a
+writer from the suffix. This is the project's own stated design intent — the
+backend does the recording, Glados hooks on — and it gets OME metadata,
+finalisation and format support for free. Rejected the obvious alternative of
+pointing the *scratch* zarr at the Storage folder: that store is chunked,
+uncompressed and shaped for display (T-D1/T-D3 tuned it for exactly that), it has
+no acquisition metadata, and conflating the display buffer with the archive is
+what made this confusing in the first place. Also rejected writing the
+`pyMMCdataset` NDTiff store by hand — reimplementing a writer pymmcore-plus
+already ships.
+
+**Format is a user setting, not a hardcode.** `MDAConfig.mmcore_save_format`
+(`ome-zarr` | `ome-tiff` | `none`), rendered automatically by Advanced Settings
+from the dataclass metadata, same as T-C2's dropdowns. Default `ome-zarr`:
+measured on the demo camera it wrote a 36-frame acquisition in 0.94 s against
+3.10 s for OME-TIFF, and it scales to long runs. `none` keeps
+acquire-without-saving reachable, since that was the old behaviour and somebody
+may rely on it. `pymmcore_plus.mda.handlers` is deprecated in favour of
+`ome-writers`, but the *path* form of `output=` is the public API and is
+unaffected; a test pins that both suffixes still resolve to a handler, so the
+migration surfaces as a failure rather than as silent data loss.
+
+**Names are never overwritten** — `run.ome.zarr`, then `run_1`, `run_2` — the
+same reflex pycromanager has for a reused acquisition name. An unwritable
+Storage folder logs an error and degrades to not saving rather than crashing
+mid-run.
+
+**The runner thread is joined** after `mda.is_running()` goes False:
+`is_running()` can clear before the output handler finalises (OME-TIFF assembles
+the stack on `sequenceFinished`), and `_acquisition_storage_path()` is read right
+after. Bounded at `MDA_WRITER_FINALISE_TIMEOUT_S` (300 s) since finalisation
+scales with acquisition size.
+
+**`_acquisition_storage_path()` prefers `shared_data.mdaSavedPath`.** Otherwise
+it reports the scratch store's `TemporaryDirectory`, i.e. a path that stops
+existing — the note T-D6 left in that docstring is now resolved rather than
+merely documented.
+
+**Verification.** `pytest -q` — 499 passed. Crucially this one *was* verified
+end to end: pymmcore-plus ships a demo camera, so
+`tests/test_mmcore_mda_saving.py` runs real MDAs headlessly, asserts the data
+lands, reads it back at the acquisition's shape (4 t x 2 c x 3 z), and checks
+`frameReady` still fires for every frame so Glados' display/analysis hook is
+unaffected by the writer. **That demo camera makes MMCORE_PLUS acquisition
+testable without hardware in general** — worth remembering for the tasks whose
+manual checks have been skipped so far.

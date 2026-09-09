@@ -229,3 +229,50 @@ def test_submit_after_close_is_refused_not_silently_lost(writer_factory):
     writer.close(timeout=5)
 
     assert writer.submit((0, slice(None), slice(None)), _frame()) is False
+
+
+# -- what the display is allowed to render --------------------------------
+
+def test_last_written_tag_is_none_until_something_lands(writer_factory):
+    array = FakeArray()
+    array.gate = threading.Event()
+    writer = writer_factory(array)
+
+    writer.submit((0, slice(None), slice(None)), _frame(), tag=(0,))
+
+    assert writer.last_written_tag is None, "not on disk yet, must not be shown"
+    array.gate.set()
+
+
+def test_last_written_tag_follows_the_disk_not_the_queue(writer_factory):
+    """The regression this fixes: with a queued write the frame path runs ahead
+    of the disk, so a viewer pointed at the arrived frame renders unwritten
+    slices as black."""
+    array = FakeArray(shape=(64, 8, 8), delay=0.01)
+    writer = writer_factory(array, memory_budget_bytes=64 * 1024 * 1024)
+
+    for i in range(20):
+        writer.submit((i, slice(None), slice(None)), _frame(i), tag=(i,))
+    # Producer is well ahead here; whatever the display would show must already
+    # be on disk.
+    mid_flight = writer.last_written_tag
+    assert mid_flight is None or mid_flight[0] < 19
+
+    writer.close(timeout=30)
+    assert writer.last_written_tag == (19,), "final frame must be shown once landed"
+
+
+def test_a_failed_write_does_not_advance_the_display(writer_factory):
+    """A slice that raised is still zeros; pointing the viewer at it shows black."""
+    class Exploding(FakeArray):
+        def __setitem__(self, key, value):
+            if key[0] == 1:
+                raise ValueError("boom")
+            super().__setitem__(key, value)
+
+    writer = writer_factory(Exploding())
+    for i in range(2):
+        writer.submit((i, slice(None), slice(None)), _frame(i), tag=(i,))
+    writer.close(timeout=5)
+
+    assert writer.last_written_tag == (0,)

@@ -81,6 +81,18 @@ class MDAConfig:
         "Only applies when live_mode_method == 'sequence'.",
         input_type="dropdown", options=["latest", "sequential"])
     live_mode_nr_frames: int = setting(999,"Number of frames taken for live mode","Only applies when live_mode_method == 'mda', where live mode is a MDA with many frames. Set how many frames here.")
+    mmcore_save_format: str = setting(
+        "ome-zarr",
+        "MDA save format (pymmcore-plus)",
+        "What an MDA writes to your Storage folder when the pymmcore-plus "
+        "backend is selected. That backend has no NDTiff engine, so the data "
+        "is written by pymmcore-plus' own output handler. 'ome-zarr' is a "
+        "directory of chunks -- measured about 3x faster to write and the "
+        "right choice for long or large acquisitions. 'ome-tiff' is a single "
+        "portable file, slower to write. 'none' acquires without saving "
+        "anything to disk, which was the behaviour before this setting "
+        "existed. Ignored by the pycromanager backends, which save NDTiff.",
+        input_type="dropdown", options=["ome-zarr", "ome-tiff", "none"])
 
 @dataclass
 class WebhookConfig:
@@ -277,6 +289,14 @@ class Shared_data(QObject):
         # dataset gets its own slot.
         self.mdaZarrTempDirs = {}
         self.pyMMCdatasetTempDir = None
+        # The active ZarrFrameWriter, published by napariHandler so the
+        # module-level display path can ask how far behind the disk it is and
+        # render the newest slice that actually exists rather than a queued one.
+        self.zarrFrameWriter = None
+        # Where the pymmcore-plus MDA output handler actually wrote this
+        # acquisition, so `_acquisition_storage_path()` can report the user's
+        # Storage folder rather than the scratch zarr's temp directory.
+        self.mdaSavedPath = None
         self.nodzInstance = None
         self.backend='JAVA' #JAVA or Python, if running headlessly
         self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.

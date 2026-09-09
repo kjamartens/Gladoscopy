@@ -4,6 +4,7 @@ import importlib
 import json
 import logging
 import os
+from pathlib import Path
 import sys
 import time
 from collections import deque
@@ -114,6 +115,51 @@ def _get_cached_dimensions(shared_data):
 ZARR_WRITTEN_SLICE_KEY = '_gladosZarrWrittenSlice'
 
 
+#: Output-handler suffixes pymmcore-plus infers a writer from. `handler_for_path`
+#: dispatches on the extension: '.zarr' -> OMEZarrWriter, '.tif'/'.tiff' ->
+#: OMETiffWriter. Anything else raises, so these are not free-form strings.
+MMCORE_SAVE_SUFFIXES = {'ome-zarr': '.ome.zarr', 'ome-tiff': '.ome.tiff'}
+
+
+def mmcore_output_path(shared_data, savefolder, savename):
+    """Where pymmcore-plus should write this MDA, or None to acquire unsaved.
+
+    The `MMCORE_PLUS` MDA branch used to ignore the user's Storage folder
+    completely: `savefolder`/`savename` were computed and never read, and the
+    only copy of the data was the scratch zarr in a `TemporaryDirectory` that
+    `release_all_temp_dirs()` deletes on exit. So an MDA on that backend saved
+    nothing, anywhere. It has no NDTiff engine of its own, which is why the
+    pycromanager branches next to it did not have this problem.
+
+    pymmcore-plus can do the recording itself -- `run_mda(..., output=<path>)`
+    picks a writer from the suffix -- which is also the design this project
+    wants: the backend records, Glados hooks on. This just builds the path.
+
+    Returns None when the user set no Storage folder, or chose 'none', so
+    "acquire without saving" stays reachable.
+    """
+    fmt = getattr(shared_data.config.mda_config, 'mmcore_save_format', 'ome-zarr')
+    suffix = MMCORE_SAVE_SUFFIXES.get(fmt)
+    if suffix is None or not savefolder:
+        return None
+    folder = Path(savefolder)
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        logging.error('Cannot write to Storage folder %s (%s); MDA will not be saved',
+                      savefolder, exc)
+        return None
+    stem = savename or 'MDA'
+    # Never overwrite a previous acquisition -- the same reflex pycromanager has
+    # when it suffixes a duplicate acquisition name.
+    candidate = folder / f'{stem}{suffix}'
+    attempt = 1
+    while candidate.exists():
+        candidate = folder / f'{stem}_{attempt}{suffix}'
+        attempt += 1
+    return candidate
+
+
 def _camera_dtype(shared_data):
     """numpy dtype of one camera pixel (uint8 for 8-bit cameras, else uint16).
 
@@ -172,6 +218,33 @@ def _create_mda_zarr(shared_data, layer_name, shape, h, w, dtype):
     logging.debug('_create_mda_zarr: layer=%s shape=%s dtype=%s',
                   layer_name, shape + [h, w], np.dtype(dtype))
     return array
+
+
+def _slice_safe_to_display(shared_data, arrived_slice):
+    """Which slice the viewer should actually be pointed at.
+
+    Since T-D3 the zarr write is queued, not immediate: the frame path can run a
+    full writer queue ahead of the disk. Pointing napari at the frame that just
+    *arrived* therefore asks it to render slices the writer has not written yet,
+    and an unwritten slice in a freshly created store is zeros -- which is
+    exactly the "live view is black during the acquisition, perfect once it
+    finishes" symptom.
+
+    So follow the writer instead: show the newest slice that has genuinely
+    reached disk. Slightly behind live, never black. `arrived_slice` is the
+    fallback for every path with no writer running (both pycromanager backends,
+    and the inline-write fallback), where the frame is already on disk by the
+    time this is reached.
+    """
+    writer = getattr(shared_data, 'zarrFrameWriter', None)
+    if writer is None:
+        return arrived_slice
+    written = writer.last_written_tag
+    if written is None or len(written) != len(arrived_slice):
+        # Nothing committed yet, or a store that changed shape under us: the
+        # arrived index is the better guess, and it is what the old code did.
+        return arrived_slice
+    return written
 
 
 def _get_contrast_frame_counters(shared_data):
@@ -558,8 +631,9 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     #once. Measured against the pinned napari 0.7.0: 4 point events
                     #for the per-axis loop, 1 for the batched call, same resulting
                     #`current_step`.
-                    napariViewer.dims.set_current_step(list(range(len(sliceTuple))),
-                                                       list(sliceTuple))
+                    displaySlice = _slice_safe_to_display(shared_data, sliceTuple)
+                    napariViewer.dims.set_current_step(list(range(len(displaySlice))),
+                                                       list(displaySlice))
 
                     # Throttled auto-contrast (T-E2), after the sliders have moved so
                     # the limits are fitted to the slice now on screen. Replaces
@@ -649,6 +723,11 @@ class napariHandler:
     # (the MMCORE_PLUS backend has no NDTiff store to recover it from), so the
     # ring must absorb a disk-write hiccup rather than overwrite.
     FRAME_RING_CAPACITY_STORAGE = 256
+
+    #: How long to wait for pymmcore-plus' output handler to finalise the file it
+    #: wrote after the sequence ends. OME-TIFF assembles the whole stack at that
+    #: point, so this is proportional to acquisition size, not a quick flush.
+    MDA_WRITER_FINALISE_TIMEOUT_S = 300.0
     # How long _stop_frame_ring_consumer waits for the consumer to drain and exit.
     FRAME_RING_DRAIN_TIMEOUT_S = 10.0
     # True only while run_liveSequence_worker is driving the camera. A class
@@ -841,9 +920,9 @@ class napariHandler:
     def _process_ring_frame(self, image, metadata):
         """Per-frame work, off the acquisition thread.
 
-        Was the body of grab_image_liveVis_PyMMCore until T-A7. The zarr write
-        deliberately stays on this consumer thread for now; T-D3 moves it to a
-        dedicated writer thread with amortized chunks.
+        Was the body of grab_image_liveVis_PyMMCore until T-A7. Since T-D3 the
+        zarr write is only *queued* here -- `ZarrFrameWriter` does it on its own
+        thread -- so this stays fast even when the disk does not.
         """
         metadata = utils.metadata_refactor(metadata, self.shared_data)
         # For multiDstack MDA: write every frame directly to zarr so fast acquisitions
@@ -963,7 +1042,7 @@ class napariHandler:
             # burst and pushes back instead of dropping.
             writer = self._get_zarr_writer(zarr_data)
             if writer is not None:
-                writer.submit(destination, image)
+                writer.submit(destination, image, tag=sliceTuple)
             else:
                 zarr_data[destination] = image
             # Tell the display path this exact frame is in the store already, and
@@ -1000,6 +1079,11 @@ class napariHandler:
             logging.exception('Could not start the zarr writer; writing inline instead')
             return None
         self._zarr_writer = writer
+        # Published on shared_data because the display path
+        # (`_napariUpdateLive_locked`) is a module-level function with no handler
+        # reference, and needs to know how far behind the disk actually is. This
+        # is the documented convention for cross-component state.
+        self.shared_data.zarrFrameWriter = writer
         return writer
 
     def _stop_zarr_writer(self):
@@ -1010,6 +1094,8 @@ class napariHandler:
         """
         writer = self._zarr_writer
         self._zarr_writer = None
+        if getattr(self.shared_data, 'zarrFrameWriter', None) is writer:
+            self.shared_data.zarrFrameWriter = None
         if writer is None:
             return
         try:
@@ -1403,12 +1489,21 @@ class napariHandler:
                     if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
                         logging.info('Connected to PymmCore!')
                         acq=None
-                        #NOTE (T-D7): this branch ignores the user's Storage folder
-                        #entirely. savefolder/savename were computed above and are
-                        #never read here, and the pyMMCdataset NDTiff store created
-                        #in PyMMCore_startedAcqCallback is never written to -- the
-                        #frames go to a TemporaryDirectory-backed zarr array instead.
-                        #Recorded in claude_issues.md; deliberately out of scope here.
+                        #This backend has no NDTiff engine, so pymmcore-plus does the
+                        #recording itself via run_mda(output=...) -- see
+                        #mmcore_output_path(). Before that, savefolder/savename were
+                        #computed here and never read, and the only copy of the data
+                        #was the scratch zarr in a TemporaryDirectory that
+                        #release_all_temp_dirs() deletes on exit: the MDA saved
+                        #nothing at all. The zarr store remains, but as what it always
+                        #really was -- the display buffer, not the archive.
+                        output_path = mmcore_output_path(shared_data, savefolder, savename)
+                        self.shared_data.mdaSavedPath = str(output_path) if output_path else None
+                        if output_path is None:
+                            logging.warning('pymmcore-plus MDA will not be saved '
+                                            '(no Storage folder set, or save format is "none")')
+                        else:
+                            logging.info('pymmcore-plus MDA will be saved to %s', output_path)
 
                         #Frame-ring consumer first — see the live-mode branch above. On the
                         #multiDstack path the consumer also writes every frame into zarr, where
@@ -1427,8 +1522,12 @@ class napariHandler:
                             self._preinit_mda_zarr(shared_data)
                         #Get the MDA plan
                         mda_sequence_useq = shared_data._mdaModeParams_useq
-                        #Actually start the MDA
-                        self.shared_data.MILcore.core.run_mda(mda_sequence_useq)
+                        #Actually start the MDA. `output` is what makes pymmcore-plus
+                        #write the data; None keeps the old acquire-without-saving
+                        #behaviour.
+                        mda_thread = self.shared_data.MILcore.core.run_mda(
+                            mda_sequence_useq,
+                            output=str(output_path) if output_path else None)
                         logging.info("Started MDA sequence")
                         #Give some time to understand that it's running
                         time.sleep(0.1)
@@ -1437,6 +1536,15 @@ class napariHandler:
                         # processEvents() polling is needed here either.
                         while self.shared_data.MILcore.core.mda.is_running():
                             time.sleep(0.01)
+                        #Join the runner thread as well: is_running() can go False
+                        #before the output handler has finalised the file it wrote
+                        #(OME-TIFF in particular assembles on sequenceFinished), and
+                        #the storage path is reported to nodz right after this.
+                        if mda_thread is not None:
+                            mda_thread.join(timeout=self.MDA_WRITER_FINALISE_TIMEOUT_S)
+                            if mda_thread.is_alive():
+                                logging.warning('MDA output handler did not finalise within %.0fs',
+                                                self.MDA_WRITER_FINALISE_TIMEOUT_S)
 
                         #When it's done, disconnect the callback, then let the consumer drain
                         #the ring — the multiDstack finalisation pass below must not run while

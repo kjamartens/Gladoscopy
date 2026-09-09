@@ -175,7 +175,12 @@ fps with 2.1 MB frames, this takes the consumer thread (which also feeds display
 every RT-analysis queue) from ~33-41 ms blocked per frame to ~0.05 ms, with no frames
 lost. It absorbs *bursts*, not a sustained overrun — `max_depth` and
 `blocked_seconds` in the teardown log are what distinguish the two. Tests:
-`tests/test_frame_writer.py`, `tests/test_zarr_single_writer.py`.
+`tests/test_frame_writer.py`, `tests/test_zarr_single_writer.py`. Because the write
+is queued, the display must **not** be pointed at the frame that just arrived —
+`_slice_safe_to_display()` follows `writer.last_written_tag` (published only after the
+write returns) so napari renders the newest slice that genuinely exists. Skipping this
+is what made a multiDstack MDA show a black live view during acquisition and a perfect
+stack afterwards: an unwritten slice of a fresh store is zeros.
 
 Each frame reaches that store **once** (T-D2). The acquisition-side writer
 (`_try_write_frame_to_zarr`, on the frame-ring consumer thread) stamps the frame's
@@ -196,9 +201,21 @@ per-layer `mdaZarrTempDirs` dict, `new_pyMMC_temp_dir()` for the NDTiff scratch
 dataset, and `release_all_temp_dirs()` wired to `aboutToQuit` — needed because the
 app force-exits through `os._exit(0)` and runs no finalizers. Never construct a
 `TemporaryDirectory` inline and keep only `.name` (T-D7). Tests:
-`tests/test_temp_store_lifetimes.py`. Known gap, deliberately deferred: the
-`MMCORE_PLUS` MDA branch ignores the user's Storage folder entirely — see
-`claude_issues.md`.
+`tests/test_temp_store_lifetimes.py`. **`MMCORE_PLUS` saves via pymmcore-plus itself.** That backend has no NDTiff
+engine, so `run_mda(output=<path>)` does the recording: `napariGlados.mmcore_output_path()`
+builds `<Storage folder>/<name>.ome.zarr` (or `.ome.tiff`) from the
+`MDAConfig.mmcore_save_format` dropdown — `'none'` acquires without saving — suffixing
+`_1`, `_2` … rather than overwriting an existing acquisition, since pymmcore-plus
+dispatches its writer off the file extension (`handler_for_path`). The runner thread is
+joined after `mda.is_running()` goes False, because an OME-TIFF handler assembles the
+stack on `sequenceFinished` and the storage path is reported to nodz immediately after.
+`shared_data.mdaSavedPath` records where it landed and `_acquisition_storage_path()`
+prefers it over the scratch store's temp directory. Before this the branch ignored the
+Storage folder completely and an MDA on this backend saved **nothing**. The scratch zarr
+remains, as what it always was — the display buffer, not the archive. Tests:
+`tests/test_mmcore_mda_saving.py`, which drives pymmcore-plus' bundled demo camera, so
+the saving claim is verified rather than reasoned about — that demo camera makes
+`MMCORE_PLUS` acquisition testable headlessly in general.
 
 `MDAConfig.live_mode_method` (`sequence` | `mda`, default `sequence`) selects between
 the continuous-sequence live path and the legacy 999-frame-MDA loop;

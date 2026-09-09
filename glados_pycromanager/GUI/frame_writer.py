@@ -96,6 +96,7 @@ class ZarrFrameWriter:
         self._failed = 0
         self._max_depth = 0
         self._blocked_seconds = 0.0
+        self._last_written_tag = None
 
     @staticmethod
     def _capacity_for(array, memory_budget_bytes):
@@ -152,6 +153,19 @@ class ZarrFrameWriter:
         return self._blocked_seconds
 
     @property
+    def last_written_tag(self):
+        """Caller's tag for the most recent frame that actually reached disk.
+
+        The display needs this. A queued write means the frame path can be well
+        ahead of the disk -- up to a full queue -- so a viewer pointed at the
+        frame that just *arrived* would be reading slices the writer has not
+        written yet, and rendering them as black. Pointing it here instead shows
+        the newest frame that genuinely exists: slightly behind live, never
+        empty.
+        """
+        return self._last_written_tag
+
+    @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
@@ -164,11 +178,15 @@ class ZarrFrameWriter:
         self._thread.start()
         logging.debug('ZarrFrameWriter started (queue capacity %d frames)', self._capacity)
 
-    def submit(self, slice_tuple, image) -> bool:
+    def submit(self, slice_tuple, image, tag=None) -> bool:
         """Queue one frame. Blocks while full; False if the frame was dropped.
 
         Blocking is the point: it pushes back on the frame path instead of
         quietly discarding data the caller believes is being stored.
+
+        `tag` is an opaque caller-side label for the frame, published as
+        `last_written_tag` once the write lands. It exists so the caller does not
+        have to reverse-engineer an index out of `slice_tuple`.
         """
         if self._stopping.is_set():
             return False
@@ -176,7 +194,7 @@ class ZarrFrameWriter:
             self._submitted += 1
         started_waiting = time.perf_counter()
         try:
-            self._queue.put((slice_tuple, image), timeout=self._submit_timeout_s)
+            self._queue.put((slice_tuple, image, tag), timeout=self._submit_timeout_s)
         except Full:
             waited = time.perf_counter() - started_waiting
             with self._lock:
@@ -239,6 +257,7 @@ class ZarrFrameWriter:
                 'max_depth': self._max_depth,
                 'blocked_seconds': self._blocked_seconds,
                 'capacity': self._capacity,
+                'last_written_tag': self._last_written_tag,
             }
 
     # -- writer thread ----------------------------------------------------
@@ -252,11 +271,14 @@ class ZarrFrameWriter:
                 continue
             if item is _SENTINEL:
                 return
-            slice_tuple, image = item
+            slice_tuple, image, tag = item
             try:
                 self.array[slice_tuple] = image
                 with self._lock:
                     self._written += 1
+                    # Published only after the write returns, so a reader of
+                    # last_written_tag can trust that slice exists on disk.
+                    self._last_written_tag = tag
             except Exception:
                 with self._lock:
                     self._failed += 1

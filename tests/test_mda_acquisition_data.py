@@ -34,7 +34,11 @@ def _resolve(shared_data):
     )
 
 
-def _storage_path(**attrs):
+def _storage_path(saved_path=None, **attrs):
+    # A real MDAGlados always carries shared_data; `saved_path` is what the
+    # pymmcore-plus output handler reported writing to (None on the pycromanager
+    # backends, which record NDTiff themselves).
+    attrs.setdefault("shared_data", SimpleNamespace(mdaSavedPath=saved_path))
     return MDAGlados._acquisition_storage_path(SimpleNamespace(**attrs))
 
 
@@ -117,4 +121,29 @@ def test_storage_path_falls_back_to_the_expected_path_without_data():
     assert (
         _storage_path(data=None, storage_folder="C:/acq", storage_file_name="run")
         == "C:/acq" + os.sep + "run_1//"
+    )
+
+
+def test_storage_path_prefers_where_pymmcore_plus_actually_saved():
+    """On MMCORE_PLUS the archive is what the output handler wrote to the user's
+    Storage folder; `self.data` there is the scratch display zarr, whose store
+    root is a TemporaryDirectory deleted on exit. Reporting that would hand
+    downstream nodes a path that stops existing."""
+    scratch = SimpleNamespace(store=SimpleNamespace(root="C:/Temp/tmp123"))
+
+    assert (
+        _storage_path(saved_path="D:/data/MDA.ome.zarr", data=scratch,
+                      storage_folder="D:/data", storage_file_name="MDA")
+        == "D:/data/MDA.ome.zarr"
+    )
+
+
+def test_storage_path_still_uses_the_store_when_nothing_was_saved():
+    """'none', or no Storage folder set: the scratch store is all there is."""
+    scratch = SimpleNamespace(store=SimpleNamespace(root="C:/Temp/tmp123"))
+
+    assert (
+        _storage_path(saved_path=None, data=scratch,
+                      storage_folder="C:/nope", storage_file_name="nope")
+        == "C:/Temp/tmp123"
     )

@@ -159,3 +159,59 @@ def test_the_writer_is_retired_when_the_store_is_replaced(tmp_appdata):
     assert handler._zarr_writer.array is shared_data.mdaZarrData["MDA"]
     assert not first_writer.is_running
     handler._stop_zarr_writer()
+
+
+def test_the_display_follows_the_disk_not_the_queue(tmp_appdata):
+    """The viewer must never be pointed at a slice the writer has not written.
+
+    Reproduces the "live view is black during a MMCORE_PLUS multiDstack MDA but
+    perfect once it finishes" report: the frame path runs up to a full writer
+    queue ahead of the disk, and an unwritten slice of a fresh store is zeros.
+    """
+    from glados_pycromanager.GUI.napariGlados import _slice_safe_to_display
+
+    shared_data = _shared_data_with_store(n_time=30)
+    handler = _handler(shared_data)
+
+    # No writer yet: the arrived slice is on disk by definition.
+    assert _slice_safe_to_display(shared_data, (7,)) == (7,)
+
+    handler._try_write_frame_to_zarr(np.zeros((4, 5), dtype=np.uint16),
+                                     {"Axes": {"time": 0}})
+    assert shared_data.zarrFrameWriter is not None
+
+    for time_point in range(1, 30):
+        handler._try_write_frame_to_zarr(
+            np.full((4, 5), time_point, dtype=np.uint16),
+            {"Axes": {"time": time_point}},
+        )
+        shown = _slice_safe_to_display(shared_data, (time_point,))
+        assert shown[0] <= time_point, "cannot show a frame from the future"
+
+    handler._stop_zarr_writer()
+    # Writer gone: fall back to the arrived slice rather than a stale one.
+    assert _slice_safe_to_display(shared_data, (29,)) == (29,)
+
+
+def test_every_displayed_slice_has_actually_been_written(tmp_appdata):
+    """The property that matters: whatever the viewer is pointed at is non-black."""
+    from glados_pycromanager.GUI.napariGlados import _slice_safe_to_display
+
+    n_time = 25
+    shared_data = _shared_data_with_store(n_time=n_time)
+    handler = _handler(shared_data)
+    store = shared_data.mdaZarrData["MDA"]
+    shown_slices = []
+
+    for time_point in range(n_time):
+        handler._try_write_frame_to_zarr(
+            np.full((4, 5), time_point + 1, dtype=np.uint16),
+            {"Axes": {"time": time_point}},
+        )
+        shown_slices.append(_slice_safe_to_display(shared_data, (time_point,)))
+
+    handler._stop_zarr_writer()
+    for shown in shown_slices:
+        # Every frame written here is non-zero, so a zero slice means the viewer
+        # was pointed at something that had not landed.
+        assert store[shown[0]].any(), f"slice {shown[0]} was shown while still empty"

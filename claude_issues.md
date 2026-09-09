@@ -43,15 +43,26 @@ Add longer context underneath as a nested bullet if needed.
   shard=32 frames gives 1 file per 32); measured at 4.3 ms/slice read but 44 ms/frame write on
   this machine, so it needs a batched whole-shard writer before it is worth taking.
 
-- **pymmcore-plus MDA zarr storage** — crashes fixed (MDA_acq_finished and pyMMCdataset.finish() no longer crash); actual zarr storage for pymmcore-plus MDA + advanced-settings storage selector deferred to a future plan step.
-- **MMCORE_PLUS MDA ignores the user's Storage folder** — recorded by T-D7, deliberately not fixed there. On the `MMCORE_PLUS` branch of `run_MILCoreAcquisition_worker`, `savefolder`/`savename` are computed from `_mdaModeSaveLoc` and then never read, and the `pyMMCdataset` NDTiff store created in `PyMMCore_startedAcqCallback` is never written to — frames go into a `TemporaryDirectory`-backed zarr array instead, which `release_all_temp_dirs()` deletes on quit. So an MMCORE_PLUS MDA saves nothing where the user asked, and `_acquisition_storage_path()` reports a temp directory. Overlaps the existing "pymmcore-plus MDA zarr storage" item above; both want the same fix. Deferral rationale in `claude_decisions.md` (2026-09-09, T-D7).
-
 - **Napari layer thumbnail loading icon** — user suggested ignoring. The icon spins on every `layer.data =` assignment; suppressing it requires internal napari APIs. Defer unless user flags as priority.
 
 
 ---
 
 ## Resolved (history)
+
+- [x] **pymmcore-plus MDA saved nothing / ignored the user's Storage folder** — the two
+  deferred items above, fixed together. `run_mda()` was called with no `output=`, so the
+  only copy of the frames was the scratch display zarr in a `TemporaryDirectory` that
+  `release_all_temp_dirs()` deletes on exit; `savefolder`/`savename` were computed and
+  never read. This backend has no NDTiff engine, so pymmcore-plus now does the recording
+  itself: `mmcore_output_path()` builds `<Storage folder>/<name>.ome.zarr` (or `.ome.tiff`)
+  from the new `MDAConfig.mmcore_save_format` dropdown, never overwriting an existing
+  acquisition, and `run_mda(output=...)` writes it. The runner thread is joined so the
+  handler finalises before the storage path is reported, and
+  `_acquisition_storage_path()` now prefers `shared_data.mdaSavedPath` over the scratch
+  store's temp directory. Verified end-to-end against pymmcore-plus' bundled demo camera
+  (`tests/test_mmcore_mda_saving.py`), including reading the data back at the
+  acquisition's shape. Committed in `fix(storage): save pymmcore-plus MDAs to the user's Storage folder`.
 
 - [x] **Live/MDA mode on MMCORE_PLUS ran but showed no image (regression from Phase 13.2)** — `core.mda.events` is a Qt-backed (PyQt5) signaler whenever a `QApplication` is running (always true in this GUI app); `frameReady`/`sequenceStarted`/`sequenceFinished`/`sequenceCanceled` were connected inside `run_MILCoreAcquisition_worker`, a napari `@thread_worker` QThreadPool worker thread with no Qt event loop of its own. Under default `Qt.AutoConnection` the callback invocation queued for that thread and was never dispatched — Phase 13.2's removed `processEvents()` polling turned out to be the only thing draining that queue, not dead overhead as assumed. Fixed by connecting with an explicit `Qt.DirectConnection` via a new `_connect_mda_signal_direct()` helper (faster than the original pre-13.2 code, since it needs no polling at all). Also fixed an unrelated real bug found during triage: `napariUpdateLive`'s `liveModeUpdateOngoing` reentrancy guard could get stuck `True` forever on an early return, permanently freezing the live layer for the rest of the session — now wrapped in `try/finally`. See `claude_decisions.md` (2026-07-15) for full root-cause detail. Committed in `fix: deliver MMCORE_PLUS MDA signals via Qt.DirectConnection`.
 - [x] **`liveMode` flips back to False ~1 s after being set programmatically** — Three improvements committed: (1) traceback diagnostic in the `liveMode` setter logs the full call stack on every False transition (DEBUG level) — re-run `make profile-runtime PROFILE_SECS=8` to capture the stack; (2) `stop_sequence_acquisition()` for MMCORE_PLUS now also calls `core.mda.cancel()` when an MDA is running — `stopSequenceAcquisition()` alone does not cancel a `run_mda`-based sequence; (3) profiler watchdog delay increased from 500 ms → 1500 ms and `mdaMode` guard added to `_profile_try_start` to avoid false-positive early dumps when the demo cam completes its first 999-frame batch and the worker momentarily re-arms. Committed in `reliability: diagnose liveMode flip + fix MMCORE_PLUS stop + robustify profiler watchdog`.
