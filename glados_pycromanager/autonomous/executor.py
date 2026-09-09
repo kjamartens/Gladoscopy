@@ -103,6 +103,36 @@ from glados_pycromanager.GUI.slack_settings_dialog import (
 from glados_pycromanager.GUI.slack_settings_dialog import (
     apply_to_shared_data as _apply_slack_settings,
 )
+from glados_pycromanager.GUI.napari_bridge import get_bridge
+
+
+def _replace_visualisation_layer(shared_data, layerType, layerName, colormap):
+    """Create an RT-visualisation layer for a node, on the GUI thread (T-F9).
+
+    The node call-actions that use this run on a `QThreadPool` worker, and they
+    used to remove and add `viewer.layers` entries from there directly -- the
+    classic route to an inconsistent layer list or a vispy segfault. The bridge
+    performs the swap on the GUI thread and hands the layer back, because the
+    node's `..._visualise` function is called with it.
+
+    Returns `None` if there is no bridge (no shared_data / no viewer yet).
+    """
+    bridge = get_bridge(shared_data)
+    if bridge is None:
+        logging.error('No napari bridge available; cannot create layer %s', layerName)
+        return None
+
+    if layerType == 'points':
+        return bridge.replace_layer('points', name=layerName, data=None, text=None)
+    if layerType == 'shapes':
+        return bridge.replace_layer('shapes', name=layerName, data=None)
+    if layerType == 'image':
+        logging.debug('creating new image layer')
+        return bridge.replace_layer(
+            'image', name=layerName, data=np.random.random((30, 30)), colormap=colormap)
+
+    logging.error('Unknown RT-visualisation layer type: %s', layerType)
+    return None
 
 
 # Define a WorkerSignals class to handle signals
@@ -458,35 +488,16 @@ class FlowchartExecutorMixin:
                     if chosenLayerType != None:
                         
                         layerName = visual_connected_node.visualisation_currentData['layerName']
-                        
-                        #If a layer with this name already exists, simply remove it:
-                        for layer in self.shared_data.napariViewer.layers: #type:ignore
-                            if layer.name == layerName:
-                                self.shared_data.napariViewer.layers.remove(layer) #type:ignore
-                                
                         cmap = visual_connected_node.visualisation_currentData['colormap']
-                        if chosenLayerType == 'points':
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            napariLayer = viewer.add_points(
-                                data=None,
-                                text=None,
-                                name=layerName,
-                            )
-                        elif chosenLayerType == 'shapes':
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            napariLayer = viewer.add_shapes(
-                                data=None,
-                                name=layerName,
-                            )
-                        elif chosenLayerType == 'image':
-                            logging.debug('creating new image layer')
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            im = np.random.random((30, 30))
-                            napariLayer = viewer.add_image(
-                                data=im,
-                                name=layerName,
-                                colormap = cmap
-                            )
+
+                        # T-F9: this method runs on a QThreadPool worker, so the
+                        # layer swap goes through the GUI-thread bridge instead
+                        # of mutating viewer.layers from here. `replace_layer`
+                        # does the remove and the add in one GUI-thread call, so
+                        # no other thread can observe the gap between them, and
+                        # blocks because the new layer is needed below.
+                        napariLayer = _replace_visualisation_layer(
+                            self.shared_data, chosenLayerType, layerName, cmap)
                         
                         visualOutput = registry.dispatch_from_eval_text(
                             visualEvalText,
@@ -587,34 +598,13 @@ class FlowchartExecutorMixin:
                     
                     if chosenLayerType != None:
                         layerName = visual_connected_node.visualisation_currentData['layerName']
-                        
-                        #If a layer with this name already exists, simply remove it:
-                        for layer in self.shared_data.napariViewer.layers: #type:ignore
-                            if layer.name == layerName:
-                                self.shared_data.napariViewer.layers.remove(layer) #type:ignore
-                                
                         cmap = visual_connected_node.visualisation_currentData['colormap']
-                        if chosenLayerType == 'points':
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            napariLayer = viewer.add_points(
-                                data=None,
-                                text=None,
-                                name=layerName,
-                            )
-                        elif chosenLayerType == 'shapes':
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            napariLayer = viewer.add_shapes(
-                                data=None,
-                                name=layerName,
-                            )
-                        elif chosenLayerType == 'image':
-                            viewer = self.shared_data.napariViewer #type:ignore
-                            im = np.random.random((30, 30))
-                            napariLayer = viewer.add_image(
-                                data=im,
-                                name=layerName,
-                                colormap = cmap
-                            )
+
+                        # T-F9: as in the scoring path above -- created on the
+                        # GUI thread via the bridge, returned here because the
+                        # node's visualise function is handed the layer.
+                        napariLayer = _replace_visualisation_layer(
+                            self.shared_data, chosenLayerType, layerName, cmap)
                         
                         #Phase 9.5: dispatch via registry instead of bare eval.
                         PerformVisualisation = registry.dispatch_from_eval_text(

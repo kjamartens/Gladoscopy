@@ -209,7 +209,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-F6** Debounce resize rebuilds; fix the `QScrollArea` leak — M, no deps
 - [x] **T-F7** Remove the synthetic resize + `processEvents()` — S, no deps
 - [ ] **T-F8** `textChanged` to `editingFinished` + debounce — M, no deps — **partly a decision**
-- [ ] **T-F9** `NapariBridge` for worker-to-GUI layer updates — **L**, no deps
+- [x] **T-F9** `NapariBridge` for worker-to-GUI layer updates — **L**, no deps
 - [ ] **T-F10** Make the live/MDA toggle non-blocking — M, no deps
 
 ### Tier G — Analysis dispatch

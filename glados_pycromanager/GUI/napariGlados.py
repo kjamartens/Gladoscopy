@@ -1852,6 +1852,12 @@ class napariHandler:
         logging.debug("#nH - acquisition done")
         self.shared_data.liveModeUpdateOngoing = False
 
+    def _napari_bridge(self):
+        """The GUI-thread receiver for this handler's napari mutations (T-F9)."""
+        from glados_pycromanager.GUI.napari_bridge import get_bridge
+
+        return get_bridge(self.shared_data)
+
     def acqModeChanged(self, newSharedData = None):
         """
         General function which is called if live mode is changed or not. Generally called from sharedFunction - when self._liveMode is altered
@@ -1912,7 +1918,9 @@ class napariHandler:
                     #Always start live-mode visualisation:
                     napariGlados.startLiveModeVisualisation(self.shared_data)
                     #Move layer to top - if it isn't created yet, it will fail
-                    moveLayerToTop(self.shared_data.napariViewer,"Live")
+                    # T-F9: acqModeChanged runs on the acquisition worker's own
+                    # thread, so this goes through the GUI-thread bridge.
+                    self._napari_bridge().move_to_top("Live")
 
                     #Start the worker to run the pycromanager acquisition
                     worker1 = self.run_MILCoreAcquisition_worker(self) #type:ignore
@@ -1961,7 +1969,8 @@ class napariHandler:
                     self.stop_continuous_task = False
                     #Move layer to top - if it isn't created yet, it will fail
                     if self.shared_data.newestLayerName != '':
-                        moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
+                        # T-F9: see the live branch above.
+                        self._napari_bridge().move_to_top(self.shared_data.newestLayerName)
                     #Start the two workers, one to run it, one to visualise it.
 
 

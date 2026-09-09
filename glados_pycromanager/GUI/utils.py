@@ -3291,18 +3291,35 @@ def forceReset_actual(shared_data):
     """
     logging.debug('Attempting force-reset!')
     import time
+
+    from glados_pycromanager.GUI.napari_bridge import get_bridge
     core=shared_data.core
-    
+
+    # T-F9: this function runs on a ThreadPoolExecutor thread. Assigning
+    # liveMode/mdaMode re-enters acqModeChanged, which reaches moveLayerToTop --
+    # i.e. it mutates viewer.layers from a non-GUI thread. Route the two flips
+    # through the bridge so that whole chain runs where it belongs. The waits
+    # are bounded; forceReset's own 5 s future timeout is the outer bound.
+    bridge = get_bridge(shared_data)
+
+    def _set_mode(attribute):
+        def _apply(_viewer):
+            setattr(shared_data, attribute, False)
+        if bridge is None:
+            _apply(None)
+        else:
+            bridge.submit(_apply, wait=True, timeout=2.0)
+
     #Trying a bunch of different things:
     try:
-        shared_data.liveMode = False
+        _set_mode('liveMode')
         logging.debug("Attempted: shared_data.liveMode=False")
-    except (AttributeError, RuntimeError):
+    except (AttributeError, RuntimeError, TimeoutError):
         logging.debug("Attempted but failed: shared_data.liveMode=False")
     try:
-        shared_data.mdaMode = False
+        _set_mode('mdaMode')
         logging.debug("Attempted: shared_data.mdaMode=False")
-    except (AttributeError, RuntimeError):
+    except (AttributeError, RuntimeError, TimeoutError):
         logging.debug("Attempted but failed: shared_data.mdaMode=False")
     time.sleep(0.1)
     try:

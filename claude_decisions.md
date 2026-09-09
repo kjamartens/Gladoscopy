@@ -2481,3 +2481,60 @@ dragging a property slider against real hardware) could not be performed: no
 hardware in this environment.
 **Affects:** `glados_pycromanager/GUI/MMcontrols.py`,
 `tests/test_hardware_edit_debounce.py`.
+
+## 2026-09-09 — NapariBridge marshals with a signal plus an Event, and owns its own thread affinity  [T-F9]
+**Decision:** `glados_pycromanager/GUI/napari_bridge.py` adds `NapariBridge`, a
+`QObject` carrying one internal `pyqtSignal(object)`. `submit(fn, ..., wait=)`
+wraps the callable in a `_Call` (a `threading.Event` plus result/error slots) and
+either runs it inline (caller is already the GUI thread) or emits — which Qt's
+automatic connection type turns into a queued call on the GUI thread. A blocking
+caller waits on the Event; the result is returned and an exception is re-raised on
+the calling thread. `get_bridge(shared_data)` caches one bridge per `Shared_data`.
+**Alternatives for the blocking path:** `QMetaObject.invokeMethod` with
+`Qt.BlockingQueuedConnection` and `Q_RETURN_ARG` — rejected. Returning an
+arbitrary Python object that way depends on `PyQt_PyObject` metatype handling and
+fails opaquely; the signal-plus-Event form is plain Python, testable without Qt
+introspection, and is what lets the call carry an exception back as well as a
+result. The task's own reference pattern (`AnalysisClass.py`) is a `pyqtSignal`
+too.
+**Thread affinity is taken, not assumed.** `__init__` calls
+`self.moveToThread(app.thread())` when it is constructed off the GUI thread. Without
+that, a bridge first created by a worker would carry *that* thread's affinity and
+every "queued" call would target a thread with no event loop — the exact silent
+failure T-C/T-B chased elsewhere. It also means `get_bridge` is safe to call from
+anywhere, which the migrated call sites rely on.
+**Every blocking call has a timeout** (`DEFAULT_CALL_TIMEOUT_S`, 10 s; 2 s for the
+force-reset flips, which sit inside `forceReset`'s own 5 s future timeout). A
+wedged GUI thread must not make an acquisition uncancellable.
+**`replace_layer` rather than remove-then-add.** The two `executor.py` sites remove
+any layer of the target name and immediately add a fresh one. Routing those as two
+separate `submit`s would leave a window in which the layer list has neither, into
+which another thread's submit can land; one GUI-thread call closes it. A test
+pins that `replace_layer` contains exactly one `submit`.
+**Migrated:** `executor.py`'s two blocks (both now call the module-level
+`_replace_visualisation_layer`, which blocks because the node's `..._visualise`
+function is handed the layer); `utils.forceReset_actual`'s two mode flips (the
+assignment re-enters `acqModeChanged`, which reaches `moveLayerToTop`); and
+`napariHandler.acqModeChanged`'s two `moveLayerToTop` calls, via a new
+`_napari_bridge()` accessor on the handler.
+**Not migrated, deliberately:** `AnalysisClass.py`'s existing
+`_do_visualise` → `_visualise_on_main_thread` signal. The task says not to change
+it beyond routing it through the bridge "if that is natural" — it is already a
+correct GUI-thread hop, and rerouting it would churn a working path for no gain.
+The `moveLayerToTop` import in `napariGlados.py` is kept though its live callers
+are gone: that module is star-imported by `_dock_widget.py`, so the name is part
+of an exported surface.
+**Verification:** `tests/test_napari_bridge.py` — 23 tests driving the bridge from
+real worker threads against a real `QApplication` event loop: affinity taken when
+built on a worker, a worker's mutation running on `MainThread`, a GUI-thread call
+running inline, blocking results, exceptions re-raised on the caller, a *wedged*
+GUI thread producing `TimeoutError` instead of hanging, atomic replace, remove
+counting/tolerating misses, the batched `set_dims_step`, `get_bridge` caching and
+late viewer binding, plus source guards on all three migrated sites and a
+functional check of the executor helper for all three layer types.
+`pytest -q` — 655 passed (full suite, slow markers included). The manual check
+(a full autonomous recipe plus a Force-reset during live mode) could not be
+performed: no hardware or display in this environment.
+**Affects:** new `glados_pycromanager/GUI/napari_bridge.py`;
+`glados_pycromanager/autonomous/executor.py`, `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/GUI/napariGlados.py`, `tests/test_napari_bridge.py`.
