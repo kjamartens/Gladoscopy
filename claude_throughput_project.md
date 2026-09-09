@@ -188,7 +188,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
 - [x] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
 - [x] **T-D7** Fix `TemporaryDirectory` lifetimes — S, no deps
-- [ ] **T-D8** Offer NDTiff as a pymmcore-plus storage format — M, no deps — *measured 19x faster to write than zarr; do before T-E6*
+- [ ] **T-D8** Offer NDTiff as a pymmcore-plus storage format; benchmark tuned OME-Zarr/OME-TIFF against it — M, no deps — *do before T-E6*
 
 ### Tier E — Napari visualisation
 
@@ -1173,6 +1173,52 @@ Three consequences, in increasing order of importance:
    and this measurement is the evidence it needs — which is why this task comes
    first.
 
+**Before defaulting to NDTiff, investigate OME-TIFF and OME-Zarr properly — the
+comparison above is not yet fair.** NDTiff was driven through its native API,
+while both OME formats got whatever defaults `handler_for_path` picks from a bare
+path string. That is a configuration comparison as much as a format comparison,
+and the tell is in the file counts: `run_mda(output=…​.ome.zarr)` produced **1002
+files for 1000 frames**, i.e. it fell into exactly the same one-chunk-per-frame
+trap measured in T-E6 — not necessarily anything intrinsic to OME-Zarr.
+
+This matters because the OME formats are the *interoperable* ones. NDTiff is
+Micro-Manager-specific; OME-Zarr and OME-TIFF are read by anything in the imaging
+ecosystem. If a properly configured OME-Zarr lands anywhere near NDTiff, it is
+the better default on portability grounds alone. Decide the default on
+measurements, not on format loyalty in either direction.
+
+What to try:
+
+- **Pass a configured writer, not a path.** `run_mda`'s `output` is typed
+  `SingleOutput = Path | str | SupportsFrameReady | AcquisitionSettings`, so a
+  writer *instance* is accepted. Build `OMEZarrWriter` (or its `ome-writers`
+  successor) with explicit chunk and shard settings sized to the frame, rather
+  than letting a bare path choose them. The T-D3/T-E6 measurements say chunking
+  along the frame axis hurts *reads*, so shards over 1-frame chunks is the shape
+  to test: it was the one configuration that kept a cheap random read (4.27 ms at
+  1024x1024) while collapsing the file count.
+- **`TensorStoreHandler`.** Also exposed by `pymmcore_plus.mda.handlers`, and
+  never benchmarked here. It is the most likely candidate to be fast without
+  giving up an open format.
+- **The `ome-writers` path.** `pymmcore_plus.mda.handlers` emits a
+  `FutureWarning` — "we are moving to ome-writers as the internally supported
+  data-sink" — so the handlers benchmarked here are the *old* implementation and
+  may not be what a current pymmcore-plus does at all. Measure the new sink
+  before concluding anything about OME-Zarr's ceiling. `tests/test_mmcore_mda_saving.py`
+  already pins that these suffixes still resolve to a handler, so that migration
+  will surface as a test failure rather than silent data loss.
+- **Check OME-TIFF's memory behaviour, separately from its speed.** It wrote a
+  single file at 6.97 ms/frame, so its cost is *not* per-file overhead — it is
+  somewhere else, and the suspicion is that it assembles the stack at
+  `sequenceFinished` rather than streaming. If it buffers a whole acquisition in
+  RAM that is a hard limit on long MDAs and a correctness/robustness concern, not
+  a performance one. This is also why `MDA_WRITER_FINALISE_TIMEOUT_S` exists at
+  300 s. Measure peak RSS across a long acquisition per format.
+
+Record the outcome in `claude_decisions.md` whichever way it goes: "OME-Zarr was
+tuned and still lost" is as useful to a future session as the reverse, and stops
+this being re-litigated.
+
 **The write path already exists in this codebase.** `MMcontrols.py` (~line 788)
 constructs `NDTiffDataset(path, summary_metadata=…​, writable=True)` and calls
 `put_image(coords, pixels, metadata)` / `finish()`. `napariGlados.py`'s
@@ -1207,8 +1253,11 @@ this task finally makes real. `ndstorage` 0.1.18 is already a dependency.
    report it, then simplify those two now that both backends can produce the same
    shape.
 5. **Re-run the benchmark before choosing the default**, on more than one frame
-   size and with a cold page cache. If it holds, make `ndtiff` the default and
-   say so in the setting's description.
+   size and with a cold page cache, and against *tuned* OME writers per the
+   investigation note above — not the bare-path defaults. If NDTiff still wins by
+   a wide margin, make it the default and say so in the setting's description; if
+   a configured OME-Zarr is close, prefer it for interoperability. Either way
+   record the result in `claude_decisions.md`.
 
 **Don't:** Don't remove the OME-Zarr/OME-TIFF options — they are the
 interoperable, non-Micro-Manager-specific formats and somebody will want them;
