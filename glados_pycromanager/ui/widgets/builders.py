@@ -10,6 +10,7 @@ directly.
 """
 from __future__ import annotations
 
+import functools
 import logging
 import os
 
@@ -21,8 +22,20 @@ from PyQt5.QtWidgets import QFileDialog
 logger = logging.getLogger(__name__)
 
 
+# T-F1: rendered-pixmap cache, keyed by (iconFolder, type, alteration, iconSize).
+# Populated lazily on first use — never at import, because constructing a QPixmap
+# before a QApplication exists is invalid.
+_ICON_PIXMAP_CACHE: dict[tuple[str, str, str, int], QPixmap] = {}
+
+
+@functools.lru_cache(maxsize=1)
 def findIconFolder() -> str:
-    """Locate the `GUI/Icons/` folder regardless of install / repo layout."""
+    """Locate the `GUI/Icons/` folder regardless of install / repo layout.
+
+    Memoized (T-F1): this is a pure lookup of a path that cannot change during a
+    session, but it was called several times per warning-icon update — each call
+    running an `importlib.util.find_spec` plus up to three `os.path.exists` probes.
+    """
     import importlib.util
 
     if importlib.util.find_spec("glados_pycromanager") is not None:
@@ -58,6 +71,12 @@ def setWarningErrorInfoIcon(widget, type, iconFolder, alteration="grayscale", ic
         else:
             iconLoc = iconFolder + os.sep + "InfoIcon.png"
 
+        cache_key = (iconFolder, type, alteration, iconSize)
+        cached = _ICON_PIXMAP_CACHE.get(cache_key)
+        if cached is not None:
+            widget.setPixmap(cached)
+            return widget
+
         pixmap = QPixmap(iconLoc)
 
         if alteration == "grayscale":
@@ -76,6 +95,10 @@ def setWarningErrorInfoIcon(widget, type, iconFolder, alteration="grayscale", ic
         scaled_pixmap = pixmap.scaled(
             iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
+        # Only cache a pixmap that actually rendered; a missing/unreadable PNG
+        # yields a null QPixmap that we should keep retrying rather than pin.
+        if not scaled_pixmap.isNull():
+            _ICON_PIXMAP_CACHE[cache_key] = scaled_pixmap
         widget.setPixmap(scaled_pixmap)
         return widget
     except Exception:  # noqa: BLE001 — preserve historical "swallow on icon fail"

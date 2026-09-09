@@ -201,7 +201,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 ### Tier F — Keep the GUI thread holy
 
-- [ ] **T-F1** Memoize `findIconFolder()` and cache pixmaps — M, no deps
+- [x] **T-F1** Memoize `findIconFolder()` and cache pixmaps — M, no deps
 - [ ] **T-F2** Stop loading a PNG from disk inside `NodeItem.paint()` — M, needs F1
 - [x] **T-F3** Tail-follow the log file instead of re-reading it — M, no deps
 - [ ] **T-F4** Coalesce the nodz timer and gate it on acquisition — M, needs F1

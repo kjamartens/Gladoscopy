@@ -2218,3 +2218,28 @@ passed (the bench flag is additive and defaults off).
 `docs/bench-live-display.md` (new "Re-measured after T-E1 - T-E4" section),
 `docs/bench-live-display.txt` (appended runs),
 `claude_issues_and_features.md` (deferred entry).
+
+## 2026-09-09 — Icon caches are lazy, per-variant, and refuse to cache a null pixmap  [T-F1]
+**Decision:** `findIconFolder()` is memoized with `functools.lru_cache(maxsize=1)`,
+and rendered icons are cached in a module-level dict keyed by
+`(iconFolder, type, alteration, iconSize)`. A `QPixmap` whose `isNull()` is true —
+a missing or unreadable PNG — is deliberately **not** stored.
+**Alternatives:** (a) cache the raw `QPixmap` before the grayscale/scale steps and
+redo those per call — rejected, the numpy grayscale pass over the whole image was
+the expensive half; (b) precompute all variants at import — rejected, constructing
+a `QPixmap` without a live `QApplication` is invalid, and the task says so
+explicitly; (c) cache null pixmaps too for a uniform fast path — rejected, that
+pins a transient failure (icons not yet unpacked, a bad folder argument) for the
+rest of the session with no way to recover.
+**Reason:** The full lookup+render chain ran 3-4 times per warning update, which
+the 1 Hz nodz timer triggers roughly twice a second for the whole session, on the
+GUI thread. Keying on the full argument tuple keeps every existing call site's
+behaviour byte-identical while collapsing the repeat cost to a dict hit. Function
+signatures are unchanged, as the task requires — several call sites pass
+`iconFolder` positionally and assign the return value back.
+**Verification:** `tests/test_icon_cache.py` — six tests pinning: no disk re-probe
+after the first `findIconFolder()`, one PNG decode per variant, a shared pixmap
+still painting every widget, an empty cache at import, and a missing icon staying
+retryable. `pytest -q -m "not slow"` — 535 passed.
+**Affects:** `glados_pycromanager/ui/widgets/builders.py`,
+`tests/test_icon_cache.py`.
