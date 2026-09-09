@@ -2439,3 +2439,45 @@ environment.
 **Affects:** `glados_pycromanager/Core/MDAGlados.py`,
 `glados_pycromanager/_dock_widget.py`, `tests/test_mda_gui_rebuild.py`,
 `tests/test_dock_relayout_debounce.py`.
+
+## 2026-09-09 — T-F8 MMcontrols half: debounce with an immediate release flush; wheel notches coalesce into one move  [T-F8]
+**Decision:** Implemented the lower-risk MMcontrols half only. The laser half is a
+stop point and is left for the user (see below).
+- `on_sliderChanged`'s device write is split into `_writeSliderProperty()` and
+  routed through `_scheduleSliderPropertyWrite()` **only when `fromSlider`**. The
+  GUI half (updating the edit field text so the number tracks the handle) still
+  runs per pixel; the two hardware getters plus `set_property` are deferred by
+  200 ms, and `sliderReleased` is connected straight to the flush so releasing
+  commits at once.
+- The pending map is keyed per `config_id`, so dragging one slider never discards
+  another's pending value, and a device error on one config is caught and logged
+  rather than stranding the rest of the batch.
+- Wheel notches over the z-stage widget accumulate and are applied as **one**
+  relative move of the same total distance, via a new `steps` multiplier on
+  `moveOneDStage` (default 1, so the four button callers are untouched). Each
+  notch previously issued its own `set_relative_position` plus two position
+  read-backs, one of them on a 500 ms `singleShot`.
+**Alternatives:** (a) writing only on `sliderReleased` and dropping the timer —
+rejected, that leaves keyboard-driven slider changes (arrow keys, page up/down)
+never reaching the device, since they emit `valueChanged` without a release;
+(b) throttling the wheel by dropping notches — rejected, that silently changes how
+far the stage travels for a given scroll. Coalescing preserves the total distance
+exactly, including the case where equal up and down notches cancel out.
+**Not done (already correct):** `onEditFieldChanged` is already wired to
+`editingFinished`, not `textChanged`, as is the slider's own edit field. The task
+text anticipated otherwise; nothing to change.
+**Also routed through the accumulator:** the *second* wheel-to-stage path, the
+modifier-plus-scroll callback over the napari image canvas (`_imageScrollToZ`).
+The task names only the z-stage widget, but it is the same handler on the same
+stage with the same per-notch cost.
+**Verification:** `tests/test_hardware_edit_debounce.py` — 16 tests covering a
+100-step drag writing once with the final value, release flushing immediately and
+disarming the timer, per-slider pending values, a double flush not rewriting, one
+failing config not blocking the batch, typed values bypassing the debounce, the
+write body being unchanged, a 10-notch burst becoming one 10-step move, direction
+preservation, opposing notches cancelling, and both wheel paths being coalesced.
+`pytest -q -m "not slow"` — 620 passed. The manual check (typing an exposure,
+dragging a property slider against real hardware) could not be performed: no
+hardware in this environment.
+**Affects:** `glados_pycromanager/GUI/MMcontrols.py`,
+`tests/test_hardware_edit_debounce.py`.

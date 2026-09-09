@@ -1808,7 +1808,10 @@ class MMConfigUI(CustomMainWindow):
             delta = eventDelta[1]
             if delta == 0:
                 return
-            self.moveOneDStage(2 if delta > 0 else -2)
+            # T-F8: same coalescing as the z-stage widget's wheel handler -- a
+            # scroll burst becomes one relative move of the same total distance
+            # instead of one hardware move plus two read-backs per notch.
+            self._accumulateStageWheel(1 if delta > 0 else -1)
 
         napariViewer.mouse_wheel_callbacks.append(_imageScrollToZ)
 
@@ -1822,10 +1825,38 @@ class MMConfigUI(CustomMainWindow):
         if event.type() == QEvent.Wheel and container is not None and (obj is container or container.isAncestorOf(obj)):
             delta = event.angleDelta().y()
             if delta != 0:
-                self.moveOneDStage(2 if delta > 0 else -2)
+                # T-F8: a fast scroll delivers many notches, and each one used to
+                # issue its own stage move plus two position read-backs. Notches
+                # are accumulated and applied as a single relative move of the
+                # same total distance.
+                self._accumulateStageWheel(1 if delta > 0 else -1)
             event.accept()
             return True
         return super().eventFilter(obj, event)
+
+    #: Idle window before accumulated wheel notches reach the stage (T-F8).
+    STAGE_WHEEL_DEBOUNCE_MS = 120
+
+    def _accumulateStageWheel(self, notches):
+        """Add wheel notches to the pending total and (re)arm the flush timer."""
+        self._pendingStageWheelSteps = getattr(self, '_pendingStageWheelSteps', 0) + notches
+
+        timer = getattr(self, '_stageWheelTimer', None)
+        if timer is None:
+            timer = self._stageWheelTimer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._flushStageWheel)
+        timer.start(self.STAGE_WHEEL_DEBOUNCE_MS)
+
+    def _flushStageWheel(self):
+        """Apply the accumulated notches as one relative move."""
+        net = getattr(self, '_pendingStageWheelSteps', 0)
+        self._pendingStageWheelSteps = 0
+        if net == 0:
+            # Equal numbers of up and down notches cancel out, exactly as the
+            # per-notch moves would have.
+            return
+        self.moveOneDStage(2 if net > 0 else -2, steps=abs(net))
 
     def updateOneDstageLayout(self):
         """
@@ -1845,13 +1876,16 @@ class MMConfigUI(CustomMainWindow):
             if widget.objectName() == self.oneDstageDropdown.currentText():
                 self.oneDStackedWidget.setCurrentIndex(widget_id)
     
-    def moveOneDStage(self,amount):
+    def moveOneDStage(self,amount,steps=1):
         """
         Moves the selected one-D stage by the specified amount
 
         Parameters
         ----------
         amount: int: 1 or 2, 'small step' or 'big step'
+        steps: int: how many of that step to take in one move (T-F8). Defaults
+            to 1, so every existing caller is unaffected; the wheel handler uses
+            it to apply a burst of notches as a single relative move.
         """
         #Get the currently selected one-D stage:
         selectedStage = self.oneDstageDropdown.currentText()
@@ -1864,9 +1898,9 @@ class MMConfigUI(CustomMainWindow):
         
         #Move the stage relatively
         if abs(amount) == 2:
-            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float)) #type:ignore
+            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*steps*self.moveoneDstagesmallAmount).astype(float)) #type:ignore
         elif abs(amount) == 1:
-            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
+            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*steps*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
         self.updateOneDstageLayout()
         # Second read-back after the stage has had time to settle.
         QTimer.singleShot(500, self.updateOneDstageLayout)
@@ -2104,6 +2138,10 @@ class MMConfigUI(CustomMainWindow):
         self.sliders[config_id].slider_conversion_array = [lowerLimit,upperLimit,sliderPrecision]
         #Add a callback when it is changed:
         self.sliders[config_id].valueChanged.connect(lambda value, config_id = config_id: self.on_sliderChanged(config_id,fromSlider=True,fromText=False))
+        #T-F8: releasing the handle commits immediately rather than waiting out
+        #the debounce, so the device reaches the final value as soon as the drag
+        #ends.
+        self.sliders[config_id].sliderReleased.connect(self._flushSliderPropertyWrites)
         # #Add the slider to the rowLayout:
         rowLayout.addWidget(self.sliders[config_id])
         pass
@@ -2139,19 +2177,17 @@ class MMConfigUI(CustomMainWindow):
         if self.changes_update_MM:
             #Change the value if it's a true value
             if trueValue != "" and trueValue != " ":
-                #Get the config group name:
-                configGroupName = self.config_groups[config_id].configGroupName()
-                #Set in MM:
-                #A slider config by definition (?) only has a single property underneath, so get that:
-                
-                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
-                configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-                device_label = configdata.getSetting(0).getDeviceLabel()
-                property_name = configdata.getSetting(0).getPropertyName()
+                # T-F8: dragging a slider emits valueChanged per pixel, and each
+                # one of those used to do two hardware getters plus a
+                # set_property. The GUI half below still runs per pixel so the
+                # number tracks the handle; only the device write is deferred to
+                # the end of the drag. A typed value is a deliberate commit, so
+                # it is written straight through.
+                if fromSlider:
+                    self._scheduleSliderPropertyWrite(config_id, trueValue)
+                else:
+                    self._writeSliderProperty(config_id, trueValue)
 
-                #Set this property:
-                self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
-                
         if trueValue != "" and trueValue != " ":
             trueValue = round(trueValue,3)
             #Set the slider/text if the other is changed
@@ -2161,6 +2197,58 @@ class MMConfigUI(CustomMainWindow):
                 newValue = self.sliders[config_id].slider_conversion_array[2] * (trueValue - self.sliders[config_id].slider_conversion_array[0]) / (self.sliders[config_id].slider_conversion_array[1] - self.sliders[config_id].slider_conversion_array[0])
                 self.sliders[config_id].setValue(int(newValue))
     
+    #: Idle window before a dragged slider's value reaches the device (T-F8).
+    #: `sliderReleased` flushes immediately, so this only matters for a drag
+    #: that pauses mid-flight or a value changed with the arrow keys.
+    SLIDER_WRITE_DEBOUNCE_MS = 200
+
+    def _writeSliderProperty(self, config_id, trueValue):
+        """Push one slider's value to the device (two getters + a set_property)."""
+        configGroupName = self.config_groups[config_id].configGroupName()
+        #Set in MM:
+        #A slider config by definition (?) only has a single property underneath, so get that:
+        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+        configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+        device_label = configdata.getSetting(0).getDeviceLabel()
+        property_name = configdata.getSetting(0).getPropertyName()
+
+        #Set this property:
+        self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
+
+    def _scheduleSliderPropertyWrite(self, config_id, trueValue):
+        """Coalesce a drag into one device write (T-F8).
+
+        Keyed per `config_id`, so dragging one slider never discards another's
+        pending value. Only the newest value for a given slider is kept -- the
+        intermediate positions of a drag are not values the user asked for.
+        """
+        pending = getattr(self, '_pendingSliderWrites', None)
+        if pending is None:
+            pending = self._pendingSliderWrites = {}
+        pending[config_id] = trueValue
+
+        timer = getattr(self, '_sliderWriteTimer', None)
+        if timer is None:
+            timer = self._sliderWriteTimer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._flushSliderPropertyWrites)
+        timer.start(self.SLIDER_WRITE_DEBOUNCE_MS)
+
+    def _flushSliderPropertyWrites(self):
+        """Write every slider whose value is still pending."""
+        pending = getattr(self, '_pendingSliderWrites', None)
+        if not pending:
+            return
+        self._pendingSliderWrites = {}
+        timer = getattr(self, '_sliderWriteTimer', None)
+        if timer is not None:
+            timer.stop()
+        for config_id, trueValue in pending.items():
+            try:
+                self._writeSliderProperty(config_id, trueValue)
+            except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as exc:
+                logging.warning('Setting slider property for %s failed: %s', config_id, exc)
+
     def addInputField(self,rowLayout,config_id):
         """ 
         Add a editfield to a rowLayout for a given MMConfigItem.
