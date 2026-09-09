@@ -131,6 +131,7 @@ T-0.1
   -> Tier C  (C1, C2, C3, C4)                         [STOP POINT after C3]
   -> Tier D  (D5, D6, D7 first - small; then D1, D2, D3, D4)
   -> Tiers E, F, G, H in any order
+  -> T-E6                      (only after Tier E and Tier F; re-measure first)
   -> T-B3 (after C3), then T-B4
   -> T-G10 (decision), T-F8 scope (decision)          [STOP POINTS]
 ```
@@ -194,6 +195,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [ ] **T-E3** Stop per-frame layer teardown/rebuild — M, no deps
 - [ ] **T-E4** Preallocate album-mode layers — M, no deps
 - [ ] **T-E5** Re-measure the many-layers cliff — S, needs E1-E4
+- [ ] **T-E6** Take zarr off the live display path during an MDA — **L**, needs E1-E5, F1-F5 — *reported open issue*
 
 ### Tier F — Keep the GUI thread holy
 
@@ -1268,6 +1270,90 @@ mitigate even if the root cause is upstream.
 **Verify:** `make bench-live-display` runs and appends results.
 
 **Commit:** `docs(bench): re-measure per-frame cost against total layer count`
+
+---
+
+### T-E6 — Take zarr off the live display path during an MDA (MMCORE_PLUS)
+
+Tier: E | Depends on: E1-E5, F1-F5 (**do the GUI and napari work first**) | Risk: medium | Size: **L**
+
+**Reported from a real session (2026-09-09), still open after T-E1/T-E2/T-F3:**
+live viewing during an MDA is slow with 256x256 frames at ~5 ms frametime
+(~200 fps), and **only on the `MMCORE_PLUS` backend**. The user's read is "it's
+really something zarr-ish", and the backend-specific part of the display path is
+exactly the zarr round trip: `add_image(shared_data.mdaZarrData[layerName])`
+makes the napari layer *the zarr array*, so every displayed frame is written to
+the store by the writer thread and then read back out of it by napari to paint.
+
+Do not start this until Tier E and Tier F are done — several of those tasks touch
+the same code and the GUI thread was demonstrably the bottleneck for the earlier
+report (T-F3 was worth 145-486 ms per tick). Re-measure before assuming this is
+still present.
+
+**Files:** `glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/GUI/frame_writer.py`
+
+**Hypotheses, most likely first.**
+
+1. **The display is not slow, it is *late*.** `_slice_safe_to_display()` points
+   napari at `writer.last_written_tag` — the newest slice actually on disk —
+   which is correct for avoiding black frames but makes display lag equal to the
+   writer backlog. The arithmetic is unforgiving at small frames, because the
+   queue is sized by *bytes*: 256x256 uint16 is 128 KB, so the 256 MB budget
+   gives a **2048-frame** queue. That matches the user's log exactly
+   (`peak queue depth 437/2048`). At ~200 fps a 437-frame backlog is **2.2 s**
+   of lag, and a full queue would be **10 s**. A viewer 2 seconds behind reads
+   as "slow" even while updating at 60 fps.
+   *Check first:* log `writer.depth` alongside each displayed frame and see
+   whether the complaint is lag rather than rate.
+   *Likely fix:* cap the queue in *time* as well as bytes (e.g. also clamp to
+   ~0.5 s of frames at the current exposure), and/or have the display follow the
+   newest frame in memory rather than the newest frame on disk — see 4.
+
+2. **Writer and reader are contending on the same store.** The writer thread
+   creates one file per frame (chunking was deliberately left at 1 frame/chunk,
+   see the T-D3 decision) at up to 200 files/s, while napari reads slices out of
+   the same directory on the GUI thread. Thousands of small file creates
+   interleaved with reads is the worst case for NTFS, and both sides hold the GIL
+   for their Python-level work.
+   *Check:* time `layer.refresh()` / the re-slice on the GUI thread with the
+   writer running versus stopped, same store.
+
+3. **Per-frame re-slice cost that T-E1 did not remove.** T-E1 collapsed N
+   `set_current_step` calls into one, but one re-slice per displayed frame
+   remains, and on a zarr-backed layer that is a real chunk read plus decode plus
+   GPU upload. At 128 KB/frame it should be sub-millisecond — worth confirming
+   rather than assuming, since it is the step T-E1 made cheaper but not free.
+
+4. **The real fix, probably: do not display from the store at all.** The store
+   exists so a finished MDA can be scrubbed. The *live* view during acquisition
+   only ever shows the newest frame, and that frame is already in memory on the
+   frame-ring consumer. Showing it the way live mode does — a plain numpy layer,
+   no zarr, no slider move, no read-back — removes the entire round trip, and the
+   zarr-backed multi-D stack can be swapped in when the acquisition finishes.
+   This also makes hypotheses 1-3 moot at once. Cost: the dims sliders would not
+   track during acquisition, which is a behaviour change worth confirming with
+   the user first.
+
+**Do:**
+
+1. Reproduce and measure before changing anything: 256x256, ~5 ms exposure,
+   `multiDstack`, `MMCORE_PLUS`. Record displayed-frame rate *and* display lag
+   (`writer.depth` at display time), plus GUI-thread time per displayed frame.
+2. Work the hypotheses in order; each has a cheap discriminating measurement.
+3. If 4 is the answer, put the layer swap behind the existing
+   `_effective_vis_method()` seam rather than adding a new mode flag.
+
+**Don't:** Don't reintroduce black frames — whatever replaces
+`_slice_safe_to_display()` must never point the viewer at an unwritten slice
+(that regression is why it exists). Don't make the storage path lossy to make the
+display faster; they were deliberately separated in T-D3.
+
+**Verify:** `pytest -q`, plus the reproduction above showing both a displayed
+frame rate at the configured fps *and* sub-100 ms lag behind the camera. The
+pymmcore-plus demo camera makes this measurable without hardware.
+
+**Commit:** `perf(napari): display MDA frames from memory instead of via the store`
 
 ---
 

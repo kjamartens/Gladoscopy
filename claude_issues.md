@@ -33,6 +33,14 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
+- **Live view during an MDA is slow on MMCORE_PLUS only** (256x256 @ ~5 ms frametime,
+  reported 2026-09-09, still open after T-E1/T-E2/T-F3) — scheduled as **T-E6** in
+  `claude_throughput_project.md`, deliberately sequenced after Tier E and Tier F because
+  those touch the same code and the GUI thread has already proven to be the dominant
+  cost. Leading hypothesis is display *lag*, not display *rate*: the writer queue is
+  sized in bytes, so 128 KB frames give a 2048-frame queue, and the reported
+  `peak queue depth 437/2048` is ~2.2 s of lag behind the camera at 200 fps.
+
 - **A JVM is loaded even on the MMCORE_PLUS backend** — `hs_err_pid49512.log` shows 17
   JavaThreads in a session whose selected backend was pymmcore-plus, which needs no Java
   at all. Most likely the module-level `pycromanager` imports in `napariGlados.py`. It
