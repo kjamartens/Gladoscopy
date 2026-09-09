@@ -110,20 +110,48 @@ reference is not itself a boolean literal.
    as a string).
 4. Do not touch `hideAdvVariables()` — it is already widget-class-agnostic.
 
-## 4. Known pre-existing limitation (not introduced by the checkbox change)
+## 4. Two paths out of `currentData`: the eval-text path and the binder
 
-`getEvalTextFromGUIFunction()` (`GUI/utils.py`) builds the eval-text sent to
-`autonomous/registry.py`'s `dispatch_from_eval_text()`. For **required** kwargs it
-special-cases Variable mode (emits an unquoted `nodzInfo.globalVariables['X']['data']`-style
-expression) — but not Advanced mode (`logging.error('To implement!')`, falls back
-to a quoted literal). For **optional** kwargs — which is where every bool kwarg in
-this codebase lives — the Value/Variable/Advanced mode is **ignored entirely**:
-the raw widget text is always wrapped in quotes as a string literal
-(`LogScale="True"`, or `LogScale="WaitTime@Global"` if Variable mode was
-selected without it being resolved). This is a pre-existing gap unrelated to the
-checkbox widget change; a node's `kwargs.get('SomeBool', default)` should
-defensively parse a possible string (see `WindowTaper` handling in
-`AutonomousMicroscopy/Real_Time_Analysis/FFT_im.py`) rather than assume a real
-Python `bool`. Fixing the optional-kwarg eval-text quoting is out of scope here
-and should be a separate, deliberate change (it affects every optional kwarg of
-every type, not just bools).
+`_rtAnalysisKwargsFromCurrentData()` (`GUI/utils.py`) is the single scanner that
+turns a panel's `currentData` dict into `(methodName, kwargNames, kwargValues,
+kwargModes)`. Two consumers take it from there:
+
+- **`getEvalTextFromGUIFunction()`** — the original: builds a Python call
+  expression as *text*, which `autonomous/registry.py`'s
+  `dispatch_from_eval_text()` re-parses and evaluates. Still used by the
+  Analysis-measurement / recipe paths.
+- **`bindKwargsFromGUIFunction()`** (T-G2) — returns a **typed kwargs dict**
+  instead, with each value coerced by `coerceKwargValue()` to the `"type"` its
+  metadata declares. This is what the RT-analysis path uses (node construction
+  as of T-G2; `run`/`visualise`/`end` as of T-G4).
+
+### What coercion changed
+
+`"type"` used to pick a widget class and nothing else: the value travelled to
+the node as a string and was re-parsed inside the node body
+(`float(kwargs.get(...))`, `str(...).lower() in ('true','1')`). Nodes may keep
+that defensive parsing — it works on typed values too — but they can now rely on
+receiving a real `int`/`float`/`bool`. One live bug this fixed: `LogScale="False"`
+is a *truthy string*, so a node doing a bare `if self.log_scale:` treated an
+unchecked checkbox as checked.
+
+Coercion is **permissive**: a value that does not convert cleanly is passed
+through as the original string with a warning naming the node and kwarg, so no
+existing recipe changes behaviour. A kwarg that declares no `"type"`, or declares
+`str` / `'fileLoc'`, is never touched.
+
+### Value / Variable / Advanced, per path
+
+| | required kwarg | optional kwarg |
+|---|---|---|
+| `getEvalTextFromGUIFunction` | Variable resolved to an unquoted expression; **Advanced unimplemented** (`logging.error('To implement!')`, falls back to a quoted literal) | **mode ignored entirely** — the raw widget text is always quoted as a string literal |
+| `bindKwargsFromGUIFunction` | Variable read live via `resolveNodzVariable()`; Advanced unimplemented, same fallback | Variable **is** honoured, same as required |
+
+Honouring the mode for optional kwargs in the binder is a deliberate fix of the
+old asymmetry (T-G2), not an accident: a user who picks Variable mode for an
+optional kwarg previously got the literal string `"WaitTime@Global"` passed to
+the node. It is safe because `resolveNodzVariable()` falls back to that same raw
+reference text (with a warning) whenever there is no graph to resolve against —
+e.g. an RT node started from the live view, where `nodzInfo` is None.
+
+**Advanced (`{name@Origin}`) mode is still unimplemented on both paths.**

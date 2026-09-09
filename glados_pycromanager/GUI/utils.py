@@ -55,6 +55,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 from glados_pycromanager.autonomous import registry as _node_registry
+from glados_pycromanager.errors import NodeDispatchError
 
 #endregion
 
@@ -2293,220 +2294,269 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None,
         return moduleMethodEvalTexts[0]
 
 
-def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    variableValueOrAdvanced={}
-    
-    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
-    variableValueOrAdvanced = {}
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("ComboBoxSwitch#" in key):
-                kwargName = key.split('#')[2]
-                variableValueOrAdvanced[kwargName] = value
-                
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            
-            split_list = key.split('#')
-            kwargName = split_list[2]
-            #If not found, it's a Value:
-            if kwargName not in variableValueOrAdvanced:
-                variableValueOrAdvanced[kwargName] = 'Value'
-            if variableValueOrAdvanced[kwargName] == 'Variable':
-                lineEditNameVarAdv = "LineEditVariable#"
-            elif variableValueOrAdvanced[kwargName] == 'Advanced':
-                lineEditNameVarAdv = "LineEditAdv#"
-            else:
-                lineEditNameVarAdv = "LineEdit#"
-                
-            if (lineEditNameVarAdv in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+#region T-G2: bind-time kwarg coercion
+# __function_metadata__ declares a real Python type for every kwarg, but that
+# type used to pick a *widget class* and nothing else: the value travelled as a
+# string, was re-quoted into a Python string literal on every frame, and was
+# re-parsed inside the node body (float(kwargs.get(...)),
+# str(...).lower() in ('true','1')). These helpers coerce once, at bind time.
+_KWARG_TRUE_STRINGS = ('true', '1', 'yes', 'on')
+_KWARG_FALSE_STRINGS = ('false', '0', 'no', 'off', '')
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    methodKwargTypes_method = []
-    #Get the Value/Variable/Adv:
-    for entry in methodKwargNames_method:
-        if variableValueOrAdvanced[entry]  == 'Variable':
-            methodKwargTypes_method.append('Variable')
-        elif variableValueOrAdvanced[entry]  == 'Advanced':
-            methodKwargTypes_method.append('Advanced')
+
+def coerceKwargValue(value, declaredType, kwargName='', methodName=''):
+    """Coerce one GUI-sourced kwarg string to its declared metadata type.
+
+    Permissive by design: anything that does not convert cleanly is handed back
+    as the original string with a warning, so an existing recipe carrying an
+    unparseable value keeps behaving exactly as it did before (the node's own
+    defensive parsing, or its failure, is unchanged).
+
+    Non-strings pass through untouched - a Variable-mode kwarg resolves to a
+    live object, not text.
+    """
+    if not isinstance(value, str):
+        return value
+    if declaredType is None or declaredType is str or declaredType == 'fileLoc':
+        return value
+    text = value.strip()
+    try:
+        if declaredType is bool:
+            lowered = text.lower()
+            if lowered in _KWARG_TRUE_STRINGS:
+                return True
+            if lowered in _KWARG_FALSE_STRINGS:
+                return False
+            raise ValueError(f'{value!r} is neither true nor false')
+        if declaredType is int:
+            return int(text)
+        if declaredType is float:
+            return float(text)
+    except (ValueError, TypeError) as exc:
+        logging.warning("Keeping kwarg %s.%s as text: %r is not a valid %s (%s)",
+                        methodName, kwargName, value,
+                        getattr(declaredType, '__name__', declaredType), exc)
+        return value
+    #An unrecognised declared type is not an error - leave the text alone.
+    return value
+
+
+def kwargTypesFromFunction(functionname):
+    """Return {kwargName: declared type} for one node function, from the cached
+    metadata. Kwargs that declare no "type" are absent from the map (their
+    values stay strings)."""
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
+        return {}
+    declaredTypes = {}
+    for kwargListName in ('required_kwargs', 'optional_kwargs'):
+        for kwarg in entry.get(kwargListName, []):
+            if 'type' in kwarg:
+                declaredTypes[kwarg['name']] = kwarg['type']
+    return declaredTypes
+
+
+def resolveNodzVariable(reference, nodzInfo, nodeDict=None):
+    """Read the current value of a `name@Origin` Glados-variable reference.
+
+    Origin is `Global`, `Core`, or another node's name. This is the direct
+    equivalent of the source text `getEvalTextFromGUIFunction` used to emit
+    (`nodeDict['X'].variablesNodz['y']['data']`), evaluated instead of eval'ed.
+    """
+    variableName, _, originNodeName = str(reference).partition('@')
+    if originNodeName == 'Global':
+        return nodzInfo.globalVariables[variableName]['data']
+    if originNodeName == 'Core':
+        return nodzInfo.coreVariables[variableName]['data']
+    if nodeDict is None:
+        nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
+    return nodeDict[originNodeName].variablesNodz[variableName]['data']
+
+
+def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
+                              methodKwargTypes=None, removeKwargs=None,
+                              skipInput=False, nodzInfo=None, nodeDict=None):
+    """Build a **typed kwargs dict** for one node function from GUI values.
+
+    The dict-returning sibling of :func:`getEvalTextFromGUIFunction`: same kwarg
+    selection rules (declared required kwargs, plus the function's `input`
+    entries unless ``skipInput``, plus any optional kwarg that has a value, plus
+    `dist_kwarg`/`time_kwarg`), but the values are coerced to the types declared
+    in ``__function_metadata__`` instead of being re-quoted as string literals.
+
+    ``methodKwargTypes`` is the per-kwarg Value/Variable/Advanced *mode* list
+    (the same argument `getEvalTextFromGUIFunction` takes), not a list of Python
+    types. Variable-mode kwargs are resolved through :func:`resolveNodzVariable`;
+    Advanced mode is still unimplemented and falls back to the raw text, exactly
+    as the eval-text path does.
+
+    Returns None when a required kwarg has no value (logging the same error the
+    eval-text path logs), so callers can keep their existing failure handling.
+    """
+    if methodKwargTypes is None:
+        methodKwargTypes = ['Value'] * len(methodKwargNames)
+    if not methodName:
+        return None
+
+    inputKwargs = []
+    if not skipInput:
+        for inputEntry in inputFromFunction(methodName)[0]:
+            inputKwargs.append(inputEntry['name'])
+    reqKwargs = inputKwargs + reqKwargsFromFunction(methodName)
+    if removeKwargs is not None:
+        for removeKwarg in removeKwargs:
+            if removeKwarg in reqKwargs:
+                reqKwargs.remove(removeKwarg)
+
+    if not all(elem in set(methodKwargNames) for elem in reqKwargs):
+        logging.error('SOMETHING VERY STUPID HAPPENED')
+        return None
+
+    declaredTypes = kwargTypesFromFunction(methodName)
+    boundKwargs = {}
+
+    def _bind(kwargName, rawValue, mode):
+        if mode == 'Variable':
+            #Live reference, not a literal - never coerced, never quoted.
+            try:
+                boundKwargs[kwargName] = resolveNodzVariable(rawValue, nodzInfo, nodeDict)
+            except (AttributeError, KeyError, TypeError) as exc:
+                #No graph to resolve against (e.g. an RT node started from the
+                #live view, nodzInfo=None), or a stale reference. Hand the raw
+                #reference text through, which is what the eval-text path does
+                #for optional kwargs anyway.
+                logging.warning("Could not resolve Variable kwarg %s.%s = %r (%s); "
+                                "passing the reference through as text",
+                                methodName, kwargName, rawValue, exc)
+                boundKwargs[kwargName] = rawValue
+        elif mode == 'Advanced':
+            logging.error('To implement!')
+            boundKwargs[kwargName] = rawValue
         else:
-            methodKwargTypes_method.append('Value')
-        
-    
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart='core=core',methodKwargTypes=methodKwargTypes_method,skipInput=True)
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
+            boundKwargs[kwargName] = coerceKwargValue(
+                rawValue, declaredTypes.get(kwargName), kwargName, methodName)
 
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
+    for reqKwarg in reqKwargs:
+        GUIbasedIndex = methodKwargNames.index(reqKwarg)
+        if methodKwargValues[GUIbasedIndex] == '':
+            logging.error(f'Missing required keyword argument in {methodName}: {reqKwarg}, NOT CONTINUING')
+            logging.error('NOT ALL KWARGS PROVIDED!')
+            return None
+        _bind(reqKwarg, methodKwargValues[GUIbasedIndex], methodKwargTypes[GUIbasedIndex])
+
+    #Optional kwargs are looked up by name rather than by position. The eval-text
+    #path indexes methodKwargValues positionally here, which turns a kwarg the
+    #GUI did not supply into an IndexError instead of a default-value fallback.
+    for optKwarg in optKwargsFromFunction(methodName):
+        if optKwarg not in methodKwargNames:
+            continue
+        GUIbasedIndex = methodKwargNames.index(optKwarg)
+        if methodKwargValues[GUIbasedIndex] == '':
+            continue
+        _bind(optKwarg, methodKwargValues[GUIbasedIndex], methodKwargTypes[GUIbasedIndex])
+
+    #Distribution/time-fit choices come from combo boxes and stay text.
+    for extraKwarg in ('dist_kwarg', 'time_kwarg'):
+        if extraKwarg in methodKwargNames:
+            boundKwargs[extraKwarg] = methodKwargValues[methodKwargNames.index(extraKwarg)]
+
+    return boundKwargs
+#endregion
+
+def _rtAnalysisKwargsFromCurrentData(function, currentData, modeAware=True):
+    """Scan a node parameter panel's `currentData` dict for one function's kwargs.
+
+    `currentData` is keyed by widget object name (`LineEdit#<function>#<kwarg>`,
+    `LineEditVariable#...`, `LineEditAdv#...`, `ComboBoxSwitch#...`) - see
+    Documentation/rt_analysis_parameters.md. Which of the three parallel input
+    widgets is authoritative for a kwarg is decided by that kwarg's
+    `ComboBoxSwitch` value (Value / Variable / Advanced).
+
+    Args:
+        function: the dotted node-function name the keys are scoped to.
+        currentData: the panel's object-name -> value dict.
+        modeAware: False reproduces the visualisation path's looser matching,
+            which accepts *any* `LineEdit*` key and ignores the mode switch.
+
+    Returns:
+        ``(methodName, kwargNames, kwargValues, kwargModes)``; ``methodName`` is
+        '' when nothing matched.
+    """
+    variableValueOrAdvanced = {}
+    if modeAware:
+        for key, value in currentData.items():
+            if "#" + function + "#" in key and "ComboBoxSwitch#" in key:
+                variableValueOrAdvanced[key.split('#')[2]] = value
+
+    methodName = ''
+    kwargNames = []
+    kwargValues = []
+    kwargModes = []
+    for key, value in currentData.items():
+        if "#" + function + "#" not in key:
+            continue
+        split_list = key.split('#')
+        kwargName = split_list[2]
+        #If no switch was found, it's a Value:
+        mode = variableValueOrAdvanced.setdefault(kwargName, 'Value')
+        if modeAware:
+            lineEditNameVarAdv = {'Variable': 'LineEditVariable#',
+                                  'Advanced': 'LineEditAdv#'}.get(mode, 'LineEdit#')
+            matched = lineEditNameVarAdv in key
+        else:
+            mode = 'Value'
+            matched = 'LineEdit' in key
+        if matched:
+            methodName = split_list[1]
+            kwargNames.append(kwargName)
+            #value could contain a file location. Thus, we need to swap out all \ for /:
+            kwargValues.append(value.replace('\\', '/'))
+            kwargModes.append(mode)
+
+    return methodName, kwargNames, kwargValues, kwargModes
+
+
+def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
+    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
+    if methodName_method == '':
+        return None
+    #note that RT analysis methods do not have an input, thus we skipInput.
+    return getEvalTextFromGUIFunction(methodName_method, names, values,
+                                      partialStringStart='core=core',
+                                      methodKwargTypes=modes, skipInput=True)
 
 
 def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2,pshared_data,p3):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    variableValueOrAdvanced={}
-    
-    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
-    variableValueOrAdvanced = {}
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("ComboBoxSwitch#" in key):
-                kwargName = key.split('#')[2]
-                variableValueOrAdvanced[kwargName] = value
-                
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            
-            split_list = key.split('#')
-            kwargName = split_list[2]
-            #If not found, it's a Value:
-            if kwargName not in variableValueOrAdvanced:
-                variableValueOrAdvanced[kwargName] = 'Value'
-            if variableValueOrAdvanced[kwargName] == 'Variable':
-                lineEditNameVarAdv = "LineEditVariable#"
-            elif variableValueOrAdvanced[kwargName] == 'Advanced':
-                lineEditNameVarAdv = "LineEditAdv#"
-            else:
-                lineEditNameVarAdv = "LineEdit#"
-                
-            if (lineEditNameVarAdv in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
+    if methodName_method == '':
+        return None
+    evalText = getEvalTextFromGUIFunction(
+        methodName_method, names, values,
+        partialStringStart=str(p1) + ',' + str(p2) + ',' + str(pshared_data) + ',' + str(p3),
+        methodKwargTypes=modes, skipInput=True)
+    return evalText.replace(methodName_method, '.run') if evalText is not None else None
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    methodKwargTypes_method = []
-    #Get the Value/Variable/Adv:
-    for entry in methodKwargNames_method:
-        if variableValueOrAdvanced[entry]  == 'Variable':
-            methodKwargTypes_method.append('Variable')
-        elif variableValueOrAdvanced[entry]  == 'Advanced':
-            methodKwargTypes_method.append('Advanced')
-        else:
-            methodKwargTypes_method.append('Value')
-
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(pshared_data)+','+str(p3),methodKwargTypes=methodKwargTypes_method,skipInput=True)
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run') #type:ignore
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
-
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
 
 def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    variableValueOrAdvanced={}
-    
-    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
-    variableValueOrAdvanced = {}
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("ComboBoxSwitch#" in key):
-                kwargName = key.split('#')[2]
-                variableValueOrAdvanced[kwargName] = value
-                
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            
-            split_list = key.split('#')
-            kwargName = split_list[2]
-            #If not found, it's a Value:
-            if kwargName not in variableValueOrAdvanced:
-                variableValueOrAdvanced[kwargName] = 'Value'
-            if variableValueOrAdvanced[kwargName] == 'Variable':
-                lineEditNameVarAdv = "LineEditVariable#"
-            elif variableValueOrAdvanced[kwargName] == 'Advanced':
-                lineEditNameVarAdv = "LineEditAdv#"
-            else:
-                lineEditNameVarAdv = "LineEdit#"
-                
-            if (lineEditNameVarAdv in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
+    if methodName_method == '':
+        return None
+    evalText = getEvalTextFromGUIFunction(methodName_method, names, values,
+                                          partialStringStart=str(p1),
+                                          methodKwargTypes=modes, skipInput=True)
+    return evalText.replace(methodName_method, '.end') if evalText is not None else None
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    methodKwargTypes_method = []
-    #Get the Value/Variable/Adv:
-    for entry in methodKwargNames_method:
-        if variableValueOrAdvanced[entry]  == 'Variable':
-            methodKwargTypes_method.append('Variable')
-        elif variableValueOrAdvanced[entry]  == 'Advanced':
-            methodKwargTypes_method.append('Advanced')
-        else:
-            methodKwargTypes_method.append('Value')
-        
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1),methodKwargTypes=methodKwargTypes_method,skipInput=True)
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.end') #type:ignore
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
-
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
 
 def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,currentData,p1,p2,p3,p4):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("LineEdit" in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+    methodName_method, names, values, _modes = _rtAnalysisKwargsFromCurrentData(
+        function, currentData, modeAware=False)
+    if methodName_method == '':
+        return None
+    evalText = getEvalTextFromGUIFunction(
+        methodName_method, names, values,
+        partialStringStart=str(p1) + ',' + str(p2) + ',' + str(p3) + ',' + str(p4))
+    return evalText.replace(methodName_method, '.visualise') if evalText is not None else None
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3)+','+str(p4))
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.visualise') #type:ignore
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
-
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
 
 def getFunctionEvalText(layout,p1,p2):
     #Get the dropdown info
@@ -2700,32 +2750,39 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
             return None
         
 
-def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
-    #Get the classname from rt_analysis_info
+def _rtAnalysisClassName(rt_analysis_info):
+    """Map an RT-analysis panel's selected dropdown entry to its dotted node name."""
     functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
     for function in rt_analysis_info['__displayNameFunctionNameMap__']:
         if function[0] == functionDispName:
-            className = function[1]
-    
-    if nodzInfo is not None:
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
-    else:
-        nodeDict = None
+            return function[1]
+    return None
 
-    #Get the object via the autonomous registry (Phase 9.5). The eval
-    #text from RTAnalysis_init is shaped like
-    #"LaserAdjustment.laser_adjustment(core=core, Laser_id='X', maxFrame=100)"
-    #— the head ("LaserAdjustment.laser_adjustment") is the registry
-    #key, so dispatch_from_eval_text instantiates the class through the
-    #registry rather than eval'ing the class lookup.
+
+def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
+    #Get the classname from rt_analysis_info
+    className = _rtAnalysisClassName(rt_analysis_info)
+
+    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None
+
+    #Bind the node's kwargs once, here, with each value coerced to the type its
+    #__function_metadata__ declares (T-G2). This used to build a Python call
+    #expression ("LaserAdjustment.laser_adjustment(core=core, Laser_id='X',
+    #maxFrame='100')") that dispatch_from_eval_text then re-parsed with ast and
+    #eval'ed argument-by-argument, which is also why every value reached the node
+    #as a string regardless of its declared type.
+    methodName, names, values, modes = _rtAnalysisKwargsFromCurrentData(className, rt_analysis_info)
+    boundKwargs = bindKwargsFromGUIFunction(methodName or className, names, values,
+                                            methodKwargTypes=modes, skipInput=True,
+                                            nodzInfo=nodzInfo, nodeDict=nodeDict)
+    if boundKwargs is None:
+        raise NodeDispatchError(
+            f"Cannot start RT-analysis node {className!r}: its required kwargs are incomplete"
+        )
+
     from glados_pycromanager.autonomous import registry as _registry
-    _init_eval_text = getFunctionEvalTextFromCurrentData_RTAnalysis_init(className, rt_analysis_info)
-    RT_analysis_object = _registry.dispatch_from_eval_text(
-        _init_eval_text,
-        scope={'core': core, 'nodeDict': nodeDict, 'nodzInfo': nodzInfo},
-    )
+    return _registry.dispatch(className, core=core, **boundKwargs)
 
-    return RT_analysis_object
 
 def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
     #Get the classname from rt_analysis_info

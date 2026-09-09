@@ -2734,3 +2734,67 @@ not be performed in this environment.
 `glados_pycromanager/autonomous/executor.py`,
 `glados_pycromanager/plugins/discovery.py`,
 `glados_pycromanager/GUI/utils.py`, `tests/test_node_metadata_cache.py`.
+
+## 2026-09-09 — Coercion produces a kwargs *dict*, and node construction is its first consumer  [T-G2]
+
+**Shape.** T-G2 could have stayed inside the eval-text world (emit
+`WindowTaperStrength=0.25` instead of `="0.25"`), but repr-ing a typed value into
+source only to re-parse it is the same serialise/deserialise round trip the tier
+is removing, and T-G3/T-G4 need a dict anyway. So the deliverable is
+`bindKwargsFromGUIFunction()` — the dict-returning sibling of
+`getEvalTextFromGUIFunction()`, same kwarg-selection rules — plus
+`coerceKwargValue()` and `kwargTypesFromFunction()`.
+
+**First consumer: `realTimeAnalysis_init`.** It now binds once and calls
+`registry.dispatch(className, core=core, **kwargs)` directly, instead of building
+a call expression for `dispatch_from_eval_text()` to ast-parse and eval
+argument-by-argument. `run`/`end`/`visualise` still go through the eval text —
+T-G4 moves them. Committing the machinery with a live, testable consumer beats
+landing it dead.
+
+**Coercion is permissive.** A value that will not convert is handed back as the
+original string with a warning naming node and kwarg; kwargs declaring no
+`"type"`, or `str`/`'fileLoc'`, are never touched. So no existing recipe changes
+behaviour by accident.
+
+**One real behaviour change, deliberate.** Bool kwargs now arrive as real bools.
+`LogScale="False"` was a *truthy string*, so `FFT_im`'s `if self.log_scale:`
+applied log scaling with the box unchecked. `tests/test_analysis_process.py`'s
+end-to-end FFT assertion changed from `== "True"` to `is True` accordingly. Every
+node's own defensive parsing (`float(kwargs.get(...))`,
+`str(...).lower() in ('true','1')`) keeps working on typed values, and every
+`str`-declared kwarg (including `LaserAdjustment.Laser_power`, which the node
+`eval()`s as text) is untouched.
+
+**§4 of `Documentation/rt_analysis_parameters.md` fixed, not preserved.** That
+section documented that the Value/Variable/Advanced mode is ignored entirely for
+*optional* kwargs — a Variable-mode optional kwarg reached the node as the literal
+string `"WaitTime@Global"`. The binder honours the mode for optional kwargs too.
+The task allowed either preserving or deliberately fixing this; fixing it is safe
+because `resolveNodzVariable()` falls back to that same raw reference text (with a
+warning) whenever there is no graph to resolve against — an RT node started from
+the live view passes `nodzInfo=None`, and crashing there would be a regression.
+The eval-text path's behaviour is unchanged; the doc now has a table per path.
+Advanced (`{name@Origin}`) mode stays unimplemented on both.
+
+**Optional kwargs are looked up by name in the binder.** The eval-text path
+indexes `methodKwargValues` positionally for the has-a-value check, which is why
+a kwarg the GUI never supplied is an `IndexError` rather than a fallback to the
+node's default (documented in `CLAUDE.md`). The binder skips it instead.
+
+**Also folded in:** the four
+`getFunctionEvalTextFromCurrentData_RTAnalysis_{init,run,end,visualisation}`
+functions were ~40 lines of copy-paste each; they now share
+`_rtAnalysisKwargsFromCurrentData()`. Its `modeAware=False` branch reproduces the
+visualisation path's looser `"LineEdit" in key` matching (which accepts
+`LineEditVariable`/`LineEditAdv` keys too) rather than quietly fixing it — that
+is a separate change with its own risk.
+
+**Verification:** `tests/test_rt_kwarg_binding.py` (23 tests) plus the existing
+`@pytest.mark.slow` end-to-end FFT subprocess test, which drives the real node
+with real GUI-shaped `currentData`. `pytest -q` — 734 passed. No manual GUI run
+possible here.
+
+**Affects:** `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/Documentation/rt_analysis_parameters.md`,
+`tests/test_rt_kwarg_binding.py`, `tests/test_analysis_process.py`.
