@@ -349,7 +349,44 @@ class AnalysisThread_customFunction_Visualisation(QThread):
 # main-process visualisation shadow instance (see AnalysisProcess_customFunction).
 # Deliberately excludes anything that could be a live handle (core, Qt objects,
 # open files, etc.) which wouldn't survive/be meaningful across a process boundary.
+# Since T-G5 this only *filters* the attributes a node explicitly declared via
+# "__snapshot_attrs__" (or returned from its own snapshot() method) -- it is no
+# longer the selection rule. Mirroring every picklable attribute meant, for
+# RealTimeFFT, shipping the full-size FFT array *and* the cached taper window
+# across the process boundary on every single frame.
 _SUBPROCESS_SNAPSHOT_TYPES = (int, float, bool, str, bytes, type(None), np.ndarray, list, dict, tuple)
+
+
+def _build_state_snapshot(RT_analysis_object, snapshot_attrs):
+    """Plain-data mirror of the node, for the main-process visualisation shadow.
+
+    A `snapshot()` method on the node wins; otherwise the attributes it declared
+    in "__snapshot_attrs__"; otherwise nothing at all.
+    """
+    snapshot_fn = getattr(RT_analysis_object, 'snapshot', None)
+    if callable(snapshot_fn):
+        try:
+            return dict(snapshot_fn())
+        except Exception:
+            logging.exception('AnalysisProcess worker: node snapshot() failed, sending nothing')
+            return {}
+    if not snapshot_attrs:
+        return {}
+    snapshot = {}
+    _absent = object()
+    for name in snapshot_attrs:
+        #Not `getattr(..., None)`: None is a legitimate snapshotable value, so a
+        #declared-but-absent attribute would be mirrored as None and clobber
+        #whatever the shadow instance holds.
+        value = getattr(RT_analysis_object, name, _absent)
+        if value is _absent:
+            logging.debug('AnalysisProcess worker: node has no attribute %r to snapshot', name)
+        elif isinstance(value, _SUBPROCESS_SNAPSHOT_TYPES):
+            snapshot[name] = value
+        else:
+            logging.debug('AnalysisProcess worker: skipping non-snapshotable attribute %r (%s)',
+                          name, type(value).__name__)
+    return snapshot
 
 
 def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
@@ -400,6 +437,9 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
     end_fn = end_fn or utils.realTimeAnalysis_end
 
     RT_analysis_object = init_fn(rt_analysis_info, core=None, nodzInfo=None)
+    #Which attributes travel back to the main process after each frame - a node
+    #property, so resolved once here rather than per frame (T-G5).
+    snapshot_attrs = utils.realTimeAnalysis_snapshotAttrs(rt_analysis_info)
     _child_profiler = cProfile.Profile()
     try:
         while not stop_event.is_set():
@@ -445,10 +485,7 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
             except Exception:
                 logging.exception('AnalysisProcess worker: run_fn failed')
                 continue
-            state_snapshot = {
-                k: v for k, v in vars(RT_analysis_object).items()
-                if isinstance(v, _SUBPROCESS_SNAPSHOT_TYPES)
-            }
+            state_snapshot = _build_state_snapshot(RT_analysis_object, snapshot_attrs)
             try:
                 out_queue.put([result, metadata, state_snapshot])
             except Exception:

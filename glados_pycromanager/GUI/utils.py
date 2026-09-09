@@ -3004,6 +3004,33 @@ def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
 
     return delay
 
+def realTimeAnalysis_snapshotAttrs(rt_analysis_info):
+    """Return the attribute names a subprocess-isolated node wants mirrored back.
+
+    See `AnalysisProcess_customFunction`: `.visualise()` needs a live napari
+    layer, so it runs against a shadow instance in *this* process whose
+    plain-data attributes are refreshed from the child after each frame. That
+    mirror used to be every picklable attribute on the node, pickled and shipped
+    per frame — for `RealTimeFFT` that meant the full-size FFT array *and* the
+    cached Tukey window, every frame (T-G5).
+
+    A node opts in by listing the attributes its `visualise()` actually reads, in
+    a `"__snapshot_attrs__"` key of its `__function_metadata__` entry. Declaring
+    nothing means nothing is mirrored. A node needing something more dynamic can
+    instead define a `snapshot()` method returning a dict, which takes precedence.
+
+    Returns an empty list for anything that is not a resolvable node (the
+    plain-string sentinels used elsewhere, test doubles, ...).
+    """
+    try:
+        entry = _nodeFunctionEntry(_rtAnalysisClassName(rt_analysis_info))
+    except (KeyError, TypeError, AttributeError):
+        return []
+    if not entry:
+        return []
+    return list(entry.get('__snapshot_attrs__', []))
+
+
 def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool:
     """Return whether the selected RT-analysis node should run in a subprocess.
 

@@ -41,6 +41,14 @@ def __function_metadata__():
             # init/run/end in a separate process instead of a QThread so it can
             # never block the UI regardless of exposure time.
             "__runInSubprocess__": True,
+            # visualise() runs against a shadow instance in the main process (a
+            # napari layer cannot cross a process boundary), so the child mirrors
+            # these attributes back after every frame. Declare only what
+            # visualise() actually reads: this used to be *every* picklable
+            # attribute, which shipped the cached Tukey window alongside the FFT
+            # on every frame. `firstLayerInit` is set by visualise_init() on the
+            # shadow itself and must not be overwritten from the child.
+            "__snapshot_attrs__": ["fft_display"],
         }
     }
 

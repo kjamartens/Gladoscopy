@@ -219,7 +219,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-G2** Coerce kwarg values at bind time — M, needs G1
 - [x] **T-G3** Resolve Variable kwargs to closures — M, needs G1
 - [x] **T-G4** `BoundNode`; delete the three per-frame `eval()` sites — **L**, needs G1-G3 — *eval path kept behind `GLADOS_RT_EVAL_DISPATCH=1` for one release; see decisions*
-- [ ] **T-G5** Opt-in subprocess state snapshots — M, no deps
+- [x] **T-G5** Opt-in subprocess state snapshots — M, no deps
 - [ ] **T-G6** Probe metadata picklability once, not per frame — S, no deps
 - [ ] **T-G7** Drop the duty-cycle sleep in the subprocess proxy — S, no deps
 - [ ] **T-G8** Pass the dimension map as init context — M, no deps

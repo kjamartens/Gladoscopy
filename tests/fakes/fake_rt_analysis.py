@@ -18,6 +18,17 @@ class FakeRTAnalysisObject:
         self.init_calls = 0
         self.end_calls = 0
 
+    def snapshot(self):
+        """Opt into the subprocess state mirror (T-G5).
+
+        A node declares what `visualise()` needs either via "__snapshot_attrs__"
+        in its `__function_metadata__` (the usual way, see FFT_im) or with this
+        method, which takes precedence. Nothing is mirrored by default.
+        """
+        return {"total": self.total,
+                "init_calls": self.init_calls,
+                "end_calls": self.end_calls}
+
 
 def fake_init_fn(rt_analysis_info, core=None, nodzInfo=None):
     assert core is None, "subprocess worker must never pass a live core into init"

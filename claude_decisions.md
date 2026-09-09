@@ -2894,3 +2894,49 @@ check could not be performed here; the env-var fallback exists for that reason.
 
 **Affects:** `glados_pycromanager/GUI/utils.py`, `CLAUDE.md`,
 `tests/test_bound_node_dispatch.py`.
+
+## 2026-09-09 — Snapshot opt-in via metadata, with a `snapshot()` escape hatch; declaring nothing mirrors nothing  [T-G5]
+
+**Decision:** two declaration channels, as the task offered — a
+`"__snapshot_attrs__"` list in the node's `__function_metadata__` entry (the
+normal way; resolved once per worker, before the frame loop, by
+`utils.realTimeAnalysis_snapshotAttrs`), and a `snapshot()` method on the node
+instance returning a dict, which wins when present. Default is an empty mirror.
+
+**`FFT_im.RealTimeFFT` declares `["fft_display"]` only.** Its `visualise()` reads
+`self.fft_display` and `self.firstLayerInit`; the latter is set by
+`visualise_init()` **on the shadow instance itself** and never exists in the
+child, so mirroring it would be wrong, not merely wasteful. `run()` returns
+`None`, so the FFT image genuinely has to travel through the snapshot — it is not
+duplicated in `result`.
+
+**Measured (1024x1024 frames, taper enabled):** the old every-attribute mirror
+pickles at 16.8 MB / 14.2 ms per frame; declaring `fft_display` alone gives
+8.4 MB / 4.8 ms — the cached Tukey window was the other half, and the parent paid
+unpickling for it again. With the taper off the win is small, since the window is
+never built.
+
+**A declared-but-absent attribute is skipped, not sent as `None`.** `None` is a
+legitimate snapshot value and is in `_SUBPROCESS_SNAPSHOT_TYPES`, so a plain
+`getattr(obj, name, None)` would mirror a missing attribute as `None` and clobber
+whatever the shadow holds. `_build_state_snapshot` uses a sentinel.
+
+**A failing `snapshot()` returns `{}` and logs** rather than killing the worker —
+the same posture as the rest of that loop, where one bad frame must never strand
+every subsequent one.
+
+**`tests/fakes/fake_rt_analysis.py` gained a `snapshot()` method** rather than a
+metadata dict, both because those fakes are deliberately independent of the
+GUI-widget-derived `rt_analysis_info` format and because it exercises the second
+channel.
+
+**Verification:** `tests/test_subprocess_snapshot_optin.py` (8 tests) plus the
+existing `@pytest.mark.slow` real-FFT subprocess test, whose assertion is now
+`set(state_snapshot) == {"fft_display"}`, and `test_subprocess_pool.py`'s
+pool-claimed FFT run. `pytest -q` — 753 passed.
+
+**Affects:** `glados_pycromanager/GUI/AnalysisClass.py`,
+`glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/FFT_im.py`,
+`tests/fakes/fake_rt_analysis.py`, `tests/test_analysis_process.py`,
+`tests/test_subprocess_snapshot_optin.py`, `CLAUDE.md`.

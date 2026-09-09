@@ -186,12 +186,10 @@ def test_worker_runs_the_real_fft_node_end_to_end(mp_ctx):
         assert metadata == {"frame": 0}
         fft_display = state_snapshot["fft_display"]
         assert fft_display.shape == (64, 64)
-        # GUI-sourced kwarg values are coerced to the type the node's
-        # __function_metadata__ declares, once, at bind time (T-G2). Before
-        # that, every value reached the node as the quoted string the eval-text
-        # mechanism produced (LogScale="True") -- which is truthy either way,
-        # so `LogScale` unchecked used to still apply log scaling.
-        assert state_snapshot["log_scale"] is True
+        # Only what the node declared in "__snapshot_attrs__" travels back
+        # (T-G5). This used to be every picklable attribute, so the cached Tukey
+        # window crossed the process boundary alongside the FFT on every frame.
+        assert set(state_snapshot) == {"fft_display"}
 
         # A second frame must also work (init isn't re-run per frame).
         in_queue.put((image, {"frame": 1}))
