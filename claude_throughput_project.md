@@ -184,7 +184,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [ ] **T-D3** Writer thread with amortized chunks — **L**, needs A7, D1
 - [ ] **T-D4** Delete the O(N*M) backfill pass — M, needs D3
 - [x] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
-- [ ] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
+- [x] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
 - [ ] **T-D7** Fix `TemporaryDirectory` lifetimes — S, no deps
 
 ### Tier E — Napari visualisation

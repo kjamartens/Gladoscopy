@@ -1377,3 +1377,61 @@ back — that test fails against the pre-T-D5 code. The manual check ("run two
 different-shaped MDAs back-to-back and confirm the second renders with its own
 dimensions") was **not** performed: no hardware here, and there is no CLI path to
 drive an MDA unattended (same limitation recorded for T-C4).
+
+---
+
+## 2026-09-09 — T-D6: two extracted helpers, a corrected dict key, and no exception handler at all
+
+**The re-open.** Confirmed against the installed zarr (3.1.0):
+`zarr.open(<zarr.Array>)` raises `TypeError: Unsupported type for store_like:
+'Array'`. The old code caught it with `except (KeyError, Exception)` and set
+`self.data = None`, so the MMCORE_PLUS branch never once produced data. Fixed by
+using the array directly.
+
+**The dict key was wrong too — fixed, though the task did not ask.** The fallback
+read `mdaZarrData['MDA']`, but `mdaZarrData` is keyed by *napari layer name*
+(`napariGlados` writes `mdaZarrData[layerName]`), and `'MDA'` is only
+`startMDAVisualisation`'s default: a Nodz-driven acquisition names the layer
+after its node (`MDAGlados.py`, `visualisation_currentData['layerName']`).
+Leaving the literal in place would have swapped a guaranteed `TypeError` for a
+guaranteed `KeyError` on exactly the Nodz path whose broken
+`variablesNodz['data']` motivates the task. Now keyed on
+`shared_data.newestLayerName`, which is what the writer side uses.
+
+**No exception handler, rather than a narrowed one.** The task said to catch the
+specific expected exceptions instead of `except (KeyError, Exception)`. Once
+nothing is re-opened there is nothing left that raises: an empty `mdaDatasets`
+and a missing zarr entry are ordinary "nothing here" answers, expressed as a
+truthiness check and a `dict.get()`. A `try` block kept for symmetry would only
+re-hide the next real failure.
+
+**`self.data.path` was a *silent* wrong answer after the fix, not an
+`AttributeError`.** The task predicted `AttributeError` on this path. That was
+true only while `self.data` was None. With the array actually present,
+`zarr.Array.path` exists and returns `''` — the array's path *inside* its store,
+not a filesystem location — so the `except AttributeError` fallback would never
+fire and downstream nodes would receive an empty string. `_acquisition_storage_path()`
+now prefers `data.store.root` (the real directory, verified present on the
+`LocalStore` these arrays use), then `data.path` for an NDTiff `Dataset`, then the
+expected path. `test_storage_path_of_a_zarr_array_is_its_store_root_not_its_in_store_path`
+asserts `zarr_array.path == ""` explicitly so the trap stays documented.
+
+**Why helpers.** Both fixes live in `MDA_acq_finished` / `updateNodzVariables`,
+methods far too entangled (Qt signal disconnects, nodz graph walking) to call in
+a test. Extracting `_resolve_finished_acquisition_data()` and
+`_acquisition_storage_path()` makes the corrected logic reachable.
+`MDAGlados` is a Qt widget and cannot be instantiated headlessly, so the tests
+call both helpers **unbound** against a `SimpleNamespace` stand-in — which also
+pins exactly which attributes they are allowed to touch.
+
+**Note for T-D7.** `_acquisition_storage_path()` will report a
+`TemporaryDirectory` on MMCORE_PLUS, because that branch ignores the user's
+Storage folder entirely. Left as-is with a comment pointing at T-D7, which owns
+those lifetimes.
+
+**Verification.** `pytest -q` — 436 passed (9 new in
+`tests/test_mda_acquisition_data.py`). The manual check (run an MDA on
+MMCORE_PLUS, confirm `self.data` is not None and a Nodz node receives an array)
+was **not** performed: no hardware, and no CLI path drives an MDA unattended.
+`test_reopening_the_array_would_still_fail` pins the underlying zarr behaviour so
+a future zarr bump that changes it is caught here.

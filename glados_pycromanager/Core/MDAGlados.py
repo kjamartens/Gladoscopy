@@ -1359,6 +1359,70 @@ class MDAGlados(CustomMainWindow):
     #endregion
     
     #region Multi-D acquisition logic
+    def _resolve_finished_acquisition_data(self):
+        """The acquisition's data object, or None if nothing was captured.
+
+        Two backends, two shapes. The pycromanager backends append an NDTiff
+        `Dataset` to `shared_data.mdaDatasets`; MMCORE_PLUS has no NDTiff store
+        and instead puts a `zarr.Array` in `shared_data.mdaZarrData`, keyed by
+        the napari layer name the acquisition renders into.
+
+        T-D6: this used to be `zarr.open(shared_data.mdaZarrData['MDA'])`, which
+        could not work. `mdaZarrData[...]` is an already-open `zarr.Array`, not a
+        store path, and zarr 3.x rejects one with
+        `TypeError: Unsupported type for store_like: 'Array'` -- swallowed by the
+        `except (KeyError, Exception)` right below it, so `self.data` came back
+        None on *every* MMCORE_PLUS acquisition and every downstream Nodz node
+        consuming `variablesNodz['data']` got None. The key was wrong too: 'MDA'
+        is only the default layer name, and a Nodz-driven acquisition names the
+        layer after its node.
+
+        No try/except is needed now that nothing is re-opened: an empty
+        `mdaDatasets` and a missing zarr entry are both ordinary "nothing here"
+        answers rather than exceptions.
+        """
+        datasets = getattr(self.shared_data, 'mdaDatasets', None)
+        if datasets:
+            return datasets[-1]
+
+        # MMCORE_PLUS: the zarr array the visualisation path created and wrote.
+        layer_name = getattr(self.shared_data, 'newestLayerName', '')
+        data = self.shared_data.mdaZarrData.get(layer_name)
+        if data is not None:
+            logging.info('MDA data loaded from zarr store for layer %r', layer_name)
+            return data
+
+        logging.warning(
+            'MDA dataset not available in mdaDatasets, and no zarr store for layer %r; '
+            'data not accessible for downstream analysis nodes.',
+            layer_name,
+        )
+        return None
+
+    def _acquisition_storage_path(self):
+        """Filesystem location of the acquired data, for `variablesNodz['storage_path']`.
+
+        An NDTiff `Dataset` exposes `.path`, the directory it wrote to. A
+        `zarr.Array` also has a `.path`, but it means something else entirely --
+        the array's path *within* its store, which is `''` for a root array -- so
+        reading `.path` blindly would hand downstream nodes an empty string
+        (T-D6). The array's real location is its store root.
+
+        Falls back to the path the acquisition was *asked* to write to when there
+        is no data object to ask.
+
+        Note: on MMCORE_PLUS that store root is a `TemporaryDirectory`, not the
+        user's configured Storage folder -- that branch ignores the folder
+        entirely. See T-D7.
+        """
+        store_root = getattr(getattr(self.data, 'store', None), 'root', None)
+        if store_root is not None:
+            return str(store_root)
+        dataset_path = getattr(self.data, 'path', None)
+        if dataset_path:
+            return dataset_path
+        return self.storage_folder + os.sep + self.storage_file_name + '_1//'
+
     def MDA_acq_finished(self):
         """
         Signal that MDA acquisition has finished.
@@ -1373,21 +1437,7 @@ class MDAGlados(CustomMainWindow):
         """
         
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
-        try:
-            self.data = self.shared_data.mdaDatasets[-1]
-        except (IndexError, AttributeError):
-            # pymmcore-plus backend: data lives in mdaZarrData, not mdaDatasets
-            try:
-                import zarr
-                self.data = zarr.open(self.shared_data.mdaZarrData['MDA'])
-                logging.info('MDA data loaded from zarr store')
-            except (KeyError, Exception) as zarr_exc:
-                logging.warning(
-                    'MDA dataset not available in mdaDatasets or zarr store (%s); '
-                    'data not accessible for downstream analysis nodes.',
-                    zarr_exc,
-                )
-                self.data = None
+        self.data = self._resolve_finished_acquisition_data()
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
         
@@ -1866,12 +1916,8 @@ class MDAGlados(CustomMainWindow):
                 self.nodeInfo.variablesNodz['channels']['data'] = None
                 self.nodeInfo.variablesNodz['n_channels']['data'] = None
             if self.GUI_storage_enabled == True:
-                try:
-                    #Update to the actually-stored-path.
-                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.data.path #type: ignore
-                except AttributeError:
-                    #Update to the expectedpath.
-                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name+'_1//' #type: ignore
+                #Update to the actually-stored path, falling back to the expected one.
+                self.nodeInfo.variablesNodz['storage_path']['data'] = self._acquisition_storage_path()
             else:
                 self.nodeInfo.variablesNodz['storage_path']['data'] = None
     #endregion
