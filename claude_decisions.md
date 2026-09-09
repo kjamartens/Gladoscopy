@@ -1603,3 +1603,39 @@ asks for (2-channel / 3-timepoint / 3-z MMCORE_PLUS MDA, scrub the sliders for
 black slices) was **not** performed: no hardware or demo backend in this
 environment. `test_the_stamp_is_the_index_actually_written` covers the same
 property mechanically over a 3-timepoint store.
+
+---
+
+## 2026-09-09 — T-E2: seed the multiDstack contrast counter at -1, and skip the unreachable sub-case
+
+**The counter seed had to differ from frameByFrame's.** Copying that path
+verbatim (`_keep_auto_contrast = False`, counter seeded to 0) would have shown a
+dark stack for the first 10 frames of every multiDstack MDA. frameByFrame can
+start at 0 because it calls `add_image()` with a real frame and napari fits the
+contrast limits to it; multiDstack calls `add_image()` with the zarr store,
+which at that moment is all zeros (pre-created by `_preinit_mda_zarr`) or holds
+a single seed frame — limits fitted there are meaningless, and the old
+`_keep_auto_contrast = True` quietly repaired them on the next re-slice.
+Seeding at **-1** makes `_maybe_refresh_contrast` fire on the first update frame
+(`count = 0`, `0 % n == 0`) and every Nth after it, using the existing helper
+unchanged rather than giving it a new "refresh immediately" argument that only
+one caller would pass. `tests/test_contrast_throttle.py` pins both seeds' firing
+patterns, including that the seed shifts phase only, not rate.
+
+**The refresh call sits after the `set_current_step` loop**, not before: the
+limits should be fitted to the slice that is now on screen.
+
+**The second `_keep_auto_contrast = True` was left alone.** There are two in the
+multiDstack branch; the one at the `layerName == 'Live'` sub-case is documented
+in place (and re-verified here) as unreachable — the frameByFrame branch
+intercepts every `'Live'`-named DataStructure regardless of `vis_method`. Only
+the reachable creation site changed. Changing dead code would be a speculative
+behaviour change for a path that cannot execute, and the existing comment
+already records why it is kept.
+
+**Default interval untouched** at 10, as the task requires.
+
+**Verification.** `pytest -q` — 459 passed (4 new). The manual check (run a
+multiDstack MDA, confirm brightness adapts within ~10 frames and the frame rate
+improves) was **not** performed: no hardware or demo backend in this
+environment.

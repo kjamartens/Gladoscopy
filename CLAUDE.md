@@ -124,6 +124,16 @@ used to get upcast on write (T-D1). The helper also registers the array into
 `mdaZarrData[layer_name]`, resets `allMDAslicesRendered`, and owns the
 `new_zarr_temp_dir` call. Tests: `tests/test_mda_zarr_store_creation.py`.
 
+Auto-contrast is throttled on **both** display paths (T-E2): the layer gets
+`_keep_auto_contrast = False` and `_maybe_refresh_contrast` recomputes limits every
+`visualisation_config.contrast_refresh_every_n_frames` (default 10) displayed frames,
+instead of napari rescanning the slice on every re-slice. The two paths seed their
+per-layer counter differently and deliberately — frameByFrame at 0, because
+`add_image()` is handed a real frame napari fits contrast to; multiDstack at **-1**, so
+the first update frame refreshes, because there `add_image()` gets a zarr store that is
+still all zeros and limits fitted at creation mean nothing. Tests:
+`tests/test_contrast_throttle.py`.
+
 Each frame reaches that store **once** (T-D2). The acquisition-side writer
 (`_try_write_frame_to_zarr`, on the frame-ring consumer thread) stamps the frame's
 metadata dict with `napariGlados.ZARR_WRITTEN_SLICE_KEY` = the slice tuple it wrote,

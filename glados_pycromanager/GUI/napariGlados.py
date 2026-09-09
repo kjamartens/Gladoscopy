@@ -460,8 +460,24 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     else:
                         logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
                         layer.scale = [1,1]
-                    layer._keep_auto_contrast = True #type:ignore
-                    
+                    # Same throttle the frameByFrame path uses (T-E2). With
+                    # `_keep_auto_contrast = True` napari runs reset_contrast_limits()
+                    # -- a full min/max scan of the freshly decompressed slice -- on
+                    # *every* re-slice, and the multiDstack path re-slices once per
+                    # dimension per frame. Recompute every Nth displayed frame instead
+                    # (visualisation_config.contrast_refresh_every_n_frames, default 10)
+                    # so brightness still adapts.
+                    layer._keep_auto_contrast = False #type:ignore
+                    # Seeded at -1, not 0 as the frameByFrame path does, so the very
+                    # first update frame refreshes and every Nth one after it.
+                    # frameByFrame can start at 0 because it calls add_image() with a
+                    # real frame, which napari fits contrast to; here add_image() gets
+                    # a zarr store that is still all zeros (or holds one seed frame),
+                    # so limits fitted at creation are meaningless and waiting N
+                    # frames to replace them would show a dark stack at every MDA
+                    # start.
+                    _get_contrast_frame_counters(shared_data)[layerName] = -1
+
                     for dim_id in range(len(n_entries_in_dims)):
                         napariViewer.dims.set_axis_label(dim_id, dimensionOrder[dim_id])
                         logging.info(f"Setting axis label {dim_id} to {dimensionOrder[dim_id]}")
@@ -515,7 +531,15 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     #the same searchsorted per dimension a second time.
                     for dim_id, currentSliceID in enumerate(sliceTuple):
                         napariViewer.dims.set_current_step(dim_id,currentSliceID)
-                    
+
+                    # Throttled auto-contrast (T-E2), after the sliders have moved so
+                    # the limits are fitted to the slice now on screen. Replaces
+                    # napari's per-re-slice recompute that `_keep_auto_contrast = True`
+                    # used to drive.
+                    _maybe_refresh_contrast(shared_data,
+                                            napariViewer.layers[liveImageLayer[0]],
+                                            layerName)
+
                     #Store exactly which axes is rendered
                     shared_data.allMDAslicesRendered[len(shared_data.allMDAslicesRendered)] = metadata['Axes']
                 else:
