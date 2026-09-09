@@ -16,7 +16,7 @@ import napari
 import numpy as np
 import useq
 from napari.qt import thread_worker
-from PyQt5.QtCore import Qt, QSize, pyqtSignal
+from PyQt5.QtCore import QObject, Qt, QSize, pyqtSignal
 from PyQt5.QtWidgets import (
     QAbstractButton,
     QAction,
@@ -859,6 +859,19 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
 
     shared_data.last_display_update_time = time.time()
 
+class _AcqTransitionSignals(QObject):
+    """Live/MDA transition progress, so the toggle can disable itself (T-F10).
+
+    `started` fires when a transition has to wait for a previous acquisition
+    worker to finish tearing down; `finished` carries True if it did stop in
+    time, False if `ACQ_STOP_TIMEOUT_S` elapsed. Both are emitted on the GUI
+    thread, so a widget slot can act on them directly.
+    """
+
+    started = pyqtSignal()
+    finished = pyqtSignal(bool)
+
+
 class napariHandler:
     # Max time to wait, in acqModeChanged, for a previous acquisition worker to
     # fully stop before allowing a new one to start. Generous relative to normal
@@ -929,6 +942,12 @@ class napariHandler:
         self._acq_transition_lock = RLock()
         self._worker_stopped_event = Event()
         self._worker_stopped_event.set()  # no worker running yet
+        # T-F10: the ON path may have to wait up to ACQ_STOP_TIMEOUT_S for the
+        # previous worker. That wait must never happen on the GUI thread, so it
+        # is handed to a short-lived thread and the transition resumes from a
+        # GUI-thread callback. True while such a continuation is pending.
+        self._transition_deferred = False
+        self.transition_signals = _AcqTransitionSignals()
         self.acquisition_worker = None  # handle to the in-flight worker, mirrors self.visualisation_worker
         # Bounded hand-off between the frameReady callback (which runs
         # synchronously on pymmcore-plus' MDA thread, see
@@ -1852,6 +1871,65 @@ class napariHandler:
         logging.debug("#nH - acquisition done")
         self.shared_data.liveModeUpdateOngoing = False
 
+    def _defer_transition_until_worker_stops(self):
+        """Move the wait-for-previous-worker off the GUI thread (T-F10).
+
+        Returns True when the transition has been handed to a background waiter
+        and the caller should return immediately; False when the caller should
+        do the (blocking) wait itself, which is correct on a worker thread.
+
+        The continuation re-enters `acqModeChanged`, so it re-reads the current
+        mode: a user who toggles back off while the previous worker is still
+        stopping gets the OFF path, not a stale start.
+        """
+        from PyQt5.QtWidgets import QApplication
+
+        from glados_pycromanager.GUI.napari_bridge import NapariBridge, get_bridge
+
+        if QApplication.instance() is None:
+            # Headless: there is no GUI thread to protect and no event loop to
+            # resume from. Block, exactly as before.
+            return False
+        if not NapariBridge.on_gui_thread():
+            # A worker's own thread may block; that is what it is for.
+            return False
+        if self._transition_deferred:
+            # A continuation is already pending and will re-read the mode.
+            return True
+
+        bridge = get_bridge(self.shared_data)
+        if bridge is None:
+            return False
+
+        self._transition_deferred = True
+        self.transition_signals.started.emit()
+
+        mode_attribute = 'liveMode' if self.liveOrMda == 'live' else 'mdaMode'
+
+        def _resume_on_gui_thread(_viewer):
+            self._transition_deferred = False
+            self.transition_signals.finished.emit(stopped_in_time[0])
+            if stopped_in_time[0]:
+                self.acqModeChanged()
+            else:
+                logging.error(
+                    "Previous %s acquisition worker did not stop within %.0fs of "
+                    "being cancelled; refusing to start a new one to avoid a native "
+                    "MMCore/Java-bridge race. Try again once the previous acquisition "
+                    "has finished.", self.liveOrMda, self.ACQ_STOP_TIMEOUT_S)
+                setattr(self.shared_data, mode_attribute, False)
+
+        stopped_in_time = [False]
+
+        def _wait_off_the_gui_thread():
+            stopped_in_time[0] = self._worker_stopped_event.wait(
+                timeout=self.ACQ_STOP_TIMEOUT_S)
+            bridge.submit(_resume_on_gui_thread, wait=False)
+
+        Thread(target=_wait_off_the_gui_thread,
+               name='acq-transition-wait', daemon=True).start()
+        return True
+
     def _napari_bridge(self):
         """The GUI-thread receiver for this handler's napari mutations (T-F9)."""
         from glados_pycromanager.GUI.napari_bridge import get_bridge
@@ -1901,6 +1979,11 @@ class napariHandler:
                     # fully torn down -- otherwise two workers can drive the same
                     # native MMCore/Java engine concurrently (the access-violation
                     # crash this guard fixes). See ACQ_STOP_TIMEOUT_S.
+                    # T-F10: never do that waiting on the GUI thread -- a single
+                    # button click could freeze the UI for the full timeout.
+                    if not self._worker_stopped_event.is_set():
+                        if self._defer_transition_until_worker_stops():
+                            return
                     if not self._worker_stopped_event.wait(timeout=self.ACQ_STOP_TIMEOUT_S):
                         logging.error(
                             "Previous live acquisition worker did not stop within %.0fs of "
@@ -1954,6 +2037,11 @@ class napariHandler:
                     # self.mdaacqdonefunction()
                 else:
                     # See the matching guard in the 'live' branch above.
+                    # T-F10: never do that waiting on the GUI thread -- a single
+                    # button click could freeze the UI for the full timeout.
+                    if not self._worker_stopped_event.is_set():
+                        if self._defer_transition_until_worker_stops():
+                            return
                     if not self._worker_stopped_event.wait(timeout=self.ACQ_STOP_TIMEOUT_S):
                         logging.error(
                             "Previous MDA acquisition worker did not stop within %.0fs of "

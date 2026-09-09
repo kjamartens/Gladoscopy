@@ -627,6 +627,10 @@ class MMConfigUI(CustomMainWindow):
         
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
+        #T-F10: grey the button out while a transition is waiting for the
+        #previous acquisition worker to tear down, so a second click cannot
+        #queue another start behind it.
+        self._connectLiveModeTransitionSignals()
         #Add the button to the layout:
         self.livesnapalbumbuttons.addWidget(self.LiveModeButton)
         
@@ -820,10 +824,38 @@ class MMConfigUI(CustomMainWindow):
         
         return
     
+    def _connectLiveModeTransitionSignals(self):
+        """Disable the Live button while a mode transition is in flight (T-F10).
+
+        `acqModeChanged` may have to wait up to `ACQ_STOP_TIMEOUT_S` for the
+        previous acquisition worker to tear down. That wait now happens on a
+        background thread, so the UI stays responsive -- which means the user
+        can click Live again mid-transition. Greying the button out for the
+        duration is what keeps that from queueing a second start.
+        """
+        handler = getattr(self.shared_data, '_livemodeNapariHandler', None)
+        signals = getattr(handler, 'transition_signals', None)
+        if signals is None:
+            logging.debug('No live-mode transition signals to connect to')
+            return
+        signals.started.connect(lambda: self._setLiveModeButtonBusy(True))
+        signals.finished.connect(lambda ok: self._setLiveModeButtonBusy(False))
+
+    def _setLiveModeButtonBusy(self, busy):
+        """Grey out (or restore) the Live button during a transition."""
+        try:
+            self.LiveModeButton.setEnabled(not busy)
+        except RuntimeError:  # widget already destroyed
+            pass
+
     def changeLiveMode(self):
         """
         Function that should be called when live mode is changed. Sets the shared_data.liveMode to True or False.
         """
+        if not self.LiveModeButton.isEnabled():
+            #A transition is already in flight (T-F10); ignore the click.
+            return
+
             
         if not shared_data.liveMode:
             #update the button text of the live mode:

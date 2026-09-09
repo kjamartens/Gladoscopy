@@ -2538,3 +2538,56 @@ performed: no hardware or display in this environment.
 **Affects:** new `glados_pycromanager/GUI/napari_bridge.py`;
 `glados_pycromanager/autonomous/executor.py`, `glados_pycromanager/GUI/utils.py`,
 `glados_pycromanager/GUI/napariGlados.py`, `tests/test_napari_bridge.py`.
+
+## 2026-09-09 — Only the *waiting* moved off the GUI thread; the transition itself still runs there  [T-F10]
+**Decision:** Part 1 (the urgent 10 s freeze) is done. The ON path of
+`acqModeChanged` now checks `_worker_stopped_event.is_set()` first — the common
+case, where nothing was running, is untouched and costs nothing. When a previous
+worker *is* still tearing down and the caller is the GUI thread,
+`_defer_transition_until_worker_stops()` hands the wait to a short-lived daemon
+thread, emits `transition_signals.started` (which greys out the Live button), and
+returns True so the caller returns immediately. When the event fires — or the
+timeout elapses — the waiter posts a continuation back through the T-F9 bridge,
+which re-enters `acqModeChanged` **on the GUI thread**.
+**Alternatives:** running the whole stop-then-start transition on a worker, as the
+task's wording suggests — rejected. The ON path calls
+`startLiveModeVisualisation` and `moveLayerToTop`, so moving it wholesale would
+create a fresh violation of invariant 3 (the thing T-F9 had just finished
+removing) and put hardware calls on an unowned thread. The task's own `Don't` is
+"only move the *waiting* off the GUI thread", and that is exactly what this does:
+every napari and core touch happens on precisely the thread it did before.
+**The guard is intact.** `_acq_transition_lock` and the blocking
+`_worker_stopped_event.wait(timeout=ACQ_STOP_TIMEOUT_S)` both remain — the latter
+is still the path taken off the GUI thread (a worker may block; that is what it is
+for) and headless, where `QApplication.instance()` is None and there is no event
+loop to resume from. A test asserts both are still present, since they exist
+because concurrent workers caused a JVM fatal crash.
+**Re-reading the mode on resume is deliberate:** the continuation calls
+`acqModeChanged()` rather than jumping straight to the start code, so a user who
+toggles back off while the previous worker is still stopping gets the OFF path
+instead of a stale start. A second request arriving mid-transition is absorbed
+(returns True without spawning a second waiter) for the same reason.
+**Button:** `MMConfigUI._connectLiveModeTransitionSignals` connects the two
+signals to `setEnabled`, and `changeLiveMode` returns early when the button is
+disabled — necessary precisely *because* the UI is now responsive during the
+transition, so a second click is possible where it was not before. Both tolerate
+the signals or the widget being absent.
+**Part 2 NOT done — the user's call.** The two `time.sleep(0.1)` calls in
+`on_liveMode_value_change` / `on_mdaMode_value_change` were explicitly excluded at
+the user's request on 2026-05-20 (item H2: "H2 has a subtle race condition if
+callers expect synchronous mode change"), and the task says to ask before removing
+them. They are untouched and a test pins that. Note they are *also* reached from
+`MMcontrols.setROI` and `drawROI`, which flip live mode off and on around a
+hardware read and already add their own `time.sleep(0.5)` / `0.2`, so any change
+here has callers that visibly depend on the mode change having settled on return.
+**Verification:** `tests/test_acq_transition_nonblocking.py` — 15 tests: the GUI
+caller returning in under 0.5 s against a 5 s timeout, the continuation running on
+`MainThread`, started/finished ordering, a timeout reverting the correct mode flag
+and starting nothing, a second click producing exactly one continuation, a worker
+thread still blocking inline, the lock and both blocking waits still present, the
+headless path, and the button wiring surviving a destroyed widget or a missing
+handler. `pytest -q` — 670 passed (full suite). The manual check (ten rapid Live
+toggles against hardware) could not be performed here.
+**Affects:** `glados_pycromanager/GUI/napariGlados.py` (`_AcqTransitionSignals`,
+`_defer_transition_until_worker_stops`), `glados_pycromanager/GUI/MMcontrols.py`,
+`tests/test_acq_transition_nonblocking.py`.
