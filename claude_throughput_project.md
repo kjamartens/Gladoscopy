@@ -183,7 +183,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [ ] **T-D2** Stop writing every frame to zarr twice — S, needs D1
 - [ ] **T-D3** Writer thread with amortized chunks — **L**, needs A7, D1
 - [ ] **T-D4** Delete the O(N*M) backfill pass — M, needs D3
-- [ ] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
+- [x] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
 - [ ] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
 - [ ] **T-D7** Fix `TemporaryDirectory` lifetimes — S, no deps
 

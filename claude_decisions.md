@@ -1328,3 +1328,52 @@ path to drive an MDA unattended. It is covered at the unit level
 (`test_mda_frames_still_write_to_zarr_when_multidstack_configured`), and the
 guard is gated solely on `_live_sequence_active`, which is only ever True inside
 `run_liveSequence_worker`.
+
+---
+
+## 2026-09-09 — T-D5: generation counter on `Shared_data`, not lazy invalidation from `napariGlados`
+
+**Decision.** Of the two options T-D5 offered, took the counter:
+`Shared_data._mdaModeParamsGeneration`, bumped in the `_mdaModeParams` setter,
+used as the `_get_cached_dimensions` cache key.
+
+**Why not "invalidate directly in the setter",** which the task called simpler:
+the cache attribute (`_dims_cache`) is created and owned by `napariGlados`, and
+the invalidation helper next door to it (`invalidate_contrast_refresh_interval`)
+is a module-level function in `napariGlados` that its one caller reaches through
+a *function-local* import, because `napariGlados` imports `sharedFunctions` and
+the reverse edge would be circular. Following that pattern here would put an
+`import napariGlados` — which pulls in napari, pyqtgraph, the whole GUI stack —
+inside the `_mdaModeParams` setter, a path exercised by headless tests that
+construct a bare `Shared_data`. A plain integer on `Shared_data` inverts the
+dependency: `sharedFunctions` owns the fact that the acquisition changed, and
+`napariGlados` reads it.
+
+**Two details the counter has to get right.**
+
+- The generation is bumped only in the setter, *not* in the getter's lazy
+  `useq.MDASequence -> to_pycromanager()` conversion. That conversion writes
+  `_mdaModeParams_raw` directly (bypassing the setter), which is correct: it is
+  the same acquisition, merely materialised, so a cache entry taken before it
+  stays valid. Pinned by
+  `test_the_lazy_useq_conversion_does_not_bump_the_generation`.
+- The cache entry stays a `(generation, result)` tuple rather than being
+  flattened to a bare result with `None` meaning "empty". `getDimensionsFromAcqData`
+  legitimately *returns* `None` — for an empty event list, and on the warn-and-fall-
+  through path for a malformed one — so a bare cached `None` would read as "nothing
+  cached yet" and recompute on every frame. Pinned by
+  `test_a_cached_none_is_not_mistaken_for_an_empty_cache`.
+
+**Incidental improvement.** The generation is read *before* `_mdaModeParams`, so a
+cache hit no longer touches the property at all. The old code read the property
+first (to take `id()` of it), which on the live path could trigger the very
+`to_pycromanager()` validation pass that the lazy property exists to avoid.
+
+**Verification.** `pytest -q` — 427 passed (6 new in `tests/test_dimension_cache.py`).
+The `id()` failure mode is reproduced deterministically rather than by gambling on
+the allocator: `test_a_recycled_address_does_not_return_the_previous_map` seeds
+`_dims_cache` with the *new* list's address and asserts the new dimensions come
+back — that test fails against the pre-T-D5 code. The manual check ("run two
+different-shaped MDAs back-to-back and confirm the second renders with its own
+dimensions") was **not** performed: no hardware here, and there is no CLI path to
+drive an MDA unattended (same limitation recorded for T-C4).

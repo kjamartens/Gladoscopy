@@ -80,16 +80,29 @@ def _connect_mda_signal_direct(mda_signal, slot):
 def _get_cached_dimensions(shared_data):
     """Return getDimensionsFromAcqData result, recomputing only when _mdaModeParams changes.
 
-    Uses object identity (id()) as cache key — _mdaModeParams is always fully
-    replaced on a new acquisition, never mutated in-place.
+    Keyed on `shared_data._mdaModeParamsGeneration`, a counter the
+    `_mdaModeParams` setter bumps on every assignment (T-D5). The key used to be
+    `id(params)`, which is not an acquisition identity at all: CPython reuses the
+    addresses of freed objects, so once the previous acquisition's event list was
+    released a new one could land on the same address and the cache would return
+    the *previous* acquisition's dimension map. sliceTuple, the zarr shape and the
+    napari dims stepping all derive from it.
+
+    The generation is read before `_mdaModeParams`, so a cache hit does not touch
+    the property at all -- which also avoids triggering its lazy
+    useq.MDASequence -> pycromanager-event-list conversion for a value already
+    summarised here.
     """
-    params = shared_data._mdaModeParams
-    cache_key = id(params)
+    generation = shared_data._mdaModeParamsGeneration
     cached = getattr(shared_data, '_dims_cache', None)
-    if cached is None or cached[0] != cache_key:
-        result = utils.getDimensionsFromAcqData(params)
-        shared_data._dims_cache = (cache_key, result)
-    return shared_data._dims_cache[1]
+    # Compare rather than test for absence: getDimensionsFromAcqData legitimately
+    # returns None (empty event list, or a malformed one it warns about), so a
+    # cached None must not read as "nothing cached yet".
+    if cached is None or cached[0] != generation:
+        result = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
+        shared_data._dims_cache = (generation, result)
+        return result
+    return cached[1]
 
 
 def _get_contrast_frame_counters(shared_data):

@@ -235,6 +235,9 @@ class Shared_data(QObject):
         super().__init__()
         self._liveMode = False
         self._mdaMode = False
+        # Bumped by the _mdaModeParams setter; see it for why. Must exist
+        # before the assignment below, which goes through that setter.
+        self._mdaModeParamsGeneration = 0
         self._mdaModeParams = []
         self._napariViewer = None
         self._headless = False
@@ -386,6 +389,17 @@ class Shared_data(QObject):
     @_mdaModeParams.setter
     def _mdaModeParams(self, value):
         self._mdaModeParams_raw = value
+        # Acquisition identity, for caches derived from the event list
+        # (napariGlados._get_cached_dimensions). It replaces an `id(params)`
+        # cache key, which was unsound: CPython reuses the addresses of freed
+        # objects, so the second of two back-to-back acquisitions could get a
+        # params list at the first one's old address and silently reuse the
+        # first one's dimension map -- and every sliceTuple, the zarr shape and
+        # the napari dims stepping derive from that map.
+        #
+        # Bumped here rather than in the getter's useq->list conversion on
+        # purpose: that conversion is the same acquisition, just materialised.
+        self._mdaModeParamsGeneration += 1
 
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.

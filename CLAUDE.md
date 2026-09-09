@@ -111,6 +111,16 @@ Advanced Settings; a config saved before they existed simply keeps the defaults
 
 `Shared_data` is the single object passed everywhere (UI, worker threads, napari plugins, autonomous microscopy nodes). It holds `core`, the MIL instance, config dataclasses, analysis-thread lists (`LoggingList` is a list subclass that emits Qt signals on mutation), and live/acquisition state flags. When adding cross-component state, add it as a field on `Shared_data` rather than a global.
 
+`_mdaModeParams` is a property: MDA mode assigns an already-converted pycromanager
+event list, live mode assigns a raw `useq.MDASequence` that the getter converts (and
+caches) only if something actually reads it. Its setter bumps
+`_mdaModeParamsGeneration`, the key for caches derived from the event list —
+`napariGlados._get_cached_dimensions` today. Bump that counter from any new
+assignment path, and key new event-list-derived caches on it rather than on
+`id(params)`: an address is not an identity (CPython recycles freed ones), which is
+the T-D5 bug. The getter's lazy conversion deliberately does *not* bump it — same
+acquisition, just materialised.
+
 ### UI — `GUI/`
 
 - `GUI_napari.py` — standalone entry. Builds a `headlessGUI` for backend choice, spawns Napari, runs `runNapariPycroManager` in a `Worker`/`QThread`. Sets `NAPARI_ASYNC=1` and `NAPARI_OCTREE=1` *before* importing napari.
