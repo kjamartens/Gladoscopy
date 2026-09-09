@@ -621,28 +621,36 @@ class AnalysisProcess_customFunction(QThread):
             # process (below) can shortcut most of this.
             self._worker_warmed_up = False
 
-            mp_ctx = mp.get_context('spawn')
-            self._in_queue = mp_ctx.Queue(maxsize=2)
-            self._out_queue = mp_ctx.Queue(maxsize=2)
-            self._stop_event = mp_ctx.Event()
-            # Separate queue pair used only by Performance Mode (see
-            # glados_pycromanager/observability/perf_capture.py) to start/stop
-            # cProfile inside this worker and get its hotspot report back --
-            # kept apart from _in_queue/_out_queue so profiling control traffic
-            # can never be mistaken for a frame/result and never delays one.
-            self._control_in_queue = mp_ctx.Queue(maxsize=2)
-            self._control_out_queue = mp_ctx.Queue(maxsize=2)
-
             claimed = shared_data._rt_subprocess_pool.try_claim()
             if claimed is not None:
                 # A blank process pre-spawned at app startup (subprocess_pool.py)
                 # already paid the spawn + package-tree (+ diplib) import cost --
                 # hand it this node's real work instead of spawning from scratch.
-                self._process, assign_queue = claimed
-                assign_queue.put((analysisInfo, self._in_queue, self._out_queue, self._stop_event,
-                                   self._control_in_queue, self._control_out_queue,
-                                   shared_data.config.logging_config.log_level))
+                # Its channels were created by the pool and inherited by the child
+                # at spawn time: a multiprocessing Queue/Event cannot be pickled
+                # through assign_queue ("Queue objects should only be shared
+                # between processes through inheritance"), so we adopt the pool's
+                # rather than making our own, and send only plain data.
+                self._process, assign_queue, channels = claimed
+                self._in_queue = channels['in_queue']
+                self._out_queue = channels['out_queue']
+                self._stop_event = channels['stop_event']
+                self._control_in_queue = channels['control_in_queue']
+                self._control_out_queue = channels['control_out_queue']
+                assign_queue.put((analysisInfo,
+                                  shared_data.config.logging_config.log_level))
             else:
+                mp_ctx = mp.get_context('spawn')
+                self._in_queue = mp_ctx.Queue(maxsize=2)
+                self._out_queue = mp_ctx.Queue(maxsize=2)
+                self._stop_event = mp_ctx.Event()
+                # Separate queue pair used only by Performance Mode (see
+                # glados_pycromanager/observability/perf_capture.py) to start/stop
+                # cProfile inside this worker and get its hotspot report back --
+                # kept apart from _in_queue/_out_queue so profiling control traffic
+                # can never be mistaken for a frame/result and never delays one.
+                self._control_in_queue = mp_ctx.Queue(maxsize=2)
+                self._control_out_queue = mp_ctx.Queue(maxsize=2)
                 self._process = mp_ctx.Process(
                     target=_subprocess_analysis_worker,
                     args=(analysisInfo, self._in_queue, self._out_queue, self._stop_event),
