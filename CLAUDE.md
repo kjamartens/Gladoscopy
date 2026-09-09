@@ -50,11 +50,12 @@ Three invariants. They are not currently upheld everywhere — `claude_throughpu
 is the standalone plan that enforces them — but new code must follow them.
 
 - **The Qt/GUI thread is holy.** It paints, lays out, and handles input. It must not touch
-  hardware, block on I/O, or run analysis. Anything else belongs on a worker. Violations
-  that still exist: `MMcontrols.py` snaps images and moves stages directly in slots,
-  `LaserControlScripts.py` writes serial commands to a TriggerScope per keystroke, the log
-  widget re-reads the whole log file every ~500 ms, and `NodeItem.paint()` loads a PNG from
-  disk on every repaint.
+  hardware, block on I/O, or run analysis. Anything else belongs on a worker. **Tier F of
+  `claude_throughput_project.md` is complete** and removed most of the standing violations
+  — see *GUI-thread work removed in Tier F* below. What remains: `MMcontrols.py` still
+  snaps images directly in slots, `LaserControlScripts.py` still writes serial commands to
+  a TriggerScope per keystroke (T-F8's laser half is a **decision** awaiting the user), and
+  `blinkUV` still sleeps on the GUI thread (needs T-B3/T-B4).
 - **All microscope access goes through one owner.** `MILcore`/`core` must have a single
   owning thread; other threads submit requests. Unsynchronized cross-thread `core.*` calls
   are not theoretical: commit `cd01032` fixed a **native access violation / JVM fatal
@@ -75,8 +76,21 @@ is the standalone plan that enforces them — but new code must follow them.
   Single-owner-thread dispatch (`MicroscopeService`) is still T-B3, not yet done.
 - **Only the GUI thread touches napari.** Workers emit Qt signals to a GUI-thread receiver;
   they never mutate `viewer.layers` or `viewer.dims` directly. `AnalysisClass.py`'s
-  `_do_visualise` signal into `_visualise_on_main_thread` is the reference pattern.
-  `autonomous/executor.py` and `utils.forceReset` currently violate this from pool threads.
+  `_do_visualise` signal into `_visualise_on_main_thread` is the original reference
+  pattern. **As of T-F9 there is a general one:** `GUI/napari_bridge.py`'s `NapariBridge`,
+  reached via `get_bridge(shared_data)` (cached on `shared_data._napari_bridge`). It is a
+  `QObject` that takes GUI-thread affinity in `__init__` *itself* — `moveToThread(app.thread())`
+  — so it does not matter which thread constructs it; without that, a bridge first created
+  by a worker would carry that thread's affinity and every "queued" call would target a
+  thread with no event loop, failing silently. `submit(fn, wait=False)` fires and forgets;
+  `wait=True` blocks the *worker* (never the GUI thread, which runs inline) with a timeout
+  and hands back the result or re-raises the exception. Prefer `replace_layer` over
+  `remove_layer` + `add_layer`: one GUI-thread call leaves no window in which the layer
+  list has neither. Migrated in T-F9: `autonomous/executor.py` (both RT-visualisation
+  blocks, via `_replace_visualisation_layer`), `utils.forceReset_actual`'s two mode flips
+  (the bare assignment re-entered `acqModeChanged` off-thread), and
+  `napariHandler.acqModeChanged`'s two `moveLayerToTop` calls (via `self._napari_bridge()`).
+  Tests: `tests/test_napari_bridge.py`.
 
 ### Backends — `Core/microscopeInterfaceLayer.py` (MIL)
 
@@ -353,6 +367,88 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 ```
 Keep it on new top-level modules under `glados_pycromanager/` if they're meant to be runnable directly.
+
+### GUI-thread work removed in Tier F
+
+Tier F of `claude_throughput_project.md` is complete. Each item below was work the
+GUI thread did repeatedly, competing with the frame path; the mechanism that
+replaced it is what new code in these files should follow.
+
+- **Icons (T-F1).** `ui/widgets/builders.py`: `findIconFolder()` is `lru_cache`d
+  and rendered icons live in `_ICON_PIXMAP_CACHE`, keyed by
+  `(folder, type, alteration, size)`. Both fill **lazily on first use** — a
+  `QPixmap` built before a `QApplication` exists is invalid — and a null pixmap
+  (missing PNG) is deliberately *not* cached, so the failure stays retryable. Same
+  rule applies to `nodz_main.py`'s `_NODE_STATUS_PIXMAP_CACHE`. Tests:
+  `tests/test_icon_cache.py`.
+- **`NodeItem.paint()` (T-F2).** It no longer touches disk, builds `QFontMetrics`,
+  or mutates the model. Status pixmaps, font metrics and text extents come from
+  module-level caches (`_nodeStatusPixmap` / `_fontMetrics` / `_textExtent` — the
+  last also collapses the two `boundingRect()` calls the original made per string).
+  The bottom/top attribute partition became `NodeItem._reorderAttrs()`, called from
+  the three sites that change `attrs`: `_createAttribute`, `_deleteAttribute` and
+  `Nodz.editAttribute`. **Call it from any new site that mutates `attrs`** — it
+  no-ops when the order is already correct. Tests: `tests/test_nodz_paint_caches.py`.
+- **Warning updates (T-F4).** `NodeScene.collectWarnings()` builds the list and
+  `regular_callAction` assigns it **once** (it used to clear-then-append, four
+  writes per tick), and skips the whole check while `liveMode or mdaMode`.
+  `Dict_Specific_WarningErrorInfo.__setitem__` no longer takes a full dict copy
+  into `oldValue` (nothing reads it; it survives as a `None` class attribute), and
+  `_notify_change` coalesces via a dirty flag drained by a zero-delay
+  `QTimer.singleShot`. That deferral requires a live `QApplication` **and** the GUI
+  thread (`_can_defer_notification`) — a zero-delay `QTimer` needs an event loop in
+  the *calling* thread, so off-thread and headless callers are notified inline.
+  Note the periodic assignment is also what refreshes the *error* icon, so a
+  "skip when unchanged" optimisation here would silently break that. Tests:
+  `tests/test_warning_update_coalescing.py`.
+- **`checkNodesOnErrors` (T-F5).** `evaluateGraph()` is hoisted out of the per-node
+  loop and the loop assigns `node._errorInfo` directly — the public `errorInfo`
+  *setter* calls `updateAutonousErrorWarningInfo`, which loops over every node, so
+  going through it per node was quadratic. The single refresh after the loop covers
+  all of them. The eight graph signals (including `signal_NodeMoved`, which fires
+  per mouse-move of a drag) go through `scheduleCheckNodesOnErrors` and a 100 ms
+  timer; the six direct callers stay immediate. Watch out: `findConnectedToNode(..., downstream=True)`
+  matches the node as connection **destination** (`connection[1]`) — the naming is
+  inverted from what it reads like. Tests: `tests/test_node_error_check_batching.py`.
+- **Dock relayout (T-F6/T-F7).** `GladosWidget.resizeEvent` now only classifies the
+  size (`_layoutForCurrentSize`, four aspect-ratio buckets) and calls
+  `_scheduleGroupBoxLayout`, which **drops a layout identical to the applied one**
+  and otherwise restarts a 150 ms timer. The replaced `QScrollArea` is
+  `deleteLater()`d (one leaked per resize event before) — narrowed to `QScrollArea`
+  instances so a live control can never be destroyed. Because a same-size resize is
+  now a no-op, a caller whose *widget tree* changed under unchanged geometry must
+  call `GladosWidget.requestRelayout()`; that is what replaced
+  `MDAGlados.updateGUIwidgets`' synthetic `QEvent.Resize` + `QCoreApplication.processEvents()`
+  (which allowed re-entrant `updateGUIwidgets` and could run `napariUpdateLive` slots
+  mid-rebuild). `updateGUIwidgets` also reuses one Acquire button — held on
+  `_acquireButton`, **not** `GUI_acquire_button`, which starts life as the boolean
+  flag and is passed back in as one — and discards the previous rebuild's wrapper
+  widgets instead of stacking them in the same grid cells. Tests:
+  `tests/test_dock_relayout_debounce.py`, `tests/test_mda_gui_rebuild.py`.
+- **Hardware edits (T-F8, MMcontrols half only).** A slider drag's device write is
+  deferred 200 ms (`_scheduleSliderPropertyWrite`) and flushed on `sliderReleased`;
+  the GUI half still runs per pixel so the number tracks the handle, and a typed
+  value is written straight through. Pending values are keyed per `config_id`.
+  Mouse-wheel notches over the z-stage widget *and* over the napari canvas
+  accumulate and apply as one relative move of the same total distance, via a
+  `steps` multiplier on `moveOneDStage` (default 1). `onEditFieldChanged` was
+  already on `editingFinished`. **The `LaserControlScripts.py` half is a decision
+  the user has not yet made** — per-keystroke serial writes still exist there.
+  Tests: `tests/test_hardware_edit_debounce.py`.
+- **Live/MDA toggle (T-F10, part 1).** `acqModeChanged`'s up-to-10 s wait for the
+  previous worker no longer runs on the GUI thread: when
+  `_worker_stopped_event` is not already set and the caller is the GUI thread,
+  `_defer_transition_until_worker_stops()` hands the wait to a daemon thread,
+  emits `transition_signals.started` (greying the Live button), and the
+  continuation is posted back through the napari bridge to **re-enter
+  `acqModeChanged` on the GUI thread** — so every napari and core touch stays on
+  the thread it was on. `_acq_transition_lock` and the blocking wait remain: they
+  exist because concurrent workers caused a JVM fatal crash, and the blocking wait
+  is still the correct path off the GUI thread and headless. Part 2 (the two
+  `time.sleep(0.1)` calls in the mode setters) is **still awaiting the user's
+  decision** — note `MMcontrols.setROI`/`drawROI` flip live mode off and on around a
+  hardware read and appear to depend on the mode change having settled on return.
+  Tests: `tests/test_acq_transition_nonblocking.py`.
 
 ### Logging
 
