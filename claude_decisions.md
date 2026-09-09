@@ -2966,3 +2966,30 @@ constructed and no worker process spawned. `pytest -q` — 757 passed.
 
 **Affects:** `glados_pycromanager/GUI/AnalysisClass.py`,
 `tests/test_metadata_picklability_probe.py`.
+
+## 2026-09-09 — The duty-cycle sleep is removed from the proxy only, and its floor stays  [T-G7]
+
+**Decision:** `AnalysisProcess_customFunction._run_loop` now sleeps
+`max(1, self.sleepTimeMs)`; `AnalysisThread_customFunction._run_loop` is
+untouched. `analysis_elapsed_ms` (and the `time.time()` bracketing it) is gone
+from the proxy, since nothing else read it there.
+
+**Why the asymmetry is correct and must not be "unified" later.** The cap exists
+to stop a GIL-heavy analysis starving the Qt main thread. In the in-process
+thread the compute genuinely holds this process's GIL. In the proxy the compute
+is in another process, and the proxy thread spends the entire round trip blocked
+in `_out_queue.get()` — it holds no GIL while waiting, so sleeping an extra T
+after each frame only capped the sustained rate at 1/(2T). A comment at the site
+now says so, and a test asserts each loop keeps its own shape.
+
+**The `max(1, ...)` floor stays.** With `sleepTimeMs` at a node's `run_delay` of
+0 (FFT declares exactly that), removing the floor would let the proxy spin.
+
+**Verification:** `tests/test_subprocess_proxy_duty_cycle.py` — source-level, in
+the same style as `test_mode_setter_no_sleep.py`, because the behaviour is a
+timing property of a QThread loop that would otherwise need a real worker
+process. `pytest -q` — 760 passed. The "analysis rate roughly doubles" check
+needs a live FFT run and could not be performed here.
+
+**Affects:** `glados_pycromanager/GUI/AnalysisClass.py`, `CLAUDE.md`,
+`tests/test_subprocess_proxy_duty_cycle.py`.

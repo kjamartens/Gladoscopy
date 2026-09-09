@@ -834,9 +834,7 @@ class AnalysisProcess_customFunction(QThread):
         while self.is_running:
             self._new_image.wait()
             self._new_image.clear()
-            analysis_elapsed_ms = 0
             if self.image_queue_analysis:
-                analysis_start = time.time()
                 image, metadata = self.image_queue_analysis.popleft() #type:ignore
                 metadata = self._picklable_metadata(metadata)
                 try:
@@ -857,7 +855,6 @@ class AnalysisProcess_customFunction(QThread):
                             logging.info('AnalysisProcess: worker still starting up (importing its dependencies), skipping frame')
                     else:
                         self._worker_warmed_up = True
-                        analysis_elapsed_ms = (time.time() - analysis_start) * 1000
                         self.analysis_result = [result, out_metadata]
                         if self.visualisationObject is not None and self.RT_analysis_object is not None:
                             self.RT_analysis_object.__dict__.update(state_snapshot)
@@ -865,10 +862,14 @@ class AnalysisProcess_customFunction(QThread):
                                 data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core)
                                 self.visualisationObject.visualisation_queue.append(data)
                                 self.visualisationObject.new_image()
-            # Same duty-cycle cap as AnalysisThread_customFunction: never sleep less
-            # than the round-trip just took, so a persistently backlogged worker
-            # can't monopolise this thread's requests either.
-            self.msleep(max(1, self.sleepTimeMs, int(analysis_elapsed_ms)))
+            # NOT the duty-cycle cap AnalysisThread_customFunction applies (T-G7).
+            # There, sleeping for as long as the analysis just took is a
+            # deliberate GIL-fairness trade: the compute runs on this thread, in
+            # this process, holding the GIL. Here the compute happens in another
+            # process holding no GIL of ours, and this thread spends the whole
+            # round trip idle-blocked on `_out_queue.get()` -- so the extra sleep
+            # was pure lost throughput, capping the sustained rate at 1/(2T).
+            self.msleep(max(1, self.sleepTimeMs))
         self.finished.emit()
 
     def stop(self):
