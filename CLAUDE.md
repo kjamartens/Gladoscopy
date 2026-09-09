@@ -124,6 +124,18 @@ used to get upcast on write (T-D1). The helper also registers the array into
 `mdaZarrData[layer_name]`, resets `allMDAslicesRendered`, and owns the
 `new_zarr_temp_dir` call. Tests: `tests/test_mda_zarr_store_creation.py`.
 
+Each frame reaches that store **once** (T-D2). The acquisition-side writer
+(`_try_write_frame_to_zarr`, on the frame-ring consumer thread) stamps the frame's
+metadata dict with `napariGlados.ZARR_WRITTEN_SLICE_KEY` = the slice tuple it wrote,
+and the display path in `_napariUpdateLive_locked` skips its own write (and the
+identical `searchsorted` recompute) whenever that stamp is present, reusing the index
+to step the napari dims. The stamp is a per-frame fact, not a per-backend guess: both
+pycromanager paths (`image_process_fn` / `image_saved_fn`) do no acquisition-side zarr
+write at all, and a ring write that raises stamps nothing, so in either case the
+display path stays the writer. It survives the GUI's second `metadata_refactor` call
+only because that function mutates its argument in place and returns it. Tests:
+`tests/test_zarr_single_writer.py`.
+
 Every scratch store lives in a `tempfile.TemporaryDirectory` whose *object* is the
 store's lifetime — its finalizer `rmtree`s the directory. `Shared_data` owns them
 all: `new_zarr_temp_dir(layer_name)` / `release_zarr_temp_dir(layer_name)` over the

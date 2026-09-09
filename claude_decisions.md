@@ -1553,3 +1553,53 @@ never-float64 regression, store registration + temp-dir ownership, and both
 `_camera_dtype` branches). The manual check (run a multiDstack MDA, confirm the
 on-disk dtype and a non-washed-out image) was **not** performed: no hardware or
 demo backend available in this environment.
+
+---
+
+## 2026-09-09 — T-D2: a per-frame stamp on the metadata, not a per-backend branch
+
+**The task offered two shapes; the stamp is neither exactly, and is safer than
+both.** "Remove the GUI-thread write" outright would leave *both* pycromanager
+backends writing nothing: `grab_image_liveVisualisation_and_liveAnalysis`
+(`image_process_fn`) and `..._savedFn` (`image_saved_fn`) never touch
+`mdaZarrData` — only the MMCORE_PLUS frame-ring path does — so the display write
+is their only writer. "Make it conditional on the backend" works but restates
+the ring path's own condition in a second place, where the two can drift.
+
+Instead `_try_write_frame_to_zarr` stamps the frame's metadata dict with the
+slice tuple it wrote (`ZARR_WRITTEN_SLICE_KEY`), and the display path skips its
+write exactly when the stamp is there. That is a per-frame fact rather than a
+mode inference, and it degrades in the right direction: the stamp is written
+*after* the zarr assignment succeeds, so a ring write that raises (swallowed at
+DEBUG, as before) leaves the display path as the writer, which is what the old
+code did for every frame anyway.
+
+**Why the stamp reaches the GUI at all.** The metadata dict is passed by
+reference from `_process_ring_frame` into the vis queue and out again as
+`DataStructure['data'][1]`, and `utils.metadata_refactor` — which the display
+path calls a second time on it — mutates in place and returns the same object.
+`tests/test_zarr_single_writer.py` pins that specifically, since the whole
+mechanism rests on it.
+
+**Frames the ring drops are not a hole.** The write happens before the vis-queue
+hand-off in `_process_ring_frame`, so every frame that reaches the display was
+written; frames the ring drops never reach the display to be skipped. The
+display-path frames are a strict subset of the written ones.
+
+**The slice index is reused, not just the write skipped.** The GUI recomputed
+the identical `searchsorted` per dimension to build a tuple it then used for
+`set_current_step`. Taking the stamped tuple removes that too, and it is the
+more correct of the two: it is the index the data actually went to, so the
+sliders cannot point somewhere the frame was not written.
+`_get_cached_dimensions` moved inside the fallback branch — it is only needed to
+build the tuple.
+
+**Not touched:** the seed write when the layer is first created (it fills index
+0 before any frame has a home) and the finalisation backfill (T-D4 removes
+that).
+
+**Verification.** `pytest -q` — 455 passed (5 new). The manual check the task
+asks for (2-channel / 3-timepoint / 3-z MMCORE_PLUS MDA, scrub the sliders for
+black slices) was **not** performed: no hardware or demo backend in this
+environment. `test_the_stamp_is_the_index_actually_written` covers the same
+property mechanically over a 3-timepoint store.

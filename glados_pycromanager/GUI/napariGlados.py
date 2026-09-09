@@ -104,6 +104,15 @@ def _get_cached_dimensions(shared_data):
     return cached[1]
 
 
+#: Metadata key stamped by `_try_write_frame_to_zarr` on a frame it has already
+#: written into the multiDstack store, holding the slice index it wrote to. The
+#: display path reads it to skip a second, identical write of the same frame
+#: (T-D2). Absent for backends whose acquisition path does no zarr write (both
+#: pycromanager `image_process_fn` / `image_saved_fn` paths), and absent if that
+#: write failed -- in both cases the display path writes the frame itself.
+ZARR_WRITTEN_SLICE_KEY = '_gladosZarrWrittenSlice'
+
+
 def _camera_dtype(shared_data):
     """numpy dtype of one camera pixel (uint8 for 8-bit cameras, else uint16).
 
@@ -477,19 +486,30 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             else:
                 if layerName != 'Live':
                     # logging.debug(f'updating layer with name {layerName} via multiDstack method')
-                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
-                    
-                    #Determine in which multi-D slice the image should be added:
-                    sliceTuple = ()
-                    for dim_id in range(len(n_entries_in_dims)):
-                        currentSlice = metadata['Axes'][dimensionOrder[dim_id]]
-                        currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
-                        if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
-                            logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
-                        sliceTuple += (int(currentSliceID),)
-                        
-                    shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = latestImage 
-                    
+                    # One writer per frame (T-D2). The acquisition side writes every
+                    # frame -- that is why it exists, the vis queue drops frames --
+                    # and stamps the index it used. When that stamp is present this
+                    # frame is already in the store, so writing it again is a full
+                    # chunk re-encode of identical data, on the GUI thread. Reuse
+                    # the index instead; it is also the one actually written.
+                    sliceTuple = metadata.get(ZARR_WRITTEN_SLICE_KEY)
+                    if sliceTuple is None:
+                        # No acquisition-side write for this frame: both pycromanager
+                        # paths, and any frame whose ring write failed. The display
+                        # path is then the only writer and must do the work.
+                        dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
+
+                        #Determine in which multi-D slice the image should be added:
+                        sliceTuple = ()
+                        for dim_id in range(len(n_entries_in_dims)):
+                            currentSlice = metadata['Axes'][dimensionOrder[dim_id]]
+                            currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
+                            if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
+                                logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
+                            sliceTuple += (int(currentSliceID),)
+
+                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = latestImage
+
                     #set the napariViewer to the correct slice: reuse the indices
                     #already computed for sliceTuple above rather than re-running
                     #the same searchsorted per dimension a second time.
@@ -870,6 +890,12 @@ class napariHandler:
                 slice_id = int(np.searchsorted(uniqueEntriesAllDims[dim_name], current_val))
                 sliceTuple += (int(slice_id),)
             zarr_data[sliceTuple + (slice(None), slice(None))] = np.ascontiguousarray(image)
+            # Tell the display path this exact frame is in the store already, and
+            # at which index (T-D2). The metadata dict travels with the frame
+            # through the vis queue and metadata_refactor mutates in place, so the
+            # key survives the GUI thread's second call to it. Stamped only after
+            # the write succeeds: on failure the display path must still write.
+            metadata[ZARR_WRITTEN_SLICE_KEY] = sliceTuple
         except Exception as exc:
             logging.debug('_try_write_frame_to_zarr skipped: %s', exc)
 
