@@ -182,6 +182,24 @@ write returns) so napari renders the newest slice that genuinely exists. Skippin
 is what made a multiDstack MDA show a black live view during acquisition and a perfect
 stack afterwards: an unwritten slice of a fresh store is zeros.
 
+That every-frame writer is **`MMCORE_PLUS`-only**. Both pycromanager acquisition
+callbacks (`grab_image_liveVisualisation_and_liveAnalysis` and its `_savedFn`
+sibling) do no acquisition-side zarr write at all, so there the fps-throttled
+display path is the store's only writer and most slices are missing when the
+acquisition ends. `_backfill_missing_slices` (T-D4) fills them from the NDTiff
+`Dataset` at finalisation. It is gated on `shared_data._mdaModeAcqData._dataset`,
+which is assigned only inside the pycromanager `Acquisition` context managers —
+so the pass is skipped outright on `MMCORE_PLUS`, where it never had a dataset to
+read and never filled anything. `shared_data.allMDAslicesRendered` is a **`set`**
+of `_axes_key` tuples (sorted `(key, value)` pairs), not the old
+running-integer-keyed dict: the membership test is per-expected-event, and the
+dict form made it O(N_events x M_rendered) dict-subset comparisons *plus* a
+`time.sleep(0.001)` per missing frame, on the GUI thread — a multi-second freeze
+at the end of a large MDA. Subset semantics are kept (a frame's `metadata['Axes']`
+can carry keys the event's `axes` does not) by projecting the rendered set onto
+the expected event's key names once per distinct key set. Tests:
+`tests/test_mda_backfill.py`.
+
 Each frame reaches that store **once** (T-D2). The acquisition-side writer
 (`_try_write_frame_to_zarr`, on the frame-ring consumer thread) stamps the frame's
 metadata dict with `napariGlados.ZARR_WRITTEN_SLICE_KEY` = the slice tuple it wrote,

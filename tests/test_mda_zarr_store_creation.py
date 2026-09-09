@@ -46,7 +46,7 @@ def test_store_is_registered_and_its_temp_dir_owned(tmp_appdata):
     # owned by shared_data so it outlives this call (T-D7).
     assert shared_data.mdaZarrData["MyNode"] is array
     assert "MyNode" in shared_data.mdaZarrTempDirs
-    assert shared_data.allMDAslicesRendered == {}
+    assert shared_data.allMDAslicesRendered == set()
 
 
 def test_camera_dtype_falls_back_to_uint16_without_a_core(tmp_appdata):

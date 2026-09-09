@@ -184,7 +184,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-D1** One store-creation site with an explicit dtype — M, no deps
 - [x] **T-D2** Stop writing every frame to zarr twice — S, needs D1
 - [x] **T-D3** Writer thread with amortized chunks — **L**, needs A7, D1 — *step 2 (chunking) measured and rejected; see decisions*
-- [ ] **T-D4** Delete the O(N*M) backfill pass — M, needs D3
+- [x] **T-D4** Delete the O(N*M) backfill pass — M, needs D3 — *kept but made O(1)-per-event and skipped without NDTiff; see decisions*
 - [x] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
 - [x] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
 - [x] **T-D7** Fix `TemporaryDirectory` lifetimes — S, no deps

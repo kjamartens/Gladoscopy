@@ -214,7 +214,7 @@ def _create_mda_zarr(shared_data, layer_name, shape, h, w, dtype):
         overwrite=True,
     )
     shared_data.mdaZarrData[layer_name] = array
-    shared_data.allMDAslicesRendered = {}
+    shared_data.allMDAslicesRendered = set()
     logging.debug('_create_mda_zarr: layer=%s shape=%s dtype=%s',
                   layer_name, shape + [h, w], np.dtype(dtype))
     return array
@@ -306,6 +306,112 @@ def _maybe_refresh_contrast(shared_data, layer, layerName):
 
 #region real-time visualisation/analysis handling
 #These need to be functions outside of any class due to Yield-calling
+def _axes_key(axes):
+    """Hashable, order-independent form of a frame's `Axes` dict."""
+    return tuple(sorted(axes.items()))
+
+
+def _record_rendered_axes(shared_data, axes):
+    """Note that `axes` now exists in the multiDstack store.
+
+    A `set` of `_axes_key` tuples, not the old dict-with-running-integer-key:
+    the only consumer is a membership test at finalisation, and the dict form
+    made that test O(N_events x M_rendered) dict-subset comparisons. Repeats
+    (the same slice displayed twice) collapse instead of accumulating.
+    """
+    rendered = getattr(shared_data, 'allMDAslicesRendered', None)
+    if not isinstance(rendered, set):
+        rendered = set()
+        shared_data.allMDAslicesRendered = rendered
+    rendered.add(_axes_key(axes))
+
+
+def _rendered_axes_lookup(rendered, key_names):
+    """Project every rendered axes tuple onto `key_names`, for O(1) membership.
+
+    The old test was `expected['axes'].items() <= rendered.items()` -- a
+    *subset*, because a frame's metadata `Axes` can carry keys the event's
+    `axes` does not. Projecting the rendered keys down to exactly the expected
+    event's key names preserves that semantics while turning the per-event cost
+    into a single set lookup. Built once per distinct expected key set, of
+    which a normal MDA has one.
+    """
+    lookup = set()
+    for entry in rendered:
+        as_dict = dict(entry)
+        try:
+            lookup.add(tuple(as_dict[name] for name in key_names))
+        except KeyError:
+            # This rendered frame does not carry every expected axis, so it can
+            # never satisfy the subset test for this key set.
+            continue
+    return lookup
+
+
+def _backfill_missing_slices(shared_data, layerName):
+    """Fill multiDstack slices the display path never rendered, from NDTiff.
+
+    Only the pycromanager backends need this. Their acquisition callbacks
+    (`image_process_fn` / `image_saved_fn`) do no zarr write at all, so the
+    fps-throttled display path is the store's only writer and most slices are
+    missing -- but they do have an NDTiff `Dataset` to read them back from.
+    `MMCORE_PLUS` is the mirror image: T-D3's frame-ring writer already puts
+    every frame in the store, and there is no NDTiff dataset to read anyway, so
+    the whole pass is skipped rather than run to produce N debug lines.
+    """
+    dataset = getattr(getattr(shared_data, '_mdaModeAcqData', None), '_dataset', None)
+    if dataset is None:
+        logging.debug('Backfill skipped: no NDTiff dataset for this acquisition.')
+        return 0
+
+    expected_events = shared_data._mdaModeParams or []
+    rendered = getattr(shared_data, 'allMDAslicesRendered', None) or set()
+    # getDimensionsFromAcqData legitimately returns None for an empty or
+    # malformed event list, in which case there is no slice index to write to.
+    dimensions = _get_cached_dimensions(shared_data)
+    if not expected_events or dimensions is None:
+        logging.debug('Backfill skipped: no usable acquisition dimension map.')
+        return 0
+    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = dimensions
+
+    # One lookup set per distinct expected key set (normally exactly one),
+    # instead of rescanning every rendered frame for every expected event.
+    lookups = {}
+    filled = 0
+    for expectedEntry in expected_events:
+        expected_axes = expectedEntry['axes']
+        key_names = tuple(sorted(expected_axes))
+        lookup = lookups.get(key_names)
+        if lookup is None:
+            lookup = _rendered_axes_lookup(rendered, key_names)
+            lookups[key_names] = lookup
+        if tuple(expected_axes[name] for name in key_names) in lookup:
+            continue
+
+        try:
+            sliceImage = dataset.read_image(
+                channel=expected_axes.get('channel'),
+                z=expected_axes.get('z'),
+                time=expected_axes.get('time'),
+                position=expected_axes.get('position'),
+                row=expected_axes.get('row'),
+                column=expected_axes.get('column'))
+
+            sliceTuple = ()
+            for dim_id in range(len(n_entries_in_dims)):
+                currentSlice = expected_axes[dimensionOrder[dim_id]]
+                currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
+                sliceTuple += (int(currentSliceID),)
+            shared_data.mdaZarrData[layerName][sliceTuple + (slice(None), slice(None))] = sliceImage
+            filled += 1
+        except (AttributeError, KeyError, IndexError, TypeError, ValueError) as exc:
+            logging.debug('Entry %s tried, but not acquired: %s', expectedEntry, exc)
+
+    logging.debug('Backfill filled %d of %d expected slices from NDTiff.',
+                  filled, len(expected_events))
+    return filled
+
+
 def _should_display_now(shared_data, now=None):
     """Rate-limit decision for the live/MDA display path.
 
@@ -644,7 +750,7 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                                             layerName)
 
                     #Store exactly which axes is rendered
-                    shared_data.allMDAslicesRendered[len(shared_data.allMDAslicesRendered)] = metadata['Axes']
+                    _record_rendered_axes(shared_data, metadata['Axes'])
                 else:
                     # layer is present, replace its data
                     layer = napariViewer.layers[liveImageLayer[0]]
@@ -653,57 +759,33 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     layer.data = latestImage
                     
         elif DataStructure['finalisationProcedure'] == True:
-            #Render the missing images in the MDA acquisition
+            #Render the missing images in the MDA acquisition.
+            #
+            #This used to be an O(N_events x M_rendered) subset scan with a
+            #`time.sleep(0.001)` and an NDTiff `read_image()` per missing frame,
+            #on the GUI thread -- and because the vis queue is fps-throttled,
+            #"missing" is most of the acquisition, so a large MDA froze the UI
+            #for seconds at the end of every run. The scan is now a set lookup
+            #and the pass is skipped entirely on backends that have no NDTiff
+            #dataset to read back from (T-D4).
             shared_data._busy = True
-            renderedSlices = shared_data.allMDAslicesRendered
-            dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
-            for expectedEntry in shared_data._mdaModeParams:
-                #check in the rendered sclies if this is in there:
-                entry_found = any(expectedEntry['axes'].items() <= item.items() for item in renderedSlices.values())
-                if not entry_found:
-                    time.sleep(0.001) #Can't explain why, but a sleep of 1 ms is super important for stability
-                    
-                    #Figure out which slice to read
-                    readChannel = None
-                    readZ = None
-                    readTime = None
-                    readPosition = None
-                    readRow = None
-                    readColumn = None
-                    for key, value in expectedEntry['axes'].items():
-                        if key == 'channel':
-                            readChannel = value
-                        if key == 'z':
-                            readZ = value
-                        if key == 'time':
-                            readTime = value
-                        if key == 'position':
-                            readPosition = value
-                        if key == 'row':
-                            readRow = value
-                        if key == 'column':
-                            readColumn = value
-                    #Read this slice from the NDDataset:
-                    try:
-                        sliceImage = shared_data._mdaModeAcqData._dataset.read_image(channel=readChannel,z=readZ,time=readTime,position=readPosition,row=readRow,column=readColumn)
-                        
-                        #Find the correct slice to slot it in
-                        sliceTuple = ()
-                        for dim_id in range(len(n_entries_in_dims)):
-                            currentSlice = expectedEntry['axes'][dimensionOrder[dim_id]]
-                            currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
-                            sliceTuple += (int(currentSliceID),)
-                        #Put it in
-                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = sliceImage
-                        logging.debug(f"Added entry {expectedEntry} not rendered in the MDA acquisition")
-                    except (AttributeError, KeyError, IndexError, TypeError, ValueError) as exc:
-                        logging.debug('Entry %s tried, but not acquired: %s', expectedEntry, exc)
-            
+            try:
+                _backfill_missing_slices(shared_data, layerName)
+            finally:
+                shared_data._busy = False
+
+            #napari does not watch a zarr array for writes, so whatever the
+            #backfill (or the acquisition-side writer) put in the store only
+            #appears once the layer is refreshed and the sliders are pointed at
+            #a real slice.
+            finalLayer = getLayerIdFromName(layerName, napariViewer, shared_data)
+            if finalLayer:
+                try:
+                    napariViewer.layers[finalLayer[0]].refresh()
+                except (AttributeError, IndexError, KeyError) as exc:
+                    logging.debug('Final layer refresh skipped: %s', exc)
             logging.debug('Finalised up visualisation...')
-            #Move to the end
-            # napariViewer.dims.set_point(0,timeslice)
-            shared_data._busy = False
-    
+
     shared_data.last_display_update_time = time.time()
 
 class napariHandler:
@@ -1262,7 +1344,7 @@ class napariHandler:
                 "setting is unchanged and still applies to MDA."
             )
 
-        self.shared_data.allMDAslicesRendered = {}
+        self.shared_data.allMDAslicesRendered = set()
         # Referenced by the finally block's log line, so it has to exist before
         # anything inside the try can raise.
         frame_index = 0
@@ -1361,7 +1443,7 @@ class napariHandler:
                     else:
                         #JavaBackendAcquisition is an acquisition on a different thread to not block napari I believe
                         logging.debug('#nH - starting acq')
-                        self.shared_data.allMDAslicesRendered = {}
+                        self.shared_data.allMDAslicesRendered = set()
                         #Already move the live layer to top
                         # logging.debug('BMoved layer to top')
                         # moveLayerToTop(self.shared_data.napariViewer,"Live")
@@ -1480,7 +1562,7 @@ class napariHandler:
 
                     napariViewer = None
                     showdisplay = False
-                    self.shared_data.allMDAslicesRendered = {}
+                    self.shared_data.allMDAslicesRendered = set()
                     #Already move the layer to top
                     # if self.shared_data.newestLayerName != '':
                     #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)

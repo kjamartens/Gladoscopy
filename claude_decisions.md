@@ -1998,3 +1998,52 @@ tasks): `NodeItem.paint()` loading a PNG from disk per repaint (T-F1/T-F2), the
 1 Hz nodz timer (T-F4), and `checkNodesOnErrors` on mouse-move (T-F5). The log
 widget was by far the largest and is the one that matches the reported symptom;
 if the display is still not smooth, those are next.
+
+## 2026-09-09 — T-D4: the backfill pass shrinks, it does not go away  [T-D4]
+**Decision:** Kept the end-of-MDA slice backfill, but (a) made the "was this
+slice rendered?" test a set lookup instead of an O(N_events x M_rendered)
+dict-subset scan, (b) deleted the per-missing-frame `time.sleep(0.001)`
+entirely, and (c) skipped the whole pass on any acquisition with no NDTiff
+`Dataset`. `shared_data.allMDAslicesRendered` changed from a
+running-integer-keyed dict of `Axes` dicts to a `set` of sorted `(key, value)`
+tuples. The pass now also ends with an explicit `layer.refresh()`.
+**Alternatives:** Delete the backfill outright, as T-D4 originally proposed on
+the assumption that T-D3 writes every frame.
+**Reason:** T-D3's every-frame writer is on the `MMCORE_PLUS` frame-ring path
+*only*. Both pycromanager acquisition callbacks
+(`grab_image_liveVisualisation_and_liveAnalysis` /
+`..._savedFn`) do no acquisition-side zarr write at all — verified by grepping
+every `_try_write_frame_to_zarr` call site — so on those backends the
+fps-throttled display path is the store's only writer and most slices are
+genuinely missing at the end of a fast MDA. Deleting the backfill there would
+have produced exactly the black slices T-D4's own "Don't" clause warns about.
+The task text anticipates this and prescribes the set conversion as the
+fallback; that is what was done.
+
+The `_mdaModeAcqData._dataset` gate makes the split automatic rather than
+backend-branched: that attribute is assigned only inside the pycromanager
+`Acquisition` context managers, so on `MMCORE_PLUS` it is absent and the pass
+returns immediately instead of running N iterations that each raise
+`AttributeError` and log a debug line — which is all it ever did there.
+
+Subset semantics were preserved deliberately. The old test was
+`expected['axes'].items() <= rendered.items()`, a subset and not an equality,
+because a frame's `metadata['Axes']` can carry keys the pycromanager event's
+`axes` does not. A flat set of frozen tuples cannot express that, so the
+rendered set is projected onto the expected event's key names once per distinct
+key set (a normal MDA has exactly one) and each event is then a single tuple
+lookup.
+
+On the sleep: its comment claimed it was "super important for stability" with
+no explanation, and it is the larger half of the freeze (1 ms x every missing
+frame, on the GUI thread). Nothing in the loop it guards is asynchronous — it
+sits between a set test and a synchronous `read_image()` — so there is no race
+for it to be closing on the Python side. It was removed rather than
+amortized into a single pre-loop sleep, so that if instability does reappear
+it shows up as a diagnosable NDTiff-finalisation problem rather than being
+papered over again. `tests/test_mda_backfill.py` pins its absence.
+**Affects:** `glados_pycromanager/GUI/napariGlados.py` (new `_axes_key`,
+`_record_rendered_axes`, `_rendered_axes_lookup`, `_backfill_missing_slices`;
+the `finalisationProcedure == True` branch; four
+`allMDAslicesRendered = {}` reset sites), `tests/test_mda_backfill.py` (new),
+`tests/test_mda_zarr_store_creation.py`.
