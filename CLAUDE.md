@@ -389,6 +389,19 @@ stores only values passing the `QWidget` check), which is why the QTimers T-F8
 added to `MMConfigUI` are harmless there. Tests:
 `tests/test_state_save_widget_attrs.py`.
 
+**Reading it back: never index a section.** The three sections are written by
+different code paths at different times, so any of them can be absent — a fresh
+install has none, a section appears only once its widgets have been saved, and
+`io/appdata.py`'s `save_config_to_json` rebuilds the file with **only**
+`GlobalData` when the previous one was unreadable. Use
+`gladosInfo.get('MDA', {})`, never `gladosInfo['MDA']`: indexing directly is what
+made a truncated state file stop the app booting with `KeyError: 'MMControls'`
+(the two MDA loaders had an `except KeyError` fallback, but the section lookup
+sat outside it). `appdata.load_glados_state()` is the tolerant reader — missing,
+corrupt or non-object content all come back as `{}` with a warning. An unreadable
+file is now copied to `glados_state.json.corrupt-<timestamp>` before being
+overwritten. Tests: `tests/test_state_file_missing_sections.py`.
+
 ### GUI-thread work removed in Tier F
 
 Tier F of `claude_throughput_project.md` is complete. Each item below was work the
