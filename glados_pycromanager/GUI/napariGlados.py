@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 import time
+import weakref
 from collections import deque
 from threading import Event, RLock, Thread, get_native_id
 
@@ -257,6 +258,51 @@ def _get_contrast_frame_counters(shared_data):
         counters = {}
         shared_data._contrast_frame_counters = counters
     return counters
+
+
+def _layer_shape_already_validated(shared_data, layerName, layer):
+    """True if `layer` was shape-checked against the current acquisition plan.
+
+    The multiDstack display path used to re-derive the plan's dimensions and
+    re-compare them against the layer's shape on **every frame**, with a
+    `layers.pop()` plus zarr reset waiting on the other side of any mismatch --
+    a full teardown, texture re-upload and store re-creation, driven from the
+    hot path (T-E3). The shape of an existing layer cannot drift on its own:
+    it can only stop matching when the *plan* changes (a new MDA with different
+    dimensions) or when the layer object itself is replaced. Both are exactly
+    what this cache keys on, so the real check runs once per acquisition
+    instead of once per frame.
+
+    Keyed on `_mdaModeParamsGeneration` -- the same counter `_get_cached_dimensions`
+    uses, bumped by the `_mdaModeParams` setter -- plus a **weak reference** to
+    the validated layer. The weakref, not `id(layer)`, is the identity test on
+    purpose: `id()` of a freed object is recycled by CPython, which is the T-D5
+    bug this codebase already paid for once.
+    """
+    cache = getattr(shared_data, '_mda_layer_shape_validated', None)
+    if cache is None:
+        return False
+    entry = cache.get(layerName)
+    if entry is None:
+        return False
+    generation, layer_ref = entry
+    return generation == shared_data._mdaModeParamsGeneration and layer_ref() is layer
+
+
+def _mark_layer_shape_validated(shared_data, layerName, layer):
+    """Record that `layer` matches the current plan, so later frames skip the check."""
+    cache = getattr(shared_data, '_mda_layer_shape_validated', None)
+    if cache is None:
+        cache = {}
+        shared_data._mda_layer_shape_validated = cache
+    cache[layerName] = (shared_data._mdaModeParamsGeneration, weakref.ref(layer))
+
+
+def _invalidate_layer_shape_validation(shared_data, layerName):
+    """Forget the cached verdict for `layerName` (its layer is being torn down)."""
+    cache = getattr(shared_data, '_mda_layer_shape_validated', None)
+    if cache is not None:
+        cache.pop(layerName, None)
 
 
 def _get_contrast_refresh_interval(shared_data):
@@ -581,7 +627,16 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
         
             if layerName != 'Live':
                 #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
-                if liveImageLayer:
+                #
+                #Validated once per acquisition, not once per frame (T-E3). An
+                #existing layer's shape only stops matching when the plan changes
+                #or the layer object is replaced, and _layer_shape_already_validated
+                #keys on exactly those two things -- so the steady state here is a
+                #dict lookup plus a weakref deref, instead of re-deriving the plan's
+                #dimensions and walking them with a teardown (layers.pop + zarr
+                #reset + full texture re-upload) waiting on any mismatch.
+                if liveImageLayer and not _layer_shape_already_validated(
+                        shared_data, layerName, napariViewer.layers[liveImageLayer[0]]):
                     dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
                     
                     #Assume the dimensions are correct
@@ -609,7 +664,18 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                                 break
                             
                     #Remove the layer if the dimensions are wrong
-                    if correctDimensions == False:
+                    if correctDimensions == True:
+                        #Matches the current plan: record it so subsequent frames of
+                        #this acquisition skip the check entirely.
+                        _mark_layer_shape_validated(shared_data, layerName, CurrentLayer)
+                    else:
+                        #Logged at INFO, not DEBUG: after T-E3 this must happen at most
+                        #once per acquisition, so seeing it mid-run is the signal that
+                        #something re-derived different dimensions under a live layer.
+                        logging.info('Layer %r no longer matches the acquisition plan; '
+                                     'rebuilding it (expected %s dims of %s)',
+                                     layerName, len(uniqueEntriesAllDims) + 2, n_entries_in_dims)
+                        _invalidate_layer_shape_validation(shared_data, layerName)
                         logging.debug('removing mdaZarrData - looping over layers')
                         #Remove the mdaZarrData array and ensure that we create a new layer
                         for tLayerIndex in range(0,len(napariViewer.layers)):
@@ -672,6 +738,11 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     # frames to replace them would show a dark stack at every MDA
                     # start.
                     _get_contrast_frame_counters(shared_data)[layerName] = -1
+
+                    # Built from this plan's dimensions a few lines up, so it
+                    # matches by construction -- record that, and the first frame
+                    # after creation skips the validation walk too (T-E3).
+                    _mark_layer_shape_validated(shared_data, layerName, layer)
 
                     for dim_id in range(len(n_entries_in_dims)):
                         napariViewer.dims.set_axis_label(dim_id, dimensionOrder[dim_id])

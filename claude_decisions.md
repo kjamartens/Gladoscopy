@@ -2047,3 +2047,55 @@ papered over again. `tests/test_mda_backfill.py` pins its absence.
 the `finalisationProcedure == True` branch; four
 `allMDAslicesRendered = {}` reset sites), `tests/test_mda_backfill.py` (new),
 `tests/test_mda_zarr_store_creation.py`.
+
+---
+
+## 2026-09-09 — T-E3: cache the verdict, not the shape  [T-E3]
+
+**The check moved to "once per acquisition", not literally to acquisition
+start.** The task allows either. A separate start-time hook would have needed a
+new call site in each of the paths that can begin a multiDstack acquisition
+(MDA mode, a nodz-driven node acquisition, and a re-run over an existing layer),
+and each would have had to re-find the layer that the display path finds anyway.
+Instead the existing per-frame check stays where it is and is *gated*: the first
+frame after the plan changes runs the full walk, marks the result, and every
+frame after it short-circuits. Same net effect, one code path, and no way for a
+new acquisition entry point to silently skip validation.
+
+**The cache key is `(_mdaModeParamsGeneration, weakref(layer))`.** Those are the
+only two things that can invalidate a verdict: an existing layer's shape does
+not drift on its own, so it can only stop matching the plan when the plan
+changes (the generation counter the `_mdaModeParams` setter already bumps —
+the same key `_get_cached_dimensions` uses) or when the layer object is
+replaced.
+
+The identity half is deliberately a **weakref, not `id(layer)`**. An `id()` key
+is the T-D5 bug: CPython recycles the address of a freed object, so a layer the
+user deleted and a replacement allocated at the same address would compare
+equal and the new layer would be treated as already validated — writing frames
+into a layer that was never checked. `weakref.ref()` compares the object, and a
+dead referent returns `None`, which fails the test correctly.
+`tests/test_layer_shape_validation_cache.py` pins this specific case by
+allocating until CPython hands the freed address back.
+
+**The rebuild is now logged at INFO.** The task asks to confirm no rebuild
+occurs mid-run. Before this change a mid-run rebuild was invisible (the only
+trace was a DEBUG line about looping over layers) *and* destructive — it pops
+the layer, nulls the store and releases its temp directory, discarding every
+frame written so far. After T-E3 it is a once-per-acquisition event, so a
+second occurrence in one run is a real signal and now says so in the log at a
+level that is on by default.
+
+**Newly created layers are marked at creation.** They are built from the same
+`n_entries_in_dims` the check compares against, so they match by construction;
+marking there saves the redundant walk on the first frame after creation.
+
+**Verification.** `pytest -q` — 529 passed (8 new). The manual checks (two
+different-shaped MDAs back-to-back; a long single MDA with no mid-run rebuild
+in the log) were **not** performed: no hardware or demo backend is driveable in
+this environment.
+
+**Affects:** `glados_pycromanager/GUI/napariGlados.py` (new
+`_layer_shape_already_validated`, `_mark_layer_shape_validated`,
+`_invalidate_layer_shape_validation`; the multiDstack validation block and
+layer-creation branch), `tests/test_layer_shape_validation_cache.py` (new).
