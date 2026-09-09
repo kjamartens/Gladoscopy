@@ -131,7 +131,8 @@ T-0.1
   -> Tier C  (C1, C2, C3, C4)                         [STOP POINT after C3]
   -> Tier D  (D5, D6, D7 first - small; then D1, D2, D3, D4)
   -> Tiers E, F, G, H in any order
-  -> T-E6                      (only after Tier E and Tier F; re-measure first)
+  -> T-D8                      (NDTiff storage; informs and may shrink T-E6)
+  -> T-E6                      (only after Tier E, Tier F and T-D8; re-measure first)
   -> T-B3 (after C3), then T-B4
   -> T-G10 (decision), T-F8 scope (decision)          [STOP POINTS]
 ```
@@ -187,6 +188,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
 - [x] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
 - [x] **T-D7** Fix `TemporaryDirectory` lifetimes — S, no deps
+- [ ] **T-D8** Offer NDTiff as a pymmcore-plus storage format — M, no deps — *measured 19x faster to write than zarr; do before T-E6*
 
 ### Tier E — Napari visualisation
 
@@ -1131,6 +1133,101 @@ layer still renders after the second starts, and that temp directories are clean
 
 ---
 
+### T-D8 — Offer NDTiff as a pymmcore-plus storage format (and probably default to it)
+
+Tier: D | Depends on: none (T-D1/T-D2/T-D3 already landed) | Risk: medium | Size: M | **Do before T-E6**
+
+**Why:** `MDAConfig.mmcore_save_format` currently offers `ome-zarr`, `ome-tiff`
+and `none`, all written by pymmcore-plus' own `run_mda(output=...)`. NDTiff — the
+format the pycromanager backends already produce — is not among them, and on the
+measurements below it is not a lateral choice, it is **far** faster than either.
+
+Benchmarked on this machine, 1000 frames of 256x256 uint16 (128 KB each, 131 MB
+total), written one frame at a time as the acquisition path does, then random
+single-frame reads as scrubbing does:
+
+| store | write | throughput | files | random read |
+|---|---|---|---|---|
+| zarr chunk=1 (the scratch display store) | 6.50 ms/frame | 20 MB/s | 1001 | 3.41 ms |
+| **NDTiff (`ndstorage.NDTiffDataset.put_image`)** | **0.35 ms/frame** | **379 MB/s** | **2** | **0.10 ms** |
+| `run_mda(output=…​.ome.zarr)` | 3.43 ms/frame | 38 MB/s | 1002 | – |
+| `run_mda(output=…​.ome.tiff)` | 6.97 ms/frame | 19 MB/s | 1 | – |
+
+**19x faster to write and 34x faster to read than the scratch zarr, in 2 files
+instead of 1001.** The zarr formats are limited by per-file overhead — one file
+per frame — which is exactly the cost identified in T-E6; NDTiff appends frames
+into a couple of large files and does not pay it.
+
+Three consequences, in increasing order of importance:
+
+1. Users acquiring on `MMCORE_PLUS` currently get the slowest available option as
+   the default.
+2. **It collapses the two data shapes.** `_resolve_finished_acquisition_data()`
+   and `_acquisition_storage_path()` exist in their current form only because
+   `MMCORE_PLUS` has no NDTiff store while the pycromanager backends do (see
+   *Acquisition storage and scratch directories* in `CLAUDE.md`). If this backend
+   writes NDTiff too, both branches converge on `shared_data.mdaDatasets` and a
+   whole class of backend-conditional code goes away.
+3. **It may remove the scratch display store entirely.** A 0.10 ms random frame
+   read is fast enough to back napari scrubbing directly. That is T-E6's step 4,
+   and this measurement is the evidence it needs — which is why this task comes
+   first.
+
+**The write path already exists in this codebase.** `MMcontrols.py` (~line 788)
+constructs `NDTiffDataset(path, summary_metadata=…​, writable=True)` and calls
+`put_image(coords, pixels, metadata)` / `finish()`. `napariGlados.py`'s
+`PyMMCore_startedAcqCallback` (~line 1154) *already creates* the dataset as
+`shared_data.pyMMCdataset` and then never writes to it — that dead store is what
+this task finally makes real. `ndstorage` 0.1.18 is already a dependency.
+
+**Files:** `glados_pycromanager/GUI/sharedFunctions.py` (the setting),
+`glados_pycromanager/GUI/napariGlados.py` (the acquisition branch),
+`glados_pycromanager/Core/MDAGlados.py` (storage-path / data resolution)
+
+**Find:** `mmcore_save_format` in `MDAConfig`, `mmcore_output_path()` and the
+`run_mda(...)` call in `run_MILCoreAcquisition_worker`, `PyMMCore_startedAcqCallback`.
+
+**Do:**
+
+1. Add `ndtiff` to `mmcore_save_format`. Unlike the other options it is **not** a
+   `run_mda(output=…)` path — pymmcore-plus' `handler_for_path` only infers
+   writers for `.zarr` / `.tiff` / an image-sequence directory — so it is written
+   by Glados from the frame path, via the existing `pyMMCdataset` object.
+2. Write it off the frame path, **not** the acquisition thread: reuse
+   `ZarrFrameWriter`'s shape (bounded-by-bytes queue, backpressure, drain on
+   close) rather than calling `put_image` inline. Generalise the writer over
+   "something with a per-frame write" rather than duplicating it; `submit`'s
+   `slice_tuple` becomes NDTiff's coordinate dict.
+3. `finish()` the dataset at acquisition end, before anything reads it — the same
+   ordering constraint `_stop_zarr_writer()` already has, and the reason
+   `pyMMCdataset.finish()` currently logs at DEBUG is that it was never written
+   to (see the resolved item in `claude_issues.md`).
+4. Point `shared_data.mdaSavedPath` and `mdaDatasets` at it so
+   `_acquisition_storage_path()` and `_resolve_finished_acquisition_data()`
+   report it, then simplify those two now that both backends can produce the same
+   shape.
+5. **Re-run the benchmark before choosing the default**, on more than one frame
+   size and with a cold page cache. If it holds, make `ndtiff` the default and
+   say so in the setting's description.
+
+**Don't:** Don't remove the OME-Zarr/OME-TIFF options — they are the
+interoperable, non-Micro-Manager-specific formats and somebody will want them;
+this is about the default and about having the fast option available at all.
+Don't write NDTiff inline on the frame path (see 2). Don't treat the numbers
+above as settled: one machine, one frame size, warm cache, and the NDTiff read
+figure excludes the index-loading cost paid when *opening* a large dataset, which
+was visible as a progress bar in the benchmark and needs its own measurement
+before scrubbing is built on it.
+
+**Verify:** `pytest -q`. Then a demo-camera MDA per format (the pattern in
+`tests/test_mmcore_mda_saving.py`) asserting the data lands, reads back at the
+acquisition's shape, and that `frameReady` still fires for every frame. Plus the
+re-run benchmark from step 5.
+
+**Commit:** `feat(storage): write pymmcore-plus MDAs as NDTiff`
+
+---
+
 ### T-E1 — Batch per-dimension set_current_step calls
 
 Tier: E | Depends on: none | Risk: medium | Size: M
@@ -1275,7 +1372,7 @@ mitigate even if the root cause is upstream.
 
 ### T-E6 — Take zarr off the live display path during an MDA (MMCORE_PLUS)
 
-Tier: E | Depends on: E1-E5, F1-F5 (**do the GUI and napari work first**) | Risk: medium | Size: **L**
+Tier: E | Depends on: E1-E5, F1-F5, **T-D8** (do the GUI and napari work first) | Risk: medium | Size: **L**
 
 **Reported from a real session (2026-09-09), still open after T-E1, T-E2 and T-F3:**
 during an MDA the visualisation updates only **once every 300-500 ms**, with
@@ -1354,9 +1451,13 @@ out of the store.
    not mistaken for scrubbing.
 4. Reconsider whether the scratch store needs to be written during acquisition
    at all now that the backend writes the archive. If scrubbing could read from
-   the acquisition's own OME-Zarr, the scratch store, its writer thread and its
+   the acquisition's own store, the scratch store, its writer thread and its
    ~3.2 ms/frame disappear together. This is the largest possible win and should
-   be evaluated before building 2 and 3.
+   be evaluated before building 2 and 3. **T-D8 is the evidence for this**: NDTiff
+   reads a random frame in ~0.10 ms against the scratch zarr's ~3.4 ms, which is
+   comfortably fast enough to back scrubbing directly. Do T-D8 first; it may
+   shrink this task to just the two-layer display work, or remove the need for
+   it.
 
 **Don't:** Don't reintroduce black frames — whatever replaces
 `_slice_safe_to_display()` must never point the viewer at an unwritten slice;
