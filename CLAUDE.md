@@ -144,6 +144,33 @@ the first update frame refreshes, because there `add_image()` gets a zarr store 
 still all zeros and limits fitted at creation mean nothing. Tests:
 `tests/test_contrast_throttle.py`.
 
+The multiDstack layer's shape is validated **once per acquisition, not per frame**
+(T-E3). An existing layer's shape cannot drift on its own, so
+`_layer_shape_already_validated` caches the verdict on the only two things that can
+invalidate it: `_mdaModeParamsGeneration` (the plan changed) and a **weakref** to the
+layer (the layer object was replaced). The weakref is not decoration — `id(layer)` is
+recycled by CPython for a freed object, which would report a brand-new layer as
+already validated; that is the T-D5 bug. A failed check pops the layer, nulls the
+store and releases its temp directory, discarding every frame written so far, so it
+now logs at INFO: after T-E3 it must happen at most once per acquisition, and a second
+occurrence in one run is a real signal. Newly created layers are marked validated at
+creation (they are built from the same dimensions). Tests:
+`tests/test_layer_shape_validation_cache.py`.
+
+Album mode (`napariHelperFunctions.addToExistingOrNewLayer`, one caller —
+`MMcontrols.addImageToAlbum`) appends into a **geometrically grown buffer** kept in
+`layer.metadata` (`ALBUM_BUFFER_KEY` / `ALBUM_COUNT_KEY`, start 4 frames, double when
+full), and hands napari `buffer[:count]` — a view, so O(1) per snap (T-E4). It used to
+`np.append` the whole stack *and* destroy and rebuild the layer with `add_image`,
+hand-copying twelve display properties across, per snap: measured over 50 snaps of a
+512x512 uint16 frame, 1.6 -> 14.5 -> 41.2 ms for the 2nd/20th/50th against a flat
+~0.13 ms. The `data` is **assigned**, not mutated in place as the frameByFrame path
+does, because the stack gets one frame longer each time and only an assignment tells
+napari its extent grew. The buffer takes its dtype from the incoming frame — the old
+bare `np.zeros((2, h, w))` was float64, so a uint16 album cost 4x the bytes from its
+second snap on. A frame-shape change mid-album (ROI/binning) starts a fresh stack and
+logs at INFO, where `np.append` raised. Tests: `tests/test_album_layer_growth.py`.
+
 That store is created **uncompressed, one frame per chunk, via
 `zarr.create_array`** (T-D3). `zarr.open` cannot set compression at all on zarr 3.1.0
 — it rejects `compressor` ("cannot be used for arrays with zarr_format 3") *and*

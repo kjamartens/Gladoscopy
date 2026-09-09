@@ -69,6 +69,65 @@ def checkIfLayerExistsOrCreate(napariViewer,layer_name,layer_type='image',shared
         napariViewer.reset_view()
         return layer
 
+#: Where the album stack's backing buffer and fill count live. `layer.data` is a
+#: view onto the first `count` frames of that buffer, so the buffer itself has to
+#: be reachable from the layer to be grown; `layer.metadata` is napari's own
+#: place for exactly this.
+ALBUM_BUFFER_KEY = '_glados_album_buffer'
+ALBUM_COUNT_KEY = '_glados_album_count'
+
+#: Frames the album buffer starts at, and the factor it grows by when full.
+#: Geometric growth makes the total copying over a session O(N) amortized
+#: instead of the O(N^2) `np.append` used to pay (T-E4).
+ALBUM_INITIAL_CAPACITY = 4
+ALBUM_GROWTH_FACTOR = 2
+
+
+def _album_buffer_for(layer, image_data):
+    """The album buffer and fill count backing `layer`, rebuilt if unusable.
+
+    Returns `(buffer, count)` where `buffer[:count]` is exactly the stack the
+    layer currently shows. Rebuilds (copying whatever frames the layer already
+    holds into a fresh buffer) when there is no buffer yet -- the first append
+    onto a 2-D layer made by the create branch below -- or when the bookkeeping
+    no longer describes the layer, e.g. because the incoming frame changed shape
+    or dtype, or something outside this function assigned `layer.data`.
+    """
+    existing = layer.data
+    buffer = layer.metadata.get(ALBUM_BUFFER_KEY)
+    count = layer.metadata.get(ALBUM_COUNT_KEY, 0)
+
+    usable = (
+        buffer is not None
+        and buffer.ndim == 3
+        and buffer.shape[1:] == image_data.shape
+        and buffer.dtype == image_data.dtype
+        and 0 < count <= buffer.shape[0]
+        and existing.ndim == 3
+        and existing.shape[0] == count
+    )
+    if usable:
+        return buffer, count
+
+    frames = existing if existing.ndim == 3 else existing[np.newaxis, :, :]
+    if frames.shape[1:] != image_data.shape:
+        # The frame geometry changed under us -- a ROI or binning change part-way
+        # through an album. The frames already in the layer cannot be stacked
+        # with this one at all, so start a fresh stack rather than raise, which
+        # is what `np.append` did here before.
+        logging.info('Album frame shape changed from %s to %s; starting a new stack',
+                     frames.shape[1:], image_data.shape)
+        frames = np.empty((0,) + image_data.shape, dtype=image_data.dtype)
+    capacity = max(ALBUM_INITIAL_CAPACITY, frames.shape[0])
+    # Explicit dtype, from the frame being added (T-E4). The old two-frame path
+    # used a bare `np.zeros(...)`, which is float64 -- so a uint16 camera stack
+    # was silently upcast to 4x its size on the second snap, and every
+    # `np.append` after that inherited the promotion.
+    buffer = np.zeros((capacity,) + image_data.shape, dtype=image_data.dtype)
+    buffer[:frames.shape[0]] = frames
+    return buffer, frames.shape[0]
+
+
 def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image',shared_data_throughput = None):
     """
     If a layer exist, add an image to it (i.e. album-mode). If it doesn't exist yet, create it.
@@ -81,43 +140,38 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
     if len(layerId) > 0:
         logging.debug('updating layer')
         layer = napariViewer.layers[layerId[0]]
-        if layer.data.ndim == 2:
-            new_data = np.zeros((2,layer.data.shape[0],layer.data.shape[1]))
-            new_data[0,:,:] = layer.data
-            new_data[1,:,:] = image_data
-        else:
-            new_data = np.append(layer.data,image_data[np.newaxis, :, :],axis=0)
-        layer_old = layer
-        layer_name = layer.name
-        
-        #Remove the current layer:
-        #And add a new one with the old name etc:
-        layer = napariViewer.add_image(new_data)
-        layer.opacity = layer_old.opacity
-        layer.contrast_limits = layer_old.contrast_limits
-        layer._keep_auto_contrast = layer_old._keep_auto_contrast
-        layer.rendering = layer_old.rendering
-        layer.colormap = layer_old.colormap
-        layer.scale = layer_old.scale
-        layer.scale_factor = layer_old.scale_factor
-        layer.translate = layer_old.translate
-        layer.gamma = layer_old.gamma
-        layer.iso_threshold = layer_old.iso_threshold
-        layer.blending = layer_old.blending
-        layer.attenuation = layer_old.attenuation
-        
-        #remove old on
-        napariViewer.layers.remove(layer_old)
-        
-        #Give the new one the old one's name
-        layer.name = layer_name
-            
-        current_slice = layer.data.shape[0]
-        napariViewer.dims.set_current_step(0,current_slice)
-        
+
+        # Append into a geometrically grown buffer, and hand napari a view of the
+        # filled part (T-E4). This used to `np.append` -- which copies the whole
+        # stack on every snap, O(N^2) bytes over a session -- and then destroy
+        # the layer and rebuild it with `add_image`, copying a dozen display
+        # properties across and forcing a full texture re-upload, per frame.
+        # There is no known extent here: album mode is user-driven, one snap at a
+        # time, so doubling is the right growth policy rather than preallocating.
+        buffer, count = _album_buffer_for(layer, image_data)
+        if count >= buffer.shape[0]:
+            grown = np.zeros((buffer.shape[0] * ALBUM_GROWTH_FACTOR,) + buffer.shape[1:],
+                             dtype=buffer.dtype)
+            grown[:count] = buffer[:count]
+            buffer = grown
+        buffer[count] = image_data
+        count += 1
+
+        layer.metadata[ALBUM_BUFFER_KEY] = buffer
+        layer.metadata[ALBUM_COUNT_KEY] = count
+        # A view, not a copy -- O(1) regardless of stack size. The assignment
+        # (rather than an in-place mutation plus `layer.refresh()`) is what tells
+        # napari the stack got one frame longer, so the dims slider and the
+        # layer's extent track it; napari's data setter refreshes for us.
+        layer.data = buffer[:count]
+
+        # The newest frame is at index count-1. The old code passed `count`,
+        # one past the end, and relied on napari clamping it.
+        napariViewer.dims.set_current_step(0, count - 1)
+
         #Move the layer to top
         moveLayerToTop(napariViewer,layer_name)
-            
+
     else: #create the layer
         logging.debug('creating layer')
         layer = napariViewer.add_image(image_data,name = layer_name)
@@ -129,8 +183,7 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
             layer.scale = [1,1]
         layer._keep_auto_contrast = True #type:ignore
         napariViewer.reset_view()
-        
-    
+
 def moveLayerToTop(napariViewer,layerName,selectLayer=True):
     """
     Move a layer to the top of the layer stack in the napari viewer.

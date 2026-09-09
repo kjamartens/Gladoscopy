@@ -2099,3 +2099,68 @@ this environment.
 `_layer_shape_already_validated`, `_mark_layer_shape_validated`,
 `_invalidate_layer_shape_validation`; the multiDstack validation block and
 layer-creation branch), `tests/test_layer_shape_validation_cache.py` (new).
+
+---
+
+## 2026-09-09 — T-E4: geometric growth, because album mode has no known extent  [T-E4]
+
+**Step 1 of the task (preallocate to a known extent) does not apply here.** The
+task offers preallocation "where one is available". `addToExistingOrNewLayer`
+has exactly one caller — `MMcontrols.addImageToAlbum`, which snaps a single
+image in response to a button press. There is no plan, no event list and no
+frame count to preallocate against, so this is step 4's case: grow the buffer
+geometrically (start at 4 frames, double when full) and keep a fill count.
+Amortized that is O(N) copying over a session instead of `np.append`'s O(N^2).
+
+**The layer is no longer destroyed, which deletes rather than rewrites code.**
+The old path called `add_image` with the grown stack, hand-copied twelve display
+properties (opacity, contrast limits, colormap, gamma, blending, …) onto the new
+layer, removed the old one and renamed the replacement. Keeping the layer and
+assigning `layer.data` makes all twelve survive for free, so that block is gone
+rather than reimplemented — and there is no texture rebuild per snap.
+
+**`layer.data` is assigned, not mutated in place.** The task says "mutate
+`layer.data` in place and call `layer.refresh()`", which is right for the
+frameByFrame live path it points at — there the frame shape never changes. Here
+the stack gets one frame *longer* per snap, and an in-place write cannot tell
+napari its extent grew, so the dims slider would not follow. Assigning
+`buffer[:count]` is a view, not a copy — O(1) regardless of stack size — and
+napari's data setter does the refresh. The buffer itself lives in
+`layer.metadata`, napari's own place for caller state, since a view alone gives
+no reliable way back to the array behind it.
+
+**Measured** (50 snaps of a 512x512 uint16 frame, array work only — the fake
+layer does no texture upload, so this understates the real saving):
+
+| | 2nd snap | 20th | 50th | total | dtype |
+|---|---|---|---|---|---|
+| `np.append` + recreate | 1.62 ms | 14.52 ms | 41.21 ms | 985.0 ms | float64 |
+| geometric buffer | 0.36 ms | 0.13 ms | 0.14 ms | 18.1 ms | uint16 |
+
+The old cost grows linearly *per snap*; the new one is flat. That is the task's
+"adding the 20th is not visibly slower than the 2nd", quantified.
+
+**The float64 upcast is fixed at its source.** `np.zeros((2, h, w))` with no
+dtype produced a float64 two-frame stack on the second snap, and every
+`np.append` after it inherited the promotion — a uint16 camera album cost 4x the
+bytes for its whole life. The buffer now takes its dtype from the incoming
+frame.
+
+**A frame-shape change now starts a new stack instead of raising.** If the ROI
+or binning changes part-way through an album, the frames already in the layer
+cannot be stacked with the new one at any dtype. `np.append` raised `ValueError`
+there; the rebuild path logs at INFO and starts a fresh stack around the new
+shape. This is a behaviour change beyond the letter of the task, but the
+alternative is an uncaught exception out of a button handler, and the buffer
+validity check had to handle the case one way or another.
+
+**Verification.** `pytest -q` — 541 passed (12 new). The manual check (snap 20
+images into the album in the running app) was **not** performed: no hardware or
+demo backend is driveable in this environment. The equivalent is covered at the
+function level by `test_twenty_snaps_are_all_present_and_in_order`,
+`test_stack_keeps_the_cameras_dtype` and the benchmark above.
+
+**Affects:** `glados_pycromanager/GUI/napariHelperFunctions.py`
+(`addToExistingOrNewLayer` rewritten; new `_album_buffer_for`,
+`ALBUM_BUFFER_KEY`, `ALBUM_COUNT_KEY`, `ALBUM_INITIAL_CAPACITY`,
+`ALBUM_GROWTH_FACTOR`), `tests/test_album_layer_growth.py` (new).
