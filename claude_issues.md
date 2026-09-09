@@ -33,6 +33,16 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
+- **multiDstack scratch store creates one file per frame** — T-D3 kept `chunks=[1,...,1,h,w]`
+  deliberately (multi-frame chunks were measured slower to write *and* to read, since napari
+  paints the layer by reading a slice out of this same array — see `claude_decisions.md`,
+  2026-09-09). So a 20 000-frame MDA still makes 20 000 files in one temp directory, which is
+  slow to enumerate and to `rmtree` on NTFS. Not a throughput problem — it does not show up in
+  any of the write/read measurements — but it is the one part of T-D3's motivation left
+  unaddressed. zarr 3 **sharding** is the designed fix (chunk=1 frame keeps reads cheap,
+  shard=32 frames gives 1 file per 32); measured at 4.3 ms/slice read but 44 ms/frame write on
+  this machine, so it needs a batched whole-shard writer before it is worth taking.
+
 - **pymmcore-plus MDA zarr storage** — crashes fixed (MDA_acq_finished and pyMMCdataset.finish() no longer crash); actual zarr storage for pymmcore-plus MDA + advanced-settings storage selector deferred to a future plan step.
 - **MMCORE_PLUS MDA ignores the user's Storage folder** — recorded by T-D7, deliberately not fixed there. On the `MMCORE_PLUS` branch of `run_MILCoreAcquisition_worker`, `savefolder`/`savename` are computed from `_mdaModeSaveLoc` and then never read, and the `pyMMCdataset` NDTiff store created in `PyMMCore_startedAcqCallback` is never written to — frames go into a `TemporaryDirectory`-backed zarr array instead, which `release_all_temp_dirs()` deletes on quit. So an MMCORE_PLUS MDA saves nothing where the user asked, and `_acquisition_storage_path()` reports a temp directory. Overlaps the existing "pymmcore-plus MDA zarr storage" item above; both want the same fix. Deferral rationale in `claude_decisions.md` (2026-09-09, T-D7).
 

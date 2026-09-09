@@ -1715,3 +1715,103 @@ Tier E is explicitly "in any order" once Tier D is reached, is low-risk, and
 needs no hardware, so E1 and E2 were taken meanwhile. **T-D3 remains the next
 task in the recommended order** and should be resumed before E3/E4 once the
 above is settled.
+
+---
+
+## 2026-09-09 — T-D3: writer thread yes, amortized chunks no (measured)
+
+Done at the user's request, after they asked for "an intermediate buffer to
+ensure no frames are dropped during writing". Steps 1, 3 and 4 implemented;
+**step 2 (multi-frame chunks) measured and rejected.**
+
+### Why chunking was rejected
+
+The task assumed the store is write-only, so bigger chunks would be free. It is
+not: in multiDstack, `_napariUpdateLive_locked` calls
+`add_image(shared_data.mdaZarrData[layerName])`, so **the napari layer is the
+zarr array** and painting a frame is a slice read out of it. Confirmed by
+counting reads through a proxy array: napari reads once per new slice (0 on a
+repeat of the same slice), so during a multiDstack MDA every displayed frame is
+one chunk read.
+
+Measured on this machine, 1024x1024 uint16 frames, zarr 3.1.0:
+
+| config | files | write ms/frame | read ms/slice |
+|---|---|---|---|
+| chunk=1, zstd (before) | 257 | 12.80 | 7.94 |
+| chunk=1, no compressor | 257 | **9.13** | **2.76** |
+| chunk=8, whole-chunk batched writes | 33 | 13.57 | 21.42 |
+| chunk=32, whole-chunk batched writes | 9 | 15.40 | 65.62 |
+| chunk=32, unbatched (naive reading of the task) | 9 | 504 | 60.29 |
+| chunk=1 + shard=32 | 9 | 44.47 | 4.27 |
+
+Bigger chunks lose on **both** axes even with perfect batching, so the writer's
+batching machinery would have bought nothing and cost display latency. Unbatched
+multi-frame chunks are catastrophic (504 ms/frame) because a partial chunk write
+is a read-modify-write. Only the compression change is a clear win, and it is a
+win twice over.
+
+**Cost of the decision:** the NTFS file-count concern in T-D3's motivation is
+unaddressed — one file per frame stands. Logged in `claude_issues.md` rather
+than silently dropped. zarr 3 sharding is the right fix (reads stay cheap at
+4.27 ms) but needs a batched whole-shard writer to be worth its 44 ms/frame.
+
+### The buffer, and what it can honestly promise
+
+`GUI/frame_writer.py`'s `ZarrFrameWriter` is a second thread behind its own
+queue. Two deliberate differences from `FrameRing`:
+
+- **Bounded by bytes, not frames** (`DEFAULT_MEMORY_BUDGET_BYTES`, 256 MB). A
+  256-frame bound means 0.5 GB on a 512x512 camera and 8 GB on a 2048x2048 one;
+  a byte budget adapts, and the depth is what the operator actually cares about.
+- **Backpressure, not overwrite-oldest.** `FrameRing` drops the oldest frame
+  because a stale display frame is worthless. Here a dropped frame is lost data
+  — on `MMCORE_PLUS` there is no NDTiff store to recover it — so `submit` blocks.
+  The block is **timed** (5 s): an untimed one turns a stalled disk into an
+  acquisition that cannot be cancelled, so on timeout the frame is counted and
+  logged at WARNING. Visible failure over silent loss.
+
+Chosen over the task's other suggestion (a second `FrameRing` for storage)
+because a ring's overwrite-oldest semantics are exactly wrong for storage; the
+useful part of that suggestion — storage not sharing the display's drops — is
+what the separate queue provides.
+
+**What it promises:** bursts are absorbed. Simulated against the real
+`FrameRing` at a paced camera rate, 2.1 MB frames, the consumer thread — which
+also feeds the display and every RT-analysis queue — goes from **33-41 ms
+blocked per frame to ~0.05 ms**, with no frames lost at 30, 60 or 120 fps.
+
+**What it does not promise:** a sustained overrun. If the camera outruns the
+disk indefinitely no buffer of any size helps, and with a zero-think-time
+producer the queued path is actually *slower* in wall-clock (27.5 vs 14.8
+ms/frame) because producer and writer then contend for the GIL and the disk with
+nothing to overlap. That case is now diagnosable rather than mysterious:
+`max_depth` and `blocked_seconds` are logged at teardown, and a saturating
+`max_depth` with non-zero `blocked_seconds` is the signature.
+
+**Lifecycle.** Started lazily on the first frame rather than alongside the ring
+consumer, because the store is created from either of two places and neither is
+the consumer's start (`_preinit_mda_zarr` before `run_mda()`, or the display
+path on the first frame). Keyed on the array object, so the dimension-mismatch
+branch re-creating the store retires the old writer instead of writing into a
+discarded array. Stopped by `_stop_zarr_writer()` from `_stop_frame_ring_consumer`,
+**after** the consumer join — the consumer is what submits, and a writer closed
+first would reject the ring's post-stop drain. That also satisfies T-D3's two
+"don'ts": the finalisation pass cannot read the store with writes in flight, and
+the writer cannot outlive the layer's `TemporaryDirectory`.
+
+### Test contract change
+
+`_try_write_frame_to_zarr` now *queues* rather than writes, so the three T-D2
+tests that read the array back had to drain first; they route through a `_write`
+helper that calls `_stop_zarr_writer()`, mirroring what the acquisition teardown
+does. Two new integration tests cover the end-to-end no-loss property (40 frames
+submitted, all present after teardown) and writer retirement on store
+replacement.
+
+**Verification.** `pytest -q` — 480 passed (11 new in
+`tests/test_frame_writer.py`, 2 new in `tests/test_zarr_single_writer.py`). The
+manual check T-D3 asks for (>=2000-frame MDA; file count; acquisition-thread
+frame rate) was **not** performed: no hardware or demo backend. The paced
+simulation against the real `FrameRing` substitutes for the frame-rate half; the
+file-count half no longer applies, since chunking was not changed.

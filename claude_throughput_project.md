@@ -181,7 +181,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 - [x] **T-D1** One store-creation site with an explicit dtype — M, no deps
 - [x] **T-D2** Stop writing every frame to zarr twice — S, needs D1
-- [ ] **T-D3** Writer thread with amortized chunks — **L**, needs A7, D1
+- [x] **T-D3** Writer thread with amortized chunks — **L**, needs A7, D1 — *step 2 (chunking) measured and rejected; see decisions*
 - [ ] **T-D4** Delete the O(N*M) backfill pass — M, needs D3
 - [x] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
 - [x] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
@@ -965,6 +965,16 @@ in the `_create_mda_zarr` helper introduced by T-D1.
    changed the compressor keyword.
 4. Ensure the writer is drained and joined at acquisition end before anything reads the
    store.
+
+**Done 2026-09-09, with step 2 deliberately NOT applied.** Steps 1, 3 and 4 are
+implemented (`GUI/frame_writer.py`, `compressors=None`, drain-and-join in
+`_stop_frame_ring_consumer`). Step 2 — multi-frame chunks — was **measured and
+rejected**: napari paints a multiDstack layer by reading a slice out of this very
+array, so chunk size is on the display path too, and even with perfectly batched
+whole-chunk writes 8- and 32-frame chunks were slower to write *and* several times
+slower to read than one frame per chunk. Full numbers in `claude_decisions.md`
+(2026-09-09, T-D3). The store therefore still creates 1 file per frame; the NTFS
+file-count concern is unaddressed and is logged in `claude_issues.md`.
 
 **Don't:** Don't drop storage frames silently — count and log them. Don't let the writer
 outlive the store's `TemporaryDirectory` (see T-D7).

@@ -45,6 +45,7 @@ from glados_pycromanager.GUI.custom_widget_ui import (
 )
 from glados_pycromanager.GUI.frame_ring import DEFAULT_CAPACITY as FRAME_RING_CAPACITY
 from glados_pycromanager.GUI.frame_ring import FrameRing
+from glados_pycromanager.GUI.frame_writer import ZarrFrameWriter
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName, moveLayerToTop
 from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
@@ -145,11 +146,26 @@ def _create_mda_zarr(shared_data, layer_name, shape, h, w, dtype):
     import zarr
     shape = list(shape)
     tmpdir = shared_data.new_zarr_temp_dir(layer_name)
-    array = zarr.open(
-        str(tmpdir.name),
+    # `zarr.create_array`, not `zarr.open`: on zarr 3.1.0 `open` cannot set
+    # compression at all -- it rejects both `compressor` ("cannot be used for
+    # arrays with zarr_format 3") and `compressors` (unexpected keyword). This is
+    # a scratch store in a TemporaryDirectory, deleted on exit, so paying Zstd to
+    # shrink it is the wrong trade: measured on a 1024x1024 uint16 frame,
+    # compressors=None writes at ~9.1 ms/frame against ~12.8 ms compressed, and
+    # serves a single slice back to napari in ~2.8 ms against ~7.9 ms, for ~17%
+    # more bytes on a disk we are about to throw away.
+    array = zarr.create_array(
+        store=str(tmpdir.name),
         shape=shape + [h, w],
+        # One frame per chunk. Bigger chunks were measured and rejected -- see
+        # claude_decisions.md (T-D3): even with perfectly batched whole-chunk
+        # writes, 8- and 32-frame chunks were slower to write *and* much slower
+        # to read, because napari paints a multiDstack layer by reading one
+        # slice out of this very array.
         chunks=tuple([1] * len(shape) + [h, w]),
         dtype=dtype,
+        compressors=None,
+        overwrite=True,
     )
     shared_data.mdaZarrData[layer_name] = array
     shared_data.allMDAslicesRendered = {}
@@ -690,6 +706,7 @@ class napariHandler:
         # stray late callback can never hit an AttributeError.
         self.frame_ring = FrameRing(self.FRAME_RING_CAPACITY_DISPLAY)
         self._frame_ring_thread = None
+        self._zarr_writer = None
         self._frame_ring_stop = Event()
         # See _effective_vis_method(); set by run_liveSequence_worker.
         self._live_sequence_active = False
@@ -886,24 +903,31 @@ class napariHandler:
         logging.debug('Frame-ring consumer started (capacity=%d)', capacity)
 
     def _stop_frame_ring_consumer(self):
-        """Stop the consumer, wait for it to drain, and report dropped frames."""
+        """Stop the consumer, wait for it to drain, and report dropped frames.
+
+        Then stop the storage writer -- strictly in that order, since the
+        consumer is what submits to it, and a writer closed first would reject
+        the frames still coming out of the ring's post-stop drain.
+        """
         thread = self._frame_ring_thread
         self._frame_ring_thread = None
-        if thread is None:
-            return
-        self._frame_ring_stop.set()
-        # Wake it out of frame_ring.wait() immediately instead of waiting out the
-        # poll timeout.
-        self.frame_ring.event.set()
-        thread.join(timeout=self.FRAME_RING_DRAIN_TIMEOUT_S)
-        if thread.is_alive():
-            logging.warning('Frame-ring consumer did not stop within %.0fs', self.FRAME_RING_DRAIN_TIMEOUT_S)
-        dropped = self.frame_ring.dropped
-        pushed = self.frame_ring.pushed
-        if dropped:
-            logging.warning('Frame ring dropped %d of %d frames this acquisition (consumer could not keep up)', dropped, pushed)
-        else:
-            logging.info('Frame ring handed over %d frames, none dropped', pushed)
+        if thread is not None:
+            self._frame_ring_stop.set()
+            # Wake it out of frame_ring.wait() immediately instead of waiting out the
+            # poll timeout.
+            self.frame_ring.event.set()
+            thread.join(timeout=self.FRAME_RING_DRAIN_TIMEOUT_S)
+            if thread.is_alive():
+                logging.warning('Frame-ring consumer did not stop within %.0fs', self.FRAME_RING_DRAIN_TIMEOUT_S)
+            dropped = self.frame_ring.dropped
+            pushed = self.frame_ring.pushed
+            if dropped:
+                logging.warning('Frame ring dropped %d of %d frames this acquisition (consumer could not keep up)', dropped, pushed)
+            else:
+                logging.info('Frame ring handed over %d frames, none dropped', pushed)
+        # Unconditional: the writer is started lazily on the first frame, so it
+        # can outlive a consumer that was never started or was already stopped.
+        self._stop_zarr_writer()
 
     def _try_write_frame_to_zarr(self, image: np.ndarray, metadata: dict):
         """Write a single frame to the multiDstack zarr array, bypassing the vis queue.
@@ -926,15 +950,72 @@ class napariHandler:
                 current_val = metadata['Axes'][dim_name]
                 slice_id = int(np.searchsorted(uniqueEntriesAllDims[dim_name], current_val))
                 sliceTuple += (int(slice_id),)
-            zarr_data[sliceTuple + (slice(None), slice(None))] = np.ascontiguousarray(image)
+            destination = sliceTuple + (slice(None), slice(None))
+            image = np.ascontiguousarray(image)
+            # Hand the write to the storage writer thread rather than doing it
+            # here (T-D3). A zarr write is disk-bound -- ~9 ms for a 1024x1024
+            # uint16 frame, ~4x that on a 2048x2048 sensor -- and this is the
+            # frame-ring consumer, which also feeds the display and every RT
+            # analysis queue. Charging disk latency to that thread capped the
+            # whole frame path at roughly 110 fps and, once the camera outran it,
+            # the overwrite-oldest ring silently shed frames that MMCORE_PLUS has
+            # no NDTiff store to recover. The writer's own queue absorbs the
+            # burst and pushes back instead of dropping.
+            writer = self._get_zarr_writer(zarr_data)
+            if writer is not None:
+                writer.submit(destination, image)
+            else:
+                zarr_data[destination] = image
             # Tell the display path this exact frame is in the store already, and
             # at which index (T-D2). The metadata dict travels with the frame
             # through the vis queue and metadata_refactor mutates in place, so the
-            # key survives the GUI thread's second call to it. Stamped only after
-            # the write succeeds: on failure the display path must still write.
+            # key survives the GUI thread's second call to it. Stamped once the
+            # frame is committed to the writer, which retries nothing but does
+            # report every failure -- a frame it drops is logged loudly rather
+            # than quietly re-written by the GUI thread a full second later.
             metadata[ZARR_WRITTEN_SLICE_KEY] = sliceTuple
         except Exception as exc:
             logging.debug('_try_write_frame_to_zarr skipped: %s', exc)
+
+    def _get_zarr_writer(self, zarr_data):
+        """The writer thread for `zarr_data`, started on first use.
+
+        Started lazily rather than alongside the ring consumer because the store
+        can be created from either of two places and neither is the consumer's
+        start: `_preinit_mda_zarr` builds it before `run_mda()` on the fast-camera
+        path, and the display path builds it on the first displayed frame
+        otherwise. Keying on the array object means a store re-created mid-session
+        (the dimension-mismatch branch does exactly that) retires the old writer
+        instead of writing into a discarded array.
+        """
+        writer = self._zarr_writer
+        if writer is not None and writer.array is zarr_data and writer.is_running:
+            return writer
+        self._stop_zarr_writer()
+        try:
+            label = getattr(self, 'liveOrMda', 'acq')
+            writer = ZarrFrameWriter(zarr_data, name=f'GladosZarrWriter-{label}')
+            writer.start()
+        except Exception:
+            logging.exception('Could not start the zarr writer; writing inline instead')
+            return None
+        self._zarr_writer = writer
+        return writer
+
+    def _stop_zarr_writer(self):
+        """Drain and stop the writer. Idempotent.
+
+        Must run before anything reads the store back (the finalisation pass) and
+        before the layer's TemporaryDirectory can be released underneath it.
+        """
+        writer = self._zarr_writer
+        self._zarr_writer = None
+        if writer is None:
+            return
+        try:
+            writer.close()
+        except Exception:
+            logging.exception('Stopping the zarr writer failed')
 
     def _preinit_mda_zarr(self, shared_data) -> bool:
         """Pre-create the zarr backing store before run_mda() fires.

@@ -144,6 +144,39 @@ the first update frame refreshes, because there `add_image()` gets a zarr store 
 still all zeros and limits fitted at creation mean nothing. Tests:
 `tests/test_contrast_throttle.py`.
 
+That store is created **uncompressed, one frame per chunk, via
+`zarr.create_array`** (T-D3). `zarr.open` cannot set compression at all on zarr 3.1.0
+— it rejects `compressor` ("cannot be used for arrays with zarr_format 3") *and*
+`compressors` (unexpected keyword) — so the helper uses `create_array`. Both choices
+are measured, not assumed (1024x1024 uint16 frames): dropping Zstd on a scratch store
+that gets deleted anyway writes at ~9.1 ms/frame against ~12.8 ms and serves a slice
+back to napari in ~2.8 ms against ~7.9 ms, for ~17% more bytes. Multi-frame chunks
+were **rejected**: napari paints a multiDstack layer by reading one slice out of this
+same array, so chunk size is on the display path, and even with perfectly batched
+whole-chunk writes 8-/32-frame chunks were slower to write *and* 5-17x slower to read.
+The cost of that decision is one file per frame (see `claude_issues.md`).
+
+The zarr write itself runs on a **dedicated writer thread**,
+`GUI/frame_writer.py`'s `ZarrFrameWriter` (T-D3). `_try_write_frame_to_zarr` computes
+the slice index and calls `writer.submit(destination, image)`; the writer's thread does
+the disk work. It differs from `FrameRing` on both axes deliberately: its queue is
+bounded **by bytes** (`DEFAULT_MEMORY_BUDGET_BYTES`, 256 MB, so the depth adapts to
+frame size) and it applies **backpressure** rather than overwriting the oldest — a
+stale display frame is worthless, but a dropped storage frame is lost data, and on
+`MMCORE_PLUS` there is no NDTiff store to recover it from. `submit` blocks with a
+timeout (`DEFAULT_SUBMIT_TIMEOUT_S`, 5 s) so a wedged disk cannot make an acquisition
+uncancellable; on timeout the frame is counted and logged loudly. The writer is
+started lazily on the first frame (keyed on the array object, so a re-created store
+retires the old writer) and drained by `_stop_zarr_writer()`, which
+`_stop_frame_ring_consumer` calls **after** joining the ring consumer — that ordering
+matters, since the consumer is what submits, and the finalisation pass must not read
+the store with writes still in flight. Simulated against the real ring at 30/60/120
+fps with 2.1 MB frames, this takes the consumer thread (which also feeds display and
+every RT-analysis queue) from ~33-41 ms blocked per frame to ~0.05 ms, with no frames
+lost. It absorbs *bursts*, not a sustained overrun — `max_depth` and
+`blocked_seconds` in the teardown log are what distinguish the two. Tests:
+`tests/test_frame_writer.py`, `tests/test_zarr_single_writer.py`.
+
 Each frame reaches that store **once** (T-D2). The acquisition-side writer
 (`_try_write_frame_to_zarr`, on the frame-ring consumer thread) stamps the frame's
 metadata dict with `napariGlados.ZARR_WRITTEN_SLICE_KEY` = the slice tuple it wrote,
