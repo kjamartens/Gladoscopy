@@ -1504,3 +1504,52 @@ returning an empty string.
 manual check (two back-to-back MDAs, first layer still rendering; temp dirs cleaned
 on exit) was **not** performed: no hardware, and no CLI path drives an MDA
 unattended.
+
+---
+
+## 2026-09-09 — T-D1: `dtype` is a required argument, and the display path passes the frame's own
+
+**The bug is real on this pin.** Verified directly against the installed zarr
+3.1.0: `zarr.open(path, shape=..., chunks=...)` with no `dtype=` returns a
+**float64** array. The display-path fallback in `_napariUpdateLive_locked` did
+exactly that, so whenever it won the race against `_preinit_mda_zarr` (which
+always passed a dtype), every uint16 camera frame was upcast on write — 4x the
+bytes through the compressor and on disk, and napari's contrast fast path
+defeated.
+
+**One helper, `dtype` required rather than defaulted.** `_create_mda_zarr` is a
+module-level function next to `_get_cached_dimensions`, not a `napariHandler`
+method, because one of its two callers (`_napariUpdateLive_locked`) is
+module-level itself. `dtype` has no default: a defaulted parameter is how the
+float64 array got created in the first place, so a future third call site should
+be made to state its dtype rather than be allowed to inherit a silent one. The
+helper also absorbs the two bookkeeping lines both sites already shared —
+registering into `mdaZarrData[layer_name]` and resetting `allMDAslicesRendered`
+— and owns the `new_zarr_temp_dir` call, keeping T-D7's store ownership in one
+place too.
+
+**The display path passes `latestImage.dtype`, not a fresh camera probe.** The
+task said "derive dtype from the camera", and `_preinit_mda_zarr` does that via
+the new `_camera_dtype()` helper (`getBytesPerPixel() <= 1 → uint8, else
+uint16`) because it runs before any frame exists. The display fallback has the
+frame in hand, so it uses the frame's own dtype instead — which *is* the camera
+dtype, obtained without a `core.*` call from the GUI thread (threading invariant
+1, and the reason T-B2 exists). It is also strictly the safer of the two: the
+store's dtype then cannot disagree with the data being written into it, whatever
+the frame turns out to be.
+
+**`_camera_dtype` falls back rather than raising.** uint16 on any failure, at
+DEBUG. Its only caller is already inside `_preinit_mda_zarr`'s try/except, which
+returns False and lets the display-path fallback create the store instead — but
+a pre-init that dies on a missing core would silently take away the fast-camera
+race fix, and uint16 is right for every camera this codebase has run.
+
+**Chunking and compression untouched**, as the task requires — one chunk per
+frame plane, default compressor. T-D3 changes both.
+
+**Verification.** `pytest -q` — 450 passed (5 new in
+`tests/test_mda_zarr_store_creation.py`, pinning the requested dtype, the
+never-float64 regression, store registration + temp-dir ownership, and both
+`_camera_dtype` branches). The manual check (run a multiDstack MDA, confirm the
+on-disk dtype and a non-washed-out image) was **not** performed: no hardware or
+demo backend available in this environment.

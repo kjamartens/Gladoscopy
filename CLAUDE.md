@@ -113,6 +113,17 @@ its store (`''` for a root array), not a location — the real directory is
 (zarr 3.x `TypeError: Unsupported type for store_like`). Both traps were live bugs
 (T-D6). Tests: `tests/test_mda_acquisition_data.py`.
 
+The multiDstack display zarr has exactly one creation site,
+`napariGlados._create_mda_zarr(shared_data, layer_name, shape, h, w, dtype)` — called
+by both `_preinit_mda_zarr` (pre-acquisition, dtype from `_camera_dtype()`:
+`getBytesPerPixel() <= 1` → uint8 else uint16) and the display-path fallback in
+`_napariUpdateLive_locked` (dtype from the frame in hand, so no `core.*` call on the
+GUI thread). `dtype` is deliberately **required**, not defaulted: `zarr.open()` with
+no `dtype=` yields a **float64** array on zarr 3.1.0, which is how every uint16 frame
+used to get upcast on write (T-D1). The helper also registers the array into
+`mdaZarrData[layer_name]`, resets `allMDAslicesRendered`, and owns the
+`new_zarr_temp_dir` call. Tests: `tests/test_mda_zarr_store_creation.py`.
+
 Every scratch store lives in a `tempfile.TemporaryDirectory` whose *object* is the
 store's lifetime — its finalizer `rmtree`s the directory. `Shared_data` owns them
 all: `new_zarr_temp_dir(layer_name)` / `release_zarr_temp_dir(layer_name)` over the

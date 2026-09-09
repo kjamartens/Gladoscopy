@@ -179,7 +179,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 ### Tier D — Storage
 
-- [ ] **T-D1** One store-creation site with an explicit dtype — M, no deps
+- [x] **T-D1** One store-creation site with an explicit dtype — M, no deps
 - [ ] **T-D2** Stop writing every frame to zarr twice — S, needs D1
 - [ ] **T-D3** Writer thread with amortized chunks — **L**, needs A7, D1
 - [ ] **T-D4** Delete the O(N*M) backfill pass — M, needs D3

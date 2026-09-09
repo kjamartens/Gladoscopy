@@ -104,6 +104,51 @@ def _get_cached_dimensions(shared_data):
     return cached[1]
 
 
+def _camera_dtype(shared_data):
+    """numpy dtype of one camera pixel (uint8 for 8-bit cameras, else uint16).
+
+    Falls back to uint16 -- the common case -- if the core cannot be asked.
+    """
+    try:
+        bytes_per_pixel = shared_data.MILcore.core.getBytesPerPixel()
+        return np.uint8 if bytes_per_pixel <= 1 else np.uint16
+    except Exception as exc:
+        logging.debug('_camera_dtype: falling back to uint16 (%s)', exc)
+        return np.uint16
+
+
+def _create_mda_zarr(shared_data, layer_name, shape, h, w, dtype):
+    """Create the multiDstack display store for `layer_name` and register it.
+
+    The single creation site for `shared_data.mdaZarrData` (T-D1). It used to
+    have two, and they disagreed: the display-path fallback called `zarr.open()`
+    with no `dtype=`, which on zarr 3.x yields a **float64** array, so every
+    uint16 camera frame was upcast on write -- 4x the bytes through the
+    compressor and on disk, and napari's contrast fast path defeated. Which
+    array you ended up with was a race between the two sites.
+
+    `dtype` is therefore required, not defaulted. `shape` is the acquisition's
+    non-image dimensions; `h`/`w` are appended as the frame plane. The
+    TemporaryDirectory backing the store is owned by shared_data, keyed by layer
+    name, so it is not GC'd (and the directory deleted) while zarr is still
+    writing or a layer still renders it (T-D7).
+    """
+    import zarr
+    shape = list(shape)
+    tmpdir = shared_data.new_zarr_temp_dir(layer_name)
+    array = zarr.open(
+        str(tmpdir.name),
+        shape=shape + [h, w],
+        chunks=tuple([1] * len(shape) + [h, w]),
+        dtype=dtype,
+    )
+    shared_data.mdaZarrData[layer_name] = array
+    shared_data.allMDAslicesRendered = {}
+    logging.debug('_create_mda_zarr: layer=%s shape=%s dtype=%s',
+                  layer_name, shape + [h, w], np.dtype(dtype))
+    return array
+
+
 def _get_contrast_frame_counters(shared_data):
     """Per-layer-name frame counters backing the throttled auto-contrast
     refresh (see _maybe_refresh_contrast). Lazily initialized on shared_data,
@@ -390,17 +435,12 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     # started (MMCORE_PLUS fast acquisitions). Reuse it so frameReady writes
                     # are not lost.
                     if shared_data.mdaZarrData.get(layerName) is None:
-                        import zarr
-                        # shared_data owns the TemporaryDirectory object, keyed by
-                        # layer name, so it is not GC'd (and the directory deleted)
-                        # while zarr is still writing or a layer still renders it.
-                        _tmpdir = shared_data.new_zarr_temp_dir(layerName)
-                        shared_data.mdaZarrData[layerName] = zarr.open(
-                                str(_tmpdir.name),
-                                shape = shape+[latestImage.shape[0],latestImage.shape[1]],
-                                chunks = tuple([1] * len(shape) + [latestImage.shape[0],latestImage.shape[1]]),
-                                )
-                        shared_data.allMDAslicesRendered = {}
+                        # One creation site, one explicit dtype (T-D1). The frame
+                        # in hand carries the camera's own dtype, so use it rather
+                        # than asking the core from the GUI thread.
+                        _create_mda_zarr(shared_data, layerName, shape,
+                                         latestImage.shape[0], latestImage.shape[1],
+                                         latestImage.dtype)
                         #Seed position 0 with the current frame
                         shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
                     
@@ -851,19 +891,8 @@ class napariHandler:
                 _get_cached_dimensions(shared_data)
             h = int(self.shared_data.MILcore.core.getImageHeight())
             w = int(self.shared_data.MILcore.core.getImageWidth())
-            bytes_per_pixel = self.shared_data.MILcore.core.getBytesPerPixel()
-            dtype = np.uint8 if bytes_per_pixel <= 1 else np.uint16
-            shape = n_entries_in_dims
-            import zarr
-            _tmpdir = shared_data.new_zarr_temp_dir(layerName)
-            shared_data.mdaZarrData[layerName] = zarr.open(
-                str(_tmpdir.name),
-                shape=shape + [h, w],
-                chunks=tuple([1] * len(shape) + [h, w]),
-                dtype=dtype,
-            )
-            shared_data.allMDAslicesRendered = {}
-            logging.debug('_preinit_mda_zarr: shape=%s dtype=%s', shape + [h, w], dtype)
+            dtype = _camera_dtype(self.shared_data)
+            _create_mda_zarr(shared_data, layerName, n_entries_in_dims, h, w, dtype)
             return True
         except Exception as exc:
             logging.warning('_preinit_mda_zarr failed: %s', exc)
