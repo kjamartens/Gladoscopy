@@ -607,6 +607,17 @@ def main():
             logging.exception('Failed to terminate RT-analysis subprocesses on quit')
     app.aboutToQuit.connect(_terminate_rt_subprocesses)
 
+    # Same reason, for scratch stores: every multiDstack zarr array and the
+    # NDTiff scratch dataset live in a tempfile.TemporaryDirectory, and the
+    # os._exit(0) below runs no finalizers -- so without this each session
+    # leaves its stores behind in the OS temp directory (T-D7).
+    def _remove_temp_stores():
+        try:
+            shared_data.release_all_temp_dirs()
+        except Exception:
+            logging.exception('Failed to remove temporary stores on quit')
+    app.aboutToQuit.connect(_remove_temp_stores)
+
     # Force-exit to avoid the ~10-20 s hang + STATUS_ACCESS_VIOLATION that
     # happens when pyjavaz bridge threads or the CMMCorePlus destructor try
     # to clean up after the Qt event loop ends.  The OS reclaims all resources,

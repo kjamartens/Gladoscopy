@@ -34,6 +34,8 @@ Add longer context underneath as a nested bullet if needed.
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
 - **pymmcore-plus MDA zarr storage** — crashes fixed (MDA_acq_finished and pyMMCdataset.finish() no longer crash); actual zarr storage for pymmcore-plus MDA + advanced-settings storage selector deferred to a future plan step.
+- **MMCORE_PLUS MDA ignores the user's Storage folder** — recorded by T-D7, deliberately not fixed there. On the `MMCORE_PLUS` branch of `run_MILCoreAcquisition_worker`, `savefolder`/`savename` are computed from `_mdaModeSaveLoc` and then never read, and the `pyMMCdataset` NDTiff store created in `PyMMCore_startedAcqCallback` is never written to — frames go into a `TemporaryDirectory`-backed zarr array instead, which `release_all_temp_dirs()` deletes on quit. So an MMCORE_PLUS MDA saves nothing where the user asked, and `_acquisition_storage_path()` reports a temp directory. Overlaps the existing "pymmcore-plus MDA zarr storage" item above; both want the same fix. Deferral rationale in `claude_decisions.md` (2026-09-09, T-D7).
+
 - **Napari layer thumbnail loading icon** — user suggested ignoring. The icon spins on every `layer.data =` assignment; suppressing it requires internal napari APIs. Defer unless user flags as priority.
 
 

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, fields
 from typing import Optional
@@ -271,7 +272,11 @@ class Shared_data(QObject):
         self.pyMMCdataset = None
         self.activeMDAobject = None
         self.mdaZarrData = {}
-        self.mdaZarrTempDir = None  # holds the TemporaryDirectory object for the active zarr store
+        # See the "Temporary store directories" methods below. Keyed by napari
+        # layer name, one TemporaryDirectory per zarr store; the NDTiff scratch
+        # dataset gets its own slot.
+        self.mdaZarrTempDirs = {}
+        self.pyMMCdatasetTempDir = None
         self.nodzInstance = None
         self.backend='JAVA' #JAVA or Python, if running headlessly
         self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.
@@ -357,6 +362,75 @@ class Shared_data(QObject):
 
     def unregister_perf_thread_label(self, native_id) -> None:
         self.perfThreadLabels.pop(native_id, None)
+
+    # --- Temporary store directories (T-D7) ------------------------------
+    # Every on-disk scratch store -- the multiDstack zarr arrays, the
+    # MMCORE_PLUS NDTiff dataset -- lives in a `tempfile.TemporaryDirectory`
+    # whose *object* has to outlive every reader of that directory: its
+    # finalizer rmtree()s the directory, so dropping the last reference to it
+    # deletes a store a napari layer may still be rendering from.
+
+    @staticmethod
+    def _discard_temp_dir(tmpdir) -> None:
+        """Delete one temporary store now, tolerating a locked directory."""
+        if tmpdir is None:
+            return
+        try:
+            tmpdir.cleanup()
+        except OSError as exc:
+            # Windows keeps zarr chunk files open until the layer releases them.
+            # cleanUpTemporaryFiles and the OS temp sweep are the backstop; a
+            # store we could not remove is not worth failing a teardown over.
+            logging.debug(
+                'Could not remove temporary store %s: %s',
+                getattr(tmpdir, 'name', '?'), exc,
+            )
+
+    def new_zarr_temp_dir(self, layer_name: str):
+        """Create, and take ownership of, `layer_name`'s zarr store directory.
+
+        Per layer, not one shared slot. Both zarr-creation sites in
+        `napariGlados` used to assign the same `mdaZarrTempDir` attribute, so
+        starting a second MDA dropped the first `TemporaryDirectory` and its
+        finalizer rmtree'd a store the first acquisition's napari layer was
+        still pointing at.
+
+        Re-creating a store for the *same* layer does replace it: that layer's
+        old array is being discarded anyway (see the dimension-mismatch branch
+        in `_napariUpdateLive_locked`).
+        """
+        self._discard_temp_dir(self.mdaZarrTempDirs.pop(layer_name, None))
+        tmpdir = tempfile.TemporaryDirectory()
+        self.mdaZarrTempDirs[layer_name] = tmpdir
+        return tmpdir
+
+    def release_zarr_temp_dir(self, layer_name: str) -> None:
+        """Drop `layer_name`'s store. Call when the layer itself goes away."""
+        self._discard_temp_dir(self.mdaZarrTempDirs.pop(layer_name, None))
+
+    def new_pyMMC_temp_dir(self):
+        """Create, and take ownership of, the NDTiff scratch dataset's directory.
+
+        `PyMMCore_startedAcqCallback` used to write
+        `str(tempfile.TemporaryDirectory().name)` -- constructing the object and
+        immediately discarding it, so the finalizer deleted the directory and
+        the `os.makedirs` right below recreated it with no owner at all.
+        """
+        self._discard_temp_dir(self.pyMMCdatasetTempDir)
+        self.pyMMCdatasetTempDir = tempfile.TemporaryDirectory()
+        return self.pyMMCdatasetTempDir
+
+    def release_all_temp_dirs(self) -> None:
+        """Remove every scratch store this session created.
+
+        Wired to `aboutToQuit` in `GUI_napari.main()`: the app deliberately
+        force-exits via `os._exit(0)`, so no finalizer would otherwise run and
+        every store would be left behind in the OS temp directory.
+        """
+        for layer_name in list(self.mdaZarrTempDirs):
+            self.release_zarr_temp_dir(layer_name)
+        self._discard_temp_dir(self.pyMMCdatasetTempDir)
+        self.pyMMCdatasetTempDir = None
     
     @property
     def _mdaModeParams(self):

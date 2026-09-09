@@ -1435,3 +1435,72 @@ MMCORE_PLUS, confirm `self.data` is not None and a Nodz node receives an array)
 was **not** performed: no hardware, and no CLI path drives an MDA unattended.
 `test_reopening_the_array_would_still_fail` pins the underlying zarr behaviour so
 a future zarr bump that changes it is caught here.
+
+---
+
+## 2026-09-09 — T-D7: two of the four flagged sites were dead code; ownership moved onto `Shared_data`
+
+**What was actually broken.** T-D7 pointed at four `TemporaryDirectory()` sites.
+Only two are live:
+
+- `napariGlados.PyMMCore_startedAcqCallback` — `str(tempfile.TemporaryDirectory().name)`.
+  The object is discarded on the same line, its finalizer deletes the directory,
+  and the `os.makedirs` two lines down recreates it with no cleanup owner. Real.
+- `shared_data.mdaZarrTempDir`, one slot written by two sites
+  (`_napariUpdateLive_locked`'s multiDstack branch and `_preinit_mda_zarr`). Real,
+  and the worse of the two: a second MDA drops the first `TemporaryDirectory`,
+  whose finalizer rmtree's a store the first acquisition's napari layer is still
+  rendering from.
+
+The other two are **not** bugs and were left alone:
+
+- `MMcontrols.py:739` — the task named this one, but it sits in a `## Testing area`
+  block *after* an unconditional `return` at line 730. The whole block (through the
+  second `pyMMCdataset` creation at line 788) is unreachable. Fixing dead code
+  would only make it look maintained.
+- `autonomous/executor.py:1266` — `tempDir` is a local that stays alive across the
+  `image.save()` and the Slack upload that read from it. Correct as written.
+
+**Where ownership went.** Onto `Shared_data`, as four methods
+(`new_zarr_temp_dir`, `release_zarr_temp_dir`, `new_pyMMC_temp_dir`,
+`release_all_temp_dirs`) over `mdaZarrTempDirs: dict[layer_name, TemporaryDirectory]`
+and a `pyMMCdatasetTempDir` slot. Chosen over the task's other suggestion ("tear
+down the layer when the store goes") because the causality runs the other way:
+`napariGlados` already knows exactly when a layer is discarded — the
+dimension-mismatch branch pops it from the viewer and nulls `mdaZarrData[layerName]`
+— so releasing the store *there* needs one line and no new teardown machinery.
+Keying by layer name also matches how `mdaZarrData` is already keyed, so the store
+and the array it backs now share a key and a lifetime. `napariGlados` no longer
+imports `tempfile` at all.
+
+Re-creating a store for the *same* layer deliberately replaces (and deletes) the
+old one: that layer's array is being thrown away in the same breath.
+
+**Cleanup on exit needed wiring, not just holding.** The app force-exits through
+`os._exit(0)` on `aboutToQuit` (see the "After-close hang" fix in
+`claude_issues.md`), which runs no finalizers — so holding the objects correctly
+would have meant *every* session leaks its stores into the OS temp directory.
+`release_all_temp_dirs()` is connected to `aboutToQuit` ahead of the `os._exit`,
+following the `_terminate_rt_subprocesses` precedent right above it.
+`_discard_temp_dir` swallows `OSError` at DEBUG: Windows keeps zarr chunk files
+open until the layer releases them, and a store we cannot remove is not worth
+failing a teardown over — `cleanUpTemporaryFiles` and the OS temp sweep stay the
+backstop, as the task required.
+
+**Item 3 recorded, not fixed.** The MMCORE_PLUS branch ignores the user's Storage
+folder entirely: `savefolder`/`savename` are computed and never read, and the
+`pyMMCdataset` NDTiff store is created and never written to. Noted as a comment at
+the branch itself and as an entry in `claude_issues.md` under *Scheduled /
+deferred*. **The deferral is safe** because it is not a regression this task
+introduces — the behaviour predates the plan, it duplicates the pre-existing
+"pymmcore-plus MDA zarr storage" deferred item, and T-D7 explicitly says not to fix
+it here. It is now strictly more visible than before: T-D6's
+`_acquisition_storage_path()` reports the temp directory rather than silently
+returning an empty string.
+
+**Verification.** `pytest -q` — 445 passed (9 new in
+`tests/test_temp_store_lifetimes.py`, covering both regressions with an explicit
+`gc.collect()` to force the finalizer the old code depended on by accident). The
+manual check (two back-to-back MDAs, first layer still rendering; temp dirs cleaned
+on exit) was **not** performed: no hardware, and no CLI path drives an MDA
+unattended.

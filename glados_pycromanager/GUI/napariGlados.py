@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import sys
-import tempfile
 import time
 from collections import deque
 from threading import Event, RLock, Thread, get_native_id
@@ -372,6 +371,10 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                                 logging.debug(f'found layer to remove: {tLayer} at {tLayerIndex}')
                                 napariViewer.layers.pop(tLayerIndex)
                                 shared_data.mdaZarrData[layerName] = None
+                                # The layer that referenced this store is gone, so
+                                # the store can go with it (T-D7). A fresh one is
+                                # created just below.
+                                shared_data.release_zarr_temp_dir(layerName)
                                 liveImageLayer = False
                                 break
         
@@ -388,10 +391,10 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     # are not lost.
                     if shared_data.mdaZarrData.get(layerName) is None:
                         import zarr
-                        # Hold the TemporaryDirectory object in shared_data so it is not
-                        # GC'd (and the directory deleted) while zarr is still writing.
-                        _tmpdir = tempfile.TemporaryDirectory()
-                        shared_data.mdaZarrTempDir = _tmpdir
+                        # shared_data owns the TemporaryDirectory object, keyed by
+                        # layer name, so it is not GC'd (and the directory deleted)
+                        # while zarr is still writing or a layer still renders it.
+                        _tmpdir = shared_data.new_zarr_temp_dir(layerName)
                         shared_data.mdaZarrData[layerName] = zarr.open(
                                 str(_tmpdir.name),
                                 shape = shape+[latestImage.shape[0],latestImage.shape[1]],
@@ -852,8 +855,7 @@ class napariHandler:
             dtype = np.uint8 if bytes_per_pixel <= 1 else np.uint16
             shape = n_entries_in_dims
             import zarr
-            _tmpdir = tempfile.TemporaryDirectory()
-            shared_data.mdaZarrTempDir = _tmpdir
+            _tmpdir = shared_data.new_zarr_temp_dir(layerName)
             shared_data.mdaZarrData[layerName] = zarr.open(
                 str(_tmpdir.name),
                 shape=shape + [h, w],
@@ -878,7 +880,10 @@ class napariHandler:
     def PyMMCore_startedAcqCallback(self,sequence: useq.MDASequence):
         logging.info("MDA sequence started")
         #Create a new NDTiff stack to store images in - for sure used for internal logic - possibly adding something later for secondary saving?
-        tempdataloc = os.path.join(str(tempfile.TemporaryDirectory().name),'ndtiff_data')
+        #shared_data owns the TemporaryDirectory: constructing one inline and
+        #keeping only .name let its finalizer delete the directory immediately,
+        #so the makedirs below recreated it with nothing owning its cleanup (T-D7).
+        tempdataloc = os.path.join(self.shared_data.new_pyMMC_temp_dir().name,'ndtiff_data')
         
         #if it doesn't exist, create it
         if not os.path.exists(tempdataloc):
@@ -1225,6 +1230,12 @@ class napariHandler:
                     if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
                         logging.info('Connected to PymmCore!')
                         acq=None
+                        #NOTE (T-D7): this branch ignores the user's Storage folder
+                        #entirely. savefolder/savename were computed above and are
+                        #never read here, and the pyMMCdataset NDTiff store created
+                        #in PyMMCore_startedAcqCallback is never written to -- the
+                        #frames go to a TemporaryDirectory-backed zarr array instead.
+                        #Recorded in claude_issues.md; deliberately out of scope here.
 
                         #Frame-ring consumer first — see the live-mode branch above. On the
                         #multiDstack path the consumer also writes every frame into zarr, where
