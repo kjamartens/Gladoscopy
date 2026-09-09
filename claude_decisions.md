@@ -1675,3 +1675,43 @@ dimension MDA, sliders track correctly, frame rate improves) was **not**
 performed: no hardware or demo backend in this environment. The event-count
 tests substitute for the re-slice-count half of that claim, not the frame-rate
 half.
+
+---
+
+## 2026-09-09 — T-D3/T-D4 paused for the user; Tier E taken out of order
+
+**Deviation from the recommended order**, recorded because section 3 puts Tier D
+before Tier E. T-D1 and T-D2 are done; **T-D3 and T-D4 are deliberately left
+open** and Tier E was started instead. Two reasons, both about verification
+rather than difficulty:
+
+1. **T-D3's acceptance criteria cannot be met in this environment.** Its
+   `Verify:` block requires a >=2000-frame MDA to confirm full slice coverage,
+   the drop in store file count, and an improved acquisition-thread frame rate.
+   There is no hardware and no demo backend here, so the task would be committed
+   on a green unit-test suite alone — and it is the plan's own **high**-risk,
+   architectural entry.
+2. **T-D4 is explicitly gated on T-D3 being verified** ("Don't delete this until
+   T-D3 is verified — the sleep is papering over a real race"), so it cannot
+   proceed either.
+
+**Two design questions in T-D3 need the user's call**, and both can make things
+slower if answered wrongly:
+
+- *Chunk size must be budgeted in bytes, not frames.* The task says "at least 8
+  to 32 frames per chunk". zarr reads a whole chunk to serve one slice, so with
+  a 2048x2048 uint16 camera (8 MB/frame) a 32-frame chunk means a **268 MB read
+  to display one frame**. A frame-count rule is only safe on small sensors; a
+  byte budget (say 32-64 MB/chunk, clamped to 1..32 frames) adapts, but that is
+  a policy choice, not a mechanical edit.
+- *Multi-frame chunks require batched writes to be a win at all.* Writing frames
+  one at a time into a multi-frame chunk makes zarr do read-modify-write per
+  frame — decode the chunk, insert one plane, re-encode, rewrite — which is
+  strictly **worse** than today's one-chunk-per-frame. The writer thread must
+  accumulate a whole chunk's worth of frames along the chunked axis and flush
+  them contiguously, which also assumes frames arrive in order on that axis.
+
+Tier E is explicitly "in any order" once Tier D is reached, is low-risk, and
+needs no hardware, so E1 and E2 were taken meanwhile. **T-D3 remains the next
+task in the recommended order** and should be resumed before E3/E4 once the
+above is settled.
