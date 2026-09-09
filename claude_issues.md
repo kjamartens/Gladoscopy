@@ -33,6 +33,13 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
+- **A JVM is loaded even on the MMCORE_PLUS backend** — `hs_err_pid49512.log` shows 17
+  JavaThreads in a session whose selected backend was pymmcore-plus, which needs no Java
+  at all. Most likely the module-level `pycromanager` imports in `napariGlados.py`. It
+  costs startup time and memory, and it is what made the `-X faulthandler` crash possible
+  (see `claude_decisions.md`, 2026-09-09). Not urgent now that faulthandler is off by
+  default, but worth removing.
+
 - **multiDstack scratch store creates one file per frame** — T-D3 kept `chunks=[1,...,1,h,w]`
   deliberately (multi-frame chunks were measured slower to write *and* to read, since napari
   paints the layer by reading a slice out of this same array — see `claude_decisions.md`,

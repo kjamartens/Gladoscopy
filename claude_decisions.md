@@ -1913,3 +1913,88 @@ lands, reads it back at the acquisition's shape (4 t x 2 c x 3 z), and checks
 unaffected by the writer. **That demo camera makes MMCORE_PLUS acquisition
 testable without hardware in general** — worth remembering for the tasks whose
 manual checks have been skipped so far.
+
+---
+
+## 2026-09-09 — The back-to-back MDA "crash" is faulthandler vs the JVM, not the writer
+
+**The Python traceback was a red herring.** The first dump showed the MDA runner
+thread inside `yaozarrs._create_zarr3_group` -> `pathlib.write_text`, which reads
+as "the new OME-Zarr output handler crashed". It did not: faulthandler dumps
+*every* thread, and that was simply where that thread happened to be.
+
+`hs_err_pid49512.log` names the actual fault: `Current thread: JavaThread
+"Thread-2" [_thread_in_Java]`, `Problematic frame: C [python313.dll+0x39af70]
+dump_frame+0xc0`, with the native stack `dump_frame` <- `dump_traceback` <-
+`_Py_DumpTracebackThreads` <- `faulthandler_dump_traceback` <-
+`faulthandler_exc_handler` <- `ntdll`.
+
+So: a JIT-compiled Java frame raised `EXCEPTION_ACCESS_VIOLATION`. **HotSpot does
+that on purpose** — implicit null checks and safepoint polling are implemented as
+deliberate faults it catches itself. Python's faulthandler installs a Windows
+exception handler that runs first, prints "Windows fatal exception: access
+violation" and dumps all threads, then continues; the log shows ~22 of those
+survived. The fatal one is the dump itself, walking the frames of threads that
+are still executing.
+
+**Fix is in the `Makefile`, not the code:** `make run` / `run-dev` passed
+`-X faulthandler`. That is now opt-in (`FAULTHANDLER=1`), with the reasoning
+written at the targets so it does not get re-added.
+
+**Honest about the correlation.** This is a pre-existing hazard, not something
+T-D3 or the storage work introduced — but it is fair that the user hit it now:
+`run_mda(output=...)` means a real writer thread, a real OME-Zarr group creation
+and steady disk IO where previously there was almost nothing, and more concurrent
+work raises the chance of a dump landing on a running frame. The trigger changed;
+the bug did not.
+
+**Left open:** a JVM is in the process at all while the selected backend is
+`MMCORE_PLUS` (17 JavaThreads in the dump). Nothing in the pymmcore-plus path
+needs one, so something — most likely the module-level `pycromanager` imports in
+`napariGlados` — is starting it. Worth removing, but it is a separate
+investigation and the crash is fixed without it. Logged in `claude_issues.md`.
+
+---
+
+## 2026-09-09 — T-F3: the ~300 ms live display was the log widget
+
+**Measured, not guessed.** `LoggerWidget.update_log_content` runs on the GUI
+thread on a ~500 ms `QTimer` and did `setPlainText(log_file.read())` — re-reading
+the entire log and rebuilding the entire `QPlainTextEdit` document layout. Cost
+scales with session length, not with new text. Benchmarked against the real
+widget:
+
+| log size | lines | current `setPlainText` | tail-append |
+|---|---|---|---|
+| 0.3 MB | 2 000 | 13.1 ms | 3.6 ms |
+| 1.4 MB | 10 000 | 30.1 ms | 2.1 ms |
+| 7.2 MB | 50 000 | **145.1 ms** | 2.1 ms |
+| 21.8 MB | 150 000 | **486.4 ms** | 2.7 ms |
+
+Every 500 ms. A 1000-frame MDA logs steadily, so the GUI thread was spending a
+large fraction of its time rebuilding a log view while napari's frame updates
+queued behind it — which is exactly the reported "live view updates only every
+~300 ms". Threading invariant 1 says the GUI thread must not block on I/O; this
+was the largest violation still standing.
+
+**Fix:** keep a byte offset, `seek()` to it, append only the delta. A tick with
+nothing new returns after a single `os.path.getsize`, which is most ticks.
+`tell()` after the read rather than the size sampled before it, since the file
+can grow mid-read and a byte count is not a character count.
+`setMaximumBlockCount(5000)` bounds the document — without it the widget's own
+layout cost still grows all session. The appended text is right-stripped of its
+trailing newline, because `appendPlainText` adds its own block and the newline
+would compound one blank line per tick. Truncation/rotation (size < offset)
+clears and restarts rather than seeking past the end and freezing the view for
+the rest of the run.
+
+**Deliberately not changed:** the widget still scrolls to the end on every
+update. Only auto-scrolling when the user is already at the bottom is better
+behaviour for a log viewer, but it is a behaviour change and the reported problem
+was purely performance.
+
+**Still on the GUI thread, not addressed here** (all have their own Tier F
+tasks): `NodeItem.paint()` loading a PNG from disk per repaint (T-F1/T-F2), the
+1 Hz nodz timer (T-F4), and `checkNodesOnErrors` on mouse-move (T-F5). The log
+widget was by far the largest and is the one that matches the reported symptom;
+if the display is still not smooth, those are next.

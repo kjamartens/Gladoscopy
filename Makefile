@@ -121,12 +121,31 @@ bandit:  ## Run bandit security scan (informational).
 	$(BANDIT) -r $(PACKAGE) --exclude $(PACKAGE)/GUI/nodz
 
 # ── Run ───────────────────────────────────────────────────────────────────────
+# NOTE: do NOT add `-X faulthandler` to these targets. Whenever a JVM is in the
+# process -- any pycromanager/Micro-Manager path, and it can be loaded even when
+# the selected backend is pymmcore-plus -- HotSpot deliberately raises
+# EXCEPTION_ACCESS_VIOLATION as part of normal operation (implicit null checks,
+# safepoint polling) and handles them itself. faulthandler's Windows exception
+# handler runs first, prints "Windows fatal exception: access violation" for each
+# one, and dumps every thread's traceback; eventually one of those dumps walks
+# the frames of a thread that is still running and faults inside `dump_frame`,
+# which kills the process for real. That was diagnosed from `hs_err_pid*.log`:
+# "Current thread: JavaThread ... [_thread_in_Java]", "Problematic frame:
+# python313.dll dump_frame", reached via `faulthandler_exc_handler`.
+# Set FAULTHANDLER=1 to opt back in when debugging a genuine native crash in a
+# JVM-free run.
+FAULTHANDLER ?= 0
+ifeq ($(FAULTHANDLER),1)
+PYFLAGS := -X faulthandler
+else
+PYFLAGS :=
+endif
 
 run:  ## Launch the standalone Glados-PycroManager GUI.
-	$(PYTHON) -X faulthandler -m glados_pycromanager.GUI.GUI_napari
+	$(PYTHON) $(PYFLAGS) -m glados_pycromanager.GUI.GUI_napari
 
 run-dev: dev  ## Editable install (dev extras) then launch Glados — one-shot dev workflow.
-	$(PYTHON) -X faulthandler -m glados_pycromanager.GUI.GUI_napari
+	$(PYTHON) $(PYFLAGS) -m glados_pycromanager.GUI.GUI_napari
 
 run-prod: .venv ensure-uv  ## Non-editable (production) install then launch Glados — simulate end-user install.
 	$(PIP) .

@@ -199,7 +199,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 - [ ] **T-F1** Memoize `findIconFolder()` and cache pixmaps — M, no deps
 - [ ] **T-F2** Stop loading a PNG from disk inside `NodeItem.paint()` — M, needs F1
-- [ ] **T-F3** Tail-follow the log file instead of re-reading it — M, no deps
+- [x] **T-F3** Tail-follow the log file instead of re-reading it — M, no deps
 - [ ] **T-F4** Coalesce the nodz timer and gate it on acquisition — M, needs F1
 - [ ] **T-F5** Fix O(nodes x scene items) `checkNodesOnErrors` on mouse-move — M, needs F1
 - [ ] **T-F6** Debounce resize rebuilds; fix the `QScrollArea` leak — M, no deps

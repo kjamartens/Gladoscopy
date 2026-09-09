@@ -311,6 +311,27 @@ Keep it on new top-level modules under `glados_pycromanager/` if they're meant t
 
 ### Logging
 
+`LoggerWidget` (in `GUI/FlowChart_dockWidgets.py`) **tail-follows** its log file
+(T-F3): it keeps a byte offset, `seek()`s to it and appends only the delta, and a tick
+with nothing new costs a single `stat`. It used to re-read the whole file and
+`setPlainText` it every ~500 ms **on the GUI thread**, rebuilding the entire document
+layout at a cost that grew with session length — measured 13 ms at a 0.3 MB log, 145 ms
+at 7 MB, 486 ms at 22 MB, per tick — which starved napari's frame updates during a long
+acquisition. The document is capped at `MAX_LOG_BLOCKS` (5000 lines); the full log stays
+on disk. Truncation or rotation resets the offset. Tests:
+`tests/test_logger_widget_tail.py`.
+
+**Never launch this app with `-X faulthandler` while a JVM can be in the process.**
+HotSpot deliberately raises `EXCEPTION_ACCESS_VIOLATION` during normal operation
+(implicit null checks, safepoint polling) and handles them itself; faulthandler's Windows
+exception handler runs first, prints "Windows fatal exception: access violation" for each
+and dumps every thread, and eventually faults inside `dump_frame` walking a running
+thread's frames — killing the process for real. Diagnosed from `hs_err_pid*.log`
+("Current thread: JavaThread ... [_thread_in_Java]", "Problematic frame: python313.dll
+dump_frame", reached via `faulthandler_exc_handler`). The `Makefile` run targets
+therefore default to no faulthandler; `make run FAULTHANDLER=1` opts back in for a
+JVM-free debugging run.
+
 `utils.set_up_logger()` writes log files into the AppData directory. Both stdlib `logging` and `loguru` are used; prefer `logging` for consistency with existing code.
 
 RT-analysis nodes that opt into subprocess isolation (`"__runInSubprocess__": True`, see `AnalysisProcess_customFunction` in `GUI/AnalysisClass.py`) run in a `multiprocessing` `spawn`ed child process with its own, separately-initialized root logger — `set_up_logger()`/`set_log_level()` in the main process cannot reach it. The child is given the Adv.-settings log level at spawn time (`log_level` kwarg into `_subprocess_analysis_worker`, applied via `logging.basicConfig`); a later change to the Adv. settings while such a node is running is pushed live through the same `control_in_queue` used for Performance Mode profiling (`__set_log_level__:<LEVEL>` sentinel, sent via `AnalysisProcess_customFunction.update_log_level()`, called from every entry in `shared_data.RTAnalysisQueuesThreads` in `utils.py`'s advanced-settings save handler).
