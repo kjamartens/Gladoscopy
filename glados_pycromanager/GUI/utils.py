@@ -384,7 +384,10 @@ def inputFromFunction(functionname):
         
         input_arr = []
         for i in looprange:
-            input_arr.append(functionMetadata[list(functionMetadata.keys())[i]]["input"])
+            #Not every node declares "input" (e.g. LaserAdjustment) - that used
+            #to be a KeyError here, which crashed anything binding a node's
+            #visualise kwargs (the only path that does not skipInput).
+            input_arr.append(functionMetadata[list(functionMetadata.keys())[i]].get("input", []))
     except AttributeError:
         input_arr = []
         return f"No __function_metadata__ in {functionname}"
@@ -408,7 +411,7 @@ def outputFromFunction(functionname):
         
         output_arr = []
         for i in looprange:
-            output_arr.append(functionMetadata[list(functionMetadata.keys())[i]]["output"])
+            output_arr.append(functionMetadata[list(functionMetadata.keys())[i]].get("output", []))
     except AttributeError:
         output_arr = []
         return f"No __function_metadata__ in {functionname}"
@@ -2801,11 +2804,108 @@ def _rtAnalysisClassName(rt_analysis_info):
     return None
 
 
+#region T-G4: bound node dispatch
+# `realTimeAnalysis_run` used to rebuild a Python call expression from the kwarg
+# dict and eval() it on *every analysed frame* (~13us to compile() alone, plus
+# metadata re-derivation, plus a currentData rescan with per-key split('#')), and
+# `realTimeAnalysis_visualisation` did the same thing on the GUI thread. None of
+# it can change unless the user edits the node's parameter panel -- which is what
+# `BoundNode.signature` detects, cheaply, instead of re-deriving unconditionally.
+_BOUND_NODE_ATTR = '_glados_bound_node'
+
+# Escape hatch: GLADOS_RT_EVAL_DISPATCH=1 restores the pre-T-G4 eval() dispatch
+# for run/end/visualise. Read once, at import.
+RT_ANALYSIS_USE_EVAL_DISPATCH = os.environ.get('GLADOS_RT_EVAL_DISPATCH', '') == '1'
+
+
+@dataclass(frozen=True)
+class BoundNode:
+    """Everything needed to call one RT-analysis node, resolved once.
+
+    Deliberately a dataclass and not a dict/list/tuple: it is stashed on the node
+    instance, and `AnalysisClass._subprocess_analysis_worker` pickles every
+    plain-data attribute of that instance back to the parent after each frame
+    (`_SUBPROCESS_SNAPSHOT_TYPES`). A dataclass is not in that tuple, so this
+    never crosses the process boundary.
+    """
+    className: str
+    metadata: dict
+    kwargs: 'BoundKwargs'                 # run() and end() take the same set
+    visualisationKwargs: 'BoundKwargs'
+    signature: tuple
+
+
+def _rtAnalysisBindingSignature(rt_analysis_info):
+    """Cheap fingerprint of the panel values a binding was built from.
+
+    A user editing a kwarg while the analysis runs mutates `currentData` in
+    place, and that used to take effect on the next frame because every frame
+    re-derived everything. Comparing this tuple keeps that behaviour at a
+    fraction of the cost.
+    """
+    return tuple(rt_analysis_info.items())
+
+
+def buildBoundNode(rt_analysis_info, nodzInfo=None, signature=None):
+    """Resolve a node's kwargs (run/end and visualise) once, from `currentData`."""
+    className = _rtAnalysisClassName(rt_analysis_info)
+    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None
+
+    methodName, names, values, modes = _rtAnalysisKwargsFromCurrentData(className, rt_analysis_info)
+    kwargs = bindKwargsFromGUIFunction(methodName or className, names, values,
+                                       methodKwargTypes=modes, skipInput=True,
+                                       nodzInfo=nodzInfo, nodeDict=nodeDict)
+
+    #The visualisation path deliberately keeps its looser matching and its
+    #skipInput=False - see Documentation/rt_analysis_parameters.md section 4.
+    visMethodName, visNames, visValues, visModes = _rtAnalysisKwargsFromCurrentData(
+        className, rt_analysis_info, modeAware=False)
+    try:
+        visualisationKwargs = bindKwargsFromGUIFunction(
+            visMethodName or className, visNames, visValues, methodKwargTypes=visModes,
+            nodzInfo=nodzInfo, nodeDict=nodeDict)
+    except Exception:  # noqa: BLE001
+        #A node that never visualises must not fail to *run* because of a quirk
+        #in the metadata its visualise binding reads. The error surfaces from
+        #realTimeAnalysis_visualisation instead, where it is actionable.
+        logging.debug('Could not bind visualisation kwargs for %s', className, exc_info=True)
+        visualisationKwargs = None
+
+    #kwargs is None when a required kwarg has no value; the error is raised at
+    #the call site, which knows whether it is run/end or visualise that failed.
+    return BoundNode(
+        className=className,
+        metadata=_nodeFunctionEntry(className) or {},
+        kwargs=kwargs,
+        visualisationKwargs=visualisationKwargs,
+        signature=_rtAnalysisBindingSignature(rt_analysis_info) if signature is None else signature,
+    )
+
+
+def _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo=None):
+    """Return the node's BoundNode, rebuilding it only if the panel changed."""
+    signature = _rtAnalysisBindingSignature(rt_analysis_info)
+    bound = getattr(RT_analysis_object, _BOUND_NODE_ATTR, None)
+    if bound is not None:
+        try:
+            if bound.signature == signature:
+                return bound
+        except Exception:  # noqa: BLE001 - an exotic unequal-comparable value just rebinds
+            logging.debug('RT-analysis binding signature could not be compared, rebinding', exc_info=True)
+        logging.debug('RT-analysis parameters changed, rebinding %s', getattr(bound, 'className', '?'))
+    bound = buildBoundNode(rt_analysis_info, nodzInfo=nodzInfo, signature=signature)
+    try:
+        setattr(RT_analysis_object, _BOUND_NODE_ATTR, bound)
+    except (AttributeError, TypeError):
+        #A node using __slots__ cannot carry the binding; it just rebinds per call.
+        logging.debug('Could not cache the binding on %r', type(RT_analysis_object))
+    return bound
+#endregion
+
+
 def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
     #Get the classname from rt_analysis_info
     className = _rtAnalysisClassName(rt_analysis_info)
-
-    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None
 
     #Bind the node's kwargs once, here, with each value coerced to the type its
     #__function_metadata__ declares (T-G2). This used to build a Python call
@@ -2813,68 +2913,77 @@ def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
     #maxFrame='100')") that dispatch_from_eval_text then re-parsed with ast and
     #eval'ed argument-by-argument, which is also why every value reached the node
     #as a string regardless of its declared type.
-    methodName, names, values, modes = _rtAnalysisKwargsFromCurrentData(className, rt_analysis_info)
-    boundKwargs = bindKwargsFromGUIFunction(methodName or className, names, values,
-                                            methodKwargTypes=modes, skipInput=True,
-                                            nodzInfo=nodzInfo, nodeDict=nodeDict)
-    if boundKwargs is None:
+    bound = buildBoundNode(rt_analysis_info, nodzInfo=nodzInfo)
+    if bound.kwargs is None:
         raise NodeDispatchError(
             f"Cannot start RT-analysis node {className!r}: its required kwargs are incomplete"
         )
 
     from glados_pycromanager.autonomous import registry as _registry
-    return _registry.dispatch(className, core=core, **boundKwargs.resolve())
+    RT_analysis_object = _registry.dispatch(className, core=core, **bound.kwargs.resolve())
+    try:
+        setattr(RT_analysis_object, _BOUND_NODE_ATTR, bound)
+    except (AttributeError, TypeError):
+        logging.debug('Could not cache the binding on %r', type(RT_analysis_object))
+    return RT_analysis_object
 
 
 def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
-    #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
-    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
-        if function[0] == functionDispName:
-            className = function[1]
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','vshared_data','v3')
+    if RT_ANALYSIS_USE_EVAL_DISPATCH:
+        return _realTimeAnalysis_run_viaEval(RT_analysis_object, rt_analysis_info, v1, v2, vshared_data, v3, nodzInfo)
+    bound = _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo)
+    if bound.kwargs is None:
+        raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
+    return RT_analysis_object.run(v1, v2, vshared_data, v3, **bound.kwargs.resolve())
 
-    if nodzInfo is not None:
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
-    else:
-        nodeDict = None
-        
-    #And run the .run function:
-    result = eval("RT_analysis_object" + evalText) #type:ignore
-
-    return result
 
 def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None):
-    #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
-    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
-        if function[0] == functionDispName:
-            className = function[1]
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_end(className,rt_analysis_info,'v1')
-    
-    if nodzInfo is not None:
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
-    else:
-        nodeDict = None
-        
-    #And run the .run function:
-    result = eval("RT_analysis_object" + evalText) #type:ignore
+    if RT_ANALYSIS_USE_EVAL_DISPATCH:
+        return _realTimeAnalysis_end_viaEval(RT_analysis_object, rt_analysis_info, v1, nodzInfo)
+    bound = _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo)
+    if bound.kwargs is None:
+        raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
+    return RT_analysis_object.end(v1, **bound.kwargs.resolve())
 
-    return result
 
 def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,v4):
-    #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
-    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
-        if function[0] == functionDispName:
-            className = function[1]
+    if RT_ANALYSIS_USE_EVAL_DISPATCH:
+        return _realTimeAnalysis_visualisation_viaEval(RT_analysis_object, rt_analysis_info, v1, v2, v3, v4)
+    logging.debug('Attempting to visualise RT Analysis')
+    bound = _boundNodeFor(RT_analysis_object, rt_analysis_info)
+    if bound.visualisationKwargs is None:
+        raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
+    result = RT_analysis_object.visualise(v1, v2, v3, v4, **bound.visualisationKwargs.resolve())
+    logging.debug(result)
+    return result
+
+
+#region T-G4 fallback: the pre-bind eval() dispatch, kept behind
+#GLADOS_RT_EVAL_DISPATCH=1 for one release so a node that misbehaves under bound
+#dispatch has an escape hatch that does not need a code change.
+def _realTimeAnalysis_run_viaEval(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
+    className = _rtAnalysisClassName(rt_analysis_info)
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','vshared_data','v3')
+    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None  # noqa: F841 - read by eval
+    return eval("RT_analysis_object" + evalText)  #type:ignore
+
+
+def _realTimeAnalysis_end_viaEval(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None):
+    className = _rtAnalysisClassName(rt_analysis_info)
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_end(className,rt_analysis_info,'v1')
+    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None  # noqa: F841 - read by eval
+    return eval("RT_analysis_object" + evalText)  #type:ignore
+
+
+def _realTimeAnalysis_visualisation_viaEval(RT_analysis_object,rt_analysis_info,v1,v2,v3,v4):
+    className = _rtAnalysisClassName(rt_analysis_info)
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3','v4')
     logging.debug('Attempting to visualise RT Analysis')
-    #And run the .visualise function:
-    result = eval("RT_analysis_object" + evalText) #type:ignore
+    result = eval("RT_analysis_object" + evalText)  #type:ignore
     logging.debug(result)
-
     return result
+#endregion
+
 
 def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
     indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])

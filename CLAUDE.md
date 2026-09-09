@@ -367,6 +367,34 @@ path that re-imports node modules. `reqKwargsFromFunction` /
 callers, but nothing per-frame goes through it. Tests:
 `tests/test_node_metadata_cache.py`.
 
+**RT-analysis dispatch is bound once, not eval'ed per frame (T-G2/T-G3/T-G4).**
+`realTimeAnalysis_run` used to rebuild a Python call expression from the kwarg
+dict and `eval()` it on *every analysed frame*, and
+`realTimeAnalysis_visualisation` did the same on the GUI thread. Now
+`utils.buildBoundNode(rt_analysis_info, nodzInfo)` resolves everything once into
+a frozen `BoundNode` (className, cached metadata entry, a `BoundKwargs` for
+run/end and one for visualise), stashed on the node instance as
+`_glados_bound_node`; `run`/`end`/`visualise` are plain method calls with
+`bound.kwargs.resolve()` splatted in. Three things to know before touching it:
+- **`BoundNode`/`BoundKwargs` must stay dataclasses**, never dict/list/tuple —
+  the subprocess worker pickles every attribute of the node instance matching
+  `AnalysisClass._SUBPROCESS_SNAPSHOT_TYPES` back to the parent *per frame*, and
+  a dict would ship the whole binding with it.
+- **Kwarg values are coerced to their declared metadata `"type"` at bind time**,
+  permissively (an unconvertible value stays a string, with a warning). Bool
+  kwargs therefore arrive as real bools — `LogScale="False"` used to be a truthy
+  string. Variable-mode kwargs are closures over the *container* mapping
+  (`nodzInfo.globalVariables` / the origin node's `variablesNodz`), re-read on
+  every `resolve()`.
+- **Editing a parameter mid-run still takes effect.** `currentData` is mutated in
+  place by the panel, so `_boundNodeFor` compares `BoundNode.signature`
+  (`tuple(rt_analysis_info.items())`) and rebinds when it differs.
+`GLADOS_RT_EVAL_DISPATCH=1` restores the pre-T-G4 eval path
+(`_realTimeAnalysis_*_viaEval`) for one release as an escape hatch. Details and
+the per-path Value/Variable/Advanced table live in
+`Documentation/rt_analysis_parameters.md` §4. Tests:
+`tests/test_rt_kwarg_binding.py`, `tests/test_bound_node_dispatch.py`.
+
 **Node kwarg widgets and the Value/Variable/Advanced switch:** how a node's
 `__function_metadata__()` kwargs turn into parameter-panel widgets, how the
 per-kwarg Value/Variable/Advanced switch (`name@Origin` / `{name@Origin}`

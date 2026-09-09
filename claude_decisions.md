@@ -2839,3 +2839,58 @@ node origin; `resolve()` allocates nothing when there are no Variable kwargs.
 **Affects:** `glados_pycromanager/GUI/utils.py`,
 `glados_pycromanager/Documentation/rt_analysis_parameters.md`,
 `tests/test_rt_kwarg_binding.py`.
+
+## 2026-09-09 — The binding lives on the node instance and is revalidated by a cheap signature  [T-G4]
+
+**Where the binding lives.** `BoundNode` is stashed on the RT-analysis object as
+`_glados_bound_node`, not in a module-level cache. That gives it exactly the right
+lifetime (it dies with the node), works unchanged in the subprocess child (which
+builds its own object via `init`), and gives the visualisation shadow instance in
+the parent process its own binding. `realTimeAnalysis_init` attaches it, so the
+first frame never rebinds.
+
+**It must not be a dict.** `_subprocess_analysis_worker` pickles every attribute
+of the node instance whose type is in `_SUBPROCESS_SNAPSHOT_TYPES` (which includes
+`dict`, `list`, `tuple`) back to the parent **after every frame**. A dataclass is
+not in that tuple, so the binding never crosses the boundary. A test pins this.
+
+**Rebinding: kept, not dropped.** The task's premise is that nothing can change
+while the analysis runs. That is true of the *metadata*, but not of the panel:
+`currentData` is mutated in place when the user edits a kwarg, and today's
+re-derive-everything-per-frame meant such an edit took effect on the next frame.
+Nodes really do read kwargs per frame (`RT_counter` in `visualise`, `EndAtFrame`
+via `self.kwargs`). Rather than silently making parameters init-only,
+`_boundNodeFor` compares `tuple(rt_analysis_info.items())` against the binding's
+stored signature — around 1 us for a panel-sized dict, against the ~27 us of
+`compile()` + metadata re-derivation + `split('#')` rescan it replaces — and
+rebinds only on a real change. Comparison failures (an exotic unequal-comparable
+value) fall back to rebinding.
+
+**Eval fallback kept behind an env var.** `GLADOS_RT_EVAL_DISPATCH=1` routes
+run/end/visualise back through `_realTimeAnalysis_*_viaEval`, preserved verbatim.
+The task explicitly permits this for one release, and it is the right call here:
+the manual "run all seven nodes in the GUI" check could not be performed in this
+environment. Remove it once a hardware session has exercised every node.
+
+**A real pre-existing bug fixed in passing.** `inputFromFunction` /
+`outputFromFunction` indexed `metadata["input"]` / `["output"]` directly, and
+`LaserAdjustment` declares neither — so binding its *visualise* kwargs (the only
+path that does not `skipInput`) raised `KeyError`. Both now use `.get(..., [])`.
+`buildBoundNode` additionally builds the visualisation binding inside a
+`try/except`: a node that never visualises must not fail to *run* because of a
+quirk in metadata only its visualise path reads. The error resurfaces from
+`realTimeAnalysis_visualisation`, where it is actionable.
+
+**Verification:** `tests/test_bound_node_dispatch.py` — direct method dispatch
+with typed kwargs for run/end/visualise; no rebuild across 50 frames; a mid-run
+parameter edit picked up; a Variable kwarg re-read per frame; the eval fallback
+still working (and still producing string kwargs, which is the T-G2 difference);
+`BoundNode` excluded from the subprocess snapshot; a `__slots__` node still
+dispatching. Plus a proxy for the manual check: **every shipped RT node** binds
+from its declared defaults with every required kwarg present at its declared
+type. The `@pytest.mark.slow` FFT test drives the real node end to end through
+init/run/end. `pytest -q` — 745 passed. The manual "run every node in the GUI"
+check could not be performed here; the env-var fallback exists for that reason.
+
+**Affects:** `glados_pycromanager/GUI/utils.py`, `CLAUDE.md`,
+`tests/test_bound_node_dispatch.py`.
