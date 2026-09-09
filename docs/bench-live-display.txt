@@ -82,3 +82,45 @@ mode=queue-depth render_cost_ms=5.0 arrival_interval_ms=2.0 duration_s=5.0
   maxlen=1 arrivals=2500 rendered=1000 dropped=1499 (60.0% dropped)
   maxlen=2 arrivals=2500 rendered=1000 dropped=1498 (59.9% dropped)
   maxlen=3 arrivals=2500 rendered=1000 dropped=1497 (59.9% dropped)
+
+=== bench_live_display run 2026-09-09 11:25:45 ===
+mode=layer-update frames_per_config=60
+  shape=(512, 512) contrast=auto existing_layers=0 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.822s steady_mean=15.202ms steady_p95=24.487ms (n=59)
+  shape=(1024, 1024) contrast=auto existing_layers=0 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.441s steady_mean=14.652ms steady_p95=26.046ms (n=59)
+  shape=(2048, 2048) contrast=auto existing_layers=0 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.301s steady_mean=16.890ms steady_p95=28.677ms (n=59)
+
+=== bench_live_display run 2026-09-09 11:26:58 ===
+mode=layer-update frames_per_config=60
+  shape=(512, 512) contrast=auto existing_layers=50 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=3.217s steady_mean=40.264ms steady_p95=58.366ms (n=59)
+  shape=(1024, 1024) contrast=auto existing_layers=50 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=1.926s steady_mean=44.228ms steady_p95=65.784ms (n=59)
+  shape=(2048, 2048) contrast=auto existing_layers=50 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=3.444s steady_mean=36.518ms steady_p95=56.306ms (n=59)
+
+=== bench_live_display run 2026-09-09 11:27:27 ===
+mode=layer-update frames_per_config=60
+  shape=(512, 512) contrast=auto existing_layers=10 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.835s steady_mean=21.782ms steady_p95=45.415ms (n=59)
+  shape=(1024, 1024) contrast=auto existing_layers=10 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.385s steady_mean=25.688ms steady_p95=42.663ms (n=59)
+  shape=(2048, 2048) contrast=auto existing_layers=10 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.394s steady_mean=26.124ms steady_p95=36.594ms (n=59)
+
+=== bench_live_display run 2026-09-09 11:28:05 ===
+mode=layer-update frames_per_config=60
+  shape=(512, 512) contrast=auto existing_layers=25 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=2.046s steady_mean=26.110ms steady_p95=37.836ms (n=59)
+  shape=(1024, 1024) contrast=auto existing_layers=25 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.582s steady_mean=32.548ms steady_p95=53.647ms (n=59)
+  shape=(2048, 2048) contrast=auto existing_layers=25 java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.573s steady_mean=34.284ms steady_p95=48.191ms (n=59)
+
+=== bench_live_display run 2026-09-09 11:29:19 ===
+mode=layer-update frames_per_config=60
+  shape=(512, 512) contrast=auto existing_layers=50 hidden=True java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=1.141s steady_mean=40.908ms steady_p95=58.090ms (n=59)
+  shape=(1024, 1024) contrast=auto existing_layers=50 hidden=True java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=1.382s steady_mean=36.801ms steady_p95=60.542ms (n=59)
+  shape=(2048, 2048) contrast=auto existing_layers=50 hidden=True java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=1.431s steady_mean=41.678ms steady_p95=60.754ms (n=59)
+
+=== bench_live_display run 2026-09-09 13:38:52 ===
+mode=layer-update frames_per_config=60
+  shape=(512, 512) contrast=auto existing_layers=0 hidden=False java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.587s steady_mean=19.466ms steady_p95=33.261ms (n=59)
+  shape=(1024, 1024) contrast=auto existing_layers=0 hidden=False java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.257s steady_mean=25.164ms steady_p95=45.878ms (n=59)
+  shape=(2048, 2048) contrast=auto existing_layers=0 hidden=False java_latency_ms=0.0 exposure_cached=False log_level=WARNING first_frame=0.290s steady_mean=18.491ms steady_p95=30.851ms (n=59)
+
+=== bench_live_display run 2026-09-09 13:38:53 ===
+mode=queue-depth render_cost_ms=5.0 arrival_interval_ms=2.0 duration_s=5.0
+  maxlen=1 arrivals=2500 rendered=1000 dropped=1499 (60.0% dropped)
+  maxlen=2 arrivals=2500 rendered=1000 dropped=1498 (59.9% dropped)
+  maxlen=3 arrivals=2500 rendered=1000 dropped=1497 (59.9% dropped)

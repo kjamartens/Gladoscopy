@@ -2164,3 +2164,57 @@ function level by `test_twenty_snaps_are_all_present_and_in_order`,
 (`addToExistingOrNewLayer` rewritten; new `_album_buffer_for`,
 `ALBUM_BUFFER_KEY`, `ALBUM_COUNT_KEY`, `ALBUM_INITIAL_CAPACITY`,
 `ALBUM_GROWTH_FACTOR`), `tests/test_album_layer_growth.py` (new).
+
+---
+
+## 2026-09-09 — T-E5: it is a slope, not a cliff, and hiding does not help  [T-E5]
+
+**The original write-up had two data points and read them as a cliff.**
+`docs/bench-live-display.md` recorded ~13-20 ms at 0 dummy layers and ~70-75 ms
+at 50, and called it a 4-5x regression of unclear shape. Adding 10 and 25 to the
+re-run shows it is simply **linear**: roughly `15.6 + 0.5 x N` ms, with all
+three intermediate points on the line. That changes what a mitigation has to
+achieve — there is no threshold to stay under, every layer costs the same
+~0.5 ms, so the only lever is the layer count itself.
+
+**It is per-layer bookkeeping, not pixel work.** The surcharge is identical at
+512x512 and 2048x2048. Worth stating explicitly because it means the cost does
+not shrink on smaller cameras or ROIs.
+
+**Tier E halved the absolute numbers without targeting this.** 15.6 ms / 40.3 ms
+now against 13-20 / 70-75 before — a 2.6x spread instead of 4-5x. None of
+T-E1 - T-E4 addresses layer count; the general per-frame work simply came down
+around it. Recorded so a future reader does not mistake this for a partial fix.
+
+**`visible = False` was measured and rejected as a mitigation.** This was the
+cheapest option on the table — hide inactive RT overlays, change nothing about
+layer lifecycle — so it was worth one measurement rather than an assumption. 50
+hidden layers cost 39.8 ms against 40.3 ms visible, i.e. within noise. The cost
+tracks layers that *exist*, not layers being rendered, so hiding buys nothing.
+`scripts/bench_live_display.py` gained `--hide-existing-layers` to make that
+result reproducible rather than a claim in prose.
+
+**Deferred to the issues inbox, not fixed.** T-E5 says explicitly not to attempt
+a napari-internals fix, and what is left after ruling out hiding is
+layer-lifecycle work in *our* code: an RT-analysis node reusing one overlay
+layer across runs, and/or an eviction cap on accumulated overlays. Both are
+real changes to node behaviour with their own correctness questions, well
+outside a measurement task. Filed under **Scheduled / deferred** in
+`claude_issues_and_features.md` rather than **Open issues**, because an open
+item there blocks all further plan progress on the next "continue" — and this
+is a known, quantified, non-regressing cost, not a bug barring the way. This
+entry is the justification that file's own rules require for that placement.
+
+**On the file name:** the task text says to log this in `claude_issues.md`. That
+file has been renamed to `claude_issues_and_features.md` in the working tree;
+the entry went to the current file. That rename is the user's own uncommitted
+change and was left uncommitted.
+
+**Verification.** `make bench-live-display` runs and appends;
+`docs/bench-live-display.txt` carries all five new runs. `pytest -q` — 541
+passed (the bench flag is additive and defaults off).
+
+**Affects:** `scripts/bench_live_display.py` (`--hide-existing-layers`),
+`docs/bench-live-display.md` (new "Re-measured after T-E1 - T-E4" section),
+`docs/bench-live-display.txt` (appended runs),
+`claude_issues_and_features.md` (deferred entry).

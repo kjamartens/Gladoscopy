@@ -111,6 +111,47 @@ deeper napari internals are out of easy reach). Flagged here for whoever
 picks up the next perf pass, especially since this app's RT-analysis dock
 is designed to accumulate many layers in a single session.
 
+#### Re-measured after T-E1 - T-E4 (2026-09-09) — the cliff shrinks but persists
+
+T-E5 re-ran the same case after the Tier E display work (batched
+`set_current_step`, throttled auto-contrast, once-per-acquisition layer-shape
+validation, in-place album growth). `steady_mean`, averaged over the three
+frame sizes:
+
+| dummy layers | steady_mean | vs. 0 layers |
+|---|---|---|
+| 0  | 15.6 ms | — |
+| 10 | 24.5 ms | +8.9 ms |
+| 25 | 31.0 ms | +15.4 ms |
+| 50 | 40.3 ms | +24.7 ms |
+| 50, all `visible = False` | 39.8 ms | +24.2 ms |
+
+Two things changed and one did not.
+
+**The absolute cliff is roughly half what it was.** The original numbers were
+~13-20 ms at 0 layers and ~70-75 ms at 50, a 4-5x regression; it is now
+~15.6 ms and ~40.3 ms, a 2.6x one. Tier E did not target this cost, so the
+improvement is the general per-frame work coming down around it, not a fix.
+
+**The growth is linear in layer count, not a cliff at all.** Roughly
+`15.6 + 0.5 x N` ms, and the three intermediate points fit it closely. The
+original write-up only had the two endpoints, which is why it read as a cliff.
+It is also **independent of frame size** — 512x512 and 2048x2048 pay the same
+per-layer surcharge — confirming this is per-layer bookkeeping, not pixel work.
+
+**Hiding the layers does not help.** `visible = False` on all 50 measured
+within noise of leaving them visible (39.8 vs 40.3 ms). The cost therefore
+scales with the number of layers that *exist*, not with the number being
+rendered — which removes the cheapest candidate mitigation ("hide inactive RT
+overlays") from consideration. `--hide-existing-layers` on
+`scripts/bench_live_display.py` is the flag that measures this.
+
+What remains is capping or recycling the layers themselves: an RT-analysis node
+that reuses one overlay layer instead of adding a new one per run, and/or an
+upper bound on accumulated overlay layers with oldest-first eviction. Logged in
+`claude_issues_and_features.md`; not attempted here, since T-E5 is explicitly a
+measurement task.
+
 ### 3 — Hot-path logging guards (implemented)
 
 Several `logging.debug(f"...")`/`logging.info(f"...")` calls in the

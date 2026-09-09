@@ -16,6 +16,7 @@ Usage:
     python -m scripts.bench_live_display --mode layer-update
     python -m scripts.bench_live_display --mode layer-update --contrast fixed
     python -m scripts.bench_live_display --mode layer-update --existing-layers 20
+    python -m scripts.bench_live_display --mode layer-update --existing-layers 50 --hide-existing-layers
     python -m scripts.bench_live_display --mode queue-depth
 
 Results are appended to docs/bench-live-display.txt.
@@ -113,12 +114,18 @@ def _build_fake_shared_data(existing_layers: int, java_latency_ms: float, exposu
     return shared_data
 
 
-def _make_viewer(existing_layers: int):
+def _make_viewer(existing_layers: int, hide_existing: bool = False):
     import napari
 
     viewer = napari.Viewer(show=True)
     for i in range(existing_layers):
-        viewer.add_image(np.zeros((8, 8), dtype=np.uint16), name=f"DummyLayer{i}")
+        layer = viewer.add_image(np.zeros((8, 8), dtype=np.uint16), name=f"DummyLayer{i}")
+        # `hide_existing` tests the cheapest of the candidate mitigations for the
+        # many-layers cliff (T-E5): if napari's per-frame cost scales with the
+        # number of *visible* layers rather than the number that merely exist,
+        # hiding inactive RT-analysis overlays fixes it with no layer-lifecycle
+        # management at all.
+        layer.visible = not hide_existing
     return viewer
 
 
@@ -130,6 +137,7 @@ def run_layer_update_benchmark(
     java_latency_ms: float,
     exposure_cached: bool,
     logging_level: int,
+    hide_existing_layers: bool = False,
 ) -> LayerUpdateResult:
     import glados_pycromanager.GUI.napariGlados as napariGlados
     from PyQt5.QtWidgets import QApplication
@@ -137,7 +145,7 @@ def run_layer_update_benchmark(
     logging.getLogger().setLevel(logging_level)
 
     app = QApplication.instance() or QApplication(sys.argv)
-    viewer = _make_viewer(existing_layers)
+    viewer = _make_viewer(existing_layers, hide_existing_layers)
     shared_data = _build_fake_shared_data(existing_layers, java_latency_ms, exposure_cached)
     napariGlados.shared_data = shared_data
 
@@ -184,6 +192,7 @@ def run_layer_update_benchmark(
     return LayerUpdateResult(
         label=(
             f"contrast={contrast} existing_layers={existing_layers} "
+            f"hidden={hide_existing_layers} "
             f"java_latency_ms={java_latency_ms} exposure_cached={exposure_cached} "
             f"log_level={logging.getLevelName(logging_level)}"
         ),
@@ -246,6 +255,7 @@ def main():
     parser.add_argument("--frames", type=int, default=60, help="Synthetic frames per configuration (layer-update mode)")
     parser.add_argument("--contrast", choices=["auto", "fixed"], default="auto")
     parser.add_argument("--existing-layers", type=int, default=0, help="Pre-populate the viewer with N dummy layers to exercise the layer-lookup scan cost")
+    parser.add_argument("--hide-existing-layers", action="store_true", help="Set visible=False on the dummy layers, to test whether the many-layers cost scales with visible or with existing layers")
     parser.add_argument("--java-latency-ms", type=float, default=0.0, help="Modeled PYCROMANAGER_JAVA get_exposure() round-trip cost (no real Java bridge in this dev environment; 0 = disabled)")
     parser.add_argument("--exposure-cached", action="store_true", help="Simulate a single-value exposure cache instead of calling get_exposure() every frame")
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING"], default="WARNING")
@@ -265,6 +275,7 @@ def main():
                 java_latency_ms=args.java_latency_ms,
                 exposure_cached=args.exposure_cached,
                 logging_level=getattr(logging, args.log_level),
+                hide_existing_layers=args.hide_existing_layers,
             )
             lines.append(
                 f"  shape={result.frame_shape} {result.label} "
