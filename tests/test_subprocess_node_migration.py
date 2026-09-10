@@ -198,3 +198,98 @@ def test_psmlm_without_axes_still_records_positions():
     table = node.fullSMLMlocs
     assert list(table.columns) == ["x_pos", "y_pos"]
     assert len(table) >= 1
+
+
+# --- the default, and what it may and may not capture ----------------------
+
+#: The node modules shipped in this repo. Scoped deliberately: the
+#: Real_Time_Analysis folder also picks up whatever the developer has dropped in
+#: it (and, at runtime, the AppData plugin folder), and those are exactly the
+#: nodes the default exists for.
+SHIPPED_NODE_MODULES = ('FFT_im', 'EndAtFrame', 'LaserAdjustment', 'RT_counter',
+                        'SharpnessValue', 'pSMLM', 'BioImageModelZoo')
+
+
+def test_every_shipped_node_declares_its_isolation_explicitly():
+    """The default only exists for user-dropped AppData nodes. A shipped node
+    relying on it would change behaviour silently the next time it flips."""
+    undeclared = [
+        name for name, _cls, entry in _rt_nodes()
+        if name.split('.')[0] in SHIPPED_NODE_MODULES
+        and '__runInSubprocess__' not in entry and '__needsLiveCore__' not in entry
+    ]
+    assert not undeclared, (
+        f"{undeclared} declare neither __runInSubprocess__ nor __needsLiveCore__, "
+        f"so they silently inherit RT_SUBPROCESS_ISOLATION_DEFAULT"
+    )
+
+
+def test_an_undeclared_node_reading_shared_data_is_not_isolated(monkeypatch):
+    """The safety net under the inverted default: an AppData node whose run()
+    dereferences the live context would raise AttributeError on its first frame
+    in a child process, so it is detected and left in-process."""
+    import sys
+    import types
+
+    from glados_pycromanager.autonomous import registry
+
+    module = types.ModuleType("ZZ_live_context_node")
+
+    class Node:
+        def run(self, image, metadata, shared_data, core, **kwargs):
+            return shared_data._mdaModeParams
+
+    module.Node = Node
+    monkeypatch.setitem(sys.modules, "ZZ_live_context_node", module)
+    monkeypatch.setitem(registry._METADATA_CACHE, "ZZ_live_context_node", {"Node": {}})
+    utils.clear_resolve_node_obj_cache()
+
+    assert utils.nodeRunNeedsLiveContext("ZZ_live_context_node.Node") is True
+    assert utils.realTimeAnalysis_runInSubprocess(_rt_info("ZZ_live_context_node.Node")) is False
+    utils.clear_resolve_node_obj_cache()
+
+
+def test_an_undeclared_frame_only_node_is_isolated(monkeypatch):
+    import sys
+    import types
+
+    from glados_pycromanager.autonomous import registry
+
+    module = types.ModuleType("ZZ_frame_only_node")
+
+    class Node:
+        def run(self, image, metadata, shared_data, core, **kwargs):
+            return image.mean()
+
+    module.Node = Node
+    monkeypatch.setitem(sys.modules, "ZZ_frame_only_node", module)
+    monkeypatch.setitem(registry._METADATA_CACHE, "ZZ_frame_only_node", {"Node": {}})
+    utils.clear_resolve_node_obj_cache()
+
+    assert utils.nodeRunNeedsLiveContext("ZZ_frame_only_node.Node") is False
+    assert utils.realTimeAnalysis_runInSubprocess(_rt_info("ZZ_frame_only_node.Node")) is True
+    utils.clear_resolve_node_obj_cache()
+
+
+def test_an_unreadable_node_is_left_in_process():
+    """Conservative on doubt: if the source cannot be inspected, do not isolate."""
+    assert utils.nodeRunNeedsLiveContext("ZZ_no_such_module.Node") is True
+    utils.clear_resolve_node_obj_cache()
+
+
+def test_the_default_is_now_isolation():
+    assert utils.RT_SUBPROCESS_ISOLATION_DEFAULT is True
+
+
+def test_the_global_kill_switch_still_overrides_the_default(monkeypatch):
+    from types import SimpleNamespace
+
+    from glados_pycromanager.autonomous import registry
+    from glados_pycromanager.GUI.sharedFunctions import Config
+
+    monkeypatch.setitem(registry._METADATA_CACHE, "ZZ_appdata_node2", {"Node": {}})
+    cfg = Config()
+    cfg.rt_analysis_config.subprocess_isolation = "False"
+    shared_data = SimpleNamespace(config=cfg)
+    assert utils.realTimeAnalysis_runInSubprocess(
+        _rt_info("ZZ_appdata_node2.Node"), shared_data) is False

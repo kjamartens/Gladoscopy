@@ -1,4 +1,5 @@
 #region imports
+import ast
 import collections
 import datetime
 import importlib
@@ -11,6 +12,7 @@ import os
 import re
 import shutil
 import sys
+import textwrap
 import time
 import warnings
 import webbrowser
@@ -140,6 +142,7 @@ def clear_resolve_node_obj_cache() -> None:
     removed, or replaced (see plugins/discovery.py's reload_all_node_modules).
     """
     _resolve_node_obj_module_cache.clear()
+    _NODE_LIVE_CONTEXT_CACHE.clear()
 
 
 def _resolve_node_obj(name_str):
@@ -3031,10 +3034,61 @@ def realTimeAnalysis_snapshotAttrs(rt_analysis_info):
     return list(entry.get('__snapshot_attrs__', []))
 
 
+#: Cache for :func:`nodeRunNeedsLiveContext`, keyed by dotted node name.
+#: Cleared with the stem->module cache, since it is derived from the class the
+#: stem resolves to.
+_NODE_LIVE_CONTEXT_CACHE: dict[str, bool] = {}
+
+#: Names that are None inside a subprocess-isolated node's run() (see
+#: AnalysisClass._subprocess_analysis_worker).
+_LIVE_CONTEXT_NAMES = ('core', 'shared_data', 'nodzInfo')
+
+
+def nodeRunNeedsLiveContext(functionname) -> bool:
+    """True when a node's ``run()`` dereferences the live in-process context.
+
+    Reads the node's own source and looks for attribute access on ``core``,
+    ``shared_data`` or ``nodzInfo`` — all three of which are ``None`` inside a
+    subprocess-isolated worker, so such a node would raise on its first frame.
+
+    This is the safety net under the inverted default (T-G10): a node that
+    declares neither ``__runInSubprocess__`` nor ``__needsLiveCore__`` is
+    third-party code dropped into the AppData plugin folder, and isolating it
+    blindly would break it with an ``AttributeError`` in another process.
+    Conservative on doubt: anything that cannot be resolved or parsed counts as
+    needing the live context. It cannot see indirection (a helper that
+    dereferences a passed-in ``shared_data``), which is why an explicit
+    ``__needsLiveCore__`` is still the supported way to say so.
+    """
+    dottedName = str(functionname)
+    cached = _NODE_LIVE_CONTEXT_CACHE.get(dottedName)
+    if cached is not None:
+        return cached
+    needsLiveContext = True
+    try:
+        runMethod = getattr(_resolve_node_obj(dottedName), 'run')
+        tree = ast.parse(textwrap.dedent(inspect.getsource(runMethod)))
+        needsLiveContext = any(
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in _LIVE_CONTEXT_NAMES
+            for node in ast.walk(tree)
+        )
+    except Exception as exc:  # noqa: BLE001 - unreadable source must not isolate blindly
+        logging.debug('Could not inspect %s.run() for live-context use (%s); '
+                      'assuming it needs the live context', dottedName, exc)
+    _NODE_LIVE_CONTEXT_CACHE[dottedName] = needsLiveContext
+    return needsLiveContext
+
+
 #: What a node gets when its `__function_metadata__` says nothing about
-#: subprocess isolation. T-G10 inverts this; a node that cannot be isolated
-#: declares `"__needsLiveCore__": True` instead of relying on the default.
-RT_SUBPROCESS_ISOLATION_DEFAULT = False
+#: subprocess isolation. Inverted by T-G10: a node that cannot be isolated
+#: declares `"__needsLiveCore__": True` rather than relying on the default.
+#: Every shipped node declares one or the other explicitly, so this decides
+#: only what a node dropped into the AppData plugin folder gets - and the
+#: safe answer for unknown third-party code holding the GIL is "its own
+#: process". The Adv.-settings kill switch turns it off globally.
+RT_SUBPROCESS_ISOLATION_DEFAULT = True
 
 
 def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool:
@@ -3075,7 +3129,21 @@ def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool
     functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
     if functionMetadata2.get('__needsLiveCore__', False):
         return False
-    return bool(functionMetadata2.get('__runInSubprocess__', RT_SUBPROCESS_ISOLATION_DEFAULT))
+    explicit = functionMetadata2.get('__runInSubprocess__')
+    if explicit is not None:
+        return bool(explicit)
+    if not RT_SUBPROCESS_ISOLATION_DEFAULT:
+        return False
+    #An undeclared node is third-party code (dropped into the AppData plugin
+    #folder). Before isolating it, check the one thing isolation actually
+    #breaks: a run() that dereferences core/shared_data/nodzInfo, all of which
+    #are None in the child.
+    dottedName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1]
+    if nodeRunNeedsLiveContext(dottedName):
+        logging.info("Not isolating %s: its run() reads the live core/shared_data/nodzInfo. "
+                     "Declare \"__needsLiveCore__\": True to make that explicit.", dottedName)
+        return False
+    return True
 
 class SmallWindow(QMainWindow):
     """ 

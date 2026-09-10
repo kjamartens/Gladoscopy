@@ -108,7 +108,10 @@ def test_needs_live_core_beats_an_explicit_opt_in(monkeypatch):
     assert utils.realTimeAnalysis_runInSubprocess(rt_info) is False
 
 
-def test_a_node_declaring_neither_gets_the_documented_default(monkeypatch):
+def test_a_node_declaring_neither_is_never_blindly_isolated(monkeypatch):
+    """An undeclared node reaches the default *and* the live-context scan (see
+    tests/test_subprocess_node_migration.py). This one's source cannot be
+    resolved at all, which counts as needing the live context."""
     from glados_pycromanager.autonomous import registry
 
     monkeypatch.setitem(registry._METADATA_CACHE, "ZZ_silent", {"Node": {}})
@@ -116,4 +119,5 @@ def test_a_node_declaring_neither_gets_the_documented_default(monkeypatch):
         "__selectedDropdownEntryRTAnalysis__": "Silent",
         "__displayNameFunctionNameMap__": [("Silent", "ZZ_silent.Node")],
     }
-    assert utils.realTimeAnalysis_runInSubprocess(rt_info) is utils.RT_SUBPROCESS_ISOLATION_DEFAULT
+    assert utils.realTimeAnalysis_runInSubprocess(rt_info) is False
+    utils.clear_resolve_node_obj_cache()

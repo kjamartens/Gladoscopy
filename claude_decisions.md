@@ -3126,3 +3126,66 @@ a node declaring neither getting the documented default. `pytest -q -m "not slow
 `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/LaserAdjustment.py`,
 `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/EndAtFrame.py`,
 `tests/test_rt_analysis_subprocess_flag.py`.
+
+## 2026-09-10 — The inverted default is gated by a live-context scan, not taken on trust  [T-G10]
+
+**The flip.** `RT_SUBPROCESS_ISOLATION_DEFAULT` is now True. Because every
+shipped node declares `__runInSubprocess__` or `__needsLiveCore__` explicitly
+(a test enforces that), the flip changes nothing for them — it decides only what
+a node dropped into the **AppData plugin folder** gets.
+
+**Which is exactly the risky case, so it is checked rather than assumed.**
+`nodeRunNeedsLiveContext(dottedName)` reads the node's own `run()` source and
+looks for attribute access on `core`, `shared_data` or `nodzInfo` — the three
+names that are `None` in the child. If it finds any, the node stays in-process
+and an INFO line says so and names the fix. Anything that cannot be resolved or
+parsed counts as needing the live context: conservative on doubt. The verdict is
+cached per node and cleared with the stem→module cache.
+
+This turned out to matter immediately: the working tree carries an untracked
+work-in-progress node, `pSMLM_image.py`, which does
+`utils.getDimensionsFromAcqData(shared_data._mdaModeParams)` in `run()`. Under a
+naive flip it would have been isolated and raised `AttributeError` on its first
+frame, in another process, on the user's own unfinished code. The scan catches it
+and leaves it in-process. **It was deliberately not edited** — it is untracked
+WIP; the user should add `"__needsLiveCore__": True` or the frame-Axes fallback
+`pSMLM` got.
+
+**The scan's limit, stated plainly:** it sees `shared_data.x`, not
+`helper(shared_data)` where the helper dereferences it. `__needsLiveCore__` is
+still the supported declaration; the scan is a net, not a replacement.
+
+**Migration outcome.** Isolated: `FFT_im` (already), `SharpnessValue`,
+`RT_counter`, `pSMLM`, `BioImageModelZoo`. In-process by declaration:
+`LaserAdjustment` (×2), `EndAtFrame`. Two nodes needed a code change to qualify,
+each in its own commit: `RT_counter` and `pSMLM` used `shared_data` only to learn
+the acquisition's axis *names*, which the frame's own `metadata['Axes']` already
+carries.
+
+**Costs accepted, and where to look first if they bite:**
+- `BioImageModelZoo` now loads its model twice — once in the child, once in the
+  main-process visualisation shadow. Recorded in its own metadata as the first
+  node to move back in-process if memory becomes a problem.
+- `pSMLM`'s accumulated `fullSMLMlocs` table now lives in the child and dies with
+  it. Nothing in the main process reads it today, in-process or isolated, so this
+  is latent either way — but a future "save the localizations" feature must go
+  through `__snapshot_attrs__` or the result queue, not `self`.
+- `subprocess_pool.py` pre-imports diplib only. It pre-spawns one blank child,
+  which the first claiming node takes, so with five isolated nodes the prewarm is
+  a coin flip. Generalising it to a `"__prewarm_imports__"` metadata key is the
+  obvious follow-up.
+
+**Verification:** `tests/test_subprocess_node_migration.py` (27 tests) — the
+static `__snapshot_attrs__` guard and the no-live-context guard across every
+isolated node, each node's routing, the shipped-nodes-declare-explicitly rule,
+the live-context scan in both directions plus its unreadable-source fallback, the
+kill switch, and per-node behaviour for `RT_counter` and `pSMLM`.
+`tests/test_rt_analysis_subprocess_flag.py`'s undeclared-node test was updated to
+the new contract. `pytest -q` — 810 passed. Running each node against real
+hardware could not be done here; the Adv.-settings kill switch reverts all of
+this at runtime, and `GLADOS_RT_EVAL_DISPATCH=1` covers the T-G4 half.
+
+**Affects:** `glados_pycromanager/GUI/utils.py`, five node modules under
+`AutonomousMicroscopy/Real_Time_Analysis/`, `CLAUDE.md`,
+`tests/test_subprocess_node_migration.py`,
+`tests/test_rt_analysis_subprocess_flag.py`.

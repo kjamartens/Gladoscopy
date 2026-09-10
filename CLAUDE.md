@@ -610,6 +610,33 @@ ours and the proxy thread is idle-blocked on `_out_queue.get()` for the whole
 round trip, so the same cap merely halved the sustained rate. Don't "unify" them.
 Tests: `tests/test_subprocess_proxy_duty_cycle.py`.
 
+**RT-analysis nodes are subprocess-isolated by default (T-G10).**
+`utils.realTimeAnalysis_runInSubprocess` answers in this order: the Adv.-settings
+global kill switch (`rt_analysis_config.subprocess_isolation`) →
+`"__needsLiveCore__": True` (never isolated) → an explicit
+`"__runInSubprocess__"` → `RT_SUBPROCESS_ISOLATION_DEFAULT` (now **True**).
+`__needsLiveCore__` covers `core`, `shared_data` *and* `nodzInfo`, since
+`_subprocess_analysis_worker` passes `None` for all three, and it wins over an
+explicit opt-in so a node cannot opt into an isolation it cannot survive.
+- Isolated today: `FFT_im`, `SharpnessValue`, `RT_counter`, `pSMLM`,
+  `BioImageModelZoo`. In-process by declaration: `LaserAdjustment` (drives the
+  laser DAC through the live core), `EndAtFrame` (aborts via
+  `shared_data._mdaModeAcqData`).
+- **Every shipped node declares one flag explicitly**; the default exists for
+  nodes dropped into the AppData plugin folder. Before isolating such a node,
+  `nodeRunNeedsLiveContext()` AST-scans its `run()` for attribute access on
+  `core`/`shared_data`/`nodzInfo` and leaves it in-process (logging why) if it
+  finds any — so an unknown third-party node cannot be silently broken by the
+  default. It cannot see indirection, so `__needsLiveCore__` remains the
+  supported way to say so.
+- Migrating a node means declaring `__snapshot_attrs__` too (T-G5), or its
+  overlay silently freezes. `tests/test_subprocess_node_migration.py` enforces
+  that statically: every attribute an isolated node's `visualise()` reads that
+  its `run()` writes must be declared.
+- `subprocess_pool.py` still pre-imports diplib only (it pre-spawns **one** blank
+  child, which the first claiming node takes). Generalising that to a
+  `"__prewarm_imports__"` metadata key matters more now that five nodes isolate.
+
 **Subprocess state snapshots are opt-in (T-G5).** `.visualise()` needs a live
 napari layer, so a subprocess-isolated node runs it against a *shadow* instance
 in the main process whose attributes are refreshed from the child after every

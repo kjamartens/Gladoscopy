@@ -224,7 +224,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-G7** Drop the duty-cycle sleep in the subprocess proxy — S, no deps
 - [x] **T-G8** Pass the dimension map as init context — M, no deps
 - [x] **T-G9** Fix the thread leak on RT-node stop — M, no deps
-- [ ] **T-G10** **(decision)** Invert the subprocess default — needs G5, G7 — **stop point**
+- [x] **T-G10** **(decision)** Invert the subprocess default — needs G5, G7 — *approved by the user 2026-09-10; flip gated by a live-context scan, see decisions*
 
 ### Tier H — MDA GUI
 
