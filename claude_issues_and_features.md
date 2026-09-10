@@ -1,4 +1,4 @@
-# claude_issues.md — issue inbox
+# claude_issues_and_features.md — issue/features inbox
 
 This file is the inbox for bugs, regressions, or follow-ups that must be
 fixed **before** further progress on `claude_project.md`.
@@ -27,39 +27,39 @@ Add longer context underneath as a nested bullet if needed.
 
 ---
 
-## Open issues
+## Open issues/features
+
+[] I want to have an option to have the full MM/pycromanager 'device property browser' implementation - i.e. a button (next/in the configurations panel) which allows me to open all the device properties in a separate window. This should be implemented for all microscope backends.
+[] RT methods ideally have their visualisation processed on a different core - right now, while visualisation is prepared, the visualisation (or something else, but looks as visualision) of the live view is hindered/hiccups.
+[] When the exposure time is changed and live mode is running, the live mode should restart with the new exposure time.
+[] Investigate whether the following is possible, and if so, implement as a new RT script: I want to do the pSMLM analysis on the fly, and show the localized spots on top of the image, as well as show a SR image next to it. Now I see a few issues. 1: there should be 2 layers created as far as i know, not sure if the plumbing can be updated to allow this. 2: ideally i want to show the pSMLM localization a little delayed compared to the raw data - i.e. lets say pSMLM analysis takes 2 ms, and i get a frame every 50 ms, I believe with my current updating, my pSMLM is always 1 frame behind. I would be perfectly happy to just have pSMLM-visualise show the 'old' frame with the overlaid localizations - but then it needs to create 3 layers I believe. Issue 3: With toggle grid-mode, i can have layers on top of each other, or side-by-side, but here i want a mix: i want live/pSMLM-'old'/pSMLM-'locs' overlaid, and then the pSMLM-SR to the side. If this is not possible with grid-mode, are there other options?
+[] Can we support RT analysis which has this stored in memory when a MDA is done, and then re-show it during scrubbing of the movie? I.e. with pSMLM-version, where it just shows circles now, i want to have a MDA and scrub through the movie, and show me what it analysed in those frames. Ideally, I want the scripts used for RT analyses to remain the same (or similar), and have all of this in glados back-end.
+
+[] **Flaky (rarely) under a full-suite run: `tests/test_perf_capture_subprocess_ipc.py::test_profiling_start_stop_round_trip_does_not_disturb_frames`** — failed once in a full `pytest -q` run on 2026-09-09, passed in isolation and on the immediately following full run. Its `out_queue.get(timeout=10)` calls have to cover a cold `spawn` that re-imports the whole package tree; under load from the other spawn-based tests that can exceed 10 s. Not a product bug. Fix by giving the first `get()` a longer, cold-start-sized timeout (the same distinction `AnalysisProcess_customFunction` already makes between its 30 s cold and 5 s warm timeouts), or by polling `proc.is_alive()` like `_get_or_fail_fast` in `test_analysis_process.py`.
+
 
 ---
 
 ## Scheduled / deferred (will be addressed by a specific plan phase)
 
-- **Live view during an MDA repaints only 2-3x/s on MMCORE_PLUS only** (256x256 @ ~5 ms
-  frametime, reported 2026-09-09, still open after T-E1/T-E2/T-F3) — scheduled as **T-E6**
-  in `claude_throughput_project.md`, sequenced after Tier E and Tier F because those touch
-  the same code. Confirmed by the user to be a *rate* problem, not display lag. Measured:
-  the scratch display store costs ~3.2 ms/frame at 256x256 (41 MB/s — per-file overhead,
-  one file per frame), so at a 5 ms frametime the writer thread uses ~64% of the frame
-  budget doing ~200 file creations/s. Chunking and sharding were re-measured at this frame
-  size and are 5-6x worse, so there is nothing to tune in zarr. Note the scratch store may
-  now be redundant entirely, since the MDA writes its real archive via
-  `run_mda(output=...)`.
-
-- **A JVM is loaded even on the MMCORE_PLUS backend** — `hs_err_pid49512.log` shows 17
-  JavaThreads in a session whose selected backend was pymmcore-plus, which needs no Java
-  at all. Most likely the module-level `pycromanager` imports in `napariGlados.py`. It
-  costs startup time and memory, and it is what made the `-X faulthandler` crash possible
-  (see `claude_decisions.md`, 2026-09-09). Not urgent now that faulthandler is off by
-  default, but worth removing.
-
-- **multiDstack scratch store creates one file per frame** — T-D3 kept `chunks=[1,...,1,h,w]`
-  deliberately (multi-frame chunks were measured slower to write *and* to read, since napari
-  paints the layer by reading a slice out of this same array — see `claude_decisions.md`,
-  2026-09-09). So a 20 000-frame MDA still makes 20 000 files in one temp directory, which is
-  slow to enumerate and to `rmtree` on NTFS. Not a throughput problem — it does not show up in
-  any of the write/read measurements — but it is the one part of T-D3's motivation left
-  unaddressed. zarr 3 **sharding** is the designed fix (chunk=1 frame keeps reads cheap,
-  shard=32 frames gives 1 file per 32); measured at 4.3 ms/slice read but 44 ms/frame write on
-  this machine, so it needs a batched whole-shard writer before it is worth taking.
+- **Per-frame display cost grows ~0.5 ms per napari layer that exists** (T-E5
+  measurement, `docs/bench-live-display.md` "Re-measured after T-E1 - T-E4").
+  Steady-state frame cost is roughly `15.6 + 0.5 x N` ms with N layers in the
+  viewer: 15.6 ms at 0, 40.3 ms at 50. It is independent of frame size, so it is
+  per-layer bookkeeping inside napari/Qt, not pixel work. This matters here
+  because the RT-analysis dock is *designed* to accumulate overlay layers over a
+  session.
+  - **Hiding does not work.** `visible = False` on all 50 layers measured within
+    noise of leaving them visible (39.8 vs 40.3 ms), so the cost scales with
+    layers that *exist*, not layers being rendered. The cheap mitigation is off
+    the table; measured with `bench_live_display --hide-existing-layers`.
+  - **Remaining options**, both requiring layer-lifecycle work rather than a
+    display-path change: (a) have each RT-analysis node reuse one overlay layer
+    across runs instead of adding a new one, and (b) cap the number of
+    accumulated overlay layers with oldest-first eviction.
+  - Deferred deliberately: T-E5 is a measurement task and says not to attempt a
+    fix. See `claude_decisions.md` (2026-09-09, T-E5) for why this is safe to
+    defer.
 
 - **Napari layer thumbnail loading icon** — user suggested ignoring. The icon spins on every `layer.data =` assignment; suppressing it requires internal napari APIs. Defer unless user flags as priority.
 

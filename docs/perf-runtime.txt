@@ -72,3 +72,225 @@ napariUpdateLive calls observed: 99
      2012    0.006    0.000    1.204    0.001 C:\Users\koen-\Documents\GitHub\Gladoscopy\.venv\Lib\site-packages\useq\_mda_sequence.py:525(__iter__)
 
 
+
+=== Runtime profile 2026-07-10 16:56:53 (10.46s sample, ended via timer, --auto-demo) ===
+napariUpdateLive calls observed: 148
+
+         2080962 function calls (2024445 primitive calls) in 10.224 seconds
+
+   Ordered by: cumulative time
+   List reduced from 4014 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  156/153    0.014    0.000   18.077    0.118 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_runner.py:604(_iter_exec_output)
+  154/152    0.021    0.000   12.357    0.081 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_runner.py:620(_advance)
+      152    0.007    0.000    9.970    0.066 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:305(exec_event)
+        1    0.000    0.000    8.584    8.584 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\superqt\utils\_qthreading.py:413(work)
+      152    0.011    0.000    8.255    0.054 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:740(exec_sequenced_event)
+      152    0.034    0.000    6.338    0.042 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:771(_exec_single_camera_sequence)
+ 1829/955    0.024    0.000    2.636    0.003 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\utils\events\event.py:772(_invoke_callback)
+ 2011/609    0.068    0.000    2.133    0.004 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\utils\events\event.py:685(__call__)
+    58/55    0.003    0.000    2.093    0.038 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\app\backends\_qt.py:691(event)
+    58/55    0.025    0.000    2.061    0.037 {function QtBaseCanvasBackend.event at 0x000001E536AE2200}
+   146/79    0.414    0.003    1.999    0.025 {function _QtMainWindow.event at 0x000001E5371F4180}
+ 1714/447    0.008    0.000    1.973    0.004 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\util\event.py:467(_invoke_callback)
+ 3009/765    0.038    0.000    1.904    0.002 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\util\event.py:402(__call__)
+       51    0.017    0.000    1.839    0.036 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\app\backends\_qt.py:995(paintGL)
+   146/79    0.014    0.000    1.801    0.023 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\_qt\qt_main_window.py:281(event)
+       51    0.002    0.000    1.354    0.027 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\scene\canvas.py:211(on_draw)
+       51    0.004    0.000    1.347    0.026 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\scene\canvas.py:281(_draw_scene)
+       51    0.003    0.000    1.323    0.026 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\_vispy\canvas.py:94(draw_visual)
+  421/319    0.003    0.000    1.313    0.004 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\scene\visuals.py:103(draw)
+       52    0.004    0.000    1.290    0.025 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\concurrent\futures\thread.py:54(run)
+      274    0.005    0.000    1.280    0.005 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\visuals\visual.py:502(draw)
+       51    0.008    0.000    1.173    0.023 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\components\_layer_slicer.py:270(_slice_layers)
+      152    0.024    0.000    1.132    0.007 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:887(_create_seqimg_payload_from_popped)
+        4    0.000    0.000    1.091    0.273 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\settings\_napari_settings.py:90(_save_dict)
+        4    0.000    0.000    1.091    0.273 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\settings\_base.py:420(_save_dict)
+
+
+
+=== Runtime profile 2026-07-10 17:08:03 (8.67s sample, ended via timer, --auto-demo) ===
+napariUpdateLive calls observed: 90
+
+         1294525 function calls (1262661 primitive calls) in 8.243 seconds
+
+   Ordered by: cumulative time
+   List reduced from 3578 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    98/96    0.006    0.000   10.725    0.112 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_runner.py:604(_iter_exec_output)
+ 1000/999    0.009    0.000    9.038    0.009 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_runner.py:620(_advance)
+        1    0.000    0.000    7.995    7.995 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\_qt\qt_main_window.py:1113(add_dock_widget)
+        1    0.000    0.000    7.933    7.933 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\_qt\qt_main_window.py:1267(_add_viewer_dock_widget)
+        1    0.010    0.010    7.294    7.294 {built-in method show}
+        2    0.000    0.000    7.283    3.641 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\napariGlados.py:1018(resizeEvent)
+        1    0.000    0.000    7.282    7.282 C:\GitHub\Gladoscopy\glados_pycromanager\Core\MDAGlados.py:1006(handleSizeChange)
+        1    0.000    0.000    7.282    7.282 C:\GitHub\Gladoscopy\glados_pycromanager\Core\MDAGlados.py:583(GUI_grid_width)
+        1    0.000    0.000    7.282    7.282 C:\GitHub\Gladoscopy\glados_pycromanager\Core\MDAGlados.py:1114(showOptionChanged)
+        1    0.003    0.003    7.282    7.282 C:\GitHub\Gladoscopy\glados_pycromanager\Core\MDAGlados.py:1157(updateGUIwidgets)
+        1    0.017    0.017    7.017    7.017 {processEvents}
+      2/1    0.000    0.000    6.997    6.997 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\superqt\utils\_qthreading.py:146(run)
+        1    0.000    0.000    6.997    6.997 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\superqt\utils\_qthreading.py:353(work)
+        1    0.000    0.000    6.996    6.996 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\napariGlados.py:612(run_MILCoreAcquisition_worker)
+      9/2    0.000    0.000    6.608    3.304 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\logging\handlers.py:1569(handle)
+      8/1    0.001    0.000    6.607    6.607 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\logging\handlers.py:1536(dequeue)
+      8/1    0.001    0.000    6.607    6.607 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\queue.py:177(get)
+     1000    0.038    0.000    6.453    0.006 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:305(exec_event)
+     1000    0.006    0.000    5.832    0.006 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:740(exec_sequenced_event)
+     1000    0.027    0.000    4.372    0.004 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:771(_exec_single_camera_sequence)
+       94    0.014    0.000    2.299    0.024 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\pymmcore_plus\mda\_engine.py:887(_create_seqimg_payload_from_popped)
+  726/237    0.006    0.000    2.168    0.009 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\util\event.py:467(_invoke_callback)
+    28/27    0.026    0.001    2.122    0.079 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\app\backends\_qt.py:691(event)
+ 1449/522    0.036    0.000    2.034    0.004 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\vispy\util\event.py:402(__call__)
+ 1229/642    0.019    0.000    1.914    0.003 C:\Users\kjamartens\.conda\envs\GladosEnv\Lib\site-packages\napari\utils\events\event.py:772(_invoke_callback)
+
+
+
+=== Runtime profile 2026-09-08 23:10:32 (12.38s sample, ended via timer, --auto-demo) ===
+napariUpdateLive calls observed: 126
+
+         2271580 function calls (2193089 primitive calls) in 12.223 seconds
+
+   Ordered by: cumulative time
+   List reduced from 3918 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  163/161    0.008    0.000   16.868    0.105 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_runner.py:604(_iter_exec_output)
+  161/160    0.010    0.000   14.669    0.092 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_runner.py:620(_advance)
+      160    0.004    0.000   11.676    0.073 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_engine.py:305(exec_event)
+      2/1    0.000    0.000   10.484   10.484 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\superqt\utils\_qthreading.py:147(run)
+        1    0.000    0.000   10.484   10.484 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\superqt\utils\_qthreading.py:414(work)
+        1    0.000    0.000   10.484   10.484 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\superqt\utils\_qthreading.py:354(work)
+        1    0.000    0.000   10.484   10.484 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\napariGlados.py:880(run_MILCoreAcquisition_worker)
+     51/7    0.001    0.000   10.484    1.498 C:\ProgramData\miniconda3\Lib\logging\__init__.py:1011(handle)
+     12/2    0.000    0.000   10.483    5.242 C:\ProgramData\miniconda3\Lib\logging\handlers.py:1565(handle)
+      160    0.004    0.000   10.139    0.063 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_engine.py:740(exec_sequenced_event)
+      160    0.053    0.000    8.662    0.054 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_engine.py:771(_exec_single_camera_sequence)
+  258/138    0.589    0.002    2.824    0.020 {function _QtMainWindow.event at 0x0000015CE0DC4900}
+    95/92    0.003    0.000    2.757    0.030 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:691(event)
+  258/138    0.024    0.000    2.756    0.020 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_qt\qt_main_window.py:281(event)
+ 1563/756    0.017    0.000    2.705    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\utils\events\event.py:772(_invoke_callback)
+    95/92    0.039    0.000    2.682    0.029 {function QtBaseCanvasBackend.event at 0x0000015CDF738040}
+ 2224/663    0.004    0.000    2.657    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:467(_invoke_callback)
+ 3799/853    0.048    0.000    2.622    0.003 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:402(__call__)
+       85    0.004    0.000    2.361    0.028 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:995(paintGL)
+ 2332/659    0.059    0.000    2.262    0.003 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\utils\events\event.py:685(__call__)
+  693/523    0.004    0.000    1.981    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\visuals.py:103(draw)
+      444    0.005    0.000    1.947    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\visuals\visual.py:502(draw)
+       85    0.001    0.000    1.734    0.020 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:211(on_draw)
+       85    0.001    0.000    1.732    0.020 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:281(_draw_scene)
+       85    0.001    0.000    1.705    0.020 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_vispy\canvas.py:94(draw_visual)
+
+
+
+=== Runtime profile 2026-09-08 23:34:54 (10.41s sample, ended via timer, --auto-demo) ===
+napariUpdateLive calls observed: 111
+
+         1585800 function calls (1528684 primitive calls) in 10.124 seconds
+
+   Ordered by: cumulative time
+   List reduced from 3745 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  118/114    0.007    0.000   12.852    0.113 {method 'send' of 'generator' objects}
+      149    0.016    0.000   11.617    0.078 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\frame_ring.py:125(wait)
+  456/434    0.055    0.000    9.390    0.022 {method 'emit' of 'PyQt5.QtCore.pyqtBoundSignal' objects}
+    310/2    0.031    0.000    8.914    4.457 C:\ProgramData\miniconda3\Lib\threading.py:327(wait)
+3212/3124    2.206    0.001    8.550    0.003 {built-in method time.sleep}
+  117/114    0.007    0.000    2.892    0.025 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\napariGlados.py:1255(run_napariVisualisation_worker)
+   181/96    0.688    0.004    2.825    0.029 {function _QtMainWindow.event at 0x000001641F8C5440}
+   181/96    0.019    0.000    2.734    0.028 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_qt\qt_main_window.py:281(event)
+3702/3691    0.101    0.000    2.552    0.001 C:\GitHub\Gladoscopy\glados_pycromanager\Core\microscopeInterfaceLayer.py:61(wrapper)
+    61/59    0.001    0.000    1.954    0.033 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:691(event)
+    61/59    0.037    0.001    1.927    0.033 {function QtBaseCanvasBackend.event at 0x000001641E1FCB80}
+ 1380/448    0.010    0.000    1.923    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:467(_invoke_callback)
+ 1041/508    0.022    0.000    1.921    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\utils\events\event.py:772(_invoke_callback)
+ 2474/636    0.042    0.000    1.882    0.003 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:402(__call__)
+       56    0.009    0.000    1.803    0.032 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:995(paintGL)
+ 1561/447    0.047    0.000    1.282    0.003 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\utils\events\event.py:685(__call__)
+       56    0.002    0.000    1.200    0.021 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:211(on_draw)
+      148    0.019    0.000    1.195    0.008 C:\GitHub\Gladoscopy\glados_pycromanager\Core\microscopeInterfaceLayer.py:516(get_last_image_and_metadata)
+       56    0.002    0.000    1.191    0.021 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:281(_draw_scene)
+       56    0.001    0.000    1.165    0.021 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_vispy\canvas.py:94(draw_visual)
+  456/344    0.003    0.000    1.159    0.003 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\visuals.py:103(draw)
+       56    0.008    0.000    1.157    0.021 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:287(draw_visual)
+      292    0.005    0.000    1.148    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\visuals\visual.py:502(draw)
+      148    0.014    0.000    0.924    0.006 C:\GitHub\Gladoscopy\glados_pycromanager\Core\microscopeInterfaceLayer.py:210(_metadata_to_dict)
+        4    0.000    0.000    0.922    0.230 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\settings\_napari_settings.py:90(_save_dict)
+
+
+
+=== Runtime profile 2026-09-08 23:37:27 (10.41s sample, ended via timer, --auto-demo) ===
+napariUpdateLive calls observed: 107
+
+         1498889 function calls (1448894 primitive calls) in 10.194 seconds
+
+   Ordered by: cumulative time
+   List reduced from 3929 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  145/143    0.010    0.000   17.075    0.119 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_runner.py:604(_iter_exec_output)
+  143/142    0.015    0.000   15.210    0.107 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_runner.py:620(_advance)
+      142    0.008    0.000   10.584    0.075 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_engine.py:305(exec_event)
+    52/51    0.001    0.000    8.932    0.175 C:\ProgramData\miniconda3\Lib\logging\__init__.py:1011(handle)
+       39    0.001    0.000    8.894    0.228 C:\ProgramData\miniconda3\Lib\logging\__init__.py:1139(emit)
+      2/1    0.000    0.000    8.885    8.885 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\superqt\utils\_qthreading.py:147(run)
+        1    0.000    0.000    8.885    8.885 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\superqt\utils\_qthreading.py:414(work)
+    297/2    0.004    0.000    8.885    4.443 C:\ProgramData\miniconda3\Lib\threading.py:641(wait)
+        1    0.000    0.000    8.885    8.885 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\superqt\utils\_qthreading.py:354(work)
+        1    0.000    0.000    8.884    8.884 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\napariGlados.py:998(run_MILCoreAcquisition_worker)
+      142    0.019    0.000    8.192    0.058 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_engine.py:740(exec_sequenced_event)
+      142    0.033    0.000    6.859    0.048 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_engine.py:771(_exec_single_camera_sequence)
+ 1190/334    0.010    0.000    2.641    0.008 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:467(_invoke_callback)
+    42/40    0.041    0.001    2.633    0.066 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:691(event)
+   103/57    0.465    0.005    2.511    0.044 {function _QtMainWindow.event at 0x0000024084245440}
+    42/40    0.020    0.000    2.475    0.062 {function QtBaseCanvasBackend.event at 0x0000024082BACB80}
+ 2092/539    0.035    0.000    2.308    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:402(__call__)
+  700/338    0.019    0.000    2.090    0.006 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\utils\events\event.py:772(_invoke_callback)
+       37    0.017    0.000    2.086    0.056 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:995(paintGL)
+   103/57    0.035    0.000    2.018    0.035 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_qt\qt_main_window.py:281(event)
+      142    0.082    0.001    1.787    0.013 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\pymmcore_plus\mda\_engine.py:887(_create_seqimg_payload_from_popped)
+       37    0.001    0.000    1.711    0.046 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:211(on_draw)
+       37    0.001    0.000    1.708    0.046 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:281(_draw_scene)
+       37    0.001    0.000    1.644    0.044 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_vispy\canvas.py:94(draw_visual)
+      197    0.003    0.000    1.516    0.008 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\visuals\visual.py:502(draw)
+
+
+
+=== Runtime profile 2026-09-08 23:46:04 (8.41s sample, ended via timer, --auto-demo) ===
+napariUpdateLive calls observed: 88
+
+         1315779 function calls (1266784 primitive calls) in 8.348 seconds
+
+   Ordered by: cumulative time
+   List reduced from 3746 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    94/91    0.006    0.000   11.409    0.125 {method 'send' of 'generator' objects}
+      115    0.015    0.000    8.942    0.078 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\frame_ring.py:125(wait)
+      2/1    0.000    0.000    6.540    6.540 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\superqt\utils\_qthreading.py:147(run)
+    234/2    0.012    0.000    6.540    3.270 C:\ProgramData\miniconda3\Lib\threading.py:641(wait)
+2328/2239    1.976    0.001    4.297    0.002 {built-in method time.sleep}
+    93/91    0.004    0.000    2.705    0.030 C:\GitHub\Gladoscopy\glados_pycromanager\GUI\napariGlados.py:1307(run_napariVisualisation_worker)
+   116/64    0.432    0.004    1.662    0.026 {function _QtMainWindow.event at 0x000002BBD12353A0}
+   116/64    0.012    0.000    1.516    0.024 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_qt\qt_main_window.py:281(event)
+ 1029/309    0.028    0.000    1.430    0.005 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\utils\events\event.py:685(__call__)
+2716/2709    0.070    0.000    1.413    0.001 C:\GitHub\Gladoscopy\glados_pycromanager\Core\microscopeInterfaceLayer.py:61(wrapper)
+ 1569/362    0.003    0.000    1.407    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:467(_invoke_callback)
+    44/41    0.001    0.000    1.292    0.032 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:691(event)
+    44/41    0.019    0.000    1.262    0.031 {function QtBaseCanvasBackend.event at 0x000002BBCFB6CAE0}
+ 2621/592    0.033    0.000    1.254    0.002 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\util\event.py:402(__call__)
+       37    0.002    0.000    1.121    0.030 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\app\backends\_qt.py:995(paintGL)
+  683/342    0.007    0.000    1.054    0.003 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\utils\events\event.py:772(_invoke_callback)
+      114    0.016    0.000    0.930    0.008 C:\GitHub\Gladoscopy\glados_pycromanager\Core\microscopeInterfaceLayer.py:516(get_last_image_and_metadata)
+       37    0.006    0.000    0.855    0.023 C:\ProgramData\miniconda3\Lib\concurrent\futures\thread.py:54(run)
+       37    0.001    0.000    0.835    0.023 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:211(on_draw)
+       36    0.001    0.000    0.831    0.023 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\components\_layer_slicer.py:270(_slice_layers)
+       37    0.001    0.000    0.828    0.022 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:281(_draw_scene)
+       37    0.000    0.000    0.814    0.022 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\napari\_vispy\canvas.py:94(draw_visual)
+       37    0.006    0.000    0.807    0.022 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\canvas.py:287(draw_visual)
+  309/235    0.002    0.000    0.797    0.003 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\scene\visuals.py:103(draw)
+      204    0.003    0.000    0.788    0.004 C:\GitHub\Gladoscopy\.venv\Lib\site-packages\vispy\visuals\visual.py:502(draw)
+
+

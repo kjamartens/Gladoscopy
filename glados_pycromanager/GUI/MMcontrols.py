@@ -43,6 +43,8 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+import glados_pycromanager.GUI.config_group_editor as config_group_editor
+import glados_pycromanager.GUI.device_property_browser as device_property_browser
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.AnalysisClass import *
 from glados_pycromanager.GUI.napariHelperFunctions import (
@@ -704,8 +706,16 @@ class MMConfigUI(CustomMainWindow):
         self.advSettingsButton = QPushButton("Adv. settings")
         self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
         debugHbox.addWidget(self.advSettingsButton)
-        
-        
+
+        self.devicePropertyBrowserButton = QPushButton("Device Property Browser…")
+        self.devicePropertyBrowserButton.clicked.connect(lambda: self.openDevicePropertyBrowser())
+        debugHbox.addWidget(self.devicePropertyBrowserButton)
+
+        self.configGroupEditorButton = QPushButton("Config Group Editor…")
+        self.configGroupEditorButton.clicked.connect(lambda: self.openConfigGroupEditor())
+        debugHbox.addWidget(self.configGroupEditorButton)
+
+
         self.helpButton = QPushButton("Help")
         self.helpButton.clicked.connect(lambda: self.openHelpWindow())
         debugHbox.addWidget(self.helpButton)
@@ -720,6 +730,17 @@ class MMConfigUI(CustomMainWindow):
         help_group_box = utils.HelpGroupBox(help_window)
         help_window.centralWidget().layout().addWidget(help_group_box.helpGroupBox)
         help_window.show()
+
+    def openDevicePropertyBrowser(self):
+        dialog = device_property_browser.DevicePropertyBrowserDialog(shared_data.MILcore, self)
+        dialog.exec_()
+
+    def openConfigGroupEditor(self):
+        dialog = config_group_editor.ConfigGroupEditorDialog(shared_data.MILcore, shared_data, self)
+        dialog.exec_()
+        # Config groups may have changed (new/renamed/deleted presets), so
+        # rebuild the config-group widgets from the live MM state.
+        self.updateAllMMinfo()
     
     def snapImage(self):
         """
@@ -2470,60 +2491,6 @@ class MMConfigUI(CustomMainWindow):
             self.updateValuefromMM(config_id)
         pass
     #endregion
-
-    #region deprecated
-    def get_device_properties(self):
-        """
-        Get device properties.
-        
-        Args:
-            self: The object itself.
-            
-        Returns:
-            List: A list of dictionaries containing device properties.
-        """
-        
-        core = self.core
-        devices = core.get_loaded_devices() #type:ignore
-        devices = [devices.get(i) for i in range(devices.size())]
-        device_items = []
-        for device in devices:
-            logging.debug('Device: '+device)
-            names = core.get_device_property_names(device) #type:ignore
-            props = [names.get(i) for i in range(names.size())]
-            property_items = []
-            for prop in props:
-                logging.debug('Property',prop)
-                value = core.get_property(device, prop) #type:ignore
-                is_read_only = core.is_property_read_only(device, prop) #type:ignore
-                if core.has_property_limits(device, prop): #type:ignore
-                    lower = core.get_property_lower_limit(device, prop) #type:ignore
-                    upper = core.get_property_upper_limit(device, prop) #type:ignore
-                    allowed = {
-                    "type": "range",
-                    "min": lower,
-                    "max": upper,
-                    "readOnly": is_read_only,
-                    }
-                else:
-                    allowed = core.get_allowed_property_values(device, prop) #type:ignore
-                    allowed = {
-                    "type": "enum",
-                    "options": [allowed.get(i) for i in range(allowed.size())],"readOnly": is_read_only,
-                    }
-                    property_items.append(
-                    {"device": device, "name": prop, "value": value, "allowed": allowed}
-                    )
-                    logging.debug('===>', device, prop, value, allowed)
-            if len(property_items) > 0:
-                device_items.append(
-                {
-                "name": device,
-                "value": f"{len(props)} properties",
-                "items": property_items,
-                }
-                )
-        return device_items
 
     def Vseparator_line(self):
         """

@@ -397,7 +397,35 @@ class MicroscopeInterfaceLayer:
             return config_data.getSetting(0).getPropertyName()
         else:
             raise ValueError("Unsupported microscope interface type for get_config_device_label.")
-    
+
+    @_hardware_locked
+    def get_config_settings(self, config_data) -> list:
+        """
+        Get every device/property/value triple contained in a config_data
+        object (see get_config_data), instead of only the first one that
+        get_config_device_label/get_config_property_name look at. A preset
+        can define more than one device/property setting (e.g. a "Channel"
+        preset that sets both a filter wheel position and a shutter state).
+        """
+        settings = []
+        for i in range(config_data.size()):
+            setting = config_data.getSetting(i)
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+                settings.append({
+                    "device": setting.get_device_label(),
+                    "property": setting.get_property_name(),
+                    "value": setting.get_property_value(),
+                })
+            elif self._mi in (MicroscopeInstance.PYCROMANAGER_PYTHON, MicroscopeInstance.MMCORE_PLUS):
+                settings.append({
+                    "device": setting.getDeviceLabel(),
+                    "property": setting.getPropertyName(),
+                    "value": setting.getPropertyValue(),
+                })
+            else:
+                raise ValueError("Unsupported microscope interface type for get_config_settings.")
+        return settings
+
     @_hardware_locked
     def get_current_config(self, config_group) -> str:
         """
@@ -426,7 +454,21 @@ class MicroscopeInterfaceLayer:
             return self.core.getDeviceType(device_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_device_type.")
-    
+
+    @_hardware_locked
+    def get_device_property_names(self, device_name) -> list:
+        """
+        Get the names of all properties exposed by a device.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return self.java_arr_to_numpy(self.core.get_device_property_names(device_name))
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return self.core.get_device_property_names(device_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            return self.core.getDevicePropertyNames(device_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for get_device_property_names.")
+
     def get_exposure(self, *, use_cache: bool = True) -> float:
         """Return the camera exposure time, caching after the first call.
 
@@ -608,7 +650,37 @@ class MicroscopeInterfaceLayer:
             return self.core.getProperty(device_name, property_name)
         else:
             raise ValueError("Unsupported microscope interface type for get_property.")
-    
+
+    @_hardware_locked
+    def get_allowed_property_values(self, device_name, property_name) -> list:
+        """
+        Get the allowed values of a property, for properties that expose a
+        fixed enumeration of choices (see has_property_limits for range-limited
+        properties instead).
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return self.java_arr_to_numpy(self.core.get_allowed_property_values(device_name, property_name))
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return self.core.get_allowed_property_values(device_name, property_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            return self.core.getAllowedPropertyValues(device_name, property_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for get_allowed_property_values.")
+
+    @_hardware_locked
+    def is_property_read_only(self, device_name, property_name) -> bool:
+        """
+        Check whether a property is read-only.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return self.core.is_property_read_only(device_name, property_name)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return self.core.is_property_read_only(device_name, property_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            return self.core.isPropertyReadOnly(device_name, property_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for is_property_read_only.")
+
     @_hardware_locked
     def has_property_limits(self, device_name, property_name):
         """
@@ -862,7 +934,146 @@ class MicroscopeInterfaceLayer:
             self.core.setConfig(config_group, config_name)
         else:
             raise ValueError("Unsupported microscope interface type for set_config.")
-    
+
+    @_hardware_locked
+    def define_config_group(self, group_name) -> None:
+        """
+        Define a new (initially empty) configuration group.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.define_config_group(group_name)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.define_config_group(group_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.defineConfigGroup(group_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for define_config_group.")
+
+    @_hardware_locked
+    def define_config(self, group_name, config_name, device_name=None, property_name=None, value=None) -> None:
+        """
+        Define a configuration preset within a group. Called with only
+        group_name/config_name this creates (or keeps) an empty preset;
+        passing device_name/property_name/value additionally adds that
+        device/property setting to the preset (calling it again for the
+        same preset adds further settings -- MMCore keys settings by
+        device+property, so re-adding the same one overwrites its value).
+        """
+        if device_name is None:
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+                self.core.define_config(group_name, config_name)
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                self.core.define_config(group_name, config_name)
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+                self.core.defineConfig(group_name, config_name)
+            else:
+                raise ValueError("Unsupported microscope interface type for define_config.")
+        else:
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+                self.core.define_config(group_name, config_name, device_name, property_name, value)
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                self.core.define_config(group_name, config_name, device_name, property_name, value)
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+                self.core.defineConfig(group_name, config_name, device_name, property_name, value)
+            else:
+                raise ValueError("Unsupported microscope interface type for define_config.")
+
+    @_hardware_locked
+    def delete_config(self, group_name, config_name, device_name=None, property_name=None) -> None:
+        """
+        Delete a configuration preset, or (if device_name/property_name are
+        given) remove just that one setting from the preset.
+        """
+        if device_name is None:
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+                self.core.delete_config(group_name, config_name)
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                self.core.delete_config(group_name, config_name)
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+                self.core.deleteConfig(group_name, config_name)
+            else:
+                raise ValueError("Unsupported microscope interface type for delete_config.")
+        else:
+            if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+                self.core.delete_config(group_name, config_name, device_name, property_name)
+            elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+                self.core.delete_config(group_name, config_name, device_name, property_name)
+            elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+                self.core.deleteConfig(group_name, config_name, device_name, property_name)
+            else:
+                raise ValueError("Unsupported microscope interface type for delete_config.")
+
+    @_hardware_locked
+    def delete_config_group(self, group_name) -> None:
+        """
+        Delete a configuration group and all of its presets.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.delete_config_group(group_name)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.delete_config_group(group_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.deleteConfigGroup(group_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for delete_config_group.")
+
+    @_hardware_locked
+    def rename_config(self, group_name, old_config_name, new_config_name) -> None:
+        """
+        Rename a configuration preset within a group.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.rename_config(group_name, old_config_name, new_config_name)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.rename_config(group_name, old_config_name, new_config_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.renameConfig(group_name, old_config_name, new_config_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for rename_config.")
+
+    @_hardware_locked
+    def rename_config_group(self, old_group_name, new_group_name) -> None:
+        """
+        Rename a configuration group.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.rename_config_group(old_group_name, new_group_name)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.rename_config_group(old_group_name, new_group_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.renameConfigGroup(old_group_name, new_group_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for rename_config_group.")
+
+    @_hardware_locked
+    def is_config_defined(self, group_name, config_name) -> bool:
+        """
+        Check whether a configuration preset is already defined in a group.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return self.core.is_config_defined(group_name, config_name)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return self.core.is_config_defined(group_name, config_name)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            return self.core.isConfigDefined(group_name, config_name)
+        else:
+            raise ValueError("Unsupported microscope interface type for is_config_defined.")
+
+    @_hardware_locked
+    def save_system_configuration(self, file_path) -> None:
+        """
+        Save the current device/config-group/preset state to a Micro-Manager
+        .cfg file at file_path.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.save_system_configuration(file_path)
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.save_system_configuration(file_path)
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.saveSystemConfiguration(file_path)
+        else:
+            raise ValueError("Unsupported microscope interface type for save_system_configuration.")
+
     @_hardware_locked
     def set_exposure(self,exposure_time: float) -> None:
         """

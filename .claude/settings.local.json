@@ -53,7 +53,15 @@
       "Bash(grep *)",
       "Bash(awk -F: '{print $1, $2}')",
       "PowerShell(conda activate *)",
-      "PowerShell(pytest *)"
+      "PowerShell(pytest *)",
+      "Bash(pip show *)",
+      "Bash(.venv/Scripts/python.exe -c \"import glados_pycromanager; print\\(glados_pycromanager.__file__\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pip show glados-pycromanager)",
+      "Bash(pip install *)",
+      "Bash(git push *)",
+      "Skill(update-config)",
+      "Bash(scoop install *)",
+      "PowerShell(Select-String *)"
     ]
   }
 }

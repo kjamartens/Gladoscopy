@@ -112,6 +112,76 @@ invalidated in `set_core`/`set_roi`/`clear_roi`, same idiom as the exposure and
 pixel-size caches). Nothing calls them yet — T-C3 of `claude_throughput_project.md`
 replaces the 999-frame-MDA live loop with them.
 
+**Device property browser:** MIL exposes full device/property introspection —
+`get_loaded_devices()`, `get_device_property_names(device)`,
+`get_property(device, prop)` / `set_property(device, prop, value)`,
+`is_property_read_only(device, prop)`, `has_property_limits(device, prop)` +
+`get_property_lower_limit`/`get_property_upper_limit` for range properties, and
+`get_allowed_property_values(device, prop)` for enum properties. All follow the
+same three-way snake_case/snake_case/camelCase branch pattern (Java bridge /
+pymmcore / pymmcore-plus), with the Java branch wrapped in
+`java_arr_to_numpy()` for vector-returning calls. `GUI/device_property_browser.py`'s
+`collect_device_properties(mil)` walks all three into a flat list of dicts
+(GUI-free, unit-tested against a mocked MIL), and `DevicePropertyBrowserDialog`
+renders it as an editable `QTableWidget` (enum → `QComboBox`, ranged → `QLineEdit`,
+read-only → greyed out), opened via the "Device Property Browser…" button in
+`MMConfigUI`'s debug button row (`GUI/MMcontrols.py`, next to "Adv. settings").
+This replaced a dead, single-backend, buggy prototype
+(`MMConfigUI.get_device_properties`, formerly in a `#region deprecated` block)
+that called raw Java-vector methods directly and silently dropped every
+range-limited property (its `has_property_limits` branch never appended to
+the results list — only the `enum` branch did). Tests:
+`tests/test_mil_device_properties.py`, `tests/test_device_property_browser.py`.
+
+**Config group / preset editor:** MIL also exposes the write side of the same
+MMCore config-group API: `define_config_group(group)`, `define_config(group,
+preset, device=None, prop=None, value=None)` (device/prop/value all-or-nothing
+— omit them to create/keep an empty preset, pass them to add or overwrite one
+device/property setting in that preset), `delete_config(group, preset,
+device=None, prop=None)` (omit device/prop to delete the whole preset,
+otherwise remove just that one setting), `delete_config_group`,
+`rename_config(group, old, new)`, `rename_config_group(old, new)`,
+`is_config_defined`, and `save_system_configuration(path)` (writes the current
+device/config state to a Micro-Manager `.cfg` file — this is a full-state
+dump, not a diff). `get_config_settings(config_data)` is the many-setting
+counterpart to `get_config_device_label`/`get_config_property_name` (which
+only ever look at `getSetting(0)`) — it walks every setting in a preset, which
+matters for presets like a "Channel" group that set more than one device at
+once. All follow the existing three-way branch pattern.
+
+`GUI/config_group_editor.py` deliberately mirrors Micro-Manager's own
+"Configuration settings" panel / Group Editor / Preset editor methodology and
+phrasing rather than inventing a new UX: a group is defined *once* by picking
+which device properties belong to it (`GroupEditorDialog`, phrased exactly
+like MM's "Specify properties in this configuration group:" with device-type
+filter checkboxes — cameras/shutters/stages/"wheels, turrets, etc."/other
+devices, bucketed via `device_type_bucket()` off `mil.get_device_type()`,
+mirroring `MMcontrols.py`'s `getDevicesOfDeviceType` `deviceTypeArray` — plus
+a name/property search box and a "Show read-only" toggle); every preset in
+that group then just supplies values for that same fixed property set
+(`PresetEditorDialog`, titled `Preset editor for the "<group>" configuration
+group`). `group_property_set(mil, group)` derives that fixed set as the union
+of settings across the group's existing presets, since MMCore has no
+independent record of "which properties belong to a group" — only presets.
+Interacting with `GroupEditorDialog`'s "Current Property Value" column writes
+to the live device immediately (it reuses
+`device_property_browser.build_property_value_widget`, extracted from that
+module for exactly this sharing), because that's how you put the hardware
+into the state a new group's initial `"NewPreset"` preset should capture;
+`PresetEditorDialog`'s value column does not touch hardware. Editing an
+*existing* group's property selection adds/removes that setting across every
+one of its presets (added properties take the live value shown in the
+editor). `collect_config_groups(mil)` (GUI-free, unit-tested against a mocked
+MIL) feeds the top-level `ConfigGroupEditorDialog` — one row per group with a
+preset `QComboBox` (selecting a preset calls `set_config` immediately) and
+Group/Preset `+`/`−`/`Edit` buttons opening the two editors above — opened via
+the "Config Group Editor…" button next to "Device Property Browser…" in
+`MMConfigUI`'s debug button row (`GUI/MMcontrols.py`). "Save" writes via
+`save_system_configuration` to `shared_data.config.micromanager_config.config_path`.
+This all matches the actual `.cfg` file syntax 1:1 — one
+`ConfigGroup,<group>,<preset>,<device>,<property>,<value>` line per setting.
+Tests: `tests/test_mil_config_groups.py`, `tests/test_config_group_editor.py`.
+
 `Core/MDAGlados.py` is the multi-dimensional acquisition layer that talks to MIL.
 
 ### Acquisition storage and scratch directories

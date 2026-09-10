@@ -228,3 +228,4 @@ scalene-profile.*
 *.swp
 bash.exe.stackdump
 
+/bioimageio_unzipped_tf_weights
