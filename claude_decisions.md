@@ -3235,3 +3235,69 @@ warm, the cold fallback, the unbound-core no-op, and callback-failure isolation.
 `glados_pycromanager/GUI/sharedFunctions.py`,
 `glados_pycromanager/GUI/napariGlados.py`, `CLAUDE.md`,
 `tests/test_hardware_mirror.py`, `tests/test_live_sequence_worker.py`.
+
+
+## 2026-09-10 — The owner thread is a plain daemon thread with a priority queue, and live mode becomes its loop  [T-B3]
+
+**Context:** T-B3 is a marked stop point ("do not start without checking in").
+The user asked for "full Tier B" in one instruction on 2026-09-10, which is that
+check-in; recorded here because the plan text still says to ask.
+
+**Decision 1 — not a `QThread` running `exec_()`.** The task text says "a QObject
+moved onto a dedicated QThread". Nothing the owner thread does needs a Qt event
+loop: the loop is a `PriorityQueue` drain, and replies are `pyqtSignal` emissions,
+which work from any thread. A plain daemon `threading.Thread` matches the two
+other worker threads in this codebase (`FrameRing`'s consumer,
+`ZarrFrameWriter`) and, unlike a `QThread`, is testable with no `QApplication`.
+`MicroscopeService` is still a `QObject`, so `request_completed` reaches GUI slots
+as a queued signal exactly as planned for T-B4.
+
+**Decision 2 — the streaming mode services requests between frames.** Handing the
+live pull loop to the service as one long-running request would have frozen every
+other requester for the whole acquisition — strictly worse than today's RLock,
+where requests interleave between frames. `start_streaming(pull_once)` therefore
+makes the pull the *loop body*, with `STREAM_REQUEST_BUDGET` (8) queued requests
+drained between two pulls. `pull_once` returns True/False (frame produced / camera
+idle) so the loop, not the caller, owns the idle sleep.
+
+**Decision 3 — the pull body calls raw MIL, not the proxy.** On the owner thread
+the proxy would only allocate a `Request` per call (4 per frame), and off it T-B1's
+lock already makes the call safe. The *setup and teardown* calls in
+`run_liveSequence_worker` do go through the proxy, so hardware start/stop is owned
+by the owner thread.
+
+**Decision 4 — no global installation of the proxy.** `shared_data.MILcore` still
+hands back the real MIL, and the ~273 existing call sites are untouched. Installing
+the proxy globally now would make every GUI slot block on the queue *plus* the
+call, which is worse than today and is precisely what T-B4 exists to fix. Instead
+`note_gui_block()` warns once per method when a GUI-thread caller blocks on a
+reply, so the remaining slots are visible in the log rather than silent.
+
+**Decision 5 — a missing or stopped service is a fallback, not an error.** The
+proxy calls MIL directly when the service is not running, and
+`run_liveSequence_worker` keeps its in-worker loop for that case. The napari-plugin
+entry point (`_dock_widget.MainWidget`) never calls
+`start_microscope_service()`, and neither do the tests; both must keep working.
+
+**Not done here (still T-B4):** migrating `MMcontrols.py`,
+`LaserControlScripts.py` and `FlowChart_dockWidgets.createCoreVariables` to submit
+intents. Node-side `core.*` calls are deliberately left alone — they are correctly
+synchronous on their own worker threads.
+
+**Verification:** `tests/test_microscope_service.py` (16 tests) — owner-thread
+execution, proxy API pass-through, priority ordering, FIFO within a priority,
+re-entrancy, streaming on the owner thread, a request serviced mid-stream, a
+raising pull loop leaving streaming without killing the service, double-streaming
+refusal, stopped-service submit, queued requests failed on stop, call timeout,
+direct-call fallback, the reply signal, and the `Shared_data` lifecycle.
+`tests/test_live_sequence_worker.py` gained three (pull runs on the owner thread,
+setup/teardown through it, a UI intent serviced while streaming) and keeps its
+existing coverage of the no-service path. `pytest -q -m "not slow"` — 883 passed.
+No hardware here, so the three-backend manual smoke test in the task's Verify
+block was **not** performed.
+
+**Affects:** new `glados_pycromanager/Core/microscope_service.py`,
+`glados_pycromanager/GUI/sharedFunctions.py`,
+`glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/GUI/GUI_napari.py`, `CLAUDE.md`,
+`tests/test_microscope_service.py`, `tests/test_live_sequence_worker.py`.

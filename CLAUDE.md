@@ -74,7 +74,38 @@ is the standalone plan that enforces them — but new code must follow them.
   acquiring the lock (double-checked inside), so the per-frame display gate never
   serializes behind a slow stage move. `create_mda` is unlocked too — it is pure event-list
   construction and never touches the core. Tests: `tests/test_mil_hardware_lock.py`.
-  Single-owner-thread dispatch (`MicroscopeService`) is still T-B3, not yet done.
+  **As of T-B3 there is a single owner thread**, `Core/microscope_service.py`'s
+  `MicroscopeService`: a `QObject` owning one MIL, running every call to it on its
+  own daemon thread, ordered by a `PriorityQueue` (`Priority.FRAME` <
+  `Priority.NORMAL` < `Priority.LOW`). Started once per session by
+  `Shared_data.start_microscope_service()` (called from `GUI_napari.main()` right
+  after the backend selection settles, stopped on `aboutToQuit` before the
+  `os._exit(0)`), reachable as `shared_data.microscope_service` and
+  `shared_data.microscope_proxy(priority)`. Three things to know:
+  - **`MicroscopeProxy` keeps MIL's synchronous API** and blocks *the caller's*
+    thread on the reply, so worker and node code needs no rewrite. Non-callable
+    attributes (`core`, `mda`, the caches) fall through to the real MIL. With no
+    service running it calls MIL directly instead of raising, which is what keeps
+    the tests, the napari-plugin path and post-shutdown callers working.
+  - **Re-entrancy is inline, not queued.** `submit`/`call` from the owner thread
+    execute immediately — MIL methods compose and the streaming loop calls back in,
+    so anything else would deadlock.
+  - **Streaming mode is why the frame path gains no hop.** `start_streaming(pull_once)`
+    makes the live pull loop (T-C3) the service loop body, so the thread that owns
+    the hardware is the thread that pulls the frames;
+    `run_liveSequence_worker` then only waits on the stop flag
+    (`LIVE_SEQUENCE_STOP_POLL_S`) and falls back to its own in-worker loop when no
+    service is running. Between two pulls the loop still drains up to
+    `STREAM_REQUEST_BUDGET` (8) queued requests, so a stage move issued during live
+    mode is serviced within a frame or two instead of waiting out the acquisition.
+  It is deliberately **not** a `QThread` running `exec_()` — nothing on the owner
+  thread needs a Qt event loop, and a plain daemon thread matches `FrameRing`'s
+  consumer and `ZarrFrameWriter`. It stays a `QObject` so `request_completed`
+  reaches GUI slots as a queued signal (T-B4). `note_gui_block()` logs a warning
+  once per method when a GUI-thread caller blocks on a reply, making the
+  not-yet-migrated slots visible. T-B1's `_hw_lock` remains and is what makes the
+  still-direct callers safe. Tests: `tests/test_microscope_service.py`,
+  `tests/test_live_sequence_worker.py`.
 - **The display path never calls MIL (T-B2).** `Shared_data` mirrors the hardware
   constants the display needs into plain attributes — `hw_exposure_ms`,
   `hw_pixel_size_um`, `hw_roi`, `hw_image_shape` — and

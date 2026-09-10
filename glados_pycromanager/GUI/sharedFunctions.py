@@ -18,6 +18,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 
 from glados_pycromanager.Core import microscopeInterfaceLayer as MIL
+from glados_pycromanager.Core.microscope_service import MicroscopeService
 from glados_pycromanager.GUI.napariGlados import napariHandler
 from glados_pycromanager.GUI.subprocess_pool import WarmSubprocessPool
 from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
@@ -268,6 +269,11 @@ class Shared_data(QObject):
         self.hw_pixel_size_um: float | None = None
         self.hw_image_shape: tuple | None = None
         self.hw_roi: tuple | None = None
+        # T-B3: the single owning thread for `MILcore`. Created by
+        # `start_microscope_service()` once a backend is bound; until then (and
+        # in tests / the napari-plugin path) every caller keeps talking to MIL
+        # directly, which T-B1's re-entrant lock still makes safe.
+        self.microscope_service = None
         
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()
@@ -431,6 +437,49 @@ class Shared_data(QObject):
                 self.hw_image_shape = (self.hw_roi[3], self.hw_roi[2])
             except Exception:
                 logging.debug("refresh_hardware_mirror: get_roi failed", exc_info=True)
+
+    # --- Hardware owner thread (T-B3) -------------------------------------
+
+    def start_microscope_service(self, name: str = "MicroscopeService"):
+        """Start the single owner thread for the currently bound `MILcore`.
+
+        Returns the running `MicroscopeService`, or None when no MIL is bound.
+        Idempotent: a second call with a service already running is a no-op, and
+        a service bound to a *different* MIL (a backend switch) is stopped and
+        replaced.
+        """
+        mil = self._MILcore
+        if mil is None:
+            logging.warning('start_microscope_service(): no MILcore bound yet')
+            return None
+        service = self.microscope_service
+        if service is not None:
+            if service.running and service.mil is mil:
+                return service
+            service.stop()
+        self.microscope_service = MicroscopeService(mil, name=name).start()
+        return self.microscope_service
+
+    def stop_microscope_service(self, timeout: float = 5.0) -> None:
+        service = self.microscope_service
+        if service is None:
+            return
+        service.stop(timeout)
+        self.microscope_service = None
+
+    def microscope_proxy(self, priority=None):
+        """A MIL-shaped facade routed through the owner thread.
+
+        Falls back to the raw `MILcore` when no service is running, so callers
+        do not have to branch (see `MicroscopeProxy`, which also falls back
+        per call if the service stops underneath it).
+        """
+        service = self.microscope_service
+        if service is None:
+            return self._MILcore
+        if priority is None:
+            return service.proxy()
+        return service.proxy(priority=priority)
 
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')

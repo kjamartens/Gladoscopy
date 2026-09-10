@@ -15,6 +15,7 @@ into the (absent) display path.
 """
 from __future__ import annotations
 
+import threading
 import time
 from collections import deque
 from threading import Event, Thread
@@ -476,3 +477,80 @@ def test_override_is_lifted_when_the_ring_consumer_fails_to_start(config, monkey
 
     assert handler._live_sequence_active is False
     assert handler._effective_vis_method() == "multiDstack"
+
+
+# ---- the pull loop runs on the hardware owner thread (T-B3) ------------
+
+
+def _service_for(handler, mil):
+    """Attach a started MicroscopeService to the handler's stub shared_data."""
+    from glados_pycromanager.Core.microscope_service import MicroscopeService
+
+    service = MicroscopeService(mil, name="LiveSequenceTestService").start()
+    handler.shared_data.microscope_service = service
+    return service
+
+
+def test_frames_are_pulled_on_the_service_thread_when_one_is_running(config):
+    """T-B3: the thread that owns the hardware is the thread that pulls."""
+    mil = _SeededFakeMIL(_frames(3))
+    handler = _make_handler(mil, config)
+    service = _service_for(handler, mil)
+    pull_threads = []
+    real_pull = handler._live_sequence_pull_once
+
+    def recording_pull(*args, **kwargs):
+        pull_threads.append(threading.get_ident())
+        return real_pull(*args, **kwargs)
+
+    handler._live_sequence_pull_once = recording_pull
+    owner_ident = service._owner_ident  # cleared by stop()
+    try:
+        _run_until_frames(handler, 1)
+    finally:
+        service.stop()
+
+    assert pull_threads, "the pull loop never ran"
+    assert set(pull_threads) == {owner_ident}
+    assert threading.get_ident() not in pull_threads
+    # And the stream was left cleanly, not still running.
+    assert service.is_streaming is False
+
+
+def test_setup_and_teardown_also_go_through_the_owner_thread(config):
+    mil = _SeededFakeMIL(_frames(2))
+    handler = _make_handler(mil, config)
+    service = _service_for(handler, mil)
+    try:
+        _run_until_frames(handler, 1)
+    finally:
+        service.stop()
+
+    # Same asserts as the worker-owned path: whichever thread ran them, the
+    # sequence was started free-running and stopped again.
+    assert mil._continuous_starts == [0.0]
+    assert mil.is_sequence_running() is False
+    assert handler.consumer_stops == [True]
+
+
+def test_a_ui_intent_is_serviced_while_live_mode_is_streaming(config):
+    """The point of the request budget between frame pulls."""
+    mil = _SeededFakeMIL(_frames(50))
+    handler = _make_handler(mil, config)
+    service = _service_for(handler, mil)
+    thread = threading.Thread(
+        target=handler.run_liveSequence_worker, args=(None,), daemon=True)
+    thread.start()
+    try:
+        deadline = time.monotonic() + JOIN_TIMEOUT_S
+        while not service.is_streaming and time.monotonic() < deadline:
+            time.sleep(0.005)
+        assert service.is_streaming
+
+        assert service.call_mil("get_exposure", timeout=5.0) == mil.get_exposure()
+    finally:
+        handler.acqstate = False
+        thread.join(timeout=JOIN_TIMEOUT_S)
+        service.stop()
+
+    assert not thread.is_alive()

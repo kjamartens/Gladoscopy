@@ -462,6 +462,17 @@ def main():
                                  'only buffer_mb (%s MB, circular buffer) is applied.',
                                  headlessGUIv.max_memory_mb, headlessGUIv.buffer_size_mb)
     
+    # T-B3: one owner thread for the bound backend, started as soon as the
+    # backend selection above has settled and before any worker exists. Every
+    # branch above ends with a MILcore bound, so this is the single place that
+    # needs to know. Callers that do not use the service keep talking to MIL
+    # directly -- T-B1's re-entrant lock still makes that safe.
+    try:
+        shared_data.start_microscope_service()
+    except Exception:
+        logging.exception('Could not start the MicroscopeService; '
+                          'falling back to direct MIL access')
+
     #Open JSON file with MM settings
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MM_PycroManager_JSON.json')) as f:
@@ -617,6 +628,18 @@ def main():
         except Exception:
             logging.exception('Failed to remove temporary stores on quit')
     app.aboutToQuit.connect(_remove_temp_stores)
+
+    # Same reason again, for the hardware owner thread (T-B3): it is a daemon
+    # thread, so os._exit(0) would take it down mid-call. Stopping it first
+    # lets an in-flight request finish and fails every queued one, rather than
+    # leaving a caller blocked on a reply that can never arrive.
+    def _stop_microscope_service():
+        try:
+            shared_data.stop_microscope_service()
+        except Exception:
+            logging.exception('Error stopping the MicroscopeService')
+
+    app.aboutToQuit.connect(_stop_microscope_service)
 
     # Force-exit to avoid the ~10-20 s hang + STATUS_ACCESS_VIOLATION that
     # happens when pyjavaz bridge threads or the CMMCorePlus destructor try

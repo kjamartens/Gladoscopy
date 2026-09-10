@@ -42,6 +42,7 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.napariGlados as napariGlados
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.Core.MDAGlados import MDAGlados
+from glados_pycromanager.Core.microscope_service import Priority
 from glados_pycromanager.GUI.custom_widget_ui import (
     Ui_CustomDockWidget,  # Import the generated UI module
 )
@@ -936,6 +937,10 @@ class napariHandler:
     # is a bridge round trip, and the lock is shared with the GUI thread's
     # stage/config calls.
     LIVE_SEQUENCE_POLL_S = 0.0005
+    #: How often the live worker re-checks `acqstate` while the
+    #: MicroscopeService owns the pull loop (T-B3). Coarser than the
+    #: pull poll: this thread is only waiting for the stop flag.
+    LIVE_SEQUENCE_STOP_POLL_S = 0.02
 
     def __init__(self, shared_data,liveOrMda='live') -> None:
         logging.debug('#nH - ititalisation of napariHandler')
@@ -1417,6 +1422,32 @@ class napariHandler:
         metadata['Axes'] = {'time': frame_index}
         return metadata
 
+    def _live_sequence_pull_once(self, MILcore, pull_latest, constants, state) -> bool:
+        """Pull at most one frame from the circular buffer into the ring.
+
+        Returns True if a frame was pushed, False if the camera had nothing
+        ready. Extracted from `run_liveSequence_worker` because T-B3 runs it as
+        the `MicroscopeService` loop body (on the hardware's owner thread)
+        whenever a service is running, and as a plain worker-thread loop
+        otherwise. It calls the raw MIL deliberately: on the owner thread the
+        proxy would only add a `Request` object per call, and off it T-B1's
+        lock already makes the call safe.
+        """
+        if MILcore.get_remaining_image_count() <= 0:
+            return False
+        if pull_latest:
+            image, raw = MILcore.get_last_image_and_metadata()
+            # Peeking consumes nothing, so the frames we skipped would sit
+            # there until the buffer overflowed.
+            MILcore.clear_circular_buffer()
+        else:
+            image, raw = MILcore.pop_next_image_and_metadata()
+        frame_index = state['frame_index']
+        self.frame_ring.push(
+            image, self._live_sequence_metadata(raw, frame_index, constants))
+        state['frame_index'] = frame_index + 1
+        return True
+
     def run_liveSequence_worker(self, parent):
         """Live mode as a continuous sequence acquisition (`live_mode_method='sequence'`).
 
@@ -1462,9 +1493,16 @@ class napariHandler:
             )
 
         self.shared_data.allMDAslicesRendered = set()
-        # Referenced by the finally block's log line, so it has to exist before
-        # anything inside the try can raise.
-        frame_index = 0
+        # Mutable so `_live_sequence_pull_once` can advance it from whichever
+        # thread ends up running the pull, and so the finally block's log line
+        # can read it. Must exist before anything inside the try can raise.
+        state = {'frame_index': 0}
+        service = getattr(self.shared_data, 'microscope_service', None)
+        if service is not None and not service.running:
+            service = None
+        # T-B3: the setup and teardown calls go through the owner thread too
+        # when there is one, so the hardware is only ever touched from it.
+        hw = MILcore if service is None else service.proxy(priority=Priority.FRAME)
         try:
             # Display-only path: the display and RT analysis each drop frames at
             # their own gate, so a deep ring would buy latency, not throughput.
@@ -1474,37 +1512,45 @@ class napariHandler:
             self._start_frame_ring_consumer(needs_every_frame=False)
             # Drop whatever a previous run left behind, so the first displayed
             # frame is not a stale one.
-            MILcore.clear_circular_buffer()
-            MILcore.start_continuous_sequence_acquisition(0)
+            hw.clear_circular_buffer()
+            hw.start_continuous_sequence_acquisition(0)
             # Read once, not per frame -- see _live_sequence_metadata.
             constants = {
-                'Exposure': MILcore.get_exposure(),
-                'PixelSize_um': MILcore.get_pixel_size_um(),
-                'ROI': MILcore.get_roi(),
+                'Exposure': hw.get_exposure(),
+                'PixelSize_um': hw.get_pixel_size_um(),
+                'ROI': hw.get_roi(),
             }
             logging.info(
-                'Live: continuous sequence acquisition started (pull policy=%s)', policy
+                'Live: continuous sequence acquisition started (pull policy=%s, owner=%s)',
+                policy, 'service' if service is not None else 'worker'
             )
-            while self.acqstate:
-                if MILcore.get_remaining_image_count() > 0:
-                    if pull_latest:
-                        image, raw = MILcore.get_last_image_and_metadata()
-                        # Peeking consumes nothing, so the frames we skipped
-                        # would sit there until the buffer overflowed.
-                        MILcore.clear_circular_buffer()
-                    else:
-                        image, raw = MILcore.pop_next_image_and_metadata()
-                    self.frame_ring.push(
-                        image, self._live_sequence_metadata(raw, frame_index, constants)
-                    )
-                    frame_index += 1
-                else:
-                    time.sleep(self.LIVE_SEQUENCE_POLL_S)
+
+            def pull_once():
+                return self._live_sequence_pull_once(
+                    MILcore, pull_latest, constants, state)
+
+            if service is not None:
+                # T-B3: the thread that owns the hardware is the thread that
+                # pulls the frames, so the frame path gains no extra hop. This
+                # worker thread only waits for the stop flag; the service loop
+                # still services queued UI intents between frames.
+                service.start_streaming(pull_once,
+                                        idle_sleep=self.LIVE_SEQUENCE_POLL_S,
+                                        label='live sequence')
+                while self.acqstate and service.is_streaming:
+                    time.sleep(self.LIVE_SEQUENCE_STOP_POLL_S)
+                service.stop_streaming()
+            else:
+                while self.acqstate:
+                    if not pull_once():
+                        time.sleep(self.LIVE_SEQUENCE_POLL_S)
         finally:
             # stop first, then drain: the consumer must not be shut down while
             # the camera is still filling the ring.
+            if service is not None:
+                service.stop_streaming()
             try:
-                MILcore.stop_sequence_acquisition()
+                hw.stop_sequence_acquisition()
             except Exception:
                 logging.exception('Live: stop_sequence_acquisition() failed')
             self._stop_frame_ring_consumer()
@@ -1512,7 +1558,7 @@ class napariHandler:
             # see the same visualisation method as every frame before it.
             self._live_sequence_active = False
             try:
-                if MILcore.is_sequence_running():
+                if hw.is_sequence_running():
                     logging.warning(
                         'Live: sequence still running after stop_sequence_acquisition(); '
                         'a later start may be refused'
@@ -1520,7 +1566,8 @@ class napariHandler:
             except Exception:
                 logging.exception('Live: is_sequence_running() check failed')
             logging.info(
-                'Live: continuous sequence acquisition stopped after %d frames', frame_index
+                'Live: continuous sequence acquisition stopped after %d frames',
+                state['frame_index']
             )
 
     @thread_worker
