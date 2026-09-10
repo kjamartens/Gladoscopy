@@ -171,7 +171,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-B1** Serialize all MIL access behind a re-entrant lock — M, no deps
 - [x] **T-B2** Mirror hardware constants into `shared_data`; display never calls MIL — M, needs B1
 - [x] **T-B3** `MicroscopeService` owner thread — **L**, needs B1, B2, C3 — **stop point** — *started on the user's explicit "full Tier B" instruction, 2026-09-10*
-- [ ] **T-B4** Migrate GUI slots to submit intents — L, incremental, needs B3 — *2 of 3 files done 2026-09-10: `LaserControlScripts.py` and `FlowChart_dockWidgets.updateCoreVariables` (the plan's `createCoreVariables`, since renamed). `MMcontrols.py` still open — it had uncommitted user edits at the time.*
+- [x] **T-B4** Migrate GUI slots to submit intents — L, incremental, needs B3 — *all three files done 2026-09-10: `LaserControlScripts.py`, `FlowChart_dockWidgets.updateCoreVariables` (the plan's `createCoreVariables`, since renamed) and `MMcontrols.py`. Hardware **writes, moves and snaps** are queued; a handful of pure reads on click-only paths stay inline — see `claude_decisions.md`.*
 
 ### Tier C — Live mode is a 999-frame MDA
 

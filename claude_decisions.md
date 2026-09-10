@@ -3386,3 +3386,63 @@ their edits into this work. It is the remaining T-B4 item.
 
 **Affects:** `glados_pycromanager/GUI/FlowChart_dockWidgets.py`, `CLAUDE.md`,
 `tests/test_core_variables_owner_thread.py`.
+
+
+## 2026-09-10 — MMcontrols queues writes and moves; three slots need a thread that is neither the GUI nor the owner  [T-B4]
+
+**Context:** the last of T-B4's three files, done once the user's own in-flight
+edits to it were committed (`d96cf30`).
+
+**Decision 1 — migrate writes, moves and snaps; leave pure reads on click-only
+paths.** Queued: `snapImage`/`addImageToAlbum`, `changeLiveMode`'s exposure write,
+the three shutter slots, `resetROI`/`zoomROI`/`setROI`, `moveOneDStage`/
+`moveXYStage` and all three position read-backs, `set_config`, and the slider/edit
+field property writes. Left inline: `updateShutterOptions`' three reads, the
+scanning helpers' `get_pixel_size_um`/`get_roi`, and all of `ConfigInfo` — these
+run on a button press or at panel construction, never in the frame path, and
+`ConfigInfo` in particular was being reworked by the user in the same window.
+
+**Decision 2 — three flows must not run on the owner thread**, because they wait
+for the acquisition worker, whose own hardware calls are queued *on* that thread —
+waiting there deadlocks:
+- `changeLiveMode` flips `liveMode` from the exposure write's completion callback,
+  bounced to the GUI thread via `guiThreadCall`. Flipping it before the write lands
+  would let the camera start on the old exposure (the ordering the original code
+  got for free by blocking), and flipping it on the owner thread deadlocks.
+- `setROI`'s live branch (stop -> wait -> set -> wait -> restart) runs on a
+  short-lived daemon thread: not the GUI thread (up to `ACQ_STOP_TIMEOUT_S`), not
+  the owner thread (deadlock). Its hardware goes through the proxy as usual.
+- `_setROI_hw`, the no-live-mode branch, is a single queued job — set and wait
+  belong together.
+
+**Decision 3 — ordering comes from the FIFO queue, not from blocking.** A stage
+move is submitted and the read-back is submitted straight after; because the queue
+is FIFO within a priority, the read still reports the post-move position. This is
+what let the read-backs become non-blocking without a callback chain.
+
+**Decision 4 — `drawROI` drops its live-mode pause.** `get_sensor_size()` is a
+read; it was bracketed by a live-mode stop, a 0.2 s GUI-thread sleep and a restart.
+The owner thread serialises it against the live pull loop, so the query alone is
+correct. It remains a *blocking* proxy call from the GUI thread — the one left in
+this file — because `drawROI` needs the bound before installing its drag callbacks;
+`note_gui_block()` will name it in the log, accurately.
+
+**Decision 5 — `_writeSliderProperty` and `onEditFieldChanged` share one
+`_setUnderlyingConfigProperty`.** Both config kinds have exactly one property
+underneath and both did the same two lookups plus a write; on the Java backend
+that is three bridge round trips the GUI thread used to make per flushed drag.
+Two T-F8/T-F10 source-inspection tests were updated to follow the moved code —
+same asserted contract (same lookups, same `set_property`; one wait when live is
+off, two around the ROI change when it is on), new location.
+
+**Verification:** `tests/test_mmcontrols_owner_thread.py` (9 tests) — off-thread
+snap with the display coming back, inline snap with no service, the queued move
+plus its post-move read-back, T-F8's `steps` folding, the optimistic shutter
+button, `resetROI`, both `setROI` branches (including that the live restart runs on
+neither the GUI nor the owner thread), and live mode starting only after the
+exposure write landed. Full `pytest -q` — 933 passed. No microscope here: nothing
+was exercised against real hardware.
+
+**Affects:** `glados_pycromanager/GUI/MMcontrols.py`, `CLAUDE.md`,
+`claude_throughput_project.md`, `tests/test_mmcontrols_owner_thread.py`,
+`tests/test_hardware_edit_debounce.py`, `tests/test_mode_setter_no_sleep.py`.

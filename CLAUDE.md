@@ -74,8 +74,34 @@ is the standalone plan that enforces them — but new code must follow them.
   swaps the finished dict in with one assignment (`_refreshCoreVariables`), so the
   snapshot is **eventually consistent** — a reader right after a node finishes may
   see the previous one. `createSingleCoreVar` grew a `target=` parameter for that.
-  Tests: `tests/test_core_variables_owner_thread.py`. What remains of T-B4:
-  `MMcontrols.py`, which still snaps images and moves stages directly in slots.
+  Tests: `tests/test_core_variables_owner_thread.py`. **`MMcontrols.py` completed
+  T-B4**: `submitHardware(shared_data, fn, ...)` / `guiThreadCall(shared_data, fn)`
+  at module scope are the pair every slot uses — queue the hardware work, bring the
+  widget or napari touch back. Migrated: `snapImage` / `addImageToAlbum` (the snap
+  blocks for the whole exposure), the exposure write behind `changeLiveMode`, all
+  three shutter slots, `resetROI` / `zoomROI` / `setROI`, both stage moves and every
+  position read-back, and the config writes (`set_config`, plus the slider's and
+  edit field's shared `_setUnderlyingConfigProperty`). Four things to know:
+  - **A read-back submitted right after a move reports the post-move position**,
+    because the queue is FIFO within a priority. That is the ordering guarantee the
+    stage slots rely on instead of blocking.
+  - **`changeLiveMode` flips `liveMode` from the exposure write's completion
+    callback**, bounced back to the GUI thread by `guiThreadCall` — the camera must
+    not start on the previous exposure, and flipping it *on the owner thread* would
+    deadlock (`acqModeChanged` waits for the acquisition worker, whose own stop call
+    is queued on that same thread).
+  - **`setROI`'s live branch gets its own short-lived thread** for the same reason:
+    it stops live, waits, sets, waits and restarts, which belongs on neither the GUI
+    thread (up to `ACQ_STOP_TIMEOUT_S`) nor the owner thread. `_setROI_hw` (no live
+    mode) is a single queued job.
+  - **`drawROI` no longer pauses live mode to read the sensor size** — that was a
+    stop / read / 0.2 s GUI-thread sleep / restart around a pure query. It is one
+    proxy read now, and the only call in the file the GUI thread still waits on
+    (it needs the bound before installing the drag callbacks).
+  Still inline, deliberately: pure reads on click-only paths — `updateShutterOptions`,
+  the scanning/grid helpers' `get_pixel_size_um`/`get_roi`, and `ConfigInfo`'s
+  introspection (which runs at panel construction). Tests:
+  `tests/test_mmcontrols_owner_thread.py`.
 - **All microscope access goes through one owner.** `MILcore`/`core` must have a single
   owning thread; other threads submit requests. Unsynchronized cross-thread `core.*` calls
   are not theoretical: commit `cd01032` fixed a **native access violation / JVM fatal

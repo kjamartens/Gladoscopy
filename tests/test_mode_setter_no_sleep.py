@@ -111,12 +111,21 @@ def test_the_unused_time_import_was_dropped(shared_mod):
 
 
 def test_set_roi_waits_on_the_core_instead_of_sleeping(qapp):
-    """setROI changes the ROI right after stopping live mode."""
+    """setROI changes the ROI right after stopping live mode.
+
+    T-B4 split the two branches into their own methods -- `_setROI_hw` (queued
+    on the hardware owner thread) and `_setROI_liveRestart` (its own short-lived
+    thread, since it must wait for the acquisition worker) -- so the waits are
+    asserted there. The contract is unchanged: one wait when live is off, two
+    around the ROI change when it is on.
+    """
     from glados_pycromanager.GUI.MMcontrols import MMConfigUI
 
-    source = inspect.getsource(MMConfigUI.setROI)
-    assert "time.sleep(0.5)" not in source, "the blind sleep is replaced by a wait"
-    assert source.count("wait_for_system()") == 3, (
+    combined = (inspect.getsource(MMConfigUI.setROI)
+                + inspect.getsource(MMConfigUI._setROI_hw)
+                + inspect.getsource(MMConfigUI._setROI_liveRestart))
+    assert "time.sleep(0.5)" not in combined, "the blind sleep is replaced by a wait"
+    assert combined.count("wait_for_system()") == 3, (
         "the non-live branch waits once; the live branch waits after the stop "
         "and again after the ROI change"
     )
@@ -126,8 +135,7 @@ def test_set_roi_live_branch_orders_stop_wait_set_wait_start(qapp):
     """Ordering is the whole point: stop, settle, set, settle, restart."""
     from glados_pycromanager.GUI.MMcontrols import MMConfigUI
 
-    source = inspect.getsource(MMConfigUI.setROI)
-    live_branch = source.split("else:", 1)[1]
+    live_branch = inspect.getsource(MMConfigUI._setROI_liveRestart)
     order = []
     for line in live_branch.splitlines():
         stripped = line.strip()
@@ -145,13 +153,22 @@ def test_set_roi_live_branch_orders_stop_wait_set_wait_start(qapp):
 
 
 def test_draw_roi_only_reads_and_needs_no_wait(qapp):
-    """The other live-mode pause surrounds a pure query, so it is left alone."""
+    """The other live-mode pause surrounded a pure query, so T-B4 dropped it.
+
+    `get_sensor_size()` is a read. It used to be bracketed by a live-mode stop,
+    a 0.2 s GUI-thread sleep and a restart; the owner thread serialises it
+    against the live pull loop instead, so the query alone is enough.
+    """
     from glados_pycromanager.GUI.MMcontrols import MMConfigUI
 
     source = inspect.getsource(MMConfigUI.drawROI)
     assert "get_sensor_size()" in source
     assert "set_roi(" not in source, (
         "if this ever writes to the core it needs the same explicit wait setROI got"
+    )
+    assert "time.sleep(0.2)" not in source, (
+        "a read does not need a live-mode pause, let alone one that sleeps on "
+        "the GUI thread"
     )
 
 

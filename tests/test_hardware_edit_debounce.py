@@ -149,13 +149,21 @@ def test_slider_release_is_connected_to_the_flush(ui_cls):
 
 
 def test_the_write_itself_is_unchanged(ui_cls):
-    """Same two getters, same set_property -- only the timing moved."""
+    """Same two getters, same set_property -- only the timing and thread moved.
+
+    T-B4 moved the body out of `_writeSliderProperty` (which now only queues it)
+    into `_setUnderlyingConfigProperty`, shared with the edit field; both config
+    kinds have exactly one property underneath. The lookups and the write are
+    still the same three calls, now on the hardware owner thread.
+    """
     import inspect
 
-    source = inspect.getsource(ui_cls._writeSliderProperty)
+    assert "submitHardware" in inspect.getsource(ui_cls._writeSliderProperty)
+
+    source = inspect.getsource(ui_cls._setUnderlyingConfigProperty)
     assert "get_available_configs" in source
     assert "get_config_data" in source
-    assert "set_property(device_label,property_name,trueValue)" in source
+    assert "set_property(device_label,property_name,value)" in source
 
 
 # ------------------------------------------------------------- wheel notches

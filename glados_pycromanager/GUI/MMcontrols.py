@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 
 import appdirs
@@ -53,6 +54,68 @@ from glados_pycromanager.GUI.napariHelperFunctions import (
     moveLayerToTop,
 )
 from glados_pycromanager.GUI.utils import CustomMainWindow
+
+
+#: T-B4: a hardware intent from a GUI slot goes to the MicroscopeService owner
+#: thread (T-B3) instead of running on the GUI thread. With no service running
+#: -- tests, the napari-plugin path, a shutdown in progress -- everything falls
+#: back to the direct call it used to be, which T-B1's lock still makes safe.
+
+
+def _hardwareService(shared_data):
+    """The running `MicroscopeService` for `shared_data`, or None."""
+    service = getattr(shared_data, 'microscope_service', None)
+    if service is not None and getattr(service, 'running', False):
+        return service
+    return None
+
+
+class _InlineRequest:
+    """Stands in for a `Request` when there is no service to submit to."""
+
+    __slots__ = ('result', 'exception')
+
+    def __init__(self, result):
+        self.result = result
+        self.exception = None
+
+
+def submitHardware(shared_data, fn, *args, label=None, callback=None, **kwargs):
+    """Queue `fn` on the hardware owner thread; run it inline if there is none.
+
+    Fire-and-forget: these are user intents with no reply the UI blocks on. The
+    queue is FIFO within a priority, so the hardware sees them in the order the
+    user asked for them -- which is what lets a read-back submitted right after
+    a stage move report the post-move position. `callback` receives the
+    completed request on the owner thread; use `guiThreadCall` from it to touch
+    a widget.
+    """
+    service = _hardwareService(shared_data)
+    if service is None:
+        result = fn(*args, **kwargs)
+        if callback is not None:
+            callback(_InlineRequest(result))
+        return None
+    return service.submit(fn, *args, label=label or getattr(fn, '__name__', 'mm'),
+                          callback=callback, **kwargs)
+
+
+def guiThreadCall(shared_data, fn):
+    """Run `fn()` on the GUI thread (inline when already there).
+
+    Invariant 3's mechanism: a hardware job runs on the owner thread and must
+    not touch a widget or a napari layer from there. `NapariBridge.submit`
+    calls back with the viewer as its first argument, which none of these need.
+    """
+    try:
+        from glados_pycromanager.GUI.napari_bridge import get_bridge
+        bridge = get_bridge(shared_data)
+    except Exception:
+        bridge = None
+    if bridge is None:
+        fn()
+        return
+    bridge.submit(lambda _viewer: fn())
 
 
 class ConfigInfo:
@@ -742,14 +805,45 @@ class MMConfigUI(CustomMainWindow):
         """
         Function that's called when an image is snapped (i.e. get a single image), uses the float(self.exposureTimeInputField.text()) as time in ms
         """
-        logging.debug("snapImage: exposure=%.1f ms, backend=%s", float(self.exposureTimeInputField.text()), shared_data.MILcore.MI())
+        # T-B4: the widget read stays here; the exposure write, the snap (which
+        # blocks for the whole exposure) and the image transfer go to the owner
+        # thread, and the layer update comes back to the GUI thread.
+        exposure = float(self.exposureTimeInputField.text())
+        logging.debug("snapImage: exposure=%.1f ms, backend=%s", exposure, shared_data.MILcore.MI())
+        submitHardware(self.shared_data, self._snapImage_hw, exposure,
+                       label='mm.snapImage')
+        return
+
+    def _startLiveAfterExposure(self, request):
+        """Start live mode once the exposure write has landed (T-B4).
+
+        Runs on the owner thread, so the actual flip is bounced to the GUI
+        thread: `shared_data.liveMode` re-enters `acqModeChanged`, which may
+        wait for the previous acquisition worker -- and that worker's own stop
+        call is queued *on* the owner thread, so waiting there would deadlock.
+        """
+        if getattr(request, 'exception', None) is not None:
+            logging.error('Setting the exposure before live mode failed: %s',
+                          request.exception)
+        guiThreadCall(self.shared_data, self._startLiveMode)
+
+    @staticmethod
+    def _startLiveMode():
+        shared_data.liveMode = True
+
+    def _snapImage_hw(self, exposure):
+        """Snap one image on the owner thread, show it on the GUI thread."""
         #Set the correct exposure time
-        shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
+        shared_data.MILcore.set_exposure(exposure)
         #Snap an image
         shared_data.MILcore.snap_image()
         #Get the just-snapped image
         newImage = shared_data.MILcore.get_image()
-        
+        guiThreadCall(self.shared_data, lambda: self._showSnappedImage(newImage))
+
+    @staticmethod
+    def _showSnappedImage(newImage):
+        """GUI-thread half of `_snapImage_hw`."""
         snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.shape[0],newImage.shape[1]))
         snapLayer.data = newImage
         #Move the layer to top
@@ -887,9 +981,15 @@ class MMConfigUI(CustomMainWindow):
             # icon: Flaticon.com
             self.LiveModeButton.setIcon(icon)
             #set exposure time first:
-            shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
-            #Then start live mode, which is just a custom MDA
-            shared_data.liveMode = True
+            # T-B4: queued on the owner thread, and live mode is flipped from
+            # the completion callback (back on the GUI thread) so the camera
+            # cannot start before the new exposure has been applied. With no
+            # service running the submit runs inline and this is exactly the
+            # old ordering.
+            exposure = float(self.exposureTimeInputField.text())
+            submitHardware(self.shared_data, shared_data.MILcore.set_exposure,
+                           exposure, label='mm.setExposure',
+                           callback=self._startLiveAfterExposure)
         else:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Start Live Mode")
@@ -940,13 +1040,17 @@ class MMConfigUI(CustomMainWindow):
         """" 
         Method that's called when the Open/Close shutter button is pressed.
         """
+        # T-B4: the device write is queued; the button updates optimistically,
+        # as it did before -- it never waited for a reply.
         current_text = self.shutterOpenCloseButton.text()
         if current_text == 'Open':
-            self.shared_data.MILcore.set_shutter_open(True)
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_shutter_open,
+                           True, label='mm.set_shutter_open')
             self.shutterOpenCloseButton.setText('Close')
             self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterClosed.png'))
         elif current_text == 'Close':
-            self.shared_data.MILcore.set_shutter_open(False) #type:ignore
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_shutter_open,
+                           False, label='mm.set_shutter_open')
             self.shutterOpenCloseButton.setText('Open')
             self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterOpen.png'))
 
@@ -955,7 +1059,8 @@ class MMConfigUI(CustomMainWindow):
         Set the shutter to the new choice if the dropdown is changed
         """ 
         selected_item = self.shutterChoiceDropdown.currentText()
-        self.shared_data.MILcore.set_shutter_device(selected_item)
+        submitHardware(self.shared_data, self.shared_data.MILcore.set_shutter_device,
+                       selected_item, label='mm.set_shutter_device')
 
     def on_shutterAutoCheckboxChanged(self,state):
         """
@@ -963,10 +1068,12 @@ class MMConfigUI(CustomMainWindow):
         """
         if state == 2:
             self.shutterOpenCloseButton.setEnabled(False)
-            self.shared_data.MILcore.set_auto_shutter(True)
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_auto_shutter,
+                           True, label='mm.set_auto_shutter')
         else:
             self.shutterOpenCloseButton.setEnabled(True)
-            self.shared_data.MILcore.set_auto_shutter(False)
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_auto_shutter,
+                           False, label='mm.set_auto_shutter')
     
     def updateShutterOptions(self):
         """" 
@@ -1037,17 +1144,25 @@ class MMConfigUI(CustomMainWindow):
 
         This function resets the ROI to its maximum size, which is the size of the image
         """
-        self.shared_data.MILcore.clear_roi() #type:ignore
+        submitHardware(self.shared_data, self.shared_data.MILcore.clear_roi,
+                       label='mm.clear_roi')  # T-B4
     
     def zoomROI(self,option):
         """
         Zoom the ROI in or out from the center
-        
+
         This function zooms the ROI in or out from the center.
         It zooms the ROI by a factor of 2.
         If the option is "ZoomIn", the ROI is zoomed in twice.
         If the option is "ZoomOut", the ROI is zoomed out twice
         """
+        # T-B4: the read and the resulting setROI are one job on the owner
+        # thread, so the ROI cannot change between them.
+        submitHardware(self.shared_data, self._zoomROI_hw, option,
+                       label='mm.zoomROI')
+
+    def _zoomROI_hw(self,option):
+        """Owner-thread half of `zoomROI`: read the ROI, compute, apply."""
         #Get the current ROI info
         #[x,y,width,height]
         roiv = self.shared_data.MILcore.get_roi()
@@ -1089,23 +1204,43 @@ class MMConfigUI(CustomMainWindow):
         """
         #ROIpos should be a list of [x,y,width,height]
         logging.debug('Zooming ROI to ' + str(ROIpos))
+        if not shared_data.liveMode:
+            # T-B4: one job on the owner thread -- set and wait belong together.
+            submitHardware(self.shared_data, self._setROI_hw, list(ROIpos),
+                           label='mm.setROI')
+            return
+        # Live mode has to be stopped, the ROI changed, and live restarted. That
+        # orchestration runs on neither the GUI thread (`acqModeChanged` may wait
+        # up to ACQ_STOP_TIMEOUT_S for the previous worker) nor the owner thread
+        # (the live worker's own stop call is queued *on* that thread, so waiting
+        # for it there would deadlock) -- so it gets a short-lived thread of its
+        # own, and reaches the hardware through the owner thread as usual.
+        threading.Thread(target=self._setROI_liveRestart, args=(list(ROIpos),),
+                         name='setROI', daemon=True).start()
+
+    def _setROI_hw(self, ROIpos):
+        """Apply an ROI with no live mode running (owner thread)."""
         try:
-            if not shared_data.liveMode:
-                self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
-                self.shared_data.MILcore.wait_for_system() #type:ignore
-            else:
-                # T-F10 part 2: this is the one caller that genuinely depended on
-                # the `time.sleep(0.1)` the mode setter used to do -- it changes
-                # the ROI immediately after stopping live mode, and
-                # `stop_sequence_acquisition()` is fire-and-forget on the Java
-                # side. Now that the setter no longer sleeps, wait on the core
-                # explicitly instead: once for the camera to finish stopping,
-                # once for the ROI change to take effect before restarting.
-                shared_data.liveMode = False
-                self.shared_data.MILcore.wait_for_system() #type:ignore
-                self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
-                self.shared_data.MILcore.wait_for_system() #type:ignore
-                shared_data.liveMode = True
+            self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
+            self.shared_data.MILcore.wait_for_system() #type:ignore
+        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+            logging.error('setROI(%s) failed: %s', ROIpos, exc)
+
+    def _setROI_liveRestart(self, ROIpos):
+        """Stop live, change the ROI, restart live -- off the GUI thread.
+
+        T-F10 part 2: `stop_sequence_acquisition()` is fire-and-forget on the
+        Java side, so the waits either side of the `set_roi` are what make this
+        correct -- once for the camera to finish stopping, once for the ROI
+        change to take effect before restarting.
+        """
+        hw = self.shared_data.microscope_proxy()
+        try:
+            shared_data.liveMode = False
+            hw.wait_for_system() #type:ignore
+            hw.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
+            hw.wait_for_system() #type:ignore
+            shared_data.liveMode = True
         except (RuntimeError, OSError, ValueError, AttributeError) as exc:
             logging.error('setROI(%s) failed: %s', ROIpos, exc)
     
@@ -1172,16 +1307,14 @@ class MMConfigUI(CustomMainWindow):
         # ------------------------------------------------------------------
         sensor_w, sensor_h = 65535, 65535  # generous fallback; microscope will enforce its own limits
         try:
-            if not shared_data.liveMode:
-                sensor_w, sensor_h = shared_data.MILcore.get_sensor_size()
-            else:
-                # Brief live-mode pause (same pattern as setROI())
-                shared_data.liveMode = False
-                try:
-                    sensor_w, sensor_h = shared_data.MILcore.get_sensor_size()
-                finally:
-                    time.sleep(0.2)
-                    shared_data.liveMode = True
+            # T-B4: `get_sensor_size()` is a pure query. It does not need the
+            # live-mode stop/start this used to do (nor the 0.2 s GUI-thread
+            # sleep that went with it) -- the owner thread serialises it against
+            # the live pull loop, so it is safe mid-acquisition. This is the one
+            # call in this file the GUI thread still waits on: drawROI needs the
+            # bound before it can install the drag callbacks, and one query
+            # replaces a stop/read/sleep/start round trip.
+            sensor_w, sensor_h = self.shared_data.microscope_proxy().get_sensor_size()
         except Exception as exc:
             logging.warning('drawROI: could not determine sensor size, using fallback: %s', exc)
 
@@ -1928,12 +2061,23 @@ class MMConfigUI(CustomMainWindow):
         stage_name = self.oneDstageDropdown.currentText()
         if not stage_name:
             return
+        # T-B4: read on the owner thread, apply on the GUI thread.
+        submitHardware(self.shared_data, self._readOneDstagePosition, stage_name,
+                       label='mm.get_position')
+
+    def _readOneDstagePosition(self, stage_name):
+        """Owner-thread half of `updateOneDstageLayout`."""
         try:
             pos = self.shared_data.MILcore.get_position(stage_name)
         except Exception:
             return
+        guiThreadCall(self.shared_data,
+                      lambda: self._applyOneDstageLayout(stage_name, pos))
+
+    def _applyOneDstageLayout(self, stage_name, pos):
+        """GUI-thread half of `updateOneDstageLayout`."""
         self.oneDinfoWidget.setText(f"{stage_name}\r\n {pos:.1f}") #type:ignore
-        
+
         for widget_id in range(0,self.oneDStackedWidget.count()):
             widget = self.oneDStackedWidget.widget(widget_id)
             if widget.objectName() == self.oneDstageDropdown.currentText():
@@ -1959,11 +2103,20 @@ class MMConfigUI(CustomMainWindow):
         
         logging.debug("moving " + selectedStage + " by " + str(amount))
         
-        #Move the stage relatively
+        #Move the stage relatively -- queued on the owner thread (T-B4). A
+        #wheel notch over the napari canvas reaches this slot, so it used to
+        #drive a stage move from the GUI thread on every scroll burst.
         if abs(amount) == 2:
-            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*steps*self.moveoneDstagesmallAmount).astype(float)) #type:ignore
+            distance = float(np.sign(amount)*steps*self.moveoneDstagesmallAmount)
         elif abs(amount) == 1:
-            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*steps*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
+            distance = float(np.sign(amount)*steps*self.moveoneDstagelargeAmount)
+        else:
+            distance = None
+        if distance is not None:
+            submitHardware(self.shared_data,
+                           self.shared_data.MILcore.set_relative_position,
+                           selectedStage, distance, label='mm.moveOneDStage')
+        #Queued behind the move, so it reads the post-move position.
         self.updateOneDstageLayout()
         # Second read-back after the stage has had time to settle.
         QTimer.singleShot(500, self.updateOneDstageLayout)
@@ -2033,8 +2186,26 @@ class MMConfigUI(CustomMainWindow):
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
         logging.debug("Updating OneD stage layout")
-        self.oneDinfoRelWidget.setText(f"{self.oneDstageRelDropdown.currentText()}\r\n {self.shared_data.MILcore.get_position(self.oneDstageRelDropdown.currentText()):.1f}") #type:ignore
-        
+        # T-B4: the position read goes to the owner thread; the widget text and
+        # the stacked-widget switch come back to the GUI thread.
+        stage_name = self.oneDstageRelDropdown.currentText()
+        submitHardware(self.shared_data, self._readOneDstageRelPosition, stage_name,
+                       label='mm.get_position')
+
+    def _readOneDstageRelPosition(self, stage_name):
+        """Owner-thread half of `updateOneDstageRelLayout`."""
+        try:
+            pos = self.shared_data.MILcore.get_position(stage_name) #type:ignore
+        except Exception as exc:
+            logging.debug('One-D stage position update skipped: %s', exc)
+            return
+        guiThreadCall(self.shared_data,
+                      lambda: self._applyOneDstageRelLayout(stage_name, pos))
+
+    def _applyOneDstageRelLayout(self, stage_name, pos):
+        """GUI-thread half of `updateOneDstageRelLayout`."""
+        self.oneDinfoRelWidget.setText(f"{stage_name}\r\n {pos:.1f}") #type:ignore
+
         for widget_id in range(0,self.oneDRelStackedWidget.count()):
             widget = self.oneDRelStackedWidget.widget(widget_id)
             if widget.objectName() == self.oneDstageRelDropdown.currentText():
@@ -2046,23 +2217,45 @@ class MMConfigUI(CustomMainWindow):
 
         """
         #TODO: catch if no xy stage present
+        # T-B4: the four hardware reads happen on the owner thread and only the
+        # final text reaches the GUI thread. The three-read loop below is kept
+        # (see its comment -- the first read reports the pre-move position), but
+        # only its last result was ever visible.
+        submitHardware(self.shared_data, self._readXYStagePosition,
+                       label='mm.get_xy_position')
+
+    def _readXYStagePosition(self):
+        """Owner-thread half of `updateXYStageInfoWidget`."""
         try:
             #Obtain the stage info from MM:
             XYStageName = self.shared_data.MILcore.get_xy_stage_device() #type:ignore
             #Get the stage position
             for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
                 XYStagePos = self.shared_data.MILcore.get_xy_position(XYStageName) #type:ignore
-                self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
-            #Align text center:
-            self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         except (RuntimeError, OSError, AttributeError, TypeError) as exc:
             logging.debug('XY stage position update skipped: %s', exc)
+            return
+        guiThreadCall(self.shared_data,
+                      lambda: self._applyXYStageInfo(XYStageName, XYStagePos))
+
+    def _applyXYStageInfo(self, XYStageName, XYStagePos):
+        """GUI-thread half of `updateXYStageInfoWidget`."""
+        try:
+            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
+            #Align text center:
+            self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        except RuntimeError:  # widget already destroyed
+            pass
         
     def moveXYStage(self,relX,relY):
         """
         Move XY stage with um positions in relx, rely:
         """
-        self.shared_data.MILcore.set_relative_xy_position([relX,relY])
+        # T-B4: queued on the owner thread, like the one-D stage move. The
+        # read-back below queues behind it, so it reports the post-move position.
+        submitHardware(self.shared_data,
+                       self.shared_data.MILcore.set_relative_xy_position,
+                       [relX,relY], label='mm.moveXYStage')
         self.updateXYStageInfoWidget()
         # Second read-back after the stage has had time to complete the move.
         QTimer.singleShot(500, self.updateXYStageInfoWidget)
@@ -2192,7 +2385,11 @@ class MMConfigUI(CustomMainWindow):
                 #Get the config group name:
                 configGroupName = self.config_groups[config_id].configGroupName()
                 #Set in MM:
-                self.config_groups[config_id].core.set_config(configGroupName,newValue)
+                # T-B4: queued on the hardware owner thread. A config switch
+                # can move a filter wheel, i.e. seconds of hardware time.
+                submitHardware(self.shared_data,
+                               self.config_groups[config_id].core.set_config,
+                               configGroupName, newValue, label='mm.set_config')
     
     def addSlider(self,rowLayout,config_id):
         """
@@ -2309,17 +2506,33 @@ class MMConfigUI(CustomMainWindow):
     SLIDER_WRITE_DEBOUNCE_MS = 200
 
     def _writeSliderProperty(self, config_id, trueValue):
-        """Push one slider's value to the device (two getters + a set_property)."""
-        configGroupName = self.config_groups[config_id].configGroupName()
-        #Set in MM:
-        #A slider config by definition (?) only has a single property underneath, so get that:
-        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
-        configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-        device_label = configdata.getSetting(0).getDeviceLabel()
-        property_name = configdata.getSetting(0).getPropertyName()
+        """Queue one slider's value for the device (T-B4).
 
-        #Set this property:
-        self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
+        The lookups and the write are one job on the owner thread: two getters
+        plus a `set_property`, which on the Java backend is three bridge round
+        trips the GUI thread used to make per flushed drag.
+        """
+        submitHardware(self.shared_data, self._setUnderlyingConfigProperty,
+                       config_id, trueValue, label='mm.set_property')
+
+    def _setUnderlyingConfigProperty(self, config_id, value):
+        """Resolve a single-property config group and write it (owner thread).
+
+        Shared by the slider and the edit field -- both config kinds have, by
+        definition, exactly one property underneath.
+        """
+        try:
+            configGroupName = self.config_groups[config_id].configGroupName()
+            #A slider/editfield config by definition (?) only has a single property underneath, so get that:
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+            configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+            device_label = configdata.getSetting(0).getDeviceLabel()
+            property_name = configdata.getSetting(0).getPropertyName()
+
+            #Set this property:
+            self.config_groups[config_id].core.set_property(device_label,property_name,value)
+        except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as exc:
+            logging.warning('Setting property for config %s failed: %s', config_id, exc)
 
     def _scheduleSliderPropertyWrite(self, config_id, trueValue):
         """Coalesce a drag into one device write (T-F8).
@@ -2379,18 +2592,10 @@ class MMConfigUI(CustomMainWindow):
         """
 
         CurrentText = self.editFields[config_id].text()
-        #Get the config group name:
-        configGroupName = self.config_groups[config_id].configGroupName()
-
-        #An Editfield config by definition (?) only has a single property underneath, so get that:
-        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
-            
-        configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-        device_label = configdata.getSetting(0).getDeviceLabel()
-        property_name = configdata.getSetting(0).getPropertyName()
-
-        #Set this property:
-        self.config_groups[config_id].core.set_property(device_label,property_name,CurrentText)
+        # T-B4: the widget read stays here; the two lookups and the write go to
+        # the owner thread as one job.
+        submitHardware(self.shared_data, self._setUnderlyingConfigProperty,
+                       config_id, CurrentText, label='mm.set_property')
         
     def updateValuefromMM(self,config_id):
         """
