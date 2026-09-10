@@ -157,3 +157,44 @@ def test_rt_counter_warns_rather_than_crashing_on_an_axis_less_frame(caplog):
         node.run(None, {}, None, None, Color='red')
     assert node.currentValue == 5.0
     assert "neither ImageNumber nor Axes" in caplog.text
+
+
+def test_psmlm_labels_its_localizations_from_the_frame_when_isolated():
+    """In the child there is no acquisition plan to read axis names from, so the
+    frame's own Axes have to carry them -- otherwise the localization table
+    silently loses its MDA columns."""
+    import numpy as np
+
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.pSMLM import pSMLM
+
+    class _Core:
+        def get_pixel_size_um(self):
+            return 1.0
+
+    node = pSMLM(core=_Core(), ROIradius=3, stdmult=2)
+    image = np.random.default_rng(0).poisson(50, (32, 32)).astype(np.uint16)
+    image[16, 16] = 5000
+    node.run(image, {"Axes": {"time": 4}}, None, None, ROIradius=3, stdmult=2)
+
+    table = node.fullSMLMlocs
+    assert list(table.columns) == ["time", "x_pos", "y_pos"]
+    assert len(table) >= 1, "the spike should localize; otherwise this asserts nothing"
+    assert set(table["time"]) == {4.0}
+
+
+def test_psmlm_without_axes_still_records_positions():
+    import numpy as np
+
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.pSMLM import pSMLM
+
+    class _Core:
+        def get_pixel_size_um(self):
+            return 1.0
+
+    node = pSMLM(core=_Core(), ROIradius=3, stdmult=2)
+    image = np.random.default_rng(0).poisson(50, (32, 32)).astype(np.uint16)
+    image[16, 16] = 5000
+    node.run(image, {}, None, None, ROIradius=3, stdmult=2)
+    table = node.fullSMLMlocs
+    assert list(table.columns) == ["x_pos", "y_pos"]
+    assert len(table) >= 1

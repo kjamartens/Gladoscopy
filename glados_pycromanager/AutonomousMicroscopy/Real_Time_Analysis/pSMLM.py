@@ -45,6 +45,14 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # A phasor fit over every local maximum, in scipy/skimage/pandas,
+            # per frame - exactly the GIL-heavy shape subprocess isolation
+            # exists for. See utils.realTimeAnalysis_runInSubprocess.
+            "__runInSubprocess__": True,
+            # What visualise() reads that run() produces. Note `lastImage` is
+            # deliberately NOT mirrored: it is a full frame, and nothing in the
+            # main process reads it.
+            "__snapshot_attrs__": ["SMLMlocs"],
         }
     }
 
@@ -182,16 +190,24 @@ class pSMLM:
                          self.SMLMlocs[:, 1].min(), self.SMLMlocs[:, 1].max())
             logging.debug("pSMLM: first 3 locs: %s", self.SMLMlocs[:3])
         
-        #Append to full list with frame info
-        #Cached per acquisition (T-G8): this used to walk every event of the
-        #plan, in pure Python, on every frame.
+        #Append to full list with frame info.
+        #The acquisition's axis names come from the cached dimension map when
+        #there is one (T-G8: this used to walk every event of the plan, in pure
+        #Python, on every frame), and otherwise from the frame's own Axes - which
+        #carry the same names, and are all a subprocess-isolated node has, since
+        #shared_data is None there (T-G10).
+        axes = (metadata.get('Axes', {}) if metadata else {}) or {}
         _dims = utils.getAcquisitionDimensions(shared_data)
         if _dims is not None:
             self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = _dims
-            column_headers = np.hstack([list(self.uniqueEntriesAllDims.keys()), ['x_pos', 'y_pos']])
+            axisNames = list(self.uniqueEntriesAllDims.keys())
+        else:
+            axisNames = list(axes)
+        if axisNames:
+            column_headers = np.hstack([axisNames, ['x_pos', 'y_pos']])
             mda_values = []
-            for v in list(self.uniqueEntriesAllDims.keys()):
-                mda_values = np.hstack((mda_values, metadata.get('Axes', {}).get(v, 0)))
+            for v in axisNames:
+                mda_values = np.hstack((mda_values, axes.get(v, 0)))
             mda_val_column = np.full((self.SMLMlocs.shape[0], 1), mda_values)
             new_locs_with_mdaVals = np.hstack((mda_val_column, self.SMLMlocs))
         else:
