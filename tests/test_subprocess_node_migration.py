@@ -126,3 +126,34 @@ def test_sharpness_value_is_isolated_and_mirrors_its_metric():
 
 def _rt_nodes_by_name():
     return {name: entry for name, _cls, entry in _rt_nodes()}
+
+
+# --- per-node behaviour under isolation ------------------------------------
+
+def test_rt_counter_reads_its_frame_number_from_the_frame_itself():
+    """It used to walk the acquisition plan (via shared_data) purely to learn
+    which axis to read. The frame's own Axes carry the same answer, and
+    shared_data is None in the child."""
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.RT_counter import (
+        RealTimeCounter,
+    )
+
+    node = RealTimeCounter(core=None, Color='red')
+    node.run(None, {"Axes": {"time": 7, "z": 3}}, None, None, Color='red')
+    assert node.currentValue == 3.0  # innermost axis, as the dimension map gave
+
+    node.run(None, {"ImageNumber": "12"}, None, None, Color='red')
+    assert node.currentValue == 12.0
+
+
+def test_rt_counter_warns_rather_than_crashing_on_an_axis_less_frame(caplog):
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.RT_counter import (
+        RealTimeCounter,
+    )
+
+    node = RealTimeCounter(core=None, Color='red')
+    node.currentValue = 5.0
+    with caplog.at_level("WARNING"):
+        node.run(None, {}, None, None, Color='red')
+    assert node.currentValue == 5.0
+    assert "neither ImageNumber nor Axes" in caplog.text

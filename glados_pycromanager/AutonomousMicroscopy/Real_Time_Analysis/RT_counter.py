@@ -6,8 +6,6 @@ import time
 
 import numpy as np
 
-import glados_pycromanager.GUI.utils as utils
-
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -35,6 +33,12 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # run() reads only the frame's metadata, so it is isolated in its own
+            # process - see utils.realTimeAnalysis_runInSubprocess.
+            "__runInSubprocess__": True,
+            # What visualise() reads that run() produces. `firstLayerInit` is set
+            # by visualise_init() on the main-process shadow instance.
+            "__snapshot_attrs__": ["currentValue"],
         }
     }
 
@@ -63,17 +67,20 @@ class RealTimeCounter:
             if info_enabled:
                 logging.info("At frame: "+metadata['ImageNumber']+" (metadata-ImageNumber)")
         else:
-            #Append to full list with frame info
-            #Cached per acquisition (T-G8): this used to walk every event of
-            #the plan, in pure Python, on every frame.
-            self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getAcquisitionDimensions(shared_data)
-            mda_values = []
-            for v in list(self.uniqueEntriesAllDims.keys()):
-                mda_values = np.hstack((mda_values,metadata['Axes'][v]))
-
-            self.currentValue = float(metadata['Axes'][v])
-            if info_enabled:
-                logging.info("At frame: "+str(metadata['Axes'][v])+" (metadata-Axes)")
+            #The frame's own Axes carry the counter: take the last (innermost)
+            #axis, which is what walking the acquisition plan's dimension map
+            #used to yield - the plan's dimension order is read off its first
+            #event's axes, so the two agree. Reading it from the frame instead
+            #costs nothing and needs no shared_data, which a subprocess-isolated
+            #node does not get (T-G8/T-G10).
+            axes = metadata.get('Axes', {}) if metadata else {}
+            axisName = list(axes)[-1] if axes else None
+            if axisName is None:
+                logging.warning("RT counter: frame carries neither ImageNumber nor Axes")
+            else:
+                self.currentValue = float(axes[axisName])
+                if info_enabled:
+                    logging.info("At frame: "+str(axes[axisName])+" (metadata-Axes)")
         if info_enabled:
             logging.info(f"Running time counter rta: {time.time()-run_time}")
     
