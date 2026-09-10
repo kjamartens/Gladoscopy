@@ -151,6 +151,17 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # PyTorch inference per frame, reading nothing but the frame - the
+            # heaviest GIL holder of any node here. See
+            # utils.realTimeAnalysis_runInSubprocess. Note the cost: the
+            # main-process visualisation shadow builds its own instance, so the
+            # model's weights are loaded (and held) twice. If that becomes a
+            # memory problem, this is the first node to move back in-process.
+            "__runInSubprocess__": True,
+            # What visualise() reads that run() produces. `imageLayerId` is not
+            # here on purpose: it is derived from the kwargs in __init__, so the
+            # shadow instance already has the identical value.
+            "__snapshot_attrs__": ["outputImage"],
         }
     }
 
