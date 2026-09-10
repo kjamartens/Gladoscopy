@@ -3081,3 +3081,48 @@ Performance Mode needs the GUI and could not be done here.
 
 **Affects:** `glados_pycromanager/GUI/AnalysisClass.py`, `CLAUDE.md`,
 `tests/test_rt_thread_teardown.py`.
+
+## 2026-09-10 — T-G10 approved; `__needsLiveCore__` lands before the flip, and three nodes stay in-process  [T-G10]
+
+**Approval.** The user approved T-G10 on 2026-09-10, choosing "do it now, one
+node per commit".
+
+**Ordering, deliberately not the task's.** T-G10 says "invert the default, add
+the opt-out, then migrate one node per commit". Done in that order, every
+un-migrated node is silently isolated from commit 1 onward — losing its
+visualisation (nothing declares `__snapshot_attrs__` yet, T-G5) and, for nodes
+reading `shared_data`, raising. So the flip goes **last**: the opt-out and each
+node's own declaration land first, and the final commit's default change is a
+no-op for every shipped node — it only decides what a *user-dropped AppData node*
+gets. That is exactly the semantic the task wants, reached without a broken
+intermediate state.
+
+**`__needsLiveCore__` covers core, shared_data and nodzInfo,** not just the core,
+because `_subprocess_analysis_worker` passes `None` for all three and the failure
+mode is identical. It takes **precedence over** `__runInSubprocess__`, so a node
+cannot opt into an isolation it cannot survive.
+
+**Nodes that stay in-process, and why:**
+- `LaserAdjustment.laser_adjustment` / `.laser_adjustment_advanced` — set the
+  laser DAC through the live `core` inside `run()`.
+- `EndAtFrame.EndAtFrame` — aborts the acquisition via
+  `shared_data._mdaModeAcqData.abort()`.
+
+**Nodes to migrate** (one commit each, after this one): `SharpnessValue`,
+`RT_counter`, `pSMLM`, `BioImageModelZoo`. `FFT_im` is already isolated. Two of
+them (`RT_counter`, `pSMLM`) read `shared_data` only to learn the acquisition's
+axis *names*, which the frame's own `metadata['Axes']` already carries — each
+gets that fallback in its own commit rather than an opt-out.
+
+**`RT_SUBPROCESS_ISOLATION_DEFAULT`** is a named module constant so the final
+flip is a one-line, obvious diff rather than an edit buried in a `.get()`.
+
+**Verification:** `tests/test_rt_analysis_subprocess_flag.py` — the opt-out for
+both laser functions and EndAtFrame, its precedence over an explicit opt-in, and
+a node declaring neither getting the documented default. `pytest -q -m "not slow"`
+— 771 passed.
+
+**Affects:** `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/LaserAdjustment.py`,
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/EndAtFrame.py`,
+`tests/test_rt_analysis_subprocess_flag.py`.

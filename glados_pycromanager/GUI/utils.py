@@ -3031,22 +3031,37 @@ def realTimeAnalysis_snapshotAttrs(rt_analysis_info):
     return list(entry.get('__snapshot_attrs__', []))
 
 
+#: What a node gets when its `__function_metadata__` says nothing about
+#: subprocess isolation. T-G10 inverts this; a node that cannot be isolated
+#: declares `"__needsLiveCore__": True` instead of relying on the default.
+RT_SUBPROCESS_ISOLATION_DEFAULT = False
+
+
 def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool:
     """Return whether the selected RT-analysis node should run in a subprocess.
 
-    See https://github.com/kjamartens/Gladoscopy/issues/16 — a node whose
-    ``__function_metadata__`` sets ``"__runInSubprocess__": True`` normally
-    runs its init/run/end in a separate OS process
-    (AnalysisProcess_customFunction) instead of a QThread, so a GIL-heavy
-    compute can't starve the Qt main thread. Defaults to False (existing
-    QThread behaviour) for every node that doesn't explicitly opt in.
+    See https://github.com/kjamartens/Gladoscopy/issues/16 — a node run in a
+    separate OS process (AnalysisProcess_customFunction) instead of a QThread
+    cannot starve the Qt main thread with a GIL-heavy compute, whatever the
+    underlying library does.
+
+    Three metadata-level answers, in order of precedence:
+
+    1. ``"__needsLiveCore__": True`` — the node reads something that does not
+       cross a process boundary: the live ``core``, ``shared_data``, or
+       ``nodzInfo``. Never isolated, whatever else is declared. In the child,
+       ``run()`` receives ``None`` for all three (see
+       ``_subprocess_analysis_worker``), so such a node would silently degrade
+       or raise.
+    2. ``"__runInSubprocess__"`` — the explicit per-node answer.
+    3. :data:`RT_SUBPROCESS_ISOLATION_DEFAULT` — what a node that says neither
+       gets.
 
     ``shared_data.config.rt_analysis_config.subprocess_isolation`` (Adv.
     settings, "RT-analysis: use a separate CPU core (subprocess)") is a
-    global kill switch on top of the per-node opt-in: when set to "False" it
-    forces every node back onto the same-process QThread path regardless of
-    its own metadata flag. ``shared_data`` is optional so existing/test call
-    sites that don't have it keep the pure per-node behaviour.
+    global kill switch on top of all three: when set to "False" it forces every
+    node back onto the same-process QThread path. ``shared_data`` is optional so
+    existing/test call sites that don't have it keep the pure per-node behaviour.
     """
     if shared_data is not None:
         global_setting = getattr(shared_data.config.rt_analysis_config, 'subprocess_isolation', 'True')
@@ -3058,7 +3073,9 @@ def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool
     wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
     functionMetadata = _node_metadata(wrapperName)
     functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
-    return bool(functionMetadata2.get('__runInSubprocess__', False))
+    if functionMetadata2.get('__needsLiveCore__', False):
+        return False
+    return bool(functionMetadata2.get('__runInSubprocess__', RT_SUBPROCESS_ISOLATION_DEFAULT))
 
 class SmallWindow(QMainWindow):
     """ 

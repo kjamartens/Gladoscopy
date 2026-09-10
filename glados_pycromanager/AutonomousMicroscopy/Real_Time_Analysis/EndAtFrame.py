@@ -38,6 +38,10 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # run() aborts the acquisition through shared_data._mdaModeAcqData,
+            # and a subprocess-isolated node is handed shared_data=None. Never
+            # isolate this one - see utils.realTimeAnalysis_runInSubprocess.
+            "__needsLiveCore__": True,
         }
     }
 

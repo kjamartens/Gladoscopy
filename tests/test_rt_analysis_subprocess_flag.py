@@ -62,3 +62,58 @@ def test_global_setting_false_overrides_a_node_that_opted_in():
 def test_global_setting_false_does_not_change_a_node_that_never_opted_in():
     shared_data = _fake_shared_data("False")
     assert utils.realTimeAnalysis_runInSubprocess(END_AT_FRAME_RT_ANALYSIS_INFO, shared_data) is False
+
+
+# --- T-G10: the __needsLiveCore__ opt-out ---------------------------------
+
+import glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.LaserAdjustment  # noqa: E402,F401
+
+LASER_ADJUSTMENT_RT_ANALYSIS_INFO = {
+    "__selectedDropdownEntryRTAnalysis__": "LaserAdj",
+    "__displayNameFunctionNameMap__": [("LaserAdj", "LaserAdjustment.laser_adjustment")],
+}
+
+ADVANCED_LASER_RT_ANALYSIS_INFO = {
+    "__selectedDropdownEntryRTAnalysis__": "Advanced laser adjustment",
+    "__displayNameFunctionNameMap__": [
+        ("Advanced laser adjustment", "LaserAdjustment.laser_adjustment_advanced")
+    ],
+}
+
+
+def test_a_node_needing_the_live_core_is_never_isolated():
+    """`core`, `shared_data` and `nodzInfo` are all None inside the child, so a
+    node reading any of them in run() must stay on the QThread path."""
+    assert utils.realTimeAnalysis_runInSubprocess(LASER_ADJUSTMENT_RT_ANALYSIS_INFO) is False
+    assert utils.realTimeAnalysis_runInSubprocess(ADVANCED_LASER_RT_ANALYSIS_INFO) is False
+
+
+def test_end_at_frame_needs_shared_data_to_abort_the_acquisition():
+    assert utils.realTimeAnalysis_runInSubprocess(END_AT_FRAME_RT_ANALYSIS_INFO) is False
+
+
+def test_needs_live_core_beats_an_explicit_opt_in(monkeypatch):
+    """Precedence: __needsLiveCore__ wins over __runInSubprocess__, so a node
+    cannot accidentally opt into an isolation it cannot survive."""
+    from glados_pycromanager.autonomous import registry
+
+    monkeypatch.setitem(
+        registry._METADATA_CACHE, "ZZ_conflicting",
+        {"Node": {"__needsLiveCore__": True, "__runInSubprocess__": True}},
+    )
+    rt_info = {
+        "__selectedDropdownEntryRTAnalysis__": "Conflicting",
+        "__displayNameFunctionNameMap__": [("Conflicting", "ZZ_conflicting.Node")],
+    }
+    assert utils.realTimeAnalysis_runInSubprocess(rt_info) is False
+
+
+def test_a_node_declaring_neither_gets_the_documented_default(monkeypatch):
+    from glados_pycromanager.autonomous import registry
+
+    monkeypatch.setitem(registry._METADATA_CACHE, "ZZ_silent", {"Node": {}})
+    rt_info = {
+        "__selectedDropdownEntryRTAnalysis__": "Silent",
+        "__displayNameFunctionNameMap__": [("Silent", "ZZ_silent.Node")],
+    }
+    assert utils.realTimeAnalysis_runInSubprocess(rt_info) is utils.RT_SUBPROCESS_ISOLATION_DEFAULT

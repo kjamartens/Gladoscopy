@@ -33,7 +33,11 @@ def __function_metadata__():
             "help_string": ".",
             "display_name": "LaserAdj",
             "run_delay": 0,
-            "visualise_delay": 500
+            "visualise_delay": 500,
+            # Drives the microscope directly (core.setProperty on the laser DAC)
+            # from run(), and a subprocess-isolated node is handed core=None.
+            # Never isolate this one - see utils.realTimeAnalysis_runInSubprocess.
+            "__needsLiveCore__": True,
         },
         "laser_adjustment_advanced": {
             "required_kwargs": [
@@ -45,7 +49,9 @@ def __function_metadata__():
             "help_string": ".",
             "display_name": "Advanced laser adjustment",
             "run_delay": 0,
-            "visualise_delay": 500
+            "visualise_delay": 500,
+            # Same as above: drives the laser through the live core in run().
+            "__needsLiveCore__": True,
         }
     }
 
