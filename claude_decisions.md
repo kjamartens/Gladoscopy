@@ -3189,3 +3189,49 @@ this at runtime, and `GLADOS_RT_EVAL_DISPATCH=1` covers the T-G4 half.
 `AutonomousMicroscopy/Real_Time_Analysis/`, `CLAUDE.md`,
 `tests/test_subprocess_node_migration.py`,
 `tests/test_rt_analysis_subprocess_flag.py`.
+
+## 2026-09-10 — The mirror is push-refreshed by a MIL callback, not polled or timed  [T-B2]
+
+**Context:** T-B2 asks for `hw_exposure_ms` / `hw_pixel_size_um` / `hw_image_shape`
+/ `hw_roi` on `Shared_data`, refreshed "at the points where they can change", and
+explicitly forbids a timer. Those points are all *inside* MIL (`set_core`,
+`set_exposure`, `set_roi`, `clear_roi`), which knows nothing about `Shared_data`.
+
+**Options:** (a) call `shared_data.refresh_hardware_mirror()` from every GUI call
+site that writes hardware; (b) give MIL an optional observer it notifies from
+those four methods.
+
+**Decision:** (b). `MIL.set_hardware_mirror(cb)` registers one callback, invoked
+with a reason string (`'core'` / `'exposure'` / `'roi'`) right after the existing
+`invalidate_*_cache()` calls; `Shared_data`'s `MILcore` property setter registers
+itself. Option (a) would have had to find and maintain every writer — MMcontrols,
+the laser scripts, node code, `utils.forceReset` — and would silently rot the
+moment a new one appeared, which is exactly the failure mode the mirror is
+supposed to remove. The callback runs on the calling thread inside the re-entrant
+`_hw_lock`, so it may read the new values back through MIL, and it is wrapped so
+a broken observer can never turn a hardware write into an exception.
+
+**Also decided:**
+- `MILcore` became a property on `Shared_data` so binding a MIL is what wires the
+  mirror. The five `shared_data.MILcore = ...` sites in `GUI_napari.py` are
+  unchanged.
+- `None` means "not read yet". The two display helpers refresh once and then fall
+  back to `MILcore` directly, so a stub/partially-built `shared_data` (several
+  tests, the napari-plugin path) keeps working instead of raising.
+- The pixel-size mirror deliberately inherits `get_pixel_size_um`'s existing cache
+  semantics (refreshed on `set_core` only). Making it also refresh on config-group
+  changes would be a behaviour change beyond this task; noted in `CLAUDE.md`.
+- `run_MILCoreAcquisition_worker` refreshes the whole mirror once at acquisition
+  start, on the acquisition thread — the one place the plan names that is not a
+  MIL write.
+
+**Verification:** `tests/test_hardware_mirror.py` (9 tests) — bind-time population,
+refresh on each of the four MIL writes, the display path making no MIL call once
+warm, the cold fallback, the unbound-core no-op, and callback-failure isolation.
+`pytest -q -m "not slow"` — 864 passed. No hardware available here, so the manual
+"change exposure while live" check was not performed.
+
+**Affects:** `glados_pycromanager/Core/microscopeInterfaceLayer.py`,
+`glados_pycromanager/GUI/sharedFunctions.py`,
+`glados_pycromanager/GUI/napariGlados.py`, `CLAUDE.md`,
+`tests/test_hardware_mirror.py`, `tests/test_live_sequence_worker.py`.

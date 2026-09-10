@@ -75,6 +75,26 @@ is the standalone plan that enforces them — but new code must follow them.
   serializes behind a slow stage move. `create_mda` is unlocked too — it is pure event-list
   construction and never touches the core. Tests: `tests/test_mil_hardware_lock.py`.
   Single-owner-thread dispatch (`MicroscopeService`) is still T-B3, not yet done.
+- **The display path never calls MIL (T-B2).** `Shared_data` mirrors the hardware
+  constants the display needs into plain attributes — `hw_exposure_ms`,
+  `hw_pixel_size_um`, `hw_roi`, `hw_image_shape` — and
+  `napariGlados._mirrored_exposure_ms` / `_mirrored_pixel_size_um` /
+  `_apply_pixel_scale` read those instead of `shared_data.MILcore.*`.
+  `napariUpdateLive`'s rate-limit gate made a `get_exposure()` call per candidate
+  frame on the GUI thread, and each layer creation three `get_pixel_size_um()`
+  calls. The mirror is refreshed *only* where the value can change: MIL invokes a
+  registered callback (`MIL.set_hardware_mirror`, called from `Shared_data`'s
+  `MILcore` property setter) at the end of `set_core`, `set_exposure`, `set_roi`
+  and `clear_roi` with a reason string, and `run_MILCoreAcquisition_worker`
+  calls `refresh_hardware_mirror()` once at acquisition start. `None` means "not
+  read yet" — the helpers then refresh once and fall back to MIL, so a
+  `shared_data` that never bound a MIL mirror still works. The callback runs on
+  the calling thread inside the (re-entrant) `_hw_lock`, so it may read MIL back;
+  an exception in it is logged, never propagated into the hardware write.
+  Note the pixel-size mirror inherits `get_pixel_size_um`'s cache semantics —
+  only a `set_core` re-reads it, so an objective change through a config group
+  is not picked up (pre-existing; same for the MIL cache itself). Tests:
+  `tests/test_hardware_mirror.py`.
 - **Only the GUI thread touches napari.** Workers emit Qt signals to a GUI-thread receiver;
   they never mutate `viewer.layers` or `viewer.dims` directly. `AnalysisClass.py`'s
   `_do_visualise` signal into `_visualise_on_main_thread` is the original reference

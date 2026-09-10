@@ -255,7 +255,19 @@ class Shared_data(QObject):
         self._headless = False
         self._busy = False
         self._core = []
-        self.MILcore: MIL.MicroscopeInterfaceLayer | None = None
+        self._MILcore: "MIL.MicroscopeInterfaceLayer | None" = None
+        # T-B2: mirrored hardware constants. The display path must never call
+        # MIL -- on PYCROMANAGER_JAVA a bridge round trip was measured at
+        # ~257 ms, and napariUpdateLive used to make one per candidate frame on
+        # the GUI thread. These plain attributes are refreshed from MIL only at
+        # the points where the hardware value can actually change (core bind,
+        # set_exposure, set_roi/clear_roi, acquisition start) via the mirror
+        # callback registered in the `MILcore` setter below. `None` means "not
+        # read yet"; readers fall back to MIL once and the refresh fills it in.
+        self.hw_exposure_ms: float | None = None
+        self.hw_pixel_size_um: float | None = None
+        self.hw_image_shape: tuple | None = None
+        self.hw_roi: tuple | None = None
         
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()
@@ -368,6 +380,57 @@ class Shared_data(QObject):
     # diagnostic value that the targeted log lines don't already provide.
     # (The liveMode/mdaMode transitions, which are the writes worth tracing, have
     # their own property setters with their own logging.)
+
+    # --- Mirrored hardware constants (T-B2) -------------------------------
+
+    @property
+    def MILcore(self):
+        return self._MILcore
+
+    @MILcore.setter
+    def MILcore(self, new_value):
+        self._MILcore = new_value
+        if new_value is not None and hasattr(new_value, "set_hardware_mirror"):
+            # MIL calls back on set_core/set_exposure/set_roi/clear_roi.
+            new_value.set_hardware_mirror(self._on_hardware_mirror_changed)
+            if getattr(new_value, "core", None) is not None:
+                self.refresh_hardware_mirror()
+
+    def _on_hardware_mirror_changed(self, reason: str) -> None:
+        """MIL mirror callback -- runs on whichever thread changed the hardware."""
+        self.refresh_hardware_mirror(reason)
+
+    def refresh_hardware_mirror(self, reason: str = "all") -> None:
+        """Re-read the mirrored hardware constants from MIL.
+
+        `reason` is one of ``'core'``, ``'exposure'``, ``'roi'`` or ``'all'``
+        (acquisition start / explicit refresh). Never raises: a backend that
+        cannot answer leaves the previous mirrored value in place, and the
+        readers fall back to MIL themselves.
+        """
+        mil = self._MILcore
+        if mil is None or getattr(mil, "core", None) is None:
+            return
+        wants_exposure = reason in ("all", "core", "exposure")
+        wants_geometry = reason in ("all", "core", "roi")
+        if wants_exposure:
+            try:
+                self.hw_exposure_ms = float(mil.get_exposure())
+            except Exception:
+                logging.debug("refresh_hardware_mirror: get_exposure failed", exc_info=True)
+        if reason in ("all", "core"):
+            try:
+                self.hw_pixel_size_um = float(mil.get_pixel_size_um())
+            except Exception:
+                logging.debug("refresh_hardware_mirror: get_pixel_size_um failed", exc_info=True)
+        if wants_geometry:
+            try:
+                roi = mil.get_roi()
+                self.hw_roi = tuple(int(v) for v in roi)
+                # ROI is (x, y, width, height); image shape is (height, width).
+                self.hw_image_shape = (self.hw_roi[3], self.hw_roi[2])
+            except Exception:
+                logging.debug("refresh_hardware_mirror: get_roi failed", exc_info=True)
 
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')

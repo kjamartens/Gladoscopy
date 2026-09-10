@@ -452,6 +452,51 @@ def _backfill_missing_slices(shared_data, layerName):
     return filled
 
 
+def _mirrored_exposure_ms(shared_data) -> float:
+    """Exposure in ms from `Shared_data`'s mirror, never calling MIL per frame.
+
+    T-B2: this runs on the GUI thread for every candidate frame. The mirror is
+    refreshed by MIL's hardware-mirror callback (core bind, set_exposure,
+    set_roi) and at acquisition start; the MIL fallback only ever runs before
+    the first refresh (or if the backend could not answer then).
+    """
+    exposure = getattr(shared_data, 'hw_exposure_ms', None)
+    if exposure is not None:
+        return float(exposure)
+    try:
+        shared_data.refresh_hardware_mirror('exposure')
+    except AttributeError:  # a stub/mock shared_data without the mirror
+        pass
+    exposure = getattr(shared_data, 'hw_exposure_ms', None)
+    if exposure is not None:
+        return float(exposure)
+    return float(shared_data.MILcore.get_exposure())
+
+
+def _mirrored_pixel_size_um(shared_data) -> float:
+    """Pixel size in um from the mirror, falling back to MIL once (see T-B2)."""
+    pixel_size = getattr(shared_data, 'hw_pixel_size_um', None)
+    if pixel_size is None:
+        try:
+            shared_data.refresh_hardware_mirror('core')
+        except AttributeError:
+            pass
+        pixel_size = getattr(shared_data, 'hw_pixel_size_um', None)
+    if pixel_size is None:
+        pixel_size = shared_data.MILcore.get_pixel_size_um()
+    return float(pixel_size)
+
+
+def _apply_pixel_scale(layer, shared_data) -> None:
+    """Scale a freshly created layer to the camera pixel size (or 1 um)."""
+    pixel_size = _mirrored_pixel_size_um(shared_data)
+    if pixel_size != 0:
+        layer.scale = [pixel_size, pixel_size]  # type:ignore
+    else:
+        logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
+        layer.scale = [1, 1]
+
+
 def _should_display_now(shared_data, now=None):
     """Rate-limit decision for the live/MDA display path.
 
@@ -472,7 +517,7 @@ def _should_display_now(shared_data, now=None):
         now = time.time()
     #The min_delay_time is here to prevent 2 frames updating 1ms after one another if they arrive like this. Ideally, we wait exactly the frame-time between frames.
     # builtin min() on two scalars -- np.min() here allocated a numpy array per call.
-    min_delay_time = min(50/1000, (float(shared_data.MILcore.get_exposure())*0.99)/1000) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
+    min_delay_time = min(50/1000, (_mirrored_exposure_ms(shared_data)*0.99)/1000) #Never more than 50 ms! This is on the main thread, so we don't want to unnecessarily wait.
     display_update_time = 1/float(shared_data.config.visualisation_config.fps)#0.05
 
     elapsed = now - shared_data.last_display_update_time
@@ -565,11 +610,7 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             # live images use the default 2-D renderer (omit the kwarg).
             layer = napariViewer.add_image(liveImage, colormap=DataStructure['layer_color_map'],name = layerName)
             #Set correct scale - in nm
-            if shared_data.MILcore.get_pixel_size_um() != 0:
-                layer.scale = [shared_data.MILcore.get_pixel_size_um(),shared_data.MILcore.get_pixel_size_um()] #type:ignore
-            else:
-                logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
-                layer.scale = [1,1]
+            _apply_pixel_scale(layer, shared_data)
             # `_keep_auto_contrast = True` recomputes contrast limits (a full
             # min/max scan) on every single frame update below -- bench_live_display
             # measured this as the single largest recurring per-frame cost in the
@@ -710,11 +751,7 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     
                     layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
-                    if shared_data.MILcore.get_pixel_size_um() != 0:
-                        layer.scale = [shared_data.MILcore.get_pixel_size_um(),shared_data.MILcore.get_pixel_size_um()] #type:ignore
-                    else:
-                        logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
-                        layer.scale = [1,1]
+                    _apply_pixel_scale(layer, shared_data)
                     # Same throttle the frameByFrame path uses (T-E2). With
                     # `_keep_auto_contrast = True` napari runs reset_contrast_limits()
                     # -- a full min/max scan of the freshly decompressed slice -- on
@@ -753,11 +790,7 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     nrLayersBefore = len(napariViewer.layers)
                     layer = napariViewer.add_image(latestImage, colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
-                    if shared_data.MILcore.get_pixel_size_um() != 0:
-                        layer.scale = [shared_data.MILcore.get_pixel_size_um(),shared_data.MILcore.get_pixel_size_um()] #type:ignore
-                    else:
-                        logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
-                        layer.scale = [1,1]
+                    _apply_pixel_scale(layer, shared_data)
                     layer._keep_auto_contrast = True #type:ignore
                     napariViewer.reset_view()
             #Else if the layer already exists, replace it!
@@ -1498,6 +1531,10 @@ class napariHandler:
         """
         from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
         shared_data.register_perf_thread_label(get_native_id(), 'MDA/acquisition worker')
+        # T-B2: refresh the mirrored hardware constants once here, on the
+        # acquisition thread, so the GUI-thread display path reads plain
+        # attributes for the whole run instead of calling MIL per frame.
+        self.shared_data.refresh_hardware_mirror()
         visualisation_queue = parent.visualisation_queue
         shared_data.debugImageArrivalTimes=[]
         shared_data.debugImageDisplayTimes=[]

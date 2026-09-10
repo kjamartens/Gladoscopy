@@ -65,6 +65,12 @@ class _StubSharedData:
         self.debugImageDisplayTimes = []
         self._headless = True
         self.backend = "Python"
+        self.mirror_refreshes: list[str] = []
+
+    def refresh_hardware_mirror(self, reason="all"):
+        # T-B2: the acquisition worker refreshes the mirrored hardware
+        # constants once at start; nothing in these tests reads them.
+        self.mirror_refreshes.append(reason)
 
     def register_perf_thread_label(self, native_id, label):
         self.perf_labels[native_id] = label

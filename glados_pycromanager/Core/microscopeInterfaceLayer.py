@@ -91,6 +91,12 @@ class MicroscopeInterfaceLayer:
         # cannot come from a per-frame get_roi() call. Invalidated wherever
         # the frame geometry can change: set_core(), set_roi(), clear_roi().
         self._image_shape_cache: tuple[int, int] | None = None
+        # T-B2: optional observer notified whenever a mirrored hardware
+        # constant (exposure / pixel size / ROI / frame shape) may have
+        # changed, so the display path can read a plain Python attribute off
+        # `Shared_data` instead of calling MIL per frame. Registered by
+        # `Shared_data.MILcore`'s setter; see `set_hardware_mirror`.
+        self._mirror_callback = None  # Callable[[str], None] | None
         self.mda: dict | None = None
 
     @_hardware_locked
@@ -120,6 +126,7 @@ class MicroscopeInterfaceLayer:
                 type(core).__name__,
                 core,
             )
+        self._notify_hardware_mirror("core")
 
     def get_core(self):
         return self.core
@@ -249,6 +256,29 @@ class MicroscopeInterfaceLayer:
         """Force the next frame reshape to re-read the ROI."""
         self._image_shape_cache = None
 
+    def set_hardware_mirror(self, callback) -> None:
+        """Register a callback invoked when mirrored hardware state changes.
+
+        `callback(reason)` is called with one of ``'core'``, ``'exposure'`` or
+        ``'roi'`` from `set_core`, `set_exposure` and `set_roi`/`clear_roi` --
+        exactly the points at which the values `Shared_data` mirrors can
+        change. Pass ``None`` to unregister.
+
+        The callback runs on the calling thread, inside the (re-entrant)
+        hardware lock, so it may call back into MIL to read the new values.
+        """
+        self._mirror_callback = callback
+
+    def _notify_hardware_mirror(self, reason: str) -> None:
+        """Invoke the registered mirror callback, never raising into the caller."""
+        callback = self._mirror_callback
+        if callback is None:
+            return
+        try:
+            callback(reason)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("MIL hardware-mirror callback failed for reason %r", reason)
+
     def _reshape_if_flat(self, pix, tags: dict | None = None) -> np.ndarray:
         """Return ``pix`` as a 2-D array, reshaping a flat buffer if needed.
 
@@ -298,6 +328,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for clear_roi.")
         self.invalidate_image_shape_cache()
+        self._notify_hardware_mirror("roi")
 
     @_hardware_locked
     def get_auto_shutter(self) -> bool:
@@ -1088,6 +1119,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for setting exposure.")
         self.invalidate_exposure_cache()
+        self._notify_hardware_mirror("exposure")
 
     @_hardware_locked
     def set_focus_device(self,focus_device) -> None:
@@ -1162,6 +1194,7 @@ class MicroscopeInterfaceLayer:
         else:
             raise ValueError("Unsupported microscope interface type for set_roi.")
         self.invalidate_image_shape_cache()
+        self._notify_hardware_mirror("roi")
     
     @_hardware_locked
     def set_shutter_device(self, shutter_device: str) -> None:
