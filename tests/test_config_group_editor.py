@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import QApplication
 import glados_pycromanager.GUI.config_group_editor as config_group_editor
 from glados_pycromanager.GUI.config_group_editor import (
     DEVICE_TYPE_FILTER_BUCKETS,
+    ConfigGroupEditorDialog,
     GroupEditorDialog,
     PresetEditorDialog,
     collect_config_groups,
@@ -328,3 +329,46 @@ class TestPresetEditorDialogAccept:
         dialog._onAccept()
 
         mil.define_config.assert_not_called()
+
+
+class TestSaveConfigurationFeedback:
+    """The Save button must relabel to "Saved!" (and disable itself) right
+    after a successful save, so a click that otherwise has no visible
+    effect still gives the user feedback -- then revert once
+    SAVED_FEEDBACK_MS elapses, via _restoreSaveButton()."""
+
+    def _dialog(self, monkeypatch):
+        monkeypatch.setattr(config_group_editor, "storeSharedData_GlobalData", lambda shared_data: None)
+        mil = MagicMock()
+        mil.get_available_config_groups.return_value = []
+        shared_data = MagicMock()
+        shared_data.config.micromanager_config.config_path = "C:/tmp/x.cfg"
+        return ConfigGroupEditorDialog(mil, shared_data), mil
+
+    def test_successful_save_flashes_saved_and_disables_button(self, monkeypatch):
+        dialog, mil = self._dialog(monkeypatch)
+
+        dialog.saveConfiguration()
+
+        mil.save_system_configuration.assert_called_once_with("C:/tmp/x.cfg")
+        assert dialog.save_button.text() == "Saved!"
+        assert dialog.save_button.isEnabled() is False
+
+    def test_restore_save_button_reverts_label_and_reenables(self, monkeypatch):
+        dialog, _mil = self._dialog(monkeypatch)
+
+        dialog.saveConfiguration()
+        dialog._restoreSaveButton()
+
+        assert dialog.save_button.text() == "Save"
+        assert dialog.save_button.isEnabled() is True
+
+    def test_failed_save_does_not_flash_saved(self, monkeypatch):
+        dialog, mil = self._dialog(monkeypatch)
+        monkeypatch.setattr(config_group_editor, "QMessageBox", _NoOpMessageBox)
+        mil.save_system_configuration.side_effect = RuntimeError("disk full")
+
+        dialog.saveConfiguration()
+
+        assert dialog.save_button.text() == "Save"
+        assert dialog.save_button.isEnabled() is True

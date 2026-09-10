@@ -26,7 +26,7 @@ import logging
 import os
 import sys
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -53,6 +53,10 @@ import glados_pycromanager.GUI.device_property_browser as device_property_browse
 from glados_pycromanager.io.appdata import storeSharedData_GlobalData
 
 logger = logging.getLogger(__name__)
+
+# How long the Save button reads "Saved!" before reverting, so a click that
+# writes a file with no other visible effect still gets user feedback.
+SAVED_FEEDBACK_MS = 1500
 
 # Mirrors MMcontrols.py's getDevicesOfDeviceType() deviceTypeArray -- see
 # https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html
@@ -438,9 +442,9 @@ class ConfigGroupEditorDialog(QDialog):
         top_row = QHBoxLayout()
         top_row.addWidget(QLabel("Configuration settings"))
         top_row.addStretch()
-        save_button = QPushButton("Save", self)
-        save_button.clicked.connect(self.saveConfiguration)
-        top_row.addWidget(save_button)
+        self.save_button = QPushButton("Save", self)
+        self.save_button.clicked.connect(self.saveConfiguration)
+        top_row.addWidget(self.save_button)
 
         group_preset_row = QHBoxLayout()
         group_preset_row.addWidget(QLabel("Group:"))
@@ -578,6 +582,18 @@ class ConfigGroupEditorDialog(QDialog):
             self._warn(f"Could not save configuration to {path}: {exc}")
             return
         storeSharedData_GlobalData(self._shared_data)
+        self._flashSavedFeedback()
+
+    def _flashSavedFeedback(self):
+        """Briefly relabel the Save button to "Saved!" so the user gets
+        feedback that the click actually did something, then restore it."""
+        self.save_button.setText("Saved!")
+        self.save_button.setEnabled(False)
+        QTimer.singleShot(SAVED_FEEDBACK_MS, self._restoreSaveButton)
+
+    def _restoreSaveButton(self):
+        self.save_button.setText("Save")
+        self.save_button.setEnabled(True)
 
     def _warn(self, message):
         logger.warning(message)

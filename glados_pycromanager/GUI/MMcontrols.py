@@ -134,44 +134,32 @@ class ConfigInfo:
         return upperLimit
             
     def isDropDown(self):
-        """Returns Boolean whether the config group should be represented as a drop-down menu"""
-        if self.nrConfigs()>1:
-            return True
-        else:
-            #If there is exactly one option...
-            if self.nrConfigs() == 1:
-                #And the option is 'NewPreset', it means there are no presets specified
-                if shared_data.MILcore.get_available_configs(self.configGroupName())[0] == 'NewPreset':
-                    return False
-                else:
-                    return True
-        
+        """Returns Boolean whether the config group should be represented as a drop-down menu
+
+        Only a group with more than one named preset gets a preset-name
+        dropdown. A group with a single preset (whatever it's named --
+        including the 'NewPreset' sentinel MM/the group editor give an
+        as-yet-uncustomized group) manages one set of property values
+        directly instead: see isSlider()/isInputField(). Previously a
+        single *named* preset (anything but literally 'NewPreset') was
+        also shown as a one-item preset dropdown instead of the
+        underlying property's own widget -- which is what produced a
+        1-item combobox glued next to (or instead of) the property
+        widget for e.g. a single-property group.
+        """
+        return self.nrConfigs() > 1
+
     def isSlider(self):
         """Returns Boolean whether the config group should be represented as a slider"""
-        if self.nrConfigs()>1:
+        if self.nrConfigs() != 1:
             return False
-        else:
-            if self.hasPropertyLimits():
-                return True
-            else:
-                return False
-    
+        return self.hasPropertyLimits()
+
     def isInputField(self):
         """Returns Boolean whether the config group should be represented as an input field"""
-        if self.nrConfigs()>1:
+        if self.nrConfigs() != 1:
             return False
-        else:
-            #If there is exactly one option...
-            if self.nrConfigs() == 1:
-                #And the option is 'NewPreset', it means there are no presets specified
-                if shared_data.MILcore.get_available_configs(self.configGroupName())[0] == 'NewPreset':
-                    #check if it's not a slider...
-                    if self.hasPropertyLimits():
-                        return False
-                    else:
-                        return True
-                else:
-                    return False
+        return not self.hasPropertyLimits()
 
     def helpStringInfo(self):
         """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
@@ -334,23 +322,36 @@ class MMConfigUI(CustomMainWindow):
             self.configGroupBox = QGroupBox("Configurations")
             self.configLayout = QGridLayout()
             self.configLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
-            #Add this to the mainLayout via the groupbox:
-            self.configGroupBox.setLayout(self.configLayout)
+            #The row grid and the button row below it are two separate
+            #layouts (not one widget spanning configLayout's columns) so the
+            #buttons' width never forces the grid to allocate extra, mostly
+            #empty columns -- that used to squeeze the config rows (and their
+            #labels) into a fraction of the group box's real width.
+            self.configOuterLayout = QVBoxLayout()
+            self.configOuterLayout.addLayout(self.configLayout)
+            self.configGroupBox.setLayout(self.configOuterLayout)
             self.mainLayout.addWidget(self.configGroupBox,0,2)
             #Fill the configLayout
             for config_id in range(len(config_groups)):
                 self.configEntries[config_id] = self.addRow(config_id)
-            pass
-        
-            #Add a button to refresh from MM:
+
+            #Add the config-panel button row: refresh, device property
+            #browser, config group editor.
+            configButtonRow = QHBoxLayout()
             self.refreshButton = QPushButton("Refresh configs from MM")
-            totalRowsAdded = int(np.ceil(len(config_groups)/self.number_columns))
-            #Add a button spanning the total columns at the bottom
-            self.configLayout.addWidget(self.refreshButton,totalRowsAdded+99,0,1,self.number_columns)
-            #Connect the button:
-            self.refreshButton.clicked.connect(lambda index: self.updateConfigsFromMM())
-            
-        
+            self.refreshButton.clicked.connect(lambda index: self.rebuildConfigLayout())
+            configButtonRow.addWidget(self.refreshButton)
+
+            self.devicePropertyBrowserButton = QPushButton("Device Property Browser…")
+            self.devicePropertyBrowserButton.clicked.connect(lambda: self.openDevicePropertyBrowser())
+            configButtonRow.addWidget(self.devicePropertyBrowserButton)
+
+            self.configGroupEditorButton = QPushButton("Config Group Editor…")
+            self.configGroupEditorButton.clicked.connect(lambda: self.openConfigGroupEditor())
+            configButtonRow.addWidget(self.configGroupEditorButton)
+
+            self.configOuterLayout.addLayout(configButtonRow)
+
         #Add the stages widget to the right of this if wanted
         if showStages:
             #Now add the stages widget
@@ -409,7 +410,7 @@ class MMConfigUI(CustomMainWindow):
         """
         logging.debug('Updating all MM info')
         if self.showConfigs:
-            self.updateConfigsFromMM()
+            self.rebuildConfigLayout()
         if self.showStages:
             self.updateXYStageInfoWidget()
             self.updateOneDstageLayout()
@@ -707,14 +708,9 @@ class MMConfigUI(CustomMainWindow):
         self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
         debugHbox.addWidget(self.advSettingsButton)
 
-        self.devicePropertyBrowserButton = QPushButton("Device Property Browser…")
-        self.devicePropertyBrowserButton.clicked.connect(lambda: self.openDevicePropertyBrowser())
-        debugHbox.addWidget(self.devicePropertyBrowserButton)
-
-        self.configGroupEditorButton = QPushButton("Config Group Editor…")
-        self.configGroupEditorButton.clicked.connect(lambda: self.openConfigGroupEditor())
-        debugHbox.addWidget(self.configGroupEditorButton)
-
+        #Device Property Browser / Config Group Editor buttons live in the
+        #Configurations panel itself (next to "Refresh configs from MM"),
+        #not here -- see the showConfigs block above.
 
         self.helpButton = QPushButton("Help")
         self.helpButton.clicked.connect(lambda: self.openHelpWindow())
@@ -2073,6 +2069,48 @@ class MMConfigUI(CustomMainWindow):
     #endregion
     
     #region MM-configs
+    def rebuildConfigLayout(self):
+        """Fully rebuild the Configurations panel from live MM state.
+
+        Unlike updateConfigsFromMM() (which only pushes new values into
+        already-existing row widgets), this re-fetches the current list of
+        config groups from MIL and recreates every row. That's required
+        after the config group editor adds/renames/deletes a group or
+        preset: self.config_groups, and each dropdown's item list, are
+        otherwise frozen at construction time, so a renamed/added group
+        would never appear and setCurrentText() on a preset name that
+        didn't exist yet at construction would silently do nothing.
+        """
+        if not self.showConfigs:
+            return
+        self._clearConfigLayout()
+
+        self.dropDownBoxes = {}
+        self.sliders = {}
+        self.editFields = {}
+        self.configCheckboxes = {}
+        self.configEntries = {}
+
+        group_count = len(shared_data.MILcore.get_available_config_groups())
+        self.config_groups = {i: ConfigInfo(self.core, self.shared_data, i) for i in range(group_count)}
+
+        for config_id in range(len(self.config_groups)):
+            self.configEntries[config_id] = self.addRow(config_id)
+
+    def _clearConfigLayout(self):
+        """Remove every row (and any leftover widgets) from configLayout."""
+        while self.configLayout.count():
+            self._clearLayoutItem(self.configLayout.takeAt(0))
+
+    def _clearLayoutItem(self, item):
+        child_layout = item.layout()
+        widget = item.widget()
+        if child_layout is not None:
+            while child_layout.count():
+                self._clearLayoutItem(child_layout.takeAt(0))
+        if widget is not None:
+            widget.deleteLater()
+
     def addRow(self,config_id):
         """
         Add a new row in the configLayout which will be populated with a label-dropdown/slider/inputField combination
@@ -2101,12 +2139,13 @@ class MMConfigUI(CustomMainWindow):
         label = QLabel()
         label.setText(self.config_groups[config_id].configGroupName())
         rowLayout.addWidget(label)
-        #Add the dropdown/slider/inputfield:
+        #Add the dropdown/slider/inputfield (mutually exclusive -- see
+        #ConfigInfo.isDropDown/isSlider/isInputField):
         if self.config_groups[config_id].isDropDown():
             self.addDropDown(rowLayout,config_id)
-        if self.config_groups[config_id].isSlider():
+        elif self.config_groups[config_id].isSlider():
             self.addSlider(rowLayout,config_id)
-        if self.config_groups[config_id].isInputField():
+        elif self.config_groups[config_id].isInputField():
             self.addInputField(rowLayout,config_id)
         return rowLayout
         # pass
