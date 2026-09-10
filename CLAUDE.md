@@ -53,10 +53,22 @@ is the standalone plan that enforces them — but new code must follow them.
   hardware, block on I/O, or run analysis. Anything else belongs on a worker. **Tier F of
   `claude_throughput_project.md` is complete** — both halves, including the two decision
   gates the user approved on 2026-09-09 — and removed the standing violations it named;
-  see *GUI-thread work removed in Tier F* below. What remains: `MMcontrols.py` still snaps
-  images directly in slots, `LaserControlScripts.py`'s `ResetLasersTrigger` still issues
-  ~100 serial round-trips in one click, and `blinkUV` still sleeps on the GUI thread (all
-  three need T-B3/T-B4).
+  see *GUI-thread work removed in Tier F* below. **T-B4 removed the
+  `LaserControlScripts.py` half**: every hardware touch in that file goes through
+  `submitHardware()`, which queues onto the T-B3 owner thread (and runs inline when no
+  service is running, so the plugin path and the tests are unaffected). The three slots
+  that hurt — `ResetLasersTrigger` (~100 serial round trips per click), `armLaser`
+  (0.1 s of sleep per repeat frame, x5 lasers via `armLaserTriggering`) and `blinkUV`
+  (sleeps between its on and off writes) — are queued whole, with widget *reads* done on
+  the caller first and widget *writes* marshalled back through
+  `_onGuiThread` (the `NapariBridge`). Two behaviour notes: `TS_Response_verbose` made
+  three identical `get_property` reads to display one answer and now makes one, and
+  `_refreshLaserButtonLabels`/`_applyLaserButtonLabels` split the five on/off reads from
+  the label writes (the reset loop refreshes once at the end instead of ten times
+  mid-loop). Tests: `tests/test_laser_controls_owner_thread.py`, which pins the emitted
+  serial command sequence so the refactor stays observationally identical at the wire.
+  What remains: `MMcontrols.py` still snaps images directly in slots and
+  `FlowChart_dockWidgets.createCoreVariables` still blocks (the rest of T-B4).
 - **All microscope access goes through one owner.** `MILcore`/`core` must have a single
   owning thread; other threads submit requests. Unsynchronized cross-thread `core.*` calls
   are not theoretical: commit `cd01032` fixed a **native access violation / JVM fatal
@@ -232,6 +244,56 @@ the "Config Group Editor…" button next to "Device Property Browser…" in
 This all matches the actual `.cfg` file syntax 1:1 — one
 `ConfigGroup,<group>,<preset>,<device>,<property>,<value>` line per setting.
 Tests: `tests/test_mil_config_groups.py`, `tests/test_config_group_editor.py`.
+`ConfigGroupEditorDialog`'s "Save" button flashes `"Saved!"` (disabled) for
+`SAVED_FEEDBACK_MS` (1.5s) after a successful save, reverted by
+`_restoreSaveButton()` via `QTimer.singleShot` — otherwise a save has no
+visible effect at all. The two "…Browser…"/"…Editor…" buttons and the
+"Refresh configs from MM" button now all live together in the live
+Configurations panel, not this dialog — see `MMConfigUI` below.
+
+**Configurations panel — `MMConfigUI`/`ConfigInfo` (`GUI/MMcontrols.py`):**
+this is the *other*, always-visible config-group UI (one row per group with
+a dropdown/slider/input-field, built in `MMConfigUI.__init__`'s
+`showConfigs` block) — distinct from the `ConfigGroupEditorDialog` popup
+above, which is reached from a button inside this same panel alongside
+"Device Property Browser…" and "Refresh configs from MM" (previously these
+two buttons sat in the unrelated debug-button row).
+- **`ConfigInfo.isDropDown()`/`isSlider()`/`isInputField()` are mutually
+  exclusive by construction**: `isDropDown()` is `nrConfigs() > 1` and
+  nothing else — a group with a single preset is *never* shown as a
+  preset-name dropdown, even if that one preset has a real name (not the
+  `'NewPreset'` sentinel); it always goes to `isSlider()`/`isInputField()`
+  (branching on `hasPropertyLimits()`) so a single-property group is edited
+  through that property's own widget, matching Micro-Manager's own
+  behaviour and the Group/Preset editor's methodology above. Previously a
+  single *named* preset with a ranged property satisfied both `isDropDown()`
+  and `isSlider()`, and `addLabel()` added widgets for both predicates via
+  independent `if`s rather than `elif` — producing a stray 1-item dropdown
+  glued onto (and crowding out the label next to) the slider/input-field.
+  `addLabel()` now uses `elif`.
+- **The panel can rebuild itself**, via `rebuildConfigLayout()` (clears
+  `configLayout` through `_clearConfigLayout()`/`_clearLayoutItem()`,
+  re-fetches `get_available_config_groups()` from MIL, and reconstructs
+  `self.config_groups` + every row from scratch). `updateConfigsFromMM()`
+  (the previous single mechanism, still used nowhere else) only pushed new
+  *values* into already-existing row widgets — a dropdown's item list and
+  the row count itself were frozen at construction, so a group added,
+  renamed, or given a new preset via the config group editor could never
+  appear, and refreshing an existing dropdown to a preset name that didn't
+  exist yet at construction silently did nothing (`QComboBox.setCurrentText`
+  on a non-matching string is a no-op). The "Refresh configs from MM"
+  button, `updateAllMMinfo()`, and `openConfigGroupEditor()`'s post-dialog
+  refresh all now call `rebuildConfigLayout()`.
+- **The button row is a sibling of the row grid, not inside it.**
+  `configGroupBox`'s layout is `configOuterLayout` (a `QVBoxLayout` holding
+  `configLayout`, the `QGridLayout` of rows, plus a separate `QHBoxLayout`
+  button row) instead of the button being `addWidget`'d directly into
+  `configLayout` with a `colSpan=number_columns`. A widget spanning that many
+  grid columns forces Qt to allocate all of them even though only column 0
+  had real content (2 groups, `number_config_columns` defaulting to 5) —
+  squeezing the row grid's real column into a fraction of the group box's
+  width, which is what made group-name labels render clipped/invisible.
+  Tests: `tests/test_mmconfig_panel.py`.
 
 `Core/MDAGlados.py` is the multi-dimensional acquisition layer that talks to MIL.
 

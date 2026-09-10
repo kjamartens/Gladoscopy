@@ -3301,3 +3301,51 @@ block was **not** performed.
 `glados_pycromanager/GUI/napariGlados.py`,
 `glados_pycromanager/GUI/GUI_napari.py`, `CLAUDE.md`,
 `tests/test_microscope_service.py`, `tests/test_live_sequence_worker.py`.
+
+
+## 2026-09-10 — The laser UI submits fire-and-forget intents; widget reads stay on the caller  [T-B4]
+
+**Context:** T-B4 says "one file per commit. For each slot: submit the intent,
+disable the widget, re-enable on the reply signal." `LaserControlScripts.py` is
+the first file (chosen ahead of `MMcontrols.py` only because the user had
+uncommitted work in that file at the time).
+
+**Decision 1 — fire-and-forget, no widget disable/re-enable.** These slots have
+no return value the UI shows, and the service queue is FIFO within a priority, so
+the TriggerScope sees the commands in the order the user pressed them. Greying a
+button for the duration would be new UI behaviour in a file whose header says
+"deprecated, last used in 2022". The reply signal (`request_completed`) is wired
+and available if a slot ever needs it.
+
+**Decision 2 — reads on the caller, writes marshalled back.** `armLaser` read
+`form.*_Edit_Laser_<i>.text()` inline; a hardware thread must not touch a widget,
+so the three widget reads happen on the calling thread and the parsed ints are
+passed into the queued job. In the other direction `addToVerboseBoxText` and the
+laser button labels are written through `_onGuiThread` (the T-F9 `NapariBridge`).
+The `exec("form.PushLaser_0.setText(...)")` string-built widget access became
+plain `getattr`, which is what made the split possible at all.
+
+**Decision 3 — the intensity write is recorded as written when it is queued.**
+`_lastWrittenLaserIntensity` is T-F8's duplicate-write skip. Recording it only
+after the queued write completed would let a focus-out repeat the write while the
+first one was still queued, which is the exact thing T-F8 removed.
+
+**Also changed, and visible on the wire:** `TS_Response_verbose` made three
+identical `get_property('TriggerScopeMM-Hub', 'Serial Receive')` reads to show one
+answer (one discarded, one displayed, one logged) — three serial round trips per
+command, in every loop in the file. It now reads once. And
+`_resetLasersTrigger_hw` toggles the lasers directly instead of calling the public
+`SwitchOnOffLaser` (which would queue ten more jobs from inside a job) and
+refreshes the button labels once at the end rather than ten times mid-loop. The
+`Serial Send` command sequence itself is byte-identical, and a test pins it.
+
+**Verification:** `tests/test_laser_controls_owner_thread.py` (8 tests) — the
+reset and arm command sequences against the pre-refactor ones, inline execution
+with no service, off-caller execution with one, `blinkUV` not blocking its caller,
+`armLaser`'s widget reads staying on the caller, the single serial-response read,
+and the intensity write being recorded immediately. `pytest -q -m "not slow"` —
+906 passed. No TriggerScope here, so nothing was exercised against real hardware;
+the command-sequence tests are what stands in for that.
+
+**Affects:** `glados_pycromanager/GUI/LaserControlScripts.py`, `CLAUDE.md`,
+`tests/test_laser_controls_owner_thread.py`.
