@@ -39,6 +39,15 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # run() touches nothing but the frame and its own kwargs (a
+            # convolution per frame, in numpy/cv2, holding the GIL), so it is
+            # isolated in its own process - see
+            # utils.realTimeAnalysis_runInSubprocess.
+            "__runInSubprocess__": True,
+            # What visualise() reads that run() produces. `firstLayerInit` is
+            # set by visualise_init() on the main-process shadow instance and
+            # must not be mirrored from the child.
+            "__snapshot_attrs__": ["currentValue"],
         }
     }
 
