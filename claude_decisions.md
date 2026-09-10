@@ -3349,3 +3349,40 @@ the command-sequence tests are what stands in for that.
 
 **Affects:** `glados_pycromanager/GUI/LaserControlScripts.py`, `CLAUDE.md`,
 `tests/test_laser_controls_owner_thread.py`.
+
+
+## 2026-09-10 — `createCoreVariables` is now `updateCoreVariables`, and its snapshot goes eventually-consistent  [T-B4]
+
+**Plan drift:** T-B4 names `FlowChart_dockWidgets.createCoreVariables` (approx.
+line 3499 at commit `cd01032`). No such symbol exists any more; the successor is
+`GladosNodzFlowChart_dockWidget.updateCoreVariables` at roughly that line, with
+`createSingleCoreVar` as its per-variable writer. Migrated that instead of
+reporting a mismatch, since it is unambiguously the same code doing the same job.
+
+**Decision — collect on the owner thread, swap atomically, accept staleness.**
+The alternative was a blocking `call()` from the GUI thread, which keeps the
+snapshot exactly current but leaves the GUI thread blocked on tens of hardware
+reads — the thing T-B4 exists to stop. The variables are all declared
+`Informative` (stage positions, config values, pixel size, ROI) and nothing in
+the executor waits on them, so a snapshot that lands a few milliseconds after the
+node finishes is fine. The swap is a single `self.coreVariables = <new dict>`, so
+a concurrent reader sees one snapshot or the other, never a half-filled one.
+
+**Also fixed while here:** the ROI entry called `MILcore.get_roi()` twice to read
+`[2]` and `[3]` — two round trips for one answer — and the pixel-size branch
+called `MILcore.get_pixel_size_um()` and then `self.core.get_pixel_size_um()`
+(the second bypassing MIL's cache entirely). Both now read once.
+
+**Verification:** `tests/test_core_variables_owner_thread.py` (6 tests) — inline
+collection with no service and with a stopped one, collection on the owner thread
+with one running, the atomic swap, and `createSingleCoreVar`'s default target. The
+methods are bound onto a bare host object rather than constructing a real
+`GladosNodzFlowChart_dockWidget`, which would need a full Qt widget tree.
+`pytest -q -m "not slow"` — 912 passed.
+
+**Deferred:** `MMcontrols.py`, the third T-B4 file, is untouched — the user had
+uncommitted work in it throughout this session, so migrating it would have mixed
+their edits into this work. It is the remaining T-B4 item.
+
+**Affects:** `glados_pycromanager/GUI/FlowChart_dockWidgets.py`, `CLAUDE.md`,
+`tests/test_core_variables_owner_thread.py`.

@@ -3493,36 +3493,68 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         return self
     
     def updateCoreVariables(self):
+        """Refresh the core-variable snapshot -- off the GUI thread (T-B4).
+
+        This is one hardware read per stage plus one `ConfigInfo` per config
+        group (each of which reads properties of its own), and it runs on
+        **every node finish** in a recipe as well as at construction. On the
+        Java backend that is tens of ~257 ms bridge round trips on the GUI
+        thread, in the middle of a running acquisition.
+
+        The snapshot is therefore collected on the `MicroscopeService` owner
+        thread and swapped in as one dict assignment. That makes it
+        eventually-consistent: a reader immediately after a node finishes may
+        still see the previous snapshot. These are `Informative` variables
+        (stage positions, config values, pixel size) and no control flow waits
+        on them; a caller that needs the live value should read the hardware
+        rather than this cache. With no service running it collects inline,
+        exactly as before -- which is also what happens at construction time,
+        before the service exists.
         """
-        
+        service = getattr(self.shared_data, 'microscope_service', None)
+        if service is None or not getattr(service, 'running', False):
+            self.coreVariables = self._collectCoreVariables()
+            return
+        service.submit(self._refreshCoreVariables, label='nodz.updateCoreVariables')
+
+    def _refreshCoreVariables(self):
+        """Owner-thread half of `updateCoreVariables`.
+
+        Builds a fresh dict and swaps it in with a single assignment, so a
+        concurrent reader sees either the old snapshot or the new one -- never
+        a half-filled one.
+        """
+        self.coreVariables = self._collectCoreVariables()
+
+    def _collectCoreVariables(self):
+        """Read the hardware and return a fresh core-variable dict.
+
         Idea, get information like this:
         self.coreVariables is initialised like {}
-        
+
         self.coreVariables['TrialGlobalVariable']={}
         self.coreVariables['TrialGlobalVariable']['type'] = str
         self.coreVariables['TrialGlobalVariable']['data'] = 'test'
         self.coreVariables['TrialGlobalVariable']['importance'] = 'Informative'
-        
+
         """
+        variables = {}
         allXYstages = utils.getCoreDevicesOfDeviceType(self.core,'XYStageDevice')
         all1Dstages = utils.getCoreDevicesOfDeviceType(self.core,'StageDevice')
-        
+
         #Core variables to store:
         #Stage positions, all stages
         for stage in allXYstages:
             xypos = self.core.get_xy_stage_position(stage) #type:ignore
-            self.createSingleCoreVar(stage+'_current_pos',[xypos.x,xypos.y],[list,np.ndarray]) #type:ignore
-        
+            self.createSingleCoreVar(stage+'_current_pos',[xypos.x,xypos.y],[list,np.ndarray],target=variables) #type:ignore
+
         for stage in all1Dstages:
             pos = self.core.get_position(stage) #type:ignore
-            self.createSingleCoreVar(stage+'_current_pos',[pos],[list,np.ndarray]) #type:ignore
-        
+            self.createSingleCoreVar(stage+'_current_pos',[pos],[list,np.ndarray],target=variables) #type:ignore
+
         #Config values, all configs
         allConfigs = self.shared_data.MILcore.get_available_config_groups()
         if (type(allConfigs != None) == bool and allConfigs != None) or any(allConfigs != None):
-            # if self.shared_data.backend == 'JAVA':
-            #     nrconfiggroups = allConfigs.size()
-            # elif self.shared_data.backend == 'Python':
             nrconfiggroups = len(allConfigs)
             for config_id in range(nrconfiggroups):
                 configInfo = ConfigInfo(self.core,shared_data,config_id)
@@ -3532,23 +3564,26 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                     typev = [type(configValue)]
                 except (AttributeError, NameError, TypeError):
                     typev = [str]
-                self.createSingleCoreVar('config_'+configName,configValue,typev) #type:ignore
-            
+                self.createSingleCoreVar('config_'+configName,configValue,typev,target=variables) #type:ignore
+
         #Pixel size, ROI size
-        if self.shared_data.MILcore.get_pixel_size_um() != 0:
-            self.createSingleCoreVar('Pixel_size_um',self.core.get_pixel_size_um(),[float]) #type:ignore
+        pixel_size = self.shared_data.MILcore.get_pixel_size_um()
+        if pixel_size != 0:
+            self.createSingleCoreVar('Pixel_size_um',pixel_size,[float],target=variables) #type:ignore
         else:
-            self.createSingleCoreVar('Pixel_size_um',1,[float]) #type:ignore
-        # if self.shared_data.backend == 'JAVA':
-        #     self.createSingleCoreVar('ROI_size',[self.core.get_roi().width,self.core.get_roi().height],[list,np.ndarray]) #type:ignore
-        # elif self.shared_data.backend == 'Python':
-        self.createSingleCoreVar('ROI_size',[self.shared_data.MILcore.get_roi()[2],self.shared_data.MILcore.get_roi()[3]],[list,np.ndarray]) #type:ignore
-    
-    def createSingleCoreVar(self,name,data,type,importance='Informative'):
-        self.coreVariables[name] = {} 
-        self.coreVariables[name]['type'] = type 
-        self.coreVariables[name]['data'] = data 
-        self.coreVariables[name]['importance'] = importance 
+            self.createSingleCoreVar('Pixel_size_um',1,[float],target=variables) #type:ignore
+        roi = self.shared_data.MILcore.get_roi()  # one read; this used to call get_roi() twice
+        self.createSingleCoreVar('ROI_size',[roi[2],roi[3]],[list,np.ndarray],target=variables) #type:ignore
+        return variables
+
+    def createSingleCoreVar(self,name,data,type,importance='Informative',target=None):
+        """Write one core variable into `target` (default: the live dict)."""
+        if target is None:
+            target = self.coreVariables
+        target[name] = {}
+        target[name]['type'] = type
+        target[name]['data'] = data
+        target[name]['importance'] = importance
     
     def cleanupNodeList(self):
         #Ensure that self.nodes accurately reflects the nodes on the screen.

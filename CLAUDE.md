@@ -67,8 +67,15 @@ is the standalone plan that enforces them — but new code must follow them.
   the label writes (the reset loop refreshes once at the end instead of ten times
   mid-loop). Tests: `tests/test_laser_controls_owner_thread.py`, which pins the emitted
   serial command sequence so the refactor stays observationally identical at the wire.
-  What remains: `MMcontrols.py` still snaps images directly in slots and
-  `FlowChart_dockWidgets.createCoreVariables` still blocks (the rest of T-B4).
+  **`FlowChart_dockWidgets` followed**: `updateCoreVariables` (which the plan
+  anchored under its old name `createCoreVariables`) runs on every node finish in
+  a recipe and is one hardware read per stage plus one `ConfigInfo` per config
+  group; it now collects on the owner thread via `_collectCoreVariables()` and
+  swaps the finished dict in with one assignment (`_refreshCoreVariables`), so the
+  snapshot is **eventually consistent** — a reader right after a node finishes may
+  see the previous one. `createSingleCoreVar` grew a `target=` parameter for that.
+  Tests: `tests/test_core_variables_owner_thread.py`. What remains of T-B4:
+  `MMcontrols.py`, which still snaps images and moves stages directly in slots.
 - **All microscope access goes through one owner.** `MILcore`/`core` must have a single
   owning thread; other threads submit requests. Unsynchronized cross-thread `core.*` calls
   are not theoretical: commit `cd01032` fixed a **native access violation / JVM fatal
