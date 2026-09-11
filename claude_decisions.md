@@ -3446,3 +3446,53 @@ was exercised against real hardware.
 **Affects:** `glados_pycromanager/GUI/MMcontrols.py`, `CLAUDE.md`,
 `claude_throughput_project.md`, `tests/test_mmcontrols_owner_thread.py`,
 `tests/test_hardware_edit_debounce.py`, `tests/test_mode_setter_no_sleep.py`.
+
+## 2026-09-11 — MDA plan rebuilds are debounced; `textChanged` stays, `editingFinished` flushes  [T-H1]
+
+**Context:** `get_MDA_events_from_GUI` was wired to 17 widget signals (the plan said
+16 — it counted the list widget's `parent` connection separately; 18 wiring points in
+all), 9 of them `textChanged`. Each call built a `useq.MDASequence`, materialised it
+with `to_pycromanager()`, made a hardware `set_focus_device()` call and rewrote
+`glados_state.json` — per keystroke.
+
+**Decision 1 — keep `textChanged`, debounce it, and add `editingFinished` as a flush,
+rather than switching to `editingFinished`.** Plan item 2 said to switch. Doing so
+would have changed what the plan builds, which the task's *Don't* forbids:
+- `setZStart` / `setZEnd` and the storage folder `...` button change the fields with
+  `setText()`, which emits `textChanged` but never `editingFinished` — the plan would
+  silently keep the old z range / folder until the user touched the field.
+- All the numeric fields carry a `QIntValidator`/`QDoubleValidator`, and
+  `editingFinished` is not emitted while the input is `Intermediate` — clearing a z
+  field (which the rebuild maps to `None`) would never reach the plan.
+So every signal goes to `scheduleMDAEventsUpdate()` (200 ms single-shot, restarted per
+edit), and each QLineEdit's `editingFinished` calls `flushMDAEventsUpdate()` so leaving
+a field applies it immediately. Same end state, one rebuild per burst.
+
+**Decision 2 — readers flush; direct calls stay synchronous.** `MDA_acq_from_GUI`,
+`MDA_acq_from_Node` and `getEvents` flush a pending rebuild before reading `self.mda`,
+so an acquisition can never start on a plan that lags the widgets. The existing direct
+calls (`showOptionChanged` — which the Nodz MDA dialog's OK button runs before
+`getInputs()` reads `.mda` — and `reconnectFunGUIConnection(runOnce=True)`) remain
+immediate, and `get_MDA_events_from_GUI` stops any pending timer on entry so a direct
+call supersedes it. Before `fully_started`, `scheduleMDAEventsUpdate` rebuilds
+synchronously, so construction behaves exactly as before (including not writing state).
+
+**Decision 3 — the state write gets its own 500 ms debounce, flushed at acquisition
+start.** Decoupled from the rebuild as the plan asks. Trade-off accepted: an edit made
+within 500 ms of quitting is not persisted, because the app leaves through `os._exit(0)`
+on `aboutToQuit` and a flush connected from `MDAGlados` would be connected after that
+slot. Before, the same edit was saved per keystroke.
+
+**Not changed here:** the per-rebuild `set_focus_device()` hardware call (T-H3) and the
+eager `to_pycromanager()` (T-H2) — now at most once per burst instead of per keystroke.
+
+**Verification:** `tests/test_mda_events_debounce.py` — one rebuild per burst, flush
+semantics, synchronous construction, separate state-write debounce, the timers excluded
+from the persisted state, and source pins that no signal calls the rebuild directly,
+that all 9 debounced line edits flush on `editingFinished`, and that both acquire paths
+flush before reading `self.mda`. Full `pytest -q` green. No microscope here: the manual
+check (type a large time-point count, Acquire, restart) was not performed.
+
+**Affects:** `glados_pycromanager/Core/MDAGlados.py`, `glados_pycromanager/GUI/utils.py`
+(`storingExceptions`), `CLAUDE.md`, `claude_throughput_project.md`,
+`tests/test_mda_events_debounce.py`.

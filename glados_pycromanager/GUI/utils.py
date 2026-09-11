@@ -3424,7 +3424,8 @@ class CustomMainWindow(QWidget):
         # dumped verbatim, so anything holding widgets belongs here.
         # `_guiWrappers` is MDAGlados' list of the current rebuild's wrapper
         # widgets (T-F7); it crashed the whole save until it was listed.
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','_guiWrappers']
+        # The two `_mda*Timer`s are MDAGlados' T-H1 debounce QTimers.
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','_guiWrappers','_mdaEventsUpdateTimer','_mdaStateSaveTimer']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):

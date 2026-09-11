@@ -197,7 +197,7 @@ class InteractiveListWidget(QTableWidget):
         self.itemChanged.disconnect()
     
     def reconnectFunGUIConnection(self,runOnce=True):
-        self.itemChanged.connect(lambda: self.parent.get_MDA_events_from_GUI())
+        self.itemChanged.connect(lambda: self.parent.scheduleMDAEventsUpdate())
         if runOnce:
             self.parent.get_MDA_events_from_GUI()
 
@@ -407,6 +407,14 @@ class MDAGlados(CustomMainWindow):
     """
     #Pysignal should be outside the functions for proper init
     MDA_completed = pyqtSignal(bool)
+    # T-H1: every GUI-edit signal restarts this single-shot timer, so typing
+    # "100000" into a field builds the plan once, not six times.
+    MDA_EVENTS_DEBOUNCE_MS = 200
+    # The glados_state.json write is debounced on its own, decoupled from the
+    # plan rebuild. An edit made within this window of quitting is not saved
+    # (the app leaves via os._exit(0) on aboutToQuit).
+    MDA_STATE_SAVE_DEBOUNCE_MS = 500
+
     def __init__(self,core,MM_JSON,layout,
                 shared_data,
                 hasGUI=False,
@@ -664,8 +672,9 @@ class MDAGlados(CustomMainWindow):
         exposureLayout.addWidget(self.exposureEntry)
         exposureLayout.addWidget(self.exposureDropdown)
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
-        self.exposureEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.exposureDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.exposureEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.exposureEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.exposureDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         
         #--------------- Time widget -----------------------------------------------
         #Time: add labels for time points and time intervals, and integer-based entry fields:
@@ -693,9 +702,11 @@ class MDAGlados(CustomMainWindow):
         timeLayout.addWidget(self.timeIntervalEntry,1,1)
         timeLayout.addWidget(self.timeIntervalDropdown,1,2)
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
-        self.timePointEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.timeIntervalEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.timeIntervalDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.timePointEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.timePointEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.timeIntervalEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.timeIntervalEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.timeIntervalDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         
         #--------------- storage widget -----------------------------------------------
         #storage: first, add a label, entry field, and button with '...' to select a folder of choice:
@@ -717,8 +728,10 @@ class MDAGlados(CustomMainWindow):
         storageLayout.addWidget(self.storageFolderButton,0,2)
         storageLayout.addWidget(self.storageFileNameLabel,1,0)
         storageLayout.addWidget(self.storageFileNameEntry,1,1)
-        self.storageFolderEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.storageFileNameEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.storageFolderEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.storageFolderEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.storageFileNameEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.storageFileNameEntry.editingFinished.connect(self.flushMDAEventsUpdate)
         
         #--------------- XY widget widget -----------------------------------------------
         #First a dropdown to select the xy stage:
@@ -781,7 +794,7 @@ class MDAGlados(CustomMainWindow):
                 self.xypositionListWidget.addNewEntry(textEntry=entry[0],id=int(entry[1]),setxy=[float(entry[2]),float(entry[3])])
         
         #Add a callback lambda
-        self.xypositionListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.xypositionListWidget.itemChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:
@@ -847,13 +860,17 @@ class MDAGlados(CustomMainWindow):
         zLayout.addItem(QSpacerItem(1, 2, QSizePolicy.Minimum, QSizePolicy.Expanding),5,0,1,2)
         
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
-        self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_startEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_endEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_nrsteps_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_stepdistance_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_nrsteps_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_startEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_startEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.z_endEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_endEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.z_nrsteps_radio.toggled.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_stepdistance_radio.toggled.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_nrsteps_entry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_nrsteps_entry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.z_stepdistance_entry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_stepdistance_entry.editingFinished.connect(self.flushMDAEventsUpdate)
 
         # --- Ordering widget ---
         #Note: only used in updateGUIwidgets
@@ -925,7 +942,7 @@ class MDAGlados(CustomMainWindow):
                 self.channelListWidget.addNewEntry(channelEntry=self.channels[entry],exposureEntry=str(self.channel_exposures_ms[entry]))
                 
         #Change MDA events when adapted
-        self.channelListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.channelListWidget.itemChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         
         #--------------- Show options widget -----------------------------------------------
         #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
@@ -1099,7 +1116,7 @@ class MDAGlados(CustomMainWindow):
         #add the options to the dropdown:
         for option in permuatations:
             self.orderDropdown.addItem(option)
-        self.orderDropdown.currentTextChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.orderDropdown.currentTextChanged.connect(lambda: self.scheduleMDAEventsUpdate())
 
         #Show the widgets.
         orderLayout.addWidget(self.orderLabel)
@@ -1330,6 +1347,7 @@ class MDAGlados(CustomMainWindow):
         Returns:
             The MDA events stored in the object.
         """
+        self.flushMDAEventsUpdate()
         return self.mda
     
     def getGui(self):
@@ -1530,6 +1548,9 @@ class MDAGlados(CustomMainWindow):
         This function acquires data from a node and performs various operations based on the node information provided.
         """
         logging.debug('At MDA_acq_from_node')
+        #Apply any GUI edit still waiting on the debounce before the plan is read
+        self.flushMDAEventsUpdate()
+        self.flushMDAStateSave()
         nodeName = nodeInfo.name
         
         self.nodeInfo = nodeInfo
@@ -1623,6 +1644,9 @@ class MDAGlados(CustomMainWindow):
             Trelent
         """
         logging.debug('At MDA_acq_from_GUI')
+        #Apply any GUI edit still waiting on the debounce before the plan is read
+        self.flushMDAEventsUpdate()
+        self.flushMDAStateSave()
         self.shared_data._mdaMode = False
         
         #Set the exposure time:
@@ -1688,7 +1712,9 @@ class MDAGlados(CustomMainWindow):
     
     def get_MDA_events_from_GUI(self):
         """
-        The get_MDA_events_from_GUI function is called every time the user changes any option in the GUI.
+        The get_MDA_events_from_GUI function rebuilds the MDA plan from the GUI widgets.
+        GUI edits reach it through scheduleMDAEventsUpdate() (debounced); a direct call runs
+        immediately and supersedes any pending debounced rebuild.
         It will then update all variables that are used to create an MDA object, which can be used to run a multi-dimensional acquisition.
         
         
@@ -1696,6 +1722,9 @@ class MDAGlados(CustomMainWindow):
             self: Refer to the object itself
         """
         logging.debug('starting get_MDA_events_from_GUI')
+        pendingUpdate = getattr(self, '_mdaEventsUpdateTimer', None)
+        if pendingUpdate is not None:
+            pendingUpdate.stop()
         #Make this somewhat readable:
         if self.exposureGroupBox.isEnabled():
             try:
@@ -1859,18 +1888,65 @@ class MDAGlados(CustomMainWindow):
         #TODO: improve MDA call from useq
         
         logging.debug(f"mda: {self.mda}")
-        if self.fully_started:
-            if self.autoSaveLoad:
-                #Store in appdata
-                appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
-                if appdata_folder is None:
-                    raise OSError("APPDATA environment variable not found")
-                app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-                os.makedirs(app_specific_folder, exist_ok=True)
-                self.save_state_MDA(os.path.join(app_specific_folder, 'glados_state.json'))
+        if self.fully_started and self.autoSaveLoad:
+            self._scheduleMDAStateSave()
         logging.debug('ended get_MDA_events_from_GUI')
-        
-        pass
+
+    def scheduleMDAEventsUpdate(self):
+        """Debounced entry point for every GUI-edit signal (T-H1).
+
+        Restarts a single-shot MDA_EVENTS_DEBOUNCE_MS timer; the plan is rebuilt once
+        the edits stop. During construction (`fully_started` False) it rebuilds
+        synchronously, exactly as the signals did before, so a freshly built panel has
+        its plan in place.
+        """
+        if not self.fully_started:
+            self.get_MDA_events_from_GUI()
+            return
+        timer = getattr(self, '_mdaEventsUpdateTimer', None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(self.MDA_EVENTS_DEBOUNCE_MS)
+            timer.timeout.connect(self.get_MDA_events_from_GUI)
+            self._mdaEventsUpdateTimer = timer
+        timer.start()
+
+    def flushMDAEventsUpdate(self):
+        """Run a pending debounced rebuild now; a no-op when nothing is pending.
+
+        Connected to each QLineEdit's editingFinished, and called before anything
+        reads self.mda to acquire, so the plan can never lag the widgets.
+        """
+        timer = getattr(self, '_mdaEventsUpdateTimer', None)
+        if timer is not None and timer.isActive():
+            self.get_MDA_events_from_GUI()
+
+    def _scheduleMDAStateSave(self):
+        timer = getattr(self, '_mdaStateSaveTimer', None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(self.MDA_STATE_SAVE_DEBOUNCE_MS)
+            timer.timeout.connect(self._saveMDAStateNow)
+            self._mdaStateSaveTimer = timer
+        timer.start()
+
+    def flushMDAStateSave(self):
+        """Write a pending glados_state.json save now; a no-op when nothing is pending."""
+        timer = getattr(self, '_mdaStateSaveTimer', None)
+        if timer is not None and timer.isActive():
+            timer.stop()
+            self._saveMDAStateNow()
+
+    def _saveMDAStateNow(self):
+        #Store in appdata
+        appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
+        if appdata_folder is None:
+            raise OSError("APPDATA environment variable not found")
+        app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+        os.makedirs(app_specific_folder, exist_ok=True)
+        self.save_state_MDA(os.path.join(app_specific_folder, 'glados_state.json'))
     
     def setZStart(self):
         """

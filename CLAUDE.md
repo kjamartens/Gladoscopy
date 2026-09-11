@@ -661,6 +661,17 @@ stores only values passing the `QWidget` check), which is why the QTimers T-F8
 added to `MMConfigUI` are harmless there. Tests:
 `tests/test_state_save_widget_attrs.py`.
 
+**The MDA panel's plan rebuild and its state write are both debounced (T-H1).**
+Every widget signal goes to `MDAGlados.scheduleMDAEventsUpdate()` (200 ms), never to
+`get_MDA_events_from_GUI` directly; each QLineEdit's `editingFinished` flushes it, and
+`MDA_acq_from_GUI` / `MDA_acq_from_Node` / `getEvents` call `flushMDAEventsUpdate()`
+before reading `self.mda`. **Wire new MDA-panel widgets the same way, and flush in any
+new reader of `self.mda`.** `textChanged` is kept on purpose — `setText()` from
+`setZStart`/`setZEnd`/the folder picker never emits `editingFinished`, nor does a field
+whose validator is `Intermediate`. The rebuild schedules the `glados_state.json` write on
+a separate 500 ms timer (`_scheduleMDAStateSave` / `flushMDAStateSave`); both timers are
+in `storingExceptions`. Tests: `tests/test_mda_events_debounce.py`.
+
 **Reading it back: never index a section.** The three sections are written by
 different code paths at different times, so any of them can be absent — a fresh
 install has none, a section appears only once its widgets have been saved, and
