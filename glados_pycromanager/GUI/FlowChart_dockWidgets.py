@@ -2494,7 +2494,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             if dialog.exec_() == QDialog.Accepted:
                 self.set_readable_text_after_dialogChange(currentNode,dialog,'acquisition')
                 currentNode.dialogInfo = dialog #type:ignore
-                logging.debug(f"MDA dialog input: {dialog.getInputs()}")
+                logging.debug("MDA dialog input: %s", dialog.getInputs())
             
             # currentNode.mdaData.exposure_ms = dialog.getExposureTime()
             # currentNode.mdaData.mda = dialog.getInputs()#type:ignore

@@ -3496,3 +3496,51 @@ check (type a large time-point count, Acquire, restart) was not performed.
 **Affects:** `glados_pycromanager/Core/MDAGlados.py`, `glados_pycromanager/GUI/utils.py`
 (`storingExceptions`), `CLAUDE.md`, `claude_throughput_project.md`,
 `tests/test_mda_events_debounce.py`.
+
+## 2026-09-11 — `MDAGlados.mda` becomes a lazy property; acquire paths hand over the raw sequence  [T-H2]
+
+**Context:** every plan rebuild ended with `self.mda = to_pycromanager(self.mda_useq)`,
+materialising and validating one event dict per frame, followed by an eager
+`logging.debug(f"mda: {self.mda}")` that formatted the whole list at any log level.
+
+**Decision 1 — a cached property over `_mda`, mirroring `Shared_data._mdaModeParams`,
+rather than deferring the call to the two acquire methods only.** The task allowed
+either. `self.mda` has readers beyond acquisition — `getEvents`/`printEvents`, the Nodz
+dialog's `getInputs()` (its `len()` builds the node's display text), the node info
+text, and the recipe save — so a property serves them all unchanged. The rebuild sets
+`_mda = None`; the getter converts `mda_useq` on first read and caches until the next
+rebuild. An explicit assignment (constructor, `setMDAparams`, recipe load via
+`setattr`) is stored as-is, as before.
+
+**Decision 2 — acquire paths assign `_mdaEventsForAcquisition()`, not `self.mda`.**
+That returns the materialised list when one exists (explicit assignment, or something
+already read `.mda`) and otherwise the raw `useq.MDASequence`, which
+`Shared_data._mdaModeParams` already converts lazily. So on the pycromanager backends
+the conversion now happens where `acq.acquire(events)` reads it — on the acquisition
+worker — and on MMCORE_PLUS (which runs `_mdaModeParams_useq`) only if a dimension-map
+reader needs it. Preferring an existing list keeps `setMDAparams` meaningful and keeps
+a recipe-loaded node (which has `mda` from JSON but no `mda_useq`) working exactly as
+before.
+
+**Decision 3 — the persistence paths were adjusted so nothing leaks and nothing is
+lost.** A property is not in `vars(self)`, but its backing `_mda` is — and an event list
+is JSON-encodable, so the generic branch of `save_state_MDA` would have silently written
+it into `glados_state.json`. `_mda` is in `storingExceptions`. The recipe save in
+`nodz_main.py` walks `vars(mdaData)` too: it now skips `_mda` and stores `mda`
+explicitly, so a recipe carries the same `mda` key as before (materialised once, at
+save time). The dialog-to-node copy in `FlowChart_dockWidgets.py` copies `_mda` and
+`mda_useq` together, which the property handles. The dialog's
+`logging.debug(f"MDA dialog input: {...}")` became `%s`-style.
+
+**Verification:** `tests/test_mda_lazy_events.py` — no conversion in the rebuild,
+convert-once-and-cache, invalidation, explicit assignments untouched, lazy output equal
+to the eager conversion on a t/p/c/z plan, the raw sequence reaching `Shared_data`
+unconverted and converting to the same events on read, both acquire paths pinned, and
+the state-file and recipe persistence pinned. Full `pytest -q` green. No microscope
+here: the manual check (large MDA, responsive editing, correct event count on
+acquisition) was not performed.
+
+**Affects:** `glados_pycromanager/Core/MDAGlados.py`, `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/GUI/nodz/nodz_main.py`, `glados_pycromanager/GUI/FlowChart_dockWidgets.py`,
+`CLAUDE.md`, `claude_throughput_project.md`, `tests/test_mda_lazy_events.py`,
+`tests/test_mda_events_debounce.py`.

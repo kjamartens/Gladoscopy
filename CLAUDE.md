@@ -671,6 +671,13 @@ new reader of `self.mda`.** `textChanged` is kept on purpose — `setText()` fro
 whose validator is `Intermediate`. The rebuild schedules the `glados_state.json` write on
 a separate 500 ms timer (`_scheduleMDAStateSave` / `flushMDAStateSave`); both timers are
 in `storingExceptions`. Tests: `tests/test_mda_events_debounce.py`.
+`MDAGlados.mda` is a **lazy property** (T-H2): `mda_useq` is the plan, the rebuild only
+sets `_mda = None`, and the first read runs `to_pycromanager()` and caches. Acquire paths
+assign `_mdaEventsForAcquisition()` (the list if already materialised, else the raw
+sequence, which `Shared_data._mdaModeParams` converts lazily). Because `vars(self)` shows
+`_mda` rather than `mda`, it is in `storingExceptions`, and `nodz_main`'s recipe save skips
+`_mda` and writes `mda` explicitly. **Never log `self.mda` with an f-string** — that
+forces the conversion. Tests: `tests/test_mda_lazy_events.py`.
 
 **Reading it back: never index a section.** The three sections are written by
 different code paths at different times, so any of them can be absent — a fresh

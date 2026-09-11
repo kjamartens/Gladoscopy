@@ -208,7 +208,7 @@ def test_every_debounced_line_edit_flushes_on_editing_finished(mda_mod):
 @pytest.mark.parametrize("method", ["MDA_acq_from_GUI", "MDA_acq_from_Node"])
 def test_acquisition_applies_pending_edits_before_reading_the_plan(mda_cls, method):
     source = inspect.getsource(getattr(mda_cls, method))
-    assert source.index("self.flushMDAEventsUpdate()") < source.index("_mdaModeParams = self.mda")
+    assert source.index("self.flushMDAEventsUpdate()") < source.index("_mdaModeParams = self._mdaEventsForAcquisition()")
 
 
 def test_get_events_applies_pending_edits(mda_cls):

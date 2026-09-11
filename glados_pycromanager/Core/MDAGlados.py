@@ -415,6 +415,40 @@ class MDAGlados(CustomMainWindow):
     # (the app leaves via os._exit(0) on aboutToQuit).
     MDA_STATE_SAVE_DEBOUNCE_MS = 500
 
+    @property
+    def mda(self):
+        """The MDA plan as pycromanager event dicts, converted lazily (T-H2).
+
+        `mda_useq` is the source of truth: `get_MDA_events_from_GUI` builds it and
+        only invalidates this cache, because `to_pycromanager()` materialises and
+        pydantic-validates one dict per event. The conversion runs on first read and
+        is cached until the next rebuild. An explicit assignment (the constructor,
+        `setMDAparams`, a recipe load) is stored as-is.
+        """
+        events = getattr(self, '_mda', None)
+        if events is None:
+            sequence = getattr(self, 'mda_useq', None)
+            if sequence is not None:
+                from useq.pycromanager import to_pycromanager
+                events = to_pycromanager(sequence)
+                self._mda = events
+        return events
+
+    @mda.setter
+    def mda(self, value):
+        self._mda = value
+
+    def _mdaEventsForAcquisition(self):
+        """What an acquire path assigns to `shared_data._mdaModeParams`.
+
+        The event list if one is already materialised (an explicit assignment, or
+        something already read `self.mda`), otherwise the raw `useq.MDASequence` --
+        which `Shared_data._mdaModeParams` converts lazily on first read, i.e. on the
+        acquisition worker for the pycromanager backends rather than on the GUI thread.
+        """
+        events = getattr(self, '_mda', None)
+        return events if events is not None else getattr(self, 'mda_useq', None)
+
     def __init__(self,core,MM_JSON,layout,
                 shared_data,
                 hasGUI=False,
@@ -1617,7 +1651,7 @@ class MDAGlados(CustomMainWindow):
         #Set whether the napariviewer should (also) try to connect to the mda
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
-        self.shared_data._mdaModeParams = self.mda
+        self.shared_data._mdaModeParams = self._mdaEventsForAcquisition()
         self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
@@ -1661,7 +1695,7 @@ class MDAGlados(CustomMainWindow):
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
         
-        self.shared_data._mdaModeParams = self.mda
+        self.shared_data._mdaModeParams = self._mdaEventsForAcquisition()
         self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
@@ -1863,7 +1897,6 @@ class MDAGlados(CustomMainWindow):
         # self.mda = self.shared_data.MILcore.create_mda(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order)
         
         import useq
-        from useq.pycromanager import to_pycromanager
         
         channel_data = []
         for i, channel_name in enumerate(self.channels):
@@ -1884,10 +1917,11 @@ class MDAGlados(CustomMainWindow):
             channels = channel_data,
             stage_positions=xy_pos
         )
-        self.mda = to_pycromanager(self.mda_useq)
+        #Invalidate the pycromanager event list; the `mda` property converts on first read (T-H2)
+        self._mda = None
         #TODO: improve MDA call from useq
         
-        logging.debug(f"mda: {self.mda}")
+        logging.debug('mda_useq: %s', self.mda_useq)
         if self.fully_started and self.autoSaveLoad:
             self._scheduleMDAStateSave()
         logging.debug('ended get_MDA_events_from_GUI')
