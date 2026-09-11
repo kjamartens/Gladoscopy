@@ -3581,3 +3581,88 @@ here: the manual z-stack MDA check was not performed.
 
 **Affects:** `glados_pycromanager/Core/MDAGlados.py`, `CLAUDE.md`,
 `claude_throughput_project.md`, `tests/test_mda_focus_device_at_acquire.py`.
+
+## 2026-09-11 — pymmcore-plus MDAs default to NDTiff, written by Glados; tuned OME-Zarr lost  [T-D8]
+
+**Context:** the plan's table (NDTiff 19x faster than OME-Zarr) was measured against
+pymmcore-plus' *old* `mda.handlers`. On the installed pymmcore-plus 0.18.1,
+`run_mda(output="x.ome.zarr")` goes through `mda/_sink.py` into **ome-writers 0.3.2**,
+backend `auto` = tensorstore (acquire-zarr and zarrs are not installed), 1-frame
+chunks, no shards, uncompressed. So the comparison had to be redone against what the
+code actually does now.
+
+**Measurement** (`scripts/bench_storage.py`, `make bench-storage`, appended to
+`docs/bench-storage.txt`): each format x size in its own writer subprocess (imports and
+stream setup excluded from ms/frame, close included), then a fresh reader subprocess;
+384 MB of incompressible uint16 per configuration; every read verified. Warm page cache
+(Windows cannot drop it without admin), one disk, ome-writers rows exclude the
+pymmcore-plus sink's per-frame metadata conversion.
+
+| format | 512² ms/frame | 1024² | 2048² | peak RSS | files | read 512²/1024²/2048² |
+|---|---|---|---|---|---|---|
+| **ndtiff** | 2.44 | 3.36 | 7.44 | ~0 MB | 2 | 0.25 / 4.1 / 4.1 ms |
+| ome-tiff | 2.67 | 2.30 | 3.91 | 44 MB | 1 | 1.96 / 1.38 / 3.55 ms |
+| ome-zarr (today's default) | 3.80 | 9.41 | 6.32 | **~390 MB** | frames+2 | 2.10 / 5.34 / 15.7 ms |
+| ome-zarr sharded (tensorstore, 64-frame shards) | 45.3 | 238 | 713 | ~400 MB | few | 8.4 / 8.6 / 17.5 ms |
+| ome-zarr sharded (zarr-python) | 465 | 1121 | 2742 | up to 1.1 GB | few | 11 / 9 / 10 ms |
+| scratch zarr (display store) | 20.5 | 19.0 | 45.9 | small | frames+1 | 6.1 / 8.0 / 9.2 ms |
+
+OME-TIFF additionally pays **1.5-4.6 s of stream setup** before the first frame; NDTiff
+pays none. NDTiff's reopen (index load) was 9-18 ms at these sizes.
+
+**Decision 1 — default `ndtiff`.**
+- The existing `ome-zarr` default is not streaming: tensorstore's appends return in
+  ~0.1 ms because every frame is held as a pending future, peaking at ~390 MB for 384 MB
+  of data and resolving it all at close (up to 2.8 s). Memory grows with acquisition
+  length, which is a robustness limit on long MDAs, not a speed number.
+- **Tuned OME-Zarr lost, badly.** The configuration the plan singled out (shards over
+  1-frame chunks) was 10-100x slower than the default through tensorstore and slower
+  still through zarr-python, with no memory improvement. "OME-Zarr was tuned and still
+  lost" is the recorded outcome.
+- **OME-TIFF was close and is kept.** It streams through a writer thread (44 MB peak)
+  and was faster than NDTiff at 2048² in these runs. It lost on the multi-second setup,
+  on small-frame reads, and on its queue being unbounded (a sustained overrun grows RAM,
+  where `NDTiffFrameWriter` applies backpressure). NDTiff also produces exactly the data
+  shape the pycromanager backends already produce, so downstream nodes get the same
+  `Dataset` on every backend. OME-TIFF is the interoperable choice and says so in the
+  setting text.
+- A config file saved before this change keeps its stored `ome-zarr` value
+  (`load_config_from_json` overwrites the defaults with every key present in the saved
+  JSON, so a stored value wins); only fresh configs get the new default.
+
+**Decision 2 — Glados writes NDTiff from the frameReady callback, via a writer thread.**
+Not `run_mda(output=...)` (no NDTiff sink exists) and not a `SupportsFrameReady` handler
+(that would write inline on the MDA thread, which the task forbids). The callback only
+queues; `FrameWriter` (extracted from `ZarrFrameWriter`, same byte-bounded queue,
+backpressure and drain-on-close) does the `put_image` and the JSON-sanitising of
+pymmcore-plus' metadata (it carries the `MDAEvent`). Submitting *before* the ring push,
+not from the ring consumer, is deliberate: the ring is overwrite-oldest, which is right
+for display and wrong for an archive.
+
+**Decision 3 — per-acquisition dataset identity.** Once MMCORE_PLUS can append to
+`mdaDatasets`, `mdaDatasets[-1]` can belong to an earlier acquisition (NDTiff run, then
+an OME-Zarr run). `shared_data.mdaCurrentDataset` is reset at each MDA's start and set by
+`appendNewMDAdataset`; the resolver prefers it and falls back to `[-1]` only on a
+`shared_data` without the attribute. An identity rather than an index, because
+`cleanUpTemporaryFiles` pops from `mdaDatasets`.
+
+**Not done, deliberately:** the two resolvers were *not* collapsed into one branch as the
+task hoped — `ome-zarr`/`ome-tiff`/`none` still resolve to the scratch zarr, so the
+backend-conditional path remains; it only converges when the format is `ndtiff`. The
+scratch display store is untouched (that is T-E6's question; the NDTiff read numbers
+above are its evidence). `Shared_data.new_pyMMC_temp_dir` has no caller now but is kept,
+with its tests, as `release_all_temp_dirs` still handles it.
+
+**Verification:** `tests/test_ndtiff_frame_writer.py` (real `NDTiffDataset`: coordinates,
+metadata round-trip, unencodable metadata, capacity), `tests/test_mmcore_ndtiff_saving.py`
+(option offered with the OME formats kept, naming, coordinate mapping, metadata copy,
+resolver identity, source pins on callback/worker ordering, and a demo-camera MDA written
+through the production helpers, read back at (t, c, z, h, w) with every frameReady
+delivered). Full `pytest -q` green. No microscope here: not exercised against real
+hardware, and not through the full GUI worker.
+
+**Affects:** `glados_pycromanager/GUI/frame_writer.py`, `glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/GUI/sharedFunctions.py`, `glados_pycromanager/Core/MDAGlados.py`,
+`scripts/bench_storage.py`, `Makefile`, `docs/bench-storage.txt`, `CLAUDE.md`,
+`claude_throughput_project.md`, `tests/test_ndtiff_frame_writer.py`,
+`tests/test_mmcore_ndtiff_saving.py`.

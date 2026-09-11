@@ -55,6 +55,10 @@ from glados_pycromanager.GUI.utils import CustomMainWindow
 
 
 #region List Widgets
+#: `shared_data` predating per-acquisition dataset tracking (T-D8): fall back to mdaDatasets[-1].
+_DATASET_NOT_TRACKED = object()
+
+
 class InteractiveListWidget(QTableWidget):
     """
     Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
@@ -1442,10 +1446,12 @@ class MDAGlados(CustomMainWindow):
     def _resolve_finished_acquisition_data(self):
         """The acquisition's data object, or None if nothing was captured.
 
-        Two backends, two shapes. The pycromanager backends append an NDTiff
-        `Dataset` to `shared_data.mdaDatasets`; MMCORE_PLUS has no NDTiff store
-        and instead puts a `zarr.Array` in `shared_data.mdaZarrData`, keyed by
-        the napari layer name the acquisition renders into.
+        Two shapes. The pycromanager backends append an NDTiff `Dataset` to
+        `shared_data.mdaDatasets`, and so does MMCORE_PLUS when its save format is
+        'ndtiff' (T-D8). Otherwise MMCORE_PLUS has only the `zarr.Array` it
+        rendered into, in `shared_data.mdaZarrData`, keyed by the napari layer
+        name. `shared_data.mdaCurrentDataset` says which dataset, if any, belongs
+        to *this* acquisition.
 
         T-D6: this used to be `zarr.open(shared_data.mdaZarrData['MDA'])`, which
         could not work. `mdaZarrData[...]` is an already-open `zarr.Array`, not a
@@ -1461,9 +1467,17 @@ class MDAGlados(CustomMainWindow):
         `mdaDatasets` and a missing zarr entry are both ordinary "nothing here"
         answers rather than exceptions.
         """
-        datasets = getattr(self.shared_data, 'mdaDatasets', None)
-        if datasets:
-            return datasets[-1]
+        # T-D8: MMCORE_PLUS can append an NDTiff dataset too now, so mdaDatasets[-1]
+        # may belong to an *earlier* acquisition (an NDTiff run, then an OME-Zarr
+        # one). `mdaCurrentDataset` is reset at each acquisition's start and set by
+        # appendNewMDAdataset, so None means "this acquisition produced none".
+        current = getattr(self.shared_data, 'mdaCurrentDataset', _DATASET_NOT_TRACKED)
+        if current is _DATASET_NOT_TRACKED:
+            datasets = getattr(self.shared_data, 'mdaDatasets', None)
+            if datasets:
+                return datasets[-1]
+        elif current is not None:
+            return current
 
         # MMCORE_PLUS: the zarr array the visualisation path created and wrote.
         layer_name = getattr(self.shared_data, 'newestLayerName', '')
@@ -1492,8 +1506,8 @@ class MDAGlados(CustomMainWindow):
         is no data object to ask.
 
         `shared_data.mdaSavedPath` wins when set. On MMCORE_PLUS the data the
-        user keeps is what pymmcore-plus' output handler wrote to their Storage
-        folder; `self.data` there is the scratch display zarr, whose store root
+        user keeps is in their Storage folder -- written by pymmcore-plus' output
+        handler, or by Glados' NDTiff writer; `self.data` can be the scratch display zarr, whose store root
         is a `TemporaryDirectory` deleted on exit. Reporting that as the
         acquisition's location would hand downstream nodes a path that stops
         existing.

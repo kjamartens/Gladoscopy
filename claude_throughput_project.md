@@ -189,7 +189,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 - [x] **T-D5** Fix the `id()`-keyed dimension cache — S, no deps
 - [x] **T-D6** Fix `zarr.open(<Array>)` always failing — S, no deps
 - [x] **T-D7** Fix `TemporaryDirectory` lifetimes — S, no deps
-- [ ] **T-D8** Offer NDTiff as a pymmcore-plus storage format; benchmark tuned OME-Zarr/OME-TIFF against it — M, no deps — *do before T-E6*
+- [x] **T-D8** Offer NDTiff as a pymmcore-plus storage format; benchmark tuned OME-Zarr/OME-TIFF against it — M, no deps — *NDTiff is the default; OME-TIFF was close, tuned OME-Zarr lost; see decisions*
 
 ### Tier E — Napari visualisation
 

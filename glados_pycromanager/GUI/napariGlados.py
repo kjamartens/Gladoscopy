@@ -48,7 +48,7 @@ from glados_pycromanager.GUI.custom_widget_ui import (
 )
 from glados_pycromanager.GUI.frame_ring import DEFAULT_CAPACITY as FRAME_RING_CAPACITY
 from glados_pycromanager.GUI.frame_ring import FrameRing
-from glados_pycromanager.GUI.frame_writer import ZarrFrameWriter
+from glados_pycromanager.GUI.frame_writer import NDTiffFrameWriter, ZarrFrameWriter
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName, moveLayerToTop
 from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
@@ -116,6 +116,14 @@ ZARR_WRITTEN_SLICE_KEY = '_gladosZarrWrittenSlice'
 #: OMETiffWriter. Anything else raises, so these are not free-form strings.
 MMCORE_SAVE_SUFFIXES = {'ome-zarr': '.ome.zarr', 'ome-tiff': '.ome.tiff'}
 
+#: The save format Glados writes itself (T-D8). pymmcore-plus has no NDTiff sink, so
+#: this is not a run_mda(output=...) path and deliberately not in the dict above.
+MMCORE_NDTIFF_FORMAT = 'ndtiff'
+
+#: NDTiff axis names, matching what pycromanager writes, so a dataset reads the same
+#: whichever backend recorded it.
+NDTIFF_AXIS_NAMES = {'t': 'time', 'c': 'channel', 'z': 'z', 'p': 'position'}
+
 
 def mmcore_output_path(shared_data, savefolder, savename):
     """Where pymmcore-plus should write this MDA, or None to acquire unsaved.
@@ -125,17 +133,21 @@ def mmcore_output_path(shared_data, savefolder, savename):
     only copy of the data was the scratch zarr in a `TemporaryDirectory` that
     `release_all_temp_dirs()` deletes on exit. So an MDA on that backend saved
     nothing, anywhere. It has no NDTiff engine of its own, which is why the
-    pycromanager branches next to it did not have this problem.
+    pycromanager branches next to it did not have this problem -- and why the
+    'ndtiff' format (T-D8) is written by Glados, not by pymmcore-plus.
 
     pymmcore-plus can do the recording itself -- `run_mda(..., output=<path>)`
     picks a writer from the suffix -- which is also the design this project
-    wants: the backend records, Glados hooks on. This just builds the path.
+    wants: the backend records, Glados hooks on. This just builds the path:
+    `<name>.ome.zarr` / `<name>.ome.tiff` for those, and a pycromanager-style
+    `<name>_1` directory for 'ndtiff', which `run_mda` never sees.
 
     Returns None when the user set no Storage folder, or chose 'none', so
     "acquire without saving" stays reachable.
     """
     fmt = getattr(shared_data.config.mda_config, 'mmcore_save_format', 'ome-zarr')
-    suffix = MMCORE_SAVE_SUFFIXES.get(fmt)
+    is_ndtiff = fmt == MMCORE_NDTIFF_FORMAT
+    suffix = '' if is_ndtiff else MMCORE_SAVE_SUFFIXES.get(fmt)
     if suffix is None or not savefolder:
         return None
     folder = Path(savefolder)
@@ -146,6 +158,15 @@ def mmcore_output_path(shared_data, savefolder, savename):
                       savefolder, exc)
         return None
     stem = savename or 'MDA'
+    if is_ndtiff:
+        # An NDTiff acquisition is a directory named the way pycromanager names
+        # its own: <name>_1, <name>_2, ...
+        attempt = 1
+        candidate = folder / f'{stem}_{attempt}'
+        while candidate.exists():
+            attempt += 1
+            candidate = folder / f'{stem}_{attempt}'
+        return candidate
     # Never overwrite a previous acquisition -- the same reflex pycromanager has
     # when it suffixes a duplicate acquisition name.
     candidate = folder / f'{stem}{suffix}'
@@ -154,6 +175,48 @@ def mmcore_output_path(shared_data, savefolder, savename):
         candidate = folder / f'{stem}_{attempt}{suffix}'
         attempt += 1
     return candidate
+
+
+def ndtiff_coordinates(event):
+    """NDTiff coordinates for one `useq.MDAEvent`: pycromanager's axis names, with the
+    channel as its config name (as pycromanager stores it) and every index an int."""
+    coordinates = {}
+    for axis, value in dict(event.index).items():
+        if axis == 'c' and getattr(event, 'channel', None) is not None:
+            value = event.channel.config
+        coordinates[NDTIFF_AXIS_NAMES.get(axis, axis)] = value if isinstance(value, str) else int(value)
+    return coordinates
+
+
+def open_ndtiff_store(path, frame_nbytes):
+    """Create the NDTiff dataset at `path` and start its writer thread (T-D8)."""
+    from ndstorage import NDTiffDataset
+    dataset = NDTiffDataset(str(path), summary_metadata={'writer': 'Glados NDTiffFrameWriter'},
+                            writable=True)
+    writer = NDTiffFrameWriter(dataset, frame_nbytes=frame_nbytes, name='GladosNDTiffWriter-mda')
+    writer.start()
+    return dataset, writer
+
+
+def submit_ndtiff_frame(writer, image, event, metadata):
+    """Queue one frame for the NDTiff archive. Blocks only while the queue is full.
+
+    The metadata dict is shallow-copied: the frame-ring consumer's
+    `metadata_refactor` mutates the original while the writer thread may still be
+    serialising it.
+    """
+    return writer.submit((ndtiff_coordinates(event), dict(metadata or {})), image)
+
+
+def finish_ndtiff_store(dataset, writer):
+    """Drain the writer, then finish the dataset -- in that order, or frames still
+    queued would land after the index was closed."""
+    if writer is not None:
+        writer.close()
+    try:
+        dataset.finish()
+    except Exception:
+        logging.exception('Finishing the NDTiff dataset at %s failed', getattr(dataset, 'path', None))
 
 
 def _camera_dtype(shared_data):
@@ -1089,6 +1152,12 @@ class napariHandler:
                 if not getattr(self, '_first_frame_logged', False):
                     logging.info('grab_image_liveVis_PyMMCore: first frame received, shape=%s dtype=%s', image.shape, image.dtype)
                     self._first_frame_logged = True
+                writer = getattr(self, '_ndtiff_writer', None)
+                if writer is not None:
+                    # Storage first, and with backpressure: a frame the archive drops
+                    # is lost data, where the ring below may shed display frames (T-D8).
+                    # This is only a queue put; the write happens on the writer thread.
+                    submit_ndtiff_frame(writer, image, event, metadata)
                 self.frame_ring.push(image, metadata)
             except Exception:
                 logging.exception('grab_image_liveVis_PyMMCore: frame hand-off failed (frame dropped)')
@@ -1340,24 +1409,38 @@ class napariHandler:
         logging.info("MDA sequence cancelled: %s", sequence)
         self.shared_data.tempDataC = sequence
 
+    def _open_ndtiff_store(self, path):
+        """Open this acquisition's NDTiff archive before run_mda() starts (T-D8)."""
+        self._finish_ndtiff_store()  # never leave a previous store half-open
+        core = self.shared_data.MILcore.core
+        frame_nbytes = int(core.getImageWidth()) * int(core.getImageHeight()) * int(core.getBytesPerPixel())
+        dataset, writer = open_ndtiff_store(path, frame_nbytes)
+        self._ndtiff_dataset = dataset
+        self._ndtiff_writer = writer
+        self.shared_data.pyMMCdataset = dataset
+
+    def _finish_ndtiff_store(self):
+        """Drain, finish and publish the NDTiff archive. Idempotent.
+
+        Publishing goes through `appendNewMDAdataset`, which also marks it as this
+        acquisition's dataset, so `MDAGlados._resolve_finished_acquisition_data`
+        hands it to downstream nodes exactly as it does a pycromanager dataset.
+        """
+        writer = getattr(self, '_ndtiff_writer', None)
+        dataset = getattr(self, '_ndtiff_dataset', None)
+        self._ndtiff_writer = None  # frameReady stops submitting from here on
+        self._ndtiff_dataset = None
+        if dataset is None:
+            return
+        finish_ndtiff_store(dataset, writer)
+        self.shared_data.appendNewMDAdataset(dataset)
+
     def PyMMCore_startedAcqCallback(self,sequence: useq.MDASequence):
         logging.info("MDA sequence started")
-        #Create a new NDTiff stack to store images in - for sure used for internal logic - possibly adding something later for secondary saving?
-        #shared_data owns the TemporaryDirectory: constructing one inline and
-        #keeping only .name let its finalizer delete the directory immediately,
-        #so the makedirs below recreated it with nothing owning its cleanup (T-D7).
-        tempdataloc = os.path.join(self.shared_data.new_pyMMC_temp_dir().name,'ndtiff_data')
-        
-        #if it doesn't exist, create it
-        if not os.path.exists(tempdataloc):
-            os.makedirs(tempdataloc)
-        
-        # print('storing temp data in : ', tempdataloc)
-        summary_metadata = {'name_1': 123, 'name_2': 'something else'} # make this whatever you want
-        from ndstorage import NDTiffDataset
-        shared_data.pyMMCdataset = NDTiffDataset(tempdataloc, summary_metadata=summary_metadata, writable=True)
-        
-        #TODO: summary metadata
+        #This used to create an NDTiffDataset in a scratch TemporaryDirectory that
+        #nothing ever wrote to. The NDTiff store is real now (T-D8): the MDA worker
+        #opens it before run_mda() when the save format is 'ndtiff'. It must not be
+        #created here, on the MDA thread, where it would replace that real store.
         self.shared_data.tempDataStart = sequence
     
     def grab_image_liveVisualisation_and_liveAnalysis_savedFn(self,axes,dataset, event_queue):
@@ -1731,6 +1814,8 @@ class napariHandler:
                     napariViewer = None
                     showdisplay = False
                     self.shared_data.allMDAslicesRendered = set()
+                    #Which dataset this acquisition produced; appendNewMDAdataset sets it (T-D8)
+                    self.shared_data.mdaCurrentDataset = None
                     #Already move the layer to top
                     # if self.shared_data.newestLayerName != '':
                     #     moveLayerToTop(self.shared_data.napariViewer,self.shared_data.newestLayerName)
@@ -1754,6 +1839,13 @@ class napariHandler:
                                             '(no Storage folder set, or save format is "none")')
                         else:
                             logging.info('pymmcore-plus MDA will be saved to %s', output_path)
+                        #NDTiff is written by Glados itself (T-D8): pymmcore-plus has no
+                        #NDTiff sink, so frameReady hands each frame to a writer thread
+                        #and run_mda() gets no output of its own.
+                        ndtiff_output = output_path is not None and getattr(
+                            shared_data.config.mda_config, 'mmcore_save_format', '') == MMCORE_NDTIFF_FORMAT
+                        if ndtiff_output:
+                            self._open_ndtiff_store(output_path)
 
                         #Frame-ring consumer first — see the live-mode branch above. On the
                         #multiDstack path the consumer also writes every frame into zarr, where
@@ -1777,7 +1869,7 @@ class napariHandler:
                         #behaviour.
                         mda_thread = self.shared_data.MILcore.core.run_mda(
                             mda_sequence_useq,
-                            output=str(output_path) if output_path else None)
+                            output=str(output_path) if output_path and not ndtiff_output else None)
                         logging.info("Started MDA sequence")
                         #Give some time to understand that it's running
                         time.sleep(0.1)
@@ -1801,6 +1893,9 @@ class napariHandler:
                         #frames are still pending a zarr write.
                         self.shared_data.MILcore.core.mda.events.frameReady.disconnect(connected_callback)
                         self._stop_frame_ring_consumer()
+                        #frameReady is disconnected, so nothing submits any more: drain
+                        #and finish the archive before anything reports or reads it.
+                        self._finish_ndtiff_store()
                         self.shared_data.MILcore.core.mda.events.sequenceStarted.disconnect(connected_callback_startedAcq)
                         # self.shared_data.MILcore.core.mda.events.sequenceFinished.disconnect(connected_callback_finishedAcq)
                         # self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
@@ -1830,13 +1925,6 @@ class napariHandler:
 
                     if acq is not None:
                         self.shared_data.appendNewMDAdataset(acq.get_dataset())
-                    else:
-                        # pymmcore-plus backend: pyMMCdataset may be uninitialized or
-                        # have received no images (put_image is not yet implemented).
-                        try:
-                            self.shared_data.pyMMCdataset.finish()
-                        except Exception as exc:
-                            logging.debug('pyMMCdataset.finish() skipped (pymmcore-plus backend, no images stored yet): %s', exc)
 
                 logging.debug('#nH - Stopping the acquisition from napariHandler')
                 #Now we're after the acquisition
@@ -1853,6 +1941,9 @@ class napariHandler:
             # _stop_frame_ring_consumer() never ran and the consumer thread would
             # outlive the acquisition. Idempotent when it already stopped.
             self._stop_frame_ring_consumer()
+            # Same for the NDTiff archive: finish what was written rather than
+            # leaving an unindexed dataset behind. Idempotent.
+            self._finish_ndtiff_store()
             self._worker_stopped_event.set()
 
 

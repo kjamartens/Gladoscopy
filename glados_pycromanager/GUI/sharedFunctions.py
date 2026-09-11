@@ -82,17 +82,21 @@ class MDAConfig:
         input_type="dropdown", options=["latest", "sequential"])
     live_mode_nr_frames: int = setting(999,"Number of frames taken for live mode","Only applies when live_mode_method == 'mda', where live mode is a MDA with many frames. Set how many frames here.")
     mmcore_save_format: str = setting(
-        "ome-zarr",
+        "ndtiff",
         "MDA save format (pymmcore-plus)",
         "What an MDA writes to your Storage folder when the pymmcore-plus "
-        "backend is selected. That backend has no NDTiff engine, so the data "
-        "is written by pymmcore-plus' own output handler. 'ome-zarr' is a "
-        "directory of chunks -- measured about 3x faster to write and the "
-        "right choice for long or large acquisitions. 'ome-tiff' is a single "
-        "portable file, slower to write. 'none' acquires without saving "
-        "anything to disk, which was the behaviour before this setting "
-        "existed. Ignored by the pycromanager backends, which save NDTiff.",
-        input_type="dropdown", options=["ome-zarr", "ome-tiff", "none"])
+        "backend is selected. 'ndtiff' (default) is the format the "
+        "pycromanager backends write: two files per acquisition, written by "
+        "Glados on its own thread with bounded memory, ~2-7 ms/frame and "
+        "fast random frame reads. 'ome-tiff' is a single interoperable file, "
+        "similarly fast to write but with a few seconds of setup before the "
+        "first frame. 'ome-zarr' is interoperable too, but pymmcore-plus' "
+        "writer keeps the whole acquisition in RAM until it ends and writes "
+        "one file per frame -- avoid it for long acquisitions. 'none' "
+        "acquires without saving anything. Measured with "
+        "'make bench-storage' (docs/bench-storage.txt). Ignored by the "
+        "pycromanager backends, which always save NDTiff.",
+        input_type="dropdown", options=["ndtiff", "ome-tiff", "ome-zarr", "none"])
 
 @dataclass
 class WebhookConfig:
@@ -298,6 +302,9 @@ class Shared_data(QObject):
         self._mdaModeSaveLoc = ['','']
         self._mdaModeNapariViewer = None
         self.mdaDatasets = []
+        #The dataset the current/last MDA acquisition produced, or None if it
+        #produced none. mdaDatasets[-1] can be an earlier acquisition's (T-D8).
+        self.mdaCurrentDataset = None
         self.pyMMCdataset = None
         self.activeMDAobject = None
         self.mdaZarrData = {}
@@ -728,6 +735,7 @@ class Shared_data(QObject):
     
     def appendNewMDAdataset(self,mdadataset):
         self.mdaDatasets.append(mdadataset)
+        self.mdaCurrentDataset = mdadataset
     
     
     @property

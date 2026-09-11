@@ -51,7 +51,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build ensure-uv \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run run-dev run-prod run-mm run-demo profile-runtime profile-startup bench-live-display \
+        run run-dev run-prod run-mm run-demo profile-runtime profile-startup bench-live-display bench-storage \
         ci verify \
         clean
 
@@ -184,6 +184,9 @@ BENCH_FRAMES ?= 60
 bench-live-display:  ## Hardware-free live-display micro-benchmark; appends to docs/bench-live-display.txt.
 	$(PYTHON) -m scripts.bench_live_display --mode layer-update --frames $(BENCH_FRAMES)
 	$(PYTHON) -m scripts.bench_live_display --mode queue-depth
+
+bench-storage:  ## Hardware-free storage-format benchmark (T-D8); appends to docs/bench-storage.txt.
+	$(PYTHON) -m scripts.bench_storage
 
 # ── Gates ─────────────────────────────────────────────────────────────────────
 

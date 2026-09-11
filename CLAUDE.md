@@ -492,6 +492,26 @@ remains, as what it always was — the display buffer, not the archive. Tests:
 `tests/test_mmcore_mda_saving.py`, which drives pymmcore-plus' bundled demo camera, so
 the saving claim is verified rather than reasoned about — that demo camera makes
 `MMCORE_PLUS` acquisition testable headlessly in general.
+**`ndtiff` is that backend's default save format, written by Glados (T-D8).**
+pymmcore-plus has no NDTiff sink, so the MDA worker opens an `NDTiffDataset` at a
+pycromanager-style `<name>_1` directory (`mmcore_output_path`) *before* `run_mda`,
+which then gets `output=None`; `grab_image_liveVis_PyMMCore` queues each frame to an
+`NDTiffFrameWriter` (`submit_ndtiff_frame`, `event.index` mapped to pycromanager's
+`time`/`channel`-name/`z`/`position` axes, a *shallow copy* of the metadata because the
+ring consumer mutates the original) *before* the ring push, so an archived frame has
+backpressure instead of being shed by the overwrite-oldest ring. `_finish_ndtiff_store()`
+drains the writer, `finish()`es the dataset and `appendNewMDAdataset`s it -- after
+`_stop_frame_ring_consumer()` and again, idempotently, in the worker's `finally`.
+`frame_writer.py` is now `FrameWriter` (queue/backpressure/stats) with `ZarrFrameWriter`
+and `NDTiffFrameWriter` subclasses. `shared_data.mdaCurrentDataset` (reset at each MDA's
+start, set by `appendNewMDAdataset`) is what `_resolve_finished_acquisition_data` prefers,
+because `mdaDatasets[-1]` can now be an earlier acquisition's. The dead scratch
+`NDTiffDataset` `PyMMCore_startedAcqCallback` used to create is gone. Why NDTiff is the
+default -- and why the plan's numbers no longer applied: pymmcore-plus 0.18's
+`run_mda(output=...)` goes through **ome-writers** (tensorstore for `.ome.zarr`), whose
+default buffers the whole acquisition in RAM until close -- see `claude_decisions.md`
+(T-D8) and `make bench-storage`. Tests: `tests/test_mmcore_ndtiff_saving.py`,
+`tests/test_ndtiff_frame_writer.py`.
 
 `MDAConfig.live_mode_method` (`sequence` | `mda`, default `sequence`) selects between
 the continuous-sequence live path and the legacy 999-frame-MDA loop;

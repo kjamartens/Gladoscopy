@@ -1,4 +1,4 @@
-"""Dedicated writer thread for the multiDstack display/storage zarr array.
+"""Dedicated writer threads for per-frame storage: the multiDstack zarr, and NDTiff.
 
 Why this exists
 ---------------
@@ -45,8 +45,15 @@ fact instead of being a mystery.
 Frames are queued by reference, not copied -- the same assumption `FrameRing`
 already makes about the acquisition callback handing over a frame it does not
 subsequently reuse.
+
+`FrameWriter` holds all of that and knows nothing about the sink; a subclass says
+how one frame is written. `ZarrFrameWriter` assigns into an array slice.
+`NDTiffFrameWriter` (T-D8) calls `NDTiffDataset.put_image`, which is how the
+pymmcore-plus backend gets an NDTiff archive without writing inline on the frame
+path.
 """
 
+import json
 import logging
 import threading
 import time
@@ -72,20 +79,22 @@ DEFAULT_CLOSE_TIMEOUT_S = 60.0
 _SENTINEL = object()
 
 
-class ZarrFrameWriter:
-    """Writes `(slice_tuple, image)` pairs into a zarr array from one thread.
+class FrameWriter:
+    """Writes `(destination, image)` pairs to a sink from one thread.
 
-    Deliberately knows nothing about metadata, acquisition axes or napari: the
-    caller computes the destination index and hands over a plain array, which
-    keeps this unit-testable against any object supporting `__setitem__`.
+    Subclasses implement `_write(destination, image)`; everything else -- the
+    byte-bounded queue, backpressure, drain-on-close and the statistics -- is here.
+    `frame_nbytes` sizes the queue for a sink that cannot describe its frames;
+    otherwise the size is read off the target's `dtype` and last two `shape` axes.
     """
 
-    def __init__(self, array, memory_budget_bytes=DEFAULT_MEMORY_BUDGET_BYTES,
-                 submit_timeout_s=DEFAULT_SUBMIT_TIMEOUT_S, name='GladosZarrWriter'):
-        self.array = array
+    def __init__(self, target, memory_budget_bytes=DEFAULT_MEMORY_BUDGET_BYTES,
+                 submit_timeout_s=DEFAULT_SUBMIT_TIMEOUT_S, name='GladosFrameWriter',
+                 frame_nbytes=None):
+        self.target = target
         self._submit_timeout_s = float(submit_timeout_s)
         self._name = name
-        self._capacity = self._capacity_for(array, memory_budget_bytes)
+        self._capacity = self._capacity_for(target, memory_budget_bytes, frame_nbytes)
         self._queue = Queue(maxsize=self._capacity)
         self._thread = None
         self._stopping = threading.Event()
@@ -99,16 +108,19 @@ class ZarrFrameWriter:
         self._last_written_tag = None
 
     @staticmethod
-    def _capacity_for(array, memory_budget_bytes):
+    def _capacity_for(array, memory_budget_bytes, frame_nbytes=None):
         """Queue depth in frames, from the budget and one frame's footprint."""
         try:
-            itemsize = array.dtype.itemsize
-            height, width = array.shape[-2], array.shape[-1]
-            frame_bytes = int(itemsize) * int(height) * int(width)
+            if frame_nbytes is not None:
+                frame_bytes = int(frame_nbytes)
+            else:
+                itemsize = array.dtype.itemsize
+                height, width = array.shape[-2], array.shape[-1]
+                frame_bytes = int(itemsize) * int(height) * int(width)
         except Exception:
             # An array-like that cannot describe itself: fall back to the floor
             # rather than refusing to buffer at all.
-            logging.debug('ZarrFrameWriter: could not size frames, using MIN_CAPACITY')
+            logging.debug('FrameWriter: could not size frames, using MIN_CAPACITY')
             return MIN_CAPACITY
         if frame_bytes <= 0:
             return MIN_CAPACITY
@@ -176,7 +188,7 @@ class ZarrFrameWriter:
         self._stopping.clear()
         self._thread = threading.Thread(target=self._run, name=self._name, daemon=True)
         self._thread.start()
-        logging.debug('ZarrFrameWriter started (queue capacity %d frames)', self._capacity)
+        logging.debug('%s started (queue capacity %d frames)', type(self).__name__, self._capacity)
 
     def submit(self, slice_tuple, image, tag=None) -> bool:
         """Queue one frame. Blocks while full; False if the frame was dropped.
@@ -202,9 +214,9 @@ class ZarrFrameWriter:
                 self._blocked_seconds += waited
                 dropped = self._dropped
             logging.warning(
-                'ZarrFrameWriter: storage queue full for %.1fs, frame dropped '
+                '%s: storage queue full for %.1fs, frame dropped '
                 '(%d dropped so far) -- the disk is not keeping up with the camera',
-                waited, dropped)
+                type(self).__name__, waited, dropped)
             return False
         waited = time.perf_counter() - started_waiting
         depth = self._queue.qsize()
@@ -230,19 +242,19 @@ class ZarrFrameWriter:
         try:
             self._queue.put(_SENTINEL, timeout=timeout)
         except Full:
-            logging.warning('ZarrFrameWriter: could not enqueue stop sentinel; '
-                            'backlog may be abandoned')
+            logging.warning('%s: could not enqueue stop sentinel; '
+                            'backlog may be abandoned', type(self).__name__)
         thread.join(timeout=timeout)
         if thread.is_alive():
-            logging.warning('ZarrFrameWriter did not finish within %.0fs; '
-                            '%d frames may not have reached disk', timeout, self.depth)
+            logging.warning('%s did not finish within %.0fs; '
+                            '%d frames may not have reached disk', type(self).__name__, timeout, self.depth)
         self._thread = None
         stats = self.stats()
         level = logging.WARNING if (stats['dropped'] or stats['failed']) else logging.INFO
         logging.log(level,
-                    'ZarrFrameWriter: %d/%d frames written (dropped %d, failed %d), '
+                    '%s: %d/%d frames written (dropped %d, failed %d), '
                     'peak queue depth %d/%d, %.2fs spent under backpressure',
-                    stats['written'], stats['submitted'], stats['dropped'],
+                    type(self).__name__, stats['written'], stats['submitted'], stats['dropped'],
                     stats['failed'], stats['max_depth'], self._capacity,
                     stats['blocked_seconds'])
         return stats
@@ -273,7 +285,7 @@ class ZarrFrameWriter:
                 return
             slice_tuple, image, tag = item
             try:
-                self.array[slice_tuple] = image
+                self._write(slice_tuple, image)
                 with self._lock:
                     self._written += 1
                     # Published only after the write returns, so a reader of
@@ -282,5 +294,67 @@ class ZarrFrameWriter:
             except Exception:
                 with self._lock:
                     self._failed += 1
-                logging.exception('ZarrFrameWriter: write to %s failed (frame lost)',
-                                  slice_tuple)
+                logging.exception('%s: write to %s failed (frame lost)',
+                                  type(self).__name__, slice_tuple)
+
+    def _write(self, destination, image):
+        raise NotImplementedError
+
+
+class ZarrFrameWriter(FrameWriter):
+    """Writes `(slice_tuple, image)` pairs into a zarr array from one thread.
+
+    Deliberately knows nothing about metadata, acquisition axes or napari: the
+    caller computes the destination index and hands over a plain array, which
+    keeps this unit-testable against any object supporting `__setitem__`.
+    """
+
+    def __init__(self, array, memory_budget_bytes=DEFAULT_MEMORY_BUDGET_BYTES,
+                 submit_timeout_s=DEFAULT_SUBMIT_TIMEOUT_S, name='GladosZarrWriter'):
+        super().__init__(array, memory_budget_bytes=memory_budget_bytes,
+                         submit_timeout_s=submit_timeout_s, name=name)
+
+    @property
+    def array(self):
+        return self.target
+
+    def _write(self, destination, image):
+        self.target[destination] = image
+
+
+def json_safe_metadata(metadata):
+    """A JSON-encodable copy of a frame's metadata dict.
+
+    `NDTiffDataset.put_image` `json.dumps` the metadata, and pymmcore-plus' frame
+    metadata carries objects that do not encode (the `MDAEvent`, numpy scalars).
+    Anything unencodable becomes its `str()`, rather than failing the frame.
+    """
+    if not metadata:
+        return {}
+    return json.loads(json.dumps(metadata, default=str))
+
+
+class NDTiffFrameWriter(FrameWriter):
+    """Writes frames into an `ndstorage.NDTiffDataset` from one thread (T-D8).
+
+    `destination` is `(coordinates, metadata)`: the NDTiff coordinate dict
+    (str keys, int or str values) and the frame's metadata, made JSON-safe here on
+    the writer thread rather than on the frame path. The caller must hand over a
+    metadata dict nobody else mutates -- a shallow copy is enough. `frame_nbytes`
+    is required because a dataset cannot describe its frames before the first one.
+    The dataset's `finish()` is the caller's, after `close()` has drained the queue.
+    """
+
+    def __init__(self, dataset, frame_nbytes, memory_budget_bytes=DEFAULT_MEMORY_BUDGET_BYTES,
+                 submit_timeout_s=DEFAULT_SUBMIT_TIMEOUT_S, name='GladosNDTiffWriter'):
+        super().__init__(dataset, memory_budget_bytes=memory_budget_bytes,
+                         submit_timeout_s=submit_timeout_s, name=name,
+                         frame_nbytes=frame_nbytes)
+
+    @property
+    def dataset(self):
+        return self.target
+
+    def _write(self, destination, image):
+        coordinates, metadata = destination
+        self.target.put_image(coordinates, image, json_safe_metadata(metadata))
