@@ -390,16 +390,31 @@ def invalidate_contrast_refresh_interval(shared_data):
 
 
 def _maybe_refresh_contrast(shared_data, layer, layerName):
-    """Recompute contrast limits every Nth frame instead of every frame.
+    """Recompute contrast limits every Nth frame, but only while the layer's
+    native napari "continuous" auto-contrast button is selected.
 
-    bench_live_display measured napari's per-frame auto-contrast recompute
-    (`_keep_auto_contrast = True`) as the single largest recurring cost in
-    the live-display path (~25-30% of steady-state frame time). Recomputing
-    on a throttle keeps the preview's brightness adapting to the data
-    without paying the full min/max-scan cost on every frame. N is
-    configurable via visualisation_config.contrast_refresh_every_n_frames
-    (default 10); set to 1 to recompute every frame (previous behavior).
+    `layer._keep_auto_contrast` is napari's own flag, driven by the
+    "once"/"continuous" buttons in napari's built-in layer controls
+    (AutoScaleButtons in qt_contrast_limits.py). Glados no longer overrides
+    the user's choice: a fresh live/MDA/album layer is seeded to
+    `_keep_auto_contrast = True` (continuous) at creation, and if the user
+    switches to "once" or drags the contrast sliders manually, the flag goes
+    False and this function must do nothing -- the whole point is that the
+    displayed range then stays exactly where the user left it.
+
+    When continuous, bench_live_display measured napari's own per-frame
+    auto-contrast recompute as the single largest recurring cost in the
+    live-display path (~25-30% of steady-state frame time) -- so this still
+    recomputes on a throttle (visualisation_config.contrast_refresh_every_n_frames,
+    default 10) rather than on every single frame, for the frameByFrame path
+    where the in-place data mutation bypasses napari's own slicing pipeline
+    and nothing else would ever refresh it. (The multiDstack path goes
+    through `dims.set_current_step`, which *does* run napari's normal
+    slicing pipeline, so napari's own per-slice recompute already covers it
+    natively while continuous is selected -- see the multiDstack call site.)
     """
+    if not getattr(layer, '_keep_auto_contrast', False):
+        return
     counters = _get_contrast_frame_counters(shared_data)
     n = _get_contrast_refresh_interval(shared_data)
     count = counters.get(layerName, 0) + 1
@@ -675,13 +690,17 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             layer = napariViewer.add_image(liveImage, colormap=DataStructure['layer_color_map'],name = layerName)
             #Set correct scale - in nm
             _apply_pixel_scale(layer, shared_data)
-            # `_keep_auto_contrast = True` recomputes contrast limits (a full
-            # min/max scan) on every single frame update below -- bench_live_display
-            # measured this as the single largest recurring per-frame cost in the
-            # display path (~25-30% of steady-state frame time at 512-2048px).
-            # Recompute periodically instead (see contrast_refresh_every_n_frames)
-            # so brightness still adapts, just not on every frame.
-            layer._keep_auto_contrast = False #type:ignore
+            # New live/MDA/album layers default to napari's native "continuous"
+            # auto-contrast (the same flag its own AutoScaleButtons drive) --
+            # the user can switch to "once" or drag the sliders manually via
+            # napari's own layer controls to hold the range constant. In-place
+            # data updates below bypass napari's slicing pipeline, so this flag
+            # alone would never actually refresh anything here; the throttled
+            # call in _maybe_refresh_contrast is what makes "continuous" work
+            # for this path without paying a full min/max scan every frame
+            # (bench_live_display measured that as ~25-30% of steady-state
+            # frame time at 512-2048px).
+            layer._keep_auto_contrast = True #type:ignore
             _get_contrast_frame_counters(shared_data)[layerName] = 0
             napariViewer.reset_view()
         #Else if the layer already exists, replace it!
@@ -816,23 +835,16 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
                     _apply_pixel_scale(layer, shared_data)
-                    # Same throttle the frameByFrame path uses (T-E2). With
-                    # `_keep_auto_contrast = True` napari runs reset_contrast_limits()
-                    # -- a full min/max scan of the freshly decompressed slice -- on
-                    # *every* re-slice, and the multiDstack path re-slices once per
-                    # dimension per frame. Recompute every Nth displayed frame instead
-                    # (visualisation_config.contrast_refresh_every_n_frames, default 10)
-                    # so brightness still adapts.
-                    layer._keep_auto_contrast = False #type:ignore
-                    # Seeded at -1, not 0 as the frameByFrame path does, so the very
-                    # first update frame refreshes and every Nth one after it.
-                    # frameByFrame can start at 0 because it calls add_image() with a
-                    # real frame, which napari fits contrast to; here add_image() gets
-                    # a zarr store that is still all zeros (or holds one seed frame),
-                    # so limits fitted at creation are meaningless and waiting N
-                    # frames to replace them would show a dark stack at every MDA
-                    # start.
-                    _get_contrast_frame_counters(shared_data)[layerName] = -1
+                    # Default to napari's native "continuous" auto-contrast, same
+                    # as the frameByFrame path -- overridable via napari's own
+                    # layer controls (once / continuous / manual slider drag).
+                    # Unlike frameByFrame, this path re-slices via
+                    # `dims.set_current_step` below, which *does* go through
+                    # napari's normal slicing pipeline -- so while continuous is
+                    # selected, napari's own per-slice recompute already adapts
+                    # brightness natively; no separate Glados-side throttle call
+                    # is needed for this path (see the update branch below).
+                    layer._keep_auto_contrast = True #type:ignore
 
                     # Built from this plan's dimensions a few lines up, so it
                     # matches by construction -- record that, and the first frame
@@ -903,13 +915,12 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     napariViewer.dims.set_current_step(list(range(len(displaySlice))),
                                                        list(displaySlice))
 
-                    # Throttled auto-contrast (T-E2), after the sliders have moved so
-                    # the limits are fitted to the slice now on screen. Replaces
-                    # napari's per-re-slice recompute that `_keep_auto_contrast = True`
-                    # used to drive.
-                    _maybe_refresh_contrast(shared_data,
-                                            napariViewer.layers[liveImageLayer[0]],
-                                            layerName)
+                    # No explicit contrast call here: `set_current_step` above
+                    # already ran napari's own slicing pipeline, which natively
+                    # recomputes contrast limits on every re-slice while the
+                    # layer's `_keep_auto_contrast` (napari's own "continuous"
+                    # flag) is True, and does nothing while it's False ("once"
+                    # already consumed, or the user is holding a manual range).
 
                     #Store exactly which axes is rendered
                     _record_rendered_axes(shared_data, metadata['Axes'])

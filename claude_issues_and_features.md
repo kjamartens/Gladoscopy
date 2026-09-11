@@ -28,10 +28,7 @@ Add longer context underneath as a nested bullet if needed.
 ---
 
 ## Open issues/features
-
-[] I want to have an option to have the full MM/pycromanager 'device property browser' implementation - i.e. a button (next/in the configurations panel) which allows me to open all the device properties in a separate window. This should be implemented for all microscope backends.
 [] RT methods ideally have their visualisation processed on a different core - right now, while visualisation is prepared, the visualisation (or something else, but looks as visualision) of the live view is hindered/hiccups.
-[] When the exposure time is changed and live mode is running, the live mode should restart with the new exposure time.
 [] Investigate whether the following is possible, and if so, implement as a new RT script: I want to do the pSMLM analysis on the fly, and show the localized spots on top of the image, as well as show a SR image next to it. Now I see a few issues. 1: there should be 2 layers created as far as i know, not sure if the plumbing can be updated to allow this. 2: ideally i want to show the pSMLM localization a little delayed compared to the raw data - i.e. lets say pSMLM analysis takes 2 ms, and i get a frame every 50 ms, I believe with my current updating, my pSMLM is always 1 frame behind. I would be perfectly happy to just have pSMLM-visualise show the 'old' frame with the overlaid localizations - but then it needs to create 3 layers I believe. Issue 3: With toggle grid-mode, i can have layers on top of each other, or side-by-side, but here i want a mix: i want live/pSMLM-'old'/pSMLM-'locs' overlaid, and then the pSMLM-SR to the side. If this is not possible with grid-mode, are there other options?
 [] Can we support RT analysis which has this stored in memory when a MDA is done, and then re-show it during scrubbing of the movie? I.e. with pSMLM-version, where it just shows circles now, i want to have a MDA and scrub through the movie, and show me what it analysed in those frames. Ideally, I want the scripts used for RT analyses to remain the same (or similar), and have all of this in glados back-end.
 
@@ -68,6 +65,30 @@ Add longer context underneath as a nested bullet if needed.
 
 ## Resolved (history)
 
+- [x] **Read-only configuration groups** — `ConfigInfo.isReadOnly()` derives it purely at
+  render time (no new persisted flag: MMCore's `.cfg` format has no such concept) from
+  `MIL.is_property_read_only()` over the group's property set (reusing
+  `config_group_editor.group_property_set()`); a group is read-only iff every device
+  property backing it is. `addLabel()` checks it before dropdown/slider/input-field and
+  renders a plain `QLabel` instead, refreshed the same way the other widget types are.
+  Matches the `Real_ms`-style status group in `DemoSMLM.cfg`. Tests:
+  `tests/test_mmconfig_panel.py`.
+- [x] **Live-view contrast mode driven by napari's native auto-contrast toggle** —
+  Glados no longer forces its own throttle regardless of user choice. New live/MDA/album
+  layers now seed `_keep_auto_contrast = True` at creation (napari's own "continuous"),
+  the same flag napari's built-in auto-contrast button reads/writes; switching to "once"
+  or dragging the contrast sliders manually now actually holds the range, since
+  `_maybe_refresh_contrast` does nothing at all while the flag is `False`. multiDstack no
+  longer needs a separate Glados-side call (napari's own slicing pipeline already
+  recomputes natively via `dims.set_current_step`); frameByFrame keeps the throttled
+  call since its in-place data update bypasses that pipeline. Tests:
+  `tests/test_contrast_throttle.py`.
+- [x] **Exposure change restarts live mode** — editing the exposure-time field while
+  live mode is running used to have no effect until the next live-mode start.
+  `_onExposureFieldEditingFinished()` now checks `shared_data.liveMode` and, if running,
+  spawns `_exposureChange_liveRestart` on a daemon thread mirroring `setROI`'s live
+  restart (stop, wait, `set_exposure`, wait, restart). Tests:
+  `tests/test_mode_setter_no_sleep.py`.
 - [x] **pymmcore-plus MDA saved nothing / ignored the user's Storage folder** — the two
   deferred items above, fixed together. `run_mda()` was called with no `output=`, so the
   only copy of the frames was the scratch display zarr in a `TemporaryDirectory` that

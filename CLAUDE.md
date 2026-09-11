@@ -304,6 +304,18 @@ two buttons sat in the unrelated debug-button row).
   independent `if`s rather than `elif` — producing a stray 1-item dropdown
   glued onto (and crowding out the label next to) the slider/input-field.
   `addLabel()` now uses `elif`.
+- **A group is read-only when every property backing it is** — `ConfigInfo.isReadOnly()`
+  gets the group's `(device, property)` set via `config_group_editor.group_property_set()`
+  (reused, not re-derived) and is `True` iff that set is non-empty and
+  `MIL.is_property_read_only()` says so for all of them. There is no separate
+  "read only" flag anywhere (MMCore's `.cfg` format has none) — it is purely
+  derived at render time, per the `Real_ms`-style status group in
+  `DemoSMLM.cfg` (a single preset mapping to a computed property like
+  `SMLMDemoCam.General_ActualFrameIntervalMs`) that has nothing a user could
+  actually set. `addLabel()` checks `isReadOnly()` *first*, before
+  `isDropDown()`/`isSlider()`/`isInputField()`, and renders a plain `QLabel`
+  (`addReadOnlyDisplay`) instead; `updateValuefromMM()` refreshes that label's
+  text the same way it refreshes the other widget types.
 - **The panel can rebuild itself**, via `rebuildConfigLayout()` (clears
   `configLayout` through `_clearConfigLayout()`/`_clearLayoutItem()`,
   re-fetches `get_available_config_groups()` from MIL, and reconstructs
@@ -365,15 +377,25 @@ events for a 4-D per-axis loop, 1 for the batched call, identical resulting
 `current_step`. Tests: `tests/test_dims_batched_update.py` (which also pins the
 per-axis behaviour, so a future napari that stops coalescing fails loudly).
 
-Auto-contrast is throttled on **both** display paths (T-E2): the layer gets
-`_keep_auto_contrast = False` and `_maybe_refresh_contrast` recomputes limits every
-`visualisation_config.contrast_refresh_every_n_frames` (default 10) displayed frames,
-instead of napari rescanning the slice on every re-slice. The two paths seed their
-per-layer counter differently and deliberately — frameByFrame at 0, because
-`add_image()` is handed a real frame napari fits contrast to; multiDstack at **-1**, so
-the first update frame refreshes, because there `add_image()` gets a zarr store that is
-still all zeros and limits fitted at creation mean nothing. Tests:
-`tests/test_contrast_throttle.py`.
+Auto-contrast defers to napari's own native "once"/"continuous" toggle (T-E2, revised):
+new live/MDA/album layers seed `_keep_auto_contrast = True` at creation — the same flag
+napari's built-in `AutoScaleButtons` (`qt_contrast_limits.py`, the "auto-contrast"
+control in napari's own layer controls) reads for its initial checked state and writes
+when the user clicks "continuous" or drags the contrast sliders manually (which the
+user's own napari controls already leave at `False` after a manual set). Glados no
+longer overrides the user's choice with a forced throttle: `_maybe_refresh_contrast`
+checks `layer._keep_auto_contrast` first and does nothing at all when `False` ("once"
+already consumed, or a manual/slider-set range the user wants held constant). While
+`True` it still recomputes on a throttle
+(`visualisation_config.contrast_refresh_every_n_frames`, default 10) rather than every
+frame, but *only* for the **frameByFrame** path, whose in-place `layer.data[:] = ...`
+update bypasses napari's own slicing pipeline entirely — nothing else would ever
+refresh it. **multiDstack no longer calls this function at all**: its
+`dims.set_current_step` already runs napari's normal slicing pipeline
+(`_update_slice_response` in `napari/layers/image/image.py`), which natively recomputes
+contrast on every re-slice while `_keep_auto_contrast` is `True`, and does nothing while
+it's `False` — a second, redundant Glados-side throttle would just repeat the same scan.
+Tests: `tests/test_contrast_throttle.py`.
 
 The multiDstack layer's shape is validated **once per acquisition, not per frame**
 (T-E3). An existing layer's shape cannot drift on its own, so
@@ -812,6 +834,15 @@ replaced it is what new code in these files should follow.
   start) and its own `time.sleep(0.5)` is gone. `drawROI`'s pause surrounds a pure
   query and needed nothing — **if it ever grows a `set_roi()`, give it the same
   explicit wait.** Tests: `tests/test_acq_transition_nonblocking.py`,
+  `tests/test_mode_setter_no_sleep.py`.
+- **Exposure changes restart live mode.** `MMcontrols.py`'s exposure-time field
+  (`exposureTimeInputField`) mirrors `setROI`'s live-restart pattern exactly:
+  `_onExposureFieldEditingFinished()` (wired to `editingFinished`, replacing a bare
+  `storeAllControlValues()` lambda) does nothing extra when `shared_data.liveMode` is
+  `False` — the new value is already picked up lazily at the next snap/live-start — and
+  otherwise spawns `_exposureChange_liveRestart` on its own daemon thread: stop live,
+  wait, `set_exposure`, wait, restart live. Previously editing the exposure field while
+  live had no effect on the running acquisition at all. Tests:
   `tests/test_mode_setter_no_sleep.py`.
 
 ### Logging

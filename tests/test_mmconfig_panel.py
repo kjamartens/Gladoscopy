@@ -97,6 +97,53 @@ class TestAddLabelUsesElifChain:
             "independent ifs let more than one value widget land in the same row."
         )
 
+    def test_read_only_display_is_checked_before_dropdown_slider_input(self):
+        """isReadOnly() must be the first branch: a group backed entirely by
+        read-only properties should render as a static label, never an
+        editable dropdown/slider/input field the user can't actually use."""
+        source = inspect.getsource(MMcontrols.MMConfigUI.addLabel)
+        assert source.index("isReadOnly()") < source.index("isDropDown()")
+
+
+def _config_info_with_properties(pairs, read_only_by_pair):
+    """Build a ConfigInfo whose group is backed by the given (device, property)
+    pairs, one preset per pair collapsed into a single preset's settings, with
+    is_property_read_only() answering per read_only_by_pair."""
+    mil = MagicMock()
+    mil.get_available_config_groups.return_value = ["MyGroup"]
+    mil.get_available_configs.return_value = ["NewPreset"]
+    mil.get_config_data.return_value = "configdata"
+    mil.get_config_settings.return_value = [
+        {"device": device, "property": prop, "value": "0"} for device, prop in pairs
+    ]
+    mil.is_property_read_only.side_effect = lambda device, prop: read_only_by_pair[(device, prop)]
+    mil.get_current_config.return_value = "NewPreset"
+    shared_data = MagicMock()
+    shared_data.MILcore = mil
+    MMcontrols.shared_data = shared_data
+    core = MagicMock()
+    return ConfigInfo(core, shared_data, 0)
+
+
+class TestConfigInfoReadOnly:
+    def test_all_properties_read_only(self):
+        info = _config_info_with_properties(
+            [("Cam", "ActualFrameIntervalMs")],
+            {("Cam", "ActualFrameIntervalMs"): True},
+        )
+        assert info.isReadOnly() is True
+
+    def test_mixed_read_only_and_writable_is_not_read_only(self):
+        info = _config_info_with_properties(
+            [("Cam", "ActualFrameIntervalMs"), ("Cam", "Exposure")],
+            {("Cam", "ActualFrameIntervalMs"): True, ("Cam", "Exposure"): False},
+        )
+        assert info.isReadOnly() is False
+
+    def test_empty_group_is_not_read_only(self):
+        info = _config_info_with_properties([], {})
+        assert info.isReadOnly() is False
+
 
 class TestConfigPanelRefreshRoutesThroughRebuild:
     def test_refresh_button_is_wired_to_rebuild_config_layout(self):

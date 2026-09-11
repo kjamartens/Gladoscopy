@@ -172,6 +172,98 @@ def test_draw_roi_only_reads_and_needs_no_wait(qapp):
     )
 
 
+# ---------------------------------------------------- exposure live-restart
+
+
+def test_exposure_field_wired_to_editing_finished(qapp):
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI
+
+    source = inspect.getsource(MMConfigUI.generalImagingLayout)
+    assert "exposureTimeInputField.editingFinished.connect" in source
+    assert "_onExposureFieldEditingFinished" in source
+
+
+def test_exposure_editing_finished_does_nothing_extra_when_not_live(qapp):
+    """The new value is already picked up lazily at the next snap/live-start;
+    when live mode isn't running there is nothing to restart."""
+    from unittest.mock import MagicMock, patch
+
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI
+
+    obj = MMConfigUI.__new__(MMConfigUI)
+    obj.exposureTimeInputField = MagicMock()
+    obj.exposureTimeInputField.text.return_value = "50"
+    obj.storeAllControlValues = MagicMock()
+    obj.shared_data = MagicMock()
+    obj.shared_data.liveMode = False
+
+    with patch("glados_pycromanager.GUI.MMcontrols.shared_data", obj.shared_data, create=True), \
+         patch("threading.Thread") as thread_cls:
+        obj._onExposureFieldEditingFinished()
+
+    obj.storeAllControlValues.assert_called_once()
+    thread_cls.assert_not_called()
+
+
+def test_exposure_editing_finished_restarts_live_mode_when_live(qapp):
+    """When live, a daemon thread must be spawned targeting
+    _exposureChange_liveRestart with the parsed exposure -- patch
+    threading.Thread itself rather than actually spawning one, so the test
+    stays deterministic and leaves no background thread behind."""
+    from unittest.mock import MagicMock, patch
+
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI
+
+    obj = MMConfigUI.__new__(MMConfigUI)
+    obj.exposureTimeInputField = MagicMock()
+    obj.exposureTimeInputField.text.return_value = "50"
+    obj.storeAllControlValues = MagicMock()
+    obj.shared_data = MagicMock()
+    obj.shared_data.liveMode = True
+
+    with patch("glados_pycromanager.GUI.MMcontrols.shared_data", obj.shared_data, create=True), \
+         patch("threading.Thread") as thread_cls:
+        obj._onExposureFieldEditingFinished()
+
+    thread_cls.assert_called_once()
+    _, kwargs = thread_cls.call_args
+    assert kwargs["target"] == obj._exposureChange_liveRestart
+    assert kwargs["args"] == (50.0,)
+    assert kwargs["daemon"] is True
+    thread_cls.return_value.start.assert_called_once()
+
+
+def test_exposure_live_restart_waits_instead_of_sleeping(qapp):
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI
+
+    source = inspect.getsource(MMConfigUI._exposureChange_liveRestart)
+    assert "time.sleep" not in source
+    assert source.count("wait_for_system()") == 2, (
+        "one wait after stopping live, one after the exposure change, before restart"
+    )
+
+
+def test_exposure_live_restart_orders_stop_wait_set_wait_start(qapp):
+    """Mirrors setROI's live branch: stop, settle, set, settle, restart."""
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI
+
+    live_branch = inspect.getsource(MMConfigUI._exposureChange_liveRestart)
+    order = []
+    for line in live_branch.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        if "liveMode = False" in stripped:
+            order.append("stop")
+        elif "wait_for_system()" in stripped:
+            order.append("wait")
+        elif "set_exposure(" in stripped:
+            order.append("set")
+        elif "liveMode = True" in stripped:
+            order.append("start")
+    assert order == ["stop", "wait", "set", "wait", "start"]
+
+
 # ------------------------------------------------------------- laser control
 
 

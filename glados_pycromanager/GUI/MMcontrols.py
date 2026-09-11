@@ -196,6 +196,29 @@ class ConfigInfo:
             upperLimit = 0
         return upperLimit
             
+    def configPropertyPairs(self):
+        """Returns the (device, property) pairs backing this config group.
+
+        Reuses config_group_editor.group_property_set() -- the union of
+        settings across the group's presets -- rather than re-deriving it.
+        """
+        return config_group_editor.group_property_set(shared_data.MILcore, self.configGroupName())
+
+    def isReadOnly(self):
+        """Returns Boolean whether every device property backing this config
+        group is read-only, i.e. the group can only ever be displayed, never
+        set through the GUI (e.g. a status/computed value like an actual
+        frame interval). A group with no properties is not read-only -- it
+        falls through to the existing empty-widget behaviour."""
+        pairs = self.configPropertyPairs()
+        if not pairs:
+            return False
+        try:
+            return all(shared_data.MILcore.is_property_read_only(device, prop) for device, prop in pairs)
+        except (RuntimeError, OSError, ValueError) as exc:
+            logging.debug('isReadOnly() check failed for %s: %s', self.configGroupName(), exc)
+            return False
+
     def isDropDown(self):
         """Returns Boolean whether the config group should be represented as a drop-down menu
 
@@ -687,7 +710,7 @@ class MMConfigUI(CustomMainWindow):
         #Add a 'exposure time' input field:
         self.exposureTimeInputField = QLineEdit()
         self.exposureTimeInputField.setText(str(100))
-        self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
+        self.exposureTimeInputField.editingFinished.connect(lambda: self._onExposureFieldEditingFinished())
         liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
         self.livesnapalbumbuttons = QHBoxLayout()
@@ -1195,6 +1218,42 @@ class MMConfigUI(CustomMainWindow):
                 self.setROI([newX,newY,newTotWidth,newTotHeight])
             except (RuntimeError, OSError, ValueError, AttributeError) as exc:
                 logging.error('Zoom-out failed: %s', exc)
+
+    def _onExposureFieldEditingFinished(self):
+        """Called when the exposure-time field loses focus / Enter is pressed.
+
+        Always persists the field value as before. If live mode is currently
+        running, the new exposure has no effect on the running acquisition
+        until live mode restarts -- so restart it, off the GUI thread, the
+        same way setROI() restarts live mode around an ROI change.
+        """
+        self.storeAllControlValues()
+        if not shared_data.liveMode:
+            return
+        try:
+            exposure = float(self.exposureTimeInputField.text())
+        except ValueError as exc:
+            logging.debug('Invalid exposure time %r: %s', self.exposureTimeInputField.text(), exc)
+            return
+        threading.Thread(target=self._exposureChange_liveRestart, args=(exposure,),
+                         name='exposureLiveRestart', daemon=True).start()
+
+    def _exposureChange_liveRestart(self, exposure):
+        """Stop live, change the exposure, restart live -- off the GUI thread.
+
+        Mirrors _setROI_liveRestart: stop_sequence_acquisition() is
+        fire-and-forget, so the waits either side of set_exposure are what
+        make this correct.
+        """
+        hw = self.shared_data.microscope_proxy()
+        try:
+            shared_data.liveMode = False
+            hw.wait_for_system() #type:ignore
+            hw.set_exposure(exposure)
+            hw.wait_for_system() #type:ignore
+            shared_data.liveMode = True
+        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+            logging.error('exposure change to %s failed: %s', exposure, exc)
 
     def setROI(self,ROIpos):
         """
@@ -2332,9 +2391,11 @@ class MMConfigUI(CustomMainWindow):
         label = QLabel()
         label.setText(self.config_groups[config_id].configGroupName())
         rowLayout.addWidget(label)
-        #Add the dropdown/slider/inputfield (mutually exclusive -- see
-        #ConfigInfo.isDropDown/isSlider/isInputField):
-        if self.config_groups[config_id].isDropDown():
+        #Add the read-only display/dropdown/slider/inputfield (mutually
+        #exclusive -- see ConfigInfo.isReadOnly/isDropDown/isSlider/isInputField):
+        if self.config_groups[config_id].isReadOnly():
+            self.addReadOnlyDisplay(rowLayout,config_id)
+        elif self.config_groups[config_id].isDropDown():
             self.addDropDown(rowLayout,config_id)
         elif self.config_groups[config_id].isSlider():
             self.addSlider(rowLayout,config_id)
@@ -2342,7 +2403,20 @@ class MMConfigUI(CustomMainWindow):
             self.addInputField(rowLayout,config_id)
         return rowLayout
         # pass
-    
+
+    def addReadOnlyDisplay(self,rowLayout,config_id):
+        """
+        Add a static, non-interactive label to the given rowLayout showing
+        this config group's current value -- used when every device property
+        backing the group is read-only (e.g. a computed/status value such as
+        an actual frame interval), so there is nothing the user could set
+        through a dropdown/slider/input field anyway.
+        """
+        self.editFields[config_id] = QLabel()
+        self.editFields[config_id].setStyleSheet("color: gray; font-style: italic;")
+        self.editFields[config_id].setText(str(self.config_groups[config_id].getStorableValue()))
+        rowLayout.addWidget(self.editFields[config_id])
+
     def addDropDown(self,rowLayout,config_id):
         """
         Add a drop-down menu to the given rowLayout
@@ -2612,7 +2686,9 @@ class MMConfigUI(CustomMainWindow):
         currentValue = self.config_groups[config_id].getCurrentMMValue()
         
         #Set the value of the dropdown to the current MM value
-        if self.config_groups[config_id].isDropDown():
+        if self.config_groups[config_id].isReadOnly():
+            self.editFields[config_id].setText(str(self.config_groups[config_id].getStorableValue()))
+        elif self.config_groups[config_id].isDropDown():
             self.dropDownBoxes[config_id].setCurrentText(currentValue)
         elif self.config_groups[config_id].isSlider():
             #A slider config by definition (?) only has a single property underneath, so get that:
