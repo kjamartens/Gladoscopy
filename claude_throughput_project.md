@@ -230,7 +230,7 @@ Legend — Size: S = under approx. 30 lines changed, M = one file, L = architect
 
 - [x] **T-H1** Debounce `get_MDA_events_from_GUI` — M, no deps — *`textChanged` kept (debounced) alongside `editingFinished` (flush), not replaced; see decisions*
 - [x] **T-H2** Keep `to_pycromanager()` lazy until acquisition start — M, needs H1 — *`MDAGlados.mda` is a lazily-converting property; recipes still store `mda`*
-- [ ] **T-H3** Move `set_focus_device` out of the keystroke path — S, needs H1
+- [x] **T-H3** Move `set_focus_device` out of the keystroke path — S, needs H1 — *node acquisitions now apply their own z stage; see decisions*
 
 ---
 

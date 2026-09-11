@@ -678,6 +678,12 @@ sequence, which `Shared_data._mdaModeParams` converts lazily). Because `vars(sel
 `_mda` rather than `mda`, it is in `storingExceptions`, and `nodz_main`'s recipe save skips
 `_mda` and writes `mda` explicitly. **Never log `self.mda` with an f-string** — that
 forces the conversion. Tests: `tests/test_mda_lazy_events.py`.
+The focus device is applied **at acquisition start**, not in the rebuild (T-H3):
+`_applyFocusDevice()` (called by both acquire paths after `set_exposure`, before
+`mdaMode = True`) sets `z_stage_sel` when `GUI_show_z`, else — or on failure —
+`shared_data._defaultFocusDevice`. It reads those attributes, not the widgets, so a Nodz
+node's widget-free `mdaData` applies its own stage. Tests:
+`tests/test_mda_focus_device_at_acquire.py`.
 
 **Reading it back: never index a section.** The three sections are written by
 different code paths at different times, so any of them can be absent — a fresh

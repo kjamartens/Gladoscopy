@@ -3544,3 +3544,40 @@ acquisition) was not performed.
 `glados_pycromanager/GUI/nodz/nodz_main.py`, `glados_pycromanager/GUI/FlowChart_dockWidgets.py`,
 `CLAUDE.md`, `claude_throughput_project.md`, `tests/test_mda_lazy_events.py`,
 `tests/test_mda_events_debounce.py`.
+
+## 2026-09-11 — The focus device is applied once per acquisition, from `z_stage_sel`  [T-H3]
+
+**Context:** `get_MDA_events_from_GUI` called `MILcore.set_focus_device()` on every
+rebuild — the selected z stage when the z widget was enabled, the session default in the
+`else` branch. After T-H1 that was once per edit burst, still a hardware call per edit.
+
+**Decision 1 — one `_applyFocusDevice()` called from both acquire paths, right after the
+existing `set_exposure`, before `mdaMode = True` starts the worker.** Same choice as
+before: the selected stage if z is enabled, otherwise the default, and the default if the
+stage is rejected (same exception tuple, same warning).
+
+**Decision 2 — it reads `GUI_show_z` and `z_stage_sel`, not `zGroupBox` / the dropdown.**
+`zGroupBox` is enabled exactly when `GUI_show_z` is (`updateGUIwidgets`), and the rebuild
+already stores the dropdown's text in `z_stage_sel`. Both are plain attributes, so they
+exist on a Nodz node's widget-free `mdaData` (copied from the dialog, restored from a
+recipe) where the widgets do not. A `None` stage — never selected — falls back to the
+default instead of passing `None` to the core.
+
+**Behaviour change, deliberate:** a Nodz acquisition node used to inherit whatever focus
+device the *last rebuild anywhere* had set — typically the main MDA panel's, overwriting
+the node dialog's. It now applies its own stored stage. That is what the node's plan was
+built for, and the task's *Don't* ("the z-stack path depends on the focus device being set
+before acquisition") is exactly what this now guarantees per acquisition.
+
+**Not changed:** the call stays synchronous on the caller's thread (the GUI thread for
+`MDA_acq_from_GUI`), like the `set_exposure` beside it — it must land before the
+acquisition worker starts, and it is now one call per acquisition. Routing both through
+the owner thread is a T-B4-style follow-up, not this task.
+
+**Verification:** `tests/test_mda_focus_device_at_acquire.py` — the four selection cases
+against a recording MIL, no focus call left in the rebuild, and both acquire paths calling
+it after the T-H1 flush and before `mdaMode = True`. Full `pytest -q` green. No microscope
+here: the manual z-stack MDA check was not performed.
+
+**Affects:** `glados_pycromanager/Core/MDAGlados.py`, `CLAUDE.md`,
+`claude_throughput_project.md`, `tests/test_mda_focus_device_at_acquire.py`.

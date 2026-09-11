@@ -1564,6 +1564,26 @@ class MDAGlados(CustomMainWindow):
 
         self.MDA_completed.emit(True)
     
+    def _applyFocusDevice(self):
+        """Set the focus device this plan's z-stack moves (T-H3).
+
+        The selected z stage when the z widget is enabled (`GUI_show_z`, which is what
+        enables `zGroupBox`), otherwise the session default -- and the default too if
+        the selected stage is rejected. This used to run inside every plan rebuild,
+        i.e. a hardware call per keystroke; it is only needed once, before acquiring.
+        It reads `z_stage_sel` rather than the dropdown, so a Nodz node's widget-free
+        `mdaData` applies its own stage.
+        """
+        mil = self.shared_data.MILcore
+        default = self.shared_data._defaultFocusDevice
+        if self.GUI_show_z and self.z_stage_sel is not None:
+            try:
+                mil.set_focus_device(self.z_stage_sel)
+                return
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logging.warning('set_focus_device(%s) failed, reverting to default: %s', self.z_stage_sel, exc)
+        mil.set_focus_device(default)
+
     def MDA_acq_from_Node(self, nodeInfo):
         """MDA_acq_from_Node(self, nodeInfo)
         
@@ -1642,6 +1662,8 @@ class MDAGlados(CustomMainWindow):
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
+        #And the focus device the z-plan moves, before the acquisition worker starts
+        self._applyFocusDevice()
         
         #Set the location where to save the mda
         Evaled_storage_file_name = utils.attemptToEvaluateVariables(self.storage_file_name,nodeInfo.flowChart)
@@ -1685,6 +1707,8 @@ class MDAGlados(CustomMainWindow):
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
+        #And the focus device the z-plan moves, before the acquisition worker starts
+        self._applyFocusDevice()
         
         #Set the location where to save the mda
         if self.GUI_storage_enabled:
@@ -1792,13 +1816,7 @@ class MDAGlados(CustomMainWindow):
             self.storage_file_name = self.storageFileNameEntry.text()
         
         if self.zGroupBox.isEnabled():
-            try:
-                #We also need to set the shared_data focus device for proper z-functioning
-                self.shared_data.MILcore.set_focus_device(self.z_oneDstageDropdown.currentText())
-            except (RuntimeError, OSError, AttributeError) as exc:
-                logging.warning('set_focus_device(%s) failed, reverting to default: %s', self.z_oneDstageDropdown.currentText(), exc)
-                self.shared_data.MILcore.set_focus_device(self.shared_data._defaultFocusDevice)
-                
+            #The focus device itself is applied at acquisition start (_applyFocusDevice, T-H3)
             self.z_stage_sel = self.z_oneDstageDropdown.currentText()
             
             if self.z_startEntry.text() != '':
@@ -1837,8 +1855,6 @@ class MDAGlados(CustomMainWindow):
                     self.z_nr_steps = None
             self.z_nrsteps_radio_sel = self.z_nrsteps_radio.isChecked()
             self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
-        else:
-            self.shared_data.MILcore.set_focus_device(self.shared_data._defaultFocusDevice)
         
         #Get the xy positions
         if self.xyGroupBox.isEnabled():
