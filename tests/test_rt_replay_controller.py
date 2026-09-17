@@ -267,7 +267,8 @@ def test_a_non_replayable_session_is_skipped(controller):
     assert ctrl.replay_now() == 0
 
 
-def test_a_failing_visualise_disables_replay_rather_than_raising(controller, caplog):
+def test_a_failing_visualise_never_raises_into_the_slider_callback(controller, caplog):
+    """Whatever the node does, a scrub must not raise."""
     ctrl, shared, viewer = controller
 
     class Exploding(RecordingNode):
@@ -276,9 +277,10 @@ def test_a_failing_visualise_disables_replay_rather_than_raising(controller, cap
 
     session = _register(shared, node=Exploding())
     session.history.record(rt_history.axes_key({'time': 0, 'z': 10}), {'locs': 1}, generation=1)
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         assert ctrl.replay_now() == 0
-    assert session.enabled is False
+    #Not disabled on the first failure -- see the transient-failure tests below.
+    assert session.enabled is True
 
 
 def test_legacy_sessions_get_the_bare_layer(controller):
@@ -368,3 +370,62 @@ def test_detach_is_idempotent_and_stops_the_timer(controller):
     ctrl.detach()
     assert ctrl._connected is False
     assert viewer.dims.events.current_step.callbacks == []
+
+
+# --------------------------------------------------------------------------
+# Transient render failures
+# --------------------------------------------------------------------------
+
+class FlakyNode(RecordingNode):
+    """Fails a fixed number of times, then works."""
+
+    def __init__(self, failures):
+        super().__init__()
+        self.remaining_failures = failures
+
+    def visualise(self, image, metadata, core, napariLayer, **kwargs):
+        if self.remaining_failures > 0:
+            self.remaining_failures -= 1
+            raise IndexError('index 52 is out of bounds for axis 0 with size 52')
+        return super().visualise(image, metadata, core, napariLayer, **kwargs)
+
+
+def _store(session, t=0):
+    session.history.record(rt_history.axes_key({'time': t, 'z': 10}),
+                           {'locs': np.array([[1.0]])},
+                           {'Axes': {'time': t, 'z': 10}}, generation=1)
+
+
+def test_one_transient_failure_does_not_disable_replay(controller):
+    """napari slices asynchronously, so a scrub can legitimately land mid-re-slice
+    and raise an IndexError that says nothing about the node."""
+    ctrl, shared, viewer = controller
+    session = _register(shared, node=FlakyNode(failures=1))
+    _store(session)
+    viewer.dims.current_step = (0, 0, 0, 0)
+    assert ctrl.replay_now() == 0
+    assert session.enabled is True
+    #The next scrub works.
+    assert ctrl.replay_now() == 1
+    assert session.enabled is True
+
+
+def test_a_success_resets_the_failure_count(controller):
+    ctrl, shared, viewer = controller
+    session = _register(shared, node=FlakyNode(failures=1))
+    _store(session)
+    viewer.dims.current_step = (0, 0, 0, 0)
+    ctrl.replay_now()
+    ctrl.replay_now()                     # succeeds, clearing the tally
+    assert ctrl._render_failures.get(session.key) is None
+
+
+def test_a_consistently_broken_node_is_still_disabled(controller):
+    ctrl, shared, viewer = controller
+    from glados_pycromanager.GUI.rt_replay import RENDER_FAILURES_BEFORE_DISABLE
+    session = _register(shared, node=FlakyNode(failures=99))
+    _store(session)
+    viewer.dims.current_step = (0, 0, 0, 0)
+    for _ in range(RENDER_FAILURES_BEFORE_DISABLE):
+        ctrl.replay_now()
+    assert session.enabled is False

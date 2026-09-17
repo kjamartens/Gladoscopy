@@ -22,6 +22,7 @@ Threading:
 """
 
 import logging
+import sys
 import threading
 
 import numpy as np
@@ -37,6 +38,11 @@ DEFAULT_DEBOUNCE_MS = 120
 #: How long the on-demand re-analysis worker waits for a request before
 #: re-checking that it should still be running.
 _WORKER_POLL_S = 0.5
+
+#: Consecutive failed re-renders before a node's replay is switched off. More than
+#: one because napari slices asynchronously, so a scrub can hit a transient error
+#: that says nothing about the node itself.
+RENDER_FAILURES_BEFORE_DISABLE = 3
 
 
 def _plan(shared_data):
@@ -118,6 +124,8 @@ class RTReplayController(QObject):
         #state it accumulated during the acquisition (pSMLM appends every frame it
         #analyses to its localization table).
         self._replay_nodes = {}
+        #Consecutive re-render failures per session; reset by a success.
+        self._render_failures = {}
 
     # -- wiring ------------------------------------------------------------
 
@@ -234,11 +242,27 @@ class RTReplayController(QObject):
             session.node.__dict__.update(snapshot)
             utils.realTimeAnalysis_visualisation(
                 session.node, session.analysis_info, image, metadata, None, target)
+            self._render_failures.pop(session.key, None)
             return True
         except Exception:
-            logging.exception('Replay of %s failed; disabling it for this node',
-                              session.label)
-            session.enabled = False
+            #Not disabled on the first failure. A scrub can legitimately land
+            #mid-re-slice -- napari 0.7 slices asynchronously, so a visualise() that
+            #touches layer properties can raise a transient IndexError while a slice
+            #response for the previous data is still in flight -- and killing replay
+            #for the rest of the session over one of those is far too brittle.
+            #A node that is genuinely broken fails every time and still gets
+            #switched off.
+            failures = self._render_failures.get(session.key, 0) + 1
+            self._render_failures[session.key] = failures
+            if failures >= RENDER_FAILURES_BEFORE_DISABLE:
+                logging.exception(
+                    'Replay of %s failed %d times in a row; disabling it for this '
+                    'node', session.label, failures)
+                session.enabled = False
+            else:
+                logging.warning('Replay of %s failed (%d/%d before it is disabled): %s',
+                                session.label, failures,
+                                RENDER_FAILURES_BEFORE_DISABLE, sys.exc_info()[1])
             return False
 
     # -- on-demand re-analysis --------------------------------------------

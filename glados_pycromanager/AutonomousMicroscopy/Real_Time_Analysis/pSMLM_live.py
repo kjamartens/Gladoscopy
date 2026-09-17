@@ -113,6 +113,8 @@ class pSMLM_live:
         # Frames already stamped into the SR canvas, so that scrubbing back and
         # forth over an acquisition does not count the same localizations twice.
         self._stamped_frames = set()
+        # The points layer's style is applied once, not per frame -- see visualise().
+        self._points_styled = False
         # Pixel size is only used to scale the layers; a subprocess-isolated node
         # gets core=None, so fall back rather than failing to start.
         try:
@@ -202,20 +204,47 @@ class pSMLM_live:
                     self._stamped_frames.add(frame_id)
 
         points = napariLayer['pSMLM: localizations']
+        # Style once, never per frame. Every one of these assignments emits a napari
+        # event whose handler re-reads the layer's view data through the indices of
+        # the *last completed* slice. napari 0.7 slices asynchronously, so doing that
+        # on each frame -- right after the point count changed -- races a slice
+        # response computed for the previous, longer point list, and the handler
+        # indexes the new (shorter) array with the old indices:
+        #     IndexError: index 52 is out of bounds for axis 0 with size 52
+        # from Points._view_data / _update_slice_response. Setting the style once
+        # removes the per-frame event storm that made the race easy to hit.
+        self._style_points(points)
+
         # pSMLM reports (x, y); napari points are (row, col).
         coords = self.SMLMlocs[:, [1, 0]].copy() if len(self.SMLMlocs) else np.empty((0, 2))
+        # A selection left over from the previous frame refers to points that may no
+        # longer exist -- the same stale-index bug by another route. Cleared *before*
+        # the data shrinks, and only when there is something to clear.
+        try:
+            if len(points.selected_data):
+                points.selected_data = set()
+        except (AttributeError, TypeError):
+            pass
+        # Assigned last: the style events above therefore fire while the data and
+        # napari's slice indices still agree with each other.
         points.data = coords
-        points.selected_data = []
-        points.symbol = 'disc'
-        points.size = 8
-        points.face_color = [0, 0, 0, 0]
-        # napari renamed edge_* to border_*; tolerate either.
-        for attribute, value in (('border_color', 'red'), ('edge_color', 'red'),
-                                 ('border_width', 0.05), ('edge_width', 0.05)):
+
+        napariLayer['pSMLM: SR render'].data = self.sr_canvas
+        return napariLayer
+
+    def _style_points(self, points):
+        """Apply the point style once per layer. See visualise() for why not per frame."""
+        if self._points_styled:
+            return
+        for attribute, value in (
+                ('symbol', 'disc'),
+                ('size', 8),
+                ('face_color', [0, 0, 0, 0]),
+                # napari renamed edge_* to border_*; set whichever exists.
+                ('border_color', 'red'), ('edge_color', 'red'),
+                ('border_width', 0.05), ('edge_width', 0.05)):
             try:
                 setattr(points, attribute, value)
             except (AttributeError, ValueError, KeyError):
                 pass
-
-        napariLayer['pSMLM: SR render'].data = self.sr_canvas
-        return napariLayer
+        self._points_styled = True

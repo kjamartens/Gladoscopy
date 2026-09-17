@@ -193,3 +193,91 @@ def test_a_node_built_without_a_core_still_scales_its_layers():
     """A subprocess-isolated node is constructed with core=None."""
     specs, _ = normalise_layer_specs(pSMLM_live(None).visualise_init())
     assert all(s.scale is not None for s in specs)
+
+
+# --------------------------------------------------------------------------
+# Regression: the napari async-slicing IndexError
+# --------------------------------------------------------------------------
+
+class RecordingPointsLayer:
+    """Records the order and count of attribute assignments."""
+
+    STYLE = {'symbol', 'size', 'face_color',
+             'border_color', 'edge_color', 'border_width', 'edge_width'}
+
+    def __init__(self):
+        object.__setattr__(self, 'assignments', [])
+        object.__setattr__(self, 'selected_data', set())
+        object.__setattr__(self, 'data', np.empty((0, 2)))
+
+    def __setattr__(self, name, value):
+        self.assignments.append(name)
+        object.__setattr__(self, name, value)
+
+    @property
+    def style_count(self):
+        return sum(1 for a in self.assignments if a in self.STYLE)
+
+    @property
+    def data_count(self):
+        return self.assignments.count('data')
+
+
+class RecordingGroup(dict):
+    def __getitem__(self, name):
+        if name not in self:
+            layer = RecordingPointsLayer() if 'localizations' in name else FakeLayer()
+            dict.__setitem__(self, name, layer)
+        return dict.__getitem__(self, name)
+
+
+def test_point_style_is_applied_once_not_per_frame(node, frame):
+    """Every style assignment emits a napari event whose handler re-reads the
+    layer's view data through the previous slice's indices. Doing that per frame,
+    right after the point count changed, races napari 0.7's async slicing and
+    raises IndexError out of Points._view_data."""
+    group = RecordingGroup()
+    for t in range(5):
+        _run(node, frame, t=t)
+        node.visualise(frame, {'Axes': {'time': t}}, None, group, srSigma=1.0)
+    points = group['pSMLM: localizations']
+    assert points.data_count == 5
+    #Styled on the first visualise only.
+    assert 0 < points.style_count <= len(RecordingPointsLayer.STYLE)
+    assert points.assignments.count('symbol') == 1
+
+
+def test_point_data_is_assigned_after_the_style(node, frame):
+    """So the style events fire while the data and napari's slice indices still
+    agree with each other."""
+    group = RecordingGroup()
+    _run(node, frame)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    assignments = group['pSMLM: localizations'].assignments
+    assert assignments.index('symbol') < assignments.index('data')
+
+
+def test_a_stale_selection_is_cleared_before_the_data_shrinks(node, frame):
+    """A selection referring to points that no longer exist is the same stale-index
+    bug by another route."""
+    group = RecordingGroup()
+    _run(node, frame)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    points = group['pSMLM: localizations']
+    points.selected_data = {0, 1}
+    points.assignments.clear()
+    _run(node, frame, t=1)
+    node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
+    assert points.assignments.index('selected_data') < points.assignments.index('data')
+    assert points.selected_data == set()
+
+
+def test_an_empty_selection_is_not_reassigned_every_frame(node, frame):
+    group = RecordingGroup()
+    _run(node, frame)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    points = group['pSMLM: localizations']
+    points.assignments.clear()
+    _run(node, frame, t=1)
+    node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
+    assert 'selected_data' not in points.assignments
