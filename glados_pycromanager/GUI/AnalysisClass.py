@@ -26,11 +26,12 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.utils as utils
+import glados_pycromanager.GUI.layer_group as layer_group
 
 
 #Class for overlays and their update and such
 class napariOverlay:
-    def __init__(self,napariViewer,layer_name:str | None='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None):
+    def __init__(self,napariViewer,layer_name:str | None='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None,shared_data=None):
         """
         Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
 
@@ -53,45 +54,80 @@ class napariOverlay:
         self.blending = blending
         self.RT_analysisObject = RT_analysisObject
         self.layerType = layerType
+        self.shared_data = shared_data
         try:
             self.layer_scale = napariViewer.layers[0].scale
         except (AttributeError, IndexError, TypeError):
             self.layer_scale = [1,1]
         
-        #Get info from a RT analysis object (i.e. outside-based-analysis)
+        #Get info from a RT analysis object (i.e. outside-based-analysis).
+        #
+        #visualise_init() may return the historical `(name, type)` 2-tuple or, since
+        #the layer-group work, a list of specs. `is_legacy` is what decides whether
+        #the node's visualise() is handed the bare napari layer (legacy, so every
+        #node written against the old contract is untouched) or the group.
         if self.RT_analysisObject is not None:
-            self.layer_name, self.layerType = self.RT_analysisObject.visualise_init()
-            logging.debug("#nO - Initialised napariOverlay with layer_name: %s, layerType: %s", self.layer_name, self.layerType)
-            
-        #Create the layer if layer_name is not none
-        #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
-        if self.layer_name is not None:
-            if self.layerType is not None:
-                
-                #check if a layer with this name already exists:
-                if self.layer_name in napariViewer.layers:
-                    self.layer = napariViewer.layers[self.layer_name]
-                        
-                else: #else create the layer
-                    if self.layerType == 'image':
-                        self.layer = napariViewer.add_image(np.zeros((32,32)),name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'labels':
-                        self.layer = napariViewer.add_labels([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'points':
-                        self.layer = napariViewer.add_points(name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'shapes':
-                        self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'surface':
-                        self.layer = napariViewer.add_surface([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'tracks':
-                        self.layer = napariViewer.add_tracks([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'vectors':
-                        self.layer = napariViewer.add_vectors(name=self.layer_name,scale=self.layer_scale)
-            else: #Fallback if no layer type is specified at all
-                self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+            self.specs, self.is_legacy = layer_group.normalise_layer_specs(
+                self.RT_analysisObject.visualise_init())
+            logging.debug("#nO - Initialised napariOverlay with specs: %s (legacy=%s)",
+                          [s.name for s in self.specs], self.is_legacy)
+        elif self.layer_name is not None:
+            #Direct construction with an explicit name (the non-RT callers). A
+            #layerType of None has always meant "give me a shapes layer".
+            self.specs = [layer_group.LayerSpec(
+                name=self.layer_name,
+                type=self.layerType if self.layerType is not None else 'shapes')]
+            self.is_legacy = True
+        else:
+            #layer_name is None if we only want to instantiate the napariOverlay
+            #but not get any shape.
+            self.specs = []
+            self.is_legacy = True
+
+        self.group = layer_group.NapariLayerGroup(specs=self.specs, layers=[])
+        for spec in self.specs:
+            self.group.layers.append(
+                layer_group.create_layer(napariViewer, spec, scale=self.layer_scale))
+
+        if self.group.layers:
+            #`self.layer` stays the primary layer for every existing caller
+            #(getLayer, changeName, the legacy draw*Overlay helpers, the teardown
+            #paths in napariGlados/MMcontrols).
+            self.layer = self.group.primary
+            self.layer_name = self.specs[0].name
+            self.layerType = self.specs[0].type
+            #Side-by-side layers are offset against the acquisition layer when
+            #there is one, so the panel sits beside the image the node analysed
+            #rather than beside its own (possibly tiny) placeholder.
+            self.group.apply_placement(base_layer=self._placementBaseLayer())
+            logging.debug("Using layer(s) %s", self.group.names)
         
-            logging.debug("Using layer %s", self.layer)
-        
+    def _placementBaseLayer(self):
+        """The layer a side-by-side panel is positioned against.
+
+        The acquisition/live layer when one exists, so an SR panel lands beside the
+        image its localizations came from. Falls back to the group's own primary
+        layer (`apply_placement`'s own default) when there is none -- at node
+        startup the acquisition layer may not exist yet, which is why
+        `apply_placement` is re-run from the visualisation path as the extent
+        settles.
+        """
+        name = getattr(self.shared_data, 'newestLayerName', None)
+        if not name:
+            return None
+        try:
+            if name in self.napariViewer.layers and name not in self.group.names:
+                return self.napariViewer.layers[name]
+        except (AttributeError, KeyError, TypeError) as exc:
+            logging.debug('Could not resolve placement base layer %r: %s', name, exc)
+        return None
+
+    def refreshPlacement(self):
+        """Re-offset side-by-side layers; cheap no-op when nothing moved."""
+        if not self.group.layers:
+            return False
+        return self.group.apply_placement(base_layer=self._placementBaseLayer())
+
     #Update the name of the overlay
     def changeName(self,new_name):
         """
@@ -316,7 +352,7 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.analysisInfo = analysisInfo
         self.napariViewer = shared_data.napariViewer
         self.sleepTimeMs = delay
-        self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS')
+        self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS',shared_data=shared_data)
         self.visualisation_queue = deque(maxlen=10)#queue.Queue()
         self.shared_data = shared_data
         
@@ -369,7 +405,15 @@ class AnalysisThread_customFunction_Visualisation(QThread):
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
         # tic = time.time()
-        res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
+        #A node that declared its layers the legacy way gets the bare napari layer
+        #it has always got; only a node that opted in by returning a list sees the
+        #group. utils.realTimeAnalysis_visualisation treats this argument as opaque.
+        target = self.napariOverlay.layer if self.napariOverlay.is_legacy else self.napariOverlay.group
+        res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,target)
+        #The node may have just replaced a layer's data (and so its extent) or set
+        #its own scale; re-offset any side-by-side panel. Skips itself when the
+        #base extent has not moved, so this is not per-frame work.
+        self.napariOverlay.refreshPlacement()
         # print(f'Time spend in updateVisualisation; {time.time()-tic}')
 
 

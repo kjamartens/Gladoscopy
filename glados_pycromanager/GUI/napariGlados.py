@@ -2513,8 +2513,15 @@ def layer_removed_event_callback(event, shared_data):
     layerRemoved = shared_data.napariViewer.layers[event.index].name
     #Find this layer in the analysis threads
     for thread in [item['Thread'] for item in shared_data.RTAnalysisQueuesThreads]:
-        if thread.visualisationObject is not None: 
-            if thread.visualisationObject.napariOverlay.layer.name == layerRemoved:
+        if thread.visualisationObject is not None:
+            #Match against every layer the node owns, not just its primary one: a
+            #node may declare several, and closing any one of them means the user
+            #is done with that node. Going through the group also avoids derefing
+            #`.layer`, which napariOverlay legitimately leaves unset when it was
+            #constructed with layer_name=None.
+            overlay = getattr(thread.visualisationObject, 'napariOverlay', None)
+            group = getattr(overlay, 'group', None)
+            if group is not None and layerRemoved in group.names:
                 #Find the thread/queue:
                 for item in shared_data.RTAnalysisQueuesThreads:
                     if item['Thread'] == thread:
@@ -2534,6 +2541,14 @@ def layer_removed_event_callback(event, shared_data):
                         shared_data.RTAnalysisQueuesThreads.remove(item)
                         logging.debug('removed rtanalysis thread')
                         break
+                #The node is gone, so its remaining layers would sit there being
+                #written to by nothing. Drop them in the same pass rather than
+                #leaving orphans behind. (No-op for a single-layer node: the one
+                #layer is the one being removed.)
+                if len(group) > 1:
+                    logging.info('Removing the %d other layer(s) of the node that owned %r',
+                                 len(group) - 1, layerRemoved)
+                    group.remove_all(shared_data.napariViewer)
                 
                 
                 # if 'skipAnalysisThreadDeletion' in vars(shared_data):
