@@ -115,6 +115,10 @@ class pSMLM_live:
         self._stamped_frames = set()
         # The points layer's style is applied once, not per frame -- see visualise().
         self._points_styled = False
+        # Bumped whenever the SR canvas changes, so visualise() can skip re-pushing
+        # an unchanged (and very large) array to napari.
+        self._sr_version = 0
+        self._sr_pushed_version = -1
         # Pixel size is only used to scale the layers; a subprocess-isolated node
         # gets core=None, so fall back rather than failing to start.
         try:
@@ -133,6 +137,7 @@ class pSMLM_live:
             self.sr_canvas = np.zeros(
                 (image.shape[0] * SR_UPSAMPLING, image.shape[1] * SR_UPSAMPLING),
                 dtype=np.float32)
+            self._sr_version += 1
             logging.info('pSMLM_live: super-resolution canvas is now %s',
                          self.sr_canvas.shape)
         if self._kernel is None or self._kernel_sigma != sigma:
@@ -200,6 +205,7 @@ class pSMLM_live:
             frame_id = self._frame_id(metadata)
             if len(self.SMLMlocs) and (frame_id is None or frame_id not in self._stamped_frames):
                 self._stamp(self.SMLMlocs)
+                self._sr_version += 1
                 if frame_id is not None:
                     self._stamped_frames.add(frame_id)
 
@@ -229,22 +235,52 @@ class pSMLM_live:
         # napari's slice indices still agree with each other.
         points.data = coords
 
-        napariLayer['pSMLM: SR render'].data = self.sr_canvas
+        # Only re-assign the SR canvas when it actually changed. It is the frame
+        # upsampled 10x per axis -- up to 400 MB -- and assigning it makes napari
+        # re-slice, rescan contrast and re-upload to the GPU. Scrubbing revisits
+        # frames that are already stamped, so without this guard every slider step
+        # paid that cost to push a byte-identical array.
+        sr_layer = napariLayer['pSMLM: SR render']
+        if self._sr_version != self._sr_pushed_version or getattr(sr_layer, 'data', None) is None:
+            sr_layer.data = self.sr_canvas
+            self._sr_pushed_version = self._sr_version
         return napariLayer
 
+    #(style attribute, value) pairs. The `current_*` form is what governs points
+    #added *later*, which is the only form that works here -- see _style_points.
+    #border_* is napari's newer name for edge_*; whichever exists is set.
+    _POINT_STYLE = (
+        ('symbol', 'disc'),
+        ('size', 8),
+        ('face_color', [0, 0, 0, 0]),
+        ('border_color', 'red'), ('edge_color', 'red'),
+        ('border_width', 0.05), ('edge_width', 0.05),
+    )
+
     def _style_points(self, points):
-        """Apply the point style once per layer. See visualise() for why not per frame."""
+        """Apply the point style once per layer. See visualise() for why not per frame.
+
+        Uses `current_face_color` and friends rather than `face_color`. napari
+        stores these **per point**, so assigning `face_color` to a layer that is
+        still empty styles nothing and the points added on the next line come up
+        with napari's defaults instead -- white filled discs with a grey border,
+        rather than the open red rings this node wants. The `current_*` properties
+        are the ones that govern points added later. The per-point arrays are set
+        too, but only when the layer already holds points.
+        """
         if self._points_styled:
             return
-        for attribute, value in (
-                ('symbol', 'disc'),
-                ('size', 8),
-                ('face_color', [0, 0, 0, 0]),
-                # napari renamed edge_* to border_*; set whichever exists.
-                ('border_color', 'red'), ('edge_color', 'red'),
-                ('border_width', 0.05), ('edge_width', 0.05)):
-            try:
-                setattr(points, attribute, value)
-            except (AttributeError, ValueError, KeyError):
-                pass
+        has_points = False
+        try:
+            has_points = len(points.data) > 0
+        except (AttributeError, TypeError):
+            pass
+        for attribute, value in self._POINT_STYLE:
+            for name in (f'current_{attribute}', attribute if has_points else None):
+                if name is None:
+                    continue
+                try:
+                    setattr(points, name, value)
+                except (AttributeError, ValueError, KeyError):
+                    pass
         self._points_styled = True

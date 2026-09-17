@@ -202,8 +202,11 @@ def test_a_node_built_without_a_core_still_scales_its_layers():
 class RecordingPointsLayer:
     """Records the order and count of attribute assignments."""
 
-    STYLE = {'symbol', 'size', 'face_color',
-             'border_color', 'edge_color', 'border_width', 'edge_width'}
+    #Both forms: `current_*` governs points added later (which is what the node
+    #relies on), the bare names style points already present.
+    _NAMES = ('symbol', 'size', 'face_color',
+              'border_color', 'edge_color', 'border_width', 'edge_width')
+    STYLE = set(_NAMES) | {f'current_{n}' for n in _NAMES}
 
     def __init__(self):
         object.__setattr__(self, 'assignments', [])
@@ -244,7 +247,7 @@ def test_point_style_is_applied_once_not_per_frame(node, frame):
     assert points.data_count == 5
     #Styled on the first visualise only.
     assert 0 < points.style_count <= len(RecordingPointsLayer.STYLE)
-    assert points.assignments.count('symbol') == 1
+    assert points.assignments.count('current_symbol') == 1
 
 
 def test_point_data_is_assigned_after_the_style(node, frame):
@@ -254,7 +257,7 @@ def test_point_data_is_assigned_after_the_style(node, frame):
     _run(node, frame)
     node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
     assignments = group['pSMLM: localizations'].assignments
-    assert assignments.index('symbol') < assignments.index('data')
+    assert assignments.index('current_symbol') < assignments.index('data')
 
 
 def test_a_stale_selection_is_cleared_before_the_data_shrinks(node, frame):
@@ -281,3 +284,66 @@ def test_an_empty_selection_is_not_reassigned_every_frame(node, frame):
     _run(node, frame, t=1)
     node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
     assert 'selected_data' not in points.assignments
+
+
+def test_points_are_open_red_rings_on_a_real_napari_layer(node, frame):
+    """Regression: they came up as filled white discs.
+
+    napari stores face/border colour **per point**, so styling a still-empty layer
+    styles nothing and the points added next take napari's defaults. Only the
+    `current_*` properties govern points added later. Asserted against a real
+    napari Points layer, because a fake would happily accept either API.
+    """
+    points_module = pytest.importorskip('napari.layers')
+    points = points_module.Points(name='locs')
+
+    class RealGroup(dict):
+        def __getitem__(self, name):
+            if name == 'pSMLM: localizations':
+                return points
+            if name not in self:
+                dict.__setitem__(self, name, FakeLayer())
+            return dict.__getitem__(self, name)
+
+    _run(node, frame)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, RealGroup(), srSigma=1.0)
+
+    assert len(points.data) == 2
+    assert np.allclose(points.face_color, 0.0), 'fill must be transparent, not white'
+    assert np.allclose(points.border_color, [[1, 0, 0, 1]] * 2), 'border must be red'
+    assert list(points.size) == [8, 8]
+
+
+def test_the_sr_canvas_is_not_re_pushed_when_unchanged(node, frame):
+    """Regression: scrubbing was very slow.
+
+    The SR canvas is the frame upsampled 10x per axis (up to 400 MB). Re-assigning
+    it makes napari re-slice, rescan contrast and re-upload to the GPU, and a scrub
+    revisits frames that are already stamped -- so every slider step was paying that
+    to push a byte-identical array.
+    """
+    group = RecordingGroup()
+    _run(node, frame)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    sr = group['pSMLM: SR render']
+    pushes_after_first = 0
+
+    class Counting(FakeLayer):
+        pass
+
+    #Re-visualise the same (already stamped) frame several times.
+    before = node._sr_pushed_version
+    for _ in range(5):
+        node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    assert node._sr_pushed_version == before, 'unchanged canvas must not be re-pushed'
+    assert pushes_after_first == 0
+
+
+def test_a_new_frame_does_re_push_the_sr_canvas(node, frame):
+    group = RecordingGroup()
+    _run(node, frame, t=0)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    pushed = node._sr_pushed_version
+    _run(node, frame, t=1)
+    node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
+    assert node._sr_pushed_version != pushed

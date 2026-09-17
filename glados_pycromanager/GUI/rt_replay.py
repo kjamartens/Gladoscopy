@@ -232,9 +232,32 @@ class RTReplayController(QObject):
             self._replaying = False
         return rendered
 
+    def _source_layer_name(self, session):
+        """Which layer replay reads its frames from, resolved *now*.
+
+        Not the name captured when the session was registered: the RT-analysis
+        thread is typically started from the dock widget's Activate button, long
+        before the acquisition that will produce the frames exists, so the captured
+        name is stale or None -- and a None here silently costs the node every part
+        of its `visualise()` that is guarded by `if image is not None`.
+        """
+        candidates = [getattr(self._shared_data, 'newestLayerName', None),
+                      session.source_layer_name]
+        stores = getattr(self._shared_data, 'mdaZarrData', None) or {}
+        for name in candidates:
+            if name and stores.get(name) is not None:
+                return name
+        #No multi-dimensional store for either: fall back to whichever name exists,
+        #so read_frame can still try the layer's own data.
+        for name in candidates:
+            if name:
+                return name
+        return None
+
     def _render(self, session, snapshot, metadata, slice_index):
         """Restore a snapshot onto the node and call its visualise()."""
-        image = read_frame(self._shared_data, session.source_layer_name, slice_index)
+        image = read_frame(self._shared_data, self._source_layer_name(session),
+                           slice_index)
         target = session.visualisation_target
         if target is None:
             return False
@@ -310,7 +333,8 @@ class RTReplayController(QObject):
                 logging.exception('On-demand re-analysis failed')
 
     def _reanalyse(self, session, key, axes, slice_index, generation):
-        image = read_frame(self._shared_data, session.source_layer_name, slice_index)
+        image = read_frame(self._shared_data, self._source_layer_name(session),
+                           slice_index)
         if image is None:
             return
         metadata = {'Axes': dict(axes)}

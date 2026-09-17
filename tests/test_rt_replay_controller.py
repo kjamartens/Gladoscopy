@@ -99,6 +99,7 @@ class FakeSharedData:
         self.config = FakeConfig()
         self._mdaModeParamsGeneration = 1
         self.mdaZarrData = {'MDA': np.arange(3 * 2 * 4 * 4).reshape(3, 2, 4, 4)}
+        self.newestLayerName = 'MDA'
         self._rt_replay = rt_history.RTReplayRegistry(budget_bytes=1 << 20)
 
     @property
@@ -429,3 +430,61 @@ def test_a_consistently_broken_node_is_still_disabled(controller):
     for _ in range(RENDER_FAILURES_BEFORE_DISABLE):
         ctrl.replay_now()
     assert session.enabled is False
+
+
+# --------------------------------------------------------------------------
+# Which layer replay reads frames from
+# --------------------------------------------------------------------------
+
+def test_a_stale_captured_layer_name_does_not_stop_the_frame_being_read(controller):
+    """Regression: replay updated the localizations but not the analysed frame.
+
+    The RT thread is usually started from the dock widget's Activate button, long
+    before the acquisition that produces the frames exists, so the layer name
+    captured at registration is stale or None. read_frame then returned None and
+    every part of the node's visualise() guarded by `if image is not None` silently
+    did nothing.
+    """
+    ctrl, shared, viewer = controller
+    session = _register(shared)
+    session.source_layer_name = 'Live'          # what existed at Activate time
+    session.history.record(rt_history.axes_key({'time': 1, 'z': 0 if False else 10}),
+                           {'locs': np.array([[1.0]])},
+                           {'Axes': {'time': 1, 'z': 10}}, generation=1)
+    viewer.dims.current_step = (1, 0, 0, 0)
+    assert ctrl.replay_now() == 1
+    _locs, _md, image = session.node.visualised[-1]
+    assert image is not None, 'the analysed frame must still be read'
+    assert np.array_equal(image, shared.mdaZarrData['MDA'][1, 0])
+
+
+def test_the_current_acquisition_layer_wins_over_the_captured_one(controller):
+    ctrl, shared, _viewer = controller
+    session = _register(shared)
+    session.source_layer_name = 'Live'
+    assert ctrl._source_layer_name(session) == 'MDA'
+
+
+def test_the_captured_name_is_used_when_it_is_the_one_with_a_store(controller):
+    ctrl, shared, _viewer = controller
+    session = _register(shared)
+    session.source_layer_name = 'MDA'
+    shared.newestLayerName = 'SomethingWithoutAStore'
+    assert ctrl._source_layer_name(session) == 'MDA'
+
+
+def test_a_name_with_no_store_is_still_returned_for_the_layer_data_fallback(controller):
+    ctrl, shared, _viewer = controller
+    session = _register(shared)
+    session.source_layer_name = None
+    shared.newestLayerName = 'Live'
+    shared.mdaZarrData = {}
+    assert ctrl._source_layer_name(session) == 'Live'
+
+
+def test_no_layer_name_anywhere_is_none(controller):
+    ctrl, shared, _viewer = controller
+    session = _register(shared)
+    session.source_layer_name = None
+    shared.newestLayerName = None
+    assert ctrl._source_layer_name(session) is None
