@@ -3666,3 +3666,111 @@ hardware, and not through the full GUI worker.
 `scripts/bench_storage.py`, `Makefile`, `docs/bench-storage.txt`, `CLAUDE.md`,
 `claude_throughput_project.md`, `tests/test_ndtiff_frame_writer.py`,
 `tests/test_mmcore_ndtiff_saving.py`.
+
+---
+
+## RT-analysis multi-layer visualisation and scrub replay (2026-09-17)
+
+**Context:** two user requests in `claude_issues_and_features.md` with one root cause --
+the RT-analysis visualisation plumbing was one layer, live-only and stateless. (1) Retain
+what a node computed during an MDA and re-show it when scrubbing the movie afterwards.
+(2) Show pSMLM localizations over the frame they came from, with an SR render beside them,
+which needs several layers from one node and a layout napari's global grid mode cannot
+express. Not part of `claude_project.md` or `claude_throughput_project.md`; user-requested
+feature work on the same branch.
+
+**The enabling observation:** the per-frame `state_snapshot` that subprocess isolation
+already builds (T-G5, from `__snapshot_attrs__`) *is* "the state `visualise()` needs for
+this frame" -- it exists because a napari layer cannot cross a process boundary. Retaining
+one per frame, keyed by the frame's axes, is the whole replay feature and required no
+change to any node script.
+
+**Decisions taken (the user chose 1-3 up front; the rest fell out of the work):**
+
+1. **Retain the snapshot and the Axes metadata only; re-read the frame from zarr.** The
+   multiDstack display store already holds every frame, uncompressed at one frame per
+   chunk (T-D3, ~2.8 ms/slice read). Copying frames into RAM would blow any budget for
+   something already on disk.
+2. **Backend-computed `layer.translate` for side-by-side**, declared per layer as
+   `placement`. napari's grid mode is a global viewer setting, so a mixed
+   "three overlaid, one beside" layout is not expressible through it. Node scripts stay
+   layout-free.
+3. **Gaps are filled by on-demand re-analysis.** The per-node queue drops a frame whenever
+   the node is busy, so history necessarily has holes; scrubbing into one re-runs the node
+   off the GUI thread and caches the result.
+4. **`is_legacy`, not `len(specs) == 1`, decides what `visualise()` receives.** A node
+   returning a one-element list has opted into the group API, so adding a second layer
+   later must not break its own `visualise()`. Only the historical 2-tuple gets the bare
+   layer -- which is what keeps all eight shipped nodes byte-for-byte unaffected.
+5. **Closing any one of a node's layers tears the whole node down** (and removes its
+   siblings). The alternative -- tearing down only when the last goes -- leaves a node
+   writing into layers that no longer exist.
+6. **Invalidation by generation stamp rather than clearing at acquisition start.** Entries
+   carry `_mdaModeParamsGeneration` and a mismatch reads as a miss. Clearing at start would
+   race `MDA_acq_from_Node`, which creates the RT threads before the zarr exists; the stamp
+   makes invalidation independent of teardown ordering, the same idiom as the dimension
+   cache.
+7. **A node that declares nothing gets no replay, and says so once.** An empty snapshot
+   would `__dict__.update({})` and re-render the *last* analysed frame identically at every
+   scrub position -- which looks like it is working. Disabling and logging is the honest
+   failure.
+8. **Re-analysis uses a throwaway node instance.** `run()` accumulates (pSMLM appends every
+   analysed frame to its localization table), so re-running the acquisition's own instance
+   while scrubbing would corrupt the results that acquisition produced.
+9. **Every shipped node declares `__replayable__` explicitly**, pinned by test. The
+   resolver's default exists for nodes users drop into the AppData plugin folder, not for
+   ours. `FFT_im`/`BioImageModelZoo` are False on memory grounds; `pSMLM_image`,
+   `EndAtFrame` and `LaserAdjustment` on correctness grounds.
+
+**Corrections to the approved plan, found by a validation pass against the code.** These
+changed the work and are recorded because the plan file still carries the original text:
+`executor.py::_replace_visualisation_layer` is *not* on the RT path (it serves
+`Analysis_Measurements` nodes, a different contract), so it was not touched;
+`visualisation_type` is dead metadata for RT nodes; `stopMDAVisualisation` is not an RT
+teardown path; `MDA_acq_finished` calls `stop()` not `destroy()`, so layers already
+survived and the registry exists to hold the *node object* alive past the thread's
+`deleteLater`; and Feature C needs no snapshot attribute at all, because `visualise()`
+already receives the analysed frame as its `image` argument.
+
+**Measured, not assumed:**
+- `FFT_im`'s `fft_display` is a full camera-frame float64 (2 MB at 512 sq., 8 MB at
+  1024 sq.), not the 512x512 its `__init__` placeholder suggests -- hence replay-off.
+- `pSMLM_live`'s SR canvas at 10x upsampling is 25 MB (256 sq.), 100 MB (512 sq.) and
+  400 MB (1024 sq.) per frame. That killed the intended "accumulate in `run()` so it is
+  snapshottable" design: it would have cost more per frame than the raw data. It
+  accumulates in `visualise()` instead, from the KB-sized localization list, guarded by a
+  set of already-stamped frame keys. **The accepted price:** the SR panel is cumulative and
+  does not rewind while scrubbing, while the analysed-frame and localization layers replay
+  exactly.
+- napari 0.7.0 `translate` is post-scale and in world units, and broadcasts to 0 in leading
+  dimensions. Verified against real `napari.layers.Image` objects and pinned by test, since
+  a change there would silently mis-place the SR panel rather than fail.
+
+**Open / not done:**
+- The user chose a **lossless** "analyse every MDA frame" mode. It is **not implemented and
+  cannot be delivered as specified**: true losslessness needs backpressure onto the
+  acquisition, and on `MMCORE_PLUS` the upstream `FrameRing` is overwrite-oldest
+  (capacity 256), so frames would be shed before the RT queue saw them. What is deliverable
+  is a *best-effort deep queue*. Deferred, to be named honestly if built; the on-demand
+  re-analysis already gives the user-visible outcome ("every frame I scrub to has an
+  overlay").
+- `MMcontrols.enableAutoSliceAnalysis` was **not** refactored onto the controller. It
+  remains a parallel, undebounced, GUI-thread `current_step` subscriber. The registry has a
+  `suspended` flag for the two to coexist, but nothing sets it yet -- a follow-up.
+- Two pre-existing `pSMLM_image` bugs were found and deliberately **not** fixed (out of
+  scope, logged instead): it declares no `__snapshot_attrs__` while its `visualise()` reads
+  `sr_canvas`/`fullSMLMlocs`, so its overlay is already silently frozen under subprocess
+  isolation; and it hardcodes `scale=(0.1, 0.1)`, ignoring `pxsizeum`.
+- Not exercised against real hardware or through the full GUI worker; no microscope here.
+
+**Verification:** `tests/test_layer_group.py` (35), `tests/test_rt_multi_layer.py` (14),
+`tests/test_rt_history.py` (35), `tests/test_rt_replay_recording.py` (32),
+`tests/test_rt_replay_controller.py` (22), `tests/test_psmlm_live_node.py` (16). Full
+`pytest` green at 1156 including the slow markers.
+
+**Affects:** `glados_pycromanager/GUI/layer_group.py` (new),
+`glados_pycromanager/GUI/rt_history.py` (new), `glados_pycromanager/GUI/rt_replay.py` (new),
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM_live.py` (new),
+`glados_pycromanager/GUI/AnalysisClass.py`, `glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/GUI/MMcontrols.py`, `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/GUI/sharedFunctions.py`, the eight shipped RT node files, `CLAUDE.md`.
