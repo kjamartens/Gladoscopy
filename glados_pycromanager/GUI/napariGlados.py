@@ -2549,6 +2549,13 @@ def layer_removed_event_callback(event, shared_data):
                     logging.info('Removing the %d other layer(s) of the node that owned %r',
                                  len(group) - 1, layerRemoved)
                     group.remove_all(shared_data.napariViewer)
+                #Closing the overlay is the user saying they are done with this
+                #node, so drop its retained results too -- this is the one place
+                #replay history is released, since the analysis thread stopping
+                #(at acquisition end) deliberately does not.
+                session = shared_data.rt_replay.session_for_layer(layerRemoved)
+                if session is not None:
+                    shared_data.rt_replay.unregister(session.key)
                 
                 
                 # if 'skipAnalysisThreadDeletion' in vars(shared_data):

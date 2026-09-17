@@ -27,6 +27,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.utils as utils
 import glados_pycromanager.GUI.layer_group as layer_group
+import glados_pycromanager.GUI.rt_history as rt_history
 
 
 #Class for overlays and their update and such
@@ -461,6 +462,56 @@ def _build_state_snapshot(RT_analysis_object, snapshot_attrs):
     return snapshot
 
 
+def _createReplaySession(shared_data, analysisInfo, node, visualisationObject, label):
+    """Register this node's replay session, or None when it cannot be replayed.
+
+    Called once the visualisation object exists, since the session holds the node's
+    layers. The session outlives the analysis thread deliberately: the thread is
+    `deleteLater`'d at acquisition end and the node instance is only reachable
+    through it, so without this the results could not be re-rendered afterwards.
+    """
+    if visualisationObject is None or node is None:
+        return None
+    try:
+        if not utils.realTimeAnalysis_replayable(analysisInfo):
+            return None
+        registry = shared_data.rt_replay
+        overlay = visualisationObject.napariOverlay
+        session = rt_history.RTReplaySession(
+            key=_rt_config_key(analysisInfo),
+            node=node,
+            analysis_info=analysisInfo,
+            group=overlay.group,
+            is_legacy=overlay.is_legacy,
+            history=rt_history.RTNodeHistory(registry.budget_bytes, label=label),
+            source_layer_name=getattr(shared_data, 'newestLayerName', None),
+            label=label,
+        )
+        return registry.register(session)
+    except Exception:
+        #Retention is a convenience; never let it stop an analysis from running.
+        logging.exception('Could not set up replay history for %s', label)
+        return None
+
+
+def _recordReplayFrame(session, shared_data, metadata, snapshot):
+    """Store one analysed frame's snapshot for later replay."""
+    if session is None or not session.enabled:
+        return False
+    try:
+        if not session.note_snapshot(snapshot):
+            return False
+        axes = (metadata or {}).get('Axes')
+        key = rt_history.axes_key(axes)
+        return session.history.record(
+            key, snapshot, metadata,
+            generation=getattr(shared_data, '_mdaModeParamsGeneration', None))
+    except Exception:
+        logging.exception('Could not retain an RT-analysis frame for %s', session.label)
+        session.enabled = False
+        return False
+
+
 def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
                                  init_fn=None, run_fn=None, end_fn=None,
                                  control_in_queue=None, control_out_queue=None,
@@ -782,9 +833,19 @@ class AnalysisProcess_customFunction(QThread):
             if wants_visualisation:
                 self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
 
+        self._replay_session = None
         if wants_visualisation and self.RT_analysis_object is not None:
             self.visualisationObject = AnalysisThread_customFunction_Visualisation(self.RT_analysis_object, shared_data, analysisInfo=analysisInfo)
             self.visualisationObject.start()
+            #A reclaimed warm worker brings back the *same* shadow instance a
+            #previous session recorded against, so that session's history now
+            #describes a node being re-run. Retire it rather than aliasing the two.
+            shared_data.rt_replay.unregister(self._cache_key)
+            self._replay_session = _createReplaySession(
+                shared_data, analysisInfo, self.RT_analysis_object,
+                self.visualisationObject,
+                analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node')
+                if isinstance(analysisInfo, dict) else str(analysisInfo))
 
     def _picklable_metadata(self, metadata):
         """Return `metadata`, or {} if it cannot cross the process boundary.
@@ -930,6 +991,13 @@ class AnalysisProcess_customFunction(QThread):
                         self.analysis_result = [result, out_metadata]
                         if self.visualisationObject is not None and self.RT_analysis_object is not None:
                             self.RT_analysis_object.__dict__.update(state_snapshot)
+                            #Free here: the snapshot is already built and already
+                            #copied (it was unpickled out of the worker's queue).
+                            #Recorded before the visualisation drop-gate below so
+                            #history is not thinned by the display rate too.
+                            if self._replay_session is not None:
+                                _recordReplayFrame(self._replay_session, self.shared_data,
+                                                   out_metadata, state_snapshot)
                             if len(self.visualisationObject.visualisation_queue) < 1:
                                 data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core)
                                 self.visualisationObject.visualisation_queue.append(data)
@@ -1224,6 +1292,17 @@ class AnalysisThread_customFunction(QThread):
             self.queue_visualisation = deque(maxlen=10)
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
+            #Resolved once, not per frame -- same as the subprocess worker does.
+            self._snapshot_attrs = utils.realTimeAnalysis_snapshotAttrs(self.analysisInfo)
+            self._replay_session = _createReplaySession(
+                self.shared_data, self.analysisInfo, self.RT_analysis_object,
+                self.visualisationObject, self._replayLabel())
+
+    def _replayLabel(self):
+        info = self.analysisInfo
+        if isinstance(info, dict):
+            return info.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node')
+        return str(info)
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,shared_data=None,core=None):
         # self.msleep(self.sleepTimeMs)
@@ -1238,6 +1317,16 @@ class AnalysisThread_customFunction(QThread):
         logging.debug("Analysis on Image done with result: %s", result)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
+            #Retain this frame's result so the overlay can be re-rendered for it
+            #later. Done before the visualisation drop-gate below, so history is
+            #not additionally thinned by the display rate. The snapshot holds bare
+            #references to this node's attributes -- RTNodeHistory.record copies.
+            session = getattr(self, '_replay_session', None)
+            if session is not None:
+                _recordReplayFrame(
+                    session, shared_data, metadata,
+                    _build_state_snapshot(self.RT_analysis_object,
+                                          getattr(self, '_snapshot_attrs', ())))
             logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             # if self.visualisationObject.visualisation_queue.empty():
