@@ -44,6 +44,13 @@ _WORKER_POLL_S = 0.5
 #: that says nothing about the node itself.
 RENDER_FAILURES_BEFORE_DISABLE = 3
 
+#: How long the slider must be *still* before a frame with no stored result is
+#: re-analysed. Deliberately much longer than the render debounce: re-analysis is
+#: the node's full per-frame compute, and a drag across a stretch of unanalysed
+#: frames would otherwise keep a CPU-bound, GIL-holding worker busy continuously
+#: while the user is still dragging. Rendering already-stored frames stays snappy.
+REANALYSIS_SETTLE_MS = 500
+
 
 def _plan(shared_data):
     """`(dimensionOrder, n_entries, uniqueEntries)` for the current acquisition."""
@@ -112,6 +119,12 @@ class RTReplayController(QObject):
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.replay_now)
 
+        #Separate, slower timer for re-analysing frames that were never analysed.
+        #See REANALYSIS_SETTLE_MS.
+        self._reanalysis_timer = QTimer(self)
+        self._reanalysis_timer.setSingleShot(True)
+        self._reanalysis_timer.timeout.connect(self.reanalyse_now)
+
         #Latest-request-wins re-analysis worker. Started lazily: a session that
         #never scrubs into a gap never pays for a thread.
         self._request = None
@@ -150,6 +163,7 @@ class RTReplayController(QObject):
                 pass
         self._connected = False
         self._timer.stop()
+        self._reanalysis_timer.stop()
         self._worker_stop.set()
         self._request_event.set()
 
@@ -170,6 +184,7 @@ class RTReplayController(QObject):
         if self._is_inert():
             return
         self._timer.start(self._debounce_ms)
+        self._reanalysis_timer.start(max(self._debounce_ms, REANALYSIS_SETTLE_MS))
 
     # -- replay ------------------------------------------------------------
 
@@ -222,9 +237,9 @@ class RTReplayController(QObject):
                     continue
                 entry = session.history.get(key, generation)
                 if entry is None:
-                    #Never analysed (the node was busy when this frame arrived) --
-                    #compute it off-thread rather than leaving a stale overlay.
-                    self._request_reanalysis(session, key, axes, slice_index, generation)
+                    #Never analysed (the node was busy when this frame arrived).
+                    #Filling it in is left to reanalyse_now, once the slider has
+                    #actually settled -- see REANALYSIS_SETTLE_MS.
                     continue
                 if self._render(session, entry.snapshot, entry.metadata, slice_index):
                     rendered += 1
@@ -253,6 +268,32 @@ class RTReplayController(QObject):
             if name:
                 return name
         return None
+
+    def reanalyse_now(self):
+        """Queue re-analysis for any node with no stored result for this frame.
+
+        Split out of `replay_now` and on a longer timer on purpose: the analysis is
+        the node's full per-frame compute (a phasor fit over every local maximum,
+        for pSMLM), so requesting it on every render tick kept a CPU-bound worker
+        running for the whole duration of a drag and made the slider feel very slow.
+        """
+        if self._is_inert() or self._viewer is None:
+            return 0
+        axes = self.current_axes()
+        slice_index = self.current_slice_index()
+        if axes is None or slice_index is None:
+            return 0
+        key = rt_history.axes_key(axes)
+        generation = getattr(self._shared_data, '_mdaModeParamsGeneration', None)
+        requested = 0
+        for session in self._shared_data.rt_replay.sessions:
+            if not (session.enabled and session.replayable):
+                continue
+            if session.history.get(key, generation) is not None:
+                continue
+            self._request_reanalysis(session, key, axes, slice_index, generation)
+            requested += 1
+        return requested
 
     def _render(self, session, snapshot, metadata, slice_index):
         """Restore a snapshot onto the node and call its visualise()."""

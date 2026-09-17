@@ -311,6 +311,9 @@ def test_a_gap_triggers_re_analysis_and_caches_the_result(controller, monkeypatc
 
     viewer.dims.current_step = (2, 0, 0, 0)
     assert ctrl.replay_now() == 0                 # nothing stored for this frame
+    #Re-analysis is deliberately NOT triggered by the render tick -- it waits for
+    #the slider to settle, so a drag does not keep the analysis worker busy.
+    assert ctrl.reanalyse_now() == 1
     key = rt_history.axes_key({'time': 2, 'z': 10})
     for _ in range(100):
         if session.history.get(key, 1) is not None:
@@ -488,3 +491,43 @@ def test_no_layer_name_anywhere_is_none(controller):
     session.source_layer_name = None
     shared.newestLayerName = None
     assert ctrl._source_layer_name(session) is None
+
+
+def test_the_render_tick_does_not_queue_re_analysis(controller):
+    """Regression: scrubbing was very slow.
+
+    Requesting re-analysis from every render tick kept a CPU-bound, GIL-holding
+    worker running for the whole duration of a drag. It now waits for the slider
+    to settle, on its own longer timer, while already-stored frames still render
+    at the fast debounce.
+    """
+    ctrl, shared, viewer = controller
+    _register(shared)
+    viewer.dims.current_step = (2, 0, 0, 0)
+    ctrl.replay_now()
+    assert ctrl._request is None
+
+
+def test_a_slider_move_arms_both_timers_with_re_analysis_slower(controller):
+    ctrl, _shared, viewer = controller
+    from glados_pycromanager.GUI.rt_replay import REANALYSIS_SETTLE_MS
+    viewer.dims.events.current_step.emit()
+    assert ctrl._timer.isActive() and ctrl._reanalysis_timer.isActive()
+    assert ctrl._reanalysis_timer.interval() >= REANALYSIS_SETTLE_MS
+    assert ctrl._reanalysis_timer.interval() > ctrl._timer.interval()
+
+
+def test_reanalyse_now_skips_frames_that_are_already_stored(controller):
+    ctrl, shared, viewer = controller
+    session = _register(shared)
+    _store(session, t=2)
+    viewer.dims.current_step = (2, 0, 0, 0)
+    assert ctrl.reanalyse_now() == 0
+
+
+def test_reanalyse_now_is_inert_during_acquisition(controller):
+    ctrl, shared, viewer = controller
+    _register(shared)
+    shared.mdaMode = True
+    viewer.dims.current_step = (2, 0, 0, 0)
+    assert ctrl.reanalyse_now() == 0
