@@ -186,3 +186,50 @@ def test_a_nonsense_budget_setting_falls_back_to_the_default():
     shared = Shared_data()
     shared.config.rt_analysis_config.replay_history_budget_mb = 'not a number'
     assert shared.rt_replay.budget_bytes == rt_history.DEFAULT_HISTORY_BUDGET_MB * 1024 * 1024
+
+
+# --------------------------------------------------------------------------
+# Every shipped node declares its replay intent explicitly
+# --------------------------------------------------------------------------
+
+#The resolver has a sensible default for nodes users drop into the AppData plugin
+#folder, but a node we ship should say what it means rather than inherit it.
+SHIPPED_NODES = {
+    'pSMLM': ('pSMLM', True),
+    'pSMLM_image': ('pSMLM_image', False),
+    'FFT_im': ('RealTimeFFT', False),
+    'RT_counter': ('RealTimeCounter', True),
+    'SharpnessValue': ('SharpnessValue', True),
+    'BioImageModelZoo': ('BioImageModelZoo', False),
+    'EndAtFrame': ('EndAtFrame', False),
+    'LaserAdjustment': ('laser_adjustment', False),
+}
+
+
+@pytest.fixture(scope='module')
+def node_metadata():
+    import glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis  # noqa: F401
+    from glados_pycromanager.autonomous.registry import get_metadata
+    return get_metadata
+
+
+@pytest.mark.parametrize('stem', sorted(SHIPPED_NODES))
+def test_shipped_node_declares_replay_intent(stem, node_metadata):
+    function_name, expected = SHIPPED_NODES[stem]
+    entry = node_metadata(stem)[function_name]
+    assert entry.get('__replayable__') is expected, (
+        f'{stem} should declare "__replayable__": {expected}')
+
+
+@pytest.mark.parametrize('stem', sorted(SHIPPED_NODES))
+def test_a_replayable_node_has_something_to_restore(stem, node_metadata):
+    """Replay works by restoring a snapshot, so opting in without declaring
+    snapshot attributes (or a snapshot() method) would replay nothing."""
+    function_name, expected = SHIPPED_NODES[stem]
+    if not expected:
+        return
+    entry = node_metadata(stem)[function_name]
+    node_obj = getattr(__import__(
+        f'glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.{stem}',
+        fromlist=[stem]), function_name, None)
+    assert entry.get('__snapshot_attrs__') or callable(getattr(node_obj, 'snapshot', None))

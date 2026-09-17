@@ -162,6 +162,9 @@ def __function_metadata__():
             # here on purpose: it is derived from the kwargs in __init__, so the
             # shadow instance already has the identical value.
             "__snapshot_attrs__": ["outputImage"],
+            #Not retained for scrub-replay by default: outputImage is a full-size
+            #prediction, so the per-frame cost is the same order as the raw data.
+            "__replayable__": False,
         }
     }
 

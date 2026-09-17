@@ -39,6 +39,8 @@ def __function_metadata__():
             # What visualise() reads that run() produces. `firstLayerInit` is set
             # by visualise_init() on the main-process shadow instance.
             "__snapshot_attrs__": ["currentValue"],
+            #Replayable while scrubbing: one scalar per frame.
+            "__replayable__": True,
         }
     }
 

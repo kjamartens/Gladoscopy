@@ -47,6 +47,12 @@ def __function_metadata__():
             "run_delay": 1,
             "visualise_delay": 1000,
             "visualisation_type": "image", #'image', 'points', 'value', or 'shapes'
+            #Not replayable while scrubbing: visualise() *accumulates* into
+            #self.sr_canvas and advances self._last_processed_loc_idx, so it is not
+            #a pure function of one frame's state -- re-rendering an arbitrary frame
+            #would corrupt the super-resolution canvas rather than redraw it. A node
+            #that wants replayable SR output must accumulate in run() instead.
+            "__replayable__": False,
             "input":[
             ],
             "output":[

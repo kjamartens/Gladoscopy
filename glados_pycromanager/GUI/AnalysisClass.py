@@ -487,7 +487,15 @@ def _createReplaySession(shared_data, analysisInfo, node, visualisationObject, l
             source_layer_name=getattr(shared_data, 'newestLayerName', None),
             label=label,
         )
-        return registry.register(session)
+        registry.register(session)
+        #There is now something worth replaying, so make sure the slider is being
+        #watched. Attaching is idempotent, and costs nothing until a scrub happens.
+        try:
+            from glados_pycromanager.GUI.rt_replay import get_replay_controller
+            get_replay_controller(shared_data)
+        except Exception:
+            logging.exception('Could not attach the RT-analysis replay controller')
+        return session
     except Exception:
         #Retention is a convenience; never let it stop an analysis from running.
         logging.exception('Could not set up replay history for %s', label)

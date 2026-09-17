@@ -38,6 +38,9 @@ def __function_metadata__():
             # from run(), and a subprocess-isolated node is handed core=None.
             # Never isolate this one - see utils.realTimeAnalysis_runInSubprocess.
             "__needsLiveCore__": True,
+            #Not replayable while scrubbing: this node acts on the live hardware /
+            #running acquisition, so re-running it for an old frame is meaningless.
+            "__replayable__": False,
         },
         "laser_adjustment_advanced": {
             "required_kwargs": [
@@ -52,6 +55,9 @@ def __function_metadata__():
             "visualise_delay": 500,
             # Same as above: drives the laser through the live core in run().
             "__needsLiveCore__": True,
+            #Not replayable while scrubbing: this node acts on the live hardware /
+            #running acquisition, so re-running it for an old frame is meaningless.
+            "__replayable__": False,
         }
     }
 

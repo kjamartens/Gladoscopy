@@ -48,6 +48,8 @@ def __function_metadata__():
             # set by visualise_init() on the main-process shadow instance and
             # must not be mirrored from the child.
             "__snapshot_attrs__": ["currentValue"],
+            #Replayable while scrubbing: one scalar per frame.
+            "__replayable__": True,
         }
     }
 

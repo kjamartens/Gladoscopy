@@ -53,6 +53,9 @@ def __function_metadata__():
             # deliberately NOT mirrored: it is a full frame, and nothing in the
             # main process reads it.
             "__snapshot_attrs__": ["SMLMlocs"],
+            #Replayable while scrubbing: visualise() is a pure function of SMLMlocs,
+            #which is a handful of KB per frame.
+            "__replayable__": True,
         }
     }
 
