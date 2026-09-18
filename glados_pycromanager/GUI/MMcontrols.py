@@ -1262,7 +1262,13 @@ class MMConfigUI(CustomMainWindow):
 
         Mirrors _setROI_liveRestart: stop_sequence_acquisition() is
         fire-and-forget, so the waits either side of set_exposure are what
-        make this correct.
+        make this correct. Live mode is restarted in a `finally`, so a
+        failure anywhere in the stop/set sequence -- a bad exposure value,
+        a transient hardware error, anything not previously caught by the
+        narrow exception list this used to have -- can no longer leave live
+        mode stopped with no automatic restart; the exception is logged
+        (with a full traceback, to actually diagnose what happened) instead
+        of being swallowed.
         """
         hw = self.shared_data.microscope_proxy()
         try:
@@ -1270,9 +1276,10 @@ class MMConfigUI(CustomMainWindow):
             hw.wait_for_system() #type:ignore
             hw.set_exposure(exposure)
             hw.wait_for_system() #type:ignore
+        except Exception:
+            logging.exception('exposure change to %s failed; restarting live anyway', exposure)
+        finally:
             shared_data.liveMode = True
-        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
-            logging.error('exposure change to %s failed: %s', exposure, exc)
 
     def setROI(self,ROIpos):
         """

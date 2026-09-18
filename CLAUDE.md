@@ -867,8 +867,18 @@ replaced it is what new code in these files should follow.
   `False` — the new value is already picked up lazily at the next snap/live-start — and
   otherwise spawns `_exposureChange_liveRestart` on its own daemon thread: stop live,
   wait, `set_exposure`, wait, restart live. Previously editing the exposure field while
-  live had no effect on the running acquisition at all. Tests:
-  `tests/test_mode_setter_no_sleep.py`.
+  live had no effect on the running acquisition at all. **The restart-to-`True` now
+  lives in a `finally`, and the exception list widened from four specific types to bare
+  `Exception`** — the original version restarted live only *after* `set_exposure`
+  succeeded and only caught `(RuntimeError, OSError, ValueError, AttributeError)`, so
+  any other exception (a rejected exposure value, a transient hardware/bridge error)
+  left `liveMode` stuck `False` with nothing to auto-restart it — the user had to click
+  "Start Live Mode" by hand, which read as the field "crashing" live mode. Now the
+  exception is logged with a full traceback (`logging.exception`, for actually
+  diagnosing what happened) and live is restarted regardless. Tests:
+  `tests/test_mode_setter_no_sleep.py`,
+  `tests/test_mmcontrols_owner_thread.py::test_exposure_field_during_live_stops_sets_and_restarts_live`,
+  `tests/test_mmcontrols_owner_thread.py::test_exposure_field_restarts_live_even_if_set_exposure_raises`.
 
 ### Windows scheduling hints
 

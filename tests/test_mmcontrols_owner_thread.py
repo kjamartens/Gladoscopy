@@ -163,6 +163,8 @@ class _Host:
     _setROI_liveRestart = mm.MMConfigUI._setROI_liveRestart
     _startLiveAfterExposure = mm.MMConfigUI._startLiveAfterExposure
     _startLiveMode = mm.MMConfigUI._startLiveMode
+    _onExposureFieldEditingFinished = mm.MMConfigUI._onExposureFieldEditingFinished
+    _exposureChange_liveRestart = mm.MMConfigUI._exposureChange_liveRestart
 
     def __init__(self, shared_data):
         self.shared_data = shared_data
@@ -180,6 +182,9 @@ class _Host:
     # GUI halves, stubbed so no Qt is needed
     def _showSnappedImage(self, image):
         self.shown.append(image)
+
+    def storeAllControlValues(self):
+        pass
 
     def _applyOneDstageLayout(self, stage_name, pos):
         self.applied.append((stage_name, pos))
@@ -337,6 +342,65 @@ def test_set_roi_during_live_runs_off_both_the_gui_and_owner_threads(shared, ser
     assert threading.get_ident() not in flip_threads, 'blocked the calling thread'
     assert service._owner_ident not in flip_threads, 'would deadlock the hardware queue'
     assert shared.MILcore.names() == ['wait_for_system', 'set_roi', 'wait_for_system']
+
+
+def test_exposure_field_during_live_stops_sets_and_restarts_live(shared, service):
+    """Pressing Enter in the exposure field while live must auto-restart it."""
+    host = _Host(shared)
+    host.exposureTimeInputField.setText('50')
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+    try:
+        host._onExposureFieldEditingFinished()
+        deadline = time.monotonic() + 5.0
+        while len(flips) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    _drain(service)
+    assert [value for value, _thread in flips] == [False, True]
+    flip_threads = {thread for _value, thread in flips}
+    assert threading.get_ident() not in flip_threads, 'blocked the calling thread'
+    assert service._owner_ident not in flip_threads, 'would deadlock the hardware queue'
+    assert shared.MILcore.names() == ['wait_for_system', 'set_exposure', 'wait_for_system']
+    assert shared.MILcore.calls[1][1] == (50.0,)
+
+
+def test_exposure_field_restarts_live_even_if_set_exposure_raises(shared, service):
+    """A bad value or transient hardware error must not leave live mode off.
+
+    Previously only (RuntimeError, OSError, ValueError, AttributeError) were
+    caught, and the restart to True happened after set_exposure -- so any
+    other exception (or one of those four) left liveMode stuck at False with
+    nothing to auto-restart it, and the user had to click "Start Live Mode"
+    by hand.
+    """
+    host = _Host(shared)
+    host.exposureTimeInputField.setText('50')
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+
+    def boom(_value):
+        raise KeyError('camera rejected exposure')
+    shared.MILcore.set_exposure = boom
+
+    try:
+        host._onExposureFieldEditingFinished()
+        deadline = time.monotonic() + 5.0
+        while len(flips) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    assert [value for value, _thread in flips] == [False, True], (
+        'live mode must be restarted even when set_exposure raised')
 
 
 def test_live_mode_starts_only_after_the_exposure_write_landed(shared, service):
