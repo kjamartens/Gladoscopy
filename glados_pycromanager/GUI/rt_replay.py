@@ -24,6 +24,7 @@ Threading:
 import logging
 import sys
 import threading
+import time
 
 import numpy as np
 
@@ -32,7 +33,12 @@ from qtpy.QtCore import QObject, QTimer
 import glados_pycromanager.GUI.rt_history as rt_history
 import glados_pycromanager.GUI.utils as utils
 
-#: Fallback if the Advanced Settings value cannot be read.
+#: Minimum gap between overlay re-renders while the slider is moving. This is a
+#: **throttle**, not a trailing debounce: the first move renders immediately and
+#: further moves render at this rate, so scrolling continuously through a stack
+#: updates as you go. A trailing debounce restarts its timer on every wheel notch,
+#: so a continuous scroll never fires it until the user stops -- which is exactly
+#: what "nothing updates until I release the scroll wheel" was.
 DEFAULT_DEBOUNCE_MS = 120
 
 #: How long the on-demand re-analysis worker waits for a request before
@@ -114,6 +120,10 @@ class RTReplayController(QObject):
         except (TypeError, ValueError):
             self._debounce_ms = DEFAULT_DEBOUNCE_MS
 
+        #Monotonic timestamp of the last completed render, for the throttle.
+        #-inf so the very first slider move renders immediately.
+        self._last_render_monotonic = float('-inf')
+
         #A slider drag emits current_step per pixel; coalesce into one re-render.
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -183,8 +193,19 @@ class RTReplayController(QObject):
     def _on_current_step(self, event=None):
         if self._is_inert():
             return
-        self._timer.start(self._debounce_ms)
+        #Re-analysis stays purely trailing: it is the node's full per-frame compute
+        #and should only run once the user has actually settled.
         self._reanalysis_timer.start(max(self._debounce_ms, REANALYSIS_SETTLE_MS))
+
+        #Rendering is throttled, not debounced. Render now if enough time has
+        #passed since the last one, otherwise schedule one for when it has -- so a
+        #continuous scroll keeps updating instead of going quiet until it stops.
+        elapsed_ms = (time.monotonic() - self._last_render_monotonic) * 1000.0
+        if elapsed_ms >= self._debounce_ms:
+            self._timer.stop()
+            self.replay_now()
+        elif not self._timer.isActive():
+            self._timer.start(max(1, int(self._debounce_ms - elapsed_ms)))
 
     # -- replay ------------------------------------------------------------
 
@@ -222,14 +243,22 @@ class RTReplayController(QObject):
         """Re-render every registered node's overlay for the current frame."""
         if self._is_inert() or self._viewer is None:
             return 0
+        started = time.monotonic()
+        #Stamped up front, so the throttle spaces renders by their *start* times and
+        #a slow render cannot be immediately followed by another.
+        self._last_render_monotonic = started
         axes = self.current_axes()
         slice_index = self.current_slice_index()
         if axes is None or slice_index is None:
+            logging.debug('Replay: no frame for current_step=%s (axes=%s, slice=%s)',
+                          tuple(getattr(self._viewer.dims, 'current_step', ())),
+                          axes, slice_index)
             return 0
 
         key = rt_history.axes_key(axes)
         generation = getattr(self._shared_data, '_mdaModeParamsGeneration', None)
         rendered = 0
+        misses = 0
         self._replaying = True
         try:
             for session in self._shared_data.rt_replay.sessions:
@@ -240,11 +269,20 @@ class RTReplayController(QObject):
                     #Never analysed (the node was busy when this frame arrived).
                     #Filling it in is left to reanalyse_now, once the slider has
                     #actually settled -- see REANALYSIS_SETTLE_MS.
+                    misses += 1
                     continue
                 if self._render(session, entry.snapshot, entry.metadata, slice_index):
                     rendered += 1
         finally:
             self._replaying = False
+        #One line per render at DEBUG: which frame, how many overlays were redrawn,
+        #how many had no stored result, and how long it took on the GUI thread. If
+        #that duration approaches the throttle interval, the throttle -- not the
+        #analysis -- is what is limiting the scroll rate.
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug('Replay: axes=%s rendered=%d missing=%d in %.1f ms',
+                          axes, rendered, misses,
+                          (time.monotonic() - started) * 1000.0)
         return rendered
 
     def _source_layer_name(self, session):

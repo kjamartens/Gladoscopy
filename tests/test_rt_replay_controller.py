@@ -128,7 +128,7 @@ def controller(qapp, monkeypatch):
 
     viewer = FakeViewer()
     shared = FakeSharedData(viewer)
-    ctrl = rt_replay.RTReplayController(shared, debounce_ms=0)
+    ctrl = rt_replay.RTReplayController(shared, debounce_ms=200)
     ctrl.attach(viewer)
     return ctrl, shared, viewer
 
@@ -201,10 +201,10 @@ def test_slider_events_are_ignored_while_inert(controller):
     assert ctrl._timer.isActive() is False
 
 
-def test_slider_events_schedule_a_replay(controller):
+def test_slider_events_arm_the_re_analysis_timer(controller):
     ctrl, _shared, viewer = controller
     viewer.dims.events.current_step.emit()
-    assert ctrl._timer.isActive() is True
+    assert ctrl._reanalysis_timer.isActive() is True
 
 
 # --------------------------------------------------------------------------
@@ -508,11 +508,12 @@ def test_the_render_tick_does_not_queue_re_analysis(controller):
     assert ctrl._request is None
 
 
-def test_a_slider_move_arms_both_timers_with_re_analysis_slower(controller):
+def test_re_analysis_waits_much_longer_than_a_render(controller):
     ctrl, _shared, viewer = controller
     from glados_pycromanager.GUI.rt_replay import REANALYSIS_SETTLE_MS
-    viewer.dims.events.current_step.emit()
-    assert ctrl._timer.isActive() and ctrl._reanalysis_timer.isActive()
+    viewer.dims.events.current_step.emit()   # leading edge renders; no render timer
+    viewer.dims.events.current_step.emit()   # inside the window; schedules trailing
+    assert ctrl._reanalysis_timer.isActive() and ctrl._timer.isActive()
     assert ctrl._reanalysis_timer.interval() >= REANALYSIS_SETTLE_MS
     assert ctrl._reanalysis_timer.interval() > ctrl._timer.interval()
 
@@ -531,3 +532,93 @@ def test_reanalyse_now_is_inert_during_acquisition(controller):
     shared.mdaMode = True
     viewer.dims.current_step = (2, 0, 0, 0)
     assert ctrl.reanalyse_now() == 0
+
+
+# --------------------------------------------------------------------------
+# Throttle, not trailing debounce
+# --------------------------------------------------------------------------
+
+def test_the_first_slider_move_renders_immediately(controller):
+    """Leading edge: a trailing-only debounce made the first notch of a scroll do
+    nothing at all."""
+    ctrl, shared, viewer = controller
+    session = _register(shared)
+    _store(session, t=0)
+    viewer.dims.current_step = (0, 0, 0, 0)
+    viewer.dims.events.current_step.emit()
+    assert len(session.node.visualised) == 1
+
+
+def test_continuous_scrolling_keeps_rendering(controller):
+    """Regression: scrolling continuously through a stack showed nothing until the
+    wheel was released, then everything at once.
+
+    A trailing debounce restarts on every wheel notch, so while notches keep
+    arriving faster than the interval it never fires. The throttle renders on the
+    leading edge and then at a bounded rate.
+    """
+    ctrl, shared, viewer = controller
+    session = _register(shared)
+    for t in range(3):
+        _store(session, t=t)
+
+    rendered_during_scroll = 0
+    for t in range(3):
+        viewer.dims.current_step = (t, 0, 0, 0)
+        #Notches arriving back to back, far faster than the throttle interval.
+        ctrl._last_render_monotonic = float('-inf')   # pretend the interval elapsed
+        viewer.dims.events.current_step.emit()
+        rendered_during_scroll += 1
+    assert len(session.node.visualised) == rendered_during_scroll == 3
+
+
+def test_notches_inside_the_throttle_window_are_coalesced(controller):
+    """The throttle still has to bound the rate, or a fast scroll would render per
+    notch on the GUI thread."""
+    ctrl, shared, viewer = controller
+    session = _register(shared)
+    _store(session, t=0)
+    viewer.dims.current_step = (0, 0, 0, 0)
+
+    viewer.dims.events.current_step.emit()          # leading edge: renders now
+    assert len(session.node.visualised) == 1
+    for _ in range(5):                               # inside the window
+        viewer.dims.events.current_step.emit()
+    assert len(session.node.visualised) == 1, 'must not render per notch'
+    assert ctrl._timer.isActive(), 'a trailing render must still be scheduled'
+
+
+def test_a_pending_trailing_render_is_not_restarted_by_further_notches(controller):
+    """Restarting it is what starved the render during a continuous scroll."""
+    ctrl, shared, viewer = controller
+    _register(shared)
+    viewer.dims.current_step = (0, 0, 0, 0)
+    viewer.dims.events.current_step.emit()           # leading edge
+    viewer.dims.events.current_step.emit()           # schedules the trailing one
+    first_interval = ctrl._timer.remainingTime()
+    for _ in range(3):
+        viewer.dims.events.current_step.emit()
+    assert ctrl._timer.remainingTime() <= first_interval
+
+
+def test_the_render_timestamp_is_taken_before_the_work(controller):
+    """So a slow render cannot be immediately followed by another."""
+    ctrl, shared, viewer = controller
+    _register(shared)
+    viewer.dims.current_step = (0, 0, 0, 0)
+    before = ctrl._last_render_monotonic
+    ctrl.replay_now()
+    assert ctrl._last_render_monotonic > before
+
+
+def test_replay_logs_one_debug_line_per_render(controller, caplog):
+    """The line carries the frame, how many overlays were redrawn, how many had no
+    stored result, and the GUI-thread duration."""
+    ctrl, shared, viewer = controller
+    session = _register(shared)
+    _store(session, t=1)
+    viewer.dims.current_step = (1, 0, 0, 0)
+    with caplog.at_level(logging.DEBUG):
+        ctrl.replay_now()
+    assert 'rendered=1' in caplog.text
+    assert 'missing=0' in caplog.text
