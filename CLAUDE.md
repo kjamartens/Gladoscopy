@@ -439,7 +439,30 @@ store and releases its temp directory, discarding every frame written so far, so
 now logs at INFO: after T-E3 it must happen at most once per acquisition, and a second
 occurrence in one run is a real signal. Newly created layers are marked validated at
 creation (they are built from the same dimensions). Tests:
-`tests/test_layer_shape_validation_cache.py`.
+`tests/test_layer_shape_validation_cache.py`. **That per-dim check only ever
+walked the leading (acquisition) dims, never the trailing image plane** — two
+acquisitions reusing the same layer name (e.g. the default `"MDA"`) with the
+same leading dim counts but a different camera frame size (a ROI/binning
+change between them) passed the check regardless, so the stale store's `(h,
+w)` silently stayed whatever the *previous* acquisition's frame size was, and
+the first write of the new acquisition failed with a zarr "could not
+broadcast" error. Fixed by also comparing `layerData.shape[-2:]` against the
+incoming frame's shape once the per-dim loop completes clean (a `for/else`).
+`_preinit_mda_zarr` (the MMCORE_PLUS fast-camera pre-creation path, above) had
+the same root bug in a different shape: it only ever checked
+`mdaZarrData.get(layerName) is not None` and, if so, reused whatever was there
+unconditionally — so a store left over from a *differently-shaped* previous
+acquisition under the same layer name (different leading dim count, e.g. a
+prior z-stack reused for a t-only run, or a different frame size) was written
+into as though it still matched, and every `ZarrFrameWriter` write of the new
+acquisition raised "too many indices"/"could not broadcast" and the whole
+acquisition's data was lost. It now compares the full expected shape
+(`tuple(n_entries_in_dims) + (h, w)`) and dtype against the existing array,
+reusing it only on an exact match and otherwise discarding it (`mdaZarrData[layerName]
+= None`, `release_zarr_temp_dir`, `_invalidate_layer_shape_validation`) before
+creating a fresh one — the layer-shape-validation cache invalidation is what
+then makes the display path above rebuild the napari layer too, on the first
+frame of the new acquisition. Tests: `tests/test_preinit_mda_zarr_reset.py`.
 
 Album mode (`napariHelperFunctions.addToExistingOrNewLayer`, one caller —
 `MMcontrols.addImageToAlbum`) appends into a **geometrically grown buffer** kept in

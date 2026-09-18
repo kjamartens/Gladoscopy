@@ -827,7 +827,20 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                             if int(layerData.shape[dim_id]) != n_entries_in_dims[dim_id]:
                                 correctDimensions = False
                                 break
-                            
+                        else:
+                            # The leading (acquisition) dims all matched -- also check the
+                            # trailing image plane. A ROI/binning change between two
+                            # acquisitions that reuse the same layer name and happen to
+                            # have the same leading dim counts (e.g. both "5 time points")
+                            # was invisible to the loop above, which only ever looks at
+                            # dims *before* the image plane. The stale store's (h, w) then
+                            # silently stayed whatever the *previous* acquisition's camera
+                            # settings produced, and the first write of the new
+                            # acquisition failed with a zarr "could not broadcast" error
+                            # instead of triggering the rebuild below.
+                            if tuple(layerData.shape[-2:]) != tuple(latestImage.shape[-2:]):
+                                correctDimensions = False
+
                     #Remove the layer if the dimensions are wrong
                     if correctDimensions == True:
                         #Matches the current plan: record it so subsequent frames of
@@ -1445,8 +1458,6 @@ class napariHandler:
         layerName = shared_data.newestLayerName
         if not layerName or layerName == 'Live':
             return False
-        if shared_data.mdaZarrData.get(layerName) is not None:
-            return False
         try:
             dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = \
                 _get_cached_dimensions(shared_data)
@@ -1463,6 +1474,27 @@ class napariHandler:
             h = int(self.shared_data.MILcore.get_image_height())
             w = int(self.shared_data.MILcore.get_image_width())
             dtype = _camera_dtype(self.shared_data)
+            expected_shape = tuple(n_entries_in_dims) + (h, w)
+            existing = shared_data.mdaZarrData.get(layerName)
+            if existing is not None:
+                if tuple(existing.shape) == expected_shape and existing.dtype == np.dtype(dtype):
+                    # Already the right shape/dtype for this acquisition -- reusing
+                    # it is what lets frameReady callbacks write immediately even
+                    # for a repeated acquisition under the same layer name.
+                    return False
+                # A store from a previous acquisition under the same layer name
+                # (repeated MDA, or a ROI/binning change) with the wrong shape --
+                # reusing it as-is is what made every ZarrFrameWriter write of
+                # this acquisition fail with a zarr "could not broadcast" error.
+                # Discard it so the fresh array below actually matches what this
+                # acquisition is about to write.
+                logging.info('Stale multiDstack store for %r: shape=%s dtype=%s, '
+                             'expected shape=%s dtype=%s; recreating',
+                             layerName, existing.shape, existing.dtype,
+                             expected_shape, np.dtype(dtype))
+                shared_data.mdaZarrData[layerName] = None
+                shared_data.release_zarr_temp_dir(layerName)
+                _invalidate_layer_shape_validation(shared_data, layerName)
             _create_mda_zarr(shared_data, layerName, n_entries_in_dims, h, w, dtype)
             return True
         except Exception as exc:
