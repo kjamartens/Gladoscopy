@@ -6,6 +6,7 @@ Includes classes for Interactive Lists such as the Channels, XY positions.
 """
 import itertools
 import logging
+import math
 import os
 import sys
 import time
@@ -2108,14 +2109,20 @@ class MDAGlados(CustomMainWindow):
             except (ValueError, ZeroDivisionError):
                 pass
 
-        #Number of steps implied by the entered step distance
+        #Number of z-positions implied by the entered step distance.
+        #useq's ZTopBottom.positions() is np.arange(bottom, top + step/2, step),
+        #i.e. floor(range/step) + 1 positions -- the top is "encompassed" but not
+        #always precisely visited when step does not divide the range evenly, so
+        #this is floored (with a small epsilon so an exact division, e.g.
+        #range=10/step=2, doesn't fall just under the next integer and get
+        #floored down to one fewer position than it actually produces).
         self.z_stepdistance_computedLabel.setText("")
         if z_start is not None and z_end is not None and self.z_stepdistance_entry.text() != '':
             try:
                 step_distance = float(self.z_stepdistance_entry.text())
                 if step_distance != 0:
-                    nr_steps = abs(z_end - z_start) / abs(step_distance)
-                    self.z_stepdistance_computedLabel.setText(f"({nr_steps:.3g} steps)")
+                    nr_steps = math.floor(abs(z_end - z_start) / abs(step_distance) + 1e-9) + 1
+                    self.z_stepdistance_computedLabel.setText(f"({nr_steps} steps)")
             except (ValueError, ZeroDivisionError):
                 pass
 
