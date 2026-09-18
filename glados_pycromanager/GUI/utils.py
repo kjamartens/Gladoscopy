@@ -3034,6 +3034,45 @@ def realTimeAnalysis_snapshotAttrs(rt_analysis_info):
     return list(entry.get('__snapshot_attrs__', []))
 
 
+def realTimeAnalysis_replayable(rt_analysis_info) -> bool:
+    """Whether this node's overlay may be re-rendered while scrubbing.
+
+    Replay restores a stored per-frame snapshot onto the node and calls its
+    `visualise()` again (see `GUI/rt_history.py`), so it is only meaningful for a
+    node whose `visualise()` is a pure function of that snapshot.
+
+    Resolution order:
+
+    1. An explicit ``"__replayable__"`` in the node's ``__function_metadata__``
+       entry wins. A node that *accumulates* inside `visualise()` -- drawing into a
+       canvas it keeps, say -- must set it False: replaying an arbitrary frame would
+       corrupt that canvas rather than re-render it.
+    2. Otherwise True iff the node declares ``"__snapshot_attrs__"`` or defines a
+       ``snapshot()`` method, since without either there is nothing to restore.
+    3. Otherwise False.
+
+    Conservative by construction: a node that says nothing gets no replay rather
+    than a silently wrong overlay.
+    """
+    try:
+        entry = _nodeFunctionEntry(_rtAnalysisClassName(rt_analysis_info))
+    except (KeyError, TypeError, AttributeError):
+        return False
+    #A sparse/absent metadata entry is not itself disqualifying -- the node may
+    #still define a snapshot() method, which is checked below.
+    entry = entry or {}
+    declared = entry.get('__replayable__')
+    if declared is not None:
+        return bool(declared)
+    if entry.get('__snapshot_attrs__'):
+        return True
+    try:
+        node_obj = _resolve_node_obj(_rtAnalysisClassName(rt_analysis_info))
+        return callable(getattr(node_obj, 'snapshot', None))
+    except (KeyError, TypeError, AttributeError):
+        return False
+
+
 #: Cache for :func:`nodeRunNeedsLiveContext`, keyed by dotted node name.
 #: Cleared with the stem->module cache, since it is derived from the class the
 #: stem resolves to.

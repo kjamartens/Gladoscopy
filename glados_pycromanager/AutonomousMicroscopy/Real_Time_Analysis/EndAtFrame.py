@@ -42,6 +42,9 @@ def __function_metadata__():
             # and a subprocess-isolated node is handed shared_data=None. Never
             # isolate this one - see utils.realTimeAnalysis_runInSubprocess.
             "__needsLiveCore__": True,
+            #Not replayable while scrubbing: this node acts on the live hardware /
+            #running acquisition, so re-running it for an old frame is meaningless.
+            "__replayable__": False,
         }
     }
 

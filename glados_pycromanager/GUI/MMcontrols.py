@@ -1644,14 +1644,15 @@ class MMConfigUI(CustomMainWindow):
             for item in shared_data.RTAnalysisQueuesThreads:
                 if item['Thread'] == self.current_analysis_thread:
                     
-                    #Attempt to remove the napari layer corresponding to it
+                    #Attempt to remove the napari layer(s) corresponding to it. A
+                    #node may own several, so go through the group rather than its
+                    #primary layer alone; remove_all tolerates layers the user has
+                    #already closed.
                     if item['Thread'].visualisationObject is not None:
-                        try:
-                            shared_data.napariViewer.layers.remove(item['Thread'].visualisationObject.napariOverlay.layer.name)
-                        except ValueError as e:
-                            layername = item['Thread'].visualisationObject.napariOverlay.layer
-                            logging.debug(f'Cannot delete an expected layer connected to visualisationLayer - realtime visualisation {e},{layername}')
-                            pass
+                        overlay = getattr(item['Thread'].visualisationObject, 'napariOverlay', None)
+                        group = getattr(overlay, 'group', None)
+                        if group is not None:
+                            group.remove_all(shared_data.napariViewer)
                     
                     #Remove the thread
                     if item['Thread']:

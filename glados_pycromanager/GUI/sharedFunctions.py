@@ -181,6 +181,36 @@ class RealTimeAnalysisConfig:
         options=["True", "False"],
         hidden=False,
     )
+    # Retained real-time-analysis results, so that dragging napari's time/z
+    # slider after an acquisition re-renders each node's overlay for the frame
+    # you land on, instead of leaving it frozen on the last analysed frame.
+    # Shared across every running node; the oldest frames are dropped first.
+    replay_history_budget_mb: int = setting(
+        256,
+        "RT-analysis: replay history budget (MB)",
+        "Memory for retained real-time results, so dragging the napari time/z "
+        "slider after an acquisition re-renders each node's overlay for that "
+        "frame. Shared across all running nodes; oldest frames are dropped "
+        "first, and scrubbing to a dropped frame re-runs the analysis instead. "
+        "Set to 0 to disable retention entirely. Note a node whose result is a "
+        "full-size image (e.g. Real-Time FFT) costs megabytes per frame, which "
+        "is why such nodes are excluded by default.",
+        hidden=False,
+    )
+    replay_debounce_ms: int = setting(
+        50,
+        "RT-analysis: minimum ms between overlay redraws while scrubbing",
+        "Caps how often retained real-time results are redrawn while you drag or "
+        "scroll the napari slider: 50 ms is 20 redraws per second. This is a rate "
+        "limit, not a delay -- the first slider move redraws immediately and the "
+        "final position is always redrawn, so lowering it makes scrubbing smoother "
+        "rather than merely faster. Measured cost of one redraw for the pSMLM live "
+        "node is about 5 ms at 256x256 and 8.5 ms at 1024x1024, so 50 ms leaves "
+        "roughly six times headroom; raise it if scrubbing makes the UI stutter "
+        "with a heavier node. Frames that were never analysed are filled in "
+        "separately, once the slider stops.",
+        hidden=False,
+    )
 
 
 @dataclass
@@ -190,6 +220,19 @@ class PerformanceConfig:
         "Performance Mode: default capture window (s)",
         "Default duration for a Performance Mode capture; adjustable per-run "
         "via the spinbox in the Performance panel.",
+    )
+    foreground_scheduling_hints: str = setting(
+        "True",
+        "Keep the process off efficiency cores (Windows)",
+        "Asks Windows for an above-normal priority class and opts out of EcoQoS "
+        "power throttling at startup. On a hybrid CPU (performance + efficiency "
+        "cores) Windows otherwise parks an unfocused process on the efficiency "
+        "cores, which is why the live display slows down when the napari window "
+        "is not the active window. Best-effort and Windows-only; takes effect at "
+        "the next restart.",
+        input_type="dropdown",
+        options=["True", "False"],
+        hidden=True,
     )
     hotspot_top_n: int = setting(
         25,
@@ -296,6 +339,12 @@ class Shared_data(QObject):
         #   from GUI_napari.py's main().
         self._rt_subprocess_cache = {}
         self._rt_subprocess_pool = WarmSubprocessPool()
+        # - Retained real-time-analysis results, so a node's overlay can be
+        #   re-rendered for any frame while scrubbing a finished acquisition.
+        #   Holds the node instance, its layers and its per-frame history alive
+        #   after the analysis thread itself is gone (the thread is deleteLater'd
+        #   at acquisition end, and the node is only reachable through it).
+        self._rt_replay = None
 
         self._mdaImageQueues = []
         self._defaultFocusDevice = ''
@@ -325,6 +374,15 @@ class Shared_data(QObject):
         self.backend='JAVA' #JAVA or Python, if running headlessly
         self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.
         self.last_display_update_time = 0
+        # Depth limit for the display hand-off, the counterpart to the *rate*
+        # limit `last_display_update_time` drives in napariGlados.
+        # `_should_display_now` measures how long ago the GUI thread last
+        # *finished* a frame, so it opens wider the further behind the GUI
+        # falls -- which is backwards, and let the yielded-payload Qt event
+        # queue grow without bound. This holds the monotonic timestamp of the
+        # payload the GUI thread has not acknowledged yet, or None when it is
+        # idle. See napariGlados._claim_display_slot.
+        self.displayUpdateInFlight = None
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
         self.liveModeUpdateOngoing = False
@@ -709,6 +767,27 @@ class Shared_data(QObject):
             self.on_RTAnalysisQueuesThreads_value_change()
     def on_RTAnalysisQueuesThreads_value_change(self):
         logging.debug('_RTAnalysisQueuesThreads changed')
+
+    @property
+    def rt_replay(self):
+        """Registry of retained real-time-analysis results, created on first use.
+
+        Lazy because `rt_history` must not be imported at `Shared_data`
+        construction time in the headless/test paths that never run an analysis.
+        The budget follows the Advanced Settings value at creation; later edits go
+        through `set_budget`.
+        """
+        if self._rt_replay is None:
+            from glados_pycromanager.GUI.rt_history import (
+                DEFAULT_HISTORY_BUDGET_MB, RTReplayRegistry)
+            budget_mb = getattr(self.config.rt_analysis_config,
+                                'replay_history_budget_mb', DEFAULT_HISTORY_BUDGET_MB)
+            try:
+                budget_bytes = int(budget_mb) * 1024 * 1024
+            except (TypeError, ValueError):
+                budget_bytes = DEFAULT_HISTORY_BUDGET_MB * 1024 * 1024
+            self._rt_replay = RTReplayRegistry(budget_bytes=budget_bytes)
+        return self._rt_replay
         
         
     @property

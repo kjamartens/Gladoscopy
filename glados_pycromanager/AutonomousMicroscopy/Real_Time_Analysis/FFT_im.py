@@ -49,6 +49,10 @@ def __function_metadata__():
             # on every frame. `firstLayerInit` is set by visualise_init() on the
             # shadow itself and must not be overwritten from the child.
             "__snapshot_attrs__": ["fft_display"],
+            #Not retained for scrub-replay by default: fft_display is a full
+            #camera-frame float64 array (2 MB at 512x512, 8 MB at 1024x1024), so a
+            #1000-frame acquisition would be gigabytes. Set True to opt in.
+            "__replayable__": False,
         }
     }
 

@@ -592,6 +592,25 @@ acquisition, just materialised.
     needed no change — `_napariUpdateLive_locked` already routes any `'Live'`-named frame
     to its `frameByFrame` branch regardless of `vis_method`.
     Tests: `tests/test_live_sequence_worker.py`.
+  - **Every hand-off to the GUI thread is one deep (display backpressure).** The display
+    worker's `yield` and each RT node's `_do_visualise` emit are both *queued* Qt
+    connections, and neither used to check whether the GUI thread had drawn the previous
+    payload — so payloads accumulated in Qt's event queue and the display drifted
+    unboundedly behind the camera. Note `_should_display_now` does **not** prevent this and
+    actively makes it worse: it decides on `now - shared_data.last_display_update_time`,
+    stamped only at the *end* of a completed GUI update, so it measures starvation rather
+    than backlog and opens wider the further behind the GUI falls. It is the *rate* limit;
+    the *depth* limit is `shared_data.displayUpdateInFlight` via
+    `napariGlados._claim_display_slot()` / `_release_display_slot()`, and
+    `AnalysisThread_customFunction_Visualisation._claim_visualise_slot()` for the overlay
+    path. **A producer refused a slot must drop its frame, never hold it** — holding just
+    relocates the backlog. Both slots are watchdogged (`DISPLAY_INFLIGHT_TIMEOUT_S` /
+    `RT_VISUALISE_INFLIGHT_TIMEOUT_S`, 5 s) because a payload that never arrives would
+    otherwise freeze that display for the session, and both are released *unconditionally* —
+    `napariUpdateLive` wraps its whole body because it has four early returns, and missing
+    any one of them wedges the display. Any **new** path that marshals frames to the GUI
+    thread must claim and release a slot the same way. Tests:
+    `tests/test_display_backpressure.py`.
   - **Live/MDA stop→start race guard:** `napariHandler_liveMode`/`napariHandler_mdaMode` are constructed once per session and reused for every toggle, so rapid Live/MDA on-off-on toggling could previously start a new `run_MILCoreAcquisition_worker` (QThreadPool job) while the old one was still tearing down the same `core.mda`/`Acquisition` object (`stop_sequence_acquisition()` is fire-and-forget) — two threads driving the same native MMCore/Java engine concurrently, causing native access violations under stress testing. `napariHandler` now has `_acq_transition_lock` (an `RLock`, since the worker's own cleanup re-enters `acqModeChanged` from its own thread) and `_worker_stopped_event`: `acqModeChanged`'s ON path waits (`ACQ_STOP_TIMEOUT_S`, default 10s) for the previous worker to fully exit before starting a new one, refusing to start (and reverting the mode flag) rather than racing if the timeout is hit.
   - **Frame ring (MMCORE_PLUS `frameReady` path):** `grab_image_liveVis_PyMMCore` is connected with `Qt.DirectConnection`, so it runs synchronously on pymmcore-plus' own MDA thread — everything it does happens in front of the next camera frame. It is therefore a pure hand-off: `frame_ring.push(image, metadata)` and return. `GUI/frame_ring.py`'s `FrameRing` is a bounded, overwrite-oldest, stdlib-only buffer (drop-counting, with an `Event` the consumer waits on); `napariHandler._frame_ring_consumer_loop` (a plain daemon `Thread`, started just before the `frameReady` connect and stopped just after the disconnect, plus an idempotent stop in the acquisition worker's outer `finally`) does the real per-frame work: `metadata_refactor`, the multiDstack zarr write, and `put_data_in_visualisation_and_analysis_queues`. Two capacities: `FRAME_RING_CAPACITY_DISPLAY` (4) for live, since display and RT analysis drop frames at their own gate anyway, and `FRAME_RING_CAPACITY_STORAGE` (256) for multiDstack MDA, where a dropped frame is a permanently black slice with no NDTiff store to backfill from. The per-acquisition drop tally is logged at teardown (WARNING if non-zero). The pycromanager `image_process_fn` / `image_saved_fn` paths do **not** use the ring — `image_process_fn` must return `(image, metadata)` synchronously for pycromanager to store the frame.
 - `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `Showcase_Basic1.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
@@ -845,6 +864,26 @@ replaced it is what new code in these files should follow.
   live had no effect on the running acquisition at all. Tests:
   `tests/test_mode_setter_no_sleep.py`.
 
+### Windows scheduling hints
+
+`observability/process_priority.py`'s `apply_foreground_scheduling_hints()` runs once from
+`GUI_napari.main()`: `SetPriorityClass(ABOVE_NORMAL_PRIORITY_CLASS)` plus the EcoQoS opt-out
+(`SetProcessInformation(ProcessPowerThrottling, ControlMask=EXECUTION_SPEED, StateMask=0)` —
+`StateMask=0` is load-bearing, setting ControlMask alone requests throttling *on*). On a
+hybrid CPU Windows otherwise parks an unfocused process on the efficiency cores, which is why
+the live display slowed down whenever the napari window was not active. Above-normal rather
+than HIGH deliberately: HIGH outranks most of the system and can starve the drivers the
+acquisition depends on. Gated by the hidden `performance_config.foreground_scheduling_hints`,
+Windows-only, and **entirely best-effort — nothing may depend on it having worked.** Two
+ctypes traps are pinned by test because they made the first version a silent no-op:
+`GetCurrentProcess()` must be declared `restype = c_void_p` (the `(HANDLE)-1` pseudo-handle is
+otherwise truncated on 64-bit, and every call fails with "handle is invalid"), and
+`ctypes.get_last_error()` reports 0 unless the DLL was opened `use_last_error=True`, so a real
+failure surfaces as `WinError 0`. There is deliberately **no** per-thread priority call: the
+old `setPriority(TimeCriticalPriority)` in `AnalysisClass.runAnalysis` was removed, since it
+re-set the priority on every image and raised an *analysis* thread above the GUI thread.
+Tests: `tests/test_process_priority.py`.
+
 ### Logging
 
 `LoggerWidget` (in `GUI/FlowChart_dockWidgets.py`) **tail-follows** its log file
@@ -943,6 +982,170 @@ declare `x`. An attribute the node does not have is skipped rather than mirrored
 as `None`, which would clobber the shadow's own value (`firstLayerInit`, set by
 `visualise_init()` on the shadow, is exactly that case). Tests:
 `tests/test_subprocess_snapshot_optin.py`.
+
+**An RT node may declare several napari layers.** `visualise_init()` still accepts
+its historical `(name, type)` 2-tuple, but may instead return a **list** of specs
+(`(name, type)` pairs, dicts, or `layer_group.LayerSpec`s with
+`name`/`type`/`colormap`/`blending`/`opacity`/`visible`/`scale`/`placement`).
+`GUI/layer_group.py`'s `normalise_layer_specs()` reports `(specs, is_legacy)`, and
+**`is_legacy` is what decides what `visualise()` receives** - the bare
+`napari.layers.Layer` for a legacy 2-tuple (so every pre-existing node is
+untouched), a `NapariLayerGroup` otherwise, addressed by name
+(`napariLayer['pSMLM: SR render'].data = ...`). It is deliberately *not*
+`len(specs) == 1`: a node returning a one-element list has opted in, so adding a
+second layer later is not a breaking change to its own `visualise()`. The group
+forwards attribute access to its first layer as belt-and-braces, and
+`napariOverlay` keeps `self.layer` pointing there for the existing readers.
+- **Side-by-side layout is `layer.translate`, not grid mode.** napari's grid mode
+  is a global all-or-nothing viewer setting, so it cannot express "these three
+  overlaid, that one beside them". A spec's `placement` (`'overlay'` default,
+  `'right'`, `'below'`) has the backend compute the offset, so node scripts stay
+  layout-free. On napari 0.7.0 `translate` composes *after* `scale`
+  (`scale * data + translate`) and is therefore in **world** units - a 10x-upsampled
+  SR layer takes the same offset as the raw one - and broadcasts to 0 in leading
+  dimensions, so `[0, offset]` works on 2-D and n-D alike. Both facts are pinned
+  against real napari layers in `tests/test_layer_group.py`, not just fakes.
+  `apply_placement()` no-ops when the base extent has not moved, so the re-offset
+  call in `updateVisualisation` is not per-frame work. Note `layer.translate` is an
+  **ndarray**, so `getattr(l, 'translate', []) or []` raises "truth value of an
+  array is ambiguous".
+- **Teardown is group-aware**: closing *any* one of a node's layers tears the node
+  down and removes its siblings. `layer_removed_event_callback` and
+  `MMcontrols.deactivateRealTimeAnalysisFromDockWidget` go through `overlay.group`,
+  which also fixes a latent crash - both derefed `napariOverlay.layer.name`
+  unguarded, while `napariOverlay` legitimately leaves `.layer` unset when
+  constructed with `layer_name=None`.
+- Note `visualisation_type` in `__function_metadata__` is **dead metadata for RT
+  nodes** - its only readers are `autonomous/executor.py`'s two measurement-node
+  sites, which are a different visualisation contract entirely
+  (`<Module>.<Fn>_visualise(output, napariLayer)` via `dispatch_from_eval_text`,
+  never `visualise_init()`). The RT layer type comes solely from `visualise_init()`.
+Tests: `tests/test_layer_group.py`, `tests/test_rt_multi_layer.py`.
+
+**An overlay is drawn against the state the frame it shows produced.** The
+visualisation payload carries the image *by value* but the node *by reference*, and
+the visualisation thread deliberately runs slower than the analysis
+(`visualise_delay` plus `visualisation_config.fps`) -- so `run()` normally processes
+several more frames, overwriting the node's attributes in place, between a frame
+being queued for display and being drawn. The overlay then showed frame N's image
+with frame N+k's results, which is what put pSMLM's localizations on a frame they
+did not come from. The queued payload now carries that frame's
+`state_snapshot` as a 7th element, and
+`AnalysisThread_customFunction_Visualisation._visualise_paired` applies it around
+the `visualise()` call. Three things to know:
+- **The previous values are restored afterwards.** For an in-process node this is
+  the *live* instance `run()` is still using, so a node that accumulates in `run()`
+  (a counter, a running total) would otherwise be rewound and lose whatever
+  happened while the frame sat in the queue. Restored in a `finally`, and a key the
+  node did not have is removed rather than left behind.
+- **A node that declares no `__snapshot_attrs__` keeps the old, unpaired
+  behaviour** -- there is nothing to pair with. Declaring them is what buys
+  frame-consistent overlays, which is now a third reason to (after subprocess
+  isolation and scrub-replay).
+- The subprocess path gets this for free (it already had `state_snapshot` in hand);
+  the in-process path builds one per frame and shares it with the replay store.
+Tests: `tests/test_rt_visualisation_frame_pairing.py`.
+
+**Points layers must not change length per frame.** napari 0.7 slices
+asynchronously and Glados sets `NAPARI_ASYNC=1`, so a slice response computed for
+one point list can arrive after a different one has been assigned; napari then
+indexes the new `shown` array with the old response's indices and raises
+`IndexError: index N is out of bounds for axis 0 with size N` from
+`Points._update_slice_response`/`_view_data`, on its own thread where it cannot be
+caught. `pSMLM_live._push_points` is the pattern: a **fixed-capacity buffer** with
+`shown` masking the unused rows, so a stale index is always in range however late
+the response is. The buffer only ever grows (shrinking reintroduces the same length
+change; the memory is two floats per slot), grows geometrically, and parks surplus
+rows on the first real localization so a response that briefly renders them
+unmasked shows nothing stray. Reducing the *number* of layer-property assignments
+per frame (style once, assign `data` last) makes it rarer but does **not** remove
+the trigger -- only the constant length does. `pSMLM.py` still has the old pattern;
+see `claude_issues_and_features.md`.
+
+**RT results are retained and replayed while scrubbing a finished acquisition.**
+Dragging napari's time/z slider used to move the image but leave every RT overlay
+frozen on the last analysed frame. `GUI/rt_history.py` (the store, Qt-free) and
+`GUI/rt_replay.py` (`RTReplayController`, GUI-thread) now re-render each node's
+overlay for the frame you land on, calling the node's own unmodified `visualise()`.
+- **The stored unit is the T-G5 snapshot**, keyed by `axes_key(metadata['Axes'])`.
+  That dict already is "the state `visualise()` needs for this frame", which is why
+  no node script had to change. The **raw frame is not stored** - replay re-reads it
+  from `shared_data.mdaZarrData[layerName]`, which already holds every frame
+  uncompressed at one frame per chunk.
+- **`utils.realTimeAnalysis_replayable()`** decides participation: an explicit
+  `"__replayable__"` wins; else True iff the node declares `__snapshot_attrs__` or a
+  `snapshot()` method; else False. Every *shipped* node declares it explicitly
+  (`tests/test_rt_replay_recording.py` pins all eight); the default exists for
+  AppData plugin-folder nodes. A node that **accumulates inside `visualise()`** must
+  declare False - replaying an arbitrary frame corrupts the accumulation rather than
+  re-rendering it (`pSMLM_image`). Full-frame-output nodes (`FFT_im`,
+  `BioImageModelZoo`) are False on memory grounds: `fft_display` is a full
+  camera-frame float64 - 2 MB at 512 sq., 8 MB at 1024 sq. - not the 512x512
+  placeholder its `__init__` suggests.
+- **In-process snapshots are references, not copies.** `_build_state_snapshot`
+  stores `snapshot[name] = value` bare, so a node reusing a buffer would rewrite
+  every history entry it ever made. `RTNodeHistory.record` copies every ndarray; the
+  subprocess path gets copies free via unpickling.
+- **Invalidation is a generation stamp, not a clear-at-start.** Entries carry
+  `_mdaModeParamsGeneration` and a mismatch reads as a miss, so old results can never
+  be replayed onto a new plan - and it is independent of teardown ordering (clearing
+  at acquisition start would race the RT threads, which are created before the zarr
+  exists).
+- **The session outlives the analysis thread**, which is the whole point:
+  `create_real_time_analysis_thread` connects `finished` to `deleteLater` and the
+  node instance is only reachable through the thread. `shared_data.rt_replay` holds
+  the node, its `group` and its history. The layers already survived -
+  `MDA_acq_finished` calls `stop()`, not `destroy()`. The one release point is the
+  user closing the overlay. A reclaimed warm subprocess worker brings back the *same*
+  shadow instance, so its session is retired on reclaim rather than aliasing a live
+  run with stale history.
+- **Replay is inert while `liveMode or mdaMode`** - the display path drives
+  `dims.set_current_step` itself, once per frame, and owns those layers.
+- **A history miss re-analyses on demand**, off the GUI thread, latest-request-wins,
+  marshalling back through the napari bridge; the result is stored so a second visit
+  is a cache hit. It runs against a **throwaway node instance**, never the
+  acquisition's own - `run()` accumulates (pSMLM appends every analysed frame to its
+  localization table), so re-running the acquisition's instance while scrubbing would
+  corrupt the results it produced.
+- **No searchsorted is needed for the frame read**: the display path sets
+  `current_step` *to* the searchsorted indices, so `current_step[:k]` already is the
+  zarr slice index. Only the history key needs the inverse value lookup
+  (`axes_from_current_step`, round-trip tested against the display path).
+- Settings: `rt_analysis_config.replay_history_budget_mb` (256, shared across nodes,
+  drop-oldest, warns **once** not per frame) and `replay_debounce_ms` (120, hidden).
+- Note history only ever holds *analysed* frames: `put_data_in_visualisation_and_analysis_queues`
+  drops a frame for any node still busy with the previous one, so gaps are normal -
+  which is what the on-demand re-analysis above exists for.
+Tests: `tests/test_rt_history.py`, `tests/test_rt_replay_recording.py`,
+`tests/test_rt_replay_controller.py`.
+
+**`pSMLM_live` is the reference node for both features above**
+(`Real_Time_Analysis/pSMLM_live.py`): three layers - the frame its own `run()`
+analysed, its localizations, and an SR render placed `'right'`. **The SR panel is
+refreshed on a `SR_REFRESH_INTERVAL_S` (0.5 s) timer, not per frame, and refreshed
+*in place***: at 256x256 the canvas is 26 MB (200x a camera frame), and the
+`_sr_version` guard alone never held during an acquisition because `_sr_version` is
+bumped on every frame that has any localization - so the whole array went to napari
+at the overlay's rate, on the GUI thread. Being cumulative it carries no per-frame
+information, so lagging up to that interval costs nothing; the localization and
+analysed-frame layers still update every frame. `.data` is assigned only when napari
+holds a *different* object (first push, or after `_ensure_canvas` reallocates),
+keyed on identity so a reallocation cannot be missed; otherwise `refresh()`.
+The analysed-frame layer uses the live path's `data[:] = image; refresh()` idiom.
+Note **the `_push_points` buffer is deliberately re-allocated per frame**: napari's
+`Points._set_data` keeps the array by reference and its data event hands that same
+object to listeners, so a reused buffer would show them a later frame's
+coordinates - and the saving would be ~16 KB against a 26 MB push. Showing the
+*analysed* frame is the answer to "my localizations are always one frame behind",
+and costs no snapshot attribute because `visualise()` already receives that frame as
+its `image` argument (both producers pass on the frame they fed to `run()`). Its SR
+canvas accumulates in `visualise()`, not `run()`, because the canvas is the frame
+upsampled 10x per axis - 25 MB at 256 sq., 100 MB at 512 sq., 400 MB at 1024 sq. -
+and a `run()`-built attribute would be snapshotted and shipped across the subprocess
+boundary *per frame*. The price is that the SR panel is cumulative and does not
+rewind while scrubbing, whereas the other two layers replay exactly; a set of
+already-stamped frame keys stops a revisited frame being counted twice. Tests:
+`tests/test_psmlm_live_node.py`.
 
 **diplib import gotcha in `spawn`ed subprocesses (IPython inputhook):** if `'IPython'` is already in `sys.modules` in a subprocess (e.g. the app was launched from an IPython/Jupyter shell, or another import pulled IPython in) but `IPython.terminal.pt_inputhooks` hasn't itself been imported yet, `import diplib` raises `AttributeError: module 'IPython.terminal' has no attribute 'pt_inputhooks'` — modern IPython (9.x) only sets `pt_inputhooks` as an attribute of `IPython.terminal` once that submodule has actually been imported, but `diplib/viewer.py` (`from . import viewer` inside `diplib/__init__.py`) assumes it's already there whenever `'IPython' in sys.modules`. Both `subprocess_pool.py`'s pre-warm bootstrap and `FFT_im.py`'s `RealTimeFFT.__init__` work around it by doing `import IPython.terminal.pt_inputhooks` first when `'IPython' in sys.modules`, before `import diplib`. Apply the same guard to any new node that imports diplib in a subprocess-isolated context.
 

@@ -330,6 +330,16 @@ def main():
     # start (see AnalysisClass.py's AnalysisProcess_customFunction and
     # subprocess_pool.py).
     shared_data._rt_subprocess_pool.start()
+    # Ask Windows not to park us on efficiency cores while unfocused. Done after
+    # Shared_data exists (it carries the switch) but before any acquisition, and
+    # deliberately before the subprocess pool's children would inherit anything
+    # -- the priority class is inherited, which is what we want for the isolated
+    # RT-analysis worker too. Entirely best-effort; see the module docstring.
+    from glados_pycromanager.observability.process_priority import (
+        apply_foreground_scheduling_hints,
+    )
+    apply_foreground_scheduling_hints(
+        str(shared_data.config.performance_config.foreground_scheduling_hints) == 'True')
     print('Cleaning up temporary files.')
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
 

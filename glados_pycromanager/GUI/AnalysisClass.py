@@ -26,11 +26,13 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.utils as utils
+import glados_pycromanager.GUI.layer_group as layer_group
+import glados_pycromanager.GUI.rt_history as rt_history
 
 
 #Class for overlays and their update and such
 class napariOverlay:
-    def __init__(self,napariViewer,layer_name:str | None='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None):
+    def __init__(self,napariViewer,layer_name:str | None='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None,shared_data=None):
         """
         Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
 
@@ -53,45 +55,80 @@ class napariOverlay:
         self.blending = blending
         self.RT_analysisObject = RT_analysisObject
         self.layerType = layerType
+        self.shared_data = shared_data
         try:
             self.layer_scale = napariViewer.layers[0].scale
         except (AttributeError, IndexError, TypeError):
             self.layer_scale = [1,1]
         
-        #Get info from a RT analysis object (i.e. outside-based-analysis)
+        #Get info from a RT analysis object (i.e. outside-based-analysis).
+        #
+        #visualise_init() may return the historical `(name, type)` 2-tuple or, since
+        #the layer-group work, a list of specs. `is_legacy` is what decides whether
+        #the node's visualise() is handed the bare napari layer (legacy, so every
+        #node written against the old contract is untouched) or the group.
         if self.RT_analysisObject is not None:
-            self.layer_name, self.layerType = self.RT_analysisObject.visualise_init()
-            logging.debug("#nO - Initialised napariOverlay with layer_name: %s, layerType: %s", self.layer_name, self.layerType)
-            
-        #Create the layer if layer_name is not none
-        #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
-        if self.layer_name is not None:
-            if self.layerType is not None:
-                
-                #check if a layer with this name already exists:
-                if self.layer_name in napariViewer.layers:
-                    self.layer = napariViewer.layers[self.layer_name]
-                        
-                else: #else create the layer
-                    if self.layerType == 'image':
-                        self.layer = napariViewer.add_image(np.zeros((32,32)),name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'labels':
-                        self.layer = napariViewer.add_labels([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'points':
-                        self.layer = napariViewer.add_points(name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'shapes':
-                        self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'surface':
-                        self.layer = napariViewer.add_surface([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'tracks':
-                        self.layer = napariViewer.add_tracks([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'vectors':
-                        self.layer = napariViewer.add_vectors(name=self.layer_name,scale=self.layer_scale)
-            else: #Fallback if no layer type is specified at all
-                self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+            self.specs, self.is_legacy = layer_group.normalise_layer_specs(
+                self.RT_analysisObject.visualise_init())
+            logging.debug("#nO - Initialised napariOverlay with specs: %s (legacy=%s)",
+                          [s.name for s in self.specs], self.is_legacy)
+        elif self.layer_name is not None:
+            #Direct construction with an explicit name (the non-RT callers). A
+            #layerType of None has always meant "give me a shapes layer".
+            self.specs = [layer_group.LayerSpec(
+                name=self.layer_name,
+                type=self.layerType if self.layerType is not None else 'shapes')]
+            self.is_legacy = True
+        else:
+            #layer_name is None if we only want to instantiate the napariOverlay
+            #but not get any shape.
+            self.specs = []
+            self.is_legacy = True
+
+        self.group = layer_group.NapariLayerGroup(specs=self.specs, layers=[])
+        for spec in self.specs:
+            self.group.layers.append(
+                layer_group.create_layer(napariViewer, spec, scale=self.layer_scale))
+
+        if self.group.layers:
+            #`self.layer` stays the primary layer for every existing caller
+            #(getLayer, changeName, the legacy draw*Overlay helpers, the teardown
+            #paths in napariGlados/MMcontrols).
+            self.layer = self.group.primary
+            self.layer_name = self.specs[0].name
+            self.layerType = self.specs[0].type
+            #Side-by-side layers are offset against the acquisition layer when
+            #there is one, so the panel sits beside the image the node analysed
+            #rather than beside its own (possibly tiny) placeholder.
+            self.group.apply_placement(base_layer=self._placementBaseLayer())
+            logging.debug("Using layer(s) %s", self.group.names)
         
-            logging.debug("Using layer %s", self.layer)
-        
+    def _placementBaseLayer(self):
+        """The layer a side-by-side panel is positioned against.
+
+        The acquisition/live layer when one exists, so an SR panel lands beside the
+        image its localizations came from. Falls back to the group's own primary
+        layer (`apply_placement`'s own default) when there is none -- at node
+        startup the acquisition layer may not exist yet, which is why
+        `apply_placement` is re-run from the visualisation path as the extent
+        settles.
+        """
+        name = getattr(self.shared_data, 'newestLayerName', None)
+        if not name:
+            return None
+        try:
+            if name in self.napariViewer.layers and name not in self.group.names:
+                return self.napariViewer.layers[name]
+        except (AttributeError, KeyError, TypeError) as exc:
+            logging.debug('Could not resolve placement base layer %r: %s', name, exc)
+        return None
+
+    def refreshPlacement(self):
+        """Re-offset side-by-side layers; cheap no-op when nothing moved."""
+        if not self.group.layers:
+            return False
+        return self.group.apply_placement(base_layer=self._placementBaseLayer())
+
     #Update the name of the overlay
     def changeName(self,new_name):
         """
@@ -296,6 +333,11 @@ RT_THREAD_WAIT_TIMEOUT_S = 1.0
 #: logging that it did not. Runs on the GUI thread, so it is deliberately short.
 RT_THREAD_JOIN_TIMEOUT_MS = 1000
 
+#: How long an RT-analysis overlay payload may sit unacknowledged by the GUI
+#: thread before the hand-off slot is force-released. See
+#: AnalysisThread_customFunction_Visualisation._claim_visualise_slot.
+RT_VISUALISE_INFLIGHT_TIMEOUT_S = 5.0
+
 
 class AnalysisThread_customFunction_Visualisation(QThread):
     finished = pyqtSignal()
@@ -316,21 +358,92 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.analysisInfo = analysisInfo
         self.napariViewer = shared_data.napariViewer
         self.sleepTimeMs = delay
-        self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS')
+        self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS',shared_data=shared_data)
         self.visualisation_queue = deque(maxlen=10)#queue.Queue()
         self.shared_data = shared_data
         
         self.running = True
         self._new_image = Event()
+        #Depth limit for the hand-off to the GUI thread. _do_visualise is a
+        #queued connection and the loop below sleeps a fixed sleepTimeMs after
+        #emitting, whether or not the GUI thread ever drew the last payload --
+        #so an overlay slower than the analysis used to stack up in Qt's event
+        #queue and drift unboundedly behind the acquisition. None = idle;
+        #otherwise the monotonic timestamp of the unacknowledged payload.
+        self._visualise_in_flight = None
         self._do_visualise.connect(self._visualise_on_main_thread)
     
     def new_image(self):
         self._new_image.set()
 
+    def _claim_visualise_slot(self):
+        """Reserve the single hand-off slot to the GUI thread, or refuse it.
+
+        The watchdog exists because a payload that never reaches
+        `_visualise_on_main_thread` -- a GUI-side crash, or a teardown that
+        races the emit -- would otherwise silence this node's overlay for the
+        rest of the session.
+        """
+        pending = self._visualise_in_flight
+        if pending is not None:
+            if time.monotonic() - pending < RT_VISUALISE_INFLIGHT_TIMEOUT_S:
+                return False
+            logging.warning('RT-analysis overlay was never drawn by the GUI thread '
+                            'within %ss; releasing the hand-off slot',
+                            RT_VISUALISE_INFLIGHT_TIMEOUT_S)
+        self._visualise_in_flight = time.monotonic()
+        return True
+
     def _visualise_on_main_thread(self, data):
         """Slot executed on the main (GUI) thread via Qt queued connection."""
-        RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data
-        self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+        try:
+            RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data[:6]
+            #The state the node was in when this frame finished being analysed. See
+            #_visualise_paired for why the node's *current* state is not good enough.
+            state_snapshot = data[6] if len(data) > 6 else None
+            self._visualise_paired(RT_analysis_object, analysisInfo, image, metadata,
+                                   core, state_snapshot)
+        finally:
+            #Always, so one failed overlay cannot wedge the hand-off.
+            self._visualise_in_flight = None
+
+    def _visualise_paired(self, RT_analysis_object, analysisInfo, image, metadata,
+                          core, state_snapshot):
+        """Render `image` against the node state that *this* frame produced.
+
+        The queued payload carries the image by value but the node by reference,
+        and the visualisation thread deliberately runs slower than the analysis
+        (`visualise_delay`, plus the configured display FPS). So by the time this
+        runs, `run()` has usually processed several more frames and overwritten the
+        node's attributes in place -- and the overlay ends up drawing frame N's
+        image with frame N+k's results. That is what made pSMLM's localizations sit
+        on the wrong frame, and it applies to every node with a visualisation.
+
+        Applying the frame's own snapshot fixes the pairing. The previous values are
+        restored afterwards because for an in-process node this *is* the live
+        instance that `run()` is still using: a node that accumulates in `run()`
+        (RT_counter incrementing a tally, say) would otherwise be rewound and lose
+        whatever happened while this frame sat in the queue.
+
+        A node that declares no `__snapshot_attrs__` has no snapshot, so it keeps
+        the old, unpaired behaviour -- declaring them is what buys frame-consistent
+        overlays.
+        """
+        if not state_snapshot:
+            self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+            return
+        _absent = object()
+        previous = {key: getattr(RT_analysis_object, key, _absent)
+                    for key in state_snapshot}
+        try:
+            RT_analysis_object.__dict__.update(state_snapshot)
+            self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+        finally:
+            for key, value in previous.items():
+                if value is _absent:
+                    RT_analysis_object.__dict__.pop(key, None)
+                else:
+                    RT_analysis_object.__dict__[key] = value
 
     def run(self):
         node_label = self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node') if isinstance(self.analysisInfo, dict) else str(self.analysisInfo)
@@ -345,6 +458,12 @@ class AnalysisThread_customFunction_Visualisation(QThread):
                 if not self.visualisation_queue:
                     continue
                 data = self.visualisation_queue.popleft()
+                #Drop this frame if the GUI thread has not finished drawing the
+                #previous one. Holding it instead would only move the backlog;
+                #the next frame along is fresher and worth more.
+                if not self._claim_visualise_slot():
+                    self.msleep(max(1, self.sleepTimeMs))
+                    continue
                 # Emit to main thread so napari layer ops run on GUI thread (not here).
                 self._do_visualise.emit(data)
                 self.msleep(max(1,self.sleepTimeMs))
@@ -356,6 +475,9 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         notice at its next timeout (and, before T-G9, never)."""
         self.running = False
         self.is_running = False
+        #A payload emitted just before the stop may never be drawn; do not leave
+        #the slot claimed for a restart of this node to inherit.
+        self._visualise_in_flight = None
         self._new_image.set()
 
     def destroy(self):
@@ -369,7 +491,15 @@ class AnalysisThread_customFunction_Visualisation(QThread):
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
         # tic = time.time()
-        res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
+        #A node that declared its layers the legacy way gets the bare napari layer
+        #it has always got; only a node that opted in by returning a list sees the
+        #group. utils.realTimeAnalysis_visualisation treats this argument as opaque.
+        target = self.napariOverlay.layer if self.napariOverlay.is_legacy else self.napariOverlay.group
+        res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,target)
+        #The node may have just replaced a layer's data (and so its extent) or set
+        #its own scale; re-offset any side-by-side panel. Skips itself when the
+        #base extent has not moved, so this is not per-frame work.
+        self.napariOverlay.refreshPlacement()
         # print(f'Time spend in updateVisualisation; {time.time()-tic}')
 
 
@@ -415,6 +545,64 @@ def _build_state_snapshot(RT_analysis_object, snapshot_attrs):
             logging.debug('AnalysisProcess worker: skipping non-snapshotable attribute %r (%s)',
                           name, type(value).__name__)
     return snapshot
+
+
+def _createReplaySession(shared_data, analysisInfo, node, visualisationObject, label):
+    """Register this node's replay session, or None when it cannot be replayed.
+
+    Called once the visualisation object exists, since the session holds the node's
+    layers. The session outlives the analysis thread deliberately: the thread is
+    `deleteLater`'d at acquisition end and the node instance is only reachable
+    through it, so without this the results could not be re-rendered afterwards.
+    """
+    if visualisationObject is None or node is None:
+        return None
+    try:
+        if not utils.realTimeAnalysis_replayable(analysisInfo):
+            return None
+        registry = shared_data.rt_replay
+        overlay = visualisationObject.napariOverlay
+        session = rt_history.RTReplaySession(
+            key=_rt_config_key(analysisInfo),
+            node=node,
+            analysis_info=analysisInfo,
+            group=overlay.group,
+            is_legacy=overlay.is_legacy,
+            history=rt_history.RTNodeHistory(registry.budget_bytes, label=label),
+            source_layer_name=getattr(shared_data, 'newestLayerName', None),
+            label=label,
+        )
+        registry.register(session)
+        #There is now something worth replaying, so make sure the slider is being
+        #watched. Attaching is idempotent, and costs nothing until a scrub happens.
+        try:
+            from glados_pycromanager.GUI.rt_replay import get_replay_controller
+            get_replay_controller(shared_data)
+        except Exception:
+            logging.exception('Could not attach the RT-analysis replay controller')
+        return session
+    except Exception:
+        #Retention is a convenience; never let it stop an analysis from running.
+        logging.exception('Could not set up replay history for %s', label)
+        return None
+
+
+def _recordReplayFrame(session, shared_data, metadata, snapshot):
+    """Store one analysed frame's snapshot for later replay."""
+    if session is None or not session.enabled:
+        return False
+    try:
+        if not session.note_snapshot(snapshot):
+            return False
+        axes = (metadata or {}).get('Axes')
+        key = rt_history.axes_key(axes)
+        return session.history.record(
+            key, snapshot, metadata,
+            generation=getattr(shared_data, '_mdaModeParamsGeneration', None))
+    except Exception:
+        logging.exception('Could not retain an RT-analysis frame for %s', session.label)
+        session.enabled = False
+        return False
 
 
 def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
@@ -738,9 +926,19 @@ class AnalysisProcess_customFunction(QThread):
             if wants_visualisation:
                 self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
 
+        self._replay_session = None
         if wants_visualisation and self.RT_analysis_object is not None:
             self.visualisationObject = AnalysisThread_customFunction_Visualisation(self.RT_analysis_object, shared_data, analysisInfo=analysisInfo)
             self.visualisationObject.start()
+            #A reclaimed warm worker brings back the *same* shadow instance a
+            #previous session recorded against, so that session's history now
+            #describes a node being re-run. Retire it rather than aliasing the two.
+            shared_data.rt_replay.unregister(self._cache_key)
+            self._replay_session = _createReplaySession(
+                shared_data, analysisInfo, self.RT_analysis_object,
+                self.visualisationObject,
+                analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node')
+                if isinstance(analysisInfo, dict) else str(analysisInfo))
 
     def _picklable_metadata(self, metadata):
         """Return `metadata`, or {} if it cannot cross the process boundary.
@@ -886,8 +1084,18 @@ class AnalysisProcess_customFunction(QThread):
                         self.analysis_result = [result, out_metadata]
                         if self.visualisationObject is not None and self.RT_analysis_object is not None:
                             self.RT_analysis_object.__dict__.update(state_snapshot)
+                            #Free here: the snapshot is already built and already
+                            #copied (it was unpickled out of the worker's queue).
+                            #Recorded before the visualisation drop-gate below so
+                            #history is not thinned by the display rate too.
+                            if self._replay_session is not None:
+                                _recordReplayFrame(self._replay_session, self.shared_data,
+                                                   out_metadata, state_snapshot)
                             if len(self.visualisationObject.visualisation_queue) < 1:
-                                data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core)
+                                #state_snapshot travels with the frame it belongs to:
+                                #the shadow above keeps being updated by later frames
+                                #while this one waits in the queue.
+                                data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core, state_snapshot)
                                 self.visualisationObject.visualisation_queue.append(data)
                                 self.visualisationObject.new_image()
             # NOT the duty-cycle cap AnalysisThread_customFunction applies (T-G7).
@@ -1164,7 +1372,12 @@ class AnalysisThread_customFunction(QThread):
                     
                 return [analysisResult,metadata]
             elif self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
-                self.setPriority(self.TimeCriticalPriority) #type:ignore
+                #Was self.setPriority(self.TimeCriticalPriority) here. Removed:
+                #it ran inside the per-image handler, so it re-set the priority
+                #on every single image, and it raised an *analysis* thread above
+                #the Qt/GUI thread -- the opposite of what the display path
+                #needs. Process-level scheduling is handled once at startup by
+                #observability/process_priority.py instead.
                 return None
             else:
                 return None
@@ -1180,6 +1393,17 @@ class AnalysisThread_customFunction(QThread):
             self.queue_visualisation = deque(maxlen=10)
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
+            #Resolved once, not per frame -- same as the subprocess worker does.
+            self._snapshot_attrs = utils.realTimeAnalysis_snapshotAttrs(self.analysisInfo)
+            self._replay_session = _createReplaySession(
+                self.shared_data, self.analysisInfo, self.RT_analysis_object,
+                self.visualisationObject, self._replayLabel())
+
+    def _replayLabel(self):
+        info = self.analysisInfo
+        if isinstance(info, dict):
+            return info.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node')
+        return str(info)
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,shared_data=None,core=None):
         # self.msleep(self.sleepTimeMs)
@@ -1194,13 +1418,26 @@ class AnalysisThread_customFunction(QThread):
         logging.debug("Analysis on Image done with result: %s", result)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
+            #Retain this frame's result so the overlay can be re-rendered for it
+            #later. Done before the visualisation drop-gate below, so history is
+            #not additionally thinned by the display rate. The snapshot holds bare
+            #references to this node's attributes -- RTNodeHistory.record copies.
+            #Built once and used twice: to pair this frame's results with this
+            #frame's image in the visualisation payload below, and to retain them
+            #for scrub-replay.
+            state_snapshot = _build_state_snapshot(
+                self.RT_analysis_object, getattr(self, '_snapshot_attrs', ()))
+            session = getattr(self, '_replay_session', None)
+            if session is not None:
+                _recordReplayFrame(session, shared_data, metadata, state_snapshot)
             logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             # if self.visualisationObject.visualisation_queue.empty():
             # print(f'#ac537 -- len of queue: {len(self.visualisationObject.visualisation_queue)}')
             if len(self.visualisationObject.visualisation_queue) < 1:
-                # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
-                data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
+                #The snapshot travels with the frame it belongs to -- run() keeps
+                #mutating this same node instance while the frame waits here.
+                data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core,state_snapshot)
                 self.visualisationObject.visualisation_queue.append(data)
                 self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 logging.debug('Put data in visualisation_queue!')

@@ -3666,3 +3666,273 @@ hardware, and not through the full GUI worker.
 `scripts/bench_storage.py`, `Makefile`, `docs/bench-storage.txt`, `CLAUDE.md`,
 `claude_throughput_project.md`, `tests/test_ndtiff_frame_writer.py`,
 `tests/test_mmcore_ndtiff_saving.py`.
+
+---
+
+## RT-analysis multi-layer visualisation and scrub replay (2026-09-17)
+
+**Context:** two user requests in `claude_issues_and_features.md` with one root cause --
+the RT-analysis visualisation plumbing was one layer, live-only and stateless. (1) Retain
+what a node computed during an MDA and re-show it when scrubbing the movie afterwards.
+(2) Show pSMLM localizations over the frame they came from, with an SR render beside them,
+which needs several layers from one node and a layout napari's global grid mode cannot
+express. Not part of `claude_project.md` or `claude_throughput_project.md`; user-requested
+feature work on the same branch.
+
+**The enabling observation:** the per-frame `state_snapshot` that subprocess isolation
+already builds (T-G5, from `__snapshot_attrs__`) *is* "the state `visualise()` needs for
+this frame" -- it exists because a napari layer cannot cross a process boundary. Retaining
+one per frame, keyed by the frame's axes, is the whole replay feature and required no
+change to any node script.
+
+**Decisions taken (the user chose 1-3 up front; the rest fell out of the work):**
+
+1. **Retain the snapshot and the Axes metadata only; re-read the frame from zarr.** The
+   multiDstack display store already holds every frame, uncompressed at one frame per
+   chunk (T-D3, ~2.8 ms/slice read). Copying frames into RAM would blow any budget for
+   something already on disk.
+2. **Backend-computed `layer.translate` for side-by-side**, declared per layer as
+   `placement`. napari's grid mode is a global viewer setting, so a mixed
+   "three overlaid, one beside" layout is not expressible through it. Node scripts stay
+   layout-free.
+3. **Gaps are filled by on-demand re-analysis.** The per-node queue drops a frame whenever
+   the node is busy, so history necessarily has holes; scrubbing into one re-runs the node
+   off the GUI thread and caches the result.
+4. **`is_legacy`, not `len(specs) == 1`, decides what `visualise()` receives.** A node
+   returning a one-element list has opted into the group API, so adding a second layer
+   later must not break its own `visualise()`. Only the historical 2-tuple gets the bare
+   layer -- which is what keeps all eight shipped nodes byte-for-byte unaffected.
+5. **Closing any one of a node's layers tears the whole node down** (and removes its
+   siblings). The alternative -- tearing down only when the last goes -- leaves a node
+   writing into layers that no longer exist.
+6. **Invalidation by generation stamp rather than clearing at acquisition start.** Entries
+   carry `_mdaModeParamsGeneration` and a mismatch reads as a miss. Clearing at start would
+   race `MDA_acq_from_Node`, which creates the RT threads before the zarr exists; the stamp
+   makes invalidation independent of teardown ordering, the same idiom as the dimension
+   cache.
+7. **A node that declares nothing gets no replay, and says so once.** An empty snapshot
+   would `__dict__.update({})` and re-render the *last* analysed frame identically at every
+   scrub position -- which looks like it is working. Disabling and logging is the honest
+   failure.
+8. **Re-analysis uses a throwaway node instance.** `run()` accumulates (pSMLM appends every
+   analysed frame to its localization table), so re-running the acquisition's own instance
+   while scrubbing would corrupt the results that acquisition produced.
+9. **Every shipped node declares `__replayable__` explicitly**, pinned by test. The
+   resolver's default exists for nodes users drop into the AppData plugin folder, not for
+   ours. `FFT_im`/`BioImageModelZoo` are False on memory grounds; `pSMLM_image`,
+   `EndAtFrame` and `LaserAdjustment` on correctness grounds.
+
+**Corrections to the approved plan, found by a validation pass against the code.** These
+changed the work and are recorded because the plan file still carries the original text:
+`executor.py::_replace_visualisation_layer` is *not* on the RT path (it serves
+`Analysis_Measurements` nodes, a different contract), so it was not touched;
+`visualisation_type` is dead metadata for RT nodes; `stopMDAVisualisation` is not an RT
+teardown path; `MDA_acq_finished` calls `stop()` not `destroy()`, so layers already
+survived and the registry exists to hold the *node object* alive past the thread's
+`deleteLater`; and Feature C needs no snapshot attribute at all, because `visualise()`
+already receives the analysed frame as its `image` argument.
+
+**Measured, not assumed:**
+- `FFT_im`'s `fft_display` is a full camera-frame float64 (2 MB at 512 sq., 8 MB at
+  1024 sq.), not the 512x512 its `__init__` placeholder suggests -- hence replay-off.
+- `pSMLM_live`'s SR canvas at 10x upsampling is 25 MB (256 sq.), 100 MB (512 sq.) and
+  400 MB (1024 sq.) per frame. That killed the intended "accumulate in `run()` so it is
+  snapshottable" design: it would have cost more per frame than the raw data. It
+  accumulates in `visualise()` instead, from the KB-sized localization list, guarded by a
+  set of already-stamped frame keys. **The accepted price:** the SR panel is cumulative and
+  does not rewind while scrubbing, while the analysed-frame and localization layers replay
+  exactly.
+- napari 0.7.0 `translate` is post-scale and in world units, and broadcasts to 0 in leading
+  dimensions. Verified against real `napari.layers.Image` objects and pinned by test, since
+  a change there would silently mis-place the SR panel rather than fail.
+
+**Open / not done:**
+- The user chose a **lossless** "analyse every MDA frame" mode. It is **not implemented and
+  cannot be delivered as specified**: true losslessness needs backpressure onto the
+  acquisition, and on `MMCORE_PLUS` the upstream `FrameRing` is overwrite-oldest
+  (capacity 256), so frames would be shed before the RT queue saw them. What is deliverable
+  is a *best-effort deep queue*. Deferred, to be named honestly if built; the on-demand
+  re-analysis already gives the user-visible outcome ("every frame I scrub to has an
+  overlay").
+- `MMcontrols.enableAutoSliceAnalysis` was **not** refactored onto the controller. It
+  remains a parallel, undebounced, GUI-thread `current_step` subscriber. The registry has a
+  `suspended` flag for the two to coexist, but nothing sets it yet -- a follow-up.
+- Two pre-existing `pSMLM_image` bugs were found and deliberately **not** fixed (out of
+  scope, logged instead): it declares no `__snapshot_attrs__` while its `visualise()` reads
+  `sr_canvas`/`fullSMLMlocs`, so its overlay is already silently frozen under subprocess
+  isolation; and it hardcodes `scale=(0.1, 0.1)`, ignoring `pxsizeum`.
+- Not exercised against real hardware or through the full GUI worker; no microscope here.
+
+**Verification:** `tests/test_layer_group.py` (35), `tests/test_rt_multi_layer.py` (14),
+`tests/test_rt_history.py` (35), `tests/test_rt_replay_recording.py` (32),
+`tests/test_rt_replay_controller.py` (22), `tests/test_psmlm_live_node.py` (16). Full
+`pytest` green at 1156 including the slow markers.
+
+**Affects:** `glados_pycromanager/GUI/layer_group.py` (new),
+`glados_pycromanager/GUI/rt_history.py` (new), `glados_pycromanager/GUI/rt_replay.py` (new),
+`glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM_live.py` (new),
+`glados_pycromanager/GUI/AnalysisClass.py`, `glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/GUI/MMcontrols.py`, `glados_pycromanager/GUI/utils.py`,
+`glados_pycromanager/GUI/sharedFunctions.py`, the eight shipped RT node files, `CLAUDE.md`.
+
+## 2026-09-18 — Both hand-offs to the GUI thread get a one-deep slot; the rate limit alone was making it worse  [display-backpressure]
+
+**Context.** Reported against `DemoSMLM.cfg` at ~25-35 ms frames with `pSMLM live + SR`
+active: the overlay drifts progressively further behind the live image, and after roughly
+ten seconds the whole visualisation collapses to ~10 fps. The user's logs rule out the
+acquisition and storage layers outright -- `Frame ring handed over 500 frames, none
+dropped`, `ZarrFrameWriter: 500/500 frames written ... 0.00s spent under backpressure`, at
+~30 fps sustained.
+
+**Diagnosis.** Neither producer checked whether the GUI thread had drawn the previous
+payload, and both reach it through *queued* Qt connections:
+
+- the display worker `yield`s (`run_napariVisualisation_worker`), and
+- each RT node's overlay thread emits `_do_visualise`, then sleeps a fixed `sleepTimeMs`
+  whether or not anything was drawn.
+
+The existing display gate does not merely fail to help, it **compounds the problem**.
+`_should_display_now` decides on `now - shared_data.last_display_update_time`, and that
+stamp is written only at the *end* of a completed GUI update -- so it measures starvation,
+not backlog. Once the GUI thread falls behind, `elapsed` only grows, so the gate passes
+every single time, and payloads pile up in Qt's event queue without bound. That is exactly
+the reported shape: in sync at first, then monotonically increasing lag, then a collapse to
+whatever rate the GUI can actually sustain. The user confirmed the deviation is **temporal**
+(the overlay lagging), not spatial, which is what this explains.
+
+**Decision.** Add a one-deep slot to each hand-off -- `shared_data.displayUpdateInFlight`
+plus `napariGlados._claim_display_slot`/`_release_display_slot`, and
+`AnalysisThread_customFunction_Visualisation._claim_visualise_slot` with release in
+`_visualise_on_main_thread`.
+
+- **A refused producer drops its frame rather than holding it.** Holding one would move the
+  queue somewhere else and keep the latency the slot exists to bound; the next frame along
+  is fresher and worth more. Overload must degrade into honest frame-dropping.
+- **`_should_display_now` is left alone.** It is a correct *rate* limit; what was missing
+  was a *depth* limit. With one in place `last_display_update_time` can no longer run away,
+  so the existing gate behaves sanely again.
+- **Both slots are watchdogged** (`DISPLAY_INFLIGHT_TIMEOUT_S` /
+  `RT_VISUALISE_INFLIGHT_TIMEOUT_S`, 5 s, warned once). A payload that never arrives -- a
+  GUI-side crash, a teardown racing the emit -- would otherwise freeze that display for the
+  rest of the session. Deliberately generous: it is a safety net, not a rate control.
+- **Release is unconditional.** `napariUpdateLive`'s *entire* body is now wrapped, because
+  it has four early returns (`_should_display_now`, `liveModeUpdateOngoing`, `image is
+  None`, `acqState False`) and missing any one of them wedges the display. The overlay slot
+  is released in a `finally` in `_visualise_on_main_thread` for the same reason, and in
+  `stop()` so a node restart cannot inherit a claimed slot.
+- The display worker's teardown releases the slot before its drain/finalisation yields, so
+  an acquisition that is already over cannot refuse its own last frames.
+
+**Rejected:** deepening the queues (moves the backlog, does not bound it); making the
+producers block on the GUI thread (inverts the dependency and can deadlock against the Qt
+event loop); throttling the producers harder (guesswork, and wrong whenever the GUI is
+fast).
+
+**Verification:** `tests/test_display_backpressure.py` (8), including a simulation of the
+reported configuration -- frames arriving three times faster than the GUI draws them --
+asserting the outstanding-payload count never exceeds one while still making progress. Full
+`pytest -m "not slow"` green at 1187.
+
+**Affects:** `glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/GUI/AnalysisClass.py`, `glados_pycromanager/GUI/sharedFunctions.py`,
+`tests/test_display_backpressure.py` (new), `CLAUDE.md`.
+
+## 2026-09-18 — The pSMLM SR panel refreshes on a timer, in place; points-buffer reuse rejected  [display-backpressure]
+
+**Context.** With `pSMLM live + SR` active at ~30 fps, the SR canvas is 2560x2560 float32 =
+26.2 MB at the reported 256x256 camera frame -- 200x a frame. `visualise()` handed that whole
+array to napari on nearly every visualised frame: the `_sr_version` guard only suppresses a
+*byte-identical* re-push, and `_sr_version` is bumped on every frame that has any
+localization at all, so during an acquisition it effectively never held. The guard does its
+job while scrubbing, which is what it was written for.
+
+**Decision.** Two guards instead of one, and an in-place refresh.
+
+- **Interval guard** (`SR_REFRESH_INTERVAL_S`, 0.5 s). The panel is a *cumulative*
+  reconstruction, so unlike the localization overlay it carries no per-frame information and
+  nothing is lost by lagging up to half a second. The localization and analysed-frame layers
+  still update every frame -- which is the part the user actually reads.
+- **Refresh, not re-assign.** After the first push napari holds this exact array and `_stamp`
+  mutates it in place, so `sr_layer.refresh()` re-renders it without running the data setter
+  (`_update_dims`, the data event, a contrast rescan). The `.data` assignment is kept for the
+  two cases where napari genuinely holds a different object: the first push, and after
+  `_ensure_canvas` reallocates on a frame-shape change. Keyed on **identity**
+  (`is not self.sr_canvas`), not on a flag, so a reallocation cannot be missed.
+- **The analysed-frame layer** gets the same in-place treatment as the live display path
+  (`data[:] = image; refresh()`), falling back to assignment when shape or dtype differ.
+- **`_stamped_frames` is bounded** (`MAX_STAMPED_FRAMES`, 50k, oldest-first via a parallel
+  deque). It grew one tuple per analysed frame for the whole session. Eviction only risks
+  double-counting a frame that is both older than 50k frames *and* scrubbed back to.
+
+**Rejected: reusing the `_push_points` buffer across frames.** The plan listed it as a minor
+win; reading napari 0.7.0 shows it is a bad trade. `Points._set_data` stores the array **by
+reference** (`self._data = data`, `points.py:603`) and `Points.data`'s setter hands that same
+object to listeners in the data event (`value=self.data`, `points.py:572,587`) -- so mutating
+a reused buffer would let event listeners observe a *later* frame's coordinates through an
+array they were given for an earlier one. The saving is ~16 KB of allocation per frame
+against a 26 MB push, i.e. nothing. The fresh-allocation-per-frame stays. The fixed-capacity
+/ `shown` contract that works around napari's async-slicing `IndexError` is untouched.
+
+**Verification:** `tests/test_psmlm_live_node.py` (31, up from 16) -- the throttle pinned in
+*both* directions (no refresh inside the interval, caught up after it), in-place refresh
+asserted via an assignment counter on the test double rather than inferred, the shape-change
+fallback, and the bound on the stamped-frame set. `FakeLayer` grew `refresh()` because real
+napari layers have it and the node now depends on it. Full `pytest -m "not slow"` green at
+1191.
+
+**Affects:** `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM_live.py`,
+`tests/test_psmlm_live_node.py`, `CLAUDE.md`.
+
+## 2026-09-18 — Windows scheduling hints at startup; the per-image TimeCriticalPriority call removed  [display-backpressure]
+
+**Context.** "These effects are worse ... esp when napari is not the main window." The
+machine is an i7-1355U: **2 performance cores + 8 efficiency cores at 15 W**. Windows drops
+the foreground priority boost for a background process *and* lets EcoQoS power-throttle it,
+which parks its threads on the efficiency cores. Glados concurrently runs the Qt/GUI thread,
+the frame-ring consumer, the zarr writer, an RT proxy thread, an RT visualisation thread and
+a whole separate Python process for an isolated node -- on two real cores.
+
+Before this there was **no** priority handling anywhere in the package, and the only
+`setPriority` call in the codebase raised a *competitor* of the GUI thread.
+
+**Decision.** `observability/process_priority.py`, called once from `GUI_napari.main()` right
+after `Shared_data()` (which carries the switch) and before the acquisition stack exists:
+
+- `SetPriorityClass(ABOVE_NORMAL_PRIORITY_CLASS)`. **Not** `HIGH_PRIORITY_CLASS`: that
+  outranks most of the system and can starve the drivers and services the acquisition itself
+  depends on. Above-normal wins against ordinary background work without that risk. The
+  priority class is inherited, so the isolated RT-analysis subprocess gets it too.
+- `SetProcessInformation(ProcessPowerThrottling, {ControlMask = EXECUTION_SPEED,
+  StateMask = 0})` -- the documented EcoQoS opt-out. Note `StateMask = 0` is load-bearing:
+  setting `ControlMask` while leaving `StateMask` set requests throttling *on*.
+- Gated by a hidden `performance_config.foreground_scheduling_hints` (default `True`).
+- Both entirely best-effort: a failure logs at DEBUG and the app is unchanged. **Nothing may
+  depend on these having worked** -- they are scheduling hints, not a mechanism.
+
+**Removed:** `self.setPriority(self.TimeCriticalPriority)` in `AnalysisClass.runAnalysis`. It
+ran *inside the per-image handler*, so it re-set the priority on every image, and it raised
+an analysis thread above the Qt/GUI thread -- the opposite of what the display path needs. It
+sat in a branch that returns `None` immediately after. The commented-out twin further down is
+left as-is.
+
+**Rejected:** raising the GUI thread's own `QThread` priority. The competing work is in other
+threads and another process, so an in-process thread nudge does not address the hybrid-core
+*placement* that is the actual problem.
+
+**A 64-bit ctypes trap, worth recording because the first version was a silent no-op.**
+`GetCurrentProcess()` returns the pseudo-handle `(HANDLE)-1`; at ctypes' default `restype` of
+32-bit `c_int` it is truncated to `0x00000000FFFFFFFF` and every call fails with "the handle
+is invalid" -- while `ctypes.get_last_error()` reports `0` ("success"), because the shared
+`ctypes.windll` cache is not opened with `use_last_error=True`. So the failure presented as
+`WinError 0`. Both are fixed by `_kernel32()`, which declares explicit signatures, and both
+are pinned by test.
+
+**Verification:** `tests/test_process_priority.py` (5), including a test that reads the
+priority class back from the OS (`GetPriorityClass` == `ABOVE_NORMAL_PRIORITY_CLASS`) rather
+than assuming the call worked, and one that pins the handle is not truncated. Full
+`pytest -m "not slow"` green at 1196.
+
+**Affects:** `glados_pycromanager/observability/process_priority.py` (new),
+`glados_pycromanager/GUI/GUI_napari.py`, `glados_pycromanager/GUI/sharedFunctions.py`,
+`glados_pycromanager/GUI/AnalysisClass.py`, `tests/test_process_priority.py` (new),
+`CLAUDE.md`.
