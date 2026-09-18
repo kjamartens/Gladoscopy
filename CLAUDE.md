@@ -1101,7 +1101,21 @@ Tests: `tests/test_rt_history.py`, `tests/test_rt_replay_recording.py`,
 
 **`pSMLM_live` is the reference node for both features above**
 (`Real_Time_Analysis/pSMLM_live.py`): three layers - the frame its own `run()`
-analysed, its localizations, and an SR render placed `'right'`. Showing the
+analysed, its localizations, and an SR render placed `'right'`. **The SR panel is
+refreshed on a `SR_REFRESH_INTERVAL_S` (0.5 s) timer, not per frame, and refreshed
+*in place***: at 256x256 the canvas is 26 MB (200x a camera frame), and the
+`_sr_version` guard alone never held during an acquisition because `_sr_version` is
+bumped on every frame that has any localization - so the whole array went to napari
+at the overlay's rate, on the GUI thread. Being cumulative it carries no per-frame
+information, so lagging up to that interval costs nothing; the localization and
+analysed-frame layers still update every frame. `.data` is assigned only when napari
+holds a *different* object (first push, or after `_ensure_canvas` reallocates),
+keyed on identity so a reallocation cannot be missed; otherwise `refresh()`.
+The analysed-frame layer uses the live path's `data[:] = image; refresh()` idiom.
+Note **the `_push_points` buffer is deliberately re-allocated per frame**: napari's
+`Points._set_data` keeps the array by reference and its data event hands that same
+object to listeners, so a reused buffer would show them a later frame's
+coordinates - and the saving would be ~16 KB against a 26 MB push. Showing the
 *analysed* frame is the answer to "my localizations are always one frame behind",
 and costs no snapshot attribute because `visualise()` already receives that frame as
 its `image` argument (both producers pass on the frame they fed to `run()`). Its SR

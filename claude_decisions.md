@@ -3836,3 +3836,49 @@ asserting the outstanding-payload count never exceeds one while still making pro
 **Affects:** `glados_pycromanager/GUI/napariGlados.py`,
 `glados_pycromanager/GUI/AnalysisClass.py`, `glados_pycromanager/GUI/sharedFunctions.py`,
 `tests/test_display_backpressure.py` (new), `CLAUDE.md`.
+
+## 2026-09-18 — The pSMLM SR panel refreshes on a timer, in place; points-buffer reuse rejected  [display-backpressure]
+
+**Context.** With `pSMLM live + SR` active at ~30 fps, the SR canvas is 2560x2560 float32 =
+26.2 MB at the reported 256x256 camera frame -- 200x a frame. `visualise()` handed that whole
+array to napari on nearly every visualised frame: the `_sr_version` guard only suppresses a
+*byte-identical* re-push, and `_sr_version` is bumped on every frame that has any
+localization at all, so during an acquisition it effectively never held. The guard does its
+job while scrubbing, which is what it was written for.
+
+**Decision.** Two guards instead of one, and an in-place refresh.
+
+- **Interval guard** (`SR_REFRESH_INTERVAL_S`, 0.5 s). The panel is a *cumulative*
+  reconstruction, so unlike the localization overlay it carries no per-frame information and
+  nothing is lost by lagging up to half a second. The localization and analysed-frame layers
+  still update every frame -- which is the part the user actually reads.
+- **Refresh, not re-assign.** After the first push napari holds this exact array and `_stamp`
+  mutates it in place, so `sr_layer.refresh()` re-renders it without running the data setter
+  (`_update_dims`, the data event, a contrast rescan). The `.data` assignment is kept for the
+  two cases where napari genuinely holds a different object: the first push, and after
+  `_ensure_canvas` reallocates on a frame-shape change. Keyed on **identity**
+  (`is not self.sr_canvas`), not on a flag, so a reallocation cannot be missed.
+- **The analysed-frame layer** gets the same in-place treatment as the live display path
+  (`data[:] = image; refresh()`), falling back to assignment when shape or dtype differ.
+- **`_stamped_frames` is bounded** (`MAX_STAMPED_FRAMES`, 50k, oldest-first via a parallel
+  deque). It grew one tuple per analysed frame for the whole session. Eviction only risks
+  double-counting a frame that is both older than 50k frames *and* scrubbed back to.
+
+**Rejected: reusing the `_push_points` buffer across frames.** The plan listed it as a minor
+win; reading napari 0.7.0 shows it is a bad trade. `Points._set_data` stores the array **by
+reference** (`self._data = data`, `points.py:603`) and `Points.data`'s setter hands that same
+object to listeners in the data event (`value=self.data`, `points.py:572,587`) -- so mutating
+a reused buffer would let event listeners observe a *later* frame's coordinates through an
+array they were given for an earlier one. The saving is ~16 KB of allocation per frame
+against a 26 MB push, i.e. nothing. The fresh-allocation-per-frame stays. The fixed-capacity
+/ `shown` contract that works around napari's async-slicing `IndexError` is untouched.
+
+**Verification:** `tests/test_psmlm_live_node.py` (31, up from 16) -- the throttle pinned in
+*both* directions (no refresh inside the interval, caught up after it), in-place refresh
+asserted via an assignment counter on the test double rather than inferred, the shape-change
+fallback, and the bound on the stamped-frame set. `FakeLayer` grew `refresh()` because real
+napari layers have it and the node now depends on it. Full `pytest -m "not slow"` green at
+1191.
+
+**Affects:** `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM_live.py`,
+`tests/test_psmlm_live_node.py`, `CLAUDE.md`.

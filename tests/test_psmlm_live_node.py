@@ -7,6 +7,8 @@ pytest.importorskip('scipy')
 
 import glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis  # noqa: F401,E402
 from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.pSMLM_live import (  # noqa: E402
+    MAX_STAMPED_FRAMES,
+    SR_REFRESH_INTERVAL_S,
     SR_UPSAMPLING,
     pSMLM_live,
 )
@@ -16,8 +18,18 @@ from glados_pycromanager.GUI.layer_group import normalise_layer_specs  # noqa: E
 class FakeLayer:
     def __init__(self):
         self.data = None
+        #Real napari layers always have refresh(); the node uses it for the
+        #in-place update paths, which are the whole point of several tests here.
+        self.refreshes = 0
+        self.data_assignments = 0
+
+    def refresh(self, *args, **kwargs):
+        object.__setattr__(self, 'refreshes', self.refreshes + 1)
 
     def __setattr__(self, name, value):
+        if name == 'data' and getattr(self, 'data', None) is not None:
+            object.__setattr__(self, 'data_assignments',
+                               getattr(self, 'data_assignments', 0) + 1)
         object.__setattr__(self, name, value)
 
 
@@ -344,14 +356,90 @@ def test_the_sr_canvas_is_not_re_pushed_when_unchanged(node, frame):
     assert pushes_after_first == 0
 
 
-def test_a_new_frame_does_re_push_the_sr_canvas(node, frame):
+def test_a_changed_sr_canvas_is_refreshed_but_only_on_the_interval(node, frame):
+    """The SR panel refreshes on a timer, not once per analysed frame.
+
+    The canvas is the frame upsampled 10x per axis (26 MB at a 256x256 camera,
+    400 MB at 1024x1024) and handing it to napari re-slices it and re-uploads it
+    to the GPU. `_sr_version` is bumped on every frame that has any localization,
+    so the version guard alone effectively never held during an acquisition and
+    the full array went to napari at the overlay's rate on the GUI thread. Being
+    cumulative, the panel loses nothing by lagging up to SR_REFRESH_INTERVAL_S.
+    """
     group = RecordingGroup()
     _run(node, frame, t=0)
     node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
     pushed = node._sr_pushed_version
+
+    #A new frame within the interval changes the canvas but must not refresh it.
     _run(node, frame, t=1)
     node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
-    assert node._sr_pushed_version != pushed
+    assert node._sr_pushed_version == pushed, 'SR panel refreshed inside the interval'
+
+    #Once the interval has elapsed, the accumulated change is shown.
+    node._sr_last_push -= (SR_REFRESH_INTERVAL_S + 0.01)
+    _run(node, frame, t=2)
+    node.visualise(frame, {'Axes': {'time': 2}}, None, group, srSigma=1.0)
+    assert node._sr_pushed_version != pushed, 'SR panel never caught up'
+
+
+def test_the_sr_canvas_is_refreshed_in_place_not_reassigned(node, frame):
+    """napari already holds this exact array, so refresh() is enough.
+
+    Re-assigning `.data` would run napari's setter -- _update_dims, the data
+    event, a contrast rescan -- for an array it already has.
+    """
+    group = RecordingGroup()
+    _run(node, frame, t=0)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    sr = group['pSMLM: SR render']
+    assert sr.data is node.sr_canvas
+    assignments_after_first = sr.data_assignments
+
+    node._sr_last_push -= (SR_REFRESH_INTERVAL_S + 0.01)
+    _run(node, frame, t=1)
+    node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
+    assert sr.data_assignments == assignments_after_first, 'SR canvas was re-assigned'
+    assert sr.refreshes > 0
+
+
+def test_the_analysed_frame_layer_is_updated_in_place(node, frame):
+    """Same reasoning as the live display path: avoid napari's data setter."""
+    group = RecordingGroup()
+    _run(node, frame, t=0)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    layer = group['pSMLM: analysed frame']
+    assignments = layer.data_assignments
+
+    _run(node, frame, t=1)
+    node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
+    assert layer.data_assignments == assignments, 'analysed frame was re-assigned'
+    np.testing.assert_array_equal(layer.data, frame)
+
+
+def test_a_frame_shape_change_still_reassigns_the_analysed_frame_layer(node, frame):
+    """In-place only works while shape and dtype match."""
+    group = RecordingGroup()
+    _run(node, frame, t=0)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    layer = group['pSMLM: analysed frame']
+    assignments = layer.data_assignments
+
+    smaller = frame[:32, :32].copy()
+    _run(node, smaller, t=1)
+    node.visualise(smaller, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
+    assert layer.data_assignments > assignments
+    assert layer.data.shape == smaller.shape
+
+
+def test_the_stamped_frame_set_is_bounded(node, frame):
+    """It grew one tuple per analysed frame for the whole session."""
+    for t in range(MAX_STAMPED_FRAMES + 50):
+        node._note_stamped(node._frame_id({'Axes': {'time': t}}))
+    assert len(node._stamped_frames) <= MAX_STAMPED_FRAMES
+    assert len(node._stamped_order) <= MAX_STAMPED_FRAMES
+    #The newest key must still be remembered -- eviction is oldest-first.
+    assert node._frame_id({'Axes': {'time': MAX_STAMPED_FRAMES + 49}}) in node._stamped_frames
 
 
 # --------------------------------------------------------------------------

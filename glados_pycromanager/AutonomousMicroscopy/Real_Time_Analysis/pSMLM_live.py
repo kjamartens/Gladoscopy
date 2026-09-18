@@ -38,11 +38,21 @@ revisited. The consequence, stated plainly:
 - the SR panel is cumulative and does **not** rewind when you scrub. It shows the
   full reconstruction built so far, which is generally what you want from it.
 
+Accumulating it cheaply is only half the problem: *handing it to napari* is the
+other half, and that is what made this node unable to keep up at ~30 fps. Being
+cumulative, the panel carries no per-frame information, so it is refreshed on a
+`SR_REFRESH_INTERVAL_S` timer rather than once per analysed frame, and refreshed
+in place (napari already holds this exact array) rather than re-assigned. The
+localization and analysed-frame layers still update every frame; only the SR
+panel lags, by at most that interval.
+
 `pSMLM_image` accumulates in `visualise()` too, but without the guard, which is
 why it is marked `"__replayable__": False` outright.
 """
 
+import collections
 import logging
+import time
 
 import numpy as np
 
@@ -59,6 +69,23 @@ SR_KERNEL_RADIUS = 3
 #: Smallest points buffer. The buffer only ever grows (see _push_points), so this
 #: is just the size below which growing is not worth the churn.
 MIN_POINTS_CAPACITY = 64
+
+#: Minimum wall-clock gap between two refreshes of the super-resolution panel.
+#: The canvas is the frame upsampled 10x per axis -- 26 MB at a 256x256 camera,
+#: 100 MB at 512, 400 MB at 1024 -- and handing it to napari re-slices it and
+#: re-uploads it to the GPU. It is a *cumulative* reconstruction, so unlike the
+#: localization overlay it carries no per-frame information and nothing is lost
+#: by refreshing it on a timer instead of once per analysed frame. Before this,
+#: `_sr_version` was bumped on every frame that had any localization at all, so
+#: the version guard below effectively never held during an acquisition and the
+#: full array went to napari ~10x/s on the GUI thread.
+SR_REFRESH_INTERVAL_S = 0.5
+
+#: Cap on the set of frame keys already stamped into the SR canvas. Unbounded,
+#: this grew one tuple per analysed frame for the whole session. Evicting the
+#: oldest keys only risks double-counting a frame that is both older than this
+#: many frames *and* scrubbed back to, which is a far better trade than the leak.
+MAX_STAMPED_FRAMES = 50_000
 
 
 def __function_metadata__():
@@ -79,7 +106,7 @@ def __function_metadata__():
             "help_string": ("Phasor SMLM showing the localizations on the frame they "
                             "were found in, with a super-resolution render beside it."),
             "display_name": "pSMLM live + SR",
-            "run_delay": 20,
+            "run_delay": 5,
             "visualise_delay": 100,
             "visualisation_type": "points",
             "input": [],
@@ -116,13 +143,18 @@ class pSMLM_live:
         self._kernel_sigma = None
         # Frames already stamped into the SR canvas, so that scrubbing back and
         # forth over an acquisition does not count the same localizations twice.
+        # Bounded: the deque records insertion order so the oldest keys can be
+        # evicted once MAX_STAMPED_FRAMES is reached.
         self._stamped_frames = set()
+        self._stamped_order = collections.deque()
         # The points layer's style is applied once, not per frame -- see visualise().
         self._points_styled = False
         # Bumped whenever the SR canvas changes, so visualise() can skip re-pushing
         # an unchanged (and very large) array to napari.
         self._sr_version = 0
         self._sr_pushed_version = -1
+        # Wall clock of the last SR refresh, for the SR_REFRESH_INTERVAL_S gate.
+        self._sr_last_push = 0.0
         # The points layer's array is a fixed-capacity buffer that only grows --
         # see _push_points for why its *length* must not follow the localization
         # count.
@@ -151,6 +183,13 @@ class pSMLM_live:
         if self._kernel is None or self._kernel_sigma != sigma:
             self._kernel = _gaussian_kernel(sigma, SR_KERNEL_RADIUS).astype(np.float32)
             self._kernel_sigma = sigma
+
+    def _note_stamped(self, frame_id):
+        """Record that `frame_id` has contributed to the SR canvas, bounded."""
+        self._stamped_frames.add(frame_id)
+        self._stamped_order.append(frame_id)
+        while len(self._stamped_order) > MAX_STAMPED_FRAMES:
+            self._stamped_frames.discard(self._stamped_order.popleft())
 
     def _stamp(self, locs):
         """Add each localization to the SR canvas."""
@@ -205,7 +244,18 @@ class pSMLM_live:
         # camera produced -- which is the whole point of showing it here.
         if image is not None:
             image = np.asarray(image)
-            napariLayer['pSMLM: analysed frame'].data = image
+            # Update in place where possible: assigning `.data` runs napari's
+            # setter (_update_dims, the data event, a contrast rescan while
+            # auto-contrast is on), where an in-place write plus refresh() does
+            # not. Same idiom as the live display path in napariGlados.
+            frame_layer = napariLayer['pSMLM: analysed frame']
+            existing = getattr(frame_layer, 'data', None)
+            if (existing is not None and getattr(existing, 'shape', None) == image.shape
+                    and getattr(existing, 'dtype', None) == image.dtype):
+                existing[:] = image
+                frame_layer.refresh()
+            else:
+                frame_layer.data = image
             # Accumulate the SR render here rather than in run(); see the module
             # docstring. Each frame contributes at most once, so replaying a frame
             # re-draws the localizations without double-counting them.
@@ -215,7 +265,7 @@ class pSMLM_live:
                 self._stamp(self.SMLMlocs)
                 self._sr_version += 1
                 if frame_id is not None:
-                    self._stamped_frames.add(frame_id)
+                    self._note_stamped(frame_id)
 
         points = napariLayer['pSMLM: localizations']
         # Style once, never per frame. Every one of these assignments emits a napari
@@ -243,15 +293,36 @@ class pSMLM_live:
         # napari's slice indices still agree with each other.
         self._push_points(points, coords)
 
-        # Only re-assign the SR canvas when it actually changed. It is the frame
-        # upsampled 10x per axis -- up to 400 MB -- and assigning it makes napari
-        # re-slice, rescan contrast and re-upload to the GPU. Scrubbing revisits
-        # frames that are already stamped, so without this guard every slider step
-        # paid that cost to push a byte-identical array.
+        # The SR canvas is up to 400 MB, and handing it to napari re-slices it,
+        # rescans contrast and re-uploads it to the GPU. Two guards, because one
+        # was not enough:
+        #
+        # * the version guard stops a *byte-identical* array being re-pushed --
+        #   which is what every slider step did while scrubbing frames that were
+        #   already stamped;
+        # * the interval guard stops a genuinely-changed canvas being pushed at
+        #   the overlay's rate. `_sr_version` is bumped on every frame that has
+        #   any localization, so during an acquisition the version guard alone
+        #   effectively never held and the full array went to napari ~10x/s on
+        #   the GUI thread. The panel is cumulative, so refreshing it on a timer
+        #   loses nothing.
         sr_layer = napariLayer['pSMLM: SR render']
-        if self._sr_version != self._sr_pushed_version or getattr(sr_layer, 'data', None) is None:
+        now = time.monotonic()
+        if getattr(sr_layer, 'data', None) is not self.sr_canvas:
+            # First push, or _ensure_canvas reallocated: napari is holding a
+            # different (or no) array, so it must be given this one. Never
+            # throttled -- the layer would otherwise show a stale canvas.
             sr_layer.data = self.sr_canvas
             self._sr_pushed_version = self._sr_version
+            self._sr_last_push = now
+        elif (self._sr_version != self._sr_pushed_version
+                and now - self._sr_last_push >= SR_REFRESH_INTERVAL_S):
+            # napari already holds this exact array and _stamp mutated it in
+            # place, so refresh() re-renders it without going through the data
+            # setter at all.
+            sr_layer.refresh()
+            self._sr_pushed_version = self._sr_version
+            self._sr_last_push = now
         return napariLayer
 
     #(style attribute, value) pairs. The `current_*` form is what governs points
