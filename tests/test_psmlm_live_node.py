@@ -132,11 +132,16 @@ def test_visualise_shows_the_analysed_frame_not_the_newest(node, frame):
     assert np.array_equal(group['pSMLM: analysed frame'].data, frame)
 
 
+def _visible(layer):
+    """The points actually rendered: the buffer masked by `shown`."""
+    return np.asarray(layer.data)[np.asarray(layer.shown)]
+
+
 def test_visualise_writes_points_as_row_col(node, frame):
     _run(node, frame)
     group = FakeGroup()
     node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
-    coords = group['pSMLM: localizations'].data
+    coords = _visible(group['pSMLM: localizations'])
     assert coords.shape == (2, 2)
     #pSMLM reports (x, y); napari points are (row, col), so the columns swap.
     assert np.allclose(np.sort(coords[:, 0]), np.sort(node.SMLMlocs[:, 1]))
@@ -176,7 +181,7 @@ def test_an_empty_frame_leaves_the_points_layer_empty(node):
     node.run(blank, {'Axes': {'time': 0}}, None, None, ROIradius=3, stdmult=2)
     group = FakeGroup()
     node.visualise(blank, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
-    assert group['pSMLM: localizations'].data.shape == (0, 2)
+    assert _visible(group['pSMLM: localizations']).shape == (0, 2)
 
 
 def test_a_frame_size_change_reallocates_the_canvas(node, frame):
@@ -308,10 +313,10 @@ def test_points_are_open_red_rings_on_a_real_napari_layer(node, frame):
     _run(node, frame)
     node.visualise(frame, {'Axes': {'time': 0}}, None, RealGroup(), srSigma=1.0)
 
-    assert len(points.data) == 2
+    assert len(_visible(points)) == 2, 'exactly the two localizations are shown'
     assert np.allclose(points.face_color, 0.0), 'fill must be transparent, not white'
-    assert np.allclose(points.border_color, [[1, 0, 0, 1]] * 2), 'border must be red'
-    assert list(points.size) == [8, 8]
+    assert np.allclose(points.border_color, [1, 0, 0, 1]), 'border must be red'
+    assert set(np.asarray(points.size).ravel().tolist()) == {8}
 
 
 def test_the_sr_canvas_is_not_re_pushed_when_unchanged(node, frame):
@@ -347,3 +352,85 @@ def test_a_new_frame_does_re_push_the_sr_canvas(node, frame):
     _run(node, frame, t=1)
     node.visualise(frame, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
     assert node._sr_pushed_version != pushed
+
+
+# --------------------------------------------------------------------------
+# Regression: IndexError from napari's async slicing on a point-count change
+# --------------------------------------------------------------------------
+
+def test_the_points_array_length_does_not_follow_the_localization_count(node):
+    """The invariant the whole fixed-capacity buffer exists for.
+
+    Reported repeatedly while scrolling an MDA:
+
+        self.__indices_view = value[self.layer.shown[value]]
+        IndexError: index 21 is out of bounds for axis 0 with size 21
+
+    Always index N into an array of size N -- a slice response computed for a
+    longer point list arriving after a shorter one was assigned. Keeping the
+    array length constant makes a stale index always in range, however late the
+    response is.
+    """
+    rng = np.random.default_rng(1)
+    group = FakeGroup()
+    lengths = set()
+    visible = []
+    for t in range(8):
+        image = rng.normal(100, 5, (64, 64))
+        for _ in range(int(rng.integers(2, 30))):
+            y, x = rng.integers(8, 56, 2)
+            image[y, x] += 600
+        node.run(image, {'Axes': {'time': t}}, None, None, ROIradius=3, stdmult=2)
+        node.visualise(image, {'Axes': {'time': t}}, None, group, srSigma=1.0)
+        layer = group['pSMLM: localizations']
+        lengths.add(len(layer.data))
+        visible.append(int(np.asarray(layer.shown).sum()))
+
+    assert len(lengths) == 1, f'array length changed across frames: {lengths}'
+    #...while the number actually displayed did track the localizations.
+    assert len(set(visible)) > 1
+
+
+def test_the_buffer_grows_but_never_shrinks(node):
+    """Shrinking would reintroduce exactly the length change this avoids."""
+    group = FakeGroup()
+    rng = np.random.default_rng(2)
+    dense = rng.normal(100, 5, (64, 64))
+    for _ in range(40):
+        y, x = rng.integers(8, 56, 2)
+        dense[y, x] += 600
+    node.run(dense, {'Axes': {'time': 0}}, None, None, ROIradius=3, stdmult=2)
+    node.visualise(dense, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    grown = node._points_capacity
+
+    sparse = np.zeros((64, 64))
+    node.run(sparse, {'Axes': {'time': 1}}, None, None, ROIradius=3, stdmult=2)
+    node.visualise(sparse, {'Axes': {'time': 1}}, None, group, srSigma=1.0)
+    assert node._points_capacity == grown
+
+
+def test_the_buffer_grows_when_localizations_exceed_it(node):
+    from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.pSMLM_live import (
+        MIN_POINTS_CAPACITY,
+    )
+    group = FakeGroup()
+    rng = np.random.default_rng(3)
+    crowded = rng.normal(100, 5, (256, 256))
+    for _ in range(MIN_POINTS_CAPACITY * 3):
+        y, x = rng.integers(8, 248, 2)
+        crowded[y, x] += 600
+    node.run(crowded, {'Axes': {'time': 0}}, None, None, ROIradius=3, stdmult=2)
+    node.visualise(crowded, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    assert node._points_capacity >= len(node.SMLMlocs)
+    assert len(group['pSMLM: localizations'].data) == node._points_capacity
+
+
+def test_surplus_rows_are_parked_on_a_real_localization(node, frame):
+    """A slice response that briefly renders them unmasked must show nothing
+    stray, rather than a cluster at the origin."""
+    group = FakeGroup()
+    _run(node, frame)
+    node.visualise(frame, {'Axes': {'time': 0}}, None, group, srSigma=1.0)
+    buffer = np.asarray(group['pSMLM: localizations'].data)
+    shown = np.asarray(group['pSMLM: localizations'].shown)
+    assert np.allclose(buffer[~shown], buffer[shown][0])

@@ -198,12 +198,18 @@ class RealTimeAnalysisConfig:
         hidden=False,
     )
     replay_debounce_ms: int = setting(
-        120,
-        "RT-analysis: slider replay delay (ms)",
-        "How long the napari slider must settle before overlays are re-rendered. "
-        "Lower is more responsive; higher avoids re-rendering every intermediate "
-        "frame of a fast drag.",
-        hidden=True,
+        50,
+        "RT-analysis: minimum ms between overlay redraws while scrubbing",
+        "Caps how often retained real-time results are redrawn while you drag or "
+        "scroll the napari slider: 50 ms is 20 redraws per second. This is a rate "
+        "limit, not a delay -- the first slider move redraws immediately and the "
+        "final position is always redrawn, so lowering it makes scrubbing smoother "
+        "rather than merely faster. Measured cost of one redraw for the pSMLM live "
+        "node is about 5 ms at 256x256 and 8.5 ms at 1024x1024, so 50 ms leaves "
+        "roughly six times headroom; raise it if scrubbing makes the UI stutter "
+        "with a heavier node. Frames that were never analysed are filled in "
+        "separately, once the slider stops.",
+        hidden=False,
     )
 
 

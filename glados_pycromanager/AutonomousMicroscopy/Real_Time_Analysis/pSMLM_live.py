@@ -56,6 +56,10 @@ SR_UPSAMPLING = 10
 #: Half-width, in SR pixels, of the Gaussian stamped per localization.
 SR_KERNEL_RADIUS = 3
 
+#: Smallest points buffer. The buffer only ever grows (see _push_points), so this
+#: is just the size below which growing is not worth the churn.
+MIN_POINTS_CAPACITY = 64
+
 
 def __function_metadata__():
     return {
@@ -119,6 +123,10 @@ class pSMLM_live:
         # an unchanged (and very large) array to napari.
         self._sr_version = 0
         self._sr_pushed_version = -1
+        # The points layer's array is a fixed-capacity buffer that only grows --
+        # see _push_points for why its *length* must not follow the localization
+        # count.
+        self._points_capacity = 0
         # Pixel size is only used to scale the layers; a subprocess-isolated node
         # gets core=None, so fall back rather than failing to start.
         try:
@@ -225,7 +233,7 @@ class pSMLM_live:
         coords = self.SMLMlocs[:, [1, 0]].copy() if len(self.SMLMlocs) else np.empty((0, 2))
         # A selection left over from the previous frame refers to points that may no
         # longer exist -- the same stale-index bug by another route. Cleared *before*
-        # the data shrinks, and only when there is something to clear.
+        # the data changes, and only when there is something to clear.
         try:
             if len(points.selected_data):
                 points.selected_data = set()
@@ -233,7 +241,7 @@ class pSMLM_live:
             pass
         # Assigned last: the style events above therefore fire while the data and
         # napari's slice indices still agree with each other.
-        points.data = coords
+        self._push_points(points, coords)
 
         # Only re-assign the SR canvas when it actually changed. It is the frame
         # upsampled 10x per axis -- up to 400 MB -- and assigning it makes napari
@@ -256,6 +264,47 @@ class pSMLM_live:
         ('border_color', 'red'), ('edge_color', 'red'),
         ('border_width', 0.05), ('edge_width', 0.05),
     )
+
+    def _push_points(self, points, coords):
+        """Show `coords` without changing the layer's array length.
+
+        napari 0.7 slices asynchronously (and Glados runs it with NAPARI_ASYNC=1),
+        so a slice response computed for one point list can arrive after a
+        different one has been assigned. napari then indexes the *new* `shown`
+        array with the *old* response's indices:
+
+            self.__indices_view = value[self.layer.shown[value]]
+            IndexError: index 21 is out of bounds for axis 0 with size 21
+
+        Every reported instance of this is that shape -- index N into an array of
+        size N -- i.e. purely a point-count change. So the count is kept out of it:
+        the layer holds a fixed-capacity buffer and `shown` masks the unused rows,
+        which means a stale index is always in range however late the response is.
+
+        The buffer only ever grows. Shrinking it would reintroduce exactly the
+        length change this exists to avoid, and the memory is trivial (two floats
+        per slot). Surplus rows are parked on the first real localization rather
+        than at the origin, so a response that briefly renders them unmasked shows
+        nothing stray.
+        """
+        n = len(coords)
+        if self._points_capacity < n or self._points_capacity == 0:
+            #Geometric growth, so this is O(log n) length changes over a session
+            #rather than one per frame.
+            self._points_capacity = max(MIN_POINTS_CAPACITY, 2 * n)
+        capacity = self._points_capacity
+
+        buffer = np.zeros((capacity, 2), dtype=float)
+        if n:
+            buffer[:n] = coords
+            buffer[n:] = coords[0]
+        points.data = buffer
+        try:
+            points.shown = np.arange(capacity) < n
+        except (AttributeError, ValueError):
+            #Older/other napari without `shown`: fall back to the plain assignment,
+            #which is correct but can still hit the race above.
+            points.data = coords
 
     def _style_points(self, points):
         """Apply the point style once per layer. See visualise() for why not per frame.
