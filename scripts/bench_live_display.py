@@ -239,6 +239,101 @@ def run_queue_depth_simulation(render_cost_ms: float, arrival_interval_ms: float
     return results
 
 
+def run_mda_display_benchmark(n_frames: int = 60, t: int = 200, z: int = 3,
+                              height: int = 256, width: int = 256):
+    """MDA display: `dims.set_current_step` vs a dedicated in-place live layer.
+
+    The multiDstack MDA path shows the newest frame by stepping the viewer's
+    dims onto the slice the acquisition just wrote, which runs napari's full
+    slicing pipeline against the zarr store. The alternative is what live mode
+    already does: a 2-D layer written in place and refreshed, with the stack
+    layer kept (hidden) purely for its sliders.
+
+    The stack is a real on-disk zarr with one uncompressed frame per chunk --
+    the store the acquisition actually writes -- because an in-memory numpy
+    stand-in understates the re-slice by roughly 3x.
+    """
+    import tempfile
+
+    import zarr
+    from napari.components import ViewerModel
+
+    tmpdir = tempfile.TemporaryDirectory()
+    store_path = os.path.join(tmpdir.name, "stack.zarr")
+    array = zarr.create_array(store=store_path, shape=(t, z, height, width),
+                              chunks=(1, 1, height, width), dtype="uint16",
+                              compressors=None)
+    rng = np.random.default_rng(0)
+    array[:] = rng.integers(0, 4000, (t, z, height, width), dtype=np.uint16)
+
+    def _overlays(viewer, n):
+        """Stand-ins for an RT node's layers; index 1 is a pSMLM-sized SR panel."""
+        for i in range(n):
+            if i == 1:
+                viewer.add_image(np.zeros((height * 10, width * 10), dtype=np.float32),
+                                 name=f"sr{i}")
+            else:
+                viewer.add_image(np.zeros((height, width), dtype=np.uint16), name=f"ov{i}")
+
+    #Repeat each configuration and keep the best. A single timed pass here is
+    #dominated by OS page-cache state and first-touch allocation, which made an
+    #early version report a *hidden* stack as slower than a visible one -- i.e.
+    #pure noise. Best-of is the right statistic for "what does this cost when it
+    #is not being interfered with"; the spread is reported so a noisy run is
+    #visible rather than silently believed.
+    repeats = 5
+
+    def _repeat(build, step):
+        timings = []
+        for _ in range(repeats):
+            subject = build()
+            for warm in range(5):           # warm the page cache and the slicer
+                step(subject, warm)
+            start = time.perf_counter()
+            for frame in range(n_frames):
+                step(subject, frame)
+            timings.append((time.perf_counter() - start) / n_frames * 1000)
+        return min(timings), max(timings)
+
+    def _time_dims(n_overlays, hide_stack):
+        def build():
+            viewer = ViewerModel()
+            stack = viewer.add_image(array, name="stack")
+            _overlays(viewer, n_overlays)
+            stack.visible = not hide_stack
+            viewer.dims.set_current_step([0, 1], [0, 0])
+            return viewer
+
+        return _repeat(build,
+                       lambda viewer, i: viewer.dims.set_current_step([0, 1], [i % t, i % z]))
+
+    def _time_inplace(n_overlays):
+        frame_data = rng.integers(0, 4000, (height, width), dtype=np.uint16)
+
+        def build():
+            viewer = ViewerModel()
+            stack = viewer.add_image(array, name="stack")
+            stack.visible = False
+            live = viewer.add_image(np.zeros((height, width), dtype=np.uint16), name="live")
+            _overlays(viewer, n_overlays)
+            return live
+
+        def step(live, _i):
+            live.data[:] = frame_data
+            live.refresh()
+
+        return _repeat(build, step)
+
+    results = {
+        "set_current_step, stack visible, 0 overlays": _time_dims(0, False),
+        "set_current_step, stack visible, 3 overlays": _time_dims(3, False),
+        "set_current_step, stack hidden,  3 overlays": _time_dims(3, True),
+        "in-place 2-D live layer,         3 overlays": _time_inplace(3),
+    }
+    tmpdir.cleanup()
+    return results
+
+
 def _write_results(lines: list[str]):
     RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -251,7 +346,7 @@ def _write_results(lines: list[str]):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=["layer-update", "queue-depth"], default="layer-update")
+    parser.add_argument("--mode", choices=["layer-update", "queue-depth", "mda-display"], default="layer-update")
     parser.add_argument("--frames", type=int, default=60, help="Synthetic frames per configuration (layer-update mode)")
     parser.add_argument("--contrast", choices=["auto", "fixed"], default="auto")
     parser.add_argument("--existing-layers", type=int, default=0, help="Pre-populate the viewer with N dummy layers to exercise the layer-lookup scan cost")
@@ -263,6 +358,19 @@ def main():
     parser.add_argument("--arrival-interval-ms", type=float, default=2.0, help="queue-depth mode: simulated camera frame period")
     parser.add_argument("--duration-s", type=float, default=5.0, help="queue-depth mode: simulated session length")
     args = parser.parse_args()
+
+    if args.mode == "mda-display":
+        results = run_mda_display_benchmark(n_frames=args.frames)
+        lines = [f"mode=mda-display frames_per_config={args.frames} "
+                 f"(zarr-backed 200x3x256x256 stack, uncompressed, 1 frame/chunk)"]
+        lines.append("  best of 5 runs x %d frames, 5 warm-up frames each; "
+                     "worst run shown for spread" % args.frames)
+        for label, (best, worst) in results.items():
+            lines.append(f"  {label}: {best:7.3f} ms/frame  "
+                         f"({best * 30:6.1f} ms/s of the GUI thread at 30 fps)"
+                         f"   [worst run {worst:7.3f}]")
+        _write_results(lines)
+        return
 
     if args.mode == "layer-update":
         lines = [f"mode=layer-update frames_per_config={args.frames}"]

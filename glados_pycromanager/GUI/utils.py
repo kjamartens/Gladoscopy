@@ -4161,6 +4161,12 @@ def set_up_logger():  # type: ignore[override]
     _set_up_logger()
 
 
+#: Marks a metadata dict whose `Axes` have already been rebuilt from `mda_event`,
+#: so a second `metadata_refactor` call costs a dict lookup instead of rebuilding
+#: an OrderedDict on the GUI thread once per displayed frame.
+METADATA_REFACTORED_KEY = '__glados_axes_refactored__'
+
+
 def metadata_refactor(metadata, shared_data=None):
     """
     Refactor the metadata to be more consistent and easier to use.
@@ -4201,7 +4207,7 @@ def metadata_refactor(metadata, shared_data=None):
         'p': 'position'
     }
 
-    if 'mda_event' in metadata:
+    if 'mda_event' in metadata and not metadata.get(METADATA_REFACTORED_KEY):
         original_axes = metadata['mda_event'].index
         ordered_axes_data = collections.OrderedDict() # Use OrderedDict to guarantee order
 
@@ -4212,5 +4218,13 @@ def metadata_refactor(metadata, shared_data=None):
             ordered_axes_data[new_key] = original_axes[original_key]
 
         metadata['Axes'] = ordered_axes_data
-    
+        # Marked so a second call is a cheap no-op. On MMCORE_PLUS the frame-ring
+        # consumer thread already refactored this dict before the display path
+        # sees it, but the pycromanager backends queue raw metadata straight from
+        # their acquisition callback, so the display-side call cannot simply be
+        # deleted -- it is load-bearing there. The mark works because this
+        # function mutates its argument in place and returns it, so it travels
+        # with the dict across the hand-off.
+        metadata[METADATA_REFACTORED_KEY] = True
+
     return metadata

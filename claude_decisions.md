@@ -3936,3 +3936,61 @@ than assuming the call worked, and one that pins the handle is not truncated. Fu
 `glados_pycromanager/GUI/GUI_napari.py`, `glados_pycromanager/GUI/sharedFunctions.py`,
 `glados_pycromanager/GUI/AnalysisClass.py`, `tests/test_process_priority.py` (new),
 `CLAUDE.md`.
+
+## 2026-09-18 — Measured: what `dims.set_current_step` actually costs, and a correction  [display-backpressure]
+
+**Why this entry exists.** An earlier reading of napari 0.7.0 found that
+`ViewerModel._update_layers` submits *every* layer in the viewer to the slicer on any dims
+change (`viewer_model.py:706`), and that was reported as meaning the MDA display cost is
+"superlinear in the number of RT overlay layers". **Measurement does not support that**, and
+a first throwaway probe that appeared to (19.6 ms/frame) was measuring OS page-cache state,
+not the operation. Recorded here so the wrong number does not get reused.
+
+**The benchmark.** `make bench-live-display` gained a `--mode mda-display`
+(`scripts/bench_live_display.py:run_mda_display_benchmark`), against a **real on-disk zarr**
+stack (200x3x256x256, uncompressed, one frame per chunk -- the store the acquisition actually
+writes; an in-memory numpy stand-in understates the re-slice). Best of 5 runs x 60 frames
+with 5 warm-up frames each, because a single pass is dominated by page-cache and first-touch
+effects -- the first version reported a *hidden* stack as slower than a visible one, i.e.
+pure noise.
+
+| configuration | ms/frame | at 30 fps |
+|---|---|---|
+| `set_current_step`, stack visible, 0 overlays | 1.78 | 53 ms/s |
+| `set_current_step`, stack visible, 3 overlays | 3.08 | 93 ms/s |
+| `set_current_step`, stack hidden, 3 overlays | 2.93 | 88 ms/s |
+| in-place 2-D live layer + `refresh()`, 3 overlays | **0.016** | **0.5 ms/s** |
+
+**What this actually says:**
+
+- Overlays add cost roughly **linearly**, ~0.43 ms each, not superlinearly. The honest
+  statement is "a dims change costs ~3 ms with this node's three layers", not "the overlays
+  are why MDA collapses".
+- Hiding the stack saves only ~0.15 ms once warm, so the stack's own re-slice is *not* the
+  bulk -- most of the ~3 ms is napari's dims/slicing machinery across all layers.
+- The in-place live-layer path is **~190x cheaper** than a dims change. That is the result
+  that justifies the step-3b design.
+- **This is a lower bound on the real difference.** `ViewerModel` has no Qt or vispy canvas,
+  so the figures exclude the GPU upload and the Qt dims-slider widget updates, both of which
+  exist only in a real viewer and both of which the design also removes.
+
+**Consequence for priorities.** Step 3b remains worth doing -- 93 ms/s of GUI time at 30 fps
+is ~9%, the real-viewer cost is higher than measured here, and the follow/browse split is a
+feature the user asked for in its own right. But it is **not** the headline fix; the 26 MB
+per-frame SR push removed in the previous commit was far larger.
+
+**Also in this commit:** `metadata_refactor` is now idempotent via a
+`METADATA_REFACTORED_KEY` mark, so the multiDstack display branch's second call costs a dict
+lookup instead of rebuilding an `OrderedDict` on the GUI thread per frame. The call could not
+simply be deleted -- on the pycromanager backends the display-side call is the only one, as
+their acquisition callback queues raw metadata. The mark travels with the dict because the
+function mutates in place and returns its argument, the same property
+`ZARR_WRITTEN_SLICE_KEY` relies on.
+
+**Verification:** `tests/test_metadata_refactor_idempotence.py` (6), including that a second
+call does no work (counted through a property on the stand-in event), that a frame with no
+`mda_event` is untouched, and that the mark is per-dict rather than global. Full
+`pytest -m "not slow"` green at 1202.
+
+**Affects:** `scripts/bench_live_display.py`, `glados_pycromanager/GUI/utils.py`,
+`tests/test_metadata_refactor_idempotence.py` (new), `docs/bench-live-display.txt`.

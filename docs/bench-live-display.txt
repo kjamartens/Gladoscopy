@@ -124,3 +124,18 @@ mode=queue-depth render_cost_ms=5.0 arrival_interval_ms=2.0 duration_s=5.0
   maxlen=1 arrivals=2500 rendered=1000 dropped=1499 (60.0% dropped)
   maxlen=2 arrivals=2500 rendered=1000 dropped=1498 (59.9% dropped)
   maxlen=3 arrivals=2500 rendered=1000 dropped=1497 (59.9% dropped)
+
+=== bench_live_display run 2026-09-18 10:46:45 ===
+mode=mda-display frames_per_config=60 (zarr-backed 200x3x256x256 stack, uncompressed, 1 frame/chunk)
+  set_current_step, stack visible, 0 overlays:   2.306 ms/frame  (  69.2 ms/s of the GUI thread at 30 fps)
+  set_current_step, stack visible, 3 overlays:   3.112 ms/frame  (  93.4 ms/s of the GUI thread at 30 fps)
+  set_current_step, stack hidden,  3 overlays:   4.794 ms/frame  ( 143.8 ms/s of the GUI thread at 30 fps)
+  in-place 2-D live layer,         3 overlays:   0.929 ms/frame  (  27.9 ms/s of the GUI thread at 30 fps)
+
+=== bench_live_display run 2026-09-18 10:47:23 ===
+mode=mda-display frames_per_config=60 (zarr-backed 200x3x256x256 stack, uncompressed, 1 frame/chunk)
+  best of 5 runs x 60 frames, 5 warm-up frames each; worst run shown for spread
+  set_current_step, stack visible, 0 overlays:   1.777 ms/frame  (  53.3 ms/s of the GUI thread at 30 fps)   [worst run   2.414]
+  set_current_step, stack visible, 3 overlays:   3.083 ms/frame  (  92.5 ms/s of the GUI thread at 30 fps)   [worst run   3.293]
+  set_current_step, stack hidden,  3 overlays:   2.930 ms/frame  (  87.9 ms/s of the GUI thread at 30 fps)   [worst run   3.461]
+  in-place 2-D live layer,         3 overlays:   0.016 ms/frame  (   0.5 ms/s of the GUI thread at 30 fps)   [worst run   0.048]
