@@ -366,8 +366,50 @@ class AnalysisThread_customFunction_Visualisation(QThread):
 
     def _visualise_on_main_thread(self, data):
         """Slot executed on the main (GUI) thread via Qt queued connection."""
-        RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data
-        self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+        RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data[:6]
+        #The state the node was in when this frame finished being analysed. See
+        #_visualise_paired for why the node's *current* state is not good enough.
+        state_snapshot = data[6] if len(data) > 6 else None
+        self._visualise_paired(RT_analysis_object, analysisInfo, image, metadata,
+                               core, state_snapshot)
+
+    def _visualise_paired(self, RT_analysis_object, analysisInfo, image, metadata,
+                          core, state_snapshot):
+        """Render `image` against the node state that *this* frame produced.
+
+        The queued payload carries the image by value but the node by reference,
+        and the visualisation thread deliberately runs slower than the analysis
+        (`visualise_delay`, plus the configured display FPS). So by the time this
+        runs, `run()` has usually processed several more frames and overwritten the
+        node's attributes in place -- and the overlay ends up drawing frame N's
+        image with frame N+k's results. That is what made pSMLM's localizations sit
+        on the wrong frame, and it applies to every node with a visualisation.
+
+        Applying the frame's own snapshot fixes the pairing. The previous values are
+        restored afterwards because for an in-process node this *is* the live
+        instance that `run()` is still using: a node that accumulates in `run()`
+        (RT_counter incrementing a tally, say) would otherwise be rewound and lose
+        whatever happened while this frame sat in the queue.
+
+        A node that declares no `__snapshot_attrs__` has no snapshot, so it keeps
+        the old, unpaired behaviour -- declaring them is what buys frame-consistent
+        overlays.
+        """
+        if not state_snapshot:
+            self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+            return
+        _absent = object()
+        previous = {key: getattr(RT_analysis_object, key, _absent)
+                    for key in state_snapshot}
+        try:
+            RT_analysis_object.__dict__.update(state_snapshot)
+            self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+        finally:
+            for key, value in previous.items():
+                if value is _absent:
+                    RT_analysis_object.__dict__.pop(key, None)
+                else:
+                    RT_analysis_object.__dict__[key] = value
 
     def run(self):
         node_label = self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node') if isinstance(self.analysisInfo, dict) else str(self.analysisInfo)
@@ -1007,7 +1049,10 @@ class AnalysisProcess_customFunction(QThread):
                                 _recordReplayFrame(self._replay_session, self.shared_data,
                                                    out_metadata, state_snapshot)
                             if len(self.visualisationObject.visualisation_queue) < 1:
-                                data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core)
+                                #state_snapshot travels with the frame it belongs to:
+                                #the shadow above keeps being updated by later frames
+                                #while this one waits in the queue.
+                                data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core, state_snapshot)
                                 self.visualisationObject.visualisation_queue.append(data)
                                 self.visualisationObject.new_image()
             # NOT the duty-cycle cap AnalysisThread_customFunction applies (T-G7).
@@ -1329,19 +1374,22 @@ class AnalysisThread_customFunction(QThread):
             #later. Done before the visualisation drop-gate below, so history is
             #not additionally thinned by the display rate. The snapshot holds bare
             #references to this node's attributes -- RTNodeHistory.record copies.
+            #Built once and used twice: to pair this frame's results with this
+            #frame's image in the visualisation payload below, and to retain them
+            #for scrub-replay.
+            state_snapshot = _build_state_snapshot(
+                self.RT_analysis_object, getattr(self, '_snapshot_attrs', ()))
             session = getattr(self, '_replay_session', None)
             if session is not None:
-                _recordReplayFrame(
-                    session, shared_data, metadata,
-                    _build_state_snapshot(self.RT_analysis_object,
-                                          getattr(self, '_snapshot_attrs', ())))
+                _recordReplayFrame(session, shared_data, metadata, state_snapshot)
             logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             # if self.visualisationObject.visualisation_queue.empty():
             # print(f'#ac537 -- len of queue: {len(self.visualisationObject.visualisation_queue)}')
             if len(self.visualisationObject.visualisation_queue) < 1:
-                # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
-                data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
+                #The snapshot travels with the frame it belongs to -- run() keeps
+                #mutating this same node instance while the frame waits here.
+                data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core,state_snapshot)
                 self.visualisationObject.visualisation_queue.append(data)
                 self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 logging.debug('Put data in visualisation_queue!')

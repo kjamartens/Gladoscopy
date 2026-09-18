@@ -983,6 +983,46 @@ forwards attribute access to its first layer as belt-and-braces, and
   never `visualise_init()`). The RT layer type comes solely from `visualise_init()`.
 Tests: `tests/test_layer_group.py`, `tests/test_rt_multi_layer.py`.
 
+**An overlay is drawn against the state the frame it shows produced.** The
+visualisation payload carries the image *by value* but the node *by reference*, and
+the visualisation thread deliberately runs slower than the analysis
+(`visualise_delay` plus `visualisation_config.fps`) -- so `run()` normally processes
+several more frames, overwriting the node's attributes in place, between a frame
+being queued for display and being drawn. The overlay then showed frame N's image
+with frame N+k's results, which is what put pSMLM's localizations on a frame they
+did not come from. The queued payload now carries that frame's
+`state_snapshot` as a 7th element, and
+`AnalysisThread_customFunction_Visualisation._visualise_paired` applies it around
+the `visualise()` call. Three things to know:
+- **The previous values are restored afterwards.** For an in-process node this is
+  the *live* instance `run()` is still using, so a node that accumulates in `run()`
+  (a counter, a running total) would otherwise be rewound and lose whatever
+  happened while the frame sat in the queue. Restored in a `finally`, and a key the
+  node did not have is removed rather than left behind.
+- **A node that declares no `__snapshot_attrs__` keeps the old, unpaired
+  behaviour** -- there is nothing to pair with. Declaring them is what buys
+  frame-consistent overlays, which is now a third reason to (after subprocess
+  isolation and scrub-replay).
+- The subprocess path gets this for free (it already had `state_snapshot` in hand);
+  the in-process path builds one per frame and shares it with the replay store.
+Tests: `tests/test_rt_visualisation_frame_pairing.py`.
+
+**Points layers must not change length per frame.** napari 0.7 slices
+asynchronously and Glados sets `NAPARI_ASYNC=1`, so a slice response computed for
+one point list can arrive after a different one has been assigned; napari then
+indexes the new `shown` array with the old response's indices and raises
+`IndexError: index N is out of bounds for axis 0 with size N` from
+`Points._update_slice_response`/`_view_data`, on its own thread where it cannot be
+caught. `pSMLM_live._push_points` is the pattern: a **fixed-capacity buffer** with
+`shown` masking the unused rows, so a stale index is always in range however late
+the response is. The buffer only ever grows (shrinking reintroduces the same length
+change; the memory is two floats per slot), grows geometrically, and parks surplus
+rows on the first real localization so a response that briefly renders them
+unmasked shows nothing stray. Reducing the *number* of layer-property assignments
+per frame (style once, assign `data` last) makes it rarer but does **not** remove
+the trigger -- only the constant length does. `pSMLM.py` still has the old pattern;
+see `claude_issues_and_features.md`.
+
 **RT results are retained and replayed while scrubbing a finished acquisition.**
 Dragging napari's time/z slider used to move the image but leave every RT overlay
 frozen on the last analysed frame. `GUI/rt_history.py` (the store, Qt-free) and
