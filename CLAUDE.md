@@ -226,6 +226,31 @@ is the standalone plan that enforces them — but new code must follow them.
 
 **Backend choice and throughput:** `PYCROMANAGER_JAVA` crosses a Java↔Python bridge (Py4J/PyJavaZ) for every call and every live-mode frame reaching `image_process_fn` — documented by Pycromanager as capped around ~100 MB/s, and this codebase independently measured ~257ms for an uncached Java-bridge round trip (see the `get_exposure`/`get_pixel_size_um` caching in `microscopeInterfaceLayer.py`). `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` both bind straight to MMCore (no Java/bridge hop) and are the faster choice when live frame rate matters most; prefer `PYCROMANAGER_JAVA` only when a feature specifically requires the Java Micro-Manager engine. Note `max_memory_mb` (headless-server memory cap) is not settable on `MMCORE_PLUS` — only `buffer_mb` (circular buffer footprint) applies there; `GUI_napari.py` logs a warning when this backend is selected.
 
+**`MMCORE_PLUS` MDA runs register a resilient `MDAEngine` (`GUI_napari.py`'s
+`register_resilient_mmcore_mda_engine`, called right after both
+`CMMCorePlus(...)` construction sites).** pymmcore-plus's default
+`MDAEngine.timeout_action` is `"raise"`: for a hardware-sequenced (buffered,
+triggered) camera burst — one per z-step whenever `time_plan.interval == 0`
+groups several events together — a burst that delivers zero frames within
+`timeout_first_frame` (default 20s) raises `TimeoutError` out of the runner
+thread and **aborts the entire MDA on the spot**, discarding every event still
+to come even though everything acquired so far saved fine. A burst that drops
+only *some* of its expected frames is already non-fatal on its own (logged as
+"Unexpected number of images returned from sequence... Expected N, got M");
+it's a *complete* stall on one event that used to be fatal. The registered
+engine sets `timeout_action="warn"` (log and move on to the next event, same
+missing-frame handling as a partial-count burst) and raises
+`timeout_first_frame` from 20s to 60s, since a busy serial/USB bus (many
+devices in this rig are driven by round-trip serial commands, see the T-B4
+laser-controls note above) can plausibly delay a stage move + trigger past
+20s without the acquisition actually being stuck. This is a resilience
+stopgap for underlying camera/driver frame drops during hardware-sequenced
+bursts, not a fix for whatever is dropping the frames in the first place —
+if bursts are dropping frames frequently, also check the circular buffer size
+(`buffer_mb`) and consider testing with `use_hardware_sequencing=False` on
+the `MDAEngine` to see whether the sequenced (vs. one-shot-per-frame)
+acquisition path is itself implicated.
+
 MIL also exposes the **circular-buffer / continuous-sequence primitives** (T-C1):
 `start_continuous_sequence_acquisition(interval_ms=0)`, `is_sequence_running()`,
 `get_remaining_image_count()`, `pop_next_image_and_metadata()`,

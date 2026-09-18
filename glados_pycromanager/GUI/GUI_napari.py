@@ -55,6 +55,42 @@ from glados_pycromanager.GUI.utils import *
 
 #endregion
 
+#: Default pymmcore-plus MDAEngine.timeout_action is "raise": if a sequenced
+#: (hardware-triggered burst) camera acquisition delivers *zero* frames within
+#: timeout_first_frame, the runner thread raises TimeoutError and the whole
+#: MDA aborts on the spot -- every event still to come (remaining z-steps,
+#: time points, positions) is silently lost, even though the frames already
+#: acquired were saved fine. A camera/driver hiccup partway through a long
+#: acquisition (a burst that drops 1-2 frames without erroring is already
+#: tolerated -- see "Unexpected number of images returned from sequence" in
+#: _engine.py -- it's a *complete* stall on one event that is fatal) then
+#: takes down the entire run instead of costing one missing frame. Registering
+#: a custom MDAEngine with timeout_action="warn" makes a stalled event
+#: non-fatal: pymmcore-plus logs a warning, yields None for the missing
+#: frame(s), and the runner moves on to the next event. MMCORE_MDA_TIMEOUT_FIRST_FRAME_S
+#: is also raised from the library default (20s) since a busy serial/USB bus
+#: (many devices are driven by round-trip serial commands in this rig) can
+#: plausibly delay a stage move + trigger past 20s without the acquisition
+#: actually being stuck.
+MMCORE_MDA_TIMEOUT_BASE_S = 5.0
+MMCORE_MDA_TIMEOUT_MULTIPLIER = 5.0
+MMCORE_MDA_TIMEOUT_FIRST_FRAME_S = 60.0
+
+
+def register_resilient_mmcore_mda_engine(core):
+    """Register an MDAEngine on `core` that survives a stalled/dropped-frame
+    sequenced acquisition instead of aborting the whole MDA. See the module-level
+    comment above the MMCORE_MDA_TIMEOUT_* constants for why this exists."""
+    from pymmcore_plus.mda import MDAEngine
+    core.register_mda_engine(MDAEngine(
+        core,
+        timeout_action='warn',
+        timeout_base=MMCORE_MDA_TIMEOUT_BASE_S,
+        timeout_multiplier=MMCORE_MDA_TIMEOUT_MULTIPLIER,
+        timeout_first_frame=MMCORE_MDA_TIMEOUT_FIRST_FRAME_S,
+    ))
+
+
 def perform_post_closing_actions(shared_data:Shared_data):
     """Performing closing actions
 
@@ -408,6 +444,7 @@ def main():
             shared_data.MILcore.set_core(CMMCorePlus(mm_path=mm_cfg.path))
             shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
             shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
+            register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core())
             # Max memory MB is not settable in PyMMCorePlus; only buffer_mb (the
             # circular buffer footprint) applies to this backend. Warn instead of
             # silently no-op'ing the setting, since an unbounded acquisition could
@@ -467,6 +504,7 @@ def main():
                 shared_data.MILcore.set_core(CMMCorePlus(mm_path=headlessGUIv.mm_app_path))
                 shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
                 shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
+                register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core())
                 #Max memory MB is not settable in PyMMCorePlus, so we don't set it
                 logging.warning('max_memory_mb (%s MB) has no effect on the MMCORE_PLUS backend; '
                                  'only buffer_mb (%s MB, circular buffer) is applied.',

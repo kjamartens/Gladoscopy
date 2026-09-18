@@ -2092,8 +2092,8 @@ class napariHandler:
                         #and finish the archive before anything reports or reads it.
                         self._finish_ndtiff_store()
                         self.shared_data.MILcore.core.mda.events.sequenceStarted.disconnect(connected_callback_startedAcq)
-                        # self.shared_data.MILcore.core.mda.events.sequenceFinished.disconnect(connected_callback_finishedAcq)
-                        # self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
+                        self.shared_data.MILcore.core.mda.events.sequenceFinished.disconnect(connected_callback_finishedAcq)
+                        self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
                         logging.info("Finished MDA!")
                     else: #Pycromanager backend, either JAVA or Python
                         if shared_data.config.mda_config.backend_method == 'saved':
