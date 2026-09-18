@@ -903,7 +903,10 @@ class MDAGlados(CustomMainWindow):
         if self.z_step_distance is not None:
             self.z_stepdistance_entry.setText(str(self.z_step_distance))
         self.z_stepdistance_entry.setValidator(QDoubleValidator())
-        
+        #Labels showing the value the other field would compute to, kept live-updated (see _updateZStepLabels)
+        self.z_nrsteps_computedLabel = QLabel("")
+        self.z_stepdistance_computedLabel = QLabel("")
+
         #Add all widgets to layout
         zLayout.addWidget(self.z_oneDstageDropdownLabel,0,0)
         zLayout.addWidget(self.z_oneDstageDropdown,0,1)
@@ -915,8 +918,10 @@ class MDAGlados(CustomMainWindow):
         zLayout.addWidget(self.z_endSetButton,2,2)
         zLayout.addWidget(self.z_nrsteps_radio,3,0)
         zLayout.addWidget(self.z_nrsteps_entry,3,1)
+        zLayout.addWidget(self.z_nrsteps_computedLabel,3,2)
         zLayout.addWidget(self.z_stepdistance_radio,4,0)
         zLayout.addWidget(self.z_stepdistance_entry,4,1)
+        zLayout.addWidget(self.z_stepdistance_computedLabel,4,2)
         #Add a spacer at the bottom:
         zLayout.addItem(QSpacerItem(1, 2, QSizePolicy.Minimum, QSizePolicy.Expanding),5,0,1,2)
         
@@ -932,6 +937,12 @@ class MDAGlados(CustomMainWindow):
         self.z_nrsteps_entry.editingFinished.connect(self.flushMDAEventsUpdate)
         self.z_stepdistance_entry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.z_stepdistance_entry.editingFinished.connect(self.flushMDAEventsUpdate)
+        #Keep the computed-value labels live: any field feeding the computation triggers a refresh
+        self.z_startEntry.textChanged.connect(self._updateZStepLabels)
+        self.z_endEntry.textChanged.connect(self._updateZStepLabels)
+        self.z_nrsteps_entry.textChanged.connect(self._updateZStepLabels)
+        self.z_stepdistance_entry.textChanged.connect(self._updateZStepLabels)
+        self._updateZStepLabels()
 
         # --- Ordering widget ---
         #Note: only used in updateGUIwidgets
@@ -2072,6 +2083,42 @@ class MDAGlados(CustomMainWindow):
         zstagePos = round(float(self.core.get_position(zstage)),2)
         self.z_endEntry.setText(str(zstagePos))
         
+    def _updateZStepLabels(self):
+        """
+        Refresh the labels next to the z nr-of-steps/step-distance entries
+        with the value the *other* field would compute to, so the user can
+        see e.g. how many steps a given step distance takes without having to
+        switch the radio button. Mirrors the formulas in get_MDA_events_from_GUI.
+        """
+        try:
+            z_start = float(self.z_startEntry.text()) if self.z_startEntry.text() != '' else None
+            z_end = float(self.z_endEntry.text()) if self.z_endEntry.text() != '' else None
+        except ValueError:
+            z_start = None
+            z_end = None
+
+        #Step distance implied by the entered number of steps
+        self.z_nrsteps_computedLabel.setText("")
+        if z_start is not None and z_end is not None and self.z_nrsteps_entry.text() != '':
+            try:
+                nr_steps = int(self.z_nrsteps_entry.text())
+                if nr_steps > 0:
+                    step_distance = abs(z_end - z_start) / nr_steps
+                    self.z_nrsteps_computedLabel.setText(f"({step_distance:.4g} /step)")
+            except (ValueError, ZeroDivisionError):
+                pass
+
+        #Number of steps implied by the entered step distance
+        self.z_stepdistance_computedLabel.setText("")
+        if z_start is not None and z_end is not None and self.z_stepdistance_entry.text() != '':
+            try:
+                step_distance = float(self.z_stepdistance_entry.text())
+                if step_distance != 0:
+                    nr_steps = abs(z_end - z_start) / abs(step_distance)
+                    self.z_stepdistance_computedLabel.setText(f"({nr_steps:.3g} steps)")
+            except (ValueError, ZeroDivisionError):
+                pass
+
     def setMDAparams(self,mdaparams):
         """
         Set the MDA parameters.
