@@ -3774,3 +3774,65 @@ already receives the analysed frame as its `image` argument.
 `glados_pycromanager/GUI/AnalysisClass.py`, `glados_pycromanager/GUI/napariGlados.py`,
 `glados_pycromanager/GUI/MMcontrols.py`, `glados_pycromanager/GUI/utils.py`,
 `glados_pycromanager/GUI/sharedFunctions.py`, the eight shipped RT node files, `CLAUDE.md`.
+
+## 2026-09-18 — Both hand-offs to the GUI thread get a one-deep slot; the rate limit alone was making it worse  [display-backpressure]
+
+**Context.** Reported against `DemoSMLM.cfg` at ~25-35 ms frames with `pSMLM live + SR`
+active: the overlay drifts progressively further behind the live image, and after roughly
+ten seconds the whole visualisation collapses to ~10 fps. The user's logs rule out the
+acquisition and storage layers outright -- `Frame ring handed over 500 frames, none
+dropped`, `ZarrFrameWriter: 500/500 frames written ... 0.00s spent under backpressure`, at
+~30 fps sustained.
+
+**Diagnosis.** Neither producer checked whether the GUI thread had drawn the previous
+payload, and both reach it through *queued* Qt connections:
+
+- the display worker `yield`s (`run_napariVisualisation_worker`), and
+- each RT node's overlay thread emits `_do_visualise`, then sleeps a fixed `sleepTimeMs`
+  whether or not anything was drawn.
+
+The existing display gate does not merely fail to help, it **compounds the problem**.
+`_should_display_now` decides on `now - shared_data.last_display_update_time`, and that
+stamp is written only at the *end* of a completed GUI update -- so it measures starvation,
+not backlog. Once the GUI thread falls behind, `elapsed` only grows, so the gate passes
+every single time, and payloads pile up in Qt's event queue without bound. That is exactly
+the reported shape: in sync at first, then monotonically increasing lag, then a collapse to
+whatever rate the GUI can actually sustain. The user confirmed the deviation is **temporal**
+(the overlay lagging), not spatial, which is what this explains.
+
+**Decision.** Add a one-deep slot to each hand-off -- `shared_data.displayUpdateInFlight`
+plus `napariGlados._claim_display_slot`/`_release_display_slot`, and
+`AnalysisThread_customFunction_Visualisation._claim_visualise_slot` with release in
+`_visualise_on_main_thread`.
+
+- **A refused producer drops its frame rather than holding it.** Holding one would move the
+  queue somewhere else and keep the latency the slot exists to bound; the next frame along
+  is fresher and worth more. Overload must degrade into honest frame-dropping.
+- **`_should_display_now` is left alone.** It is a correct *rate* limit; what was missing
+  was a *depth* limit. With one in place `last_display_update_time` can no longer run away,
+  so the existing gate behaves sanely again.
+- **Both slots are watchdogged** (`DISPLAY_INFLIGHT_TIMEOUT_S` /
+  `RT_VISUALISE_INFLIGHT_TIMEOUT_S`, 5 s, warned once). A payload that never arrives -- a
+  GUI-side crash, a teardown racing the emit -- would otherwise freeze that display for the
+  rest of the session. Deliberately generous: it is a safety net, not a rate control.
+- **Release is unconditional.** `napariUpdateLive`'s *entire* body is now wrapped, because
+  it has four early returns (`_should_display_now`, `liveModeUpdateOngoing`, `image is
+  None`, `acqState False`) and missing any one of them wedges the display. The overlay slot
+  is released in a `finally` in `_visualise_on_main_thread` for the same reason, and in
+  `stop()` so a node restart cannot inherit a claimed slot.
+- The display worker's teardown releases the slot before its drain/finalisation yields, so
+  an acquisition that is already over cannot refuse its own last frames.
+
+**Rejected:** deepening the queues (moves the backlog, does not bound it); making the
+producers block on the GUI thread (inverts the dependency and can deadlock against the Qt
+event loop); throttling the producers harder (guesswork, and wrong whenever the GUI is
+fast).
+
+**Verification:** `tests/test_display_backpressure.py` (8), including a simulation of the
+reported configuration -- frames arriving three times faster than the GUI draws them --
+asserting the outstanding-payload count never exceeds one while still making progress. Full
+`pytest -m "not slow"` green at 1187.
+
+**Affects:** `glados_pycromanager/GUI/napariGlados.py`,
+`glados_pycromanager/GUI/AnalysisClass.py`, `glados_pycromanager/GUI/sharedFunctions.py`,
+`tests/test_display_backpressure.py` (new), `CLAUDE.md`.

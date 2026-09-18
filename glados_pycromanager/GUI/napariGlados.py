@@ -576,6 +576,46 @@ def _apply_pixel_scale(layer, shared_data) -> None:
         layer.scale = [1, 1]
 
 
+#: How long a display payload may sit unacknowledged by the GUI thread before the
+#: single hand-off slot is force-released. `napariUpdateLive` always releases the
+#: slot in a `finally`, so this is only reached if a yielded signal never arrives
+#: at all -- a worker torn down mid-flight, or a GUI-side crash. Without it, one
+#: lost signal would freeze the display for the rest of the session.
+DISPLAY_INFLIGHT_TIMEOUT_S = 5.0
+
+
+def _claim_display_slot(shared_data):
+    """Reserve the one display hand-off slot, or refuse it.
+
+    This is the *depth* limit on the display path. `_should_display_now` is the
+    *rate* limit, and on its own it is not enough: it only measures how long ago
+    the GUI thread last finished a frame, so once the GUI thread falls behind,
+    `elapsed` grows and the gate passes every single time. Both hand-offs to the
+    GUI thread are queued Qt connections, so payloads then accumulate in the
+    event loop and the displayed frame drifts further and further behind the
+    camera -- unboundedly, because nothing in the loop ever catches up.
+
+    A caller that is refused must **drop** its frame, not hold it: holding one
+    just moves the queue somewhere else and keeps the latency this exists to
+    bound. Dropping the stale frame and letting the next fresh one through is
+    what turns overload into honest frame-dropping.
+    """
+    pending = getattr(shared_data, 'displayUpdateInFlight', None)
+    if pending is not None:
+        if time.monotonic() - pending < DISPLAY_INFLIGHT_TIMEOUT_S:
+            return False
+        logging.warning(
+            'Display update was never acknowledged by the GUI thread within %ss; '
+            'releasing the hand-off slot', DISPLAY_INFLIGHT_TIMEOUT_S)
+    shared_data.displayUpdateInFlight = time.monotonic()
+    return True
+
+
+def _release_display_slot(shared_data):
+    """Release the hand-off slot. Safe to call when nothing is outstanding."""
+    shared_data.displayUpdateInFlight = None
+
+
 def _should_display_now(shared_data, now=None):
     """Rate-limit decision for the live/MDA display path.
 
@@ -623,44 +663,51 @@ def napariUpdateLive(DataStructure):
 
     Basically the core visualisation method
     """
-    if not getattr(shared_data, '_napariUpdateLive_first_call_logged', False):
-        logging.info('napariUpdateLive: first yielded call received (layer=%s)', DataStructure.get('layer_name'))
-        shared_data._napariUpdateLive_first_call_logged = True
-
-    # Second line of defence: the visualisation worker already applied this same
-    # gate before marshalling the payload across the thread boundary, but a frame
-    # may still have been in flight when the gate closed.
-    if not _should_display_now(shared_data):
-        return
-
-    #shared_data.debugImageDisplayTimes.append(time.time())
-    napariViewer = DataStructure['napariViewer']
-    acqstate = DataStructure['acqState']
-    core = DataStructure['core']
-    image_queue_analysisA = DataStructure['image_queue_analysis']
-    analysisThreads = DataStructure['analysisThreads']
-    layerName = DataStructure['layer_name']
-    
-    
-    # Check if the update is in progress
-    if shared_data.liveModeUpdateOngoing:
-        return
-    
-    shared_data.liveModeUpdateOngoing = True
+    # The whole body is wrapped so the hand-off slot claimed by the producer in
+    # _claim_display_slot is released on *every* path out of here -- including
+    # the early returns below. Miss one and the producer is refused forever and
+    # the display freezes (until the DISPLAY_INFLIGHT_TIMEOUT_S watchdog).
     try:
-        _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_queue_analysisA, analysisThreads, layerName)
-    except Exception:
-        # napariUpdateLive runs as a napari thread_worker 'yielded' slot; an
-        # uncaught exception here goes to Qt's default exception hook (stderr),
-        # NOT this app's log file, so it's invisible in a windowed GUI session.
-        # Log it explicitly so a silently-failing frame update is diagnosable.
-        logging.exception('napariUpdateLive: display update failed (frame dropped)')
+        if not getattr(shared_data, '_napariUpdateLive_first_call_logged', False):
+            logging.info('napariUpdateLive: first yielded call received (layer=%s)', DataStructure.get('layer_name'))
+            shared_data._napariUpdateLive_first_call_logged = True
+
+        # Second line of defence: the visualisation worker already applied this same
+        # gate before marshalling the payload across the thread boundary, but a frame
+        # may still have been in flight when the gate closed.
+        if not _should_display_now(shared_data):
+            return
+
+        #shared_data.debugImageDisplayTimes.append(time.time())
+        napariViewer = DataStructure['napariViewer']
+        acqstate = DataStructure['acqState']
+        core = DataStructure['core']
+        image_queue_analysisA = DataStructure['image_queue_analysis']
+        analysisThreads = DataStructure['analysisThreads']
+        layerName = DataStructure['layer_name']
+
+
+        # Check if the update is in progress
+        if shared_data.liveModeUpdateOngoing:
+            return
+
+        shared_data.liveModeUpdateOngoing = True
+        try:
+            _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_queue_analysisA, analysisThreads, layerName)
+        except Exception:
+            # napariUpdateLive runs as a napari thread_worker 'yielded' slot; an
+            # uncaught exception here goes to Qt's default exception hook (stderr),
+            # NOT this app's log file, so it's invisible in a windowed GUI session.
+            # Log it explicitly so a silently-failing frame update is diagnosable.
+            logging.exception('napariUpdateLive: display update failed (frame dropped)')
+        finally:
+            # Must always release the guard, even on early returns/exceptions above —
+            # otherwise a single failed frame permanently freezes the live layer for
+            # the rest of the session (every later call bails out at the
+            # liveModeUpdateOngoing check above).
+            shared_data.liveModeUpdateOngoing = False
     finally:
-        # Must always release the guard, even on early returns/exceptions above —
-        # otherwise a single failed frame permanently freezes the live layer for
-        # the rest of the session (every later call bails out at the
-        # liveModeUpdateOngoing check above).
-        shared_data.liveModeUpdateOngoing = False
+        _release_display_slot(shared_data)
 
 
 def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_queue_analysisA, analysisThreads, layerName):
@@ -2005,6 +2052,13 @@ class napariHandler:
                     # same gate.
                     if not _should_display_now(self.shared_data):
                         continue
+                    # Depth limit on top of the rate limit above. If the GUI
+                    # thread has not drawn the previous payload yet, drop this
+                    # frame rather than stacking another queued signal behind
+                    # it -- see _claim_display_slot for why holding it instead
+                    # would not help.
+                    if not _claim_display_slot(self.shared_data):
+                        continue
                     DataStructure = dict(base_payload)
                     DataStructure['data'] = frame
                     DataStructure['acqState'] = self.acqstate
@@ -2015,6 +2069,10 @@ class napariHandler:
             # It runs whether the loop finishes naturally or is aborted
             logging.info("Visualization worker: Performing final cleanup")
             visualisation_queue.clear()
+            # A payload may still have been in flight when the loop exited; the
+            # drain and finalisation yields below must not be refused by a slot
+            # left claimed by an acquisition that is already over.
+            _release_display_slot(self.shared_data)
             
         # read out last remaining element(s) after end of acquisition
         while visualisation_queue:

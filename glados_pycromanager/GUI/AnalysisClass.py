@@ -333,6 +333,11 @@ RT_THREAD_WAIT_TIMEOUT_S = 1.0
 #: logging that it did not. Runs on the GUI thread, so it is deliberately short.
 RT_THREAD_JOIN_TIMEOUT_MS = 1000
 
+#: How long an RT-analysis overlay payload may sit unacknowledged by the GUI
+#: thread before the hand-off slot is force-released. See
+#: AnalysisThread_customFunction_Visualisation._claim_visualise_slot.
+RT_VISUALISE_INFLIGHT_TIMEOUT_S = 5.0
+
 
 class AnalysisThread_customFunction_Visualisation(QThread):
     finished = pyqtSignal()
@@ -359,19 +364,48 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         
         self.running = True
         self._new_image = Event()
+        #Depth limit for the hand-off to the GUI thread. _do_visualise is a
+        #queued connection and the loop below sleeps a fixed sleepTimeMs after
+        #emitting, whether or not the GUI thread ever drew the last payload --
+        #so an overlay slower than the analysis used to stack up in Qt's event
+        #queue and drift unboundedly behind the acquisition. None = idle;
+        #otherwise the monotonic timestamp of the unacknowledged payload.
+        self._visualise_in_flight = None
         self._do_visualise.connect(self._visualise_on_main_thread)
     
     def new_image(self):
         self._new_image.set()
 
+    def _claim_visualise_slot(self):
+        """Reserve the single hand-off slot to the GUI thread, or refuse it.
+
+        The watchdog exists because a payload that never reaches
+        `_visualise_on_main_thread` -- a GUI-side crash, or a teardown that
+        races the emit -- would otherwise silence this node's overlay for the
+        rest of the session.
+        """
+        pending = self._visualise_in_flight
+        if pending is not None:
+            if time.monotonic() - pending < RT_VISUALISE_INFLIGHT_TIMEOUT_S:
+                return False
+            logging.warning('RT-analysis overlay was never drawn by the GUI thread '
+                            'within %ss; releasing the hand-off slot',
+                            RT_VISUALISE_INFLIGHT_TIMEOUT_S)
+        self._visualise_in_flight = time.monotonic()
+        return True
+
     def _visualise_on_main_thread(self, data):
         """Slot executed on the main (GUI) thread via Qt queued connection."""
-        RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data[:6]
-        #The state the node was in when this frame finished being analysed. See
-        #_visualise_paired for why the node's *current* state is not good enough.
-        state_snapshot = data[6] if len(data) > 6 else None
-        self._visualise_paired(RT_analysis_object, analysisInfo, image, metadata,
-                               core, state_snapshot)
+        try:
+            RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data[:6]
+            #The state the node was in when this frame finished being analysed. See
+            #_visualise_paired for why the node's *current* state is not good enough.
+            state_snapshot = data[6] if len(data) > 6 else None
+            self._visualise_paired(RT_analysis_object, analysisInfo, image, metadata,
+                                   core, state_snapshot)
+        finally:
+            #Always, so one failed overlay cannot wedge the hand-off.
+            self._visualise_in_flight = None
 
     def _visualise_paired(self, RT_analysis_object, analysisInfo, image, metadata,
                           core, state_snapshot):
@@ -424,6 +458,12 @@ class AnalysisThread_customFunction_Visualisation(QThread):
                 if not self.visualisation_queue:
                     continue
                 data = self.visualisation_queue.popleft()
+                #Drop this frame if the GUI thread has not finished drawing the
+                #previous one. Holding it instead would only move the backlog;
+                #the next frame along is fresher and worth more.
+                if not self._claim_visualise_slot():
+                    self.msleep(max(1, self.sleepTimeMs))
+                    continue
                 # Emit to main thread so napari layer ops run on GUI thread (not here).
                 self._do_visualise.emit(data)
                 self.msleep(max(1,self.sleepTimeMs))
@@ -435,6 +475,9 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         notice at its next timeout (and, before T-G9, never)."""
         self.running = False
         self.is_running = False
+        #A payload emitted just before the stop may never be drawn; do not leave
+        #the slot claimed for a restart of this node to inherit.
+        self._visualise_in_flight = None
         self._new_image.set()
 
     def destroy(self):

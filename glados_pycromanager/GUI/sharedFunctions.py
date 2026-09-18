@@ -361,6 +361,15 @@ class Shared_data(QObject):
         self.backend='JAVA' #JAVA or Python, if running headlessly
         self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.
         self.last_display_update_time = 0
+        # Depth limit for the display hand-off, the counterpart to the *rate*
+        # limit `last_display_update_time` drives in napariGlados.
+        # `_should_display_now` measures how long ago the GUI thread last
+        # *finished* a frame, so it opens wider the further behind the GUI
+        # falls -- which is backwards, and let the yielded-payload Qt event
+        # queue grow without bound. This holds the monotonic timestamp of the
+        # payload the GUI thread has not acknowledged yet, or None when it is
+        # idle. See napariGlados._claim_display_slot.
+        self.displayUpdateInFlight = None
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
         self.liveModeUpdateOngoing = False

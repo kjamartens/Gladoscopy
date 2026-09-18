@@ -592,6 +592,25 @@ acquisition, just materialised.
     needed no change — `_napariUpdateLive_locked` already routes any `'Live'`-named frame
     to its `frameByFrame` branch regardless of `vis_method`.
     Tests: `tests/test_live_sequence_worker.py`.
+  - **Every hand-off to the GUI thread is one deep (display backpressure).** The display
+    worker's `yield` and each RT node's `_do_visualise` emit are both *queued* Qt
+    connections, and neither used to check whether the GUI thread had drawn the previous
+    payload — so payloads accumulated in Qt's event queue and the display drifted
+    unboundedly behind the camera. Note `_should_display_now` does **not** prevent this and
+    actively makes it worse: it decides on `now - shared_data.last_display_update_time`,
+    stamped only at the *end* of a completed GUI update, so it measures starvation rather
+    than backlog and opens wider the further behind the GUI falls. It is the *rate* limit;
+    the *depth* limit is `shared_data.displayUpdateInFlight` via
+    `napariGlados._claim_display_slot()` / `_release_display_slot()`, and
+    `AnalysisThread_customFunction_Visualisation._claim_visualise_slot()` for the overlay
+    path. **A producer refused a slot must drop its frame, never hold it** — holding just
+    relocates the backlog. Both slots are watchdogged (`DISPLAY_INFLIGHT_TIMEOUT_S` /
+    `RT_VISUALISE_INFLIGHT_TIMEOUT_S`, 5 s) because a payload that never arrives would
+    otherwise freeze that display for the session, and both are released *unconditionally* —
+    `napariUpdateLive` wraps its whole body because it has four early returns, and missing
+    any one of them wedges the display. Any **new** path that marshals frames to the GUI
+    thread must claim and release a slot the same way. Tests:
+    `tests/test_display_backpressure.py`.
   - **Live/MDA stop→start race guard:** `napariHandler_liveMode`/`napariHandler_mdaMode` are constructed once per session and reused for every toggle, so rapid Live/MDA on-off-on toggling could previously start a new `run_MILCoreAcquisition_worker` (QThreadPool job) while the old one was still tearing down the same `core.mda`/`Acquisition` object (`stop_sequence_acquisition()` is fire-and-forget) — two threads driving the same native MMCore/Java engine concurrently, causing native access violations under stress testing. `napariHandler` now has `_acq_transition_lock` (an `RLock`, since the worker's own cleanup re-enters `acqModeChanged` from its own thread) and `_worker_stopped_event`: `acqModeChanged`'s ON path waits (`ACQ_STOP_TIMEOUT_S`, default 10s) for the previous worker to fully exit before starting a new one, refusing to start (and reverting the mode flag) rather than racing if the timeout is hit.
   - **Frame ring (MMCORE_PLUS `frameReady` path):** `grab_image_liveVis_PyMMCore` is connected with `Qt.DirectConnection`, so it runs synchronously on pymmcore-plus' own MDA thread — everything it does happens in front of the next camera frame. It is therefore a pure hand-off: `frame_ring.push(image, metadata)` and return. `GUI/frame_ring.py`'s `FrameRing` is a bounded, overwrite-oldest, stdlib-only buffer (drop-counting, with an `Event` the consumer waits on); `napariHandler._frame_ring_consumer_loop` (a plain daemon `Thread`, started just before the `frameReady` connect and stopped just after the disconnect, plus an idempotent stop in the acquisition worker's outer `finally`) does the real per-frame work: `metadata_refactor`, the multiDstack zarr write, and `put_data_in_visualisation_and_analysis_queues`. Two capacities: `FRAME_RING_CAPACITY_DISPLAY` (4) for live, since display and RT analysis drop frames at their own gate anyway, and `FRAME_RING_CAPACITY_STORAGE` (256) for multiDstack MDA, where a dropped frame is a permanently black slice with no NDTiff store to backfill from. The per-acquisition drop tally is logged at teardown (WARNING if non-zero). The pycromanager `image_process_fn` / `image_saved_fn` paths do **not** use the ring — `image_process_fn` must return `(image, metadata)` synchronously for pycromanager to store the frame.
 - `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `Showcase_Basic1.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
