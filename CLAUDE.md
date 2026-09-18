@@ -243,13 +243,43 @@ missing-frame handling as a partial-count burst) and raises
 `timeout_first_frame` from 20s to 60s, since a busy serial/USB bus (many
 devices in this rig are driven by round-trip serial commands, see the T-B4
 laser-controls note above) can plausibly delay a stage move + trigger past
-20s without the acquisition actually being stuck. This is a resilience
-stopgap for underlying camera/driver frame drops during hardware-sequenced
-bursts, not a fix for whatever is dropping the frames in the first place —
-if bursts are dropping frames frequently, also check the circular buffer size
-(`buffer_mb`) and consider testing with `use_hardware_sequencing=False` on
-the `MDAEngine` to see whether the sequenced (vs. one-shot-per-frame)
-acquisition path is itself implicated.
+20s without the acquisition actually being stuck. This alone is a resilience
+stopgap, not a fix — it stops one stalled event from killing the whole run,
+but does not stop frames from being dropped in the first place.
+
+**Root cause identified for the z-step case: a free-running external trigger
+generator racing the camera's per-burst re-arm.** `setup_event()` calls
+`core.waitForSystem()` *before* the camera is armed for the next sequenced
+burst — so between one z-step's burst ending and the next one's
+`startSequenceAcquisition()` call, the camera is completely deaf while the Z
+stage moves and settles. A trigger generator with a fixed cadence and no
+awareness of camera-armed state keeps firing through that gap regardless, and
+any pulse landing in it is lost forever (not delayed, not buffered) — one gap
+per z-step, so an N-z-step MDA has N chances to fall out of sync, which is
+exactly why a pure time-series (no z, one continuous burst, one arm, zero
+gaps) worked perfectly on the same rig while a z-stack did not.
+`MDAConfig.mmcore_wait_for_z_settle` (hidden, default `'False'`) is the fix
+for this specific case: when not `'True'`,
+`register_resilient_mmcore_mda_engine` registers
+`_build_z_settle_skipping_mda_engine_class()`'s `ZSettleSkippingMDAEngine`
+instead of the stock engine, which overrides `setup_event()` to still issue
+the Z move (`setup_sequenced_event`/`setup_single_event`) but skip the
+trailing `waitForSystem()` for a `SequencedEvent` — the camera is armed
+immediately after the move command is issued rather than after the stage
+physically settles, closing the deaf window down to the dispatch latency of
+issuing the arm call. Non-sequenced (single) events are unaffected and still
+wait normally. Trade-off: the leading frame(s) of a burst may be captured
+while Z is still in motion (accepted, since a slightly-blurred frame beats a
+missing one or an aborted acquisition). Set `mmcore_wait_for_z_settle` to
+`'True'` to restore pymmcore-plus' default wait-then-arm behaviour if
+positional accuracy ever matters more than trigger sync for a given setup.
+If frames still drop with this off, also check the circular buffer size
+(`buffer_mb`) and consider testing `use_hardware_sequencing=False` on the
+`MDAEngine` to see whether the sequenced (vs. one-shot-per-frame) acquisition
+path is itself implicated, or whether the trigger generator can be gated by
+the camera/stage's own ready signal instead (the only way to get zero lost
+pulses, since no software change can make a truly unsynchronized generator
+wait).
 
 MIL also exposes the **circular-buffer / continuous-sequence primitives** (T-C1):
 `start_continuous_sequence_acquisition(interval_ms=0)`, `is_sequence_running()`,

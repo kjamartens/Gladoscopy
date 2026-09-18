@@ -77,12 +77,48 @@ MMCORE_MDA_TIMEOUT_MULTIPLIER = 5.0
 MMCORE_MDA_TIMEOUT_FIRST_FRAME_S = 60.0
 
 
-def register_resilient_mmcore_mda_engine(core):
+def _build_z_settle_skipping_mda_engine_class():
+    """Return an MDAEngine subclass that arms the camera for a sequenced
+    (hardware-triggered) burst immediately after issuing the Z move command,
+    instead of blocking on `core.waitForSystem()` until the stage reports
+    settled first. See MDAConfig.mmcore_wait_for_z_settle for why: with a
+    free-running external trigger generator that has no idea the camera isn't
+    armed yet, every settle-wait is a window where pulses are silently lost.
+    Built lazily (only called once or twice per session) so pymmcore_plus is
+    never imported for the pycromanager backends."""
+    from pymmcore_plus.core._sequencing import SequencedEvent
+    from pymmcore_plus.mda import MDAEngine
+
+    class ZSettleSkippingMDAEngine(MDAEngine):
+        def setup_event(self, event):
+            if isinstance(event, SequencedEvent):
+                self.setup_sequenced_event(event)
+                # Deliberately no waitForSystem() here -- see the docstring
+                # above. The leading frame(s) of this burst may be captured
+                # while Z is still in motion; that is the accepted trade-off.
+            else:
+                self.setup_single_event(event)
+                self.mmcore.waitForSystem()
+
+    return ZSettleSkippingMDAEngine
+
+
+def register_resilient_mmcore_mda_engine(core, shared_data=None):
     """Register an MDAEngine on `core` that survives a stalled/dropped-frame
     sequenced acquisition instead of aborting the whole MDA. See the module-level
-    comment above the MMCORE_MDA_TIMEOUT_* constants for why this exists."""
+    comment above the MMCORE_MDA_TIMEOUT_* constants for why this exists.
+
+    If `shared_data` is given and its `mda_config.mmcore_wait_for_z_settle` is
+    not 'True' (the default), the registered engine also skips waiting for the
+    Z stage to settle before arming the camera for the next sequenced burst --
+    see `_build_z_settle_skipping_mda_engine_class`."""
     from pymmcore_plus.mda import MDAEngine
-    core.register_mda_engine(MDAEngine(
+    wait_for_z_settle = True
+    if shared_data is not None:
+        wait_for_z_settle = str(
+            shared_data.config.mda_config.mmcore_wait_for_z_settle) == 'True'
+    engine_cls = MDAEngine if wait_for_z_settle else _build_z_settle_skipping_mda_engine_class()
+    core.register_mda_engine(engine_cls(
         core,
         timeout_action='warn',
         timeout_base=MMCORE_MDA_TIMEOUT_BASE_S,
@@ -444,7 +480,7 @@ def main():
             shared_data.MILcore.set_core(CMMCorePlus(mm_path=mm_cfg.path))
             shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
             shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
-            register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core())
+            register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core(), shared_data)
             # Max memory MB is not settable in PyMMCorePlus; only buffer_mb (the
             # circular buffer footprint) applies to this backend. Warn instead of
             # silently no-op'ing the setting, since an unbounded acquisition could
@@ -504,7 +540,7 @@ def main():
                 shared_data.MILcore.set_core(CMMCorePlus(mm_path=headlessGUIv.mm_app_path))
                 shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
                 shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
-                register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core())
+                register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core(), shared_data)
                 #Max memory MB is not settable in PyMMCorePlus, so we don't set it
                 logging.warning('max_memory_mb (%s MB) has no effect on the MMCORE_PLUS backend; '
                                  'only buffer_mb (%s MB, circular buffer) is applied.',
