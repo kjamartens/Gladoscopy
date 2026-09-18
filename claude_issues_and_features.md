@@ -65,6 +65,75 @@ Add longer context underneath as a nested bullet if needed.
     fix. See `claude_decisions.md` (2026-09-09, T-E5) for why this is safe to
     defer.
 
+- **Decouple the MDA live view from the stack re-slice (`MDA (live)` / `MDA (stack)`
+  + a Follow/Browse toggle).** Designed and approved 2026-09-18, **deliberately not
+  built** — the user tested the four committed display fixes, found them sufficient,
+  and asked for this to be parked. Steps 0/1/2/3a/3c/4 of that plan shipped
+  (`a406604`, `5f03a19`, `f125366`, `60be86a`); this is the only remaining piece.
+
+  **The requirement, in the user's words:** *"for 95% of the time, what I want during
+  an MDA acquisition is just to see it running live. However, I do want to have the
+  slider there to (while acq. is ongoing) scrub back in time or in slices."* Today
+  those are the same object: the zarr-backed stack layer is both the live view and
+  the scrub surface, so showing the newest frame costs a full
+  `dims.set_current_step` re-slice.
+
+  **Design.** Stop driving `dims.set_current_step` from the frame path entirely.
+  - A 2-D `<name> (live)` layer fed by the existing `frameByFrame` code
+    (`napariGlados.py:707-722` — `layer.data[:] = image; layer.refresh()` plus the
+    throttled `_maybe_refresh_contrast`).
+  - The `<name> (stack)` zarr layer stays in the viewer but starts `visible = False`,
+    keeping the sliders and remaining what `rt_replay` scrubs.
+  - **Exactly one of the pair is ever visible** (the user chose this over a
+    single data-swapping layer), so napari's eye icons read as the mode indicator.
+    The control is a Follow live / Browse stack toggle in the MDA dock
+    (`Core/MDAGlados.py`, which serves both entry points); the layer list is never
+    the interface. A user slider move switches to Browse; an idle timeout returns.
+  - `RTReplayController` already watches `dims.events.current_step` and makes
+    itself inert during acquisition (`rt_replay.py:182-191`). Change that condition
+    from "inert while acquiring" to "inert while following" and scrubbing
+    mid-acquisition re-renders the RT overlays — mostly already built.
+  - At acquisition end, converge on today's state: drop the live layer, show the
+    stack, follow off. Nothing downstream of `MDA_acq_finished` then changes.
+
+  **Four napari 0.7.0 facts this rests on, all verified empirically 2026-09-18**
+  (re-verify against any napari bump; `tests/test_mda_live_layer.py` was specified
+  to pin them against *real* layers, as `test_layer_group.py` does for `translate`):
+  1. A 2-D layer added to a 4-D viewer renders identically at every slider
+     position — checked by comparing `_data_view` at two different `current_step`s.
+  2. Hiding the 4-D stack keeps `dims.ndim == 4` and `dims.nsteps` intact, because
+     `LayerList.get_extent` iterates all layers regardless of visibility
+     (`layerlist.py:486`). **This is what makes the design possible** — the sliders
+     survive hiding the stack.
+  3. `dims.events.point`/`current_step` route to `ViewerModel._update_layers`
+     (`viewer_model.py:300,308`), which submits *every* layer to the slicer
+     (`viewer_model.py:706`).
+  4. Layers with `visible == False` are not data-fetched; they take the sync path
+     that sets the slice input without reading data (`_layer_slicer.py:216-234`).
+
+  **Measured value, so this is not oversold** (`make bench-live-display
+  --mode mda-display`; full table in `claude_decisions.md`, 2026-09-18): a
+  `set_current_step` costs ~3.08 ms with three overlay layers against **0.016 ms**
+  for the in-place live-layer update — ~190x — i.e. ~93 ms/s of GUI thread at 30 fps,
+  about 9%. Overlays add ~0.43 ms each, **linearly**; an earlier claim of
+  superlinear scaling, and a 19.6 ms/frame figure, were both wrong (the latter was
+  measuring OS page-cache state). The figures are a *lower bound*: `ViewerModel` has
+  no Qt or vispy canvas, so they exclude the GPU upload and the dims-slider widget
+  updates, which the design also removes.
+
+  **Trap to respect:** `shared_data.newestLayerName` must keep pointing at the
+  **stack** layer — `_try_write_frame_to_zarr` (`napariGlados.py:1295-1341`) uses it
+  to find the store in `mdaZarrData`, and `rt_replay` uses it to read frames back.
+  Repointing it at the live layer silently stops the acquisition-side writer finding
+  its store. Also note `_slice_safe_to_display` (`napariGlados.py:282-306`) stops
+  applying to the live view (which is fed from the frame in hand) but is still
+  needed for scrubbing — do not delete it.
+
+  **Consequence if built:** the per-frame native auto-contrast rescan disappears
+  rather than needing a throttle, so the T-E2 contract stands unchanged and the
+  live layer just uses the same `_maybe_refresh_contrast` helper `frameByFrame`
+  already does.
+
 - **Napari layer thumbnail loading icon** — user suggested ignoring. The icon spins on every `layer.data =` assignment; suppressing it requires internal napari APIs. Defer unless user flags as priority.
 
 
