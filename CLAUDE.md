@@ -100,6 +100,31 @@ is the standalone plan that enforces them — but new code must follow them.
     stopping and restarting it. `zoomROI` needed no equivalent fix: it already
     computes the new rect and calls `self.setROI(...)`, so it inherits setROI's
     live handling for free.
+  - **The restart must wait for the previous worker's own teardown, not just
+    `hw.wait_for_system()`.** All three live-restart helpers
+    (`_setROI_liveRestart`, `_resetROI_liveRestart`, `_exposureChange_liveRestart`)
+    originally did `liveMode = False; hw.wait_for_system(); <hardware call>;
+    hw.wait_for_system(); liveMode = True`. `hw.wait_for_system()` is a
+    `MicroscopeProxy` call — it only confirms the *hardware* queue drained, not
+    that the acquisition worker's Python thread (`run_MILCoreAcquisition_worker`)
+    has finished draining the frame ring, finishing any NDTiff archive and
+    disconnecting the visualisation worker's `yielded` signal, which happens in
+    that thread's own `finally` (where `_worker_stopped_event` finally gets set).
+    Restarting before that finishes raced `acqModeChanged`'s *own* internal wait
+    for the same event on the ON path: when that wait timed out it reverted by
+    setting `liveMode = False` again, re-entering `stopLiveModeVisualisation` and
+    disconnecting a signal the first, genuine stop had already disconnected —
+    `TypeError: disconnect() failed between 'yielded' and all its connections`,
+    observed in practice on a real acquisition (dozens of frames in flight,
+    several seconds to tear down — nothing like the near-instant
+    `wait_for_system()` return). `waitForLiveModeWorkerStopped(shared_data,
+    label)` (module scope, next to `submitHardware`/`guiThreadCall`) is the fix:
+    it waits on `shared_data._livemodeNapariHandler._worker_stopped_event` with
+    `ACQ_STOP_TIMEOUT_S`, replacing the first `hw.wait_for_system()` in each
+    helper, and on timeout logs an error and **skips the hardware change and the
+    restart** — attempting one anyway would just re-race the same timeout.
+    Tests: `tests/test_mmcontrols_owner_thread.py::test_set_roi_waits_for_worker_teardown_before_restarting`,
+    `::test_set_roi_restarts_once_the_worker_confirms_it_stopped`.
   - **`drawROI` no longer pauses live mode to read the sensor size** — that was a
     stop / read / 0.2 s GUI-thread sleep / restart around a pure query. It is one
     proxy read now, and the only call in the file the GUI thread still waits on
