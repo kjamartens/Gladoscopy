@@ -405,8 +405,31 @@ class XYStageList(InteractiveListWidget):
             self.setItem(rowPosition, 3, QTableWidgetItem(str(setxy[1]))) #type:ignore
 #endregion
 
+def build_absolute_z_plan(z_start, z_end, z_step):
+    """Build a useq "top"/"bottom" (absolute range) z_plan dict.
+
+    `z_start`/`z_end` are absolute positions of the selected z-stage --
+    `MDAGlados.setZStart()`/`setZEnd()` capture the stage's current absolute
+    position, and a typed-in value is meant the same way. useq's "relative"
+    z_plan key instead treats a value list as literal offsets from wherever the
+    stage happens to be when the MDA actually starts, which silently turned a
+    z-stack set up around an absolute position (e.g. 53-55) into a request to
+    jump ~53 and ~55 units *away* from the stage's position at acquisition
+    start -- the likely cause of z-stage moves timing out / behaving
+    unexpectedly during MDA.
+
+    useq's ZTopBottom requires top >= bottom and a positive step, so those are
+    derived from min/max/abs of the panel values; `go_up` carries the
+    direction the panel's start->end order implied.
+    """
+    z_bottom = min(z_start, z_end)
+    z_top = max(z_start, z_end)
+    z_step_magnitude = abs(z_step) if z_step else 1
+    go_up = z_step is None or z_step >= 0
+    return {"top": z_top, "bottom": z_bottom, "step": z_step_magnitude, "go_up": go_up}
+
 class MDAGlados(CustomMainWindow):
-    """ 
+    """
     Class that handles the multi-Dimensional acquisition of Pycromanager
     """
     #Pysignal should be outside the functions for proper init
@@ -1943,19 +1966,7 @@ class MDAGlados(CustomMainWindow):
         else:
             xy_pos = [tuple(pos) for pos in self.xy_positions]
         
-        # NOTE (2026-09-18, flagged during debugging): z_start/z_end come from
-        # setZStart()/setZEnd(), which capture the *absolute* current position of
-        # the selected z-stage (see those methods) -- but useq's "relative" z_plan
-        # key treats [z_start, z_step, z_end] as a literal list of offsets from the
-        # position the stage is at when the MDA actually starts, not an absolute
-        # range. A z-stack set up around an absolute stage position of e.g. 53-55
-        # therefore asks the stage to move ~53 units and ~55 units *away* from
-        # wherever it happens to be at acquisition start, which is almost never
-        # what the panel's start/end fields mean. This is a likely explanation for
-        # z-stage moves timing out / behaving unexpectedly during MDA -- worth a
-        # proper fix (an absolute z_plan, e.g. "top"/"bottom"/"step") rather than
-        # papering over it here.
-        z_plan = {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True}
+        z_plan = build_absolute_z_plan(self.z_start, self.z_end, self.z_step)
         logging.info('MDA z_plan about to be used: %s', z_plan)
         self.mda_useq = useq.MDASequence(
             axis_order = self.order,
