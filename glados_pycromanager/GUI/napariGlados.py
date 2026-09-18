@@ -1450,8 +1450,18 @@ class napariHandler:
         try:
             dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = \
                 _get_cached_dimensions(shared_data)
-            h = int(self.shared_data.MILcore.core.getImageHeight())
-            w = int(self.shared_data.MILcore.core.getImageWidth())
+            # Read the frame shape through MIL's get_roi()-derived accessor, not a raw
+            # core.getImageHeight()/getImageWidth() call. On at least one real camera
+            # (as opposed to the demo cam this function's race was written for) those
+            # returned the unbinned sensor ROI extents rather than the actual binned
+            # frame size -- 3200x3200 pre-created here against 800x800 frames actually
+            # written, so every ZarrFrameWriter write raised
+            # "could not broadcast input array from shape (800,800) into shape
+            # (3200,3200)" and every frame of the acquisition was lost. get_roi() is
+            # the same source _get_image_shape() uses to reshape live frames, which
+            # does not exhibit this mismatch.
+            h = int(self.shared_data.MILcore.get_image_height())
+            w = int(self.shared_data.MILcore.get_image_width())
             dtype = _camera_dtype(self.shared_data)
             _create_mda_zarr(shared_data, layerName, n_entries_in_dims, h, w, dtype)
             return True
@@ -1471,7 +1481,15 @@ class napariHandler:
         """Open this acquisition's NDTiff archive before run_mda() starts (T-D8)."""
         self._finish_ndtiff_store()  # never leave a previous store half-open
         core = self.shared_data.MILcore.core
-        frame_nbytes = int(core.getImageWidth()) * int(core.getImageHeight()) * int(core.getBytesPerPixel())
+        # See the matching comment in _preinit_mda_zarr: use MIL's get_roi()-derived
+        # accessors, not raw core.getImageWidth()/getImageHeight(), which on some
+        # real cameras report the unbinned sensor ROI rather than the actual frame
+        # size. Only sizes this writer's queue capacity, so being wrong here was not
+        # itself a crash -- just an overly conservative budget -- but there is no
+        # reason to keep the same stale read in two places.
+        frame_nbytes = (int(self.shared_data.MILcore.get_image_width())
+                         * int(self.shared_data.MILcore.get_image_height())
+                         * int(core.getBytesPerPixel()))
         dataset, writer = open_ndtiff_store(path, frame_nbytes)
         self._ndtiff_dataset = dataset
         self._ndtiff_writer = writer
