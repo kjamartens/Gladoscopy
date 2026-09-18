@@ -1882,6 +1882,24 @@ class napariHandler:
                     if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
                         logging.info('Connected to PymmCore!')
                         acq=None
+                        #pymmcore-plus' own MDA engine (_engine.py) unconditionally calls
+                        #core.setShutterOpen(False) after every event whenever autoshutter
+                        #was on at sequence start -- even with no shutter device configured
+                        #at all, where getShutterDevice() is "" and setShutterOpen raises
+                        #RuntimeError: No device with label "". getAutoShutter() defaults to
+                        #True when no config is loaded, so this bites any shutter-less setup.
+                        #Disable autoshutter up front in that case; there is no shutter for
+                        #it to matter to.
+                        try:
+                            if (not self.shared_data.MILcore.get_shutter_device()
+                                    and self.shared_data.MILcore.get_auto_shutter()):
+                                logging.info('No shutter device configured; disabling '
+                                              'autoshutter before MDA to avoid pymmcore-plus '
+                                              'trying to toggle a nonexistent shutter')
+                                self.shared_data.MILcore.set_auto_shutter(False)
+                        except Exception:
+                            logging.exception('Failed to check/disable autoshutter for a '
+                                               'shutter-less setup')
                         #This backend has no NDTiff engine, so pymmcore-plus does the
                         #recording itself via run_mda(output=...) -- see
                         #mmcore_output_path(). Before that, savefolder/savename were
