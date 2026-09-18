@@ -281,6 +281,35 @@ the camera/stage's own ready signal instead (the only way to get zero lost
 pulses, since no software change can make a truly unsynchronized generator
 wait).
 
+**The same fix exists for the `PYCROMANAGER_PYTHON` backend, but not
+`PYCROMANAGER_JAVA`.** pycromanager's own pure-Python acquisition engine
+(`pycromanager.acquisition.acq_eng_py.internal.engine.Engine`, used by the
+headless 'Python' backend) has the identical shape of bug: `start_z_drive()`'s
+`move_z_device()` calls `core.wait_for_device(z_stage)` *after* `set_position()`,
+before `acquire_images()` arms the camera for the next sequenced burst — one
+settle-wait per z-step, same free-running-trigger race. `GUI_napari.py`'s
+`register_resilient_pycromanager_python_engine(shared_data)` (called right
+after `shared_data.MILcore.set_core(Core())` in both `start_headless(...,
+python_backend=True)` call sites) monkeypatches `Engine.start_z_drive` with a
+faithful copy that skips the trailing `wait_for_device()` call, gated live by
+`MDAConfig.pycromanager_wait_for_z_settle` (hidden, default `'False'`, same
+semantics as `mmcore_wait_for_z_settle`) — read fresh off `Engine._glados_shared_data`
+on every z-step, so no re-patch is needed when the setting changes, only a
+class-attribute update. **`pycromanager` is pulled from git main in
+`pyproject.toml` (unpinned)**, so the patch first checks
+`inspect.getsource(Engine.start_z_drive)` for the literal markers this patch
+was written against and silently keeps the stock wait-then-arm behaviour
+(with a warning) if they're missing, rather than risk silently breaking Z
+moves against a changed upstream shape. **There is no equivalent for
+`PYCROMANAGER_JAVA`**: that backend's engine is AcqEngJ, compiled and running
+inside the JVM, unreachable for a Python-level monkeypatch — the Z panel's
+"Wait for Z to settle before arming camera" checkbox (`MDAGlados.py`) is
+disabled with an explanatory tooltip whenever that backend is active. The
+checkbox otherwise reads/writes the backend-appropriate config field
+(`_zWaitForSettleConfigValue`) and re-applies the change live via the
+matching `register_resilient_*` function on toggle
+(`_onZWaitForSettleToggled`) — no app restart needed for either backend.
+
 MIL also exposes the **circular-buffer / continuous-sequence primitives** (T-C1):
 `start_continuous_sequence_acquisition(interval_ms=0)`, `is_sequence_running()`,
 `get_remaining_image_count()`, `pop_next_image_and_metadata()`,

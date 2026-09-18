@@ -127,6 +127,132 @@ def register_resilient_mmcore_mda_engine(core, shared_data=None):
     ))
 
 
+def register_resilient_pycromanager_python_engine(shared_data):
+    """Monkeypatch pycromanager's pure-Python acquisition engine (used by the
+    headless 'Python' backend, `pycromanager.acquisition.acq_eng_py`) so its
+    `Engine.start_z_drive` can skip waiting for the Z stage to settle before
+    the next sequenced (hardware-triggered) camera burst is armed. Same
+    rationale/trade-off as `register_resilient_mmcore_mda_engine` /
+    `ZSettleSkippingMDAEngine`, for the backend where pymmcore-plus'
+    MDAEngine does not apply: this engine's `move_z_device()` also does
+    `wait_for_device(z_stage)` *after* the move, before `acquire_images()`
+    arms the camera -- one such wait per z-step, and a window where a
+    free-running external trigger's pulses are silently lost. There is no
+    equivalent for the PYCROMANAGER_JAVA backend: that engine (AcqEngJ) runs
+    compiled inside the JVM and cannot be patched from Python.
+
+    Gated by `MDAConfig.pycromanager_wait_for_z_settle`, re-read from
+    `shared_data` on every z-step (stashed on the `Engine` class) so toggling
+    the GUI checkbox takes effect on the very next z move -- no
+    re-registration step is needed here, unlike the MMCORE_PLUS engine.
+
+    `pycromanager` is pulled from git main (unpinned, see pyproject.toml), so
+    this patch verifies the installed `Engine.start_z_drive` still looks like
+    what it was written against before replacing it, and does nothing (with a
+    warning) if not -- a stale patch silently no-op'ing is far better than one
+    that silently breaks Z moves.
+    """
+    try:
+        import inspect
+        from pycromanager.acquisition.acq_eng_py.internal.engine import (
+            DELAY_BETWEEN_RETRIES_MS,
+            HARDWARE_ERROR_RETRIES,
+            Engine,
+            HardwareControlException,
+        )
+    except ImportError as exc:
+        logging.warning('Could not import pycromanager Python-engine internals '
+                         'to patch Z-settle behaviour: %s', exc)
+        return
+
+    if getattr(Engine, '_glados_z_settle_patched', False):
+        Engine._glados_shared_data = shared_data
+        return
+
+    try:
+        original_source = inspect.getsource(Engine.start_z_drive)
+    except (OSError, TypeError):
+        original_source = ''
+    if 'Wait for move to finish' not in original_source or 'wait_for_device(z_stage)' not in original_source:
+        logging.warning(
+            "pycromanager Engine.start_z_drive doesn't match the shape this "
+            'patch was written against (pycromanager is unpinned/git-main) -- '
+            'skipping the Z-settle-skip patch; the default wait-then-arm '
+            'behaviour is kept.')
+        return
+
+    def _should_wait_for_z_settle():
+        sd = getattr(Engine, '_glados_shared_data', None)
+        if sd is None:
+            return True
+        return str(getattr(sd.config.mda_config, 'pycromanager_wait_for_z_settle', 'True')) == 'True'
+
+    def patched_start_z_drive(self, event, hardware_sequences_in_progress):
+        import time as _time
+        import traceback as _traceback
+
+        import pymmcore as _pymmcore
+
+        def loop_hardware_command_retries(r, command_name):
+            for i in range(HARDWARE_ERROR_RETRIES):
+                try:
+                    r()
+                    return
+                except Exception:
+                    self.core.log_message(_traceback.format_exc())
+                    print(self.get_current_date_and_time() + ": Problem " + command_name
+                          + "\n Retry #" + str(i) + " in " + str(DELAY_BETWEEN_RETRIES_MS) + " ms")
+                    _time.sleep(DELAY_BETWEEN_RETRIES_MS / 1000)
+            raise HardwareControlException(command_name + " unsuccessful")
+
+        def move_z_device(event):
+            try:
+                if event.is_z_sequenced():
+                    self.core.start_stage_sequence(z_stage)
+                else:
+                    previous_z = None if self.last_event is None else None if self.last_event.get_sequence() is None else \
+                        self.last_event.get_sequence()[0].get_z_position()
+                    current_z = event.get_z_position() if event.get_sequence() is None else \
+                        event.get_sequence()[0].get_z_position()
+                    if current_z is None:
+                        return
+                    change = previous_z is None or previous_z != current_z
+                    if not change:
+                        return
+                    # Wait for it to not be busy
+                    self.core.wait_for_device(z_stage)
+                    # Move Z
+                    self.core.set_position(z_stage, float(current_z))
+                    # Wait for move to finish -- unless told to arm the
+                    # camera immediately instead (see
+                    # MDAConfig.pycromanager_wait_for_z_settle)
+                    if _should_wait_for_z_settle():
+                        self.core.wait_for_device(z_stage)
+            except Exception as ex:
+                raise HardwareControlException(ex)
+
+        try:
+            z_stage = self.core.get_focus_device()
+            if event.get_sequence() is not None:
+                z_sequence = _pymmcore.DoubleVector() if event.is_z_sequenced() else None
+                for e in event.get_sequence():
+                    if z_sequence is not None:
+                        z_sequence.append(e.get_z_position())
+                if event.is_z_sequenced():
+                    self.core.load_stage_sequence(z_stage, z_sequence)
+                    hardware_sequences_in_progress.device_names.append(z_stage)
+            loop_hardware_command_retries(lambda: move_z_device(event), "Moving Z device")
+        except Exception:
+            _traceback.print_exc()
+            raise HardwareControlException("Error executing event")
+
+    Engine.start_z_drive = patched_start_z_drive
+    Engine._glados_z_settle_patched = True
+    Engine._glados_shared_data = shared_data
+    logging.info('Patched pycromanager Python-backend Engine.start_z_drive for '
+                 'live Z-settle-wait control (MDAConfig.pycromanager_wait_for_z_settle)')
+
+
 def perform_post_closing_actions(shared_data:Shared_data):
     """Performing closing actions
 
@@ -473,6 +599,8 @@ def main():
             shared_data.backend = cli_backend
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
             shared_data.MILcore.set_core(Core())
+            if cli_backend == 'Python':
+                register_resilient_pycromanager_python_engine(shared_data)
         else:  # PyMMCorePlus
             from pymmcore_plus import CMMCorePlus
             logging.info('Headless PyMMCorePlus started (CLI override)')
@@ -532,6 +660,8 @@ def main():
                 # shared_data.core = core
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
                 shared_data.MILcore.set_core(Core())
+                if headlessGUIv.backend == 'Python':
+                    register_resilient_pycromanager_python_engine(shared_data)
             elif headlessGUIv.pyMMCorePlusRadio.isChecked():
                 from pymmcore_plus import CMMCorePlus
                 logging.info('Headless PyMMCorePlus started')

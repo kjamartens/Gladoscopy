@@ -118,6 +118,21 @@ class MDAConfig:
         "accuracy matters more than trigger sync for your setup. Only "
         "applies to the MMCORE_PLUS backend.",
         input_type="dropdown", options=["True", "False"], hidden=True)
+    pycromanager_wait_for_z_settle: str = setting(
+        "False",
+        "Wait for Z to settle before arming the camera (pycromanager Python backend)",
+        "Same rationale and trade-off as mmcore_wait_for_z_settle, for the "
+        "PYCROMANAGER_PYTHON headless backend's own acquisition engine "
+        "(pycromanager.acquisition.acq_eng_py). Its start_z_drive() also "
+        "waits for the Z stage to report settled before the next sequenced "
+        "camera burst is armed, one wait per z-step -- a window where a "
+        "free-running external trigger's pulses are silently lost. 'False' "
+        "(default) arms the camera immediately after issuing the Z move "
+        "instead of waiting for it to finish. Only applies when the active "
+        "backend is PYCROMANAGER_PYTHON; there is no equivalent lever for "
+        "PYCROMANAGER_JAVA, since that engine runs compiled inside the JVM "
+        "and cannot be patched from Python.",
+        input_type="dropdown", options=["True", "False"], hidden=True)
 
 @dataclass
 class WebhookConfig:

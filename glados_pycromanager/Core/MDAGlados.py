@@ -908,22 +908,37 @@ class MDAGlados(CustomMainWindow):
         self.z_nrsteps_computedLabel = QLabel("")
         self.z_stepdistance_computedLabel = QLabel("")
 
-        #MMCORE_PLUS only: toggles MDAConfig.mmcore_wait_for_z_settle live (see
-        #GUI_napari.register_resilient_mmcore_mda_engine / ZSettleSkippingMDAEngine,
-        #and the CLAUDE.md note on the free-running-trigger-vs-z-settle race).
-        self.z_waitForSettle_checkbox = QCheckBox("Wait for Z to settle before arming camera (pymmcore-plus)")
-        self.z_waitForSettle_checkbox.setToolTip(
-            "Only applies to the MMCORE_PLUS backend. Checked (default OFF) restores "
-            "pymmcore-plus' normal behaviour of waiting for the Z stage to report "
-            "settled before arming the camera for the next triggered burst -- more "
-            "accurate Z positioning, but every wait is a window where a free-running "
-            "external trigger's pulses can be silently lost (more z-steps = more "
-            "chances to fall out of sync, up to losing the whole acquisition). "
-            "Unchecked arms the camera immediately after issuing the Z move instead, "
-            "so no trigger pulses are missed, at the cost of the leading frame(s) of "
-            "a burst possibly being captured while Z is still in motion.")
+        #Toggles the backend's Z-settle-wait-before-arming-camera behaviour live.
+        #MMCORE_PLUS: GUI_napari.register_resilient_mmcore_mda_engine / ZSettleSkippingMDAEngine.
+        #PYCROMANAGER_PYTHON: GUI_napari.register_resilient_pycromanager_python_engine.
+        #PYCROMANAGER_JAVA: no equivalent lever exists (AcqEngJ runs compiled inside
+        #the JVM), so the checkbox is disabled there. See the CLAUDE.md note on the
+        #free-running-trigger-vs-z-settle race for why this exists.
+        self.z_waitForSettle_checkbox = QCheckBox("Wait for Z to settle before arming camera")
+        try:
+            mi = self.shared_data.MILcore.MI()
+        except (AttributeError, RuntimeError):
+            mi = None
+        if mi == MIL.MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.z_waitForSettle_checkbox.setEnabled(False)
+            self.z_waitForSettle_checkbox.setToolTip(
+                "Not available for the PYCROMANAGER_JAVA backend: its acquisition "
+                "engine (AcqEngJ) runs compiled inside the JVM and cannot be patched "
+                "from Python. Switch to the MMCORE_PLUS or PYCROMANAGER_PYTHON "
+                "backend to use this.")
+        else:
+            self.z_waitForSettle_checkbox.setToolTip(
+                "Checked (default OFF) restores the normal behaviour of waiting for "
+                "the Z stage to report settled before arming the camera for the next "
+                "triggered burst -- more accurate Z positioning, but every wait is a "
+                "window where a free-running external trigger's pulses can be "
+                "silently lost (more z-steps = more chances to fall out of sync, up "
+                "to losing the whole acquisition). Unchecked arms the camera "
+                "immediately after issuing the Z move instead, so no trigger pulses "
+                "are missed, at the cost of the leading frame(s) of a burst possibly "
+                "being captured while Z is still in motion.")
         self.z_waitForSettle_checkbox.setChecked(
-            str(getattr(self.shared_data.config.mda_config, 'mmcore_wait_for_z_settle', 'False')) == 'True')
+            str(self._zWaitForSettleConfigValue(mi)) == 'True')
         self.z_waitForSettle_checkbox.toggled.connect(self._onZWaitForSettleToggled)
 
         #Add all widgets to layout
@@ -2145,25 +2160,50 @@ class MDAGlados(CustomMainWindow):
             except (ValueError, ZeroDivisionError):
                 pass
 
+    def _zWaitForSettleConfigValue(self, mi):
+        """The MDAConfig field backing the Z-settle checkbox for the given
+        MicroscopeInstance (mmcore_wait_for_z_settle / pycromanager_wait_for_z_settle),
+        or 'True' (the safe/no-op default) for a backend with no such lever."""
+        if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+            return getattr(self.shared_data.config.mda_config, 'mmcore_wait_for_z_settle', 'False')
+        if mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return getattr(self.shared_data.config.mda_config, 'pycromanager_wait_for_z_settle', 'False')
+        return 'True'
+
     def _onZWaitForSettleToggled(self, checked):
         """
-        Persist MDAConfig.mmcore_wait_for_z_settle and, for the MMCORE_PLUS
-        backend, re-register the MDAEngine immediately so the change takes
-        effect for the next MDA without restarting the app. See
-        GUI_napari.register_resilient_mmcore_mda_engine.
+        Persist the backend-appropriate MDAConfig field and apply the change
+        immediately so it takes effect for the next MDA without restarting
+        the app. See GUI_napari.register_resilient_mmcore_mda_engine /
+        register_resilient_pycromanager_python_engine.
         """
-        self.shared_data.config.mda_config.mmcore_wait_for_z_settle = 'True' if checked else 'False'
+        try:
+            mi = self.shared_data.MILcore.MI()
+        except (AttributeError, RuntimeError) as exc:
+            logging.warning('Could not determine backend for Z-settle toggle: %s', exc)
+            return
+        value = 'True' if checked else 'False'
+        if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+            self.shared_data.config.mda_config.mmcore_wait_for_z_settle = value
+        elif mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.shared_data.config.mda_config.pycromanager_wait_for_z_settle = value
+        else:
+            logging.warning('Z-settle toggle has no effect on this backend (%s)', mi)
+            return
         try:
             from glados_pycromanager.io.appdata import storeSharedData_GlobalData
             storeSharedData_GlobalData(self.shared_data)
         except Exception as exc:
-            logging.warning('Could not persist mmcore_wait_for_z_settle: %s', exc)
+            logging.warning('Could not persist Z-settle setting: %s', exc)
         try:
-            if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+            if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
                 from glados_pycromanager.GUI.GUI_napari import register_resilient_mmcore_mda_engine
                 register_resilient_mmcore_mda_engine(self.shared_data.MILcore.get_core(), self.shared_data)
+            elif mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+                from glados_pycromanager.GUI.GUI_napari import register_resilient_pycromanager_python_engine
+                register_resilient_pycromanager_python_engine(self.shared_data)
         except Exception as exc:
-            logging.warning('Could not re-register MDAEngine after Z-settle toggle: %s', exc)
+            logging.warning('Could not apply Z-settle toggle to the running engine: %s', exc)
 
     def setMDAparams(self,mdaparams):
         """
