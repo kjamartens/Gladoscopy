@@ -464,6 +464,36 @@ creating a fresh one — the layer-shape-validation cache invalidation is what
 then makes the display path above rebuild the napari layer too, on the first
 frame of the new acquisition. Tests: `tests/test_preinit_mda_zarr_reset.py`.
 
+**Fixing that reset exposed a second, narrower race in `add_image()` itself**:
+once `_preinit_mda_zarr` reliably produces a correctly-shaped store, frames
+actually reach the disk-write queue, and the very first `add_image()` call for
+a freshly-attached multiDstack layer can now land *while the ZarrFrameWriter
+thread is still mid-write of the exact chunk napari reads first*. zarr's
+`LocalStore._put` is not atomic — it opens the chunk file with mode `"wb"`,
+which **truncates it to 0 bytes on open**, then writes the bytes — so a read
+landing in that window gets a 0-byte chunk and crashes napari's own async
+`_LayerSlicer` thread pool with `ValueError: cannot reshape array of size 0
+into shape (...)`, entirely outside anything Glados can catch (it is not on a
+Glados thread). Every *explicit* read this codebase drives is already race-free
+via `_slice_safe_to_display` (it only ever points `dims.point` at a
+writer-confirmed slice) — `add_image()` is the one napari-internal read
+nothing previously controlled the target of, since it reads whatever
+`dims.point` already is (all-zeros for a brand new layer) practically
+immediately once the layer is attached. The non-preinit branch (array created
+here, not by `_preinit_mda_zarr`) was always safe because it seeds slice `(0,
+0, ...)` with the current frame *synchronously*, before `add_image()`; the
+preinit branch skipped that seed (to avoid losing the frameReady writes
+already queued) with nothing else guaranteeing the write had landed.
+`_wait_for_zarr_writer_progress(shared_data)` closes the gap: it blocks
+(bounded, `ZARR_WRITER_FIRST_WRITE_TIMEOUT_S` = 5 s, best-effort — logs and
+proceeds rather than hanging forever) until `writer.last_written_tag` is no
+longer `None`. Waiting for *any* completed write rather than specifically
+`(0, 0, ...)` is sufficient and simpler: the frame-ring consumer submits to
+the writer's single queue in arrival order and multiDstack uses the deep ring
+(every frame reaches storage), so whatever the writer completes first is
+necessarily the first frame submitted. Tests:
+`tests/test_wait_for_zarr_writer_progress.py`.
+
 Album mode (`napariHelperFunctions.addToExistingOrNewLayer`, one caller —
 `MMcontrols.addImageToAlbum`) appends into a **geometrically grown buffer** kept in
 `layer.metadata` (`ALBUM_BUFFER_KEY` / `ALBUM_COUNT_KEY`, start 4 frames, double when

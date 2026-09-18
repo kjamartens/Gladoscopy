@@ -306,6 +306,56 @@ def _slice_safe_to_display(shared_data, arrived_slice):
     return written
 
 
+#: How long to wait, once per acquisition, for the multiDstack ZarrFrameWriter
+#: to complete its first write before handing the store to napari's
+#: add_image() -- see _wait_for_zarr_writer_progress. Best-effort: a writer
+#: that has not landed a single write within this window (a stuck disk, an
+#: exposure far longer than this) is logged and the caller proceeds anyway,
+#: matching this codebase's other bounded-wait conventions.
+ZARR_WRITER_FIRST_WRITE_TIMEOUT_S = 5.0
+ZARR_WRITER_FIRST_WRITE_POLL_S = 0.01
+
+
+def _wait_for_zarr_writer_progress(shared_data,
+                                    timeout_s=ZARR_WRITER_FIRST_WRITE_TIMEOUT_S):
+    """Block until the multiDstack ZarrFrameWriter has completed at least one
+    write, so a subsequent napari read of the store cannot race an in-flight one.
+
+    zarr's LocalStore is not atomic: writing a chunk truncates the file to 0
+    bytes *before* the bytes are written (`_put` in zarr's local store opens
+    the path with mode "wb", which truncates on open). A read landing in that
+    window gets a 0-byte chunk, which crashes napari's own async layer-slicer
+    thread pool with "cannot reshape array of size 0 into shape (...)" --
+    outside anything Glados can catch, since it runs on napari's own thread.
+
+    Every *explicit* read this codebase drives is already safe:
+    `_slice_safe_to_display` only ever points `dims.point` at a slice the
+    writer has confirmed complete. `add_image()` is the one napari-internal
+    read this module does not otherwise control the target of -- it reads
+    whatever the viewer's current `dims.point` already is (all-zeros for a
+    brand new layer) practically immediately once the layer is attached.
+
+    Waiting for *any* completed write, not specifically slice (0, 0, ...), is
+    enough: the frame-ring consumer submits to the writer's queue in arrival
+    order and multiDstack acquisitions use the deep ring (every frame reaches
+    storage), so the first frame submitted -- index (0, 0, ...) -- is also the
+    first one the single writer thread completes.
+    """
+    writer = getattr(shared_data, 'zarrFrameWriter', None)
+    if writer is None:
+        # No async writer running for this store: either this backend never
+        # has one, or the frame was already written synchronously (the
+        # inline-write fallback in _try_write_frame_to_zarr) -- already safe.
+        return
+    deadline = time.monotonic() + timeout_s
+    while writer.last_written_tag is None:
+        if time.monotonic() >= deadline:
+            logging.warning('Zarr writer has not completed a write after %.1fs; '
+                            'attaching the store to napari anyway', timeout_s)
+            return
+        time.sleep(ZARR_WRITER_FIRST_WRITE_POLL_S)
+
+
 def _get_contrast_frame_counters(shared_data):
     """Per-layer-name frame counters backing the throttled auto-contrast
     refresh (see _maybe_refresh_contrast). Lazily initialized on shared_data,
@@ -891,7 +941,26 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                                          latestImage.dtype)
                         #Seed position 0 with the current frame
                         shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
-                    
+                    else:
+                        # Pre-created by _preinit_mda_zarr: no seed write happened
+                        # above, so unlike the branch just above, nothing here has
+                        # guaranteed slice (0, 0, ...) is actually on disk yet --
+                        # only that the ZarrFrameWriter thread has been *handed*
+                        # it (T-D2's metadata stamp, which fires on submit, not on
+                        # completion). add_image() below makes napari read the
+                        # array at its current dims.point (all-zeros for a brand
+                        # new layer) practically immediately, on its own thread
+                        # pool. zarr's LocalStore is not atomic -- writing a chunk
+                        # truncates the file to 0 bytes *before* the bytes are
+                        # written -- so a napari read landing in that window reads
+                        # a 0-byte chunk and crashes its slicer thread with
+                        # "cannot reshape array of size 0" where Glados cannot
+                        # catch it. Wait for the writer to land its first write
+                        # (the frame-ring consumer submits in arrival order, so
+                        # the first frame it submits -- (0, 0, ...) -- is also the
+                        # first one the writer completes).
+                        _wait_for_zarr_writer_progress(shared_data)
+
                     layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
                     _apply_pixel_scale(layer, shared_data)
