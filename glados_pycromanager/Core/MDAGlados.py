@@ -1869,7 +1869,10 @@ class MDAGlados(CustomMainWindow):
                     self.z_nr_steps = None
             self.z_nrsteps_radio_sel = self.z_nrsteps_radio.isChecked()
             self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
-        
+            logging.info('MDA z-panel values: z_start=%s z_step=%s z_end=%s (stage=%s)',
+                         self.z_start, self.z_step, self.z_end,
+                         getattr(self, 'z_stage_sel', None))
+
         #Get the xy positions
         if self.xyGroupBox.isEnabled():
             try:
@@ -1940,10 +1943,24 @@ class MDAGlados(CustomMainWindow):
         else:
             xy_pos = [tuple(pos) for pos in self.xy_positions]
         
+        # NOTE (2026-09-18, flagged during debugging): z_start/z_end come from
+        # setZStart()/setZEnd(), which capture the *absolute* current position of
+        # the selected z-stage (see those methods) -- but useq's "relative" z_plan
+        # key treats [z_start, z_step, z_end] as a literal list of offsets from the
+        # position the stage is at when the MDA actually starts, not an absolute
+        # range. A z-stack set up around an absolute stage position of e.g. 53-55
+        # therefore asks the stage to move ~53 units and ~55 units *away* from
+        # wherever it happens to be at acquisition start, which is almost never
+        # what the panel's start/end fields mean. This is a likely explanation for
+        # z-stage moves timing out / behaving unexpectedly during MDA -- worth a
+        # proper fix (an absolute z_plan, e.g. "top"/"bottom"/"step") rather than
+        # papering over it here.
+        z_plan = {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True}
+        logging.info('MDA z_plan about to be used: %s', z_plan)
         self.mda_useq = useq.MDASequence(
             axis_order = self.order,
             time_plan = {"interval": self.time_interval_s, "loops": self.num_time_points},
-            z_plan = {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True},
+            z_plan = z_plan,
             channels = channel_data,
             stage_positions=xy_pos
         )
