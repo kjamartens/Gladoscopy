@@ -157,6 +157,7 @@ class _Host:
     _readOneDstagePosition = mm.MMConfigUI._readOneDstagePosition
     on_shutterOpenCloseButtonPressed = mm.MMConfigUI.on_shutterOpenCloseButtonPressed
     resetROI = mm.MMConfigUI.resetROI
+    _resetROI_liveRestart = mm.MMConfigUI._resetROI_liveRestart
     setROI = mm.MMConfigUI.setROI
     _setROI_hw = mm.MMConfigUI._setROI_hw
     _setROI_liveRestart = mm.MMConfigUI._setROI_liveRestart
@@ -271,6 +272,30 @@ def test_reset_roi_is_queued(shared, service):
     _drain(service)
 
     assert shared.MILcore.names() == ['clear_roi']
+
+
+def test_reset_roi_during_live_stops_clears_and_restarts_live(shared, service):
+    """resetROI() must not clear the ROI out from under a running acquisition."""
+    host = _Host(shared)
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+    try:
+        host.resetROI()
+        deadline = time.monotonic() + 5.0
+        while len(flips) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    _drain(service)
+    assert [value for value, _thread in flips] == [False, True]
+    flip_threads = {thread for _value, thread in flips}
+    assert threading.get_ident() not in flip_threads, 'blocked the calling thread'
+    assert service._owner_ident not in flip_threads, 'would deadlock the hardware queue'
+    assert shared.MILcore.names() == ['wait_for_system', 'clear_roi', 'wait_for_system']
 
 
 def test_set_roi_without_live_mode_is_one_queued_job(shared, service):

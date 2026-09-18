@@ -1167,8 +1167,27 @@ class MMConfigUI(CustomMainWindow):
 
         This function resets the ROI to its maximum size, which is the size of the image
         """
-        submitHardware(self.shared_data, self.shared_data.MILcore.clear_roi,
-                       label='mm.clear_roi')  # T-B4
+        if not shared_data.liveMode:
+            submitHardware(self.shared_data, self.shared_data.MILcore.clear_roi,
+                           label='mm.clear_roi')  # T-B4
+            return
+        # Same stop/change/restart orchestration as setROI() -- clear_roi() while
+        # live is running would otherwise change the frame size out from under
+        # the running acquisition instead of restarting it around the change.
+        threading.Thread(target=self._resetROI_liveRestart,
+                         name='resetROI', daemon=True).start()
+
+    def _resetROI_liveRestart(self):
+        """Stop live, clear the ROI, restart live -- off the GUI thread."""
+        hw = self.shared_data.microscope_proxy()
+        try:
+            shared_data.liveMode = False
+            hw.wait_for_system() #type:ignore
+            hw.clear_roi() #type:ignore
+            hw.wait_for_system() #type:ignore
+            shared_data.liveMode = True
+        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+            logging.error('resetROI failed: %s', exc)
     
     def zoomROI(self,option):
         """

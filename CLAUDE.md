@@ -93,7 +93,13 @@ is the standalone plan that enforces them — but new code must follow them.
   - **`setROI`'s live branch gets its own short-lived thread** for the same reason:
     it stops live, waits, sets, waits and restarts, which belongs on neither the GUI
     thread (up to `ACQ_STOP_TIMEOUT_S`) nor the owner thread. `_setROI_hw` (no live
-    mode) is a single queued job.
+    mode) is a single queued job. `resetROI` now mirrors this exactly
+    (`_resetROI_liveRestart`) — it originally queued `clear_roi()` straight to the
+    owner thread with no live-mode check at all, so clicking "Reset ROI" while live
+    changed the frame size out from under the running acquisition instead of
+    stopping and restarting it. `zoomROI` needed no equivalent fix: it already
+    computes the new rect and calls `self.setROI(...)`, so it inherits setROI's
+    live handling for free.
   - **`drawROI` no longer pauses live mode to read the sensor size** — that was a
     stop / read / 0.2 s GUI-thread sleep / restart around a pure query. It is one
     proxy read now, and the only call in the file the GUI thread still waits on
