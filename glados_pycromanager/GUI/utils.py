@@ -4041,10 +4041,19 @@ def customFunction_outputs_to_variableNodz(currentNode):
             
 
 
+#Int-coded DeviceType -> name, mirroring MMcontrols.py's getDevicesOfDeviceType()
+#deviceTypeArray. See https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html
+_DEVICE_TYPE_NAMES = {
+    1: 'GenericDevice', 2: 'CameraDevice', 3: 'ShutterDevice', 4: 'StateDevice',
+    5: 'StageDevice', 6: 'XYStageDevice', 7: 'GenericDevice', 8: 'GenericDevice',
+    9: 'AutoFocusDevice', 10: 'CoreDevice', 11: 'GenericDevice', 12: 'GenericDevice',
+    13: 'GenericDevice', 14: 'GenericDevice', 15: 'HubDevice',
+}
+
 def getCoreDevicesOfDeviceType(core,devicetype):
     """
     #Find all devices that have a specific devicetype
-    #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+    #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html
     #for all devicetypes
     """
     #Get devices
@@ -4059,7 +4068,19 @@ def getCoreDevicesOfDeviceType(core,devicetype):
         devicesOfType = []
         #Loop over devices
         for device in devices:
-            if core.get_device_type(device).to_string() == devicetype: #type:ignore
+            raw_type = core.get_device_type(device) #type:ignore
+            #A raw pycromanager Java Core returns a Java-proxy DeviceType with
+            #.to_string() (pyjavaz auto-aliases Java's toString()). MIL's own
+            #get_device_type() (called here when `core` is shared_data.MILcore,
+            #as FlowChart_dockWidgets._collectCoreVariables does) already
+            #normalizes every backend to a plain SWIG int instead -- calling
+            #.to_string() on that raised "'int' object has no attribute
+            #'to_string'" for every device, every time, on any backend.
+            if hasattr(raw_type, 'to_string'):
+                type_name = raw_type.to_string()
+            else:
+                type_name = _DEVICE_TYPE_NAMES.get(int(raw_type), 'GenericDevice')
+            if type_name == devicetype:
                 logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
