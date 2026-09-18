@@ -908,6 +908,24 @@ class MDAGlados(CustomMainWindow):
         self.z_nrsteps_computedLabel = QLabel("")
         self.z_stepdistance_computedLabel = QLabel("")
 
+        #MMCORE_PLUS only: toggles MDAConfig.mmcore_wait_for_z_settle live (see
+        #GUI_napari.register_resilient_mmcore_mda_engine / ZSettleSkippingMDAEngine,
+        #and the CLAUDE.md note on the free-running-trigger-vs-z-settle race).
+        self.z_waitForSettle_checkbox = QCheckBox("Wait for Z to settle before arming camera (pymmcore-plus)")
+        self.z_waitForSettle_checkbox.setToolTip(
+            "Only applies to the MMCORE_PLUS backend. Checked (default OFF) restores "
+            "pymmcore-plus' normal behaviour of waiting for the Z stage to report "
+            "settled before arming the camera for the next triggered burst -- more "
+            "accurate Z positioning, but every wait is a window where a free-running "
+            "external trigger's pulses can be silently lost (more z-steps = more "
+            "chances to fall out of sync, up to losing the whole acquisition). "
+            "Unchecked arms the camera immediately after issuing the Z move instead, "
+            "so no trigger pulses are missed, at the cost of the leading frame(s) of "
+            "a burst possibly being captured while Z is still in motion.")
+        self.z_waitForSettle_checkbox.setChecked(
+            str(getattr(self.shared_data.config.mda_config, 'mmcore_wait_for_z_settle', 'False')) == 'True')
+        self.z_waitForSettle_checkbox.toggled.connect(self._onZWaitForSettleToggled)
+
         #Add all widgets to layout
         zLayout.addWidget(self.z_oneDstageDropdownLabel,0,0)
         zLayout.addWidget(self.z_oneDstageDropdown,0,1)
@@ -923,8 +941,9 @@ class MDAGlados(CustomMainWindow):
         zLayout.addWidget(self.z_stepdistance_radio,4,0)
         zLayout.addWidget(self.z_stepdistance_entry,4,1)
         zLayout.addWidget(self.z_stepdistance_computedLabel,4,2)
+        zLayout.addWidget(self.z_waitForSettle_checkbox,5,0,1,3)
         #Add a spacer at the bottom:
-        zLayout.addItem(QSpacerItem(1, 2, QSizePolicy.Minimum, QSizePolicy.Expanding),5,0,1,2)
+        zLayout.addItem(QSpacerItem(1, 2, QSizePolicy.Minimum, QSizePolicy.Expanding),6,0,1,2)
         
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
         self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
@@ -2125,6 +2144,26 @@ class MDAGlados(CustomMainWindow):
                     self.z_stepdistance_computedLabel.setText(f"({nr_steps} steps)")
             except (ValueError, ZeroDivisionError):
                 pass
+
+    def _onZWaitForSettleToggled(self, checked):
+        """
+        Persist MDAConfig.mmcore_wait_for_z_settle and, for the MMCORE_PLUS
+        backend, re-register the MDAEngine immediately so the change takes
+        effect for the next MDA without restarting the app. See
+        GUI_napari.register_resilient_mmcore_mda_engine.
+        """
+        self.shared_data.config.mda_config.mmcore_wait_for_z_settle = 'True' if checked else 'False'
+        try:
+            from glados_pycromanager.io.appdata import storeSharedData_GlobalData
+            storeSharedData_GlobalData(self.shared_data)
+        except Exception as exc:
+            logging.warning('Could not persist mmcore_wait_for_z_settle: %s', exc)
+        try:
+            if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+                from glados_pycromanager.GUI.GUI_napari import register_resilient_mmcore_mda_engine
+                register_resilient_mmcore_mda_engine(self.shared_data.MILcore.get_core(), self.shared_data)
+        except Exception as exc:
+            logging.warning('Could not re-register MDAEngine after Z-settle toggle: %s', exc)
 
     def setMDAparams(self,mdaparams):
         """
