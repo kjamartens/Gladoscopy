@@ -3882,3 +3882,57 @@ napari layers have it and the node now depends on it. Full `pytest -m "not slow"
 
 **Affects:** `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/pSMLM_live.py`,
 `tests/test_psmlm_live_node.py`, `CLAUDE.md`.
+
+## 2026-09-18 — Windows scheduling hints at startup; the per-image TimeCriticalPriority call removed  [display-backpressure]
+
+**Context.** "These effects are worse ... esp when napari is not the main window." The
+machine is an i7-1355U: **2 performance cores + 8 efficiency cores at 15 W**. Windows drops
+the foreground priority boost for a background process *and* lets EcoQoS power-throttle it,
+which parks its threads on the efficiency cores. Glados concurrently runs the Qt/GUI thread,
+the frame-ring consumer, the zarr writer, an RT proxy thread, an RT visualisation thread and
+a whole separate Python process for an isolated node -- on two real cores.
+
+Before this there was **no** priority handling anywhere in the package, and the only
+`setPriority` call in the codebase raised a *competitor* of the GUI thread.
+
+**Decision.** `observability/process_priority.py`, called once from `GUI_napari.main()` right
+after `Shared_data()` (which carries the switch) and before the acquisition stack exists:
+
+- `SetPriorityClass(ABOVE_NORMAL_PRIORITY_CLASS)`. **Not** `HIGH_PRIORITY_CLASS`: that
+  outranks most of the system and can starve the drivers and services the acquisition itself
+  depends on. Above-normal wins against ordinary background work without that risk. The
+  priority class is inherited, so the isolated RT-analysis subprocess gets it too.
+- `SetProcessInformation(ProcessPowerThrottling, {ControlMask = EXECUTION_SPEED,
+  StateMask = 0})` -- the documented EcoQoS opt-out. Note `StateMask = 0` is load-bearing:
+  setting `ControlMask` while leaving `StateMask` set requests throttling *on*.
+- Gated by a hidden `performance_config.foreground_scheduling_hints` (default `True`).
+- Both entirely best-effort: a failure logs at DEBUG and the app is unchanged. **Nothing may
+  depend on these having worked** -- they are scheduling hints, not a mechanism.
+
+**Removed:** `self.setPriority(self.TimeCriticalPriority)` in `AnalysisClass.runAnalysis`. It
+ran *inside the per-image handler*, so it re-set the priority on every image, and it raised
+an analysis thread above the Qt/GUI thread -- the opposite of what the display path needs. It
+sat in a branch that returns `None` immediately after. The commented-out twin further down is
+left as-is.
+
+**Rejected:** raising the GUI thread's own `QThread` priority. The competing work is in other
+threads and another process, so an in-process thread nudge does not address the hybrid-core
+*placement* that is the actual problem.
+
+**A 64-bit ctypes trap, worth recording because the first version was a silent no-op.**
+`GetCurrentProcess()` returns the pseudo-handle `(HANDLE)-1`; at ctypes' default `restype` of
+32-bit `c_int` it is truncated to `0x00000000FFFFFFFF` and every call fails with "the handle
+is invalid" -- while `ctypes.get_last_error()` reports `0` ("success"), because the shared
+`ctypes.windll` cache is not opened with `use_last_error=True`. So the failure presented as
+`WinError 0`. Both are fixed by `_kernel32()`, which declares explicit signatures, and both
+are pinned by test.
+
+**Verification:** `tests/test_process_priority.py` (5), including a test that reads the
+priority class back from the OS (`GetPriorityClass` == `ABOVE_NORMAL_PRIORITY_CLASS`) rather
+than assuming the call worked, and one that pins the handle is not truncated. Full
+`pytest -m "not slow"` green at 1196.
+
+**Affects:** `glados_pycromanager/observability/process_priority.py` (new),
+`glados_pycromanager/GUI/GUI_napari.py`, `glados_pycromanager/GUI/sharedFunctions.py`,
+`glados_pycromanager/GUI/AnalysisClass.py`, `tests/test_process_priority.py` (new),
+`CLAUDE.md`.

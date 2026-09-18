@@ -1372,7 +1372,12 @@ class AnalysisThread_customFunction(QThread):
                     
                 return [analysisResult,metadata]
             elif self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
-                self.setPriority(self.TimeCriticalPriority) #type:ignore
+                #Was self.setPriority(self.TimeCriticalPriority) here. Removed:
+                #it ran inside the per-image handler, so it re-set the priority
+                #on every single image, and it raised an *analysis* thread above
+                #the Qt/GUI thread -- the opposite of what the display path
+                #needs. Process-level scheduling is handled once at startup by
+                #observability/process_priority.py instead.
                 return None
             else:
                 return None

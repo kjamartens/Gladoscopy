@@ -221,6 +221,19 @@ class PerformanceConfig:
         "Default duration for a Performance Mode capture; adjustable per-run "
         "via the spinbox in the Performance panel.",
     )
+    foreground_scheduling_hints: str = setting(
+        "True",
+        "Keep the process off efficiency cores (Windows)",
+        "Asks Windows for an above-normal priority class and opts out of EcoQoS "
+        "power throttling at startup. On a hybrid CPU (performance + efficiency "
+        "cores) Windows otherwise parks an unfocused process on the efficiency "
+        "cores, which is why the live display slows down when the napari window "
+        "is not the active window. Best-effort and Windows-only; takes effect at "
+        "the next restart.",
+        input_type="dropdown",
+        options=["True", "False"],
+        hidden=True,
+    )
     hotspot_top_n: int = setting(
         25,
         "Performance Mode: hotspot rows shown",

@@ -864,6 +864,26 @@ replaced it is what new code in these files should follow.
   live had no effect on the running acquisition at all. Tests:
   `tests/test_mode_setter_no_sleep.py`.
 
+### Windows scheduling hints
+
+`observability/process_priority.py`'s `apply_foreground_scheduling_hints()` runs once from
+`GUI_napari.main()`: `SetPriorityClass(ABOVE_NORMAL_PRIORITY_CLASS)` plus the EcoQoS opt-out
+(`SetProcessInformation(ProcessPowerThrottling, ControlMask=EXECUTION_SPEED, StateMask=0)` —
+`StateMask=0` is load-bearing, setting ControlMask alone requests throttling *on*). On a
+hybrid CPU Windows otherwise parks an unfocused process on the efficiency cores, which is why
+the live display slowed down whenever the napari window was not active. Above-normal rather
+than HIGH deliberately: HIGH outranks most of the system and can starve the drivers the
+acquisition depends on. Gated by the hidden `performance_config.foreground_scheduling_hints`,
+Windows-only, and **entirely best-effort — nothing may depend on it having worked.** Two
+ctypes traps are pinned by test because they made the first version a silent no-op:
+`GetCurrentProcess()` must be declared `restype = c_void_p` (the `(HANDLE)-1` pseudo-handle is
+otherwise truncated on 64-bit, and every call fails with "handle is invalid"), and
+`ctypes.get_last_error()` reports 0 unless the DLL was opened `use_last_error=True`, so a real
+failure surfaces as `WinError 0`. There is deliberately **no** per-thread priority call: the
+old `setPriority(TimeCriticalPriority)` in `AnalysisClass.runAnalysis` was removed, since it
+re-set the priority on every image and raised an *analysis* thread above the GUI thread.
+Tests: `tests/test_process_priority.py`.
+
 ### Logging
 
 `LoggerWidget` (in `GUI/FlowChart_dockWidgets.py`) **tail-follows** its log file
