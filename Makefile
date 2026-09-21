@@ -8,6 +8,8 @@
 #   make run-mm    ← launch with pre-set backend/config (bypasses popup; for testing)
 #                    BACKEND=PyMMCorePlus CONFIG=/path/to/MMConfig.cfg [MM_PATH=...]
 #   make run-demo  ← launch against the pymmcore-plus bundled demo (no popup, no hardware)
+#   make run-demo-smlm ← launch against the local demo install/config in demo_settings.mk
+#                        (no popup; edit that file to change backend/paths/memory)
 #   make test      ← run the test suite
 #   make ci        ← full local gate: lint + bandit + tests
 #
@@ -51,7 +53,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build ensure-uv \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run run-dev run-prod run-mm run-demo profile-runtime profile-startup bench-live-display bench-storage \
+        run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup bench-live-display bench-storage \
         ci verify \
         clean
 
@@ -169,6 +171,23 @@ run-mm:  ## Launch Glados with pre-set MM backend/config (bypasses popup). Vars:
 
 run-demo:  ## Launch Glados against the pymmcore-plus bundled demo install + MMConfig_demo.cfg (no popup).
 	$(PYTHON) -m glados_pycromanager.GUI.GUI_napari --auto-demo
+
+# run-demo-smlm: same headless-bypass mechanism as run-mm, but the values come from
+# demo_settings.mk instead of the command line — edit that file, not this recipe.
+# Leading `-` so a missing file is not a hard parse error; the guard below then
+# produces a message that names the real problem.
+-include demo_settings.mk
+
+run-demo-smlm:  ## Launch Glados straight into the local demo backend/config from demo_settings.mk (no popup).
+ifeq ($(strip $(DEMO_CONFIG)),)
+	$(error demo_settings.mk not found, or DEMO_CONFIG is unset in it — see demo_settings.mk for the expected variables)
+endif
+	$(PYTHON) $(PYFLAGS) -m glados_pycromanager.GUI.GUI_napari \
+	    --backend "$(DEMO_BACKEND)" \
+	    --config "$(DEMO_CONFIG)" \
+	    --mm-path "$(DEMO_MM_PATH)" \
+	    --buffer-mb $(DEMO_BUFFER_MB) \
+	    --max-memory-mb $(DEMO_MAX_MEMORY_MB)
 
 # Default sample window for `make profile-runtime`. Override: make profile-runtime PROFILE_SECS=12
 PROFILE_SECS ?= 8

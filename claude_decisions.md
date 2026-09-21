@@ -3994,3 +3994,51 @@ call does no work (counted through a property on the stand-in event), that a fra
 
 **Affects:** `scripts/bench_live_display.py`, `glados_pycromanager/GUI/utils.py`,
 `tests/test_metadata_refactor_idempotence.py` (new), `docs/bench-live-display.txt`.
+
+## 2026-09-21 — `make run-demo-smlm`: a second no-popup launch target, configured from `demo_settings.mk`
+
+**Ask.** A one-command launch that skips the headless start dialog and goes straight into a
+fixed local configuration (PyMMCorePlus, the pymmcore-plus `mm/` install, `DemoSMLM.cfg`,
+4096 MB buffer, 12000 MB max memory), with the values editable in one file and a log entry
+recording what was opened.
+
+**No new launch mechanism was written.** `GUI_napari.main()` has taken
+`--backend/--config/--mm-path/--buffer-mb/--max-memory-mb` since plan step 13.0, and the
+`cli_override` branch already skips both the popup and the `Core()` probe. The target is a
+thin wrapper around exactly that, like `run-mm`.
+
+**Decision 1 — a new target, not a repurposed `run-demo`.** `run-demo` (`--auto-demo`,
+bundled install + `MMConfig_demo.cfg`) is named as the hardware-free verification run in a
+dozen places in `claude_throughput_project.md`. Changing what it opens would silently change
+what every one of those steps verified, so `run-demo-smlm` is additive and
+`tests/test_demo_settings_makefile.py` pins `run-demo`'s recipe as a regression guard.
+
+**Decision 2 — a tracked `demo_settings.mk`, not a JSON config read by Python.** The request
+was explicitly "changeable via the makefile", so the settings belong in Make's own namespace:
+`-include`d (leading `-`, so a deleted file is not a parse error for unrelated targets) with
+`DEMO_`-prefixed `?=` assignments. `?=` keeps command-line overrides working; the `DEMO_`
+prefix avoids collision with `run-mm`'s bare `BACKEND`/`CONFIG`/… vars. A JSON file would have
+needed a new flag, new parsing and new tests to deliver the same thing. It is tracked with the
+current machine's absolute paths as defaults — accepted as the cost of the file being the
+documented place to edit, rather than a gitignored file plus a `.example` to keep in sync.
+
+**Decision 3 — the empty-`DEMO_CONFIG` guard is `$(error)` under an `ifeq`, not a shell
+`test`.** The Makefile supports GnuWin32 make from PowerShell/cmd as well as Git-Bash make, so
+a shell conditional would need two spellings; `$(error)` in a recipe line expands only when
+that recipe runs and is shell-independent. Without it, a missing settings file surfaces as
+argparse's confusing "--config requires --backend".
+
+**The log entry** is one `logging.info` in the `cli_override` branch naming backend, install
+path, config path, `buffer_mb` and `max_memory_mb`. The two existing "Headless … started (CLI
+override)" lines stay — they said *that* a headless start happened but never *with what*. On
+PyMMCorePlus the pre-existing warning that `max_memory_mb` has no effect still fires, which is
+correct for this target.
+
+**Verification:** `pytest -q tests/test_demo_settings_makefile.py tests/test_gui_napari_cli.py`
+(26). `make -n run-demo-smlm` expands to the full flag set; `make -n run-demo-smlm
+DEMO_BUFFER_MB=1024` overrides; `make -n run-demo-smlm DEMO_CONFIG=` stops with the guard
+message. Both configured paths confirmed present on disk.
+
+**Affects:** `demo_settings.mk` (new), `Makefile`,
+`glados_pycromanager/GUI/GUI_napari.py`, `tests/test_demo_settings_makefile.py` (new),
+`CLAUDE.md`.

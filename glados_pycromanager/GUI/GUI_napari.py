@@ -391,6 +391,10 @@ def main():
         # CLI override: go straight to the requested headless backend, no popup,
         # no Core() probe — the override is explicit intent to run headless.
         mm_cfg = shared_data.config.micromanager_config
+        logging.info('Opening microscope from CLI override: backend=%s, mm_path=%s, config=%s, '
+                     'buffer_mb=%s, max_memory_mb=%s',
+                     cli_backend, mm_cfg.path, mm_cfg.config_path,
+                     mm_cfg.buffer_mb, mm_cfg.max_memory_mb)
         if cli_backend in ('JAVA', 'Python'):
             from pycromanager import Core, start_headless
             logging.info('Headless PycroManager started (CLI override, backend=%s)', cli_backend)

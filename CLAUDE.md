@@ -27,6 +27,15 @@ glados-pycro-manager
 Other entry points:
 - `napari` then *Plugins → Glados-PycroManager → Run Glados-PycroManager* — uses `_dock_widget:MainWidget` (the napari plugin path; assumes a Pycromanager Java server on port 4827 is already up — `Core()` is called directly with no headless prompt).
 - Run `glados_pycromanager/GUI/GUI_napari.py` from your IDE for full debugger access. The file contains a `sys.path.insert` shim so it works when not installed.
+- `make run-demo-smlm` launches straight into a fixed local demo backend with no start
+  dialog — same `--backend/--config/--mm-path/--buffer-mb/--max-memory-mb` override path
+  as `make run-mm`, but the values come from **`demo_settings.mk`** (`-include`d by the
+  `Makefile`; `DEMO_*` vars, all `?=` so `make run-demo-smlm DEMO_BUFFER_MB=1024` still
+  wins). Edit that file, not the recipe. `make run-demo` is unrelated and unchanged: it
+  is `--auto-demo`, the pymmcore-plus *bundled* install + `MMConfig_demo.cfg`, and is what
+  `claude_throughput_project.md`'s verification steps mean. Every CLI-override launch now
+  logs one INFO line naming the backend, install path, config and both memory settings.
+  Tests: `tests/test_demo_settings_makefile.py`.
 
 A small pytest suite lives in `tests/`. Run it with:
 
