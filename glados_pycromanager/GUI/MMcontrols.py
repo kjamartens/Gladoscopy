@@ -54,6 +54,7 @@ from glados_pycromanager.GUI.napariHelperFunctions import (
     moveLayerToTop,
 )
 from glados_pycromanager.GUI.utils import CustomMainWindow
+from glados_pycromanager.ui.layout import ROLE_READONLY, set_role
 
 
 #: T-B4: a hardware intent from a GUI slot goes to the MicroscopeService owner
@@ -2414,7 +2415,7 @@ class MMConfigUI(CustomMainWindow):
         through a dropdown/slider/input field anyway.
         """
         self.editFields[config_id] = QLabel()
-        self.editFields[config_id].setStyleSheet("color: gray; font-style: italic;")
+        set_role(self.editFields[config_id], ROLE_READONLY)
         self.editFields[config_id].setText(str(self.config_groups[config_id].getStorableValue()))
         rowLayout.addWidget(self.editFields[config_id])
 

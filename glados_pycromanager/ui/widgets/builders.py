@@ -106,11 +106,18 @@ def setWarningErrorInfoIcon(widget, type, iconFolder, alteration="grayscale", ic
 
 
 def setLineEditStyle(line_edit, type="Normal") -> None:
-    """Apply the "normal" or "warning" border styling to a `QLineEdit`."""
+    """Apply the "normal" or "warning" border styling to a `QLineEdit`.
+
+    Colours come from the layout theme (`Theme.border` / `Theme.warning`). This
+    stays a per-widget stylesheet rather than a `gladosRole`, because node
+    parameter fields can live in windows the Glados dock stylesheet does not reach.
+    """
+    from glados_pycromanager.ui.layout.theme import current_theme
+
     if type == "Normal":
-        line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
+        line_edit.setStyleSheet(f"border: 1px solid {current_theme().border};")
     elif type == "Warning":
-        line_edit.setStyleSheet("border: 1px solid red;")
+        line_edit.setStyleSheet(f"border: 1px solid {current_theme().warning};")
 
 
 def checkAndShowWidget(layout, widgetName):
