@@ -16,7 +16,7 @@ import napari
 import numpy as np
 import useq
 from napari.qt import thread_worker
-from PyQt5.QtCore import QObject, Qt, QSize, pyqtSignal
+from PyQt5.QtCore import QObject, Qt, QSize, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
     QAbstractButton,
     QAction,
@@ -2625,6 +2625,43 @@ def layer_removed_event_callback(event, shared_data):
                 #     l.destroy()
 #endregion
 
+#Delay before the startup layout pass; 0 = first event-loop iteration after startup.
+STARTUP_LAYOUT_DELAY_MS = 0
+#The Controls dock never takes more than this fraction of the window height at startup.
+STARTUP_CONTROLS_MAX_HEIGHT_FRACTION = 0.6
+
+def _finaliseStartupLayout(napariViewer, controlsWidget):
+    """Maximise the window, show the Controls tab, and make it tall enough for its content.
+
+    Runs from the event loop (see runNapariPycroManager): Qt only builds the tab bar
+    of tabified dock widgets during layout, so raising a tab before that is ignored.
+    """
+    try:
+        qtWindow = napariViewer.window._qt_window
+        #napari restores a saved 'maximised' flag alongside a stale window size; if the
+        #window is already flagged maximised, showMaximized() is a no-op and the stale
+        #size stays. Dropping the flag first makes the maximise real.
+        qtWindow.setWindowState(qtWindow.windowState() & ~Qt.WindowMaximized)
+        qtWindow.showMaximized()
+    except Exception:
+        logging.exception("Could not maximise the main window")
+    #The maximised geometry arrives as a resize event, so size the dock after it.
+    QTimer.singleShot(0, lambda: _sizeControlsDock(napariViewer, controlsWidget))
+
+def _sizeControlsDock(napariViewer, controlsWidget):
+    try:
+        qtWindow = napariViewer.window._qt_window
+        dock = controlsWidget.parent()
+        dock.raise_()
+        #Everything in the dock that is not the scrolled content (title bar, margins,
+        #scroll-area frame), measured as laid out rather than guessed.
+        overhead = dock.height() - controlsWidget.scroll_area.viewport().height()
+        wanted = controlsWidget.content_widget.sizeHint().height() + max(overhead, 0)
+        cap = int(qtWindow.height() * STARTUP_CONTROLS_MAX_HEIGHT_FRACTION)
+        qtWindow.resizeDocks([dock], [min(wanted, cap)], Qt.Vertical)
+    except Exception:
+        logging.exception("Could not select and size the Controls tab")
+
 def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,include_flowChart_automatedMicroscopy:bool = True):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data
@@ -2644,9 +2681,6 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
     napariViewer = napari.Viewer()
-    #TODO: add fullscreen flag
-    # if config.ui.FULLSCREEN:
-    napariViewer.window._qt_window.showMaximized()
 
     # napariViewer._window._qt_viewer.canvas.view._transform.scale=[2,2,2,2]
     #Add a connect event if a layer is removed - to stop background processes
@@ -2825,15 +2859,12 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #Performance Mode is a diagnostic tool, not opened by default. Users open it
     #on demand via Plugins > Glados-PycroManager > Performance Mode.
 
-    # Force the "Controls" widget to the front
-    custom_widget_MMcontrols.parent().raise_()
-    #Sketchy way to set initial height
-    #TODO: set config tab height
-    custom_widget_MMcontrols.parent().setFixedHeight(400)#config.ui.WIDGET_TAB_HEIGHT)
-    QApplication.processEvents()
-    custom_widget_MMcontrols.parent().setMinimumHeight(0)
-    custom_widget_MMcontrols.parent().setMaximumHeight(16777215)
-    
+    # Maximise, select the "Controls" tab and size the top dock area to fit it
+    # only once the event loop has run: Qt builds the tab bar of tabified docks
+    # lazily, so a raise_() issued now is lost, and the last-added tab wins.
+    QTimer.singleShot(STARTUP_LAYOUT_DELAY_MS,
+                      lambda: _finaliseStartupLayout(napariViewer, custom_widget_MMcontrols))
+
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer
     returnInfo['MMcontrolWidget'] = custom_widget_MMcontrols.getDockWidget()
