@@ -244,8 +244,41 @@ class PerformanceConfig:
 
 
 @dataclass
+class LayoutConfig:
+    """Look of the Glados docks; feeds `ui.layout.theme.Theme` (same field names).
+
+    All hidden: this is the storage for a future layout-settings UI. Values are
+    read once at startup by `runNapariPycroManager`.
+    """
+    font_family: str = setting("", "Font family", "Empty keeps napari's font.", hidden=True)
+    font_px: int = setting(10, "Font size (px)", "Base font size of the Glados docks.", hidden=True)
+    header_font_px: int = setting(10, "Table header font size (px)", "", hidden=True)
+    widget_padding_px: int = setting(5, "Widget padding (px)", "", hidden=True)
+    widget_margin_px: int = setting(2, "Widget margin (px)", "", hidden=True)
+    control_min_px: int = setting(18, "Minimum control size (px)", "", hidden=True)
+    indicator_px: int = setting(9, "Checkbox/icon size (px)", "", hidden=True)
+    section_margin_px: int = setting(4, "Section inner margin (px)", "", hidden=True)
+    section_spacing_px: int = setting(4, "Spacing inside sections (px)", "", hidden=True)
+    grid_spacing_px: int = setting(4, "Spacing between sections (px)", "", hidden=True)
+    table_min_rows: int = setting(5, "Minimum visible table rows", "", hidden=True)
+    accent: str = setting("#007acc", "Accent colour", "Colour of primary buttons (e.g. Acquire).", hidden=True)
+    accent_text: str = setting("#ffffff", "Accent text colour", "", hidden=True)
+    muted_text: str = setting("#868e93", "Muted text colour", "Read-only values.", hidden=True)
+    border: str = setting("#D5D5E5", "Field border colour", "", hidden=True)
+    warning: str = setting("red", "Warning colour", "Border of fields with invalid input.", hidden=True)
+    hidden_sections: str = setting(
+        "", "Hidden sections",
+        "Comma-separated section keys to leave out of the docks, e.g. 'mda.xy,controls.relative_stages'.",
+        hidden=True)
+
+    def hidden_section_keys(self) -> set:
+        return {k.strip() for k in str(self.hidden_sections).split(',') if k.strip()}
+
+
+@dataclass
 class Config:
     mda_config:           MDAConfig           = dataclasses.field(default_factory=MDAConfig)
+    layout_config:        LayoutConfig        = dataclasses.field(default_factory=LayoutConfig)
     visualisation_config: VisualisationConfig = dataclasses.field(default_factory=VisualisationConfig)
     micromanager_config: MicroManagerConfig  = dataclasses.field(default_factory=MicroManagerConfig)
     webhook_config: WebhookConfig  = dataclasses.field(default_factory=WebhookConfig)
