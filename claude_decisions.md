@@ -4042,3 +4042,24 @@ message. Both configured paths confirmed present on disk.
 **Affects:** `demo_settings.mk` (new), `Makefile`,
 `glados_pycromanager/GUI/GUI_napari.py`, `tests/test_demo_settings_makefile.py` (new),
 `CLAUDE.md`.
+
+## 2026-09-21 — Windows `$(PYTHON)` path separator follows `$(SHELL)`, not `$(OS)`
+
+**Found while verifying `make run-demo-smlm`.** Every Makefile run/test target was broken on
+this machine: `.venvScriptspython.exe: command not found`, exit 127. Cause: `PYTHON` applied
+`$(subst /,\,…)` under `ifeq ($(OS),Windows_NT)`, but GNU make picks `sh.exe` as its recipe
+shell whenever one is on PATH (Git for Windows, scoop, MSYS) **even when make itself was
+started from PowerShell or cmd** — `make -p` reports `SHELL := sh.exe` — and `sh` reads the
+`\S` in `.venv\Scripts\python.exe` as an escape, eating both separators.
+
+**Fix.** The separator is chosen from the recipe shell, not the OS: a `_WINPATH` call function
+guarded by `ifeq ($(findstring sh,$(notdir $(SHELL))),sh)`. cmd.exe still gets backslashes (it
+cannot reliably execute a forward-slash relative path, which is why the substitution exists);
+sh gets the path it can execute. Not reverted to plain forward slashes, since that would break
+the cmd.exe case the original was written for.
+
+**Verification:** `make test-fast` through make now runs (1233 passed) where it previously
+failed at 127, and `make run-demo-smlm` boots to the napari window with the DemoSMLM config and
+no start dialog. Pinned by `test_python_path_separator_follows_the_recipe_shell`.
+
+**Affects:** `Makefile`, `tests/test_demo_settings_makefile.py`, `CLAUDE.md`.

@@ -36,6 +36,13 @@ Other entry points:
   `claude_throughput_project.md`'s verification steps mean. Every CLI-override launch now
   logs one INFO line naming the backend, install path, config and both memory settings.
   Tests: `tests/test_demo_settings_makefile.py`.
+- **Makefile gotcha (fixed):** GNU make on Windows uses `sh.exe` as the recipe shell
+  whenever one is on PATH (Git for Windows, scoop, MSYS) *even when started from
+  PowerShell or cmd* — and `sh` reads the `\S` in `.venv\Scripts\python.exe` as an
+  escape, so every run/test target died with `.venvScriptspython.exe: command not
+  found`. The backslash substitution is therefore conditional on `$(SHELL)`
+  (`_WINPATH`), not on `$(OS)`: cmd.exe gets backslashes, sh gets the forward-slash
+  path it can execute.
 
 A small pytest suite lives in `tests/`. Run it with:
 

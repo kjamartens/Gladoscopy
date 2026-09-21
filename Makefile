@@ -27,7 +27,18 @@ ifeq ($(OS),Windows_NT)
     # Bootstrap uv via Anaconda pip, then let uv fetch Python 3.13 if needed.
     # uv venv does not install pip, so PIP uses the base-env uv (auto-detects .venv).
     _VENV_CREATE  = python -m pip install --quiet uv && python -m uv venv --python 3.13 --seed .venv
-    PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(subst /,\,$(_VENV_PYTHON)),python)
+    # Path separator: cmd.exe cannot reliably execute a forward-slash relative
+    # path, so it needs backslashes — but if make found sh.exe on PATH (Git for
+    # Windows / scoop / MSYS, very common) it uses THAT as the recipe shell even
+    # when make itself was started from PowerShell or cmd, and sh reads `\S` as
+    # an escape, so `.venv\Scripts\python.exe` becomes `.venvScriptspython.exe:
+    # command not found`. Pick the separator from the recipe shell, not the OS.
+    ifeq ($(findstring sh,$(notdir $(SHELL))),sh)
+        _WINPATH = $(1)
+    else
+        _WINPATH = $(subst /,\,$(1))
+    endif
+    PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(call _WINPATH,$(_VENV_PYTHON)),python)
     # Use the base-env's uv (not $(PYTHON), which is .venv's python once it
     # exists and doesn't have uv installed in it). Target .venv explicitly
     # via --python — relying on uv's auto-detection is unsafe when a conda

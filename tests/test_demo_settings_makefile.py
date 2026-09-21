@@ -75,6 +75,20 @@ def test_run_demo_smlm_passes_the_cli_override_flags(makefile: str, flag: str) -
     assert flag in _recipe(makefile)
 
 
+def test_python_path_separator_follows_the_recipe_shell(makefile: str) -> None:
+    """The Windows `$(subst /,\\,...)` must be conditional on the recipe shell.
+
+    GNU make uses sh.exe as SHELL whenever it finds one on PATH (Git for Windows,
+    scoop, MSYS) even when started from PowerShell/cmd, and sh reads the `\\S` in
+    `.venv\\Scripts\\python.exe` as an escape -- every run/test target then dies with
+    `.venvScriptspython.exe: command not found`.
+    """
+    assert "_WINPATH" in makefile
+    assert "ifeq ($(findstring sh,$(notdir $(SHELL))),sh)" in makefile
+    assert "$(call _WINPATH,$(_VENV_PYTHON))" in makefile
+    assert "$(subst /,\\,$(_VENV_PYTHON))" not in makefile
+
+
 def test_run_demo_is_still_the_bundled_auto_demo(makefile: str) -> None:
     """Regression guard: claude_throughput_project.md's verification runs use it."""
     assert re.search(
