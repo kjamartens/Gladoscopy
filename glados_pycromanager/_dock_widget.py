@@ -32,6 +32,7 @@ from glados_pycromanager.GUI.napariHelperFunctions import (  #type:ignore
 from glados_pycromanager.GUI.sharedFunctions import Shared_data  #type: ignore
 from glados_pycromanager.GUI.utils import *  #type: ignore
 from glados_pycromanager.GUI.utils import CustomMainWindow  #type:ignore
+from glados_pycromanager.ui.layout import classify_shape
 
 #endregion
 
@@ -121,19 +122,8 @@ class GladosWidget(QWidget):
             super().resizeEvent(event)
 
     def _layoutForCurrentSize(self):
-        """Classify the current size into one of the four layout buckets."""
-        width = self.size().width()
-        height = self.size().height()
-
-        # Determine the layout based on the window size
-        if width > height * 1.25:  # Wide window
-            return ('rows', 1)
-        elif height > width * 1.25:  # Tall window
-            return ('columns', 1)
-        elif width > height:  # Landscape
-            return ('rows', 2)
-        else:  # Portrait
-            return ('columns', 2)
+        """Classify the current size into one of the four layout buckets (`ui.layout.classify_shape`)."""
+        return classify_shape(self.size().width(), self.size().height())
 
     def requestRelayout(self):
         """Force a relayout even though the size bucket has not changed (T-F7).
@@ -177,10 +167,35 @@ class GladosWidget(QWidget):
         self.set_groupBoxLayout(rowsOrColumns=rowsOrColumns, n_items=n_items)
         self._appliedLayout = pending
         
+    def _sectionGrid(self):
+        """The hosted panel's `ui.layout.ResponsiveGrid`, if it has been migrated to one."""
+        return getattr(self.layoutInfo, 'sectionGrid', None)
+
+    def _applyToSectionGrid(self, grid, bucket):
+        """Arrange a toolkit panel: move its grid into a scroll area once, then only re-place.
+
+        Unlike the legacy path below, nothing is reparented or rebuilt per
+        relayout: the panel's `ResponsiveGrid` places its own sections.
+        """
+        if getattr(self, 'scrollArea', None) is None or self.scrollArea.widget() is not grid:
+            self.dockWidget.removeWidget(grid)
+            scrollArea = QScrollArea()
+            scrollArea.setWidgetResizable(True)
+            scrollArea.setWidget(grid)
+            self.dockWidget.addWidget(scrollArea, 0, 0)
+            self.scrollArea = scrollArea
+        grid.apply(bucket)
+
     def set_groupBoxLayout(self, rowsOrColumns='rows', n_items=1):
         """"
         Main function that sets individual widgets inside a groupbox to be rows or columns.
         """
+        grid = self._sectionGrid()
+        if grid is not None:
+            self._applyToSectionGrid(grid, (rowsOrColumns, n_items))
+            return
+
+        # Legacy path, for panels not (yet) built on ui.layout.
         #Determine nr rows and columns
         allWidgets = self.getFirstOrderWidgets()
         n_widgets = len(allWidgets)

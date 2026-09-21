@@ -12,6 +12,13 @@ import pytest
 pytest.importorskip("PyQt5.QtWidgets")
 
 
+def _address(widget):
+    """The C++ object's address: `id()` of a PyQt wrapper is not stable across calls."""
+    from PyQt5 import sip
+
+    return sip.unwrapinstance(widget)
+
+
 @pytest.fixture(scope="module")
 def qapp():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -72,10 +79,10 @@ def test_apply_creates_no_widgets_and_is_idempotent(grid):
     from glados_pycromanager.ui.layout.responsive import TALL, WIDE
 
     grid.apply(WIDE)
-    before = set(map(id, grid.findChildren(QWidget)))
+    before = set(map(_address, grid.findChildren(QWidget)))
     for bucket in (TALL, WIDE) * 20:
         grid.apply(bucket)
-    assert set(map(id, grid.findChildren(QWidget))) == before
+    assert set(map(_address, grid.findChildren(QWidget))) == before
     assert grid.apply(WIDE) is False
 
 

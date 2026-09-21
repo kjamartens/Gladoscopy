@@ -47,7 +47,7 @@ def microManagerControlsUI_plugin(parent):
     allConfigGroups={}
     nrconfiggroups = core.get_available_config_groups().size()
     for config_group_id in range(nrconfiggroups):
-        allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
+        allConfigGroups[config_group_id] = ConfigInfo(core,shared_data,config_group_id)
     
     #Create the MM config via all config groups
     MMconfig = MMConfigUI(allConfigGroups,autoSaveLoad=True,parent=parent)

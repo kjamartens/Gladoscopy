@@ -150,11 +150,16 @@ def test_sizes_are_classified_the_same_way(glados_widget_cls, qapp):
     """The four aspect-ratio buckets must be unchanged by the refactor.
 
     T-F7 moved the classification out of `resizeEvent` into
-    `_layoutForCurrentSize` so `requestRelayout` can reuse it.
+    `_layoutForCurrentSize` so `requestRelayout` can reuse it; the layout
+    toolkit then moved it to `ui.layout.classify_shape`, shared with the
+    standalone MDA dock, and `_layoutForCurrentSize` delegates to it.
     """
     import inspect
 
-    source = inspect.getsource(glados_widget_cls._layoutForCurrentSize)
+    from glados_pycromanager.ui.layout import responsive
+
+    assert "classify_shape" in inspect.getsource(glados_widget_cls._layoutForCurrentSize)
+    source = inspect.getsource(responsive.classify_shape)
     assert "width > height * 1.25" in source and "('rows', 1)" in source
     assert "height > width * 1.25" in source and "('columns', 1)" in source
     assert "('rows', 2)" in source and "('columns', 2)" in source
@@ -207,3 +212,33 @@ def test_scroll_area_deletion_actually_destroys_it(qapp, dock_mod):
     QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
     assert sip.isdeleted(area), "deleteLater must reclaim the orphaned scroll area"
+
+
+# ------------------------------------------------ panels on the layout toolkit
+
+
+def test_toolkit_panel_is_placed_not_rebuilt(glados_widget_cls, qapp):
+    """A panel exposing a ResponsiveGrid gets one scroll area, then only re-placements."""
+    from PyQt5.QtWidgets import QGridLayout, QLabel
+
+    from glados_pycromanager.ui.layout import TALL, WIDE, Placement, ResponsiveGrid
+
+    grid = ResponsiveGrid()
+    grid.register("a", QLabel("a"))
+    grid.register("b", QLabel("b"))
+    grid.set_placements({WIDE: [Placement("a", 0, 0), Placement("b", 0, 1)],
+                         TALL: [Placement("a", 0, 0), Placement("b", 1, 0)]})
+    host = type("FakeDock", (), {})()
+    host.layoutInfo = type("Panel", (), {"sectionGrid": grid})()
+    host.dockWidget = QGridLayout()
+    host.dockWidget.addWidget(grid, 0, 0)
+    for name in ("_sectionGrid", "_applyToSectionGrid", "set_groupBoxLayout"):
+        setattr(host, name, getattr(glados_widget_cls, name).__get__(host))
+
+    host.set_groupBoxLayout(rowsOrColumns="rows", n_items=1)
+    scroll = host.scrollArea
+    assert scroll.widget() is grid
+    assert grid.position_of("b") == (0, 1, 1, 1)
+    host.set_groupBoxLayout(rowsOrColumns="columns", n_items=1)
+    assert host.scrollArea is scroll, "the scroll area is built once"
+    assert grid.position_of("b") == (1, 0, 1, 1)

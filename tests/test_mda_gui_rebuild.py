@@ -26,6 +26,13 @@ import pytest
 pytest.importorskip("PyQt5.QtWidgets")
 
 
+def _address(widget):
+    """The C++ object's address: `id()` of a PyQt wrapper is not stable across calls."""
+    from PyQt5 import sip
+
+    return sip.unwrapinstance(widget)
+
+
 @pytest.fixture(scope="module")
 def qapp():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -192,12 +199,12 @@ def test_rebuilds_and_resizes_create_no_widgets(panel):
     from PyQt5.QtCore import QSize
     from PyQt5.QtWidgets import QWidget
 
-    before = set(map(id, panel.sectionGrid.findChildren(QWidget)))
+    before = set(map(_address, panel.sectionGrid.findChildren(QWidget)))
     assert len(before) > 50
     _toggle_all_options(panel, 4)
     for size in (QSize(1800, 300), QSize(400, 1300), QSize(900, 800)) * 3:
         panel.handleSizeChange(size)
-    assert set(map(id, panel.sectionGrid.findChildren(QWidget))) == before
+    assert set(map(_address, panel.sectionGrid.findChildren(QWidget))) == before
 
 
 def test_one_acquire_button_with_one_connection(panel):
