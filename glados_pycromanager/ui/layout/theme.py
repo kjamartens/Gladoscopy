@@ -135,6 +135,13 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     QGroupBox[gladosRole="{ROLE_SECTION}"] {{
         font-weight: bold;
     }}
+    QAbstractItemView, QHeaderView {{
+        padding: 0px;
+        margin: 0px;
+    }}
+    QTableWidget::item {{
+        padding: 1px;
+    }}
     QHeaderView::section {{
         font-size: {t.header_font_px}px;
         padding: 1px 4px;

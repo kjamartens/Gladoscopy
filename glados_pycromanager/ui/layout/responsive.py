@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QGridLayout, QWidget
 
 from glados_pycromanager.ui.layout.theme import current_theme
@@ -48,7 +49,14 @@ class Placement(NamedTuple):
 
 
 class ResponsiveGrid(QWidget):
-    """A grid of registered widgets, arranged per shape bucket."""
+    """A grid of registered widgets, arranged per shape bucket.
+
+    `bucketChanged(bucket)` fires after an arrangement for a *different* bucket
+    was applied, for sections that rearrange their own insides (e.g. a bar that
+    stacks its fields when the dock is tall).
+    """
+
+    bucketChanged = pyqtSignal(object)
 
     def __init__(self, parent: QWidget | None = None, default_bucket=WIDE):
         super().__init__(parent)
@@ -150,7 +158,10 @@ class ResponsiveGrid(QWidget):
             self._grid.setColumnStretch(cols.count, 1)
             self._stretched_cols.add(cols.count)
 
+        previous_bucket = self.bucket
         self._applied = state
+        if bucket != previous_bucket:
+            self.bucketChanged.emit(bucket)
         return True
 
 

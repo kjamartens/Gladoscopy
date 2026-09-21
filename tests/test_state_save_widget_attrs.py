@@ -13,7 +13,11 @@ This was hit for real by T-F7's `MDAGlados._guiWrappers` (the list of the curren
 rebuild's wrapper widgets), on the startup path
 `handleSizeChange` -> `showOptionChanged` -> `get_MDA_events_from_GUI`.
 
-Two fixes are pinned here: `_guiWrappers` is in `storingExceptions`, and the
+`_guiWrappers` is gone (the MDA sections are now built once and placed by a
+`ui.layout.ResponsiveGrid`); its successors -- the grid and the list editors --
+are what the exclusion test pins now.
+
+Two fixes are pinned here: the toolkit containers are in `storingExceptions`, and the
 generic branch now skips (loudly) anything that cannot be encoded, so a future
 attribute of the same shape costs one warning instead of the file.
 """
@@ -47,9 +51,10 @@ def utils(qapp):
 # ---------------------------------------------------------- the exclusion
 
 
-def test_gui_wrappers_is_excluded_from_the_state(utils, qapp):
+def test_layout_containers_are_excluded_from_the_state(utils, qapp):
     window = utils.CustomMainWindow()
-    assert "_guiWrappers" in window.storingExceptions
+    for key in ("sectionGrid", "xypositionListEditor", "channelListEditor"):
+        assert key in window.storingExceptions
 
 
 def test_the_other_exclusions_are_intact(utils, qapp):

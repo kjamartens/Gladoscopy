@@ -20,22 +20,19 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtGui import (
     QDoubleValidator,
-    QFont,
     QIntValidator,
 )
 from PyQt5.QtWidgets import (
+    QBoxLayout,
     QCheckBox,
     QComboBox,
     QFileDialog,
     QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QRadioButton,
     QSizePolicy,
-    QSpacerItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -52,7 +49,69 @@ import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.MMcontrols import ConfigInfo
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
 from glados_pycromanager.GUI.utils import CustomMainWindow
+from glados_pycromanager.ui.layout import (
+    LANDSCAPE,
+    PORTRAIT,
+    ROLE_PRIMARY,
+    TALL,
+    WIDE,
+    FlowRow,
+    ListEditor,
+    Placement,
+    ResponsiveGrid,
+    Section,
+    classify_shape,
+    set_role,
+)
 
+
+#region Section arrangement
+#: Where each MDA section goes per dock shape (`ui.layout.classify_shape`).
+#: "mda.storagebar" is Storage + Acquire; "mda.setup" stacks Options, Order,
+#: Exposure and Time. Stretch is per section: spare width goes to the tables.
+_SQUARISH = [
+    Placement("mda.storagebar", 0, 0, 1, 2),
+    Placement("mda.setup", 1, 0),
+    Placement("mda.z", 1, 1),
+    Placement("mda.xy", 2, 0),
+    Placement("mda.channel", 2, 1),
+]
+MDA_SECTION_PLACEMENTS = {
+    WIDE: [
+        Placement("mda.storagebar", 0, 0, 1, 4),
+        Placement("mda.setup", 1, 0),
+        Placement("mda.xy", 1, 1),
+        Placement("mda.z", 1, 2),
+        Placement("mda.channel", 1, 3),
+    ],
+    LANDSCAPE: _SQUARISH,
+    PORTRAIT: _SQUARISH,
+    TALL: [
+        Placement("mda.storagebar", 0, 0),
+        Placement("mda.setup", 1, 0),
+        Placement("mda.z", 2, 0),
+        Placement("mda.xy", 3, 0),
+        Placement("mda.channel", 4, 0),
+    ],
+}
+MDA_COLUMN_STRETCH = {
+    WIDE: {"mda.xy": 2, "mda.z": 1, "mda.channel": 2},
+    LANDSCAPE: {"mda.xy": 1, "mda.channel": 1},
+    PORTRAIT: {"mda.xy": 1, "mda.channel": 1},
+    TALL: {"mda.setup": 1},
+}
+
+
+def _bucketFromGridWidth(value):
+    """A layout bucket from a bucket, a stored list (JSON), or a legacy column count (10 / 2 / 1)."""
+    if isinstance(value, list):
+        return tuple(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return value
+    if value == 1:
+        return TALL
+    return WIDE if value > 2 else LANDSCAPE
+#endregion
 
 #region List Widgets
 #: `shared_data` predating per-acquisition dataset tracking (T-D8): fall back to mdaDatasets[-1].
@@ -63,14 +122,17 @@ class InteractiveListWidget(QTableWidget):
     """
     Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
     """
-    def __init__(self,fontsize=6,columnCount=2,parent=None):
+    def __init__(self,fontsize=None,columnCount=2,parent=None):
         """
         Initializes an InteractiveListWidget.
-        
+
+        Sizing (column widths, minimum height) is done by the `ui.layout.ListEditor`
+        that hosts it, and fonts by the theme.
+
         Args:
-            fontsize (int): The font size to be set for the widget. Default is 6.
+            fontsize: Ignored; kept for callers passing it.
             columnCount (int): The number of columns to be displayed in the widget. Default is 2.
-        
+
         Returns:
             None
         """
@@ -78,24 +140,6 @@ class InteractiveListWidget(QTableWidget):
         logging.debug('init InteractiveListWidget')
         self.parent = parent #type: ignore
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
-        scaleFactor = 1
-        if parent != None:
-            scaleFactor = parent.shared_data.GUIscaleFactor
-        colWidth = int(60*scaleFactor)
-        # Set the minimum size for the table widget
-        self.setColumnWidth(0, int(colWidth*.9)) #Slightly smaller to prevent scrollbar to appear
-        self.setMinimumWidth(colWidth*columnCount)
-        self.setMinimumHeight(20)
-        self.setFixedHeight(240)
-        # Set the size policy to ensure the widget can expand but not shrink below the minimum size
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        
-        font = QFont()
-        font.setPointSize(int(scaleFactor*fontsize))
-        self.setFont(font)
-        # Reduce padding within cells
-        self.setStyleSheet("QTableWidget::item { padding: 1px; }")
-        
         self.parentWidget=None #type:ignore
             
     def setColumNames(self, names):
@@ -220,7 +264,7 @@ class ChannelList(InteractiveListWidget):
         Returns:
             None
         """
-        super().__init__(columnCount=3)
+        super().__init__(parent=parent,columnCount=2)
         self.channelName = ''
         self.parentWidget=parent #type:ignore
         
@@ -616,41 +660,48 @@ class MDAGlados(CustomMainWindow):
     @property
     def GUI_grid_width(self):
         """
-        Get the width of the GUI grid.
-        
+        How the sections are arranged: a `ui.layout.classify_shape` bucket.
+
+        Kept under its historical name; it used to be a column count (10, 2 or 1),
+        and an int is still accepted and mapped to the matching bucket.
+
         Returns:
-            int: The width of the GUI grid.
+            tuple: The current bucket, or None before the dock was first sized.
         """
-        
+
         return self._GUI_grid_width
-    
+
     @GUI_grid_width.setter
     def GUI_grid_width(self, value):
         """
-        Updates the width of the GUI grid.
-        
+        Rearranges the sections for a new bucket. Moves widgets only; builds nothing.
+
         Args:
-            value: An integer representing the new width of the GUI grid.
-        
+            value: A `ui.layout` bucket, or a legacy column count.
+
         Returns:
             None
         """
-        
-        if value != self._GUI_grid_width:
-            self._GUI_grid_width = value
-            if self.has_GUI and self.fully_started:
-                try:
-                    logging.debug(f"updating gui with nr of columns: {self._GUI_grid_width}")
-                    self.showOptionChanged()
-                except (AttributeError, RuntimeError) as exc:
-                    logging.debug('showOptionChanged() failed during GUI grid width update: %s', exc)
+        value = _bucketFromGridWidth(value)
+        if value == self._GUI_grid_width:
+            return
+        self._GUI_grid_width = value
+        grid = getattr(self, 'sectionGrid', None)
+        if grid is not None and value is not None:
+            grid.apply(value)
     #endregion
     
     #region GUI
     def initGUI(self, GUI_show_exposure=True, GUI_show_xy = True, GUI_show_z=True, GUI_show_channel=True, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_showOptions=True,GUI_acquire_button=True):
         """
         Initiate the GUI.
-        
+
+        Every box is a `ui.layout.Section`, built once and placed by the
+        `ResponsiveGrid` `self.sectionGrid` according to the dock's shape (see
+        `MDA_SECTION_PLACEMENTS`). `self.gui` stays the QGridLayout hosts embed
+        (`addLayout` / `setLayout`); it holds only that grid. Fonts, spacing and
+        colours come from the theme, never from here.
+
         Args:
             GUI_show_exposure (bool): Whether to show the exposure widget. Default is True.
             GUI_show_xy (bool): Whether to show the XY widget. Default is True.
@@ -661,36 +712,24 @@ class MDAGlados(CustomMainWindow):
             GUI_show_storage (bool): Whether to show the Storage widget. Default is True.
             GUI_showOptions (bool): Whether to show the Options widget. Default is True.
             GUI_acquire_button (bool): Whether to show the Acquire button. Default is True.
-        
+
         Returns:
             None
         """
-        
-        #initiate the GUI
-        #Create a Vertical+horizontal layout:
         self.gui = QGridLayout()
-        self.GUI_grid_width = 7
-        
-        # Add groupboxes for xy, z, channel, time, order, storage
-        self.exposureGroupBox = QGroupBox("Exposure")
-        self.xyGroupBox = QGroupBox("XY")
-        self.zGroupBox = QGroupBox("Z")
-        self.channelGroupBox = QGroupBox("Channel")
-        self.timeGroupBox = QGroupBox("Time")
-        self.storageGroupBox = QGroupBox("Storage")
-        self.showOptionsGroupBox = QGroupBox("Options")
+        self.gui.setContentsMargins(0, 0, 0, 0)
+        self.sectionGrid = ResponsiveGrid(default_bucket=LANDSCAPE)
+        self.gui.addWidget(self.sectionGrid, 0, 0)
 
-        # Create layouts for each groupbox
-        exposureLayout=QHBoxLayout()
-        xyLayout = QGridLayout()
-        zLayout = QGridLayout()
-        channelLayout = QGridLayout()
-        timeLayout = QGridLayout()
-        orderLayout = QVBoxLayout()
-        storageLayout = QGridLayout()
-        showOptionsLayout = QGridLayout()
+        self.exposureGroupBox = Section("Exposure", "mda.exposure")
+        self.xyGroupBox = Section("XY", "mda.xy")
+        self.zGroupBox = Section("Z", "mda.z")
+        self.channelGroupBox = Section("Channel", "mda.channel")
+        self.timeGroupBox = Section("Time", "mda.time")
+        self.storageGroupBox = Section("Storage", "mda.storage", layout=QGridLayout())
+        self.showOptionsGroupBox = Section("Options", "mda.options")
+        self.orderGroupBox = Section("Order", "mda.order")
 
-        # Add widgets to each layout
         # --------------- Exposure widget -----------------------------------------------
         #Exposure: add a label, an entry field, and a dropdown between 'ms' and 's':
         self.exposureLabel = QLabel("Exposure:")
@@ -706,22 +745,20 @@ class MDAGlados(CustomMainWindow):
         self.exposureDropdown.addItem("ms")
         self.exposureDropdown.addItem("s")
         self.exposureDropdown.setCurrentText(self.exposure_s_or_ms)
-        exposureLayout.addWidget(self.exposureLabel)
-        exposureLayout.addWidget(self.exposureEntry)
-        exposureLayout.addWidget(self.exposureDropdown)
+        self.exposureGroupBox.body.add_row(self.exposureLabel, self.exposureEntry, self.exposureDropdown)
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
         self.exposureEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.exposureEntry.editingFinished.connect(self.flushMDAEventsUpdate)
         self.exposureDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
-        
+
         #--------------- Time widget -----------------------------------------------
         #Time: add labels for time points and time intervals, and integer-based entry fields:
-        self.timePointLabel = QLabel("Number time points:")
+        self.timePointLabel = QLabel("Time points:")
         self.timePointEntry = QLineEdit()
         if self.num_time_points is not None:
             self.timePointEntry.setText(str(self.num_time_points))
         self.timePointEntry.setValidator(QIntValidator())
-        self.timeIntervalLabel = QLabel("Time interval:")
+        self.timeIntervalLabel = QLabel("Interval:")
         self.timeIntervalEntry = QLineEdit()
         if self.time_interval_s is not None:
             if self.time_interval_s_or_ms == 's':
@@ -733,55 +770,40 @@ class MDAGlados(CustomMainWindow):
         self.timeIntervalDropdown.addItem("ms")
         self.timeIntervalDropdown.addItem("s")
         self.timeIntervalDropdown.setCurrentText(self.time_interval_s_or_ms)
-        #Adding widgets to layout
-        timeLayout.addWidget(self.timePointLabel,0,0)
-        timeLayout.addWidget(self.timePointEntry,0,1)
-        timeLayout.addWidget(self.timeIntervalLabel,1,0)
-        timeLayout.addWidget(self.timeIntervalEntry,1,1)
-        timeLayout.addWidget(self.timeIntervalDropdown,1,2)
+        self.timeGroupBox.body.add_row(self.timePointLabel, self.timePointEntry)
+        self.timeGroupBox.body.add_row(self.timeIntervalLabel, self.timeIntervalEntry, self.timeIntervalDropdown)
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
         self.timePointEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.timePointEntry.editingFinished.connect(self.flushMDAEventsUpdate)
         self.timeIntervalEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.timeIntervalEntry.editingFinished.connect(self.flushMDAEventsUpdate)
         self.timeIntervalDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
-        
+
         #--------------- storage widget -----------------------------------------------
-        #storage: first, add a label, entry field, and button with '...' to select a folder of choice:
-        self.storageFolderLabel = QLabel("Storage:")
+        # One row -- folder, '...', file name -- in a bar across the whole dock,
+        # so a long path has room; stacked into two rows when the dock is tall
+        # (`_arrangeStorageBar`). The folder field takes most of the spare width.
+        self.storageFolderLabel = QLabel("Folder:")
         self.storageFolderEntry = QLineEdit()
         if self.storage_folder is not None:
             self.storageFolderEntry.setText(self.storage_folder)
         self.storageFolderButton = QPushButton('...')
         #add a lambda function when this is pressed to search for a folder:
         self.storageFolderButton.clicked.connect(lambda: self.storageFolderEntry.setText(QFileDialog.getExistingDirectory()))
-        #Then add a label and entry field for the file name:
         self.storageFileNameLabel = QLabel("File name:")
         self.storageFileNameEntry = QLineEdit()
         if self.storage_file_name is not None:
             self.storageFileNameEntry.setText(self.storage_file_name)
-        #Adding widgets to layout
-        storageLayout.addWidget(self.storageFolderLabel,0,0)
-        storageLayout.addWidget(self.storageFolderEntry,0,1)
-        storageLayout.addWidget(self.storageFolderButton,0,2)
-        storageLayout.addWidget(self.storageFileNameLabel,1,0)
-        storageLayout.addWidget(self.storageFileNameEntry,1,1)
         self.storageFolderEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.storageFolderEntry.editingFinished.connect(self.flushMDAEventsUpdate)
         self.storageFileNameEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.storageFileNameEntry.editingFinished.connect(self.flushMDAEventsUpdate)
-        
+
         #--------------- XY widget widget -----------------------------------------------
-        #First a dropdown to select the xy stage:
-        
         #Adding a list widget to add a list of xy positions
         self.xypositionListWidget = XYStageList(parent=self)
         self.xypositionListWidget.setColumNames(["Name", "ID","xPos","yPos"])
-        self.xypositionListWidget.setColumnWidth(0, int(90*self.shared_data.GUIscaleFactor))
-        self.xypositionListWidget.setColumnWidth(1, int(30*self.shared_data.GUIscaleFactor))
-        self.xypositionListWidget.setColumnWidth(2, int(60*self.shared_data.GUIscaleFactor))
-        self.xypositionListWidget.setColumnWidth(3, int(60*self.shared_data.GUIscaleFactor))
-        
+
         self.xy_stagesDropdownLabel = QLabel("XY Stage:")
         self.xy_stagesDropdown = QComboBox()
         XYstages = self.getDevicesOfDeviceType('XYStageDevice')
@@ -790,19 +812,20 @@ class MDAGlados(CustomMainWindow):
             self.xy_stagesDropdown.addItem(stage)
         #Add a callback if we change this dropdown:
         self.xy_stagesDropdown.currentIndexChanged.connect(lambda: self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText()))
-        
+
         #Initisalise the XY position list
         self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText)
-        #Buttons for the xy position list
-        self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
-        self.xypositionListWidget_deleteAllButton = QPushButton('Delete All')
-        self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
-        self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
-        self.xypositionListWidget_moveToButton = QPushButton('Move to Pos')
-        self.xypositionListWidget_addButton = QPushButton('Add New Entry')
+        #Buttons for the xy position list, beside the table
+        self.xypositionListEditor = ListEditor(self.xypositionListWidget, stretch_columns=(0,))
+        self.xypositionListWidget_addButton = self.xypositionListEditor.add_action('Add New Entry')
+        self.xypositionListWidget_deleteButton = self.xypositionListEditor.add_action('Delete Selected')
+        self.xypositionListWidget_deleteAllButton = self.xypositionListEditor.add_action('Delete All')
+        self.xypositionListWidget_moveUpButton = self.xypositionListEditor.add_action('Move Up')
+        self.xypositionListWidget_moveDownButton = self.xypositionListEditor.add_action('Move Down')
+        self.xypositionListWidget_moveToButton = self.xypositionListEditor.add_action('Move to Pos')
+        self.xypositionListWidget_createGridButton = self.xypositionListEditor.add_action('Create Grid')
         #Intialise a gridManager
         self.xypositionListWidget_XYGridManager = utils.XYGridManager(core=self.core,parent=self)
-        self.xypositionListWidget_createGridButton = QPushButton('Create Grid')
         #Adding callbacks to the xy position list buttons
         self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
         self.xypositionListWidget_deleteAllButton.clicked.connect(self.xypositionListWidget.deleteAll)
@@ -810,30 +833,22 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
         self.xypositionListWidget_moveToButton.clicked.connect(self.xypositionListWidget.moveToPos)
         self.xypositionListWidget_addButton.clicked.connect(lambda: self.xypositionListWidget.addNewEntry(textEntry="Your Text Entry"))
-        
+
         #Open the GridManager GUI
         self.xypositionListWidget_createGridButton.clicked.connect(lambda: self.xypositionListWidget_XYGridManager.openGUI())
 
-        #Adding widgets to layout
-        xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
-        xyLayout.addWidget(self.xy_stagesDropdown,0,1)
-        xyLayout.addWidget(self.xypositionListWidget,1,0,8,1)
-        xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
-        xyLayout.addWidget(self.xypositionListWidget_deleteAllButton,3,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveUpButton,4,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveDownButton,5,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveToButton,6,1)
-        xyLayout.addWidget(self.xypositionListWidget_addButton,7,1)
-        xyLayout.addWidget(self.xypositionListWidget_createGridButton,8,1)
-        
+        xyLayout = self.xyGroupBox.body
+        xyLayout.add_row(self.xy_stagesDropdownLabel, self.xy_stagesDropdown)
+        xyLayout.setRowStretch(xyLayout.add_full_row(self.xypositionListEditor), 1)
+
         #Pre-load entries if they exist:
         if self.GUI_xy_pos_fullInfo != None:
             for entry in self.GUI_xy_pos_fullInfo:
                 self.xypositionListWidget.addNewEntry(textEntry=entry[0],id=int(entry[1]),setxy=[float(entry[2]),float(entry[3])])
-        
+
         #Add a callback lambda
         self.xypositionListWidget.itemChanged.connect(lambda: self.scheduleMDAEventsUpdate())
-        
+
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:
         self.z_oneDstageDropdownLabel = QLabel("Z Stage:")
@@ -860,10 +875,10 @@ class MDAGlados(CustomMainWindow):
         self.z_endEntry.setValidator(QDoubleValidator())
         self.z_endSetButton = QPushButton('Set')
         self.z_endSetButton.clicked.connect(lambda: self.setZEnd())
-        
+
         #add radio buttons:
-        self.z_nrsteps_radio= QRadioButton("Number of steps: ")
-        self.z_stepdistance_radio= QRadioButton("Step distance: ")
+        self.z_nrsteps_radio= QRadioButton("Number of steps:")
+        self.z_stepdistance_radio= QRadioButton("Step distance:")
         #preselect the nr of steps one:
         if self.z_nrsteps_radio_sel == True:
             self.z_nrsteps_radio.setChecked(True)
@@ -880,23 +895,15 @@ class MDAGlados(CustomMainWindow):
         if self.z_step_distance is not None:
             self.z_stepdistance_entry.setText(str(self.z_step_distance))
         self.z_stepdistance_entry.setValidator(QDoubleValidator())
-        
-        #Add all widgets to layout
-        zLayout.addWidget(self.z_oneDstageDropdownLabel,0,0)
-        zLayout.addWidget(self.z_oneDstageDropdown,0,1)
-        zLayout.addWidget(self.z_startLabel,1,0)
-        zLayout.addWidget(self.z_startEntry,1,1)
-        zLayout.addWidget(self.z_startSetButton,1,2)
-        zLayout.addWidget(self.z_endLabel,2,0)
-        zLayout.addWidget(self.z_endEntry,2,1)
-        zLayout.addWidget(self.z_endSetButton,2,2)
-        zLayout.addWidget(self.z_nrsteps_radio,3,0)
-        zLayout.addWidget(self.z_nrsteps_entry,3,1)
-        zLayout.addWidget(self.z_stepdistance_radio,4,0)
-        zLayout.addWidget(self.z_stepdistance_entry,4,1)
-        #Add a spacer at the bottom:
-        zLayout.addItem(QSpacerItem(1, 2, QSizePolicy.Minimum, QSizePolicy.Expanding),5,0,1,2)
-        
+
+        zLayout = self.zGroupBox.body
+        zLayout.add_row(self.z_oneDstageDropdownLabel, self.z_oneDstageDropdown)
+        zLayout.add_row(self.z_startLabel, self.z_startEntry, self.z_startSetButton)
+        zLayout.add_row(self.z_endLabel, self.z_endEntry, self.z_endSetButton)
+        zLayout.add_row(self.z_nrsteps_radio, self.z_nrsteps_entry)
+        zLayout.add_row(self.z_stepdistance_radio, self.z_stepdistance_entry)
+        zLayout.add_stretch()
+
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
         self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.z_startEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
@@ -911,17 +918,22 @@ class MDAGlados(CustomMainWindow):
         self.z_stepdistance_entry.editingFinished.connect(self.flushMDAEventsUpdate)
 
         # --- Ordering widget ---
-        #Note: only used in updateGUIwidgets
-        
+        # Built once; `_refillOrderDropdown` (from updateGUIwidgets) only changes
+        # which permutations it offers.
+        self.orderLabel = QLabel("Order:")
+        self.orderDropdown = QComboBox()
+        self.orderDropdown.currentTextChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.orderGroupBox.body.add_row(self.orderLabel, self.orderDropdown)
+
         #--------------- Channel widget -----------------------------------------------
         #Adding a list widget to add a list of channels
         self.channelListWidget = ChannelList(parent=self)
         self.channelListWidget.setColumNames(["Channel Setting", "Exposure"])
-        
+
         #Add possible channels
         self.channelDropdownLabel = QLabel("Channel:")
         self.channelDropdown = QComboBox()
-        
+
         #Figure out from all config groups which ones are "dropdown"
         nrconfiggroups = len(self.shared_data.MILcore.get_available_config_groups())
         allConfigGroups={}
@@ -933,7 +945,7 @@ class MDAGlados(CustomMainWindow):
                 comboboxindexes.append(config_group_id)
         ComboBoxes = {key: allConfigGroups[key] for key in comboboxindexes}
         ComboBoxNames = {allConfigGroups[key].configGroupName() for key in comboboxindexes}
-        
+
         #add the options to the dropdown:
         for combobox in ComboBoxes:
             self.channelDropdown.addItem(allConfigGroups[combobox].configGroupName())
@@ -941,17 +953,17 @@ class MDAGlados(CustomMainWindow):
         self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.setChannelName(self.channelDropdown.currentText()))
         #Also delete all the current entries
         self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.deleteAll())
-        
+
         #Initisalise the channel  list
         self.channelListWidget.setChannelName(self.channelDropdown.currentText)
-        
-        
-        #Buttons for the channel position list
-        self.channelListWidget_deleteButton = QPushButton('Delete Selected')
-        self.channelListWidget_moveUpButton = QPushButton('Move Up')
-        self.channelListWidget_moveDownButton = QPushButton('Move Down')
-        self.channelListWidget_addButton = QPushButton('Add New Entry')
-        self.channelListWidget_deleteAllButton = QPushButton('Delete All')
+
+        #Buttons for the channel list, beside the table
+        self.channelListEditor = ListEditor(self.channelListWidget, stretch_columns=(0,))
+        self.channelListWidget_addButton = self.channelListEditor.add_action('Add New Entry')
+        self.channelListWidget_deleteButton = self.channelListEditor.add_action('Delete Selected')
+        self.channelListWidget_deleteAllButton = self.channelListEditor.add_action('Delete All')
+        self.channelListWidget_moveUpButton = self.channelListEditor.add_action('Move Up')
+        self.channelListWidget_moveDownButton = self.channelListEditor.add_action('Move Down')
         #Adding callbacks to the channel list buttons
         self.channelListWidget_deleteButton.clicked.connect(self.channelListWidget.deleteSelected)
         self.channelListWidget_deleteAllButton.clicked.connect(self.channelListWidget.deleteAll)
@@ -959,17 +971,9 @@ class MDAGlados(CustomMainWindow):
         self.channelListWidget_moveDownButton.clicked.connect(self.channelListWidget.moveDown)
         self.channelListWidget_addButton.clicked.connect(lambda: self.channelListWidget.addNewEntry())
 
-        #Adding widgets to layout
-        dropdownQH = QHBoxLayout()
-        dropdownQH.addWidget(self.channelDropdownLabel)
-        dropdownQH.addWidget(self.channelDropdown)
-        channelLayout.addLayout(dropdownQH,0,0,1,3)
-        channelLayout.addWidget(self.channelListWidget,1,0,6,1)
-        channelLayout.addWidget(self.channelListWidget_deleteButton,2,1)
-        channelLayout.addWidget(self.channelListWidget_moveUpButton,3,1)
-        channelLayout.addWidget(self.channelListWidget_moveDownButton,4,1)
-        channelLayout.addWidget(self.channelListWidget_addButton,5,1)
-        channelLayout.addWidget(self.channelListWidget_deleteAllButton,6,1)
+        channelLayout = self.channelGroupBox.body
+        channelLayout.add_row(self.channelDropdownLabel, self.channelDropdown)
+        channelLayout.setRowStretch(channelLayout.add_full_row(self.channelListEditor), 1)
 
         #Add the pre-set channels:
         if self.channel_group in ComboBoxNames:
@@ -978,12 +982,12 @@ class MDAGlados(CustomMainWindow):
         if self.channels is not None and self.channel_exposures_ms is not None:
             for entry in range(len(self.channels)):
                 self.channelListWidget.addNewEntry(channelEntry=self.channels[entry],exposureEntry=str(self.channel_exposures_ms[entry]))
-                
+
         #Change MDA events when adapted
         self.channelListWidget.itemChanged.connect(lambda: self.scheduleMDAEventsUpdate())
-        
+
         #--------------- Show options widget -----------------------------------------------
-        #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
+        #Checkboxes that switch whole dimensions on/off. A strip that wraps when narrow.
         self.GUI_show_exposure_chkbox = QCheckBox("Exposure") #Note: created but never rendered
         self.GUI_show_xy_chkbox = QCheckBox("XY")
         self.GUI_show_z_chkbox = QCheckBox("Z")
@@ -998,44 +1002,61 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_time_chkbox.setChecked(self.GUI_show_time)
         self.GUI_show_storage_chkbox.setChecked(self.GUI_show_storage)
         #Add lambda functions to all of them that all run the same function: showOptionChanged():
-        # self.GUI_show_exposure_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_xy_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_z_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_channel_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_time_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_storage_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
-        
-        font = QFont()
-        font.setPointSize(int(7*self.shared_data.GUIscaleFactor))  # Set the desired font size
+        self.showOptionsGroupBox.body.add_full_row(FlowRow([
+            self.GUI_show_time_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox,
+            self.GUI_show_channel_chkbox, self.GUI_show_storage_chkbox]))
 
-        [checkbox.setFont(font) for checkbox in [self.GUI_show_exposure_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox, self.GUI_show_channel_chkbox, self.GUI_show_time_chkbox, self.GUI_show_storage_chkbox]]
+        # ---------- Acquire button -----------------------------------------------
+        # T-F7: built once for the life of the object, so toggling options never
+        # stacks up buttons (each with its own `clicked` connection).
+        #
+        # The widget is held on `_acquireButton`: `self.GUI_acquire_button`
+        # starts life as the *boolean* set in __init__ and is only replaced by
+        # the widget here, and callers (updateShowHideGUI) pass it back in as the
+        # flag, so it cannot double as the "already built?" test.
+        self._acquireButton = None
+        if GUI_acquire_button:
+            self._acquireButton = QPushButton("Acquire")
+            set_role(self._acquireButton, ROLE_PRIMARY)
+            self._acquireButton.setMinimumWidth(self._acquireButton.fontMetrics().horizontalAdvance("Acquire") * 3)
+            self._acquireButton.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
+            self.GUI_acquire_button = self._acquireButton
 
-        #Add all checkboxes to the options-layout
-        # showOptionsLayout.addWidget(self.GUI_show_exposure_chkbox,0,0)
-        showOptionsLayout.addWidget(self.GUI_show_time_chkbox,0,0)
-        showOptionsLayout.addWidget(self.GUI_show_xy_chkbox,0,1)
-        showOptionsLayout.addWidget(self.GUI_show_z_chkbox,0,2)
-        showOptionsLayout.addWidget(self.GUI_show_channel_chkbox,1,0)
-        showOptionsLayout.addWidget(self.GUI_show_storage_chkbox,1,1)
-        
-        # ---------- Combining all to the main layout -----------------------------------------
-        # Set layouts for each groupbox
-        self.exposureGroupBox.setLayout(exposureLayout)
-        self.xyGroupBox.setLayout(xyLayout)
-        self.zGroupBox.setLayout(zLayout)
-        self.channelGroupBox.setLayout(channelLayout)
-        self.timeGroupBox.setLayout(timeLayout)
-        self.storageGroupBox.setLayout(storageLayout)
-        self.showOptionsGroupBox.setLayout(showOptionsLayout)
+        # ---------- Arranging the sections -----------------------------------------
+        # Storage and Acquire share one bar across the top; the small settings
+        # stack into a single "setup" column.
+        storageBar = QWidget()
+        self._storageBarLayout = QBoxLayout(QBoxLayout.LeftToRight, storageBar)
+        self._storageBarLayout.setContentsMargins(0, 0, 0, 0)
+        self._storageBarLayout.addWidget(self.storageGroupBox, 1)
+        if self._acquireButton is not None:
+            self._storageBarLayout.addWidget(self._acquireButton)
+        self._arrangeStorageBar(None)
+        self.sectionGrid.bucketChanged.connect(self._arrangeStorageBar)
+        setupColumn = QWidget()
+        setupLayout = QVBoxLayout(setupColumn)
+        setupLayout.setContentsMargins(0, 0, 0, 0)
+        for section in (self.showOptionsGroupBox, self.orderGroupBox, self.exposureGroupBox, self.timeGroupBox):
+            setupLayout.addWidget(section)
+        setupLayout.addStretch(1)
+        self.sectionGrid.register("mda.storagebar", storageBar)
+        self.sectionGrid.register("mda.setup", setupColumn)
+        for section in (self.xyGroupBox, self.zGroupBox, self.channelGroupBox):
+            self.sectionGrid.register(section.key, section)
+        self.sectionGrid.set_placements(MDA_SECTION_PLACEMENTS, MDA_COLUMN_STRETCH)
 
-        # Add groupboxes to the main layout, only if they should be shown. The position of the gridbox is based on whether the previous ones are added or not:
+        # Enable/disable per option, fill the order dropdown, and place everything:
         self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions,GUI_acquire_button=GUI_acquire_button)
-        
-        #Change the font of everything in the layout
-        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", int(7*self.shared_data.GUIscaleFactor)))
-        #Twice because it relies on dependancies inside qgridlayouts
-        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", int(7*self.shared_data.GUIscaleFactor)))
-        
+        # Build the plan from the filled-in panel. This used to happen as a side
+        # effect of the order dropdown being re-created and set (a synchronous
+        # rebuild while `fully_started` is False); the refill now blocks signals.
+        self.get_MDA_events_from_GUI()
+
         if self.layout is not None:
             #Add the layout to the main layout
             try:
@@ -1044,36 +1065,52 @@ class MDAGlados(CustomMainWindow):
                 logging.debug('addLayout failed, falling back to setLayout: %s', exc)
                 self.setLayout(self.gui)
                 self.mainLayout = self.gui
-            
-            # Changing font and padding of all widgets
-            font = QFont("Arial", int(7*self.shared_data.GUIscaleFactor))
-            for i in range(self.gui.count()):
-                try:
-                    item = self.gui.itemAt(i)
-                    if item.widget():
-                        item.widget().setFont(font)
-                        item.widget().setStyleSheet("padding: 2px; margin: 1px; spacing: 1px;")  # Change padding as needed
-                except (AttributeError, RuntimeError):
-                    pass
-    
+
+    def _arrangeStorageBar(self, bucket):
+        """Storage fields and Acquire on one row, or stacked when the dock is tall."""
+        stacked = bucket == TALL
+        grid = self.storageGroupBox.body
+        for widget in (self.storageFolderLabel, self.storageFolderEntry, self.storageFolderButton,
+                       self.storageFileNameLabel, self.storageFileNameEntry):
+            grid.removeWidget(widget)
+        for col in range(5):
+            grid.setColumnStretch(col, 0)
+        grid.addWidget(self.storageFolderLabel, 0, 0)
+        grid.addWidget(self.storageFolderEntry, 0, 1)
+        grid.addWidget(self.storageFolderButton, 0, 2)
+        if stacked:
+            grid.addWidget(self.storageFileNameLabel, 1, 0)
+            grid.addWidget(self.storageFileNameEntry, 1, 1, 1, 2)
+            grid.setColumnStretch(1, 1)
+        else:
+            grid.addWidget(self.storageFileNameLabel, 0, 3)
+            grid.addWidget(self.storageFileNameEntry, 0, 4)
+            grid.setColumnStretch(1, 3)
+            grid.setColumnStretch(4, 1)
+        self._storageBarLayout.setDirection(QBoxLayout.TopToBottom if stacked else QBoxLayout.LeftToRight)
+        if self._acquireButton is not None:
+            vertical = QSizePolicy.Fixed if stacked else QSizePolicy.Expanding
+            self._acquireButton.setSizePolicy(QSizePolicy.Preferred, vertical)
+
+    def _configuredHiddenSections(self):
+        """Section keys the (hidden) `layout_config.hidden_sections` setting leaves out."""
+        try:
+            keys = self.shared_data.config.layout_config.hidden_section_keys()
+        except AttributeError:
+            return set()
+        return keys if isinstance(keys, set) else set()
+
     def handleSizeChange(self, size):
         """
-        Handle a change in size by adjusting the number of columns in the GUI grid.
-        
+        Rearrange the sections for the dock's new shape (see `ui.layout.classify_shape`).
+
         Args:
             size: The new size of the GUI window.
-        
+
         Returns:
             None
         """
-        #Very practically, it can be 1, many, or 'square'. Since we have 6 widgets total, square is 2.
-        if size.width()>1.25*size.height():
-            newNrColumns = 10
-        elif size.height()>1.25*size.width():
-            newNrColumns = 1
-        else:
-            newNrColumns = 2
-        self.GUI_grid_width = newNrColumns
+        self.GUI_grid_width = classify_shape(size.width(), size.height())
     
     def getDevicesOfDeviceType(self,devicetype):
         """
@@ -1119,22 +1156,14 @@ class MDAGlados(CustomMainWindow):
         #             devicesOfType.append(device)
         #     return devicesOfType
     
-    def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice = None):
+    def _refillOrderDropdown(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z):
         """
-        Create an order ('t','tc', etc) layout based on the provided parameters.
-        
-        Args:
-            GUI_show_channel (bool): Whether to include channel in the layout.
-            GUI_show_time (bool): Whether to include time in the layout.
-            GUI_show_xy (bool): Whether to include xy in the layout.
-            GUI_show_z (bool): Whether to include z in the layout.
-            orderChoice (str, optional): The default order choice. Defaults to None.
-        
-        Returns:
-            QVBoxLayout: The layout containing the order dropdown and label.
+        Offer every ordering ('tpcz', ...) of the enabled dimensions in the order dropdown.
+
+        The dropdown is built once in initGUI and only refilled here. The current
+        choice survives a dimension being switched off or on: its remaining
+        letters keep their relative order and a newly enabled letter goes last.
         """
-        
-        orderLayout = QHBoxLayout()
         letters_to_include = ''
         if GUI_show_channel:
             letters_to_include += 'c'
@@ -1144,27 +1173,20 @@ class MDAGlados(CustomMainWindow):
             letters_to_include += 'p'
         if GUI_show_z:
             letters_to_include += 'z'
-        #Now we create an array with all possible combinations of these letters:
-        permuatations = [''.join(comb) for comb in itertools.permutations(letters_to_include, len(letters_to_include))]
-        #Create a label first, so a stale reference to the previous (possibly
-        #already-deleted) label can't be read if addItem() below fires the
-        #currentTextChanged signal synchronously.
-        self.orderLabel = QLabel("Order:")
-        self.orderDropdown = QComboBox()
-        #add the options to the dropdown:
-        for option in permuatations:
-            self.orderDropdown.addItem(option)
-        self.orderDropdown.currentTextChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        permutations = [''.join(comb) for comb in itertools.permutations(letters_to_include, len(letters_to_include))]
 
-        #Show the widgets.
-        orderLayout.addWidget(self.orderLabel)
-        orderLayout.addWidget(self.orderDropdown)
-        
-        if orderChoice in permuatations:
-            if orderChoice is not None:
-                self.orderDropdown.setCurrentText(orderChoice)
-        
-        return orderLayout
+        previous = self.orderDropdown.currentText() or self.order or ''
+        kept = ''.join(letter for letter in previous if letter in letters_to_include)
+        wanted = kept + ''.join(letter for letter in letters_to_include if letter not in kept)
+
+        self.orderDropdown.blockSignals(True)
+        try:
+            self.orderDropdown.clear()
+            self.orderDropdown.addItems(permutations)
+            if wanted in permutations:
+                self.orderDropdown.setCurrentText(wanted)
+        finally:
+            self.orderDropdown.blockSignals(False)
         
     def showOptionChanged(self):
         """
@@ -1211,132 +1233,42 @@ class MDAGlados(CustomMainWindow):
     
     def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4,GUI_acquire_button=True):
         """
-        Updates the GUI widgets based on the specified parameters.
-        
+        Apply the option checkboxes to the (already built) sections and place them.
+
+        Nothing is constructed here: sections are enabled/disabled in place (a
+        disabled section is left out of the acquisition -- `get_MDA_events_from_GUI`
+        reads `isEnabled()`), the order dropdown is refilled, and the section grid
+        is arranged for the current dock shape.
+
         Args:
-            GUI_show_exposure (bool): Whether to show the exposure widget. Default is True.
-            GUI_show_xy (bool): Whether to show the XY widget. Default is False.
-            GUI_show_z (bool): Whether to show the Z widget. Default is True.
-            GUI_show_channel (bool): Whether to show the channel widget. Default is False.
-            GUI_show_time (bool): Whether to show the time widget. Default is True.
-            GUI_show_storage (bool): Whether to show the storage widget. Default is True.
-            GUI_showOptions (bool): Whether to show the options widget. Default is True.
-            gridWidth (int): The width of the grid. Default is 4.
-            GUI_acquire_button (bool): Whether to show the acquire button. Default is True.
-        
+            GUI_show_exposure (bool): Whether to enable the exposure section. Default is True.
+            GUI_show_xy (bool): Whether to enable the XY section. Default is False.
+            GUI_show_z (bool): Whether to enable the Z section. Default is True.
+            GUI_show_channel (bool): Whether to enable the channel section. Default is False.
+            GUI_show_time (bool): Whether to enable the time section. Default is True.
+            GUI_show_storage (bool): Whether to enable the storage section. Default is True.
+            GUI_showOptions (bool): Unused; the options section is always enabled.
+            gridWidth (int): Unused; the arrangement follows `GUI_grid_width`.
+            GUI_acquire_button (bool): Whether to show the acquire button (if one was built). Default is True.
+
         Returns:
             None
         """
-        
-        gridWidth = self.GUI_grid_width
-        # Remove the widgets from their parent
-        self.exposureGroupBox.setParent(None) # type: ignore
-        self.xyGroupBox.setParent(None) # type: ignore
-        self.zGroupBox.setParent(None) # type: ignore
-        self.channelGroupBox.setParent(None) # type: ignore
-        self.timeGroupBox.setParent(None) # type: ignore
-        if hasattr(self,'orderGroupBox'):
-            self.orderGroupBox.setParent(None) # type: ignore
-        self.storageGroupBox.setParent(None) # type: ignore
-        #self.showOptionsGroupBox.setParent(None)  # type: ignore
-        
-        self.gui.setSizeConstraint(QGridLayout.SetMinimumSize)
-        # At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
-        optionsBGroupBox = QWidget()
-        optionsBLayout = None
-        optionsBLayout = QVBoxLayout()
-        optionsBLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
-        optionsBLayout.setContentsMargins(0, 0, 0, 0)
-        optionsBGroupBox.setLayout(optionsBLayout)
-        self.showOptionsGroupBox.setEnabled(True)
-        if GUI_show_storage: 
-            self.storageGroupBox.setEnabled(True)
-        else:
-            self.storageGroupBox.setEnabled(False)
-        if GUI_acquire_button:
-            # T-F7: built once and reused. This used to construct a fresh
-            # QPushButton (and a fresh `clicked` connection) on every call, and
-            # the previous button stayed parented to the wrapper discarded below
-            # -- so a session's worth of checkbox toggles accumulated dead
-            # buttons, each still connected to MDA_acq_from_GUI.
-            #
-            # The widget is held on `_acquireButton`: `self.GUI_acquire_button`
-            # starts life as the *boolean* set in __init__ and is only replaced
-            # by the widget here, and callers (updateShowHideGUI) pass it back in
-            # as the flag, so it cannot double as the "already built?" test.
-            if getattr(self, '_acquireButton', None) is None:
-                self._acquireButton = QPushButton("Acquire")
-                self._acquireButton.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
-            else:
-                self._acquireButton.setParent(None)
+        self.showOptionsGroupBox.set_active(True)
+        self.storageGroupBox.set_active(GUI_show_storage)
+        self.exposureGroupBox.set_active(GUI_show_exposure)
+        self.timeGroupBox.set_active(GUI_show_time)
+        self.xyGroupBox.set_active(GUI_show_xy)
+        self.zGroupBox.set_active(GUI_show_z)
+        self.channelGroupBox.set_active(GUI_show_channel)
+        self._refillOrderDropdown(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
+        if self._acquireButton is not None:
+            self._acquireButton.setVisible(bool(GUI_acquire_button))
             self._acquireButton.setEnabled(True)
-            self.GUI_acquire_button = self._acquireButton
-        # else:
-        #     self.GUI_acquire_button.setEnabled(False)
-        
-        #Add order/exposure/time as single groupbox
-        orderexposuretimegroupbox = QWidget()
-        orderexposuretimelayout = QVBoxLayout()
-        orderexposuretimelayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
-        orderexposuretimelayout.setContentsMargins(0, 0, 0, 0)
-        orderexposuretimegroupbox.setLayout(orderexposuretimelayout)
-        
-        if GUI_show_exposure:
-            self.exposureGroupBox.setEnabled(True)
-        else:
-            self.exposureGroupBox.setEnabled(False)
-            
-        self.orderGroupBox = QGroupBox("Order")
-        orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice=self.order)
-        self.orderGroupBox.setLayout(orderlayout)
-        
-        orderexposuretimelayout.addWidget(self.orderGroupBox) # type: ignore
-        orderexposuretimelayout.addWidget(self.exposureGroupBox) # type: ignore
-        orderexposuretimelayout.addWidget(self.timeGroupBox) # type: ignore
-        if GUI_show_time:
-            self.timeGroupBox.setEnabled(True)
-        else:
-            self.timeGroupBox.setEnabled(False)
-        if GUI_show_xy:
-            self.xyGroupBox.setEnabled(True)
-        else:
-            self.xyGroupBox.setEnabled(False)
-        if GUI_show_z:
-            self.zGroupBox.setEnabled(True)
-        else:
-            self.zGroupBox.setEnabled(False)
-        if GUI_show_channel:
-            self.channelGroupBox.setEnabled(True)
-        else:
-            self.channelGroupBox.setEnabled(False)
-        
-        optionsBLayout.addWidget(self.showOptionsGroupBox) # type: ignore
-        optionsBLayout.addWidget(self.storageGroupBox) # type: ignore
-        if GUI_acquire_button:
-            optionsBLayout.addWidget(self.GUI_acquire_button) # type: ignore
-        
-        # T-F7: the previous wrappers are dropped rather than left stacked in the
-        # same grid cells. Everything they held (the persistent group boxes, the
-        # reused Acquire button) has already been re-parented out above.
-        self._discardPreviousGUIWrappers()
 
-        self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
-        
-        self.gui.addWidget(orderexposuretimegroupbox, 1//gridWidth, 1%gridWidth) # type: ignore
+        self.sectionGrid.set_hidden(self._configuredHiddenSections())
+        self.sectionGrid.apply(self.GUI_grid_width)
 
-        self._guiWrappers = [optionsBGroupBox, orderexposuretimegroupbox]
-        
-        #Add XY, Z, Channel, groupboxes as individual groupboxes
-        curindex = 2
-        self.gui.addWidget(self.xyGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
-        self.gui.addWidget(self.zGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
-        self.gui.addWidget(self.channelGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
-        self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
-        self.gui.setRowStretch(99,gridWidth+1) # type: ignore
-        
         # T-F7: ask the parent dock to relayout, *after* this rebuild returns.
         #
         # This used to synthesise a QEvent.Resize at the parent's current size,
@@ -1354,17 +1286,6 @@ class MDAGlados(CustomMainWindow):
 
         #redraw the self.gui:
         self.gui.update()
-
-    def _discardPreviousGUIWrappers(self):
-        """Remove and destroy the wrapper widgets from the previous rebuild."""
-        for wrapper in getattr(self, '_guiWrappers', []):
-            try:
-                self.gui.removeWidget(wrapper) #type:ignore
-                wrapper.setParent(None)
-                wrapper.deleteLater()
-            except RuntimeError:  # already destroyed by Qt
-                logging.debug('wrapper already gone')
-        self._guiWrappers = []
     
     def printText(self):
         """
@@ -1399,46 +1320,6 @@ class MDAGlados(CustomMainWindow):
             The GUI object.
         """
         return self
-    
-    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
-        """
-        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
-        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
-
-        """
-        
-        if isinstance(widget, (QPushButton)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-        if isinstance(widget, (QLabel, QComboBox)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-
-        if isinstance(widget, QGroupBox):
-            # widget.setSizePolicy(
-            #     QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            # )
-            # Ensure QGroupBox respects the size of its contents
-            widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
-
-        if hasattr(widget, 'minimumSizeHint'):
-            minsize = widget.minimumSizeHint()
-            if minsize.width() > -1 and minsize.height() > -1:
-                widget.setMinimumSize(widget.minimumSizeHint())
-
-        if hasattr(widget, 'layout'):
-            layout = widget.layout()
-            if layout:
-                # layout.setContentsMargins(0, 0, 0, 0)
-                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
-                for i in range(layout.count()):
-                    item = layout.itemAt(i)
-                    if hasattr(item, 'widget'):
-                        self.set_font_and_margins_recursive(item.widget(), font=font)
-                    if hasattr(item, 'layout'):
-                        self.set_font_and_margins_recursive(item.layout(), font=font)
     
     #endregion
     

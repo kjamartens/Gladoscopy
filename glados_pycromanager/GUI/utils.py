@@ -3461,12 +3461,14 @@ class CustomMainWindow(QWidget):
         # save_state_MDA only catches a *bare* QWidget attribute -- a container of
         # widgets (list, dict) falls through to the generic branch and would be
         # dumped verbatim, so anything holding widgets belongs here.
-        # `_guiWrappers` is MDAGlados' list of the current rebuild's wrapper
-        # widgets (T-F7); it crashed the whole save until it was listed.
+        # `sectionGrid` and the two `*ListEditor`s are MDAGlados' layout-toolkit
+        # containers (its sections live on their own attributes). The container-
+        # of-widgets hazard above was hit for real by T-F7's `_guiWrappers` list,
+        # which crashed the whole save until it was listed; it no longer exists.
         # The two `_mda*Timer`s are MDAGlados' T-H1 debounce QTimers; `_mda` is the
         # backing store of its lazy `mda` property (T-H2) -- a JSON-encodable event
         # list, so without this it would be silently written into the state file.
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','_guiWrappers','_mdaEventsUpdateTimer','_mdaStateSaveTimer','_mda']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','sectionGrid','xypositionListEditor','channelListEditor','_mdaEventsUpdateTimer','_mdaStateSaveTimer','_mda']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):
