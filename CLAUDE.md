@@ -636,6 +636,46 @@ acquisition, just materialised.
   a `raise_()` on a tabified dock before Qt builds the tab bar is ignored, and the last-added
   tab wins. The maximise first clears `WindowMaximized`, because napari restores a saved
   maximised flag with a stale size and `showMaximized()` is then a no-op.
+- **UI toolkit — `ui/layout/` (the MDA and Controls docks are built on it).** Rules:
+  **never set a font, margin, padding or colour on an individual widget** — spacing
+  comes from `current_theme()` when a layout is built, and looks come from the one
+  stylesheet `build_stylesheet(theme)` (applied to the three standalone docks by
+  `runNapariPycroManager`, and by `GladosWidget.__init__` on the plugin path), styled
+  per widget by a `gladosRole` property set with `set_role()` (`section`, `primary`
+  for Acquire, `readonly`, `warning`/`normal`). The pieces:
+  - `theme.Theme` — every size/colour; defaults reproduce the old inline
+    `ScaledStylesheet` (14 px font and Windows metrics x0.75). Persisted as the
+    all-hidden `LayoutConfig` (`config.layout_config`, same field names, fed through
+    `theme_from_config`, read once at startup) — the storage for a future
+    layout-settings UI. `hidden_sections` there (comma-separated section keys) is
+    honoured by both panels.
+  - `Section(title, key, layout)` — a titled `QGroupBox`; `key` (`"mda.z"`,
+    `"controls.stages"`) is how a grid places it. `set_active()` is `setEnabled`, so
+    `get_MDA_events_from_GUI`'s `isEnabled()` gating is unchanged. The theme's QSS
+    zeroes group-box padding, so `Section` reserves room for its title itself.
+  - `FormGrid` (label | field | trailing, field stretches; a lone field spans the
+    trailing column), `FlowRow` (wraps when narrow), `ListEditor` (table + top-aligned
+    button column; `configure_table_header` sizes columns from header text and sets a
+    `table_min_rows` minimum height — never a fixed height/width).
+  - `ResponsiveGrid` — `register(key, widget)` once, `set_placements({bucket:
+    [Placement(...)]}, column_stretch={bucket: {key: n}})`, then `apply(bucket)` only
+    **moves** widgets (no-op when unchanged). Buckets come from `classify_shape(w, h)`,
+    the single classifier both hosts use. Hidden/unbuilt sections close ranks: only
+    single-cell placements claim a row/column, so a spanning bar shrinks with them.
+    `bucketChanged` lets a section rearrange its insides (the MDA storage bar stacks
+    into two rows when tall, `_arrangeStorageBar`).
+  - Panels keep `self.gui` / `self.mainLayout` as the `QGridLayout` hosts embed
+    (`addLayout`, `setLayout`, the Nodz MDA/MM-config dialogs); it holds just the
+    `sectionGrid`. Placements live at module scope: `MDA_SECTION_PLACEMENTS` in
+    `MDAGlados.py`, `CONTROLS_SECTION_PLACEMENTS` in `MMcontrols.py`. Both panels have
+    `handleSizeChange(size)`, wired to the standalone dock's `sizeChanged`;
+    `GUI_grid_width` now holds the bucket (a legacy int column count still maps).
+  - To add a section: build a `Section`, `register` it, add a `Placement` per bucket.
+  - Offscreen screenshots need `QT_QPA_FONTDIR=C:/Windows/Fonts`, or Qt renders no text.
+  Tests: `tests/test_ui_theme.py`, `tests/test_ui_responsive_grid.py`,
+  `tests/test_ui_list_editor.py`, `tests/test_mda_gui_rebuild.py`,
+  `tests/test_controls_panel_layout.py`. Widget-identity tests compare
+  `sip.unwrapinstance()` addresses, never `id()` of a PyQt wrapper (not stable).
 - `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `Showcase_Basic1.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
 - Hostname gate: `runNapariPycroManagerWrap` flips `includeCustomUI=True` when `'SMIPC' in platform.node()` — site-specific UI add-ons.
 
@@ -735,7 +775,7 @@ list, a dict — passes the `isinstance(value, QWidget)` check and then raises
 `TypeError: Object of type QWidget is not JSON serializable` inside the encoder.
 **Any new attribute on `MDAGlados` that holds widgets, or anything else not
 JSON-encodable, must be added to `storingExceptions`** (this bit `_guiWrappers`
-from T-F7). The generic branch now skips un-encodable values with a warning
+from T-F7; today `sectionGrid` and the two `*ListEditor`s are listed). The generic branch now skips un-encodable values with a warning
 naming the key and type, and the state is encoded with `json.dumps` *before* the
 file is opened — `open(..., 'w')` truncates first, so an encoder failure used to
 destroy the user's entire settings file, not just the offending key. Watch the
@@ -825,7 +865,7 @@ replaced it is what new code in these files should follow.
   matches the node as connection **destination** (`connection[1]`) — the naming is
   inverted from what it reads like. Tests: `tests/test_node_error_check_batching.py`.
 - **Dock relayout (T-F6/T-F7).** `GladosWidget.resizeEvent` now only classifies the
-  size (`_layoutForCurrentSize`, four aspect-ratio buckets) and calls
+  size (`_layoutForCurrentSize` -> `ui.layout.classify_shape`) and calls
   `_scheduleGroupBoxLayout`, which **drops a layout identical to the applied one**
   and otherwise restarts a 150 ms timer. The replaced `QScrollArea` is
   `deleteLater()`d (one leaked per resize event before) — narrowed to `QScrollArea`
@@ -834,10 +874,14 @@ replaced it is what new code in these files should follow.
   call `GladosWidget.requestRelayout()`; that is what replaced
   `MDAGlados.updateGUIwidgets`' synthetic `QEvent.Resize` + `QCoreApplication.processEvents()`
   (which allowed re-entrant `updateGUIwidgets` and could run `napariUpdateLive` slots
-  mid-rebuild). `updateGUIwidgets` also reuses one Acquire button — held on
-  `_acquireButton`, **not** `GUI_acquire_button`, which starts life as the boolean
-  flag and is passed back in as one — and discards the previous rebuild's wrapper
-  widgets instead of stacking them in the same grid cells. Tests:
+  mid-rebuild). The Acquire button is built once — held on `_acquireButton`,
+  **not** `GUI_acquire_button`, which starts life as the boolean flag and is passed
+  back in as one. Since the UI toolkit, `updateGUIwidgets` builds nothing at all
+  (the old per-rebuild wrapper widgets and `_discardPreviousGUIWrappers` are gone):
+  it enables sections, refills the order dropdown in place and re-places, and a
+  panel with a `sectionGrid` is arranged by `GladosWidget` through
+  `ResponsiveGrid.apply` inside a scroll area built once — the reparenting path
+  remains only for panels not on the toolkit. Tests:
   `tests/test_dock_relayout_debounce.py`, `tests/test_mda_gui_rebuild.py`.
 - **Hardware edits (T-F8, MMcontrols half only).** A slider drag's device write is
   deferred 200 ms (`_scheduleSliderPropertyWrite`) and flushed on `sliderReleased`;

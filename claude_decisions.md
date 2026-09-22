@@ -4063,3 +4063,40 @@ failed at 127, and `make run-demo-smlm` boots to the napari window with the Demo
 no start dialog. Pinned by `test_python_path_separator_follows_the_recipe_shell`.
 
 **Affects:** `Makefile`, `tests/test_demo_settings_makefile.py`, `CLAUDE.md`.
+
+## 2026-09-22 — A shared layout toolkit for the MDA and Controls docks
+
+**Asked for:** the MDA tab wasted space, clipped the storage path and the "Channel
+Setting" header, and misaligned XY/Channel against Z; generally, a uniform, modular
+set of UI elements across MDA and Controls, ready for later layout settings.
+
+**Decisions (the first four confirmed with the user):**
+- Order of work: toolkit, then MDA, then Controls, one commit each.
+- Wide MDA layout: Storage + Acquire in a full-width bar on **top**; Dimensions
+  (checkboxes + order), Exposure and Time packed in one setup column; XY, Z, Channel
+  side by side with the spare width going to the tables.
+- Layout settings: **architecture only** — every value in a hidden `LayoutConfig`,
+  no settings UI yet.
+- **One placement engine for both hosts** (standalone dock and napari-plugin
+  `GladosWidget`), via `classify_shape` + `ResponsiveGrid`.
+- Styling by `gladosRole` properties in one generated stylesheet rather than
+  per-widget `setStyleSheet`. Exception: `setLineEditStyle` stays per-widget (with
+  theme colours), because node-parameter fields can sit outside any dock stylesheet.
+- `self.gui` / `self.mainLayout` stay `QGridLayout`s holding the grid, so the Nodz
+  dialogs and both hosts needed no change.
+- Rebuilds no longer construct widgets, so the source-text tests pinning the old
+  wrapper/Acquire code were rewritten as behavioural tests on a real panel.
+- The theme's defaults reproduce the old inline stylesheet, so the unmigrated
+  Autonomous-microscopy dock does not change look.
+- Order moved into the Options box ("Dimensions") so the setup column fits a
+  ~340 px wide dock; the XY button column still slightly exceeds it (scrolls).
+
+**Found, not fixed:** the napari-plugin path is likely unrunnable (no `MILcore`);
+logged in `claude_issues_and_features.md`. `test_dimension_cache::
+test_the_lazy_useq_conversion_does_not_bump_the_generation` failed once in a full
+run and passed in isolation, next to the new tests, and in the next full run —
+flaky, not investigated.
+
+**Affects:** `ui/layout/` (new), `GUI/sharedFunctions.py`, `Core/MDAGlados.py`,
+`GUI/MMcontrols.py`, `GUI/napariGlados.py`, `_dock_widget.py`,
+`GUI/Analysis_dockWidgets.py`, `GUI/utils.py`, `ui/widgets/builders.py`, tests.
