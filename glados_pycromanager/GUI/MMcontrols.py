@@ -65,6 +65,13 @@ from glados_pycromanager.ui.layout import (
 )
 
 
+#: How often the Configurations panel auto-refreshes itself from live MM state.
+CONFIG_AUTOREFRESH_INTERVAL_MS = 10_000
+#: A rebuild tick that blocks the GUI thread longer than this stops the
+#: auto-refresh timer silently rather than keep paying that freeze every tick.
+CONFIG_AUTOREFRESH_MAX_FREEZE_MS = 50
+
+
 #: T-B4: a hardware intent from a GUI slot goes to the MicroscopeService owner
 #: thread (T-B3) instead of running on the GUI thread. With no service running
 #: -- tests, the napari-plugin path, a shutdown in progress -- everything falls
@@ -470,6 +477,15 @@ class MMConfigUI(CustomMainWindow):
             #browser, config group editor. Wraps when the section is narrow.
             self.refreshButton = QPushButton("Refresh configs from MM")
             self.refreshButton.clicked.connect(lambda index: self.rebuildConfigLayout())
+            #Auto-refresh the panel from live MM state periodically. Each tick
+            #is timed on the GUI thread (rebuildConfigLayout runs synchronously
+            #there); a tick that freezes the GUI for longer than
+            #CONFIG_AUTOREFRESH_MAX_FREEZE_MS silently stops the timer rather
+            #than continuing to cost that freeze every interval.
+            self._configAutoRefreshTimer = QTimer(self)
+            self._configAutoRefreshTimer.setInterval(CONFIG_AUTOREFRESH_INTERVAL_MS)
+            self._configAutoRefreshTimer.timeout.connect(self._autoRefreshConfigLayout)
+            self._configAutoRefreshTimer.start()
             self.devicePropertyBrowserButton = QPushButton("Device Property Browser…")
             self.devicePropertyBrowserButton.clicked.connect(lambda: self.openDevicePropertyBrowser())
             self.configGroupEditorButton = QPushButton("Config Group Editor…")
@@ -2290,6 +2306,24 @@ class MMConfigUI(CustomMainWindow):
     #endregion
     
     #region MM-configs
+    def _autoRefreshConfigLayout(self):
+        """Timer-driven tick of rebuildConfigLayout(), self-disabling if it's slow.
+
+        rebuildConfigLayout() runs synchronously on the GUI thread, so its wall
+        time here is the freeze it causes. If a tick takes longer than
+        CONFIG_AUTOREFRESH_MAX_FREEZE_MS, the timer stops itself silently
+        (no dialog/warning to the user) rather than keep freezing the GUI
+        every CONFIG_AUTOREFRESH_INTERVAL_MS.
+        """
+        start = time.perf_counter()
+        self.rebuildConfigLayout()
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if elapsed_ms > CONFIG_AUTOREFRESH_MAX_FREEZE_MS:
+            logging.info(
+                'Configurations panel auto-refresh took %.1f ms (> %d ms) - disabling auto-refresh',
+                elapsed_ms, CONFIG_AUTOREFRESH_MAX_FREEZE_MS)
+            self._configAutoRefreshTimer.stop()
+
     def rebuildConfigLayout(self):
         """Fully rebuild the Configurations panel from live MM state.
 
