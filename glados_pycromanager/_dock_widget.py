@@ -7,7 +7,6 @@ import sys
 import napari
 from pycromanager import Core
 from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QGridLayout, QGroupBox, QLabel, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
 os.environ['NAPARI_ASYNC'] = '1'
@@ -32,7 +31,7 @@ from glados_pycromanager.GUI.napariHelperFunctions import (  #type:ignore
 from glados_pycromanager.GUI.sharedFunctions import Shared_data  #type: ignore
 from glados_pycromanager.GUI.utils import *  #type: ignore
 from glados_pycromanager.GUI.utils import CustomMainWindow  #type:ignore
-from glados_pycromanager.ui.layout import classify_shape
+from glados_pycromanager.ui.layout import build_stylesheet, classify_shape
 
 #endregion
 
@@ -66,6 +65,8 @@ class GladosWidget(QWidget):
         self._relayoutTimer.setSingleShot(True)
         self._relayoutTimer.setInterval(self.RELAYOUT_DEBOUNCE_MS)
         self._relayoutTimer.timeout.connect(self._applyPendingLayout)
+        # The same theme stylesheet the standalone docks get (ui/layout/theme.py).
+        self.setStyleSheet(build_stylesheet())
         
         if parent is not None:
             self.core = parent.core
@@ -306,16 +307,6 @@ class MMConfigWidget(GladosWidget):
         
         logging.debug("dockWidget_MMConfig started")
 
-    def resizeEvent(self, event):
-        """"
-        Called when the window is resized
-        Basically just updates the font/margins
-        """
-        self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
-        # self.adjustSize()
-        self.layoutInfo.adjustSize() #type:ignore
-        super().resizeEvent(event)
-        self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
 
 class MDAWidget(GladosWidget):
     """
@@ -339,16 +330,6 @@ class MDAWidget(GladosWidget):
         
         logging.debug("dockwidget_MDA started")
 
-    def resizeEvent(self, event):
-        """"
-        Called when the window is resized
-        Basically just updates the font/margins
-        """
-        # self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
-        # self.adjustSize()
-        self.layoutInfo.adjustSize() #type:ignore
-        super().resizeEvent(event)
-        # self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
 
 class AutonomousMicroscopyWidget(GladosWidget):
     """

@@ -8,7 +8,6 @@ import time
 
 import appdirs
 import numpy as np
-from PyQt5 import QtWidgets
 from PyQt5.QtCore import (
     QEvent,
     Qt,
@@ -16,16 +15,13 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtGui import (
     QDoubleValidator,
-    QFont,
     QIcon,
 )
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
-    QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -54,7 +50,19 @@ from glados_pycromanager.GUI.napariHelperFunctions import (
     moveLayerToTop,
 )
 from glados_pycromanager.GUI.utils import CustomMainWindow
-from glados_pycromanager.ui.layout import ROLE_READONLY, set_role
+from glados_pycromanager.ui.layout import (
+    LANDSCAPE,
+    PORTRAIT,
+    ROLE_READONLY,
+    TALL,
+    WIDE,
+    FlowRow,
+    Placement,
+    ResponsiveGrid,
+    Section,
+    classify_shape,
+    set_role,
+)
 
 
 #: T-B4: a hardware intent from a GUI slot goes to the MicroscopeService owner
@@ -117,6 +125,42 @@ def guiThreadCall(shared_data, fn):
         fn()
         return
     bridge.submit(lambda _viewer: fn())
+
+
+#: Where each Controls section goes per dock shape (`ui.layout.classify_shape`).
+#: Sections a panel was not built with (e.g. relative stages) are simply absent,
+#: and the grid closes up around them.
+_CONTROLS_SQUARISH = [
+    Placement("controls.general", 0, 0),
+    Placement("controls.configs", 0, 1),
+    Placement("controls.stages", 1, 0),
+    Placement("controls.rt", 1, 1),
+    Placement("controls.relative_stages", 2, 0),
+]
+CONTROLS_SECTION_PLACEMENTS = {
+    WIDE: [
+        Placement("controls.general", 0, 0),
+        Placement("controls.configs", 0, 1),
+        Placement("controls.stages", 0, 2),
+        Placement("controls.relative_stages", 0, 3),
+        Placement("controls.rt", 0, 4),
+    ],
+    LANDSCAPE: _CONTROLS_SQUARISH,
+    PORTRAIT: _CONTROLS_SQUARISH,
+    TALL: [
+        Placement("controls.general", 0, 0),
+        Placement("controls.configs", 1, 0),
+        Placement("controls.stages", 2, 0),
+        Placement("controls.relative_stages", 3, 0),
+        Placement("controls.rt", 4, 0),
+    ],
+}
+CONTROLS_COLUMN_STRETCH = {
+    WIDE: {"controls.configs": 2, "controls.rt": 1},
+    LANDSCAPE: {"controls.general": 1, "controls.configs": 1},
+    PORTRAIT: {"controls.general": 1, "controls.configs": 1},
+    TALL: {"controls.general": 1},
+}
 
 
 class ConfigInfo:
@@ -392,23 +436,22 @@ class MMConfigUI(CustomMainWindow):
                 self.iconFolder = ''
         
         
+        # Every box is a `ui.layout.Section`, placed by `self.sectionGrid`
+        # according to the dock's shape (`CONTROLS_SECTION_PLACEMENTS`).
+        # `self.mainLayout` stays the QGridLayout hosts embed; it holds only the grid.
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.sectionGrid = ResponsiveGrid(default_bucket=WIDE)
+        self.mainLayout.addWidget(self.sectionGrid, 0, 0)
+        self._GUI_grid_width = None
+
         if showLiveSnapExposureButtons:
-            self.generalImagingGroupBox = QGroupBox("General")
-            
-            #Now add the live mode widget
-            # self.liveModeGroupBox = QGroupBox("Live Mode")
-            self.generalImagingGroupBox.setLayout(self.generalImagingLayout())
-            self.mainLayout.addWidget(self.generalImagingGroupBox, 0, 0)
-            
-            #TODO: add shutter here
-            
-            
-            
+            self.generalImagingGroupBox = Section("General", "controls.general", layout=self.generalImagingLayout())
+            self.sectionGrid.register(self.generalImagingGroupBox.key, self.generalImagingGroupBox)
+
         if showConfigs:
-            #Create a layout for the configs:
-            self.configGroupBox = QGroupBox("Configurations")
+            #Create a layout for the configs: one grid, a label column and a
+            #control column per block of `number_columns` rows (see addRow).
             self.configLayout = QGridLayout()
-            self.configLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
             #The row grid and the button row below it are two separate
             #layouts (not one widget spanning configLayout's columns) so the
             #buttons' width never forces the grid to allocate extra, mostly
@@ -416,80 +459,84 @@ class MMConfigUI(CustomMainWindow):
             #labels) into a fraction of the group box's real width.
             self.configOuterLayout = QVBoxLayout()
             self.configOuterLayout.addLayout(self.configLayout)
-            self.configGroupBox.setLayout(self.configOuterLayout)
-            self.mainLayout.addWidget(self.configGroupBox,0,2)
+            self.configGroupBox = Section("Configurations", "controls.configs", layout=self.configOuterLayout)
+            self.sectionGrid.register(self.configGroupBox.key, self.configGroupBox)
             #Fill the configLayout
             for config_id in range(len(config_groups)):
                 self.configEntries[config_id] = self.addRow(config_id)
+            self.configOuterLayout.addStretch(1)
 
             #Add the config-panel button row: refresh, device property
-            #browser, config group editor.
-            configButtonRow = QHBoxLayout()
+            #browser, config group editor. Wraps when the section is narrow.
             self.refreshButton = QPushButton("Refresh configs from MM")
             self.refreshButton.clicked.connect(lambda index: self.rebuildConfigLayout())
-            configButtonRow.addWidget(self.refreshButton)
-
             self.devicePropertyBrowserButton = QPushButton("Device Property Browser…")
             self.devicePropertyBrowserButton.clicked.connect(lambda: self.openDevicePropertyBrowser())
-            configButtonRow.addWidget(self.devicePropertyBrowserButton)
-
             self.configGroupEditorButton = QPushButton("Config Group Editor…")
             self.configGroupEditorButton.clicked.connect(lambda: self.openConfigGroupEditor())
-            configButtonRow.addWidget(self.configGroupEditorButton)
-
-            self.configOuterLayout.addLayout(configButtonRow)
+            self.configOuterLayout.addWidget(FlowRow([
+                self.refreshButton, self.devicePropertyBrowserButton, self.configGroupEditorButton]))
 
         #Add the stages widget to the right of this if wanted
         if showStages:
-            #Now add the stages widget
-            # self.stagesWidget()
-            self.stagesGroupBox = QGroupBox("Stages")
-            self.stagesGroupBox.setLayout(self.stagesLayout())
-            self.mainLayout.addWidget(self.stagesGroupBox, 0, 3)
-        
-        
+            self.stagesGroupBox = Section("Stages", "controls.stages", layout=self.stagesLayout())
+            self.sectionGrid.register(self.stagesGroupBox.key, self.stagesGroupBox)
+
         if showRelativeStages:
-            self.relativeStagesGroupBox = QGroupBox("RelativeStages")
-            self.relativeStagesGroupBox.setLayout(self.relativeStagesLayout())
-            # self.relativeStagesGroupBox.setLayout(QLayout())
-            self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
-        
-        
+            self.relativeStagesGroupBox = Section("Relative stages", "controls.relative_stages", layout=self.relativeStagesLayout())
+            self.sectionGrid.register(self.relativeStagesGroupBox.key, self.relativeStagesGroupBox)
+
         #Add the real-time analysis
         if showRealTimeAnalysis:
-            #Now add the stages widget
-            # self.stagesWidget()
-            self.realTimeAnalysisGroupBox = QGroupBox("Real-time analysis")
-            self.realTimeAnalysisGroupBox.setObjectName('realTimeAnalysisGroupBox')
-            
             self.rtAnalysisLayout = QGridLayout()
-            self.realTimeAnalysisGroupBox.setLayout(self.rtAnalysisLayout)
+            self.realTimeAnalysisGroupBox = Section("Real-time analysis", "controls.rt", layout=self.rtAnalysisLayout)
+            self.realTimeAnalysisGroupBox.setObjectName('realTimeAnalysisGroupBox')
             self.rtAnalysisSubGroupBoxLayout = QGridLayout()
             self.rtAnalysisLayout.addLayout(self.rtAnalysisSubGroupBoxLayout,0,0,1,2)
-            
+
             #Initialise the rt analysis layout:
             self.realTimeAnalysisLayout()
-            self.mainLayout.addWidget(self.realTimeAnalysisGroupBox, 0, 5)
-        
-        #Add a horizontal auto-widening object to mainlayout:
-        spacer = QtWidgets.QSpacerItem(2, 1, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.mainLayout.addItem(spacer,0,99)
-        
+            self.sectionGrid.register(self.realTimeAnalysisGroupBox.key, self.realTimeAnalysisGroupBox)
+
+        self.sectionGrid.set_placements(CONTROLS_SECTION_PLACEMENTS, CONTROLS_COLUMN_STRETCH)
+        self.sectionGrid.set_hidden(self._configuredHiddenSections())
+        self.sectionGrid.apply()
+
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
         self.fullyLoaded = True
         self.LoadAllMMFromJSON()
-        
+
         #Inactivate all configs if this is wanted
         if checkboxStartInactive and showCheckboxes and showConfigs:
             for config_id in range(len(config_groups)):
                 self.configCheckboxes[config_id].setChecked(False)
-                    
-        #Change the font of everything in the layout
-        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
-        #Twice because it relies on dependancies inside qgridlayouts
-        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
-    
+
+    def _configuredHiddenSections(self):
+        """Section keys the (hidden) `layout_config.hidden_sections` setting leaves out."""
+        try:
+            keys = self.shared_data.config.layout_config.hidden_section_keys()
+        except AttributeError:
+            return set()
+        return keys if isinstance(keys, set) else set()
+
+    @property
+    def GUI_grid_width(self):
+        """How the sections are arranged: a `ui.layout.classify_shape` bucket (same name as on MDAGlados)."""
+        return self._GUI_grid_width
+
+    @GUI_grid_width.setter
+    def GUI_grid_width(self, value):
+        if value == self._GUI_grid_width:
+            return
+        self._GUI_grid_width = value
+        if value is not None:
+            self.sectionGrid.apply(value)
+
+    def handleSizeChange(self, size):
+        """Rearrange the sections for the dock's new shape (see `ui.layout.classify_shape`)."""
+        self.GUI_grid_width = classify_shape(size.width(), size.height())
+
     #region General
     def updateAllMMinfo(self):
         """
@@ -601,62 +648,6 @@ class MMConfigUI(CustomMainWindow):
                 self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
                 pass
 
-    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
-        """
-        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
-        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
-
-        """
-        # if widget is None:
-        #     return
-        #Testing a few things
-        # try:
-        #     widget.setSizePolicy(
-        #         QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        #     )
-        # except:
-        #     pass
-        # try:
-        #     widget.setMimimumSize(10, 10)
-        # except:
-        #     pass
-        
-        # if not isinstance(widget, (QPushButton,QComboBox)):
-        #     try:
-        #         widget.setSizePolicy(
-        #             QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        #         )
-        #     except:
-        #         pass
-        
-        if isinstance(widget, (QPushButton)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-        if isinstance(widget, (QLabel, QComboBox)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-
-        if isinstance(widget, QGroupBox):
-            # widget.setSizePolicy(
-            #     QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            # )
-            # Ensure QGroupBox respects the size of its contents
-            widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
-
-        if hasattr(widget, 'layout'):
-            layout = widget.layout()
-            if layout:
-                # layout.setContentsMargins(0, 0, 0, 0)
-                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
-                for i in range(layout.count()):
-                    item = layout.itemAt(i)
-                    if hasattr(item, 'widget'):
-                        self.set_font_and_margins_recursive(item.widget(), font=font)
-                    if hasattr(item, 'layout'):
-                        self.set_font_and_margins_recursive(item.layout(), font=font)
-    
     #Get all config information as set by the UI:
     def getUIConfigInfo(self,onlyChecked=False):
         """
@@ -704,7 +695,6 @@ class MMConfigUI(CustomMainWindow):
         """
         #Create a Grid layout:
         liveModeLayout = QGridLayout()
-        liveModeLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
         #Add a 'exposure time' label:
         exposureTimeLabel = QLabel("Exposure time (ms):")
         liveModeLayout.addWidget(exposureTimeLabel,0,0)
@@ -751,49 +741,42 @@ class MMConfigUI(CustomMainWindow):
         liveModeLayout.addLayout(self.livesnapalbumbuttons,1,0,1,2)
         
         if self.showShutterOptions:
-            self.shutterOptionsGroupBox = QGroupBox("Shutter")
-            self.shutterOptionsGroupBox.setLayout(self.shutterOptionsLayout(orientation='horizontal'))
+            self.shutterOptionsGroupBox = Section("Shutter", "controls.shutter", layout=self.shutterOptionsLayout(orientation='horizontal'))
             liveModeLayout.addWidget(self.shutterOptionsGroupBox, 4,0,1,2)
-            
-        
+
         if self.showROIoptions:
             #Now add the ROI options widget
-            self.roiOptionsGroupBox = QGroupBox("ROI Options")
-            self.roiOptionsGroupBox.setLayout(self.ROIoptionsLayout(orientation='horizontal'))
+            self.roiOptionsGroupBox = Section("ROI Options", "controls.roi", layout=self.ROIoptionsLayout(orientation='horizontal'))
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
 
         #Now add the Scripts widget
-        self.scriptsGroupBox = QGroupBox("Scripts")
-        self.scriptsGroupBox.setLayout(self.scriptsOptionsLayout())
+        self.scriptsGroupBox = Section("Scripts", "controls.scripts", layout=self.scriptsOptionsLayout())
         liveModeLayout.addWidget(self.scriptsGroupBox, 6,0,1,2)
 
-        #Add one of those spacers at the bottom:
-        verticalSpacer = QSpacerItem(2, 1, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        liveModeLayout.addItem(verticalSpacer)
-        
-        #Add a button to update all MM info
-        
-        #Create a 'debug-ish' button list:
-        debugHbox = QHBoxLayout()
-        self.updateAllMMinfoButton = QPushButton("Update all MM info")
+        #Spare height goes below the sub-sections, above the button row:
+        liveModeLayout.setRowStretch(7, 1)
+
+        #Create a 'debug-ish' button list; it wraps when the section is narrow:
+        debugHbox = FlowRow()
+        self.updateAllMMinfoButton= QPushButton("Update all MM info")
         self.updateAllMMinfoButton.clicked.connect(self.updateAllMMinfo)
         #all the way at the bottom of the layout
-        debugHbox.addWidget(self.updateAllMMinfoButton)
+        debugHbox.add(self.updateAllMMinfoButton)
         #Add a button to close all layers
         self.closeAllLayersButton = QPushButton("Close all Layers")
         self.closeAllLayersButton.clicked.connect(lambda index, shared_data=shared_data: utils.closeAllLayers(shared_data))
         
         #all the way at the bottom of the layout
-        debugHbox.addWidget(self.closeAllLayersButton)
+        debugHbox.add(self.closeAllLayersButton)
         
         self.forceResetButton = QPushButton("Force-reset")
         self.forceResetButton.clicked.connect(lambda index, shared_data=shared_data: utils.forceReset(shared_data))
-        debugHbox.addWidget(self.forceResetButton)
+        debugHbox.add(self.forceResetButton)
         
         
         self.advSettingsButton = QPushButton("Adv. settings")
         self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
-        debugHbox.addWidget(self.advSettingsButton)
+        debugHbox.add(self.advSettingsButton)
 
         #Device Property Browser / Config Group Editor buttons live in the
         #Configurations panel itself (next to "Refresh configs from MM"),
@@ -801,9 +784,9 @@ class MMConfigUI(CustomMainWindow):
 
         self.helpButton = QPushButton("Help")
         self.helpButton.clicked.connect(lambda: self.openHelpWindow())
-        debugHbox.addWidget(self.helpButton)
-        
-        liveModeLayout.addLayout(debugHbox,99,0,1,2)
+        debugHbox.add(self.helpButton)
+
+        liveModeLayout.addWidget(debugHbox,99,0,1,2)
         
         #Return the layout
         return liveModeLayout
@@ -1552,22 +1535,6 @@ class MMConfigUI(CustomMainWindow):
         stageLayout.addWidget(oneDstageWidget)
         #Add a horizontal spacer:
         stageLayout.addStretch(1)
-        stageLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
-        # print(stageLayout.children())
-        xyLayoutWidth = 0
-        for i in range(xyStageLayout.columnCount()):
-            xyLayoutWidth += xyStageLayout.columnMinimumWidth(i)
-        oneDstageLayoutWidth = 0
-        for i in range(self.oneDStageLayout.columnCount()):
-            oneDstageLayoutWidth += self.oneDStageLayout.columnMinimumWidth(i)
-        
-        containerWidget = QWidget()
-        containerWidget.setLayout(stageLayout)
-        containerWidget.setFixedWidth(xyLayoutWidth+oneDstageLayoutWidth)
-        
-        stageOvercapLayout = QHBoxLayout()
-        stageOvercapLayout.addWidget(containerWidget)
-        
         return stageLayout
     
     def relativeStagesLayout(self):
@@ -2363,6 +2330,10 @@ class MMConfigUI(CustomMainWindow):
             while child_layout.count():
                 self._clearLayoutItem(child_layout.takeAt(0))
         if widget is not None:
+            # Hidden and detached now, not when the event loop gets round to
+            # the deleteLater -- otherwise the old row is painted over the new.
+            widget.hide()
+            widget.setParent(None)
             widget.deleteLater()
 
     def addRow(self,config_id):
@@ -2370,11 +2341,20 @@ class MMConfigUI(CustomMainWindow):
         Add a new row in the configLayout which will be populated with a label-dropdown/slider/inputField combination
         """
         rowLayout = QHBoxLayout()
+        rowLayout.setContentsMargins(0, 0, 0, 0)
         #Add the label to it
         self.addLabel(rowLayout,config_id)
-        #Add the widget to the QVBoxlayout
-        self.configLayout.addLayout(rowLayout,divmod(config_id,self.number_columns)[1],divmod(config_id,self.number_columns)[0])
-        
+        #The label (and checkbox) go in their own grid column so every row's
+        #control starts at the same x; `number_columns` rows per block.
+        labelLayout = QHBoxLayout()
+        labelLayout.setContentsMargins(0, 0, 0, 0)
+        for _ in range(2 if self.showCheckboxes else 1):
+            labelLayout.addWidget(rowLayout.takeAt(0).widget())
+        block, row = divmod(config_id, self.number_columns)
+        self.configLayout.addLayout(labelLayout, row, 2 * block)
+        self.configLayout.addLayout(rowLayout, row, 2 * block + 1)
+        self.configLayout.setColumnStretch(2 * block + 1, 1)
+
         return rowLayout
     
     def addLabel(self,rowLayout,config_id):
@@ -2814,22 +2794,6 @@ class MMConfigUI(CustomMainWindow):
         pass
     #endregion
 
-    def Vseparator_line(self):
-        """
-        Creates a vertical separator line widget.
-        
-        Args:
-            None
-        
-        Returns:
-            QFrame: A vertical separator line widget with frame shape set to QFrame.VLine, frame shadow set to QFrame.Sunken, and background color set to #FFFFFF with a minimum width of 1px.
-        """
-        
-        separator_line = QFrame()
-        separator_line.setFrameShape(QFrame.VLine)
-        separator_line.setFrameShadow(QFrame.Sunken)
-        separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
-        return separator_line
     #endregion
     
 def microManagerControlsUI(main_layout,sshared_data):

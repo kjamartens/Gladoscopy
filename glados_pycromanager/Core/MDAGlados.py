@@ -67,8 +67,8 @@ from glados_pycromanager.ui.layout import (
 
 #region Section arrangement
 #: Where each MDA section goes per dock shape (`ui.layout.classify_shape`).
-#: "mda.storagebar" is Storage + Acquire; "mda.setup" stacks Options, Order,
-#: Exposure and Time. Stretch is per section: spare width goes to the tables.
+#: "mda.storagebar" is Storage + Acquire; "mda.setup" stacks Dimensions (with
+#: the order), Exposure and Time. Stretch is per section: spare width goes to the tables.
 _SQUARISH = [
     Placement("mda.storagebar", 0, 0, 1, 2),
     Placement("mda.setup", 1, 0),
@@ -727,8 +727,8 @@ class MDAGlados(CustomMainWindow):
         self.channelGroupBox = Section("Channel", "mda.channel")
         self.timeGroupBox = Section("Time", "mda.time")
         self.storageGroupBox = Section("Storage", "mda.storage", layout=QGridLayout())
-        self.showOptionsGroupBox = Section("Options", "mda.options")
-        self.orderGroupBox = Section("Order", "mda.order")
+        # The dimension switches and the order they are acquired in share one box.
+        self.showOptionsGroupBox = Section("Dimensions", "mda.options")
 
         # --------------- Exposure widget -----------------------------------------------
         #Exposure: add a label, an entry field, and a dropdown between 'ms' and 's':
@@ -919,11 +919,10 @@ class MDAGlados(CustomMainWindow):
 
         # --- Ordering widget ---
         # Built once; `_refillOrderDropdown` (from updateGUIwidgets) only changes
-        # which permutations it offers.
+        # which permutations it offers. Placed under the dimension checkboxes.
         self.orderLabel = QLabel("Order:")
         self.orderDropdown = QComboBox()
         self.orderDropdown.currentTextChanged.connect(lambda: self.scheduleMDAEventsUpdate())
-        self.orderGroupBox.body.add_row(self.orderLabel, self.orderDropdown)
 
         #--------------- Channel widget -----------------------------------------------
         #Adding a list widget to add a list of channels
@@ -1010,6 +1009,7 @@ class MDAGlados(CustomMainWindow):
         self.showOptionsGroupBox.body.add_full_row(FlowRow([
             self.GUI_show_time_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox,
             self.GUI_show_channel_chkbox, self.GUI_show_storage_chkbox]))
+        self.showOptionsGroupBox.body.add_row(self.orderLabel, self.orderDropdown)
 
         # ---------- Acquire button -----------------------------------------------
         # T-F7: built once for the life of the object, so toggling options never
@@ -1041,7 +1041,7 @@ class MDAGlados(CustomMainWindow):
         setupColumn = QWidget()
         setupLayout = QVBoxLayout(setupColumn)
         setupLayout.setContentsMargins(0, 0, 0, 0)
-        for section in (self.showOptionsGroupBox, self.orderGroupBox, self.exposureGroupBox, self.timeGroupBox):
+        for section in (self.showOptionsGroupBox, self.exposureGroupBox, self.timeGroupBox):
             setupLayout.addWidget(section)
         setupLayout.addStretch(1)
         self.sectionGrid.register("mda.storagebar", storageBar)

@@ -25,12 +25,16 @@ from PyQt5.QtWidgets import (
 from glados_pycromanager.ui.layout.theme import ROLE_SECTION, current_theme, set_role
 
 
-def apply_section_spacing(layout: QLayout, margins: bool = True) -> None:
-    """Give `layout` the theme's inner spacing (and margins, unless `margins=False`)."""
+def apply_section_spacing(layout: QLayout, margins: bool = True, title_px: int = 0) -> None:
+    """Give `layout` the theme's inner spacing (and margins, unless `margins=False`).
+
+    `title_px` is extra room above the body for a group-box title: the theme's
+    stylesheet zeroes QGroupBox padding, so nothing else reserves it.
+    """
     t = current_theme()
     layout.setSpacing(t.section_spacing_px)
     m = t.section_margin_px if margins else 0
-    layout.setContentsMargins(m, m, m, m)
+    layout.setContentsMargins(m, m + title_px, m, m)
 
 
 class Section(QGroupBox):
@@ -48,7 +52,7 @@ class Section(QGroupBox):
         set_role(self, ROLE_SECTION)
         if layout is None:
             layout = FormGrid()
-        apply_section_spacing(layout)
+        apply_section_spacing(layout, title_px=current_theme().font_px + 2 if title else 0)
         self.setLayout(layout)
 
     @property
