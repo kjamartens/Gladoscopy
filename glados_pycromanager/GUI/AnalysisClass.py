@@ -682,6 +682,52 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
                 elif isinstance(ctrl, str) and ctrl.startswith('__set_log_level__:'):
                     new_level = ctrl.split(':', 1)[1]
                     logging.getLogger().setLevel(getattr(logging, new_level.upper(), logging.INFO))
+                elif isinstance(ctrl, dict) and ctrl.get('__close__'):
+                    # stop() on a still-alive, cacheable worker (see
+                    # _park_subprocess_worker) parks the process instead of
+                    # tearing it down, but the node itself must still be
+                    # properly closed *at stop time* -- end_fn may finalise
+                    # something (e.g. flush/close a dataset) that must not be
+                    # deferred to whenever (or whether) this worker is later
+                    # reclaimed. The object is left in place afterwards (never
+                    # used again unless __reinit__ replaces it); nothing reads
+                    # from in_queue while parked.
+                    try:
+                        end_fn(RT_analysis_object, rt_analysis_info, None, nodzInfo=None)
+                    except Exception:
+                        logging.exception('AnalysisProcess worker: end_fn failed while parking')
+                    if control_out_queue is not None:
+                        # Ack so stop() can confirm the close was actually
+                        # applied before treating the worker as parked -- see
+                        # tests/test_analysis_process.py's
+                        # test_worker_close_control_message_calls_end_fn.
+                        try:
+                            control_out_queue.put({'__close_done__': True})
+                        except Exception:
+                            logging.exception('AnalysisProcess worker: failed to ack close')
+                elif isinstance(ctrl, dict) and ctrl.get('__reinit__'):
+                    # A warm-restart reclaim (see _park_subprocess_worker):
+                    # the process/imports stay warm, but the node's init()
+                    # must run again so a close+reopen doesn't silently reuse
+                    # the previous run's state. The stale object was already
+                    # properly closed via '__close__' when stop() parked this
+                    # worker, so only init_fn runs here -- calling end_fn again
+                    # on the same object would be a second, spurious close.
+                    rt_analysis_info = ctrl['analysisInfo']
+                    try:
+                        RT_analysis_object = init_fn(rt_analysis_info, core=None, nodzInfo=None)
+                        snapshot_attrs = utils.realTimeAnalysis_snapshotAttrs(rt_analysis_info)
+                    except Exception:
+                        logging.exception('AnalysisProcess worker: reinit failed')
+                    if control_out_queue is not None:
+                        # Ack so a caller (or a test) can know the reinit has
+                        # actually applied before relying on it -- there is no
+                        # ordering guarantee between this control message and
+                        # a frame put on in_queue right after it otherwise.
+                        try:
+                            control_out_queue.put({'__reinit_done__': True})
+                        except Exception:
+                            logging.exception('AnalysisProcess worker: failed to ack reinit')
             try:
                 item = in_queue.get(timeout=0.5)
             except std_queue.Empty:
@@ -815,15 +861,21 @@ class AnalysisProcess_customFunction(QThread):
         `visualise()` to read keeps working unmodified. This duplicates any
         one-time init cost (e.g. importing diplib) once per process.
       * Warm restarts (_rt_config_key / _park_subprocess_worker /
-        subprocess_pool.py): stop() parks a still-alive worker (+ its
-        visualisation shadow object) instead of killing it, and __init__
-        reclaims it on an identical restart to skip spawn/import/model-load.
-        This means the node's Python-level state (self attributes set in
-        run(), e.g. a frame counter or accumulation buffer) now survives a
-        stop -> start of the *same* configuration, where previously every
-        start got a fresh instance. No current node is known to rely on
-        per-start-fresh state, so this isn't fixed with a reset hook -- if a
-        future node needs one, that's the place to add it.
+        subprocess_pool.py): stop() parks a still-alive worker instead of
+        killing it, and __init__ reclaims it on an identical restart to skip
+        spawn + package-tree import. The node itself is still properly
+        closed and re-opened, at the times a user would expect: stop()
+        sends a `__close__` control message that calls end_fn *immediately*
+        (so anything end_fn finalises, e.g. flushing/closing a dataset,
+        happens at stop time, not deferred to some future reopen), and a
+        later reclaim's `__reinit__` message calls init_fn again (never
+        end_fn a second time -- that already happened at close) before
+        resuming the frame loop; the main-process visualisation shadow is
+        rebuilt fresh the same way. So a close+reopen always starts from a
+        fresh node instance, it's only the process/imports that are reused.
+        This does mean a heavy one-time init cost (e.g. loading model
+        weights) is paid again on every reopen; only the spawn+import cost
+        is actually saved.
     """
     # NOTE: no analysis_done_signal here. It was declared and emitted once per
     # frame per node but had zero connect() sites anywhere in the repo -- a
@@ -858,15 +910,29 @@ class AnalysisProcess_customFunction(QThread):
             # killing it -- its package imports/model weights/GPU context are
             # already loaded, so this restart skips spawn + import + model-load
             # entirely rather than paying it again.
-            logging.debug('AnalysisProcess: reusing warm cached subprocess for %s', self._node_label())
+            logging.debug('AnalysisProcess: reusing warm subprocess for %s, reinitialising', self._node_label())
             self._process = cached['process']
             self._in_queue = cached['in_queue']
             self._out_queue = cached['out_queue']
             self._stop_event = cached['stop_event']
             self._control_in_queue = cached['control_in_queue']
             self._control_out_queue = cached['control_out_queue']
-            self.RT_analysis_object = cached['RT_analysis_object']
             self._worker_warmed_up = True
+            # The process/imports stay warm (that's the whole point of the
+            # cache), but the node's init() must run again on every
+            # close+reopen -- reusing the parked RT_analysis_object as-is
+            # would silently carry over the previous run's state instead
+            # (see the class docstring's "warm restarts" limitation). Tell
+            # the child to rebuild its object, and rebuild the main-process
+            # visualisation shadow here too rather than reusing the parked one.
+            try:
+                self._control_in_queue.put({'__reinit__': True, 'analysisInfo': analysisInfo})
+            except Exception:
+                logging.exception('AnalysisProcess: failed to request child reinit')
+            if wants_visualisation:
+                self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
+            else:
+                self.RT_analysis_object = None
         else:
             # The child process re-imports the *entire* glados_pycromanager package
             # tree from scratch (spawn shares nothing with the parent) plus whatever
@@ -1121,6 +1187,19 @@ class AnalysisProcess_customFunction(QThread):
             # model-load entirely. The worker's run loop just idles on
             # in_queue.get(timeout=0.5) with nothing arriving, so this costs
             # ~0 CPU while parked (see _park_subprocess_worker).
+            #
+            # The node itself must still be properly closed *now*, not
+            # whenever (or whether) it's later reclaimed -- end_fn may
+            # finalise something (e.g. flush/close a dataset) that a close
+            # right after stop() is what the user expects, not a close
+            # deferred to some future reopen. '__close__' calls end_fn on the
+            # worker's own thread; fire-and-forget like the other control
+            # messages here (queue ordering guarantees any later '__reinit__'
+            # on this same control_in_queue is processed after it).
+            try:
+                self._control_in_queue.put({'__close__': True})
+            except Exception:
+                logging.exception('AnalysisProcess: failed to request child close while parking')
             _park_subprocess_worker(self.shared_data, self._cache_key, {
                 'process': self._process,
                 'in_queue': self._in_queue,
@@ -1128,7 +1207,6 @@ class AnalysisProcess_customFunction(QThread):
                 'stop_event': self._stop_event,
                 'control_in_queue': self._control_in_queue,
                 'control_out_queue': self._control_out_queue,
-                'RT_analysis_object': self.RT_analysis_object,
             })
             return
 

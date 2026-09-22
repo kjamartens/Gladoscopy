@@ -108,6 +108,62 @@ def test_worker_exits_cleanly_on_stop_sentinel_without_pending_work(mp_ctx):
         stop_event.set()
 
 
+@pytest.mark.slow
+def test_worker_close_then_reinit_matches_stop_then_reclaim(mp_ctx):
+    """AnalysisProcess_customFunction.stop() on a cacheable worker sends
+    {'__close__': True} *immediately* (so end_fn's finalisation, e.g.
+    flushing/closing a dataset, happens at stop time -- not deferred to
+    whenever, or whether, the worker is later reclaimed), and a later
+    __init__() reclaim sends {'__reinit__': True, 'analysisInfo': ...} to
+    build a fresh node instance. end_fn must fire exactly once, at close,
+    and init_fn must build a genuinely fresh object at reinit -- not
+    accumulate onto the one from before reinit, and not run end_fn a second
+    time on it."""
+    in_queue, out_queue, stop_event = _make_channels(mp_ctx)
+    control_in_queue = mp_ctx.Queue(maxsize=2)
+    control_out_queue = mp_ctx.Queue(maxsize=2)
+    proc = mp_ctx.Process(
+        target=_subprocess_analysis_worker,
+        args=({"initial_value": 10}, in_queue, out_queue, stop_event),
+        kwargs={
+            "init_fn": fake_init_fn, "run_fn": fake_run_fn, "end_fn": fake_end_fn,
+            "control_in_queue": control_in_queue, "control_out_queue": control_out_queue,
+        },
+        daemon=True,
+    )
+    proc.start()
+    try:
+        image = np.ones((2, 2), dtype=np.int64)  # sum == 4
+        in_queue.put((image, {"frame": 1}))
+        result, _metadata, state_snapshot = _get_or_fail_fast(out_queue, proc)
+        assert result == 10 + 4
+        assert state_snapshot["init_calls"] == 1
+        assert state_snapshot["end_calls"] == 0
+
+        # stop() "parking" this worker: end_fn must run right away, not when
+        # (or if) it's later reclaimed.
+        control_in_queue.put({"__close__": True})
+        assert control_out_queue.get(timeout=15) == {"__close_done__": True}
+
+        # __init__() reclaiming it later: init_fn runs again, end_fn does not
+        # (it already ran at close -- a second call would be a spurious
+        # double-close of the same, already-finalised object).
+        control_in_queue.put({"__reinit__": True, "analysisInfo": {"initial_value": 100}})
+        assert control_out_queue.get(timeout=15) == {"__reinit_done__": True}
+        in_queue.put((image, {"frame": 2}))
+        result, _metadata, state_snapshot = _get_or_fail_fast(out_queue, proc)
+        # A fresh FakeRTAnalysisObject was built from the new analysisInfo,
+        # not accumulated onto the one from before reinit.
+        assert result == 100 + 4
+        assert state_snapshot["init_calls"] == 1
+        assert state_snapshot["end_calls"] == 0  # fresh object, never closed itself
+    finally:
+        stop_event.set()
+        in_queue.put(None)
+        proc.join(timeout=15)
+        assert not proc.is_alive()
+
+
 def _get_or_fail_fast(out_queue, proc, timeout=60):
     """`out_queue.get(timeout=...)`, but give up as soon as the child dies.
 
