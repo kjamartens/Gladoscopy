@@ -1809,12 +1809,13 @@ class MDAGlados(CustomMainWindow):
         
         import useq
         
+        channel_group = self.channel_group or "Channel"
         channel_data = []
         for i, channel_name in enumerate(self.channels):
             if i < len(self.channel_exposures_ms) and self.channel_exposures_ms[i] is not None:
-                channel_data.append({"config": channel_name, "exposure": self.channel_exposures_ms[i]})
+                channel_data.append({"config": channel_name, "group": channel_group, "exposure": self.channel_exposures_ms[i]})
             else:
-                channel_data.append({"config": channel_name, "exposure": self.exposure_ms})
+                channel_data.append({"config": channel_name, "group": channel_group, "exposure": self.exposure_ms})
         
         if self.xy_positions is None:
             xy_pos = []
