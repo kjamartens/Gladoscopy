@@ -134,9 +134,6 @@ def guiThreadCall(shared_data, fn):
     bridge.submit(lambda _viewer: fn())
 
 
-#: Where each Controls section goes per dock shape (`ui.layout.classify_shape`).
-#: Sections a panel was not built with (e.g. relative stages) are simply absent,
-#: and the grid closes up around them.
 _CONTROLS_SQUARISH = [
     Placement("controls.general", 0, 0),
     Placement("controls.configs", 0, 1),
@@ -168,6 +165,45 @@ CONTROLS_COLUMN_STRETCH = {
     PORTRAIT: {"controls.general": 1, "controls.configs": 1},
     TALL: {"controls.general": 1},
 }
+
+
+def waitForLiveModeWorkerStopped(shared_data, label):
+    """Block until the previous live-mode acquisition worker has fully torn down.
+
+    `hw.wait_for_system()` (a `MicroscopeProxy` call) only confirms that queued
+    *hardware* calls have completed -- it says nothing about the Python-side
+    worker thread (`run_MILCoreAcquisition_worker`), which still has to drain
+    the frame ring, finish any NDTiff archive, and tear down the visualisation
+    worker before it sets `_worker_stopped_event` in its own `finally`. A
+    live-restart helper (`setROI`/`resetROI`/exposure) that proceeds to flip
+    `liveMode` back to `True` before that event is set races
+    `acqModeChanged`'s *own* internal wait for the same event: if that wait
+    times out it reverts by setting `liveMode = False` again, which re-enters
+    `stopLiveModeVisualisation` and tries to disconnect a signal the first,
+    genuine stop already disconnected -- `TypeError: disconnect() failed
+    between 'yielded' and all its connections`. Waiting for the event
+    ourselves, once, with the same timeout `acqModeChanged` uses, is what
+    actually observed a live acquisition needing several seconds to tear down
+    (frame-ring drain, NDTiff finish) rather than the near-instant
+    `wait_for_system()` return.
+
+    Returns True once the worker is confirmed stopped, False on timeout (in
+    which case the caller should leave live mode off rather than restart onto
+    a worker that has not finished tearing down).
+    """
+    handler = getattr(shared_data, '_livemodeNapariHandler', None)
+    event = getattr(handler, '_worker_stopped_event', None)
+    if event is None:
+        return True
+    timeout = getattr(handler, 'ACQ_STOP_TIMEOUT_S', 10.0)
+    if event.wait(timeout=timeout):
+        return True
+    logging.error(
+        '%s: previous live acquisition worker did not stop within %.0fs; '
+        'leaving live mode off instead of restarting onto a worker that has '
+        'not finished tearing down.', label, timeout)
+    return False
+
 
 
 class ConfigInfo:
@@ -1167,8 +1203,29 @@ class MMConfigUI(CustomMainWindow):
 
         This function resets the ROI to its maximum size, which is the size of the image
         """
-        submitHardware(self.shared_data, self.shared_data.MILcore.clear_roi,
-                       label='mm.clear_roi')  # T-B4
+        if not shared_data.liveMode:
+            submitHardware(self.shared_data, self.shared_data.MILcore.clear_roi,
+                           label='mm.clear_roi')  # T-B4
+            return
+        # Same stop/change/restart orchestration as setROI() -- clear_roi() while
+        # live is running would otherwise change the frame size out from under
+        # the running acquisition instead of restarting it around the change.
+        threading.Thread(target=self._resetROI_liveRestart,
+                         name='resetROI', daemon=True).start()
+
+    def _resetROI_liveRestart(self):
+        """Stop live, clear the ROI, restart live -- off the GUI thread."""
+        hw = self.shared_data.microscope_proxy()
+        shared_data.liveMode = False
+        if not waitForLiveModeWorkerStopped(self.shared_data, 'resetROI'):
+            return
+        try:
+            hw.clear_roi() #type:ignore
+            hw.wait_for_system() #type:ignore
+        except Exception:
+            logging.exception('resetROI failed; restarting live anyway')
+        finally:
+            shared_data.liveMode = True
     
     def zoomROI(self,option):
         """
@@ -1242,18 +1299,27 @@ class MMConfigUI(CustomMainWindow):
         """Stop live, change the exposure, restart live -- off the GUI thread.
 
         Mirrors _setROI_liveRestart: stop_sequence_acquisition() is
-        fire-and-forget, so the waits either side of set_exposure are what
-        make this correct.
+        fire-and-forget, so waiting for the previous worker to actually tear
+        down (see `waitForLiveModeWorkerStopped`) is what makes restarting
+        correct -- `hw.wait_for_system()` alone returns long before that
+        teardown is done. Live mode is restarted in a `finally`, so a failure
+        anywhere in the exposure write -- a bad value, a transient hardware
+        error, anything not previously caught by the narrow exception list
+        this used to have -- can no longer leave live mode stopped with no
+        automatic restart; the exception is logged (with a full traceback, to
+        actually diagnose what happened) instead of being swallowed.
         """
         hw = self.shared_data.microscope_proxy()
+        shared_data.liveMode = False
+        if not waitForLiveModeWorkerStopped(self.shared_data, 'exposure change to %s' % exposure):
+            return
         try:
-            shared_data.liveMode = False
-            hw.wait_for_system() #type:ignore
             hw.set_exposure(exposure)
             hw.wait_for_system() #type:ignore
+        except Exception:
+            logging.exception('exposure change to %s failed; restarting live anyway', exposure)
+        finally:
             shared_data.liveMode = True
-        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
-            logging.error('exposure change to %s failed: %s', exposure, exc)
 
     def setROI(self,ROIpos):
         """
@@ -1289,19 +1355,22 @@ class MMConfigUI(CustomMainWindow):
         """Stop live, change the ROI, restart live -- off the GUI thread.
 
         T-F10 part 2: `stop_sequence_acquisition()` is fire-and-forget on the
-        Java side, so the waits either side of the `set_roi` are what make this
-        correct -- once for the camera to finish stopping, once for the ROI
-        change to take effect before restarting.
+        Java side, so waiting for the previous worker to actually tear down
+        (see `waitForLiveModeWorkerStopped`) -- not just `hw.wait_for_system()`,
+        which returns long before that teardown is done -- is what makes
+        restarting correct.
         """
         hw = self.shared_data.microscope_proxy()
+        shared_data.liveMode = False
+        if not waitForLiveModeWorkerStopped(self.shared_data, 'setROI(%s)' % (ROIpos,)):
+            return
         try:
-            shared_data.liveMode = False
-            hw.wait_for_system() #type:ignore
             hw.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
             hw.wait_for_system() #type:ignore
+        except Exception:
+            logging.exception('setROI(%s) failed; restarting live anyway', ROIpos)
+        finally:
             shared_data.liveMode = True
-        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
-            logging.error('setROI(%s) failed: %s', ROIpos, exc)
     
     def _restore_draw_roi_button(self):
         """Restore the 'Draw ROI' button to its default state."""

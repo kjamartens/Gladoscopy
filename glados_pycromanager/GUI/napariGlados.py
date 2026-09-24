@@ -307,6 +307,56 @@ def _slice_safe_to_display(shared_data, arrived_slice):
     return written
 
 
+#: How long to wait, once per acquisition, for the multiDstack ZarrFrameWriter
+#: to complete its first write before handing the store to napari's
+#: add_image() -- see _wait_for_zarr_writer_progress. Best-effort: a writer
+#: that has not landed a single write within this window (a stuck disk, an
+#: exposure far longer than this) is logged and the caller proceeds anyway,
+#: matching this codebase's other bounded-wait conventions.
+ZARR_WRITER_FIRST_WRITE_TIMEOUT_S = 5.0
+ZARR_WRITER_FIRST_WRITE_POLL_S = 0.01
+
+
+def _wait_for_zarr_writer_progress(shared_data,
+                                    timeout_s=ZARR_WRITER_FIRST_WRITE_TIMEOUT_S):
+    """Block until the multiDstack ZarrFrameWriter has completed at least one
+    write, so a subsequent napari read of the store cannot race an in-flight one.
+
+    zarr's LocalStore is not atomic: writing a chunk truncates the file to 0
+    bytes *before* the bytes are written (`_put` in zarr's local store opens
+    the path with mode "wb", which truncates on open). A read landing in that
+    window gets a 0-byte chunk, which crashes napari's own async layer-slicer
+    thread pool with "cannot reshape array of size 0 into shape (...)" --
+    outside anything Glados can catch, since it runs on napari's own thread.
+
+    Every *explicit* read this codebase drives is already safe:
+    `_slice_safe_to_display` only ever points `dims.point` at a slice the
+    writer has confirmed complete. `add_image()` is the one napari-internal
+    read this module does not otherwise control the target of -- it reads
+    whatever the viewer's current `dims.point` already is (all-zeros for a
+    brand new layer) practically immediately once the layer is attached.
+
+    Waiting for *any* completed write, not specifically slice (0, 0, ...), is
+    enough: the frame-ring consumer submits to the writer's queue in arrival
+    order and multiDstack acquisitions use the deep ring (every frame reaches
+    storage), so the first frame submitted -- index (0, 0, ...) -- is also the
+    first one the single writer thread completes.
+    """
+    writer = getattr(shared_data, 'zarrFrameWriter', None)
+    if writer is None:
+        # No async writer running for this store: either this backend never
+        # has one, or the frame was already written synchronously (the
+        # inline-write fallback in _try_write_frame_to_zarr) -- already safe.
+        return
+    deadline = time.monotonic() + timeout_s
+    while writer.last_written_tag is None:
+        if time.monotonic() >= deadline:
+            logging.warning('Zarr writer has not completed a write after %.1fs; '
+                            'attaching the store to napari anyway', timeout_s)
+            return
+        time.sleep(ZARR_WRITER_FIRST_WRITE_POLL_S)
+
+
 def _get_contrast_frame_counters(shared_data):
     """Per-layer-name frame counters backing the throttled auto-contrast
     refresh (see _maybe_refresh_contrast). Lazily initialized on shared_data,
@@ -828,7 +878,20 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                             if int(layerData.shape[dim_id]) != n_entries_in_dims[dim_id]:
                                 correctDimensions = False
                                 break
-                            
+                        else:
+                            # The leading (acquisition) dims all matched -- also check the
+                            # trailing image plane. A ROI/binning change between two
+                            # acquisitions that reuse the same layer name and happen to
+                            # have the same leading dim counts (e.g. both "5 time points")
+                            # was invisible to the loop above, which only ever looks at
+                            # dims *before* the image plane. The stale store's (h, w) then
+                            # silently stayed whatever the *previous* acquisition's camera
+                            # settings produced, and the first write of the new
+                            # acquisition failed with a zarr "could not broadcast" error
+                            # instead of triggering the rebuild below.
+                            if tuple(layerData.shape[-2:]) != tuple(latestImage.shape[-2:]):
+                                correctDimensions = False
+
                     #Remove the layer if the dimensions are wrong
                     if correctDimensions == True:
                         #Matches the current plan: record it so subsequent frames of
@@ -879,7 +942,26 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                                          latestImage.dtype)
                         #Seed position 0 with the current frame
                         shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
-                    
+                    else:
+                        # Pre-created by _preinit_mda_zarr: no seed write happened
+                        # above, so unlike the branch just above, nothing here has
+                        # guaranteed slice (0, 0, ...) is actually on disk yet --
+                        # only that the ZarrFrameWriter thread has been *handed*
+                        # it (T-D2's metadata stamp, which fires on submit, not on
+                        # completion). add_image() below makes napari read the
+                        # array at its current dims.point (all-zeros for a brand
+                        # new layer) practically immediately, on its own thread
+                        # pool. zarr's LocalStore is not atomic -- writing a chunk
+                        # truncates the file to 0 bytes *before* the bytes are
+                        # written -- so a napari read landing in that window reads
+                        # a 0-byte chunk and crashes its slicer thread with
+                        # "cannot reshape array of size 0" where Glados cannot
+                        # catch it. Wait for the writer to land its first write
+                        # (the frame-ring consumer submits in arrival order, so
+                        # the first frame it submits -- (0, 0, ...) -- is also the
+                        # first one the writer completes).
+                        _wait_for_zarr_writer_progress(shared_data)
+
                     layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
                     #Set correct scale - in nm
                     _apply_pixel_scale(layer, shared_data)
@@ -1446,14 +1528,43 @@ class napariHandler:
         layerName = shared_data.newestLayerName
         if not layerName or layerName == 'Live':
             return False
-        if shared_data.mdaZarrData.get(layerName) is not None:
-            return False
         try:
             dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = \
                 _get_cached_dimensions(shared_data)
-            h = int(self.shared_data.MILcore.core.getImageHeight())
-            w = int(self.shared_data.MILcore.core.getImageWidth())
+            # Read the frame shape through MIL's get_roi()-derived accessor, not a raw
+            # core.getImageHeight()/getImageWidth() call. On at least one real camera
+            # (as opposed to the demo cam this function's race was written for) those
+            # returned the unbinned sensor ROI extents rather than the actual binned
+            # frame size -- 3200x3200 pre-created here against 800x800 frames actually
+            # written, so every ZarrFrameWriter write raised
+            # "could not broadcast input array from shape (800,800) into shape
+            # (3200,3200)" and every frame of the acquisition was lost. get_roi() is
+            # the same source _get_image_shape() uses to reshape live frames, which
+            # does not exhibit this mismatch.
+            h = int(self.shared_data.MILcore.get_image_height())
+            w = int(self.shared_data.MILcore.get_image_width())
             dtype = _camera_dtype(self.shared_data)
+            expected_shape = tuple(n_entries_in_dims) + (h, w)
+            existing = shared_data.mdaZarrData.get(layerName)
+            if existing is not None:
+                if tuple(existing.shape) == expected_shape and existing.dtype == np.dtype(dtype):
+                    # Already the right shape/dtype for this acquisition -- reusing
+                    # it is what lets frameReady callbacks write immediately even
+                    # for a repeated acquisition under the same layer name.
+                    return False
+                # A store from a previous acquisition under the same layer name
+                # (repeated MDA, or a ROI/binning change) with the wrong shape --
+                # reusing it as-is is what made every ZarrFrameWriter write of
+                # this acquisition fail with a zarr "could not broadcast" error.
+                # Discard it so the fresh array below actually matches what this
+                # acquisition is about to write.
+                logging.info('Stale multiDstack store for %r: shape=%s dtype=%s, '
+                             'expected shape=%s dtype=%s; recreating',
+                             layerName, existing.shape, existing.dtype,
+                             expected_shape, np.dtype(dtype))
+                shared_data.mdaZarrData[layerName] = None
+                shared_data.release_zarr_temp_dir(layerName)
+                _invalidate_layer_shape_validation(shared_data, layerName)
             _create_mda_zarr(shared_data, layerName, n_entries_in_dims, h, w, dtype)
             return True
         except Exception as exc:
@@ -1472,7 +1583,15 @@ class napariHandler:
         """Open this acquisition's NDTiff archive before run_mda() starts (T-D8)."""
         self._finish_ndtiff_store()  # never leave a previous store half-open
         core = self.shared_data.MILcore.core
-        frame_nbytes = int(core.getImageWidth()) * int(core.getImageHeight()) * int(core.getBytesPerPixel())
+        # See the matching comment in _preinit_mda_zarr: use MIL's get_roi()-derived
+        # accessors, not raw core.getImageWidth()/getImageHeight(), which on some
+        # real cameras report the unbinned sensor ROI rather than the actual frame
+        # size. Only sizes this writer's queue capacity, so being wrong here was not
+        # itself a crash -- just an overly conservative budget -- but there is no
+        # reason to keep the same stale read in two places.
+        frame_nbytes = (int(self.shared_data.MILcore.get_image_width())
+                         * int(self.shared_data.MILcore.get_image_height())
+                         * int(core.getBytesPerPixel()))
         dataset, writer = open_ndtiff_store(path, frame_nbytes)
         self._ndtiff_dataset = dataset
         self._ndtiff_writer = writer
@@ -1883,6 +2002,24 @@ class napariHandler:
                     if self.shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
                         logging.info('Connected to PymmCore!')
                         acq=None
+                        #pymmcore-plus' own MDA engine (_engine.py) unconditionally calls
+                        #core.setShutterOpen(False) after every event whenever autoshutter
+                        #was on at sequence start -- even with no shutter device configured
+                        #at all, where getShutterDevice() is "" and setShutterOpen raises
+                        #RuntimeError: No device with label "". getAutoShutter() defaults to
+                        #True when no config is loaded, so this bites any shutter-less setup.
+                        #Disable autoshutter up front in that case; there is no shutter for
+                        #it to matter to.
+                        try:
+                            if (not self.shared_data.MILcore.get_shutter_device()
+                                    and self.shared_data.MILcore.get_auto_shutter()):
+                                logging.info('No shutter device configured; disabling '
+                                              'autoshutter before MDA to avoid pymmcore-plus '
+                                              'trying to toggle a nonexistent shutter')
+                                self.shared_data.MILcore.set_auto_shutter(False)
+                        except Exception:
+                            logging.exception('Failed to check/disable autoshutter for a '
+                                               'shutter-less setup')
                         #This backend has no NDTiff engine, so pymmcore-plus does the
                         #recording itself via run_mda(output=...) -- see
                         #mmcore_output_path(). Before that, savefolder/savename were
@@ -1956,8 +2093,8 @@ class napariHandler:
                         #and finish the archive before anything reports or reads it.
                         self._finish_ndtiff_store()
                         self.shared_data.MILcore.core.mda.events.sequenceStarted.disconnect(connected_callback_startedAcq)
-                        # self.shared_data.MILcore.core.mda.events.sequenceFinished.disconnect(connected_callback_finishedAcq)
-                        # self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
+                        self.shared_data.MILcore.core.mda.events.sequenceFinished.disconnect(connected_callback_finishedAcq)
+                        self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
                         logging.info("Finished MDA!")
                     else: #Pycromanager backend, either JAVA or Python
                         if shared_data.config.mda_config.backend_method == 'saved':

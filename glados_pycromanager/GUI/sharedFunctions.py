@@ -97,6 +97,42 @@ class MDAConfig:
         "'make bench-storage' (docs/bench-storage.txt). Ignored by the "
         "pycromanager backends, which always save NDTiff.",
         input_type="dropdown", options=["ndtiff", "ome-tiff", "ome-zarr", "none"])
+    mmcore_wait_for_z_settle: str = setting(
+        "False",
+        "Wait for Z to settle before arming the camera (pymmcore-plus)",
+        "pymmcore-plus normally waits for the Z stage to report 'not busy' "
+        "before arming the camera for the next sequenced (hardware-"
+        "triggered) burst -- one such wait per z-step in a z-stack MDA. If "
+        "your camera's trigger source is a free-running generator with no "
+        "awareness of whether the camera is armed yet, every one of those "
+        "wait windows is a window where trigger pulses are silently lost -- "
+        "with N z-steps that is N chances to fall out of sync, up to and "
+        "including losing an entire burst and aborting the whole "
+        "acquisition (see the MDAEngine note in CLAUDE.md). 'False' "
+        "(default) still issues the Z move command but arms the camera "
+        "immediately afterwards instead of waiting for the physical move to "
+        "finish, so the trigger generator's pulses are never missed -- at "
+        "the cost of the leading frame(s) of a burst possibly being "
+        "captured while Z is still in motion. Set to 'True' to restore "
+        "pymmcore-plus' default wait-then-arm behaviour if positional "
+        "accuracy matters more than trigger sync for your setup. Only "
+        "applies to the MMCORE_PLUS backend.",
+        input_type="dropdown", options=["True", "False"], hidden=True)
+    pycromanager_wait_for_z_settle: str = setting(
+        "False",
+        "Wait for Z to settle before arming the camera (pycromanager Python backend)",
+        "Same rationale and trade-off as mmcore_wait_for_z_settle, for the "
+        "PYCROMANAGER_PYTHON headless backend's own acquisition engine "
+        "(pycromanager.acquisition.acq_eng_py). Its start_z_drive() also "
+        "waits for the Z stage to report settled before the next sequenced "
+        "camera burst is armed, one wait per z-step -- a window where a "
+        "free-running external trigger's pulses are silently lost. 'False' "
+        "(default) arms the camera immediately after issuing the Z move "
+        "instead of waiting for it to finish. Only applies when the active "
+        "backend is PYCROMANAGER_PYTHON; there is no equivalent lever for "
+        "PYCROMANAGER_JAVA, since that engine runs compiled inside the JVM "
+        "and cannot be patched from Python.",
+        input_type="dropdown", options=["True", "False"], hidden=True)
 
 @dataclass
 class WebhookConfig:

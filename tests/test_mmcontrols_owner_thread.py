@@ -110,6 +110,16 @@ class FakeSharedData:
         return service.proxy()
 
 
+class _FakeLiveHandler:
+    """Stands in for `shared_data._livemodeNapariHandler` in the wait-for-teardown tests."""
+
+    def __init__(self, already_stopped=True, timeout=0.3):
+        self._worker_stopped_event = threading.Event()
+        if already_stopped:
+            self._worker_stopped_event.set()
+        self.ACQ_STOP_TIMEOUT_S = timeout
+
+
 class FakeWidget:
     def __init__(self, text=''):
         self._text = str(text)
@@ -157,11 +167,14 @@ class _Host:
     _readOneDstagePosition = mm.MMConfigUI._readOneDstagePosition
     on_shutterOpenCloseButtonPressed = mm.MMConfigUI.on_shutterOpenCloseButtonPressed
     resetROI = mm.MMConfigUI.resetROI
+    _resetROI_liveRestart = mm.MMConfigUI._resetROI_liveRestart
     setROI = mm.MMConfigUI.setROI
     _setROI_hw = mm.MMConfigUI._setROI_hw
     _setROI_liveRestart = mm.MMConfigUI._setROI_liveRestart
     _startLiveAfterExposure = mm.MMConfigUI._startLiveAfterExposure
     _startLiveMode = mm.MMConfigUI._startLiveMode
+    _onExposureFieldEditingFinished = mm.MMConfigUI._onExposureFieldEditingFinished
+    _exposureChange_liveRestart = mm.MMConfigUI._exposureChange_liveRestart
 
     def __init__(self, shared_data):
         self.shared_data = shared_data
@@ -179,6 +192,9 @@ class _Host:
     # GUI halves, stubbed so no Qt is needed
     def _showSnappedImage(self, image):
         self.shown.append(image)
+
+    def storeAllControlValues(self):
+        pass
 
     def _applyOneDstageLayout(self, stage_name, pos):
         self.applied.append((stage_name, pos))
@@ -273,6 +289,30 @@ def test_reset_roi_is_queued(shared, service):
     assert shared.MILcore.names() == ['clear_roi']
 
 
+def test_reset_roi_during_live_stops_clears_and_restarts_live(shared, service):
+    """resetROI() must not clear the ROI out from under a running acquisition."""
+    host = _Host(shared)
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+    try:
+        host.resetROI()
+        deadline = time.monotonic() + 5.0
+        while len(flips) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    _drain(service)
+    assert [value for value, _thread in flips] == [False, True]
+    flip_threads = {thread for _value, thread in flips}
+    assert threading.get_ident() not in flip_threads, 'blocked the calling thread'
+    assert service._owner_ident not in flip_threads, 'would deadlock the hardware queue'
+    assert shared.MILcore.names() == ['clear_roi', 'wait_for_system']
+
+
 def test_set_roi_without_live_mode_is_one_queued_job(shared, service):
     host = _Host(shared)
     shared.liveMode = False
@@ -311,7 +351,121 @@ def test_set_roi_during_live_runs_off_both_the_gui_and_owner_threads(shared, ser
     flip_threads = {thread for _value, thread in flips}
     assert threading.get_ident() not in flip_threads, 'blocked the calling thread'
     assert service._owner_ident not in flip_threads, 'would deadlock the hardware queue'
-    assert shared.MILcore.names() == ['wait_for_system', 'set_roi', 'wait_for_system']
+    assert shared.MILcore.names() == ['set_roi', 'wait_for_system']
+
+
+def test_set_roi_waits_for_worker_teardown_before_restarting(shared, service):
+    """`hw.wait_for_system()` alone is not the right restart gate.
+
+    It only confirms the hardware *queue* drained -- not that the previous
+    acquisition worker's own thread has finished tearing down (frame-ring
+    drain, NDTiff finish, disconnecting the visualisation worker's `yielded`
+    signal). Restarting before that teardown finishes races
+    `acqModeChanged`'s own internal wait for the same event: if that wait
+    times out it reverts by flipping liveMode back to False, re-entering
+    `stopLiveModeVisualisation` and disconnecting a signal the first, genuine
+    stop already disconnected -- `TypeError: disconnect() failed between
+    'yielded' and all its connections`, observed in practice. So the restart
+    must wait for the worker-stopped event itself and, if it times out,
+    leave live mode off rather than attempt (and re-race) a restart.
+    """
+    host = _Host(shared)
+    shared._livemodeNapariHandler = _FakeLiveHandler(already_stopped=False, timeout=0.3)
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+    try:
+        host.setROI([5, 6, 7, 8])
+        time.sleep(0.6)  # longer than the fake handler's timeout
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    assert [value for value, _thread in flips] == [False], (
+        'must not attempt a restart while the previous worker is still torn down')
+    assert shared.MILcore.names() == [], 'must not touch the ROI while the worker is still live'
+
+
+def test_set_roi_restarts_once_the_worker_confirms_it_stopped(shared, service):
+    """The mirror image: once `_worker_stopped_event` is set, restart proceeds normally."""
+    host = _Host(shared)
+    shared._livemodeNapariHandler = _FakeLiveHandler(already_stopped=True)
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+    try:
+        host.setROI([5, 6, 7, 8])
+        deadline = time.monotonic() + 5.0
+        while len(flips) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    _drain(service)
+    assert [value for value, _thread in flips] == [False, True]
+    assert shared.MILcore.names() == ['set_roi', 'wait_for_system']
+
+
+def test_exposure_field_during_live_stops_sets_and_restarts_live(shared, service):
+    """Pressing Enter in the exposure field while live must auto-restart it."""
+    host = _Host(shared)
+    host.exposureTimeInputField.setText('50')
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+    try:
+        host._onExposureFieldEditingFinished()
+        deadline = time.monotonic() + 5.0
+        while len(flips) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    _drain(service)
+    assert [value for value, _thread in flips] == [False, True]
+    flip_threads = {thread for _value, thread in flips}
+    assert threading.get_ident() not in flip_threads, 'blocked the calling thread'
+    assert service._owner_ident not in flip_threads, 'would deadlock the hardware queue'
+    assert shared.MILcore.names() == ['set_exposure', 'wait_for_system']
+    assert shared.MILcore.calls[0][1] == (50.0,)
+
+
+def test_exposure_field_restarts_live_even_if_set_exposure_raises(shared, service):
+    """A bad value or transient hardware error must not leave live mode off.
+
+    Previously only (RuntimeError, OSError, ValueError, AttributeError) were
+    caught, and the restart to True happened after set_exposure -- so any
+    other exception (or one of those four) left liveMode stuck at False with
+    nothing to auto-restart it, and the user had to click "Start Live Mode"
+    by hand.
+    """
+    host = _Host(shared)
+    host.exposureTimeInputField.setText('50')
+    flips = []
+    type(shared).liveMode = property(
+        lambda self: True,
+        lambda self, value: flips.append((value, threading.get_ident())))
+
+    def boom(_value):
+        raise KeyError('camera rejected exposure')
+    shared.MILcore.set_exposure = boom
+
+    try:
+        host._onExposureFieldEditingFinished()
+        deadline = time.monotonic() + 5.0
+        while len(flips) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+    finally:
+        del type(shared).liveMode
+        shared.liveMode = False
+
+    assert [value for value, _thread in flips] == [False, True], (
+        'live mode must be restarted even when set_exposure raised')
 
 
 def test_live_mode_starts_only_after_the_exposure_write_landed(shared, service):

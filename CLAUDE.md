@@ -109,7 +109,38 @@ is the standalone plan that enforces them — but new code must follow them.
   - **`setROI`'s live branch gets its own short-lived thread** for the same reason:
     it stops live, waits, sets, waits and restarts, which belongs on neither the GUI
     thread (up to `ACQ_STOP_TIMEOUT_S`) nor the owner thread. `_setROI_hw` (no live
-    mode) is a single queued job.
+    mode) is a single queued job. `resetROI` now mirrors this exactly
+    (`_resetROI_liveRestart`) — it originally queued `clear_roi()` straight to the
+    owner thread with no live-mode check at all, so clicking "Reset ROI" while live
+    changed the frame size out from under the running acquisition instead of
+    stopping and restarting it. `zoomROI` needed no equivalent fix: it already
+    computes the new rect and calls `self.setROI(...)`, so it inherits setROI's
+    live handling for free.
+  - **The restart must wait for the previous worker's own teardown, not just
+    `hw.wait_for_system()`.** All three live-restart helpers
+    (`_setROI_liveRestart`, `_resetROI_liveRestart`, `_exposureChange_liveRestart`)
+    originally did `liveMode = False; hw.wait_for_system(); <hardware call>;
+    hw.wait_for_system(); liveMode = True`. `hw.wait_for_system()` is a
+    `MicroscopeProxy` call — it only confirms the *hardware* queue drained, not
+    that the acquisition worker's Python thread (`run_MILCoreAcquisition_worker`)
+    has finished draining the frame ring, finishing any NDTiff archive and
+    disconnecting the visualisation worker's `yielded` signal, which happens in
+    that thread's own `finally` (where `_worker_stopped_event` finally gets set).
+    Restarting before that finishes raced `acqModeChanged`'s *own* internal wait
+    for the same event on the ON path: when that wait timed out it reverted by
+    setting `liveMode = False` again, re-entering `stopLiveModeVisualisation` and
+    disconnecting a signal the first, genuine stop had already disconnected —
+    `TypeError: disconnect() failed between 'yielded' and all its connections`,
+    observed in practice on a real acquisition (dozens of frames in flight,
+    several seconds to tear down — nothing like the near-instant
+    `wait_for_system()` return). `waitForLiveModeWorkerStopped(shared_data,
+    label)` (module scope, next to `submitHardware`/`guiThreadCall`) is the fix:
+    it waits on `shared_data._livemodeNapariHandler._worker_stopped_event` with
+    `ACQ_STOP_TIMEOUT_S`, replacing the first `hw.wait_for_system()` in each
+    helper, and on timeout logs an error and **skips the hardware change and the
+    restart** — attempting one anyway would just re-race the same timeout.
+    Tests: `tests/test_mmcontrols_owner_thread.py::test_set_roi_waits_for_worker_teardown_before_restarting`,
+    `::test_set_roi_restarts_once_the_worker_confirms_it_stopped`.
   - **`drawROI` no longer pauses live mode to read the sensor size** — that was a
     stop / read / 0.2 s GUI-thread sleep / restart around a pure query. It is one
     proxy read now, and the only call in the file the GUI thread still waits on
@@ -210,6 +241,90 @@ is the standalone plan that enforces them — but new code must follow them.
 `MicroscopeInterfaceLayer` is the abstraction over three mutually exclusive backends, identified via the `MicroscopeInstance` enum: `PYCROMANAGER_JAVA`, `PYCROMANAGER_PYTHON`, `MMCORE_PLUS`. Code that needs to talk to the microscope should go through `MIL`, branching on `mil.get_microscope_interface()` (alias `MI()` / `get_MI()`). The user picks the backend in the headless start dialog (`headlessGUI` in `GUI_napari.py`) — this writes `shared_data.config.micromanager_config.headless_backend`.
 
 **Backend choice and throughput:** `PYCROMANAGER_JAVA` crosses a Java↔Python bridge (Py4J/PyJavaZ) for every call and every live-mode frame reaching `image_process_fn` — documented by Pycromanager as capped around ~100 MB/s, and this codebase independently measured ~257ms for an uncached Java-bridge round trip (see the `get_exposure`/`get_pixel_size_um` caching in `microscopeInterfaceLayer.py`). `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` both bind straight to MMCore (no Java/bridge hop) and are the faster choice when live frame rate matters most; prefer `PYCROMANAGER_JAVA` only when a feature specifically requires the Java Micro-Manager engine. Note `max_memory_mb` (headless-server memory cap) is not settable on `MMCORE_PLUS` — only `buffer_mb` (circular buffer footprint) applies there; `GUI_napari.py` logs a warning when this backend is selected.
+
+**`MMCORE_PLUS` MDA runs register a resilient `MDAEngine` (`GUI_napari.py`'s
+`register_resilient_mmcore_mda_engine`, called right after both
+`CMMCorePlus(...)` construction sites).** pymmcore-plus's default
+`MDAEngine.timeout_action` is `"raise"`: for a hardware-sequenced (buffered,
+triggered) camera burst — one per z-step whenever `time_plan.interval == 0`
+groups several events together — a burst that delivers zero frames within
+`timeout_first_frame` (default 20s) raises `TimeoutError` out of the runner
+thread and **aborts the entire MDA on the spot**, discarding every event still
+to come even though everything acquired so far saved fine. A burst that drops
+only *some* of its expected frames is already non-fatal on its own (logged as
+"Unexpected number of images returned from sequence... Expected N, got M");
+it's a *complete* stall on one event that used to be fatal. The registered
+engine sets `timeout_action="warn"` (log and move on to the next event, same
+missing-frame handling as a partial-count burst) and raises
+`timeout_first_frame` from 20s to 60s, since a busy serial/USB bus (many
+devices in this rig are driven by round-trip serial commands, see the T-B4
+laser-controls note above) can plausibly delay a stage move + trigger past
+20s without the acquisition actually being stuck. This alone is a resilience
+stopgap, not a fix — it stops one stalled event from killing the whole run,
+but does not stop frames from being dropped in the first place.
+
+**Root cause identified for the z-step case: a free-running external trigger
+generator racing the camera's per-burst re-arm.** `setup_event()` calls
+`core.waitForSystem()` *before* the camera is armed for the next sequenced
+burst — so between one z-step's burst ending and the next one's
+`startSequenceAcquisition()` call, the camera is completely deaf while the Z
+stage moves and settles. A trigger generator with a fixed cadence and no
+awareness of camera-armed state keeps firing through that gap regardless, and
+any pulse landing in it is lost forever (not delayed, not buffered) — one gap
+per z-step, so an N-z-step MDA has N chances to fall out of sync, which is
+exactly why a pure time-series (no z, one continuous burst, one arm, zero
+gaps) worked perfectly on the same rig while a z-stack did not.
+`MDAConfig.mmcore_wait_for_z_settle` (hidden, default `'False'`) is the fix
+for this specific case: when not `'True'`,
+`register_resilient_mmcore_mda_engine` registers
+`_build_z_settle_skipping_mda_engine_class()`'s `ZSettleSkippingMDAEngine`
+instead of the stock engine, which overrides `setup_event()` to still issue
+the Z move (`setup_sequenced_event`/`setup_single_event`) but skip the
+trailing `waitForSystem()` for a `SequencedEvent` — the camera is armed
+immediately after the move command is issued rather than after the stage
+physically settles, closing the deaf window down to the dispatch latency of
+issuing the arm call. Non-sequenced (single) events are unaffected and still
+wait normally. Trade-off: the leading frame(s) of a burst may be captured
+while Z is still in motion (accepted, since a slightly-blurred frame beats a
+missing one or an aborted acquisition). Set `mmcore_wait_for_z_settle` to
+`'True'` to restore pymmcore-plus' default wait-then-arm behaviour if
+positional accuracy ever matters more than trigger sync for a given setup.
+If frames still drop with this off, also check the circular buffer size
+(`buffer_mb`) and consider testing `use_hardware_sequencing=False` on the
+`MDAEngine` to see whether the sequenced (vs. one-shot-per-frame) acquisition
+path is itself implicated, or whether the trigger generator can be gated by
+the camera/stage's own ready signal instead (the only way to get zero lost
+pulses, since no software change can make a truly unsynchronized generator
+wait).
+
+**The same fix exists for the `PYCROMANAGER_PYTHON` backend, but not
+`PYCROMANAGER_JAVA`.** pycromanager's own pure-Python acquisition engine
+(`pycromanager.acquisition.acq_eng_py.internal.engine.Engine`, used by the
+headless 'Python' backend) has the identical shape of bug: `start_z_drive()`'s
+`move_z_device()` calls `core.wait_for_device(z_stage)` *after* `set_position()`,
+before `acquire_images()` arms the camera for the next sequenced burst — one
+settle-wait per z-step, same free-running-trigger race. `GUI_napari.py`'s
+`register_resilient_pycromanager_python_engine(shared_data)` (called right
+after `shared_data.MILcore.set_core(Core())` in both `start_headless(...,
+python_backend=True)` call sites) monkeypatches `Engine.start_z_drive` with a
+faithful copy that skips the trailing `wait_for_device()` call, gated live by
+`MDAConfig.pycromanager_wait_for_z_settle` (hidden, default `'False'`, same
+semantics as `mmcore_wait_for_z_settle`) — read fresh off `Engine._glados_shared_data`
+on every z-step, so no re-patch is needed when the setting changes, only a
+class-attribute update. **`pycromanager` is pulled from git main in
+`pyproject.toml` (unpinned)**, so the patch first checks
+`inspect.getsource(Engine.start_z_drive)` for the literal markers this patch
+was written against and silently keeps the stock wait-then-arm behaviour
+(with a warning) if they're missing, rather than risk silently breaking Z
+moves against a changed upstream shape. **There is no equivalent for
+`PYCROMANAGER_JAVA`**: that backend's engine is AcqEngJ, compiled and running
+inside the JVM, unreachable for a Python-level monkeypatch — the Z panel's
+"Wait for Z to settle before arming camera" checkbox (`MDAGlados.py`) is
+disabled with an explanatory tooltip whenever that backend is active. The
+checkbox otherwise reads/writes the backend-appropriate config field
+(`_zWaitForSettleConfigValue`) and re-applies the change live via the
+matching `register_resilient_*` function on toggle
+(`_onZWaitForSettleToggled`) — no app restart needed for either backend.
 
 MIL also exposes the **circular-buffer / continuous-sequence primitives** (T-C1):
 `start_continuous_sequence_acquisition(interval_ms=0)`, `is_sequence_running()`,
@@ -424,7 +539,60 @@ store and releases its temp directory, discarding every frame written so far, so
 now logs at INFO: after T-E3 it must happen at most once per acquisition, and a second
 occurrence in one run is a real signal. Newly created layers are marked validated at
 creation (they are built from the same dimensions). Tests:
-`tests/test_layer_shape_validation_cache.py`.
+`tests/test_layer_shape_validation_cache.py`. **That per-dim check only ever
+walked the leading (acquisition) dims, never the trailing image plane** — two
+acquisitions reusing the same layer name (e.g. the default `"MDA"`) with the
+same leading dim counts but a different camera frame size (a ROI/binning
+change between them) passed the check regardless, so the stale store's `(h,
+w)` silently stayed whatever the *previous* acquisition's frame size was, and
+the first write of the new acquisition failed with a zarr "could not
+broadcast" error. Fixed by also comparing `layerData.shape[-2:]` against the
+incoming frame's shape once the per-dim loop completes clean (a `for/else`).
+`_preinit_mda_zarr` (the MMCORE_PLUS fast-camera pre-creation path, above) had
+the same root bug in a different shape: it only ever checked
+`mdaZarrData.get(layerName) is not None` and, if so, reused whatever was there
+unconditionally — so a store left over from a *differently-shaped* previous
+acquisition under the same layer name (different leading dim count, e.g. a
+prior z-stack reused for a t-only run, or a different frame size) was written
+into as though it still matched, and every `ZarrFrameWriter` write of the new
+acquisition raised "too many indices"/"could not broadcast" and the whole
+acquisition's data was lost. It now compares the full expected shape
+(`tuple(n_entries_in_dims) + (h, w)`) and dtype against the existing array,
+reusing it only on an exact match and otherwise discarding it (`mdaZarrData[layerName]
+= None`, `release_zarr_temp_dir`, `_invalidate_layer_shape_validation`) before
+creating a fresh one — the layer-shape-validation cache invalidation is what
+then makes the display path above rebuild the napari layer too, on the first
+frame of the new acquisition. Tests: `tests/test_preinit_mda_zarr_reset.py`.
+
+**Fixing that reset exposed a second, narrower race in `add_image()` itself**:
+once `_preinit_mda_zarr` reliably produces a correctly-shaped store, frames
+actually reach the disk-write queue, and the very first `add_image()` call for
+a freshly-attached multiDstack layer can now land *while the ZarrFrameWriter
+thread is still mid-write of the exact chunk napari reads first*. zarr's
+`LocalStore._put` is not atomic — it opens the chunk file with mode `"wb"`,
+which **truncates it to 0 bytes on open**, then writes the bytes — so a read
+landing in that window gets a 0-byte chunk and crashes napari's own async
+`_LayerSlicer` thread pool with `ValueError: cannot reshape array of size 0
+into shape (...)`, entirely outside anything Glados can catch (it is not on a
+Glados thread). Every *explicit* read this codebase drives is already race-free
+via `_slice_safe_to_display` (it only ever points `dims.point` at a
+writer-confirmed slice) — `add_image()` is the one napari-internal read
+nothing previously controlled the target of, since it reads whatever
+`dims.point` already is (all-zeros for a brand new layer) practically
+immediately once the layer is attached. The non-preinit branch (array created
+here, not by `_preinit_mda_zarr`) was always safe because it seeds slice `(0,
+0, ...)` with the current frame *synchronously*, before `add_image()`; the
+preinit branch skipped that seed (to avoid losing the frameReady writes
+already queued) with nothing else guaranteeing the write had landed.
+`_wait_for_zarr_writer_progress(shared_data)` closes the gap: it blocks
+(bounded, `ZARR_WRITER_FIRST_WRITE_TIMEOUT_S` = 5 s, best-effort — logs and
+proceeds rather than hanging forever) until `writer.last_written_tag` is no
+longer `None`. Waiting for *any* completed write rather than specifically
+`(0, 0, ...)` is sufficient and simpler: the frame-ring consumer submits to
+the writer's single queue in arrival order and multiDstack uses the deep ring
+(every frame reaches storage), so whatever the writer completes first is
+necessarily the first frame submitted. Tests:
+`tests/test_wait_for_zarr_writer_progress.py`.
 
 Album mode (`napariHelperFunctions.addToExistingOrNewLayer`, one caller —
 `MMcontrols.addImageToAlbum`) appends into a **geometrically grown buffer** kept in
@@ -928,8 +1096,18 @@ replaced it is what new code in these files should follow.
   `False` — the new value is already picked up lazily at the next snap/live-start — and
   otherwise spawns `_exposureChange_liveRestart` on its own daemon thread: stop live,
   wait, `set_exposure`, wait, restart live. Previously editing the exposure field while
-  live had no effect on the running acquisition at all. Tests:
-  `tests/test_mode_setter_no_sleep.py`.
+  live had no effect on the running acquisition at all. **The restart-to-`True` now
+  lives in a `finally`, and the exception list widened from four specific types to bare
+  `Exception`** — the original version restarted live only *after* `set_exposure`
+  succeeded and only caught `(RuntimeError, OSError, ValueError, AttributeError)`, so
+  any other exception (a rejected exposure value, a transient hardware/bridge error)
+  left `liveMode` stuck `False` with nothing to auto-restart it — the user had to click
+  "Start Live Mode" by hand, which read as the field "crashing" live mode. Now the
+  exception is logged with a full traceback (`logging.exception`, for actually
+  diagnosing what happened) and live is restarted regardless. Tests:
+  `tests/test_mode_setter_no_sleep.py`,
+  `tests/test_mmcontrols_owner_thread.py::test_exposure_field_during_live_stops_sets_and_restarts_live`,
+  `tests/test_mmcontrols_owner_thread.py::test_exposure_field_restarts_live_even_if_set_exposure_raises`.
 
 ### Windows scheduling hints
 

@@ -6,6 +6,7 @@ Includes classes for Interactive Lists such as the Channels, XY positions.
 """
 import itertools
 import logging
+import math
 import os
 import sys
 import time
@@ -449,8 +450,31 @@ class XYStageList(InteractiveListWidget):
             self.setItem(rowPosition, 3, QTableWidgetItem(str(setxy[1]))) #type:ignore
 #endregion
 
+def build_absolute_z_plan(z_start, z_end, z_step):
+    """Build a useq "top"/"bottom" (absolute range) z_plan dict.
+
+    `z_start`/`z_end` are absolute positions of the selected z-stage --
+    `MDAGlados.setZStart()`/`setZEnd()` capture the stage's current absolute
+    position, and a typed-in value is meant the same way. useq's "relative"
+    z_plan key instead treats a value list as literal offsets from wherever the
+    stage happens to be when the MDA actually starts, which silently turned a
+    z-stack set up around an absolute position (e.g. 53-55) into a request to
+    jump ~53 and ~55 units *away* from the stage's position at acquisition
+    start -- the likely cause of z-stage moves timing out / behaving
+    unexpectedly during MDA.
+
+    useq's ZTopBottom requires top >= bottom and a positive step, so those are
+    derived from min/max/abs of the panel values; `go_up` carries the
+    direction the panel's start->end order implied.
+    """
+    z_bottom = min(z_start, z_end)
+    z_top = max(z_start, z_end)
+    z_step_magnitude = abs(z_step) if z_step else 1
+    go_up = z_step is None or z_step >= 0
+    return {"top": z_top, "bottom": z_bottom, "step": z_step_magnitude, "go_up": go_up}
+
 class MDAGlados(CustomMainWindow):
-    """ 
+    """
     Class that handles the multi-Dimensional acquisition of Pycromanager
     """
     #Pysignal should be outside the functions for proper init
@@ -895,13 +919,49 @@ class MDAGlados(CustomMainWindow):
         if self.z_step_distance is not None:
             self.z_stepdistance_entry.setText(str(self.z_step_distance))
         self.z_stepdistance_entry.setValidator(QDoubleValidator())
+        # Labels showing the value the other field would compute to, kept live-updated (see _updateZStepLabels)
+        self.z_nrsteps_computedLabel = QLabel("")
+        self.z_stepdistance_computedLabel = QLabel("")
+
+        # Toggles the backend's Z-settle-wait-before-arming-camera behaviour live.
+        # MMCORE_PLUS: GUI_napari.register_resilient_mmcore_mda_engine / ZSettleSkippingMDAEngine.
+        # PYCROMANAGER_PYTHON: GUI_napari.register_resilient_pycromanager_python_engine.
+        # PYCROMANAGER_JAVA: no equivalent lever exists (AcqEngJ runs compiled inside
+        # the JVM), so the checkbox is disabled there. See the CLAUDE.md note on the
+        # free-running-trigger-vs-z-settle race for why this exists.
+        self.z_waitForSettle_checkbox = QCheckBox("Wait for Z to settle before arming camera")
+        try:
+            mi = self.shared_data.MILcore.MI()
+        except (AttributeError, RuntimeError):
+            mi = None
+        if mi == MIL.MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.z_waitForSettle_checkbox.setEnabled(False)
+            self.z_waitForSettle_checkbox.setToolTip(
+                "Not available for the PYCROMANAGER_JAVA backend: its acquisition "
+                "engine (AcqEngJ) runs compiled inside the JVM and cannot be patched "
+                "from Python. Switch to the MMCORE_PLUS or PYCROMANAGER_PYTHON "
+                "backend to use this.")
+        else:
+            self.z_waitForSettle_checkbox.setToolTip(
+                "Checked (default OFF) restores the normal behaviour of waiting for "
+                "the Z stage to report settled before arming the camera for the next "
+                "triggered burst -- more accurate Z positioning, but every wait is a "
+                "window where a free-running external trigger's pulses can be "
+                "silently lost (more z-steps = more chances to fall out of sync, up "
+                "to losing the whole acquisition). Unchecked arms the camera "
+                "immediately after issuing the Z move instead, so no trigger pulses "
+                "are missed, at the cost of the leading frame(s) of a burst possibly "
+                "being captured while Z is still in motion.")
+        self.z_waitForSettle_checkbox.setChecked(str(self._zWaitForSettleConfigValue(mi)) == 'True')
+        self.z_waitForSettle_checkbox.toggled.connect(self._onZWaitForSettleToggled)
 
         zLayout = self.zGroupBox.body
         zLayout.add_row(self.z_oneDstageDropdownLabel, self.z_oneDstageDropdown)
         zLayout.add_row(self.z_startLabel, self.z_startEntry, self.z_startSetButton)
         zLayout.add_row(self.z_endLabel, self.z_endEntry, self.z_endSetButton)
-        zLayout.add_row(self.z_nrsteps_radio, self.z_nrsteps_entry)
-        zLayout.add_row(self.z_stepdistance_radio, self.z_stepdistance_entry)
+        zLayout.add_row(self.z_nrsteps_radio, self.z_nrsteps_entry, self.z_nrsteps_computedLabel)
+        zLayout.add_row(self.z_stepdistance_radio, self.z_stepdistance_entry, self.z_stepdistance_computedLabel)
+        zLayout.add_row(self.z_waitForSettle_checkbox)
         zLayout.add_stretch()
 
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
@@ -916,6 +976,12 @@ class MDAGlados(CustomMainWindow):
         self.z_nrsteps_entry.editingFinished.connect(self.flushMDAEventsUpdate)
         self.z_stepdistance_entry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
         self.z_stepdistance_entry.editingFinished.connect(self.flushMDAEventsUpdate)
+        #Keep the computed-value labels live: any field feeding the computation triggers a refresh
+        self.z_startEntry.textChanged.connect(self._updateZStepLabels)
+        self.z_endEntry.textChanged.connect(self._updateZStepLabels)
+        self.z_nrsteps_entry.textChanged.connect(self._updateZStepLabels)
+        self.z_stepdistance_entry.textChanged.connect(self._updateZStepLabels)
+        self._updateZStepLabels()
 
         # --- Ordering widget ---
         # Built once; `_refillOrderDropdown` (from updateGUIwidgets) only changes
@@ -1750,7 +1816,10 @@ class MDAGlados(CustomMainWindow):
                     self.z_nr_steps = None
             self.z_nrsteps_radio_sel = self.z_nrsteps_radio.isChecked()
             self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
-        
+            logging.info('MDA z-panel values: z_start=%s z_step=%s z_end=%s (stage=%s)',
+                         self.z_start, self.z_step, self.z_end,
+                         getattr(self, 'z_stage_sel', None))
+
         #Get the xy positions
         if self.xyGroupBox.isEnabled():
             try:
@@ -1822,10 +1891,12 @@ class MDAGlados(CustomMainWindow):
         else:
             xy_pos = [tuple(pos) for pos in self.xy_positions]
         
+        z_plan = build_absolute_z_plan(self.z_start, self.z_end, self.z_step)
+        logging.info('MDA z_plan about to be used: %s', z_plan)
         self.mda_useq = useq.MDASequence(
             axis_order = self.order,
             time_plan = {"interval": self.time_interval_s, "loops": self.num_time_points},
-            z_plan = {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True},
+            z_plan = z_plan,
             channels = channel_data,
             stage_positions=xy_pos
         )
@@ -1926,6 +1997,93 @@ class MDAGlados(CustomMainWindow):
         zstagePos = round(float(self.core.get_position(zstage)),2)
         self.z_endEntry.setText(str(zstagePos))
         
+    def _updateZStepLabels(self):
+        """
+        Refresh the labels next to the z nr-of-steps/step-distance entries
+        with the value the *other* field would compute to, so the user can
+        see e.g. how many steps a given step distance takes without having to
+        switch the radio button. Mirrors the formulas in get_MDA_events_from_GUI.
+        """
+        try:
+            z_start = float(self.z_startEntry.text()) if self.z_startEntry.text() != '' else None
+            z_end = float(self.z_endEntry.text()) if self.z_endEntry.text() != '' else None
+        except ValueError:
+            z_start = None
+            z_end = None
+
+        #Step distance implied by the entered number of steps
+        self.z_nrsteps_computedLabel.setText("")
+        if z_start is not None and z_end is not None and self.z_nrsteps_entry.text() != '':
+            try:
+                nr_steps = int(self.z_nrsteps_entry.text())
+                if nr_steps > 0:
+                    step_distance = abs(z_end - z_start) / nr_steps
+                    self.z_nrsteps_computedLabel.setText(f"({step_distance:.4g} /step)")
+            except (ValueError, ZeroDivisionError):
+                pass
+
+        #Number of z-positions implied by the entered step distance.
+        #useq's ZTopBottom.positions() is np.arange(bottom, top + step/2, step),
+        #i.e. floor(range/step) + 1 positions -- the top is "encompassed" but not
+        #always precisely visited when step does not divide the range evenly, so
+        #this is floored (with a small epsilon so an exact division, e.g.
+        #range=10/step=2, doesn't fall just under the next integer and get
+        #floored down to one fewer position than it actually produces).
+        self.z_stepdistance_computedLabel.setText("")
+        if z_start is not None and z_end is not None and self.z_stepdistance_entry.text() != '':
+            try:
+                step_distance = float(self.z_stepdistance_entry.text())
+                if step_distance != 0:
+                    nr_steps = math.floor(abs(z_end - z_start) / abs(step_distance) + 1e-9) + 1
+                    self.z_stepdistance_computedLabel.setText(f"({nr_steps} steps)")
+            except (ValueError, ZeroDivisionError):
+                pass
+
+    def _zWaitForSettleConfigValue(self, mi):
+        """The MDAConfig field backing the Z-settle checkbox for the given
+        MicroscopeInstance (mmcore_wait_for_z_settle / pycromanager_wait_for_z_settle),
+        or 'True' (the safe/no-op default) for a backend with no such lever."""
+        if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+            return getattr(self.shared_data.config.mda_config, 'mmcore_wait_for_z_settle', 'False')
+        if mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return getattr(self.shared_data.config.mda_config, 'pycromanager_wait_for_z_settle', 'False')
+        return 'True'
+
+    def _onZWaitForSettleToggled(self, checked):
+        """
+        Persist the backend-appropriate MDAConfig field and apply the change
+        immediately so it takes effect for the next MDA without restarting
+        the app. See GUI_napari.register_resilient_mmcore_mda_engine /
+        register_resilient_pycromanager_python_engine.
+        """
+        try:
+            mi = self.shared_data.MILcore.MI()
+        except (AttributeError, RuntimeError) as exc:
+            logging.warning('Could not determine backend for Z-settle toggle: %s', exc)
+            return
+        value = 'True' if checked else 'False'
+        if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+            self.shared_data.config.mda_config.mmcore_wait_for_z_settle = value
+        elif mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.shared_data.config.mda_config.pycromanager_wait_for_z_settle = value
+        else:
+            logging.warning('Z-settle toggle has no effect on this backend (%s)', mi)
+            return
+        try:
+            from glados_pycromanager.io.appdata import storeSharedData_GlobalData
+            storeSharedData_GlobalData(self.shared_data)
+        except Exception as exc:
+            logging.warning('Could not persist Z-settle setting: %s', exc)
+        try:
+            if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+                from glados_pycromanager.GUI.GUI_napari import register_resilient_mmcore_mda_engine
+                register_resilient_mmcore_mda_engine(self.shared_data.MILcore.get_core(), self.shared_data)
+            elif mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+                from glados_pycromanager.GUI.GUI_napari import register_resilient_pycromanager_python_engine
+                register_resilient_pycromanager_python_engine(self.shared_data)
+        except Exception as exc:
+            logging.warning('Could not apply Z-settle toggle to the running engine: %s', exc)
+
     def setMDAparams(self,mdaparams):
         """
         Set the MDA parameters.

@@ -139,11 +139,11 @@ def test_set_roi_live_branch_orders_stop_wait_set_wait_start(qapp):
     order = []
     for line in live_branch.splitlines():
         stripped = line.strip()
-        if stripped.startswith("#"):
+        if stripped.startswith("#") or stripped.startswith('"""') or "`" in stripped:
             continue
         if "liveMode = False" in stripped:
             order.append("stop")
-        elif "wait_for_system()" in stripped:
+        elif "waitForLiveModeWorkerStopped(self." in stripped or "wait_for_system()" in stripped:
             order.append("wait")
         elif "set_roi(" in stripped:
             order.append("set")
@@ -251,11 +251,11 @@ def test_exposure_live_restart_orders_stop_wait_set_wait_start(qapp):
     order = []
     for line in live_branch.splitlines():
         stripped = line.strip()
-        if stripped.startswith("#"):
+        if stripped.startswith("#") or stripped.startswith('"""') or "`" in stripped:
             continue
         if "liveMode = False" in stripped:
             order.append("stop")
-        elif "wait_for_system()" in stripped:
+        elif "waitForLiveModeWorkerStopped(self." in stripped or "wait_for_system()" in stripped:
             order.append("wait")
         elif "set_exposure(" in stripped:
             order.append("set")
