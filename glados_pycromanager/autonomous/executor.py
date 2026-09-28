@@ -591,6 +591,43 @@ class FlowchartExecutorMixin:
             logging.exception('Finishing node %s failed', getattr(node, 'name', node))
             self._nodeFailed(node, f"{type(exc).__name__}: {exc}")
 
+    def _hardwareProxy(self):
+        """MIL facade on the hardware owner thread (the raw core without one)."""
+        proxy = getattr(self.shared_data, 'microscope_proxy', None)
+        return proxy() if callable(proxy) else self.core
+
+    def _hardwareThen(self, node, fn, on_success, label):
+        """Run blocking hardware work ``fn`` on the owner thread, then
+        ``on_success`` on the GUI thread; a failure fails ``node`` (or, with no
+        node, stops the run)."""
+        from glados_pycromanager.GUI.MMcontrols import guiThreadCall, submitHardware
+
+        def done(request):
+            error = request.exception
+            guiThreadCall(self.shared_data, lambda: self._afterHardware(node, error, on_success, label))
+
+        try:
+            submitHardware(self.shared_data, fn, label=label, callback=done)
+        except Exception as exc:
+            #No owner thread: submitHardware ran fn inline and it raised.
+            self._afterHardware(node, exc, on_success, label)
+
+    def _afterHardware(self, node, error, on_success, label):
+        if error is None and not getattr(self, '_runAborted', False):
+            try:
+                on_success()
+                return
+            except Exception as exc:
+                logging.exception('After %s', label)
+                error = exc
+        if error is None:
+            return #Run was stopped while the hardware was busy
+        message = f"{label} failed: {type(error).__name__}: {error}"
+        if node is not None:
+            self._nodeFailed(node, message)
+        else:
+            self._abortRun(message)
+
     def _nodeFailed(self, node, message):
         """Mark ``node`` as errored, tell the user, and stop the run."""
         node.status = 'error'
@@ -822,10 +859,16 @@ class FlowchartExecutorMixin:
             self._nodeFailed(node, 'no stage/distance chosen - double-click the node to set one')
             return
 
-        self.core.set_relative_position(stageToMove,distToMove)
-        
-        self.finishedEmits(node)
-        
+        core = self.core
+
+        def move():
+            core.set_relative_position(stageToMove,distToMove)
+            #Wait for the move: the next node (often an acquisition) used to
+            #start while the stage was still travelling.
+            core.wait_for_system()
+
+        self._hardwareThen(node, move, lambda: self.finishedEmits(node), f'{node.name}: relative move')
+
     def MMconfigChangeRan(self,node):
         """
         Handle the configuration change event for a node.
@@ -841,7 +884,9 @@ class FlowchartExecutorMixin:
         
         #Create the worker
         self._startNodeWorker(node, 'MMconfigChangeRan',
-            {"config_string_storage":node.MMconfigInfo.config_string_storage, "MMconfig":node.MMconfigInfo, "core": self.core},
+            #The proxy routes each MIL call through the hardware owner thread
+            #instead of driving the core directly from a pool thread.
+            {"config_string_storage":node.MMconfigInfo.config_string_storage, "MMconfig":node.MMconfigInfo, "core": self._hardwareProxy()},
             lambda: self.finishedEmits(node))
         
         # self.finishedEmits(node)
@@ -1462,23 +1507,27 @@ class FlowchartExecutorMixin:
         
         logging.info(f'Starting new score acq at position {pos} -------------------------------------------------------------------------------')
         
-        #Set all stages correct
-        for stage in positions[pos]['STAGES']:
-            if stage != '':
-                stagepos = positions[pos][stage]
-                #Check if this stage is an XY stage device...
-                #Since then we need to do something 2-dimensional
-                if stage in self.getDevicesOfDeviceType('XYStageDevice'):
-                    logging.debug(f'Moving stage {stage} to position {stagepos}')
-                    self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
-                    self.shared_data.core.wait_for_system() #type:ignore
-                else:#else we can move a 1d stage:
-                    logging.debug(f'Moving stage {stage} to position {stagepos}')
-                    self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
-                    self.shared_data.core.wait_for_system() #type:ignore
-        
-        self.runScoring()
-    
+        #Move every stage on the hardware owner thread, then score from the GUI
+        #thread. These moves (and their wait_for_system) used to block the GUI
+        #thread for the whole travel time at every position.
+        core = self.shared_data.core
+        xyStages = self.getDevicesOfDeviceType('XYStageDevice')
+        position = positions[pos]
+
+        def moveToPosition():
+            for stage in position['STAGES']:
+                if stage == '':
+                    continue
+                stagepos = position[stage]
+                logging.debug(f'Moving stage {stage} to position {stagepos}')
+                if stage in xyStages:
+                    core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
+                else:
+                    core.set_position(stage,stagepos[0]) #type:ignore
+                core.wait_for_system() #type:ignore
+
+        self._hardwareThen(None, moveToPosition, self.runScoring, f'move to position {pos+1}')
+
     def runInitOnly(self):
         """
         Run ONLY the init process at the current position. Actively prevents scoring
