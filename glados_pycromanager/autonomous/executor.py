@@ -1269,7 +1269,7 @@ class FlowchartExecutorMixin:
                     foundNodeName = graphConnection[1].split('.')[0]
                     foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
                     node.status='finished'
-                    foundNode.oneConnectionAtStartIsFinished()
+                    QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                     break    
         elif result == False:
             graph = node.flowChart.evaluateGraph()
@@ -1278,7 +1278,7 @@ class FlowchartExecutorMixin:
                     foundNodeName = graphConnection[1].split('.')[0]
                     foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
                     node.status='finished'
-                    foundNode.oneConnectionAtStartIsFinished()
+                    QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                     break    
     
     def runInlineScriptCallAction(self,node):
@@ -1327,7 +1327,7 @@ class FlowchartExecutorMixin:
                 foundNodeName = graphConnection[1].split('.')[0]
                 logging.debug(f"Node {node.name} found a case/switch with value {CurrentValueWantedVariable} connected to node {foundNodeName}")
                 foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
-                foundNode.oneConnectionAtStartIsFinished()
+                QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                 correctPlugFound = True
                 node.status='finished'
                 break
@@ -1339,7 +1339,7 @@ class FlowchartExecutorMixin:
                 if graphConnection[0] == node.name+'.Error':
                     foundNodeName = graphConnection[1].split('.')[0]
                     foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
-                    foundNode.oneConnectionAtStartIsFinished()
+                    QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                     node.status='finished'
     
     def runslackReportCallAction(self,node):

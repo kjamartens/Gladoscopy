@@ -1410,9 +1410,10 @@ class NodeSignalManager(QObject):
         Returns:
             None
         """
-        for signal in self.signals:
-            signal.emit()
-            logging.debug(f"emitting signal {signal}")
+        #Every entry is the same class-level `new_signal` (see add_signal), so
+        #emitting each one delivered N calls to every connected node.
+        if self.signals:
+            self.signals[0].emit()
 #endregion
 
 class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
@@ -2296,7 +2297,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             #Also connect the node's finishedMDA
             #This order is important!
             newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
-            newNode.mdaData.MDA_completed.connect(lambda self, node = newNode: node.customFinishedEmits.emit_all_signals())
+            #Through finishedEmits like every other node (it used to emit directly,
+            #skipping the deferral, LastNodeRan and the core-variable refresh).
+            newNode.mdaData.MDA_completed.connect(lambda _ok, node = newNode: self.finishedEmits(node))
             #Note: the recorded MDA data is stored in node.mdaData.data - any analysis method should find/read this.
             #The core is at node.mdaData.core
             
@@ -2790,13 +2793,23 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         self.shared_data.warningErrorInfoInfo['Info']['LastNodeRan'] = node.name
         
         self.update()
+        if 'dialogInfo' in vars(node):
+            self.set_readable_text_after_dialogChange(node,node.dialogInfo)
+
+        #Start the downstream nodes from the event loop, not from inside this
+        #call. Emitting here ran the next node's callAction nested in this one,
+        #so a chain of synchronous nodes (start/end, if, variables, stage moves)
+        #- and the whole position loop - grew one stack the GUI never returned
+        #from: frozen for a full tour, and at risk of RecursionError. It also let
+        #GraphToSignals rewire signals while one of them was mid-emit.
+        QTimer.singleShot(0, lambda: self._emitNodeFinished(node))
+
+    def _emitNodeFinished(self, node):
+        """Deferred second half of finishedEmits: trigger the downstream nodes."""
         if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
             node.customFinishedEmits.emit_all_signals()
         if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
             node.customDataEmits.emit_all_signals()
-
-        if 'dialogInfo' in vars(node):
-            self.set_readable_text_after_dialogChange(node,node.dialogInfo)
 
     def giveInfoOnNode(self,node):
         """
