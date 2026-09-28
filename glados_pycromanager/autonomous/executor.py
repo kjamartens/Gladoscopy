@@ -808,14 +808,20 @@ class FlowchartExecutorMixin:
             None
         """
         
+        stageToMove = None
+        distToMove = None
         for stor in node.MMconfigInfo.relstage_string_storage:
             if stor[0] == '__chosenRelStage__':
                 stageToMove = stor[1]
-        
+
         for stor in node.MMconfigInfo.relstage_string_storage:
-            if stor[0] == stageToMove:
+            if stageToMove is not None and stor[0] == stageToMove:
                 distToMove = float(stor[1])
-        
+
+        if stageToMove is None or distToMove is None:
+            self._nodeFailed(node, 'no stage/distance chosen - double-click the node to set one')
+            return
+
         self.core.set_relative_position(stageToMove,distToMove)
         
         self.finishedEmits(node)
@@ -1041,11 +1047,15 @@ class FlowchartExecutorMixin:
         except (KeyError, AttributeError, TypeError) as exc:
             logging.debug('Scoring data gather skipped: %s', exc)
         
+        readableText = ''
+        decisionError = None
         try:
             testPassed = self.decisionWidget.testCurrentDecision()
             testPassedText = 'Test is Passed' if testPassed else 'Test is Not Passed'
-            # readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
-            
+            #Used by the reporting node(s) below; was commented out, so a passing
+            #test with a reporting node attached raised NameError.
+            readableText = self._scoreEndReadableText(node, attrs, data, testPassedText)
+
             logging.info('Scoring finished fully!')
             if testPassed:
                 logging.info("Test is... Passed!")
@@ -1078,8 +1088,9 @@ class FlowchartExecutorMixin:
             testPassed = False
             node.status = 'error'
             testPassedText = 'Error when assessing test'
-            readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
-        
+            readableText = self._scoreEndReadableText(node, attrs, data, testPassedText)
+            decisionError = f"{type(exc).__name__}: {exc}"
+
         
         #Find the reporting node(s)
         connectedNodes = nodz_utils.getConnectedNodes(node, 'bottomAttr')
@@ -1108,7 +1119,18 @@ class FlowchartExecutorMixin:
                     node.status = 'error'
 
         self.preventAcq = False
-    
+        if decisionError is not None:
+            #This used to stop the run silently: no next position, no message.
+            self._abortRun(f"scoring decision could not be evaluated ({decisionError})")
+
+    def _scoreEndReadableText(self, node, attrs, data, testPassedText):
+        """The scoreEnd node's text; a display problem must not stop the run."""
+        try:
+            return self.set_readable_text_after_dialogChange(node, [attrs, data, testPassedText], 'scoreEnd') or ''
+        except Exception:
+            logging.exception('Could not render the scoring result text')
+            return testPassedText
+
     def earlyScoringFail(self,node):
         #Sob asically it's the Scoring node, but hard-coded to fail.
         logging.info("Scoring early abandoned!")
@@ -1256,7 +1278,11 @@ class FlowchartExecutorMixin:
     
     def runInlineScriptCallAction(self,node):
         scriptText = node.InlineScriptInfo
-        
+
+        #Names a script line may use. There is no module-level shared_data in
+        #this file, so the old `core = shared_data.core` was a NameError that
+        #hung every recipe containing this node.
+        shared_data = self.shared_data
         core = shared_data.core
         #Go over each line of scriptText, broken by a \n:
         lineData = scriptText.split('\n')
@@ -1269,13 +1295,17 @@ class FlowchartExecutorMixin:
                 logging.debug(f'Ran commdand succesfully: {line}')
             except Exception as e:
                 logging.error(f'Error with line {line}: {e}. Script broken off')
-                errored=True
-        
-        if errored==False:
-            logging.debug('Fully ran custom script!')
-        
+                errored=f"line {line!r}: {type(e).__name__}: {e}"
+
+        if errored:
+            #Carrying on after a half-run script means acting on a microscope
+            #state the recipe did not ask for.
+            self._nodeFailed(node, f"inline script stopped at {errored}")
+            return
+        logging.debug('Fully ran custom script!')
+
         self.finishedEmits(node)
-    
+
     def runCaseSwitchCallAction(self,node):
         """ 
         Call action to runa  case/switch statement.
