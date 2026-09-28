@@ -80,3 +80,60 @@ def test_disconnect_of_already_disconnected_slot_is_tolerated():
     stub.shared_data.mda_acq_done_signal.disconnect.side_effect = TypeError('not connected')
     stub.MDA_acq_finished(False)  # must not raise
     stub.resetMDAbutton.assert_called_once()
+
+
+# --- one listener at a time -------------------------------------------------
+
+from PyQt5.QtCore import QObject, pyqtSignal
+
+from glados_pycromanager.Core.MDAGlados import claim_mda_done_signal
+
+
+class _Shared(QObject):
+    mda_acq_done_signal = pyqtSignal(bool)
+
+
+class _Listener(QObject):
+    def __init__(self):
+        super().__init__()
+        self.calls = []
+
+    def done(self, success=True):
+        self.calls.append(success)
+
+
+def test_claim_drops_a_stale_listener_from_another_instance():
+    shared = _Shared()
+    stale, fresh = _Listener(), _Listener()
+    claim_mda_done_signal(shared, stale.done)   # its MDA never reported
+    claim_mda_done_signal(shared, fresh.done)
+
+    shared.mda_acq_done_signal.emit(True)
+
+    assert stale.calls == []
+    assert fresh.calls == [True]
+
+
+def test_claim_tolerates_a_listener_that_disconnected_itself():
+    shared = _Shared()
+    first, second = _Listener(), _Listener()
+    claim_mda_done_signal(shared, first.done)
+    shared.mda_acq_done_signal.disconnect(first.done)
+    claim_mda_done_signal(shared, second.done)
+
+    shared.mda_acq_done_signal.emit(False)
+
+    assert second.calls == [False]
+
+
+def test_node_acquisition_refused_while_an_mda_is_running():
+    flowChart = MagicMock()
+    node = SimpleNamespace(name='acquisition_2', status='running', flowChart=flowChart)
+    stub = SimpleNamespace(shared_data=SimpleNamespace(mdaMode=True),
+                           flushMDAEventsUpdate=MagicMock(), flushMDAStateSave=MagicMock(),
+                           core=MagicMock())
+
+    MDAGlados.MDA_acq_from_Node(stub, node)
+
+    flowChart._nodeFailed.assert_called_once()
+    stub.core.set_exposure.assert_not_called()
