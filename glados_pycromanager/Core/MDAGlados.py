@@ -1470,7 +1470,7 @@ class MDAGlados(CustomMainWindow):
             return dataset_path
         return self.storage_folder + os.sep + self.storage_file_name + '_1//'
 
-    def MDA_acq_finished(self):
+    def MDA_acq_finished(self, success=True):
         """
         Signal that MDA acquisition has finished.
         
@@ -1478,12 +1478,21 @@ class MDAGlados(CustomMainWindow):
         
         Args:
             self: The object instance.
+            success: False when the acquisition raised or was refused to start
+                (``mda_acq_done_signal`` carries it). The node is then marked as
+                errored and its downstream graph is *not* triggered.
         
         Returns:
             None
         """
         
-        self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
+        try:
+            self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
+        except TypeError:
+            pass #Already disconnected
+        if not success:
+            self._MDA_acq_failed()
+            return
         self.data = self._resolve_finished_acquisition_data()
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
@@ -1525,6 +1534,21 @@ class MDAGlados(CustomMainWindow):
 
         self.MDA_completed.emit(True)
     
+    def _MDA_acq_failed(self):
+        """Tear down after a failed/refused MDA without continuing a recipe."""
+        logging.error('MDA acquisition failed or was refused')
+        self.shared_data._mdaMode = False
+        for analysis_thread in vars(self).get('nodz_analysis_threads', []):
+            analysis_thread.stop()
+        self.resetMDAbutton(mdaLayerName='MDA')
+        node = vars(self).get('nodeInfo')
+        if node is not None:
+            flowChart = node.flowChart
+            if hasattr(flowChart, '_nodeFailed'):
+                flowChart._nodeFailed(node, 'acquisition failed or could not start (see log)')
+            else:
+                node.status = 'error'
+
     def _applyFocusDevice(self):
         """Set the focus device this plan's z-stack moves (T-H3).
 

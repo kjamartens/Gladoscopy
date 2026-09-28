@@ -615,9 +615,11 @@ class Shared_data(QObject):
             return service.proxy()
         return service.proxy(priority=priority)
 
-    def mdaacqdonefunction(self):
-        logging.debug('mda acq done in shared_data')
-        self.mda_acq_done_signal.emit(True)
+    def mdaacqdonefunction(self, success=True):
+        """Emit ``mda_acq_done_signal(success)``; False means the MDA failed or
+        was refused, and the listener must not treat its data as a result."""
+        logging.debug('mda acq done in shared_data (success=%s)', success)
+        self.mda_acq_done_signal.emit(bool(success))
 
     def register_perf_thread_label(self, native_id, label: str) -> None:
         """Performance Mode: record a human label for a native OS thread id

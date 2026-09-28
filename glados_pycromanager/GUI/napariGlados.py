@@ -1202,9 +1202,9 @@ class napariHandler:
         self.sleep_time = 1/shared_data.config.visualisation_config.fps #in sec
         self.layerName = 'newLayer'
 
-    def mdaacqdonefunction(self):
+    def mdaacqdonefunction(self, success=True):
         logging.debug('#nH - mdaacqdonefunction called in napariHandler')
-        self.shared_data.mdaacqdonefunction()
+        self.shared_data.mdaacqdonefunction(success)
     
     def put_data_in_visualisation_and_analysis_queues(self,visualisation_queue,analysis_entries,image,metadata):
         """Fan a single acquired frame out to the visualisation queue and to
@@ -1855,6 +1855,10 @@ class napariHandler:
         # stop -> start transition (see napariHandler.__init__) is always set when
         # this worker truly exits, even on an uncaught exception -- otherwise a
         # future start would wait out ACQ_STOP_TIMEOUT_S and be refused forever.
+        # An MDA must also always report "done" -- a recipe's acquisition node
+        # waits on it, and an acquisition that raised used to never report,
+        # leaving the node 'running' and mdaMode stuck on for the session.
+        mda_done_reported = self.liveOrMda != 'mda'
         try:
             if self.liveOrMda == 'live':
                 savefolder = None
@@ -2128,6 +2132,7 @@ class napariHandler:
                 self.shared_data.mdaMode = False
 
                 #Signal to all parents that the MDA acquisition is done - in the Nodz MDA, now we would trigger the MDA-based analysis for scoring or so
+                mda_done_reported = True
                 parent.mdaacqdonefunction()
 
                 #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
@@ -2140,7 +2145,23 @@ class napariHandler:
             # Same for the NDTiff archive: finish what was written rather than
             # leaving an unindexed dataset behind. Idempotent.
             self._finish_ndtiff_store()
+            if not mda_done_reported:
+                self._report_failed_mda(parent)
             self._worker_stopped_event.set()
+
+    def _report_failed_mda(self, parent):
+        """The MDA branch exited without reporting: undo the mode and say so."""
+        logging.error('MDA acquisition ended abnormally; reporting it as failed')
+        self.acqstate = False
+        try:
+            self.shared_data.MILcore.stop_sequence_acquisition()
+        except Exception:
+            logging.exception('stop_sequence_acquisition after a failed MDA also failed')
+        try:
+            self.shared_data.mdaMode = False
+        except Exception:
+            logging.exception('Resetting mdaMode after a failed MDA failed')
+        parent.mdaacqdonefunction(success=False)
 
 
     def new_image(self):
@@ -2294,6 +2315,8 @@ class napariHandler:
                     "MMCore/Java-bridge race. Try again once the previous acquisition "
                     "has finished.", self.liveOrMda, self.ACQ_STOP_TIMEOUT_S)
                 setattr(self.shared_data, mode_attribute, False)
+                if self.liveOrMda == 'mda':
+                    self.shared_data.mdaacqdonefunction(False)
 
         stopped_in_time = [False]
 
@@ -2425,6 +2448,8 @@ class napariHandler:
                             "MMCore/Java-bridge race. Try again once the previous acquisition "
                             "has finished.", self.ACQ_STOP_TIMEOUT_S)
                         self.shared_data.mdaMode = False
+                        #Whoever asked for this MDA (a recipe node) is waiting on it.
+                        self.shared_data.mdaacqdonefunction(False)
                         return
                     self._worker_stopped_event.clear()
 
