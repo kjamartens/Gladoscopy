@@ -1363,7 +1363,10 @@ class NodeSignalManager(QObject):
         Returns:
             None
         """
-        QObject.__init__(self)
+        #Initialise the QObject exactly once. This used to call both
+        #QObject.__init__(self) and super().__init__(), and a QObject
+        #constructed twice segfaults when it is freed - which every node's
+        #signal manager is when a node is deleted or another recipe loaded.
         super().__init__()
         self.signals = []
 
