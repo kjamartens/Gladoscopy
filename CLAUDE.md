@@ -860,6 +860,26 @@ acquisition, just materialised.
 
 So **users add new analysis/RT/custom nodes by dropping a `.py` into the AppData folder, not into the source tree.** When searching for a node implementation, check both locations. Adding a file to one of these folders without proper top-level functions will cause it to be imported but not appear as a node.
 
+**MM-config nodes resolve groups by name, live.** `executor.py`'s
+`MMconfigChangeRan` branch reads the node's `config_string_storage` (`[group, value]`
+pairs) and looks each group up in `mil.get_available_config_groups()` *now*, never
+through `node.MMconfigInfo.config_groups`: those `ConfigInfo`s resolve their name
+by **list index** (`configGroupName()`), so after the config group editor adds,
+removes or renames a group they name a different group or none — which left
+`config_group_type` unbound (`UnboundLocalError`). A vanished group is skipped with a
+warning; >1 preset → `set_config` + `wait_for_system` (MIL has no `wait_for_config`),
+1 preset → write its single property via the MIL `get_config_*` helpers (the old
+Java-only `.get(0)`/`get_setting(0)` calls broke other backends).
+
+**Measurement/custom-function dispatch scopes must bind `nodeDict` and `nodzInfo`
+by name.** `utils.getFunctionEvalTextFromCurrentData` emits Variable-mode kwargs as
+`nodeDict['<node>'].variablesNodz['<var>']['data']` and global ones as
+`nodzInfo.globalVariables['<var>']['data']`; the legacy bare `eval` saw both as
+locals. Every `registry.dispatch_from_eval_text` scope in `executor.py` splats
+`**nodeDict` *and* binds `'nodeDict'` (the splat alone left a Variable-mode kwarg
+a `NameError`), and `generalNodzCallActionWorker` receives the flowchart as
+`args['nodzInfo']`.
+
 **Node metadata is cached (T-G1).** `__function_metadata__()` rebuilds a fresh
 nested dict literal on every call, and the GUI/dispatch path called it several
 times *per analysed frame*. Read it through
@@ -924,6 +944,18 @@ for `"type": bool` kwargs) without breaking that switch, is documented in
 `glados_pycromanager/Documentation/rt_analysis_parameters.md`. Read it before
 touching kwarg-widget code in `GUI/utils.py`.
 
+**Demo recipes for the SMLMDemoCam install** live in
+`glados_pycromanager/AutonomousMicroscopy/ExampleRecipes/` (01 simple, 02 intermediate, 03 complex,
+04 fun "nuclear pore hunt", plus a 3-plane `.pos`). They are *generated*, not hand-written:
+`_generate_demo_recipes.py` boots the real `GladosNodzFlowChart_dockWidget` offscreen (pymmcore-plus core
+loading `DemoSMLM.cfg`, stub napari viewer � napari itself needs GL), builds each graph through the app's own
+dialogs/helpers and saves with `saveGraph`. Gotchas it works around: `NodeItem.textbox` only exists after a
+node has been painted (render the scene before `saveGraph`); `PyQt5.QtWebEngineWidgets` must be imported
+before the `QApplication`; decision-widget condition rows are rebuilt on every update, so set them through
+`decisionInfoGUIVAR`, not `findChild`. Non-AND nodes start on their *first* incoming connection, so branches
+may converge on one node. Brightness thresholds are measured means (camera offset 100: Normal ~100.5,
+HighInt ~101, VeryHigh ~103.4 at 50 ms) � a guess-level starting point.
+
 ### Path / import conventions
 
 Most modules begin with this shim because the codebase supports both `pip install -e .` and "open the file in an IDE":
@@ -932,6 +964,14 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 ```
 Keep it on new top-level modules under `glados_pycromanager/` if they're meant to be runnable directly.
+
+The shim puts the *repo root* on `sys.path`, not `GUI/`, so a bare sibling import
+(`from FlowChart_dockWidgets import ...`, `from utils import ...`) raises
+`ModuleNotFoundError` at runtime. Always import package-qualified
+(`from glados_pycromanager.GUI.utils import ...`); lazy in-function imports are fine
+(and needed where the modules import each other). Beware ones wrapped in
+`except ImportError: pass` — `Shared_data.on_warningErrorInfoInfo_changed` silently
+never refreshed the node warning/error overview that way.
 
 ### Persisted GUI state — `utils.CustomMainWindow.save_state_*`
 

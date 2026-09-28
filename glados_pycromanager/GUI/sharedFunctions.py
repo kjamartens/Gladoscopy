@@ -894,7 +894,7 @@ class Shared_data(QObject):
         try:
             # logging.debug(f"shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}")
             if self.loadingOngoing == False:
-                from utils import updateAutonousErrorWarningInfo
+                from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
                 updateAutonousErrorWarningInfo(self,updateInfo='All')
         except (AttributeError, ImportError, RuntimeError) as exc:
             pass

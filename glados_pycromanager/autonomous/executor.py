@@ -167,62 +167,40 @@ class generalNodzCallActionWorker(QRunnable):
         if self.nodzType == 'Timer':
             time.sleep(self.args['wait_time'])
         elif self.nodzType == 'MMconfigChangeRan':
-            #We need to change some configs (probably):
+            #We need to change some configs (probably). Groups are resolved by
+            #*name* against the live core, not through the node's
+            #MMconfig.config_groups: those ConfigInfo objects look their name
+            #up by list index, so after a group is added/removed/renamed in the
+            #config group editor they point at a different group (or none).
+            mil = self.args['core']
+            live_groups = list(mil.get_available_config_groups())
             for config_to_change in self.args['config_string_storage']:
-                
-                #Find the correct config_group in MMconfig:
-                for config_group_id_loop in self.args['MMconfig'].config_groups:
-                    config_group_name = self.args['MMconfig'].config_groups[config_group_id_loop].configGroupName()
-                    if config_group_name == config_to_change[0]:
-                        config_group_id = config_group_id_loop
-                        #Over-write the grouptype like this:
-                        config_group_type = 'InputField'
-                        if self.args['MMconfig'].config_groups[config_group_id].isInputField():
-                            config_group_type = 'InputField'
-                        if self.args['MMconfig'].config_groups[config_group_id].isDropDown():
-                            config_group_type = 'DropDown'
-                        if self.args['MMconfig'].config_groups[config_group_id].isSlider():
-                            config_group_type = 'Slider'
-                
-                if config_group_type == 'DropDown':
-                    logging.debug('Changing dropDown value from MMconfig-Nodz!')
-                    #Change the config, and wait for the config to be changed - this works for groups
-                    self.args['core'].set_config(config_to_change[0],config_to_change[1]) #type:ignore
-                    self.args['core'].wait_for_config(config_to_change[0],config_to_change[1])#type:ignore
-                elif config_group_type == 'InputField':
-                    logging.info('Changing inputField value from MMconfig-Nodz!')
-                    CurrentText = config_to_change[1]
-                    #Get the config group name:
-                    configGroupName = self.args['MMconfig'].config_groups[config_group_id].configGroupName()
+                group_name, value = config_to_change[0], config_to_change[1]
+                if group_name not in live_groups:
+                    logging.warning('MMconfig node: config group %r no longer exists; skipping (set to %r)', group_name, value)
+                    continue
+                presets = list(mil.get_available_configs(group_name))
+                try:
+                    #Same rule as ConfigInfo.isDropDown(): more than one preset
+                    #is a preset choice; otherwise it is a single-property group
+                    #(slider or input field) and the value is the property value.
+                    if len(presets) > 1:
+                        logging.debug('Changing dropDown value from MMconfig-Nodz!')
+                        mil.set_config(group_name, value)
+                        #MIL has no wait_for_config; wait_for_system covers
+                        #every device the preset touched, on all backends.
+                        mil.wait_for_system()
+                    elif len(presets) == 1:
+                        configdata = mil.get_config_data(group_name, presets[0])
+                        device_label = mil.get_config_device_label(configdata)
+                        property_name = mil.get_config_property_name(configdata)
+                        mil.set_property(device_label, property_name, value)
+                        logging.info(f"Changed {device_label}.{property_name} to {value}")
+                    else:
+                        logging.warning('MMconfig node: config group %r has no presets; skipping', group_name)
+                except Exception:
+                    logging.exception('MMconfig node: setting config group %r to %r failed', group_name, value)
 
-                    #An Editfield config by definition (?) only has a single property underneath, so get that:
-                    underlyingProperty = self.args['MMconfig'].config_groups[config_group_id].core.get_available_configs(configGroupName).get(0)
-                    configdata = self.args['MMconfig'].config_groups[config_group_id].core.get_config_data(configGroupName,underlyingProperty)
-                    device_label = configdata.get_setting(0).get_device_label()
-                    property_name = configdata.get_setting(0).get_property_name()
-
-                    #Set this property:
-                    self.args['MMconfig'].config_groups[config_group_id].core.set_property(device_label,property_name,CurrentText)
-                    logging.info(f"Changed {device_label}.{property_name} to {CurrentText}")
-                elif config_group_type == 'Slider':
-                    logging.debug('Changing slider value from MMconfig-Nodz!')
-                    newValue = config_to_change[1]
-                    #Get the true value from the conversion - not required in MMconfig-nodz:
-                    trueValue = newValue
-                    
-                    #Get the config group name:
-                    configGroupName = self.args['MMconfig'].config_groups[config_group_id].configGroupName()
-                    #Set in MM:
-                    #A slider config by definition (?) only has a single property underneath, so get that:
-                    underlyingProperty = self.args['MMconfig'].config_groups[config_group_id].core.get_available_configs(configGroupName).get(0)
-                    configdata = self.args['MMconfig'].config_groups[config_group_id].core.get_config_data(configGroupName,underlyingProperty)
-                    device_label = configdata.get_setting(0).get_device_label()
-                    property_name = configdata.get_setting(0).get_property_name()
-
-                    #Set this property:
-                    self.args['MMconfig'].config_groups[config_group_id].core.set_property(device_label,property_name,trueValue)
-                    logging.info(f"Changed {device_label}.{property_name} to {trueValue}")
-                    
         elif self.nodzType == 'AnalysisNode' or self.nodzType == 'CustomFunctionNode':
             #Get all the necessary info
             evalText = self.args['evalText']
@@ -236,9 +214,15 @@ class generalNodzCallActionWorker(QRunnable):
             #The function name is parsed out of evalText and looked up in
             #_REGISTRY; arg expressions resolve against the worker's scope
             #plus the nodzVariable dict.
+            #`nodeDict` and `nodzInfo` must be bound *by name*: the eval-text
+            #builder (utils.getFunctionEvalTextFromCurrentData) emits
+            #"nodeDict['<node>'].variablesNodz[...]" for node variables and
+            #"nodzInfo.globalVariables[...]" for global ones.
             scope = {
                 **globals(),
                 **nodeDict,
+                'nodeDict': nodeDict,
+                'nodzInfo': self.args.get('nodzInfo'),
                 'self': self,
                 'core': core,
                 'shared_data': shared_data,
@@ -450,7 +434,7 @@ class FlowchartExecutorMixin:
         #Phase 9.5: dispatch via registry instead of bare eval.
         output = registry.dispatch_from_eval_text(
             evalText,
-            scope={**globals(), **nodeDict, 'self': self, 'nodzInfo': nodzInfo},
+            scope={**globals(), **nodeDict, 'nodeDict': nodeDict, 'self': self, 'nodzInfo': nodzInfo},
         )
         
         #Display final output to the user for now
@@ -504,6 +488,7 @@ class FlowchartExecutorMixin:
                             scope={
                                 **globals(),
                                 **nodeDict,
+                                'nodeDict': nodeDict,
                                 'self': self,
                                 'output': output,
                                 'napariLayer': napariLayer,
@@ -555,7 +540,7 @@ class FlowchartExecutorMixin:
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
         
-        worker = generalNodzCallActionWorker(nodzType='AnalysisNode',args={"evalText":evalText, "nodeDict":nodeDict, "node":node, "core": self.core, "shared_data": self.shared_data})
+        worker = generalNodzCallActionWorker(nodzType='AnalysisNode',args={"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data})
         #Add the finished emit
         worker.signals.finished.connect(lambda: self.analysisNode_finished(node))
         #Star the worker
@@ -612,6 +597,7 @@ class FlowchartExecutorMixin:
                             scope={
                                 **globals(),
                                 **nodeDict,
+                                'nodeDict': nodeDict,
                                 'self': self,
                                 'output': output,
                                 'napariLayer': napariLayer,
@@ -651,7 +637,7 @@ class FlowchartExecutorMixin:
         #Figure out the belonging evaluation-text
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.customFunction_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
-        worker = generalNodzCallActionWorker(nodzType='CustomFunctionNode',args={"evalText":evalText, "nodeDict":nodeDict, "node":node, "core": self.core, "shared_data": self.shared_data})
+        worker = generalNodzCallActionWorker(nodzType='CustomFunctionNode',args={"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data})
         #Add the finished emit
         worker.signals.finished.connect(lambda: self.CustomFunctionNode_finished(node))
         #Star the worker
@@ -917,17 +903,21 @@ class FlowchartExecutorMixin:
         try:
             data = {}
             attrs = []
+            connections = self.evaluateGraph()
             for attr in node.attrs:
                 connectedNode = None
-                for connection in self.evaluateGraph():
+                for connection in connections:
                     if connection[1][connection[1].rfind('.')+1:] == attr:
                         if connection[1][:connection[1].rfind('.')] == node.name:
                             connectedNodeName = connection[0][:connection[0].rfind('.')]
                             connectedNode = self.findNodeByName(connectedNodeName)
-            
-                        data[attr] = connectedNode.scoring_analysis_currentData['__output__'] #type:ignore
-                        attrs.append(attr)
-                        logging.debug(f"Data found for {attr}: {data[attr]}")
+                #Only for a matched upstream node - this used to run for every
+                #connection, so the first non-match hit None and aborted the gather.
+                output = getattr(connectedNode, 'scoring_analysis_currentData', {}).get('__output__') if connectedNode is not None else None
+                if output is not None:
+                    data[attr] = output
+                    attrs.append(attr)
+                    logging.debug(f"Data found for {attr}: {data[attr]}")
         except (KeyError, AttributeError, TypeError) as exc:
             logging.debug('Scoring data gather skipped: %s', exc)
         

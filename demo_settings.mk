@@ -10,8 +10,8 @@
 # DEMO_BUFFER_MB, the circular-buffer footprint, is applied there) — Glados logs
 # a warning saying so. It matters for the JAVA / Python pycromanager backends.
 
-DEMO_BACKEND       ?= PyMMCorePlus
+DEMO_BACKEND       ?= Python
 DEMO_MM_PATH       ?= C:/Users/kjamartens/AppData/Local/pymmcore-plus/pymmcore-plus/mm/Micro-Manager_2.0.3_20260724
-DEMO_CONFIG        ?= C:/Users/kjamartens/AppData/Local/pymmcore-plus/pymmcore-plus/mm/DemoSMLM.cfg
+DEMO_CONFIG        ?= C:/Users/kjamartens/AppData/Local/pymmcore-plus/pymmcore-plus/mm/insiliscope.cfg
 DEMO_BUFFER_MB     ?= 4096
 DEMO_MAX_MEMORY_MB ?= 12000

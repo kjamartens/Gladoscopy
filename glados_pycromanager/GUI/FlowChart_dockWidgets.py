@@ -2310,7 +2310,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             allConfigGroups={}
             nrconfiggroups = np.size(self.core.get_available_config_groups()) #type:ignore
             for config_group_id in range(nrconfiggroups):
-                allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
+                allConfigGroups[config_group_id] = ConfigInfo(self.core,self.shared_data,config_group_id)
         
         
             newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = True,showStages=False,showROIoptions=False,showShutterOptions=False,showLiveSnapExposureButtons=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = True,autoSaveLoad=False) # type: ignore
@@ -2327,7 +2327,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             allConfigGroups={}
             nrconfiggroups =  np.size(self.core.get_available_config_groups()) #type:ignore
             for config_group_id in range(nrconfiggroups):
-                allConfigGroups[config_group_id] = ConfigInfo(self.core,config_group_id)
+                allConfigGroups[config_group_id] = ConfigInfo(self.core,self.shared_data,config_group_id)
         
             newNode.MMconfigInfo = MMConfigUI(allConfigGroups,showConfigs = False,showStages=False,showROIoptions=False,showShutterOptions=False,showLiveSnapExposureButtons=False,number_config_columns=5,changes_update_MM = False,showCheckboxes = False,showRelativeStages = True, autoSaveLoad=False) # type: ignore
             
@@ -3157,8 +3157,16 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 displayHTMLtext += f"<br>{config[0]} to {displayRounded}"
         elif nodeType == 'scoreEnd':
             displayHTMLtext = f"<i> {datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')}</i>"
+            def _fmt(v):
+                #A measurement node's __output__ is usually a dict of named values.
+                if isinstance(v, dict):
+                    return ", ".join(f"{k}={_fmt(x)}" for k, x in v.items())
+                try:
+                    return format(v, '.2f')
+                except (TypeError, ValueError):
+                    return str(v)
             for score_entry in dialog[0]:
-                displayHTMLtext += f"<br><b>{score_entry}:</b> {format(dialog[1][score_entry],'.2f')}"
+                displayHTMLtext += f"<br><b>{score_entry}:</b> {_fmt(dialog[1].get(score_entry))}"
             if len(dialog) > 2:
                 displayHTMLtext += f"<br><b>{dialog[2]}</b>"
         elif nodeType == 'scoreStart':

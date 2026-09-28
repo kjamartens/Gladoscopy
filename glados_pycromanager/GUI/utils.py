@@ -880,11 +880,18 @@ def nodz_evaluateVar(varName,nodzInfo):
         elif originNodeName == 'Core':
             varData = nodzInfo.coreVariables[variableName]['data']
         else:
-            #Done it like this to have access to kwargvalue if needed (not retported right now)
             nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
-            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
-        
-            varData = eval(kwargvalue)
+            #Name the stale half of the reference: a bare KeyError('node_0')
+            #does not say it came from a decision/kwarg pointing at a node that
+            #was since deleted, re-added (new number) or never existed.
+            if originNodeName not in nodeDict:
+                raise KeyError(f"variable {varName!r} refers to node {originNodeName!r}, "
+                               f"which is not in the graph (nodes: {sorted(nodeDict)})")
+            nodeVars = nodeDict[originNodeName].variablesNodz
+            if variableName not in nodeVars:
+                raise KeyError(f"variable {varName!r}: node {originNodeName!r} has no variable "
+                               f"{variableName!r} (has: {sorted(nodeVars)})")
+            varData = nodeVars[variableName]['data']
         
     return varData
 
@@ -2673,7 +2680,46 @@ def getFunctionEvalText(layout,p1,p2):
         return moduleMethodEvalTexts[0]
     else:
         return None
-    
+
+_ADVANCED_TOKEN_RE = re.compile(r"\{([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9._%+-]+)\}")
+
+def nodzVariableRefExpr(variableName, originNodeName):
+    """Python expression text reading `variableName@originNodeName` at dispatch time.
+
+    Evaluated in the executor's dispatch scope, which binds `nodeDict` and
+    `nodzInfo` by name (see `autonomous/executor.py`).
+    """
+    if originNodeName == 'Global':
+        return "nodzInfo.globalVariables['"+variableName+"']['data']"
+    if originNodeName == 'Core':
+        return "nodzInfo.coreVariables['"+variableName+"']['data']"
+    return "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+
+def advancedKwargToEvalExpr(text):
+    """Translate an Advanced-mode kwarg (`{name@Origin}` tokens in free text) to an expression.
+
+    Each token becomes the same live reference Variable mode uses, so the
+    referenced object reaches the node as-is (a dataset stays a dataset, not its
+    `str()`), and the rest of the text is kept as Python: `{t@Global}+1` is
+    arithmetic. If the result is not a valid expression (plain templating such
+    as `run_{n@Global}.tif`), it is instead built as string concatenation of the
+    literal chunks and `str()` of each token.
+    """
+    expr = _ADVANCED_TOKEN_RE.sub(lambda m: "(" + nodzVariableRefExpr(m.group(1), m.group(2)) + ")", text)
+    try:
+        ast.parse(expr, mode='eval')
+        return expr
+    except SyntaxError:
+        parts, pos = [], 0
+        for m in _ADVANCED_TOKEN_RE.finditer(text):
+            if m.start() > pos:
+                parts.append(repr(text[pos:m.start()]))
+            parts.append("str(" + nodzVariableRefExpr(m.group(1), m.group(2)) + ")")
+            pos = m.end()
+        if pos < len(text):
+            parts.append(repr(text[pos:]))
+        return "+".join(parts) if parts else repr(text)
+
 def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None, methodKwargTypes = None, nodzInfo = None,skipInput=False):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
@@ -2749,16 +2795,12 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                         #         varData = node.variablesNodz[variableName]['data']
                         #         #Set it to this kwarg value - str allways
                         
-                        if originNodeName == 'Global':
-                            kwargvalue = "nodzInfo.globalVariables['"+variableName+"']['data']"
-                        elif originNodeName == 'Core':
-                            kwargvalue = "nodzInfo.coreVariables['"+variableName+"']['data']"
-                        else:
-                            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+                        kwargvalue = nodzVariableRefExpr(variableName, originNodeName)
                         ignoreQuotes = True #ignore quotes - use it as a variable, not a string
                                 # break
                     elif methodKwargTypes[GUIbasedIndex] == 'Advanced':
-                        logging.error('To implement!')
+                        kwargvalue = advancedKwargToEvalExpr(kwargvalue)
+                        ignoreQuotes = True
                     
                     #Add a comma if there is some info in the partialString already
                     if partialString != '':
@@ -3402,7 +3444,7 @@ class HelpGroupBox:
     
 
 def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
-    from FlowChart_dockWidgets import VariablesDialog
+    from glados_pycromanager.GUI.FlowChart_dockWidgets import VariablesDialog
     
     #Find the associated kwarg/function:
     associatedFunction = line_edit.objectName().split('#')[1]
@@ -3420,7 +3462,7 @@ def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
 
 
 def PushButtonAddVariableCallBack(line_edit,nodzInfo):
-    from FlowChart_dockWidgets import VariablesDialog
+    from glados_pycromanager.GUI.FlowChart_dockWidgets import VariablesDialog
     
     #Find the associated kwarg/function:
     associatedFunction = line_edit.objectName().split('#')[1]
