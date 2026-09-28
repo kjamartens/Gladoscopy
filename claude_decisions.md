@@ -4100,3 +4100,51 @@ flaky, not investigated.
 **Affects:** `ui/layout/` (new), `GUI/sharedFunctions.py`, `Core/MDAGlados.py`,
 `GUI/MMcontrols.py`, `GUI/napariGlados.py`, `_dock_widget.py`,
 `GUI/Analysis_dockWidgets.py`, `GUI/utils.py`, `ui/widgets/builders.py`, tests.
+
+## 2026-09-29 — Autonomous recipe execution: robustness and lag (Tiers 1+2)  [recipes]
+
+**Context:** the user reported recipe runs as buggy, laggy and occasionally
+crashing. Two code audits, spot-checked by hand, found that almost every hang had
+one shape: a completion signal emitted only on the happy path, with no run-level
+state to notice it never came. The lag came from synchronous node chains that
+recursed on the GUI thread, hardware on the GUI thread, and full per-node refreshes.
+
+**Decisions:**
+- **scoringEnd waits for all its inputs (user's choice).** It was ANY-triggered and
+  read the other analyses' `__output__` from the previous position. It now shares
+  ANDlogic's path (`NodeItem.waitsForAllInputs`), and scoringStart clears
+  `__output__`. Trade-off: a scoring branch that conditionally skips one of its
+  inputs now waits instead of deciding early.
+- **Stop is enforced at one choke point, `oneConnectionAtStartIsFinished`**, not by
+  cancelling every kind of in-flight work. The MDA is cancelled per backend. Timers,
+  workers and hardware jobs finish late and are ignored. Stop policy (the assistant's
+  default, per the user's wish not to be asked): Interrupt resets mid-run nodes to
+  `idle`, a failure marks them `error`, and finished nodes keep their status.
+- **Run generation (not in the original plan).** A late finish from a stopped run
+  could otherwise drive the *next* run, because `_runAborted` is cleared by then.
+  Nodes are stamped in `nodeRan`, and stale finishes/failures are dropped.
+- **Node hand-off via `QTimer.singleShot(0)`** in `finishedEmits` and the if/case
+  direct starts. Bookkeeping stays immediate; only the downstream emit is deferred.
+- **Refused/failed MDA reports `mda_acq_done_signal(False)`.** The signal was
+  already `bool` but always `True`, so no new flag was added.
+- **Finalisation backfill runs on the visualisation worker thread**, and only the
+  layer refresh goes through the napari bridge. The literal fix (gate on `vis_method`
+  and call the existing path) would have run the NDTiff backfill on the GUI thread.
+- **Plan item 14 skipped (graph-scan caching).** Nothing listens to
+  `signal_GraphEvaluated`, so `evaluateGraph()` is one pass over the scene items.
+  For recipe-sized graphs that is sub-millisecond against ~257 ms hardware calls. A
+  `name -> node` cache would add a stale-invalidation risk (rename/delete/load) for
+  no measurable gain.
+- **Live mode does not block a node acquisition.** Only an already-running MDA does:
+  the acquisition worker already turns live mode off itself, and refusing would
+  break the common "start recipe with live on" flow.
+
+**Found along the way:** `NodeSignalManager.__init__` initialised its QObject twice,
+which segfaults when the object is freed (bisected under pytest, exit 139). Every
+node owns these, so deleting a node or loading another recipe could crash the app.
+Fixed in its own commit.
+
+**Affects:** `autonomous/executor.py`, `GUI/FlowChart_dockWidgets.py`,
+`GUI/nodz/nodz_main.py`, `Core/MDAGlados.py`, `GUI/napariGlados.py`,
+`GUI/sharedFunctions.py`, tests `test_recipe_*`, `test_mda_done_always_fires.py`,
+`test_mda_finalisation_gate.py`, `test_scoring_end_waits_all.py`.

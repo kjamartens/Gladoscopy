@@ -860,6 +860,50 @@ acquisition, just materialised.
 
 So **users add new analysis/RT/custom nodes by dropping a `.py` into the AppData folder, not into the source tree.** When searching for a node implementation, check both locations. Adding a file to one of these folders without proper top-level functions will cause it to be imported but not appear as a node.
 
+**Recipe execution: how a run advances, fails and stops.** Read this before
+touching `executor.py` / `finishedEmits` (2026-09-29 robustness/lag work).
+- **Every downstream node start goes through `NodeItem.oneConnectionAtStartIsFinished`**:
+  plug signals (wired by `GraphToSignals`), the if/case direct starts, and the
+  acquisition node's `MDA_completed` (now via `finishedEmits`). That makes it the
+  one place a stopped run is enforced (`flowChart._runAborted`). `ANDlogic_` and
+  `scoringEnd_` nodes wait for *every* wired input (`waitsForAllInputs`, counted
+  against `n_connect_at_start`); everything else starts on the first. scoringStart
+  clears the scoring nodes' `__output__`.
+- **`finishedEmits` defers the downstream emit** with `QTimer.singleShot(0)`
+  (`_emitNodeFinished`). Inline emits nested every node inside the previous one:
+  the GUI froze for a whole multi-position tour and could hit RecursionError. Never
+  start the next node synchronously from a node's action; call `finishedEmits`.
+- **Pool work goes through `_startNodeWorker(node, type, args, on_success)`**. It
+  always reports back, even when the worker raised (`worker.error`) or `on_success`
+  raised, and routes failures to `_nodeFailed`: node goes to `error`, the reason goes
+  in the Info tooltip, and `_abortRun` runs. Blocking hardware (stage moves, waits)
+  goes through `_hardwareThen(node, fn, on_success, label)` onto the owner thread.
+  Do not call `core.*` on the GUI thread from a node.
+- **Run lifecycle:** `_beginRun(label)` gates all four run buttons (refuses while a
+  full run is going). `_abortRun(reason, user_requested)` sets `_runAborted`, clears
+  the run flags, cancels the MDA per backend (`core.mda.cancel()` on MMCORE_PLUS,
+  `acq.abort()` otherwise, only while `mdaMode`), and sets mid-run nodes to `idle`
+  (Interrupt) or `error` (failure). `_advanceToNextPosition` is the single "next
+  position or done" step. **Run generation:** each start/stop bumps it; `nodeRan`
+  stamps the node, and `_emitNodeFinished` / `_nodeWorkerDone` / `_afterHardware`
+  drop a stale node's finish. Without that, a timer or cancelled MDA from a stopped
+  run drives the next one.
+- **The MDA always reports done.** `mda_acq_done_signal(bool)` carries success; the
+  acquisition worker's `finally` reports a failure (`_report_failed_mda`), as do
+  both refused-start paths. `claim_mda_done_signal` keeps exactly one listener (each
+  acquisition node has its own `MDAGlados`). `MDA_acq_from_Node` refuses while an
+  MDA is already running, and always sets `newestLayerName` (default: the node's
+  name).
+- **`NodeSignalManager` must initialise its QObject once.** A double
+  `QObject.__init__` segfaults on free (node delete, recipe reload). All its signals
+  are the same class-level `new_signal`, so `emit_all_signals` emits once.
+- **Variables UI is debounced.** `nodeRan` schedules one table rebuild per 250 ms
+  burst, `updateCoreVariables` keeps at most one snapshot queued, and values show via
+  `variableDisplayText`. Node text refresh uses `dontEvaluate=True` and is guarded.
+Tests: `tests/test_recipe_*.py`, `test_mda_done_always_fires.py`,
+`test_scoring_end_waits_all.py`, `test_mda_finalisation_gate.py`. Open follow-ups:
+`claude_issues_and_features.md` ("Recipe execution, deferred").
+
 **MM-config nodes resolve groups by name, live.** `executor.py`'s
 `MMconfigChangeRan` branch reads the node's `config_string_storage` (`[group, value]`
 pairs) and looks each group up in `mil.get_available_config_groups()` *now*, never
