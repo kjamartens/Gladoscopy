@@ -582,6 +582,11 @@ class FlowchartExecutorMixin:
     def _nodeWorkerDone(self, worker, node, on_success):
         """GUI-thread slot for ``_startNodeWorker``."""
         self.__dict__.get('_activeNodeWorkers', set()).discard(worker)
+        if self.isStaleNode(node):
+            #Its run was stopped; neither its result nor its failure belongs
+            #to whatever run is going now.
+            logging.info('Ignoring late %s result of %s', worker.nodzType, getattr(node, 'name', node))
+            return
         if worker.error is not None:
             self._nodeFailed(node, worker.error)
             return
@@ -613,6 +618,8 @@ class FlowchartExecutorMixin:
             self._afterHardware(node, exc, on_success, label)
 
     def _afterHardware(self, node, error, on_success, label):
+        if node is not None and self.isStaleNode(node):
+            return
         if error is None and not getattr(self, '_runAborted', False):
             try:
                 on_success()
@@ -647,6 +654,7 @@ class FlowchartExecutorMixin:
         """
         logging.warning('Autonomous run stopped: %s', reason)
         self._runAborted = True
+        self._runGeneration = self.currentRunGeneration() + 1
         self.fullRunOngoing = False
         self.singleRunOngoing = False
         self._cancelRunningAcquisition()
@@ -695,7 +703,18 @@ class FlowchartExecutorMixin:
                 pass
             return False
         self._runAborted = False
+        self._runGeneration = self.currentRunGeneration() + 1
         return True
+
+    def currentRunGeneration(self):
+        """Bumped by every run start and stop. A node is stamped with it when it
+        starts (nodeRan), so work that finishes after its run was stopped - a
+        timer, a worker, a cancelled MDA - cannot trigger nodes in a later run."""
+        return self.__dict__.get('_runGeneration', 0)
+
+    def isStaleNode(self, node):
+        started = getattr(node, '_runGeneration', None)
+        return started is not None and started != self.currentRunGeneration()
 
     def _advanceToNextPosition(self):
         """After a position is done: move on, or finish the full run."""
@@ -1213,9 +1232,11 @@ class FlowchartExecutorMixin:
         vardata = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.timerInfo, node.flowChart)
         wait_time = float(vardata['wait_time'][0])
 
-        #Create the worker
-        self._startNodeWorker(node, 'Timer', {"wait_time":wait_time},
-            lambda: self.finishedEmits(node))
+        #A single-shot QTimer instead of time.sleep() in a pool worker: the
+        #sleep held a global-pool thread for the whole wait and could not be
+        #cancelled. A stopped (or since restarted) run ignores the timeout via
+        #the node's run generation (see _emitNodeFinished).
+        QTimer.singleShot(max(0, int(round(wait_time*1000))), lambda: self.finishedEmits(node))
     
     def storeDataCallAction(self,node):
         

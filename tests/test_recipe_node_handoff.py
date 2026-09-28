@@ -32,6 +32,7 @@ def _flow():
     flow = SimpleNamespace(updateCoreVariables=MagicMock(), update=MagicMock(),
                            shared_data=SimpleNamespace(warningErrorInfoInfo={'Info': {'LastNodeRan': None}}))
     flow._emitNodeFinished = lambda node: GladosNodzFlowChart_dockWidget._emitNodeFinished(flow, node)
+    flow.isStaleNode = lambda node: False
     return flow
 
 

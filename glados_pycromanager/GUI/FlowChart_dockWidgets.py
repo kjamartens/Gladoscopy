@@ -2483,6 +2483,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         Function that's called at the start of every node
         Updates the core variables and the variables in the UI.
         """
+        node._runGeneration = self.currentRunGeneration()
         self.update()
         self._scheduleVariablesRefresh()
         logging.debug(f'Node with name {node.name} ran')
@@ -2827,6 +2828,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
 
     def _emitNodeFinished(self, node):
         """Deferred second half of finishedEmits: trigger the downstream nodes."""
+        if self.isStaleNode(node):
+            logging.info('Ignoring late finish of %s: its run was stopped', node.name)
+            return
         if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
             node.customFinishedEmits.emit_all_signals()
         if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
