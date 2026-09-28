@@ -602,11 +602,81 @@ class FlowchartExecutorMixin:
             pass
         self._abortRun(reason)
 
-    def _abortRun(self, reason):
-        """Stop advancing the recipe: no further positions, no acquisition."""
+    def _abortRun(self, reason, user_requested=False):
+        """Stop the recipe: no further nodes, no further positions, and cancel
+        a running acquisition. Node starts are refused from here on by
+        ``NodeItem.oneConnectionAtStartIsFinished`` until the next run entry
+        (``_beginRun``) clears ``_runAborted``.
+        """
         logging.warning('Autonomous run stopped: %s', reason)
+        self._runAborted = True
         self.fullRunOngoing = False
         self.singleRunOngoing = False
+        self._cancelRunningAcquisition()
+
+        #Nodes caught mid-run: an Interrupt resets them (nothing went wrong),
+        #a failure marks them so it is visible where the run died. Finished
+        #nodes keep showing how far the run got.
+        stoppedStatus = 'idle' if user_requested else 'error'
+        for node in getattr(self, 'nodes', []):
+            if getattr(node, 'status', None) == 'running':
+                node.status = stoppedStatus
+
+        try:
+            self.shared_data.warningErrorInfoInfo['Info']['Other'] = [f"Run stopped: {reason}"]
+        except (AttributeError, KeyError, TypeError):
+            pass
+        update = getattr(self, 'update', None)
+        if callable(update):
+            update()
+
+    def _cancelRunningAcquisition(self):
+        """Cancel the MDA in flight, on whichever backend runs it. Its worker
+        still reports done; the aborted run then refuses the downstream start."""
+        shared_data = self.shared_data
+        if not getattr(shared_data, 'mdaMode', False):
+            return
+        try:
+            if shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+                shared_data.MILcore.core.mda.cancel()
+            else:
+                acq = getattr(shared_data, '_mdaModeAcqData', None)
+                if acq is not None:
+                    acq.abort()
+        except Exception:
+            logging.exception('Cancelling the running acquisition failed')
+
+    def _beginRun(self, label):
+        """Gate for every run button. Returns False (and says why) while a full
+        run is still going; otherwise clears a previous stop."""
+        if getattr(self, 'fullRunOngoing', False) and not getattr(self, '_runAborted', False):
+            logging.warning('Not starting %s: an autonomous run is still going (use Interrupt run first)', label)
+            try:
+                self.shared_data.warningErrorInfoInfo['Info']['Other'] = [
+                    f"Not starting {label}: a run is still going - interrupt it first"]
+            except (AttributeError, KeyError, TypeError):
+                pass
+            return False
+        self._runAborted = False
+        return True
+
+    def _advanceToNextPosition(self):
+        """After a position is done: move on, or finish the full run."""
+        if getattr(self, '_runAborted', False) or not self.fullRunOngoing:
+            return
+        nrPositions = self.fullRunPositions['nrPositions']
+        if self.fullRunCurrentPos+1 < nrPositions:
+            logging.info('Just did position %d/%d, continuing', self.fullRunCurrentPos+1, nrPositions)
+            self.fullRunCurrentPos += 1
+            self.startNewScoreAcqAtPos()
+        else:
+            logging.info('All done! Did %d/%d positions', self.fullRunCurrentPos+1, nrPositions)
+            self.fullRunOngoing = False
+            self.singleRunOngoing = False
+            try:
+                self.shared_data.warningErrorInfoInfo['Info']['Other'] = [f"Autonomous run finished ({nrPositions} positions)"]
+            except (AttributeError, KeyError, TypeError):
+                pass
 
     def analysisNode_finished(self,node):
         #Set the status of the nodz-coupled vis and real-time to finished:
@@ -816,15 +886,7 @@ class FlowchartExecutorMixin:
         self.finishedEmits(node)
         logging.debug("End Acquiring----------------------------------------------------------")
         if self.fullRunOngoing:
-            #if there are more positions to look at...
-            if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                logging.info(f'Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!--------------------------------------------------------')
-                self.fullRunCurrentPos +=1
-                #And start a new score/acq at a new pos:
-                self.startNewScoreAcqAtPos()
-            else:
-                logging.info(f'ALLDONE Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!----------------------------------------------------------')
-                self.singleRunOngoing = False
+            self._advanceToNextPosition()
         else:
             logging.info("ACQUIRING FULL RUN IS NOT ONGOING--------------------------------------------")
         logging.debug("End Acquiring2------------------------------------------------------------")
@@ -1008,13 +1070,7 @@ class FlowchartExecutorMixin:
                 logging.info("Test is... Not Passed!")
                 #Go to next XY position
                 if self.fullRunOngoing:
-                    if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                        self.fullRunCurrentPos +=1
-                        #And start a new score/acq at a new pos:
-                        self.startNewScoreAcqAtPos()
-                    else:
-                        self.singleRunOngoing = False
-                        logging.info('All done!')
+                    self._advanceToNextPosition()
             logging.info('----------------------')
 
         except (AttributeError, KeyError, TypeError, ValueError) as exc:
@@ -1060,13 +1116,7 @@ class FlowchartExecutorMixin:
         node.status='finished'
         #Go to next XY position
         if self.fullRunOngoing:
-            if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                self.fullRunCurrentPos +=1
-                #And start a new score/acq at a new pos:
-                self.startNewScoreAcqAtPos()
-            else:
-                self.singleRunOngoing = False
-                logging.info('All done!')
+            self._advanceToNextPosition()
         
     
     def and_logicCallAction(self,node):
@@ -1326,6 +1376,8 @@ class FlowchartExecutorMixin:
             None
         """
         logging.info('Starting a full run')
+        if not self._beginRun('a full run'):
+            return
         self.preventAcq = False
         self.preventScoring = False
         
@@ -1366,6 +1418,8 @@ class FlowchartExecutorMixin:
             None
         """
         
+        if getattr(self, '_runAborted', False):
+            return
         positions = self.fullRunPositions
         pos = self.fullRunCurrentPos
         
@@ -1400,6 +1454,8 @@ class FlowchartExecutorMixin:
         Returns:
             None
         """
+        if not self._beginRun('init only'):
+            return
         self.preventScoring = True
         self.preventAcq = False
         
@@ -1429,6 +1485,8 @@ class FlowchartExecutorMixin:
         Returns:
             None
         """
+        if not self._beginRun('scoring only'):
+            return
         self.preventAcq = True
         self.preventScoring = False
         
@@ -1486,6 +1544,8 @@ class FlowchartExecutorMixin:
         Returns:
             None
         """
+        if not self._beginRun('acquiring only'):
+            return
         logging.info("Run Acquiring")
         
         #Find the acqStart node:
@@ -1508,10 +1568,7 @@ class FlowchartExecutorMixin:
         Interrupt the run - stop the scoring/init/acq and stop ongoing acquisitions.
         """
 
-        #Trying this for now:
-        self.shared_data._mdaModeAcqData.abort()
-
-        return
+        self._abortRun('interrupted by user', user_requested=True)
 
     def _slack_send_enabled(self):
         """Return True if Slack credentials look set up; log + return False otherwise.

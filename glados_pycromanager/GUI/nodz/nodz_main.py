@@ -2029,6 +2029,12 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.oneConnectionAtStartIsFinished()
 
     def oneConnectionAtStartIsFinished(self):
+        #Every way of starting a downstream node comes through here (plug
+        #signals, if/case branches, the acquisition MDA_completed hook), so
+        #this is where a stopped run stops - whatever finishes late.
+        if getattr(self.flowChart, '_runAborted', False):
+            logging.info('Run was stopped; not starting node %s', self.name)
+            return
         self.n_connect_at_start_finished += 1
         logging.debug('Called oneConnectionAtStartIsFinished')
         logging.debug(f"n_connect_at_start_finished: {self.n_connect_at_start_finished}")
