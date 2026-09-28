@@ -817,13 +817,17 @@ class nodz_visualisationDialog(QDialog):
         self.setWindowTitle("Visualisation Dialog")
         if parentNode is not None:
             layout_sub = QFormLayout()
-            if 'layerName' not in parentNode.visualisation_currentData or parentNode.visualisation_currentData['layerName'] is not None:
+            #Offer the saved name when there is one. This test was inverted, so a
+            #saved name was never shown and OK silently reset it; the fallback
+            #is a *unique* name - two visual nodes both called 'newLayer' shared
+            #one layer and one zarr store and destroyed each other's data.
+            if parentNode.visualisation_currentData.get('layerName') is None:
                 connectedNodes = nodz_utils.getConnectedNodes(parentNode, 'topAttr')
                 if len(connectedNodes)>0:
                     connectedNode = connectedNodes[0]
                     defaultText = connectedNode.name
                 else:
-                    defaultText = 'newLayer'
+                    defaultText = parentNode.name
             else:
                 defaultText = parentNode.visualisation_currentData['layerName']
             self.layerNameEdit = QLineEdit()

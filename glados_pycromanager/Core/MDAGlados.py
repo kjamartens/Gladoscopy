@@ -1628,12 +1628,20 @@ class MDAGlados(CustomMainWindow):
                 nodeInfo.status = 'error'
             return
         
+        #The layer (and zarr store) this acquisition writes to. Without a Visual
+        #node this used to stay whatever the *previous* acquisition set, so the
+        #frames went into another node's store - which could also be discarded
+        #on a shape mismatch while that node's layer still showed it.
+        self.shared_data.newestLayerName = nodeName
+
         #Look at the 'Visual' bottom attribute:
         visualAttr = nodeInfo.bottomAttrs['Visual']
         if len(visualAttr.connections) > 0:
             for connection in visualAttr.connections:
                 if connection.plugAttr is not None and connection.socketAttr is not None and connection.plugItem is not None and connection.socketItem is not None and connection.plugNode is not None and connection.socketNode is not None:
                     visual_connected_node_name = connection.socketNode
+                    #Defaults for a connection whose node cannot be found (was UnboundLocalError)
+                    layerName, colormap = nodeName, 'gray'
                     for node in nodeInfo.flowChart.nodes:
                         if node.name == visual_connected_node_name:
                             visual_connected_node = node

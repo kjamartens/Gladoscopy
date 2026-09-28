@@ -137,3 +137,28 @@ def test_node_acquisition_refused_while_an_mda_is_running():
 
     flowChart._nodeFailed.assert_called_once()
     stub.core.set_exposure.assert_not_called()
+
+
+def test_node_acquisition_without_visual_node_uses_its_own_layer_name():
+    # It used to keep whatever layer the previous acquisition set, and write
+    # this node's frames into that node's zarr store.
+    flowChart = SimpleNamespace(nodes=[])
+    node = SimpleNamespace(name='acquisition_2', status='running', flowChart=flowChart,
+                           bottomAttrs={'Visual': SimpleNamespace(connections=[]),
+                                        'Real-time': SimpleNamespace(connections=[])})
+    shared = MagicMock(mdaMode=False, newestLayerName='acquisition_1')
+    stub = SimpleNamespace(shared_data=shared, flushMDAEventsUpdate=MagicMock(),
+                           flushMDAStateSave=MagicMock(), core=MagicMock(), exposure_ms=10,
+                           _applyFocusDevice=MagicMock(), storage_file_name='x', storage_folder='y',
+                           _mdaEventsForAcquisition=MagicMock(), mda_useq=None,
+                           MDA_acq_finished=MagicMock())
+
+    import glados_pycromanager.Core.MDAGlados as mdag
+    orig = mdag.utils.attemptToEvaluateVariables
+    mdag.utils.attemptToEvaluateVariables = lambda v, fc: v
+    try:
+        MDAGlados.MDA_acq_from_Node(stub, node)
+    finally:
+        mdag.utils.attemptToEvaluateVariables = orig
+
+    assert shared.newestLayerName == 'acquisition_2'
