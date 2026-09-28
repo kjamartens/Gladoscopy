@@ -2483,13 +2483,30 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         Function that's called at the start of every node
         Updates the core variables and the variables in the UI.
         """
+        self.update()
+        self._scheduleVariablesRefresh()
+        logging.debug(f'Node with name {node.name} ran')
+
+    #How long node starts are coalesced into one variables-table rebuild.
+    VARIABLES_REFRESH_DEBOUNCE_MS = 250
+
+    def _scheduleVariablesRefresh(self):
+        """Rebuild the variables table once per burst of node starts, not per
+        node (it re-reads every variable and snapshots the hardware)."""
+        timer = self.__dict__.get('_variablesRefreshTimer')
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(self.VARIABLES_REFRESH_DEBOUNCE_MS)
+            timer.timeout.connect(self._refreshVariablesWidget)
+            self._variablesRefreshTimer = timer
+        timer.start()
+
+    def _refreshVariablesWidget(self):
         try:
-            self.update()
-            # self.updateCoreVariables()
             self.variablesWidget.updateVariables()
         except (AttributeError, RuntimeError) as exc:
             logging.debug('variablesWidget update skipped: %s', exc)
-        logging.debug(f'Node with name {node.name} ran')
 
     def NodeDoubleClicked(self,nodeName):
         """
@@ -3543,7 +3560,17 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         if service is None or not getattr(service, 'running', False):
             self.coreVariables = self._collectCoreVariables()
             return
-        service.submit(self._refreshCoreVariables, label='nodz.updateCoreVariables')
+        #One queued snapshot serves every request made before it starts: this
+        #is called at every node start and finish, and each snapshot is a read
+        #of every stage and config group, queued ahead of real hardware work.
+        if self.__dict__.get('_coreVariablesRefreshQueued', False):
+            return
+        self._coreVariablesRefreshQueued = True
+        try:
+            service.submit(self._refreshCoreVariables, label='nodz.updateCoreVariables')
+        except Exception:
+            self._coreVariablesRefreshQueued = False
+            raise
 
     def _refreshCoreVariables(self):
         """Owner-thread half of `updateCoreVariables`.
@@ -3552,6 +3579,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         concurrent reader sees either the old snapshot or the new one -- never
         a half-filled one.
         """
+        #Cleared *before* reading, so a request arriving mid-read queues a
+        #fresh snapshot instead of being answered by this (older) one.
+        self._coreVariablesRefreshQueued = False
         self.coreVariables = self._collectCoreVariables()
 
     def _collectCoreVariables(self):
@@ -3585,7 +3615,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         if (type(allConfigs != None) == bool and allConfigs != None) or any(allConfigs != None):
             nrconfiggroups = len(allConfigs)
             for config_id in range(nrconfiggroups):
-                configInfo = ConfigInfo(self.core,shared_data,config_id)
+                configInfo = ConfigInfo(self.core,self.shared_data,config_id)
                 configName = configInfo.configGroupName()
                 configValue = configInfo.getStorableValue()
                 try:
@@ -4624,6 +4654,24 @@ class HoverTableWidget(QTableWidget):
         self.cellHovered.emit(-1, -1)
         super().leaveEvent(event)
         
+#Longest value text the variables table shows. It used to str() every
+#variable in full on every node start - whole acquisitions and localisation
+#tables included.
+VARIABLE_DISPLAY_MAX_CHARS = 200
+
+
+def variableDisplayText(data, max_chars=VARIABLE_DISPLAY_MAX_CHARS):
+    """Short, cheap text for a variable's value in the variables table."""
+    shape = getattr(data, 'shape', None)
+    if shape is not None and not np.isscalar(data):
+        dtype = getattr(data, 'dtype', '')
+        return f"{type(data).__name__} {tuple(shape)} {dtype}".rstrip()
+    if isinstance(data, (list, tuple, dict, set)) and len(data) > 20:
+        return f"{type(data).__name__}[{len(data)}]"
+    text = str(data)
+    return text if len(text) <= max_chars else text[:max_chars] + '…'
+
+
 class VariablesBase(QWidget):
     """ 
     Show the variables of all nodz-instances, possibly filtered on connectedNodz only.
@@ -4750,97 +4798,44 @@ class VariablesBase(QWidget):
     def get_selected_entry(self):
         return getattr(self, 'selected_entry', None)
     
+    def _acceptsType(self, variableTypes):
+        """Does a variable of `variableTypes` pass this table's type filter?"""
+        if self.typeInfo is None: #if no typing specified, accept everything
+            return True
+        if isinstance(variableTypes,type):
+            variableTypes = [variableTypes]
+        if isinstance(self.typeInfo,type):
+            self.typeInfo = [self.typeInfo]
+        return any(variableType == selftype for variableType in variableTypes for selftype in self.typeInfo)
+
     def updateVariables(self):
         """
         Update the nodz-variables.
         """
-        
+
         self.nodzinstance.updateCoreVariables()
-        
-        allvariableData = {}
-        #Add all global variables
-        for var in self.nodzinstance.globalVariables:
-            pos = len(allvariableData)
-            correctTyping = False
-            if self.typeInfo is not None:
-                variableTypes = self.nodzinstance.globalVariables[var]['type']
-                if isinstance(variableTypes,type):
-                    variableTypes = [variableTypes]
-                if isinstance(self.typeInfo,type):
-                    self.typeInfo = [self.typeInfo]
-                
-                for variableType in variableTypes:
-                    for selftype in self.typeInfo:
-                        if variableType == selftype:
-                            correctTyping = True
-            else: #if no typing specified, accept everything
-                correctTyping = True
-            
-            if correctTyping:
-                allvariableData[pos] = self.nodzinstance.globalVariables[var]
-                allvariableData[pos]['NodeOrigin'] = 'Global'
-                allvariableData[pos]['VariableName'] = var
-            
-        #Add all core variables
-        for var in self.nodzinstance.coreVariables:
-            pos = len(allvariableData)
-            correctTyping = False
-            if self.typeInfo is not None:
-                variableTypes = self.nodzinstance.coreVariables[var]['type']
-                if isinstance(variableTypes,type):
-                    variableTypes = [variableTypes]
-                if isinstance(self.typeInfo,type):
-                    self.typeInfo = [self.typeInfo]
-                
-                for variableType in variableTypes:
-                    for selftype in self.typeInfo:
-                        if variableType == selftype:
-                            correctTyping = True
-            else: #if no typing specified, accept everything
-                correctTyping = True
-            
-            if correctTyping:
-                allvariableData[pos] = self.nodzinstance.coreVariables[var]
-                allvariableData[pos]['NodeOrigin'] = 'Core'
-                allvariableData[pos]['VariableName'] = var
-            
-        #Add all variables of all nodes
-        allNodes = self.nodzinstance.obtainAllNodes()
-        
-        for node in allNodes:
-            for var in node.variablesNodz:
-                pos = len(allvariableData)
-                correctTyping = False
-                if self.typeInfo is not None:
-                    variableTypes = node.variablesNodz[var]['type']
-                    if isinstance(variableTypes,type):
-                        variableTypes = [variableTypes]
-                    if isinstance(self.typeInfo,type):
-                        self.typeInfo = [self.typeInfo]
-                    
-                    for variableType in variableTypes:
-                        for selftype in self.typeInfo:
-                            if variableType == selftype:
-                                correctTyping = True
-                else: #if no typing specified, accept everything
-                    correctTyping = True
-                
-                if correctTyping:
-                    allvariableData[pos] = node.variablesNodz[var]
-                    allvariableData[pos]['NodeOrigin'] = node.name
-                    allvariableData[pos]['VariableName'] = var
-            
-        
+
+        sources = [('Global', self.nodzinstance.globalVariables),
+                   ('Core', self.nodzinstance.coreVariables)]
+        sources += [(node.name, node.variablesNodz) for node in self.nodzinstance.obtainAllNodes()]
+
+        #Rows are built here rather than by writing 'NodeOrigin'/'VariableName'
+        #into the live variable dicts, as this used to do on every node start.
+        rows = []
+        for origin, variables in sources:
+            for var, varData in list(variables.items()):
+                if self._acceptsType(varData['type']):
+                    rows.append((origin, var, varData))
+
         # Set the number of rows
-        self.variablesTableWidget.setRowCount(len(allvariableData))
+        self.variablesTableWidget.setRowCount(len(rows))
 
         # Fill the table with data
-        for row_id in range(len(allvariableData)):
-            varData = allvariableData[row_id]
+        for row_id, (origin, var, varData) in enumerate(rows):
             # headers = ["CellValue", "Origin", "Name", "Value", "Importance","Type", "LastChanged"]
-            self.variablesTableWidget.setItem(row_id, 1, QTableWidgetItem(str(varData['NodeOrigin'])))
-            self.variablesTableWidget.setItem(row_id, 2, QTableWidgetItem(str(varData['VariableName'])))
-            self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(str(varData['data'])))
+            self.variablesTableWidget.setItem(row_id, 1, QTableWidgetItem(str(origin)))
+            self.variablesTableWidget.setItem(row_id, 2, QTableWidgetItem(str(var)))
+            self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(variableDisplayText(varData['data'])))
             self.variablesTableWidget.setItem(row_id, 4, QTableWidgetItem(str(varData['importance'])))
             self.variablesTableWidget.setItem(row_id, 5, QTableWidgetItem(str(varData['type'])))
             if 'lastUpdateTime' in varData and varData['lastUpdateTime'] is not None:
