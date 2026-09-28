@@ -156,13 +156,31 @@ class generalNodzCallActionWorker(QRunnable):
         self.nodzType = nodzType
         self.args = args
         self.signals = WorkerSignals()
-        logging.debug(f"GeneralNodzCallActionworker INIT with nodzType: {self.nodzType} and args: {self.args}")
+        #Set by run() when the node's work raised; read by the GUI-thread slot.
+        self.error = None
+        #Never log self.args: it holds the dock widget, shared_data and the
+        #whole nodeDict, and an f-string stringifies them even when DEBUG is off.
+        logging.debug("GeneralNodzCallActionworker INIT with nodzType: %s", self.nodzType)
     
     def run(self):
         """ 
+        Run the node's work and *always* emit ``finished`` - on failure too,
+        with ``self.error`` set. A worker that raised used to never emit, which
+        left its node 'running' and the whole recipe silently hung.
+        """
+        try:
+            self._run_body()
+        except Exception as exc:
+            logging.exception('Node worker (%s) failed', self.nodzType)
+            self.error = f"{type(exc).__name__}: {exc}"
+        finally:
+            self.signals.finished.emit()
+
+    def _run_body(self):
+        """ 
         Running of the different callActions belonging to all nodes.
         """
-        logging.debug(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
+        logging.debug("GeneralNodzCallActionworker RUN with nodzType: %s", self.nodzType)
         #Timer
         if self.nodzType == 'Timer':
             time.sleep(self.args['wait_time'])
@@ -228,9 +246,6 @@ class generalNodzCallActionWorker(QRunnable):
                 'shared_data': shared_data,
             }
             node.output = registry.dispatch_from_eval_text(evalText, scope=scope)
-        
-        #Emit that the node is finished :) 
-        self.signals.finished.emit()
 
 
 
@@ -540,12 +555,59 @@ class FlowchartExecutorMixin:
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
         
-        worker = generalNodzCallActionWorker(nodzType='AnalysisNode',args={"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.analysisNode_finished(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        self._startNodeWorker(node, 'AnalysisNode',
+            {"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data},
+            lambda: self.analysisNode_finished(node))
         
+    def _startNodeWorker(self, node, nodzType, args, on_success):
+        """Run a node's work on the pool and route the outcome back here.
+
+        ``on_success`` runs on the GUI thread when the work completed; a
+        failure - in the worker *or* in ``on_success`` itself - goes to
+        ``_nodeFailed`` instead, so a node can never be left 'running' with
+        nothing downstream ever triggered.
+        """
+        worker = generalNodzCallActionWorker(nodzType=nodzType, args=args)
+        #We hold the worker until its slot has run: with Qt's autoDelete the
+        #runnable (and its WorkerSignals) was destroyed on the pool thread
+        #while the queued finished-call to the GUI thread was still pending.
+        worker.setAutoDelete(False)
+        active = self.__dict__.setdefault('_activeNodeWorkers', set())
+        active.add(worker)
+        worker.signals.finished.connect(
+            lambda: self._nodeWorkerDone(worker, node, on_success))
+        self.thread_pool.start(worker)
+        return worker
+
+    def _nodeWorkerDone(self, worker, node, on_success):
+        """GUI-thread slot for ``_startNodeWorker``."""
+        self.__dict__.get('_activeNodeWorkers', set()).discard(worker)
+        if worker.error is not None:
+            self._nodeFailed(node, worker.error)
+            return
+        try:
+            on_success()
+        except Exception as exc:
+            logging.exception('Finishing node %s failed', getattr(node, 'name', node))
+            self._nodeFailed(node, f"{type(exc).__name__}: {exc}")
+
+    def _nodeFailed(self, node, message):
+        """Mark ``node`` as errored, tell the user, and stop the run."""
+        node.status = 'error'
+        reason = f"Node '{getattr(node, 'name', node)}' failed: {message}"
+        logging.error(reason)
+        try:
+            self.shared_data.warningErrorInfoInfo['Info']['Other'] = [reason]
+        except (AttributeError, KeyError, TypeError):
+            pass
+        self._abortRun(reason)
+
+    def _abortRun(self, reason):
+        """Stop advancing the recipe: no further positions, no acquisition."""
+        logging.warning('Autonomous run stopped: %s', reason)
+        self.fullRunOngoing = False
+        self.singleRunOngoing = False
+
     def analysisNode_finished(self,node):
         #Set the status of the nodz-coupled vis and real-time to finished:
         #Look at the 'Visual' bottom attribute and visualise if needed
@@ -637,11 +699,9 @@ class FlowchartExecutorMixin:
         #Figure out the belonging evaluation-text
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.customFunction_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
-        worker = generalNodzCallActionWorker(nodzType='CustomFunctionNode',args={"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.CustomFunctionNode_finished(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        self._startNodeWorker(node, 'CustomFunctionNode',
+            {"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data},
+            lambda: self.CustomFunctionNode_finished(node))
         
         # #And evaluate the custom function with custom parameters
         # output = eval(evalText) #type:ignore
@@ -704,11 +764,9 @@ class FlowchartExecutorMixin:
         
         
         #Create the worker
-        worker = generalNodzCallActionWorker(nodzType='MMconfigChangeRan',args={"config_string_storage":node.MMconfigInfo.config_string_storage, "MMconfig":node.MMconfigInfo, "core": self.core})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.finishedEmits(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        self._startNodeWorker(node, 'MMconfigChangeRan',
+            {"config_string_storage":node.MMconfigInfo.config_string_storage, "MMconfig":node.MMconfigInfo, "core": self.core},
+            lambda: self.finishedEmits(node))
         
         # self.finishedEmits(node)
 
@@ -1034,11 +1092,8 @@ class FlowchartExecutorMixin:
         wait_time = float(vardata['wait_time'][0])
 
         #Create the worker
-        worker = generalNodzCallActionWorker(nodzType='Timer',args={"wait_time":wait_time})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.finishedEmits(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        self._startNodeWorker(node, 'Timer', {"wait_time":wait_time},
+            lambda: self.finishedEmits(node))
     
     def storeDataCallAction(self,node):
         
