@@ -2248,23 +2248,13 @@ class napariHandler:
             DataStructure['finalisationProcedure'] = False
             yield DataStructure#visualisation_queue.get(block = False)
             
-        #Do the final N images
-        if self.shared_data.config.mda_config.backend_method == 'multiDstack':
-            if layerName == 'MDA':
-                logging.debug('Finalising MDA visualisation...')
-                DataStructure = {}
-                DataStructure['data'] = None
-                DataStructure['napariViewer'] = self.shared_data.napariViewer
-                DataStructure['acqState'] = self.acqstate
-                DataStructure['core'] = self.shared_data.core
-                DataStructure['image_queue_analysis'] = self.image_queue_analysis
-                DataStructure['analysisThreads'] = [item['Thread'] for item in self.shared_data.RTAnalysisQueuesThreads]
-                logging.info('adding analysisThread in run_napariVisualisation_worker 3')
-                DataStructure['layer_name'] = layerName
-                DataStructure['layer_color_map'] = layerColorMap
-                DataStructure['finalisationProcedure'] = True
-                napariUpdateLive(DataStructure)
-        
+        #Fill in the slices the fps-throttled display never rendered.
+        #This was dead code: it tested `backend_method` (only ever 'process' or
+        #'saved') against the vis_method value 'multiDstack', and only for a
+        #layer literally named 'MDA' - never a recipe node's layer.
+        if self.liveOrMda == 'mda' and self.shared_data.config.mda_config.vis_method == 'multiDstack':
+            self._finalise_mda_layer(layerName)
+
         logging.debug("#nH - acquisition done")
         self.shared_data.liveModeUpdateOngoing = False
 
@@ -2328,6 +2318,35 @@ class napariHandler:
         Thread(target=_wait_off_the_gui_thread,
                name='acq-transition-wait', daemon=True).start()
         return True
+
+    def _finalise_mda_layer(self, layerName):
+        """Backfill a finished multiDstack store and repaint its layer.
+
+        Runs on the visualisation worker thread. The backfill only reads the
+        NDTiff dataset and writes the zarr store, so it stays here; only the
+        repaint goes to the GUI thread. (By the time we get here
+        stopMDAVisualisation has already disconnected `yielded`, so a yield
+        would reach nothing - and calling napariUpdateLive directly would
+        mutate napari from this thread.)
+        """
+        if self.shared_data.mdaZarrData.get(layerName) is None:
+            logging.debug('MDA finalisation skipped: no store for layer %s', layerName)
+            return
+        logging.debug('Finalising MDA visualisation for layer %s', layerName)
+        try:
+            _backfill_missing_slices(self.shared_data, layerName)
+        except Exception:
+            logging.exception('Backfilling MDA layer %s failed', layerName)
+
+        shared_data = self.shared_data
+
+        def _refresh(viewer):
+            #napari does not watch a zarr array for writes.
+            found = getLayerIdFromName(layerName, viewer, shared_data)
+            if found:
+                viewer.layers[found[0]].refresh()
+
+        self._napari_bridge().submit(_refresh)
 
     def _napari_bridge(self):
         """The GUI-thread receiver for this handler's napari mutations (T-F9)."""
