@@ -2028,6 +2028,14 @@ class NodeItem(QtWidgets.QGraphicsItem):
         #At the moment, does the same as oneConnectionAtStartIsFinished, but might be changedl ater:
         self.oneConnectionAtStartIsFinished()
 
+    #Nodes that start only once *every* connected input finished. scoringEnd is
+    #one: it decides on all connected analyses' outputs, and starting on the
+    #first one meant scoring with the others' values from the previous position.
+    WAIT_FOR_ALL_INPUTS_PREFIXES = ('ANDlogic_', 'scoringEnd_')
+
+    def waitsForAllInputs(self):
+        return any(prefix in self.name for prefix in self.WAIT_FOR_ALL_INPUTS_PREFIXES)
+
     def oneConnectionAtStartIsFinished(self):
         #Every way of starting a downstream node comes through here (plug
         #signals, if/case branches, the acquisition MDA_completed hook), so
@@ -2040,7 +2048,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         logging.debug(f"n_connect_at_start_finished: {self.n_connect_at_start_finished}")
         logging.debug(f"n_connect_at_start: {self.n_connect_at_start}")
         
-        if not "ANDlogic_" in self.name:
+        if not self.waitsForAllInputs():
             #NEW, ANY-based logic
             if self.status == 'idle':
                 logging.info(f"Starting call action of node with name: {self.name}")

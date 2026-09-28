@@ -966,13 +966,18 @@ class FlowchartExecutorMixin:
         
         if self.preventScoring == False:
             logging.debug('Starting the score routine!')
-            
+
             #Set all connected nodes to idle
             connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
             for connectedNode in connectedNodes:
                 for nodeC in self.nodes:
                     if nodeC.name == connectedNode:
                         nodeC.status='idle'
+                        #Forget the previous position's result, so scoringEnd
+                        #(which waits for all its inputs) never decides on a stale value.
+                        scoringData = getattr(nodeC, 'scoring_analysis_currentData', None)
+                        if isinstance(scoringData, dict):
+                            scoringData.pop('__output__', None)
             
             #Get all connections:
             allConnections = []
