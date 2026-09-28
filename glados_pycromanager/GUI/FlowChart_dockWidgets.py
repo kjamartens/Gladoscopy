@@ -2811,7 +2811,11 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         
         self.update()
         if 'dialogInfo' in vars(node):
-            self.set_readable_text_after_dialogChange(node,node.dialogInfo)
+            #Display only - a rendering problem must never stop the recipe.
+            try:
+                self.set_readable_text_after_dialogChange(node,node.dialogInfo)
+            except Exception:
+                logging.exception('Could not refresh the text of node %s', node.name)
 
         #Start the downstream nodes from the event loop, not from inside this
         #call. Emitting here ran the next node's callAction nested in this one,
@@ -3114,7 +3118,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 if '#'+methodFunctionName+'#' in key:
                     relativeData[key] = dialog.currentData[key]
             
-            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart)
+            #Only the raw text ([1]) is shown, so never eval Advanced expressions here:
+            #this runs after every finish of the node.
+            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart,dontEvaluate=True)
             
             for rkw in reqKwargs:
                 displayVal = self.limitTextLength(str(allValues[rkw][1]))
@@ -3127,7 +3133,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             displayHTMLtext += "<br><br>Output:"
             htmloutputadded=False
             for varName in currentNode.variablesNodz:
-                currData = str(currentNode.variablesNodz[varName]['data'])
+                currData = variableDisplayText(currentNode.variablesNodz[varName]['data'])
                 typing = currentNode.variablesNodz[varName]['type']
                 importance = currentNode.variablesNodz[varName]['importance']
                 
@@ -3213,7 +3219,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         elif nodeType == 'earlyScoringFail':
             displayHTMLtext = f"This node will fail this score and go to the next position!"
         elif nodeType == 'timer':
-            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart,dontEvaluate=True)
             try:
                 displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
             except (KeyError, IndexError, TypeError, AttributeError):
@@ -3291,7 +3297,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             htmloutputadded=False
             
             for varName in currentNode.variablesNodz:
-                currData = str(currentNode.variablesNodz[varName]['data'])
+                currData = variableDisplayText(currentNode.variablesNodz[varName]['data'])
                 if currData is not None:
                     currData = self.limitTextLength(currData)
                 else:

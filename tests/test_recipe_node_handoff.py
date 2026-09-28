@@ -89,3 +89,17 @@ def test_node_with_several_finished_plugs_emits_once(qapp):
     signals.signals[0].connect(lambda: calls.append(1))
     signals.emit_all_signals()
     assert calls == [1]
+
+
+def test_node_text_failure_does_not_stop_the_chain(qapp):
+    flow = _flow()
+    flow.set_readable_text_after_dialogChange = MagicMock(side_effect=KeyError('wait_time'))
+    node = _node('timer_1')
+    node.dialogInfo = object()
+    started = []
+    node.customFinishedEmits.signals[0].connect(lambda: started.append(True))
+
+    GladosNodzFlowChart_dockWidget.finishedEmits(flow, node)
+    qapp.processEvents()
+
+    assert started == [True]
