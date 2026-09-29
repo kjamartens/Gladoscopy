@@ -729,7 +729,7 @@ Advanced Settings; a config saved before they existed simply keeps the defaults
 
 ### Shared state — `GUI/sharedFunctions.py`
 
-`Shared_data` is the single object passed everywhere (UI, worker threads, napari plugins, autonomous microscopy nodes). It holds `core`, the MIL instance, config dataclasses, analysis-thread lists (`LoggingList` is a list subclass that emits Qt signals on mutation), and live/acquisition state flags. When adding cross-component state, add it as a field on `Shared_data` rather than a global.
+`Shared_data` is the single object passed everywhere (UI, worker threads, napari plugins, autonomous microscopy nodes). **`shared_data.core` is only assigned on the napari-plugin path**; on the standalone app it was an empty-list placeholder, so its getter now falls back to `MILcore` while nothing real is assigned (a full recipe run crashed on that `[]`). New code should use `shared_data.MILcore` directly. It holds `core`, the MIL instance, config dataclasses, analysis-thread lists (`LoggingList` is a list subclass that emits Qt signals on mutation), and live/acquisition state flags. When adding cross-component state, add it as a field on `Shared_data` rather than a global.
 
 `_mdaModeParams` is a property: MDA mode assigns an already-converted pycromanager
 event list, live mode assigns a raw `useq.MDASequence` that the getter converts (and
