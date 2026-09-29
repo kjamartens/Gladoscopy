@@ -300,7 +300,8 @@ class napariOverlay:
         #Remove old layer
         self.napariViewer.layers.remove(self.layer)
         # new layer with polygons and text
-        self.layer = self.napariViewer.add_image(im,scale=self.layer_scale,opacity = self.opacity,visible=self.visible,blending=self.blending,colormap=self.colormap)
+        from glados_pycromanager.GUI.fast_image_layer import add_fast_image
+        self.layer = add_fast_image(self.napariViewer, im,scale=self.layer_scale,opacity = self.opacity,visible=self.visible,blending=self.blending,colormap=self.colormap)
         
     #Update an overlay that shows an image
     def drawImageOverlay(self,im=np.zeros((300,300))):

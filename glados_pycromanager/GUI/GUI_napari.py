@@ -727,7 +727,9 @@ def main():
 
         from glados_pycromanager.observability.perf_capture import PerformanceCapture
 
-        _capture = PerformanceCapture(get_thread_registry=lambda: dict(shared_data.perfThreadLabels))
+        _profile_source = ('--auto-demo' if args.auto_demo
+                           else f'--backend {args.backend} --config {args.config}')
+        _capture =PerformanceCapture(get_thread_registry=lambda: dict(shared_data.perfThreadLabels))
         _state = {'started': False}
         _secs = float(args.profile_runtime)
 
@@ -744,11 +746,17 @@ def main():
             out_file.parent.mkdir(parents=True, exist_ok=True)
             header = (
                 f"\n=== Runtime profile {_time.strftime('%Y-%m-%d %H:%M:%S')} "
-                f"({report.duration_s:.2f}s sample, ended via {reason}, --auto-demo) ===\n"
+                f"({report.duration_s:.2f}s sample, ended via {reason}, {_profile_source}) ===\n"
                 f"napariUpdateLive calls observed: {report.frames_rendered}\n\n"
             )
+            from glados_pycromanager.observability.perf_capture import format_report_text
             with out_file.open('a', encoding='utf-8') as f:
                 f.write(header)
+                # Per-thread CPU first: cProfile's cumulative times are not
+                # trustworthy across threads (time spent on other threads gets
+                # charged to whatever the profiled one had on its stack).
+                f.write(format_report_text(report))
+                f.write('\n')
                 f.write(report.hotspots_text)
             print(f'[profile_runtime] wrote {out_file} ({report.frames_rendered} frames, {report.duration_s:.2f}s, reason={reason})')
 

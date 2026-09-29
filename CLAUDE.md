@@ -776,6 +776,36 @@ acquisition, just materialised.
     needed no change — `_napariUpdateLive_locked` already routes any `'Live'`-named frame
     to its `frameByFrame` branch regardless of `vis_method`.
     Tests: `tests/test_live_sequence_worker.py`.
+    **The pull loop is paced (`LivePollPacer`, module scope in `napariGlados.py`).** A flat
+    0.5 ms idle polled ~21x per frame at 50 ms exposure, each poll a `_hardware_locked` MIL
+    call holding the GIL. After a frame the pacer idles `COARSE_FRACTION` (0.9) of the
+    frame interval in one go, then polls every `FINE_FRACTION` (3 %) of it, clamped to
+    `[MIN_IDLE_S, MAX_IDLE_S]` = [0.5 ms, 50 ms]. The interval is an EMA of per-frame gaps
+    seeded from the exposure; `_live_sequence_pull_once` returns the **number of camera
+    frames consumed** (the `latest` policy can skip several), and `frame_arrived(frames=n)`
+    divides the gap by it — counting a skip as one long interval fed back into ever-longer
+    sleeps. One sample is also clamped to 2x the estimate so a stall cannot inflate it.
+    `MicroscopeService.start_streaming(idle_sleep=)` accepts a callable, and the idle wait
+    blocks on the **request queue** (`_stream_idle_wait`), so a stage move ends a long
+    pacing sleep immediately. Tests: `tests/test_live_poll_pacer.py`.
+  - **2-D display layers are `FastImage`s (`GUI/fast_image_layer.py`).** A napari `Image`
+    subclass created via `add_fast_image(viewer, data, **kw)` — the Live/frameByFrame layer,
+    every RT-node `'image'` layer (`layer_group.create_layer`, so AppData plugin nodes too)
+    and `napariOverlay`'s legacy image overlay. For a same-shape/dtype 2-D numpy update on
+    the GUI thread with a 2-D display, both `layer.data = x` and `data[:] = x; refresh()`
+    skip napari's async path (`events.data` → viewer reassigns `dims.range` → async slice →
+    `_on_slice_ready` → thumbnail + highlight): they do napari's *own* sync branch
+    (`set_view_slice()` + `_refresh_sync`) with the thumbnail throttled to
+    `THUMBNAIL_INTERVAL_S` and continuous auto-contrast to every `contrast_every_n_frames`.
+    Measured 23 ms → ~3-5 ms per frame at 256², 27 → ~4 ms at 2048². Semantics stay napari's:
+    `layer.data is x` holds, the view is re-sliced from `x`. Anything else (shape/dtype/ndim
+    change, zarr/dask, multiscale, RGB, 3-D display, hidden, off-thread) falls through to
+    stock `Image`. Three gotchas: napari's slice handler rescans contrast on **every** sync
+    slice while `_keep_auto_contrast` is set, so `_fast_update` holds that flag off around
+    `set_view_slice()`; napari's layer metaclass runs a post-init `refresh()` after
+    `__init__` returns (counters start at 1); a stub viewer without `add_layer` gets a stock
+    `add_image` layer. `events.data` is skipped on purpose — its listeners only recompute
+    dims ranges/ndim, which cannot change here. Tests: `tests/test_fast_image_layer.py`.
   - **Every hand-off to the GUI thread is one deep (display backpressure).** The display
     worker's `yield` and each RT node's `_do_visualise` emit are both *queued* Qt
     connections, and neither used to check whether the GUI thread had drawn the previous
@@ -1141,7 +1171,13 @@ replaced it is what new code in these files should follow.
   value is written straight through. Pending values are keyed per `config_id`.
   Mouse-wheel notches over the z-stage widget *and* over the napari canvas
   accumulate and apply as one relative move of the same total distance, via a
-  `steps` multiplier on `moveOneDStage` (default 1). `onEditFieldChanged` was
+  `steps` multiplier on `moveOneDStage` (default 1). **It is a leading-edge
+  throttle, not a debounce** (2026-09-29): the first notch moves at once and the
+  notches within the next `STAGE_WHEEL_DEBOUNCE_MS` (120) become one move at the
+  window's end (`_lastStageWheelFlush`, same pattern as `rt_replay`'s scrub
+  render). The original re-armed a single-shot timer on every notch, so a
+  continuous scroll moved the stage *not at all* until the wheel had been still
+  for 120 ms — the "z-scroll while live is slow" complaint. `onEditFieldChanged` was
   already on `editingFinished`. **Laser half (approved 2026-09-09):**
   `ChangeIntensityLaserEditField` moved to `editingFinished` — on `textChanged` it
   issued a serial write per keystroke, driving the laser through every partial
@@ -1477,6 +1513,54 @@ already-stamped frame keys stops a revisited frame being counted twice. Tests:
 `tests/test_psmlm_live_node.py`.
 
 **diplib import gotcha in `spawn`ed subprocesses (IPython inputhook):** if `'IPython'` is already in `sys.modules` in a subprocess (e.g. the app was launched from an IPython/Jupyter shell, or another import pulled IPython in) but `IPython.terminal.pt_inputhooks` hasn't itself been imported yet, `import diplib` raises `AttributeError: module 'IPython.terminal' has no attribute 'pt_inputhooks'` — modern IPython (9.x) only sets `pt_inputhooks` as an attribute of `IPython.terminal` once that submodule has actually been imported, but `diplib/viewer.py` (`from . import viewer` inside `diplib/__init__.py`) assumes it's already there whenever `'IPython' in sys.modules`. Both `subprocess_pool.py`'s pre-warm bootstrap and `FFT_im.py`'s `RealTimeFFT.__init__` work around it by doing `import IPython.terminal.pt_inputhooks` first when `'IPython' in sys.modules`, before `import diplib`. Apply the same guard to any new node that imports diplib in a subprocess-isolated context.
+
+## "Optimize performance of gladoscopy on runtime" protocol
+
+When the user asks to **optimize (runtime) performance of gladoscopy** (or any close
+variant), start by measuring with this exact method, before changing code, and re-run it
+after each change to compare:
+
+```
+.venv/Scripts/python.exe -m glados_pycromanager.GUI.GUI_napari --backend "Python" \
+  --config "C:/Users/kjamartens/AppData/Local/pymmcore-plus/pymmcore-plus/mm/insiliscope.cfg" \
+  --mm-path "C:/Users/kjamartens/AppData/Local/pymmcore-plus/pymmcore-plus/mm/Micro-Manager_2.0.3_20260724" \
+  --buffer-mb 4096 --max-memory-mb 12000 --profile-runtime 15 > "$TEMP/claude_run.log" 2>&1
+```
+
+(Same backend/config as `make run-demo-smlm` / `demo_settings.mk`, plus `--profile-runtime`.)
+It opens the GUI, sets exposure to 50 ms, runs live mode for 15 s, stops and closes itself
+(no user interaction needed); give the Bash call a ~5 min timeout. Each run **appends** to
+`docs/perf-runtime.txt` (record `wc -l` first and read only the new tail): a header naming
+the real source (`--backend … --config …`), the **per-thread CPU** table
+(`format_report_text`), then the cProfile top-25. Read:
+- Run log: `continuous sequence acquisition stopped after N frames (M camera frames
+  consumed…)` → pulled vs. camera frames (N, M / 15 s).
+- `napariUpdateLive calls observed: N` → displayed fps.
+- **Per-thread CPU is the trustworthy number; cProfile's cumulative times are not across
+  threads.** In Python 3.13 cProfile records every thread and charges time spent waiting /
+  on other threads to whatever the profiled thread had on its stack (`pull_once` once showed
+  16.9 s cumulative in a 15 s window; `paintGL` "25 ms" was ~1 ms of real callees). Use
+  call *counts* from it, and `pstats` callee breakdowns for single-thread questions.
+- Run-to-run noise is large (camera 219-268 frames at identical settings), because the
+  inSiliScope camera simulates **in-process on the same laptop CPU + Iris Xe GPU**. Compare
+  A/B with >= 2 runs each. For a flag-free A/B, run through a tiny `runpy` launcher that
+  monkeypatches the one thing being compared before `runpy.run_module(...GUI_napari)`.
+- **inSiliScope's `General_AcqMode=Live` costs ~64-88 % of a core while idle** (continuous
+  simulation, on the GPU when `General_UseGpu=On`); `Precomputed` idles at ~2 %. Measured with
+  bare pymmcore, no Glados. Subtract it before blaming Glados for idle load; a bare napari
+  viewer idles at ~2 %.
+- Deeper tools that worked: a `QApplication.exec_` wrapper (static in PyQt5 — call it with no
+  `self`) installing an event-counting `eventFilter` for idle event rates. Did **not** work:
+  `py-spy --native` on Windows (falls behind / no Qt symbols); attach to the *child* PID, the
+  `.venv` `python.exe` is a launcher (`--subprocesses` refuses `--native` on Windows).
+
+Baseline (2026-09-29, i7-1355U laptop, Iris Xe, 16 GB, 256x256 uint16): camera 268 frames
+(~18 fps), displayed 115 (~7.7 fps); `pull_once` 5595 calls (0.5 ms `LIVE_SEQUENCE_POLL_S`
+idle sleep → busy-poll holding the GIL); `_on_slice_ready` ~24 ms per displayed frame.
+After `LivePollPacer` + `FastImage` (same day): ~600-750 polls (~2.5-3/frame), owner thread
+~0.7 s CPU/15 s (was ~2 s), displayed 125-127, `_on_slice_ready` gone from the profile,
+Glados display work ~3 ms/frame; GUI thread still 57-74 % CPU, mostly native (Qt/driver),
+with the simulator above competing for the same CPU/GPU.
 
 ## Documentation
 

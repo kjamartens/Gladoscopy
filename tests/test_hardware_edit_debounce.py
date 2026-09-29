@@ -185,14 +185,31 @@ def wheel_host(ui_cls, qapp):
     return _make
 
 
-def test_a_scroll_burst_becomes_one_move(wheel_host):
+def _net(moves):
+    """Signed total distance, in small steps, of a list of (amount, steps) moves."""
+    return sum((1 if amount > 0 else -1) * steps for amount, steps in moves)
+
+
+def test_the_first_notch_moves_immediately_and_the_rest_coalesce(wheel_host):
     host = wheel_host()
-    for _ in range(10):
+    host._accumulateStageWheel(1)
+    assert host.moves == [(2, 1)], "leading edge: the first notch moves at once"
+    for _ in range(9):
         host._accumulateStageWheel(1)
-    assert host.moves == [], "nothing moves while the scroll is in flight"
+    assert host.moves == [(2, 1)], "notches inside the window wait for its end"
 
     _settle(host._stageWheelTimer)
-    assert host.moves == [(2, 10)], "one move covering the same total distance"
+    assert host.moves == [(2, 1), (2, 9)], "one move for the rest of the window"
+
+
+def test_a_continuous_scroll_keeps_moving(wheel_host):
+    """Regression: the trailing debounce re-armed on every notch, so a scroll that
+    kept going never moved the stage until the wheel stopped."""
+    host = wheel_host()
+    for _ in range(4):
+        host._accumulateStageWheel(1)
+        host._lastStageWheelFlush = float('-inf')   # pretend the window elapsed
+    assert len(host.moves) == 4
 
 
 def test_direction_is_preserved(wheel_host):
@@ -200,16 +217,26 @@ def test_direction_is_preserved(wheel_host):
     for _ in range(4):
         host._accumulateStageWheel(-1)
     host._flushStageWheel()
-    assert host.moves == [(-2, 4)]
+    assert host.moves == [(-2, 1), (-2, 3)]
 
 
-def test_opposing_notches_cancel(wheel_host):
-    """Three up and three down left the stage where it started before, too."""
+def test_opposing_notches_inside_a_window_cancel(wheel_host):
+    """Up and down within one throttle window leave the stage untouched."""
     host = wheel_host()
-    for notch in (1, 1, 1, -1, -1, -1):
+    host._accumulateStageWheel(1)                     # leading-edge move
+    for notch in (1, 1, -1, -1):
         host._accumulateStageWheel(notch)
     host._flushStageWheel()
-    assert host.moves == [], "a net-zero scroll must not touch the stage"
+    assert host.moves == [(2, 1)], "a net-zero window must not touch the stage"
+
+
+def test_the_total_distance_always_matches_the_scroll(wheel_host):
+    host = wheel_host()
+    notches = (1, 1, 1, -1, -1, -1, -1, 1, 1)
+    for notch in notches:
+        host._accumulateStageWheel(notch)
+    host._flushStageWheel()
+    assert _net(host.moves) == sum(notches)
 
 
 def test_net_direction_wins(wheel_host):
@@ -217,7 +244,7 @@ def test_net_direction_wins(wheel_host):
     for notch in (1, 1, 1, -1):
         host._accumulateStageWheel(notch)
     host._flushStageWheel()
-    assert host.moves == [(2, 2)]
+    assert host.moves == [(2, 1), (2, 1)]
 
 
 def test_the_accumulator_resets_between_bursts(wheel_host):

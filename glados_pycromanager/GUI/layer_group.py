@@ -171,6 +171,12 @@ def create_layer(viewer, spec: LayerSpec, scale=None, seed_data=None):
     if not spec.visible:
         kwargs['visible'] = spec.visible
 
+    if spec.type == 'image':
+        # Same-shape 2-D updates from visualise() skip napari's async slicer;
+        # anything else falls back to stock Image behaviour (see fast_image_layer).
+        from glados_pycromanager.GUI.fast_image_layer import add_fast_image
+        data = seed_data if seed_data is not None else _default_seed('image')
+        return add_fast_image(viewer, data, **kwargs)
     factory = getattr(viewer, LAYER_FACTORIES[spec.type])
     if spec.type in _NEEDS_SEED_DATA:
         data = seed_data if seed_data is not None else _default_seed(spec.type)
