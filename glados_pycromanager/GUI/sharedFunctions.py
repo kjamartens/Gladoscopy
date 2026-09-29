@@ -811,6 +811,14 @@ class Shared_data(QObject):
     #core property        
     @property
     def core(self):
+        #Only the napari-plugin path ever assigns a core here; the standalone
+        #app drives everything through MILcore and left this as its `[]`
+        #placeholder - so recipe code and every node function handed
+        #`shared_data.core` (e.g. `core.snap_image()`) got an empty list.
+        #Fall back to the MIL, which exposes the same snake_case calls.
+        mil = getattr(self, '_MILcore', None)
+        if isinstance(self._core, list) and not self._core and mil is not None:
+            return mil
         return self._core
     @core.setter
     def core(self, new_value):

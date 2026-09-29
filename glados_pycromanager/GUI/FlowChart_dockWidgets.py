@@ -3353,19 +3353,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             list: A list of devices that match the specified devicetype.
         """
         
-        #Find all devices that have a specific devicetype
-        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
-        #for all devicetypes
-        #Get devices
-        devices = self.shared_data.core.get_loaded_devices() #type:ignore
-        devices = [devices.get(i) for i in range(devices.size())]
-        devicesOfType = []
-        #Loop over devices
-        for device in devices:
-            if self.shared_data.core.get_device_type(device).to_string() == devicetype: #type:ignore
-                logging.debug("found " + device + " of type " + devicetype)
-                devicesOfType.append(device)
-        return devicesOfType
+        #Was a Java-only copy (.size()/.get()/.to_string() on the raw core) that
+        #crashed on the standalone app's MIL; the shared helper handles every backend.
+        return utils.getCoreDevicesOfDeviceType(self.shared_data.MILcore, devicetype)
 
     def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """

@@ -46,7 +46,7 @@ def hops(monkeypatch):
 def _flow():
     flow = executor.FlowchartExecutorMixin()
     core = MagicMock()
-    flow.shared_data = SimpleNamespace(core=core, mdaMode=False,
+    flow.shared_data = SimpleNamespace(core=core, MILcore=core, mdaMode=False,
                                        warningErrorInfoInfo={'Info': {'Other': None}})
     flow.core = core
     flow.nodes = []

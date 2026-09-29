@@ -1531,7 +1531,7 @@ class FlowchartExecutorMixin:
         #Move every stage on the hardware owner thread, then score from the GUI
         #thread. These moves (and their wait_for_system) used to block the GUI
         #thread for the whole travel time at every position.
-        core = self.shared_data.core
+        core = self.shared_data.MILcore
         xyStages = self.getDevicesOfDeviceType('XYStageDevice')
         position = positions[pos]
 

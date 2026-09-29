@@ -1167,6 +1167,34 @@ class MicroscopeInterfaceLayer:
             raise ValueError("Unsupported microscope interface type for set_relative_position.")
     
     @_hardware_locked
+    def set_position(self, device_name: str, position: float) -> None:
+        """
+        Move a 1-D (focus/Z) stage to an absolute position.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.set_position(device_name, float(position))
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.set_position(device_name, float(position))
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.setPosition(device_name, float(position))
+        else:
+            raise ValueError("Unsupported microscope interface type for set_position.")
+
+    @_hardware_locked
+    def set_xy_position(self, xy_stage_name: str, x: float, y: float) -> None:
+        """
+        Move an X-Y stage to an absolute position.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.set_xy_position(xy_stage_name, float(x), float(y))
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.set_xy_position(xy_stage_name, float(x), float(y))
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.setXYPosition(xy_stage_name, float(x), float(y))
+        else:
+            raise ValueError("Unsupported microscope interface type for set_xy_position.")
+
+    @_hardware_locked
     def set_relative_xy_position(self, pos_change: tuple) -> None:
         """
         Set the relative position of the X-Y stage.
