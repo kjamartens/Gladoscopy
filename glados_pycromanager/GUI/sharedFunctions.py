@@ -1,14 +1,16 @@
 
+import dataclasses
+import json
 import logging
-import slack
-import time
-import appdirs
-import os,sys
-import json 
-from PyQt5.QtCore import QTimer, QObject, pyqtSignal
-from ndstorage import NDTiffDataset
-from typing import Optional
+import os
 import sys
+import tempfile
+from dataclasses import dataclass, fields
+from typing import Optional
+
+import appdirs
+import useq
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -16,7 +18,9 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 
 from glados_pycromanager.Core import microscopeInterfaceLayer as MIL
+from glados_pycromanager.Core.microscope_service import MicroscopeService
 from glados_pycromanager.GUI.napariGlados import napariHandler
+from glados_pycromanager.GUI.subprocess_pool import WarmSubprocessPool
 from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
 
 """Shared data summary
@@ -24,160 +28,463 @@ from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
     Shared_data is a class of shared data between the script, threads, napari, and napari plug-ins. It contains info on e.g. the analysis threads, the napari Viewer, and whether micromanager is acquiring data, or in live mode, or etc
 """
 
-class LoggingList(list):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.logger = logging.getLogger(__name__)
+# NOTE: there used to be a `LoggingList(list)` here whose remove() override was
+# meant to stop/destroy a removed RT-analysis entry. It was never instantiated
+# (RTAnalysisQueuesThreads is a plain list), so that teardown never ran -- and it
+# would not have worked anyway, since the removed item is a
+# {'Queue':..., 'Thread':...} dict with no .stop()/.destroy(). All four
+# RTAnalysisQueuesThreads.remove() call sites already tear the thread down
+# explicitly (item['Thread'].destroy() or stop_signal.set()+join()) and drain the
+# queue immediately before removing, so the class was deleted rather than wired
+# up. See claude_decisions.md (T-A5).
 
-    def append(self, item):
-        super().append(item)
-        self.on_analysisThreads_value_change()
 
-    def extend(self, items):
-        super().extend(items)
-        self.on_analysisThreads_value_change()
+def setting(default, display_name="", description="", input_type="lineEdit", options=None, hidden=False):
+    return dataclasses.field(
+        default=default,
+        metadata={
+            "display_name": display_name,
+            "description": description,
+            "input_type": input_type,
+            "options": options or [],
+            "hidden": hidden,
+        }
+    )
+        
+@dataclass
+class MDAConfig:
+    vis_method:     str = setting("multiDstack", "MDA Visualisation method",
+                                "Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.",
+                                input_type="dropdown", options=["multiDstack", "frameByFrame"])
+    backend_method: str = setting("process", "Backend transfer method",
+                                "Choose between the transfer method in the backend of the JAVA --> Python layer. Either directly grabs images via RAM (Can cause RAM issues), or performs a save-->load routine (limited by Disk write speed). Process is strongly recommended.",
+                                input_type="dropdown", options=["process", "saved"])
+    live_mode_method: str = setting(
+        "sequence",
+        "Live mode method",
+        "How live mode drives the camera. 'sequence' runs a continuous "
+        "sequence acquisition straight into the circular buffer -- no "
+        "acquisition engine and no per-frame event validation -- which is "
+        "how Micro-Manager's own live window works and is the faster path. "
+        "'mda' is the legacy behaviour: a multi-dimensional acquisition of "
+        "live_mode_nr_frames frames, restarted in a loop. Switch to 'mda' "
+        "to rule the new path out if live mode misbehaves.",
+        input_type="dropdown", options=["sequence", "mda"])
+    live_pull_policy: str = setting(
+        "latest",
+        "Live frame pull policy",
+        "Which frame live mode takes from the circular buffer. 'latest' "
+        "shows the newest frame and consumes nothing, so the buffer cannot "
+        "overflow no matter how far behind the display falls -- correct for "
+        "a preview. 'sequential' delivers every frame in order and can "
+        "overflow the buffer if the consumer is slower than the camera. "
+        "Only applies when live_mode_method == 'sequence'.",
+        input_type="dropdown", options=["latest", "sequential"])
+    live_mode_nr_frames: int = setting(999,"Number of frames taken for live mode","Only applies when live_mode_method == 'mda', where live mode is a MDA with many frames. Set how many frames here.")
+    mmcore_save_format: str = setting(
+        "ndtiff",
+        "MDA save format (pymmcore-plus)",
+        "What an MDA writes to your Storage folder when the pymmcore-plus "
+        "backend is selected. 'ndtiff' (default) is the format the "
+        "pycromanager backends write: two files per acquisition, written by "
+        "Glados on its own thread with bounded memory, ~2-7 ms/frame and "
+        "fast random frame reads. 'ome-tiff' is a single interoperable file, "
+        "similarly fast to write but with a few seconds of setup before the "
+        "first frame. 'ome-zarr' is interoperable too, but pymmcore-plus' "
+        "writer keeps the whole acquisition in RAM until it ends and writes "
+        "one file per frame -- avoid it for long acquisitions. 'none' "
+        "acquires without saving anything. Measured with "
+        "'make bench-storage' (docs/bench-storage.txt). Ignored by the "
+        "pycromanager backends, which always save NDTiff.",
+        input_type="dropdown", options=["ndtiff", "ome-tiff", "ome-zarr", "none"])
+    mmcore_wait_for_z_settle: str = setting(
+        "False",
+        "Wait for Z to settle before arming the camera (pymmcore-plus)",
+        "pymmcore-plus normally waits for the Z stage to report 'not busy' "
+        "before arming the camera for the next sequenced (hardware-"
+        "triggered) burst -- one such wait per z-step in a z-stack MDA. If "
+        "your camera's trigger source is a free-running generator with no "
+        "awareness of whether the camera is armed yet, every one of those "
+        "wait windows is a window where trigger pulses are silently lost -- "
+        "with N z-steps that is N chances to fall out of sync, up to and "
+        "including losing an entire burst and aborting the whole "
+        "acquisition (see the MDAEngine note in CLAUDE.md). 'False' "
+        "(default) still issues the Z move command but arms the camera "
+        "immediately afterwards instead of waiting for the physical move to "
+        "finish, so the trigger generator's pulses are never missed -- at "
+        "the cost of the leading frame(s) of a burst possibly being "
+        "captured while Z is still in motion. Set to 'True' to restore "
+        "pymmcore-plus' default wait-then-arm behaviour if positional "
+        "accuracy matters more than trigger sync for your setup. Only "
+        "applies to the MMCORE_PLUS backend.",
+        input_type="dropdown", options=["True", "False"], hidden=True)
+    pycromanager_wait_for_z_settle: str = setting(
+        "False",
+        "Wait for Z to settle before arming the camera (pycromanager Python backend)",
+        "Same rationale and trade-off as mmcore_wait_for_z_settle, for the "
+        "PYCROMANAGER_PYTHON headless backend's own acquisition engine "
+        "(pycromanager.acquisition.acq_eng_py). Its start_z_drive() also "
+        "waits for the Z stage to report settled before the next sequenced "
+        "camera burst is armed, one wait per z-step -- a window where a "
+        "free-running external trigger's pulses are silently lost. 'False' "
+        "(default) arms the camera immediately after issuing the Z move "
+        "instead of waiting for it to finish. Only applies when the active "
+        "backend is PYCROMANAGER_PYTHON; there is no equivalent lever for "
+        "PYCROMANAGER_JAVA, since that engine runs compiled inside the JVM "
+        "and cannot be patched from Python.",
+        input_type="dropdown", options=["True", "False"], hidden=True)
 
-    def insert(self, index, item):
-        super().insert(index, item)
-        self.on_analysisThreads_value_change()
-
-    def remove(self, item):
-        super().remove(item)
-        self.on_analysisThreads_value_change(removed_entry=item)
-
-    def pop(self, index=None):
-        v = super().pop(index)
-        self.on_analysisThreads_value_change()
-        return v
+@dataclass
+class WebhookConfig:
+    slack_token:   str = setting("",
+                            "Slack Token",   "The token for Slack messaging (Slack-token). Configure via Slack Settings dialog.")
+    slack_secret:  str = setting("",
+                            "Slack Secret",  "The secret ID for Slack messaging (Slack-secret). Configure via Slack Settings dialog.")
+    slack_channel: str = setting("",
+                            "Slack Channel", "Channel for the Slack node to send messages to (Slack-channel). Configure via Slack Settings dialog.")
     
-    
-    def on_analysisThreads_value_change(self,removed_entry=None):
-        logging.debug('Analysis Threads now: '+str(self))
-        # removed_entry = None
-        # if len(self) < len(self.prevSelf):
-        #     removed_entry = [entry for entry in self if entry not in self.prevSelf][0]
-        logging.debug('Analysis Threads now: ' + str(self))
-        if removed_entry is not None:
-            logging.debug('Removed entry: ' + str(removed_entry))
-            try:
-                removed_entry.stop()
-                removed_entry.destroy()
-                logging.debug('succesfully stopped/destroyed Analysis thread '+str(removed_entry))
-            except:
-                logging.debug('UNsuccesfully stopped/destroyed Analysis thread '+str(removed_entry))
-                pass
-    
+@dataclass
+class VisualisationConfig:
+    fps: int = setting(60, "Visualisation FPS", "Update speed of napari visualisation (in frames per second)")
+    contrast_refresh_every_n_frames: int = setting(
+        10,
+        "Auto-contrast refresh interval (frames)",
+        "How often (in displayed live-preview frames) to recompute contrast "
+        "limits from the image data. Recomputing every frame is expensive "
+        "(a full min/max scan); higher values trade brightness-adjustment "
+        "responsiveness for throughput. Set to 1 to recompute every frame.",
+    )
+    image_scroll_z_modifier: str = setting(
+        "Ctrl",
+        "Scroll-to-move-Z modifier key (on image)",
+        "Modifier key that must be held while scrolling the mouse wheel over "
+        "the napari image canvas to move the current Z/focus stage. Choose "
+        "'Disabled' to turn this off. Scrolling directly over the Z-stage "
+        "buttons always moves the stage, regardless of this setting.",
+        input_type="dropdown",
+        options=["Ctrl", "Shift", "Disabled"],
+        hidden=False,
+    )
+
+
+@dataclass
+class MicroManagerConfig:
+    path:             str = setting("C:/Program Files/Micro-Manager-2.0",
+                                    "Micromanager Path", "Micromanager Path",
+                                    hidden=True)
+    headless_backend: str = setting("Python",
+                                    hidden=True)
+    config_path:      str = setting("C:/Program Files/Micro-Manager-2.0/MMConfig_demo.cfg",
+                                    "Micromanager config file path", "Micromanager config file path",
+                                    hidden=True)
+    buffer_mb:        int = setting(4096,  "Buffer size (MB)",  "Buffer size of the headless Micromanager instance",  hidden=True)
+    max_memory_mb:    int = setting(12000, "Max memory (MB)",   "Maximum memory footprint of the headless Micromanager instance", hidden=True)
+
+
+@dataclass
+class LoggingConfig:
+    log_level: str = setting(
+        "INFO",
+        "Log level",
+        "Console/file log verbosity. DEBUG shows all internal trace messages; INFO is the normal level. Takes effect immediately.",
+        input_type="dropdown",
+        options=["INFO", "DEBUG", "WARNING", "ERROR"],
+        hidden=False,
+    )
+
+
+@dataclass
+class RealTimeAnalysisConfig:
+    # See https://github.com/kjamartens/Gladoscopy/issues/16: nodes whose
+    # __function_metadata__ sets "__runInSubprocess__" (e.g. Real-Time FFT)
+    # normally run in a separate OS process (AnalysisProcess_customFunction)
+    # to avoid Python GIL contention with the UI thread. This is a global
+    # kill switch: set to "False" to force every RT-analysis node back onto
+    # the older same-process QThread execution (AnalysisThread_customFunction)
+    # regardless of its own opt-in -- useful for troubleshooting (e.g. under
+    # an IDE debugger that doesn't like subprocess.spawn) or on a system
+    # where multiprocessing itself is problematic.
+    subprocess_isolation: str = setting(
+        "True",
+        "RT-analysis: use a separate CPU core (subprocess)",
+        "Nodes that opt into it (e.g. Real-Time FFT) run their compute in a "
+        "separate OS process, so a slow/GIL-heavy analysis can't freeze the "
+        "UI ('True', recommended). Set to 'False' to force the older "
+        "same-process/same-thread execution for every node instead (legacy "
+        "behaviour, useful for troubleshooting). Read fresh each time you "
+        "(re)activate real-time analysis -- no restart required.",
+        input_type="dropdown",
+        options=["True", "False"],
+        hidden=False,
+    )
+    # Retained real-time-analysis results, so that dragging napari's time/z
+    # slider after an acquisition re-renders each node's overlay for the frame
+    # you land on, instead of leaving it frozen on the last analysed frame.
+    # Shared across every running node; the oldest frames are dropped first.
+    replay_history_budget_mb: int = setting(
+        256,
+        "RT-analysis: replay history budget (MB)",
+        "Memory for retained real-time results, so dragging the napari time/z "
+        "slider after an acquisition re-renders each node's overlay for that "
+        "frame. Shared across all running nodes; oldest frames are dropped "
+        "first, and scrubbing to a dropped frame re-runs the analysis instead. "
+        "Set to 0 to disable retention entirely. Note a node whose result is a "
+        "full-size image (e.g. Real-Time FFT) costs megabytes per frame, which "
+        "is why such nodes are excluded by default.",
+        hidden=False,
+    )
+    replay_debounce_ms: int = setting(
+        50,
+        "RT-analysis: minimum ms between overlay redraws while scrubbing",
+        "Caps how often retained real-time results are redrawn while you drag or "
+        "scroll the napari slider: 50 ms is 20 redraws per second. This is a rate "
+        "limit, not a delay -- the first slider move redraws immediately and the "
+        "final position is always redrawn, so lowering it makes scrubbing smoother "
+        "rather than merely faster. Measured cost of one redraw for the pSMLM live "
+        "node is about 5 ms at 256x256 and 8.5 ms at 1024x1024, so 50 ms leaves "
+        "roughly six times headroom; raise it if scrubbing makes the UI stutter "
+        "with a heavier node. Frames that were never analysed are filled in "
+        "separately, once the slider stops.",
+        hidden=False,
+    )
+
+
+@dataclass
+class PerformanceConfig:
+    default_capture_seconds: int = setting(
+        5,
+        "Performance Mode: default capture window (s)",
+        "Default duration for a Performance Mode capture; adjustable per-run "
+        "via the spinbox in the Performance panel.",
+    )
+    foreground_scheduling_hints: str = setting(
+        "True",
+        "Keep the process off efficiency cores (Windows)",
+        "Asks Windows for an above-normal priority class and opts out of EcoQoS "
+        "power throttling at startup. On a hybrid CPU (performance + efficiency "
+        "cores) Windows otherwise parks an unfocused process on the efficiency "
+        "cores, which is why the live display slows down when the napari window "
+        "is not the active window. Best-effort and Windows-only; takes effect at "
+        "the next restart.",
+        input_type="dropdown",
+        options=["True", "False"],
+        hidden=True,
+    )
+    hotspot_top_n: int = setting(
+        25,
+        "Performance Mode: hotspot rows shown",
+        "How many top cumulative-time functions to show per cProfile table "
+        "(main process and each subprocess-isolated RT-analysis node).",
+        hidden=True,
+    )
+
+
+@dataclass
+class LayoutConfig:
+    """Look of the Glados docks; feeds `ui.layout.theme.Theme` (same field names).
+
+    All hidden: this is the storage for a future layout-settings UI. Values are
+    read once at startup by `runNapariPycroManager`.
+    """
+    font_family: str = setting("", "Font family", "Empty keeps napari's font.", hidden=True)
+    font_px: int = setting(10, "Font size (px)", "Base font size of the Glados docks.", hidden=True)
+    header_font_px: int = setting(10, "Table header font size (px)", "", hidden=True)
+    widget_padding_px: int = setting(5, "Widget padding (px)", "", hidden=True)
+    widget_margin_px: int = setting(2, "Widget margin (px)", "", hidden=True)
+    control_min_px: int = setting(18, "Minimum control size (px)", "", hidden=True)
+    indicator_px: int = setting(9, "Checkbox/icon size (px)", "", hidden=True)
+    section_margin_px: int = setting(4, "Section inner margin (px)", "", hidden=True)
+    section_spacing_px: int = setting(4, "Spacing inside sections (px)", "", hidden=True)
+    grid_spacing_px: int = setting(4, "Spacing between sections (px)", "", hidden=True)
+    table_min_rows: int = setting(5, "Minimum visible table rows", "", hidden=True)
+    accent: str = setting("#007acc", "Accent colour", "Colour of primary buttons (e.g. Acquire).", hidden=True)
+    accent_text: str = setting("#ffffff", "Accent text colour", "", hidden=True)
+    muted_text: str = setting("#868e93", "Muted text colour", "Read-only values.", hidden=True)
+    border: str = setting("#D5D5E5", "Field border colour", "", hidden=True)
+    warning: str = setting("red", "Warning colour", "Border of fields with invalid input.", hidden=True)
+    hidden_sections: str = setting(
+        "", "Hidden sections",
+        "Comma-separated section keys to leave out of the docks, e.g. 'mda.xy,controls.relative_stages'.",
+        hidden=True)
+
+    def hidden_section_keys(self) -> set:
+        return {k.strip() for k in str(self.hidden_sections).split(',') if k.strip()}
+
+
+@dataclass
+class Config:
+    mda_config:           MDAConfig           = dataclasses.field(default_factory=MDAConfig)
+    layout_config:        LayoutConfig        = dataclasses.field(default_factory=LayoutConfig)
+    visualisation_config: VisualisationConfig = dataclasses.field(default_factory=VisualisationConfig)
+    micromanager_config: MicroManagerConfig  = dataclasses.field(default_factory=MicroManagerConfig)
+    webhook_config: WebhookConfig  = dataclasses.field(default_factory=WebhookConfig)
+    logging_config:       LoggingConfig       = dataclasses.field(default_factory=LoggingConfig)
+    rt_analysis_config:   RealTimeAnalysisConfig = dataclasses.field(default_factory=RealTimeAnalysisConfig)
+    performance_config:   PerformanceConfig   = dataclasses.field(default_factory=PerformanceConfig)
+
+
+# Phase 7.1 moved the JSON load/save bodies to
+# `glados_pycromanager.io.appdata`. Phase 7.2 adds `DeprecationWarning`
+# shims so call sites that still import from `sharedFunctions` (the
+# legacy path) see a one-time warning. Phase 18.1 deletes both wrappers
+# entirely.
+import warnings as _shim_warnings  # noqa: E402
+
+from glados_pycromanager.io import appdata as _appdata  # noqa: E402
+
+_DEPRECATION_MSG = (
+    "{name}() has moved to glados_pycromanager.io.appdata.{name}; the "
+    "GUI.sharedFunctions re-export is scheduled for removal in Phase 18.1 "
+    "of claude_project.md."
+)
+
+
+def load_config_from_json(cfg):
+    _shim_warnings.warn(
+        _DEPRECATION_MSG.format(name="load_config_from_json"),
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata.load_config_from_json(cfg)
+
+
+def save_config_to_json(cfg):
+    _shim_warnings.warn(
+        _DEPRECATION_MSG.format(name="save_config_to_json"),
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata.save_config_to_json(cfg)
+
+
 class Shared_data(QObject):
     mda_acq_done_signal = pyqtSignal(bool)
-    liveUpdateEvent = pyqtSignal(object)
     #Initialises the info of shared data
     def __init__(self):
         super().__init__()
         self._liveMode = False
         self._mdaMode = False
+        # Bumped by the _mdaModeParams setter; see it for why. Must exist
+        # before the assignment below, which goes through that setter.
+        self._mdaModeParamsGeneration = 0
         self._mdaModeParams = []
         self._napariViewer = None
         self._headless = False
         self._busy = False
         self._core = []
-        self.MILcore: Optional[MIL.MicroscopeInterfaceLayer] = None
+        self._MILcore: "MIL.MicroscopeInterfaceLayer | None" = None
+        # T-B2: mirrored hardware constants. The display path must never call
+        # MIL -- on PYCROMANAGER_JAVA a bridge round trip was measured at
+        # ~257 ms, and napariUpdateLive used to make one per candidate frame on
+        # the GUI thread. These plain attributes are refreshed from MIL only at
+        # the points where the hardware value can actually change (core bind,
+        # set_exposure, set_roi/clear_roi, acquisition start) via the mirror
+        # callback registered in the `MILcore` setter below. `None` means "not
+        # read yet"; readers fall back to MIL once and the refresh fills it in.
+        self.hw_exposure_ms: float | None = None
+        self.hw_pixel_size_um: float | None = None
+        self.hw_image_shape: tuple | None = None
+        self.hw_roi: tuple | None = None
+        # T-B3: the single owning thread for `MILcore`. Created by
+        # `start_microscope_service()` once a backend is bound; until then (and
+        # in tests / the napari-plugin path) every caller keeps talking to MIL
+        # directly, which T-B1's re-entrant lock still makes safe.
+        self.microscope_service = None
         
         self._RTAnalysisQueuesThreads = []#{'Queue': [],'Thread':LoggingList()}
         # self._analysisThreads = LoggingList()
         # self._RTAnalysisQueues = []
-        
+
+        # RT-analysis subprocess startup speedups (see AnalysisClass.py's
+        # AnalysisProcess_customFunction and subprocess_pool.py):
+        # - _rt_subprocess_cache: still-alive subprocess+queues (+ the
+        #   main-process visualisation shadow object) parked on stop(), keyed
+        #   by a hash of the node's analysisInfo config, so restarting the
+        #   *same* node reclaims its already-warm worker instead of a cold
+        #   spawn + reimport + model reload.
+        # - _rt_subprocess_pool: one pre-spawned, pre-imported "blank" process
+        #   kept ready so the *first* subprocess-isolated node started in a
+        #   session isn't a cold spawn either. Started as early as possible
+        #   from GUI_napari.py's main().
+        self._rt_subprocess_cache = {}
+        self._rt_subprocess_pool = WarmSubprocessPool()
+        # - Retained real-time-analysis results, so a node's overlay can be
+        #   re-rendered for any frame while scrubbing a finished acquisition.
+        #   Holds the node instance, its layers and its per-frame history alive
+        #   after the analysis thread itself is gone (the thread is deleteLater'd
+        #   at acquisition end, and the node is only reachable through it).
+        self._rt_replay = None
+
         self._mdaImageQueues = []
         self._defaultFocusDevice = ''
         self._mdaModeSaveLoc = ['','']
         self._mdaModeNapariViewer = None
         self.mdaDatasets = []
-        self.pyMMCdataset: NDTiffDataset = NDTiffDataset('./',summary_metadata={})
+        #The dataset the current/last MDA acquisition produced, or None if it
+        #produced none. mdaDatasets[-1] can be an earlier acquisition's (T-D8).
+        self.mdaCurrentDataset = None
+        self.pyMMCdataset = None
         self.activeMDAobject = None
         self.mdaZarrData = {}
+        # See the "Temporary store directories" methods below. Keyed by napari
+        # layer name, one TemporaryDirectory per zarr store; the NDTiff scratch
+        # dataset gets its own slot.
+        self.mdaZarrTempDirs = {}
+        self.pyMMCdatasetTempDir = None
+        # The active ZarrFrameWriter, published by napariHandler so the
+        # module-level display path can ask how far behind the disk it is and
+        # render the newest slice that actually exists rather than a queued one.
+        self.zarrFrameWriter = None
+        # Where the pymmcore-plus MDA output handler actually wrote this
+        # acquisition, so `_acquisition_storage_path()` can report the user's
+        # Storage folder rather than the scratch zarr's temp directory.
+        self.mdaSavedPath = None
         self.nodzInstance = None
         self.backend='JAVA' #JAVA or Python, if running headlessly
         self.loadingOngoing = False #Set to true if loading of a nodz instance is actively ongoing - halts checking for errors and such.
         self.last_display_update_time = 0
+        # Depth limit for the display hand-off, the counterpart to the *rate*
+        # limit `last_display_update_time` drives in napariGlados.
+        # `_should_display_now` measures how long ago the GUI thread last
+        # *finished* a frame, so it opens wider the further behind the GUI
+        # falls -- which is backwards, and let the yielded-payload Qt event
+        # queue grow without bound. This holds the monotonic timestamp of the
+        # payload the GUI thread has not acknowledged yet, or None when it is
+        # idle. See napariGlados._claim_display_slot.
+        self.displayUpdateInFlight = None
         self.newestLayerName = '' #Updated with whatever the newest layer name is, when called from napariGlados.py
         self._warningErrorInfoInfo = Dict_Specific_WarningErrorInfo({'Errors': [], 'Warnings': [], 'Info': {'LastNodeRan': None, 'Other': None}},parent=self)
         self.liveModeUpdateOngoing = False
         self.liveModeVisualisationThreadRunning=False
         self.debugImageArrivalTimes = []
         self.debugImageDisplayTimes = []
+
+        # Performance Mode (glados_pycromanager/observability/perf_capture.py):
+        # native OS thread id -> human label, refreshed as threads come and go
+        # (acquisition/visualisation workers, one per active RT-analysis node).
+        # Read fresh on every capture window, not cached at app start.
+        self.perfThreadLabels: dict = {}
         
-        self.globalData = {}
-        self.globalData['SLACK-TOKEN']={}
-        self.globalData['SLACK-TOKEN']['value'] = "xoxb-134470729732-5930969383473-bmD1xnNmlKPRlnNPbKrcSiQf"
-        self.globalData['SLACK-TOKEN']['displayName'] = "Slack Token"
-        self.globalData['SLACK-TOKEN']['description'] = "The token for Slack messaging (Slack-token)"
-        self.globalData['SLACK-TOKEN']['inputType'] = "lineEdit"
-        self.globalData['SLACK-SECRET']={}
-        self.globalData['SLACK-SECRET']['value'] = "e8cd04aa4cc9ec7c51729ec6ecf98c1c"
-        self.globalData['SLACK-SECRET']['displayName'] = "Slack Secret"
-        self.globalData['SLACK-SECRET']['description'] = "The secret ID for Slack messaging (Slack-secret)"
-        self.globalData['SLACK-SECRET']['inputType'] = "lineEdit"
-        self.globalData['SLACK-CHANNEL']={}
-        self.globalData['SLACK-CHANNEL']['value'] = "glados-bot"
-        self.globalData['SLACK-CHANNEL']['displayName'] = "Slack Channel"
-        self.globalData['SLACK-CHANNEL']['description'] = "Channel for the Slack node to send messages to (Slack-channel)"
-        self.globalData['SLACK-CHANNEL']['inputType'] = "lineEdit"
-        self.globalData['MDAVISMETHOD']={}
-        self.globalData['MDAVISMETHOD']['value'] = 'multiDstack' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['displayName'] = 'MDA Visualisation method' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['description'] = 'Choose between MDA Visualisation methods - multiDStack will ensure that all frames are visualised after a full MDA, frameByFrame leaves these blank.' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['inputType'] = 'dropdown' #'multiDstack' or 'frameByFrame'
-        self.globalData['MDAVISMETHOD']['dropDownOptions'] = ['multiDstack','frameByFrame'] #'multiDstack' or 'frameByFrame'
-        self.globalData['MDABACKENDMETHOD']={}
-        self.globalData['MDABACKENDMETHOD']['value'] = 'process' #'process' or 'saved'
-        self.globalData['MDABACKENDMETHOD']['displayName'] = 'Backend transfer method'
-        self.globalData['MDABACKENDMETHOD']['description'] = 'Choose between the transfer method in the backend of the JAVA --> Python layer. Either directly grabs images via RAM (Can cause RAM issues), or performs a save-->load routine (limited by Disk write speed). Process is strongly recommended.'
-        self.globalData['MDABACKENDMETHOD']['inputType'] = 'dropdown'
-        self.globalData['MDABACKENDMETHOD']['dropDownOptions'] = ['process','saved']
-        self.globalData['VISUALISATION-FPS'] = {}
-        self.globalData['VISUALISATION-FPS']['value'] = 60
-        self.globalData['VISUALISATION-FPS']['displayName'] = 'Visualisation FPS'
-        self.globalData['VISUALISATION-FPS']['description'] = 'Update speed of napari visualisation (in frames per second)'
-        self.globalData['VISUALISATION-FPS']['inputType'] = 'lineEdit'
-        
-        self.globalData['MMPATH'] = {}
-        self.globalData['MMPATH']['value'] = "C:/Program Files/Micro-Manager-2.0"
-        self.globalData['MMPATH']['displayName'] = 'Micromanager Path'
-        self.globalData['MMPATH']['description'] = 'Micromanager Path'
-        self.globalData['MMPATH']['inputType'] = 'lineEdit'
-        self.globalData['MMPATH']['hidden'] = True
-        self.globalData['MM_HEADLESS_BACKEND'] = {}
-        self.globalData['MM_HEADLESS_BACKEND']['value'] = "Python"
-        self.globalData['MM_HEADLESS_BACKEND']['inputType'] = 'lineEdit'
-        self.globalData['MM_HEADLESS_BACKEND']['hidden'] = True
-        self.globalData['MM_CONFIG_PATH'] = {}
-        self.globalData['MM_CONFIG_PATH']['value'] = "C:/Program Files/Micro-Manager-2.0/MMConfig_demo.cfg"
-        self.globalData['MM_CONFIG_PATH']['displayName'] = 'Micromanager config file path'
-        self.globalData['MM_CONFIG_PATH']['description'] = 'Micromanager config file path'
-        self.globalData['MM_CONFIG_PATH']['inputType'] = 'lineEdit'
-        self.globalData['MM_CONFIG_PATH']['hidden'] = True
-        self.globalData['MM_HEADLESS_BUFFER_MB'] = {}
-        self.globalData['MM_HEADLESS_BUFFER_MB']['value'] = 4096
-        self.globalData['MM_HEADLESS_BUFFER_MB']['displayName'] = 'Buffer size (MB)'
-        self.globalData['MM_HEADLESS_BUFFER_MB']['description'] = 'Buffer size of the headless Micromanager instance'
-        self.globalData['MM_HEADLESS_BUFFER_MB']['inputType'] = 'lineEdit'
-        self.globalData['MM_HEADLESS_BUFFER_MB']['hidden'] = True
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB'] = {}
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['value'] = 12000
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['displayName'] = 'Max memory (MB)'
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['description'] = 'Maximum memory footprint of the headless Micromanager instance'
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['inputType'] = 'lineEdit'
-        self.globalData['MM_HEADLESS_MAX_MEMORY_MB']['hidden'] = True
-        
+        self.config = Config()
+        load_config_from_json(self.config)
+
+        # Apply the persisted log level immediately after config is loaded
+        try:
+            from glados_pycromanager.observability.logger import set_log_level
+            set_log_level(self.config.logging_config.log_level)
+        except Exception as exc:
+            logging.warning("Could not apply saved log level: %s", exc)
+
         #Overwrite all values that can be found from the .JSON:x
         #load from appdata
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
-            raise EnvironmentError("APPDATA environment variable not found")
+            raise OSError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
         os.makedirs(app_specific_folder, exist_ok=True)
         if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
             #Load the mda state
-            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+            with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
                 gladosInfo = json.load(file)
                 if 'GlobalData' in gladosInfo:
                     globalDataInfo = gladosInfo['GlobalData']
@@ -187,18 +494,17 @@ class Shared_data(QObject):
             for key in globalDataInfo:
                 try:
                     self.globalData[key]['value'] = globalDataInfo[key]
-                except:
-                    pass
+                except (KeyError, TypeError, AttributeError) as exc:
+                    logging.debug('globalData key %r not present in current schema (%s)', key, exc)
         
-        if self.globalData['SLACK-TOKEN']['value'] is not None and not len(self.globalData['SLACK-TOKEN']['value']) == 0:
+        if self.config.webhook_config.slack_token is not None and not len(self.config.webhook_config.slack_token) == 0:
             try:
-                self.globalData['SLACK-CLIENT'] = {}
-                self.globalData['SLACK-CLIENT']['value'] = slack.WebClient(token=self.globalData['SLACK-TOKEN']['value' ])
-                self.globalData['SLACK-CLIENT']['hidden'] = True
+                import slack
+                self.config.webhook_config.slack_client = slack.WebClient(token=self.config.webhook_config.slack_token)
                 logging.debug('Slack client initialised')
-            except:
-                logging.error('Error with Slack!')
-        
+            except (ValueError, TypeError, AttributeError, OSError) as exc:
+                logging.error('Slack client initialisation failed: %s', exc)
+    
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
         self._mdamodeNapariHandler = napariHandler(self,liveOrMda='mda')
@@ -206,15 +512,234 @@ class Shared_data(QObject):
         #Store whether we're running via PIP or via a local install
         self._RunningViaPIP = 'site-packages' in __file__ or 'dist-packages' in __file__
         self._RunningLocally = not self._RunningViaPIP
-    
-    def __setattr__(self, name, value):
-        logging.debug(f"Setting attribute {name} to {value}")
-        super().__setattr__(name, value)
-    
+        
+        
+    # NOTE: Shared_data deliberately does NOT override __setattr__. It used to,
+    # purely to log every attribute write at DEBUG -- which called
+    # logging.getLogger() 4-6 times per displayed frame on the GUI thread for no
+    # diagnostic value that the targeted log lines don't already provide.
+    # (The liveMode/mdaMode transitions, which are the writes worth tracing, have
+    # their own property setters with their own logging.)
+
+    # --- Mirrored hardware constants (T-B2) -------------------------------
+
+    @property
+    def MILcore(self):
+        return self._MILcore
+
+    @MILcore.setter
+    def MILcore(self, new_value):
+        self._MILcore = new_value
+        if new_value is not None and hasattr(new_value, "set_hardware_mirror"):
+            # MIL calls back on set_core/set_exposure/set_roi/clear_roi.
+            new_value.set_hardware_mirror(self._on_hardware_mirror_changed)
+            if getattr(new_value, "core", None) is not None:
+                self.refresh_hardware_mirror()
+
+    def _on_hardware_mirror_changed(self, reason: str) -> None:
+        """MIL mirror callback -- runs on whichever thread changed the hardware."""
+        self.refresh_hardware_mirror(reason)
+
+    def refresh_hardware_mirror(self, reason: str = "all") -> None:
+        """Re-read the mirrored hardware constants from MIL.
+
+        `reason` is one of ``'core'``, ``'exposure'``, ``'roi'`` or ``'all'``
+        (acquisition start / explicit refresh). Never raises: a backend that
+        cannot answer leaves the previous mirrored value in place, and the
+        readers fall back to MIL themselves.
+        """
+        mil = self._MILcore
+        if mil is None or getattr(mil, "core", None) is None:
+            return
+        wants_exposure = reason in ("all", "core", "exposure")
+        wants_geometry = reason in ("all", "core", "roi")
+        if wants_exposure:
+            try:
+                self.hw_exposure_ms = float(mil.get_exposure())
+            except Exception:
+                logging.debug("refresh_hardware_mirror: get_exposure failed", exc_info=True)
+        if reason in ("all", "core"):
+            try:
+                self.hw_pixel_size_um = float(mil.get_pixel_size_um())
+            except Exception:
+                logging.debug("refresh_hardware_mirror: get_pixel_size_um failed", exc_info=True)
+        if wants_geometry:
+            try:
+                roi = mil.get_roi()
+                self.hw_roi = tuple(int(v) for v in roi)
+                # ROI is (x, y, width, height); image shape is (height, width).
+                self.hw_image_shape = (self.hw_roi[3], self.hw_roi[2])
+            except Exception:
+                logging.debug("refresh_hardware_mirror: get_roi failed", exc_info=True)
+
+    # --- Hardware owner thread (T-B3) -------------------------------------
+
+    def start_microscope_service(self, name: str = "MicroscopeService"):
+        """Start the single owner thread for the currently bound `MILcore`.
+
+        Returns the running `MicroscopeService`, or None when no MIL is bound.
+        Idempotent: a second call with a service already running is a no-op, and
+        a service bound to a *different* MIL (a backend switch) is stopped and
+        replaced.
+        """
+        mil = self._MILcore
+        if mil is None:
+            logging.warning('start_microscope_service(): no MILcore bound yet')
+            return None
+        service = self.microscope_service
+        if service is not None:
+            if service.running and service.mil is mil:
+                return service
+            service.stop()
+        self.microscope_service = MicroscopeService(mil, name=name).start()
+        return self.microscope_service
+
+    def stop_microscope_service(self, timeout: float = 5.0) -> None:
+        service = self.microscope_service
+        if service is None:
+            return
+        service.stop(timeout)
+        self.microscope_service = None
+
+    def microscope_proxy(self, priority=None):
+        """A MIL-shaped facade routed through the owner thread.
+
+        Falls back to the raw `MILcore` when no service is running, so callers
+        do not have to branch (see `MicroscopeProxy`, which also falls back
+        per call if the service stops underneath it).
+        """
+        service = self.microscope_service
+        if service is None:
+            return self._MILcore
+        if priority is None:
+            return service.proxy()
+        return service.proxy(priority=priority)
+
     def mdaacqdonefunction(self):
         logging.debug('mda acq done in shared_data')
         self.mda_acq_done_signal.emit(True)
-        
+
+    def register_perf_thread_label(self, native_id, label: str) -> None:
+        """Performance Mode: record a human label for a native OS thread id
+        (threading.get_native_id()) so a capture can attribute CPU time to
+        e.g. "MDA/acquisition worker" instead of a bare thread number."""
+        self.perfThreadLabels[native_id] = label
+
+    def unregister_perf_thread_label(self, native_id) -> None:
+        self.perfThreadLabels.pop(native_id, None)
+
+    # --- Temporary store directories (T-D7) ------------------------------
+    # Every on-disk scratch store -- the multiDstack zarr arrays, the
+    # MMCORE_PLUS NDTiff dataset -- lives in a `tempfile.TemporaryDirectory`
+    # whose *object* has to outlive every reader of that directory: its
+    # finalizer rmtree()s the directory, so dropping the last reference to it
+    # deletes a store a napari layer may still be rendering from.
+
+    @staticmethod
+    def _discard_temp_dir(tmpdir) -> None:
+        """Delete one temporary store now, tolerating a locked directory."""
+        if tmpdir is None:
+            return
+        try:
+            tmpdir.cleanup()
+        except OSError as exc:
+            # Windows keeps zarr chunk files open until the layer releases them.
+            # cleanUpTemporaryFiles and the OS temp sweep are the backstop; a
+            # store we could not remove is not worth failing a teardown over.
+            logging.debug(
+                'Could not remove temporary store %s: %s',
+                getattr(tmpdir, 'name', '?'), exc,
+            )
+
+    def new_zarr_temp_dir(self, layer_name: str):
+        """Create, and take ownership of, `layer_name`'s zarr store directory.
+
+        Per layer, not one shared slot. Both zarr-creation sites in
+        `napariGlados` used to assign the same `mdaZarrTempDir` attribute, so
+        starting a second MDA dropped the first `TemporaryDirectory` and its
+        finalizer rmtree'd a store the first acquisition's napari layer was
+        still pointing at.
+
+        Re-creating a store for the *same* layer does replace it: that layer's
+        old array is being discarded anyway (see the dimension-mismatch branch
+        in `_napariUpdateLive_locked`).
+        """
+        self._discard_temp_dir(self.mdaZarrTempDirs.pop(layer_name, None))
+        tmpdir = tempfile.TemporaryDirectory()
+        self.mdaZarrTempDirs[layer_name] = tmpdir
+        return tmpdir
+
+    def release_zarr_temp_dir(self, layer_name: str) -> None:
+        """Drop `layer_name`'s store. Call when the layer itself goes away."""
+        self._discard_temp_dir(self.mdaZarrTempDirs.pop(layer_name, None))
+
+    def new_pyMMC_temp_dir(self):
+        """Create, and take ownership of, the NDTiff scratch dataset's directory.
+
+        `PyMMCore_startedAcqCallback` used to write
+        `str(tempfile.TemporaryDirectory().name)` -- constructing the object and
+        immediately discarding it, so the finalizer deleted the directory and
+        the `os.makedirs` right below recreated it with no owner at all.
+        """
+        self._discard_temp_dir(self.pyMMCdatasetTempDir)
+        self.pyMMCdatasetTempDir = tempfile.TemporaryDirectory()
+        return self.pyMMCdatasetTempDir
+
+    def release_all_temp_dirs(self) -> None:
+        """Remove every scratch store this session created.
+
+        Wired to `aboutToQuit` in `GUI_napari.main()`: the app deliberately
+        force-exits via `os._exit(0)`, so no finalizer would otherwise run and
+        every store would be left behind in the OS temp directory.
+        """
+        for layer_name in list(self.mdaZarrTempDirs):
+            self.release_zarr_temp_dir(layer_name)
+        self._discard_temp_dir(self.pyMMCdatasetTempDir)
+        self.pyMMCdatasetTempDir = None
+    
+    @property
+    def _mdaModeParams(self):
+        """The current MDA event list, in pycromanager event-dict form.
+
+        Live mode (MMCORE_PLUS backend, `napariGlados.run_MILCoreAcquisition_worker`)
+        assigns a raw `useq.MDASequence` here instead of eagerly converting it.
+        Converting via `useq.pycromanager.to_pycromanager()` fully iterates and
+        pydantic-validates every `MDAEvent` in the sequence (999 events for the
+        default `live_mode_nr_frames`) -- wasted work in the common case, since
+        `core.run_mda()` iterates+validates the same sequence again, internally,
+        to actually drive acquisition (bench_live_display / docs/bench-live-display.md
+        traced this to the "~3-4 useq.MDAEvent validations per frame" entry in
+        docs/perf-runtime-recipe.md's "Next perf passes"). The conversion here
+        only runs -- and is cached -- if something actually reads this property:
+        `_get_cached_dimensions` and the RT-analysis dimension bookkeeping in
+        pSMLM.py/RT_counter.py, which a plain live-preview session (no RT-analysis
+        node, no multiDstack live layer) never triggers.
+
+        MDA mode (`MDAGlados.MDA_acq_from_GUI`) still assigns an already-converted
+        list directly here, unaffected -- the getter passes lists through as-is.
+        """
+        value = self._mdaModeParams_raw
+        if isinstance(value, useq.MDASequence):
+            from useq.pycromanager import to_pycromanager
+            value = to_pycromanager(value)
+            self._mdaModeParams_raw = value  # cache the converted list
+        return value
+
+    @_mdaModeParams.setter
+    def _mdaModeParams(self, value):
+        self._mdaModeParams_raw = value
+        # Acquisition identity, for caches derived from the event list
+        # (napariGlados._get_cached_dimensions). It replaces an `id(params)`
+        # cache key, which was unsound: CPython reuses the addresses of freed
+        # objects, so the second of two back-to-back acquisitions could get a
+        # params list at the first one's old address and silently reuse the
+        # first one's dimension map -- and every sliceTuple, the zarr shape and
+        # the napari dims stepping derive from that map.
+        #
+        # Bumped here rather than in the getter's useq->list conversion on
+        # purpose: that conversion is the same acquisition, just materialised.
+        self._mdaModeParamsGeneration += 1
+
     #Each shared data property contains of this block of code. This is to ensure that the value of the property is only changed when the setter is called, and that shared_data can communicate between the different parts of the program
     #When adding a new shared_data property, change in __init__ above, and copy/paste this block and change all instances of 'liveMode' to whatever property you create.
     @property
@@ -226,8 +751,14 @@ class Shared_data(QObject):
             self._liveMode = new_value
             self.on_liveMode_value_change()
     def on_liveMode_value_change(self):
-        print('LIVE mode changed!')
-        time.sleep(0.1)
+        logging.info("LIVE mode changed!")
+        # T-F10 part 2: the `time.sleep(0.1)` that used to sit here is gone. It
+        # blocked whichever thread flipped the flag -- usually the GUI thread --
+        # and it did not make anything more synchronous: `acqModeChanged` was
+        # (and is) called synchronously either side of it, so the only effect was
+        # to *delay* the dispatch by 100 ms. What it papered over was callers
+        # that touch hardware immediately after flipping the mode; the one that
+        # genuinely did, `MMcontrols.setROI`, now waits on the core explicitly.
         self._livemodeNapariHandler.acqModeChanged(newSharedData=self)
         
         
@@ -242,7 +773,7 @@ class Shared_data(QObject):
             self.on_mdaMode_value_change()
     def on_mdaMode_value_change(self):
         logging.debug('shared_data.mdaMode changed to '+str(self._mdaMode))
-        time.sleep(0.1)
+        # T-F10 part 2: see on_liveMode_value_change above.
         self._mdamodeNapariHandler.acqModeChanged(newSharedData=self)
     
     #NapariViewer property   
@@ -305,6 +836,27 @@ class Shared_data(QObject):
             self.on_RTAnalysisQueuesThreads_value_change()
     def on_RTAnalysisQueuesThreads_value_change(self):
         logging.debug('_RTAnalysisQueuesThreads changed')
+
+    @property
+    def rt_replay(self):
+        """Registry of retained real-time-analysis results, created on first use.
+
+        Lazy because `rt_history` must not be imported at `Shared_data`
+        construction time in the headless/test paths that never run an analysis.
+        The budget follows the Advanced Settings value at creation; later edits go
+        through `set_budget`.
+        """
+        if self._rt_replay is None:
+            from glados_pycromanager.GUI.rt_history import (
+                DEFAULT_HISTORY_BUDGET_MB, RTReplayRegistry)
+            budget_mb = getattr(self.config.rt_analysis_config,
+                                'replay_history_budget_mb', DEFAULT_HISTORY_BUDGET_MB)
+            try:
+                budget_bytes = int(budget_mb) * 1024 * 1024
+            except (TypeError, ValueError):
+                budget_bytes = DEFAULT_HISTORY_BUDGET_MB * 1024 * 1024
+            self._rt_replay = RTReplayRegistry(budget_bytes=budget_bytes)
+        return self._rt_replay
         
         
     @property
@@ -331,6 +883,7 @@ class Shared_data(QObject):
     
     def appendNewMDAdataset(self,mdadataset):
         self.mdaDatasets.append(mdadataset)
+        self.mdaCurrentDataset = mdadataset
     
     
     @property
@@ -341,12 +894,22 @@ class Shared_data(QObject):
         try:
             # logging.debug(f"shared_data.warningErrorInfoInfo changed to {self._warningErrorInfoInfo}")
             if self.loadingOngoing == False:
-                from utils import updateAutonousErrorWarningInfo
+                from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
                 updateAutonousErrorWarningInfo(self,updateInfo='All')
-        except:
+        except (AttributeError, ImportError, RuntimeError) as exc:
             pass
+            # logging.debug('updateAutonousErrorWarningInfo not available yet: %s', exc)
     
 class Dict_Specific_WarningErrorInfo(dict):
+    # T-F4: `oldValue` is part of the notification signature but nothing reads
+    # it -- `on_warningErrorInfoInfo_changed` accepts and ignores it, and a grep
+    # of the codebase finds no other reader. It used to be a *full dict copy*
+    # taken on every `__setitem__`, on the GUI thread, several times a second.
+    oldValue = None
+
+    #: Set while a coalescing drain is already scheduled (see `_notify_change`).
+    _notifyPending = False
+
     def __init__(self, *args, **kwargs):
         self.parent = kwargs.pop('parent', None)
         self.errorType = kwargs.pop('errorType', None)
@@ -361,7 +924,6 @@ class Dict_Specific_WarningErrorInfo(dict):
                 self[key] = [Dict_Specific_WarningErrorInfo(item, parent=self, errorType=key) if isinstance(item, dict) else item for item in value]
 
     def __setitem__(self, key, value):
-        self.oldValue = self.copy()
         if isinstance(value, dict):
             value = Dict_Specific_WarningErrorInfo(value, parent=self, errorType=key)
         elif isinstance(value, list):
@@ -370,22 +932,52 @@ class Dict_Specific_WarningErrorInfo(dict):
         self._notify_change()
 
     def _notify_change(self):
+        """Schedule one rebuild per event-loop turn (T-F4).
+
+        A single logical update writes this dict several times -- the nodz timer
+        clears `Warnings` and then appends to it -- and each write used to drive
+        the full `updateAutonousErrorWarningInfo` chain: icon lookups, pixmap
+        builds and a loop over every node. Setting a dirty flag and draining it
+        from a zero-delay singleShot collapses those into one rebuild.
+
+        The deferral only happens on the GUI thread with a live application: a
+        zero-delay `QTimer` needs an event loop *in the calling thread*, so from
+        a worker thread (or in a headless test) the notification is delivered
+        synchronously, exactly as it was before.
+        """
+        if not self._can_defer_notification():
+            self._deliver_change()
+            return
+
+        if self._notifyPending:
+            return
+        self._notifyPending = True
+        QTimer.singleShot(0, self._drain_pending_notification)
+
+    @staticmethod
+    def _can_defer_notification():
+        try:
+            from PyQt5.QtCore import QThread
+            from PyQt5.QtWidgets import QApplication
+
+            app = QApplication.instance()
+            return app is not None and QThread.currentThread() == app.thread()
+        except (ImportError, RuntimeError):
+            return False
+
+    def _drain_pending_notification(self):
+        self._notifyPending = False
+        self._deliver_change()
+
+    def _deliver_change(self):
         if self.parent:
             self.parent.on_warningErrorInfoInfo_changed(oldValue=self.oldValue,errorType=self.errorType)
         else:
             self.on_warningErrorInfoInfo_changed(oldValue=self.oldValue,errorType=self.errorType)
-            
+
+    
     def on_warningErrorInfoInfo_changed(self, oldValue=None,errorType=None):
         # This method will be overridden in the Shared_data class
         if self.parent.loadingOngoing == False:
             updateAutonousErrorWarningInfo(self,updateInfo='All')
         pass
-
-class periodicallyUpdate:
-    def __init__(self,updateFunction,timing = 10000):
-        logging.debug('Initted periodically update with function %s', updateFunction)
-        # Create a QTimer to periodically update MM info
-        self.timer = QTimer()
-        self.timer.setInterval(timing)
-        self.timer.timeout.connect(updateFunction)
-        self.timer.start()

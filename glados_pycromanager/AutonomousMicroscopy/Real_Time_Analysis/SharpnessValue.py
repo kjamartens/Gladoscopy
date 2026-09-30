@@ -1,17 +1,24 @@
-import sys,os
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import inspect
+import logging
 
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
-import dask.array as da
 import time
+
+import dask.array as da
+import numpy as np
 from scipy import signal
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -32,6 +39,17 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # run() touches nothing but the frame and its own kwargs (a
+            # convolution per frame, in numpy/cv2, holding the GIL), so it is
+            # isolated in its own process - see
+            # utils.realTimeAnalysis_runInSubprocess.
+            "__runInSubprocess__": True,
+            # What visualise() reads that run() produces. `firstLayerInit` is
+            # set by visualise_init() on the main-process shadow instance and
+            # must not be mirrored from the child.
+            "__snapshot_attrs__": ["currentValue"],
+            #Replayable while scrubbing: one scalar per frame.
+            "__replayable__": True,
         }
     }
 
@@ -64,7 +82,8 @@ def blur_laplace(image):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class SharpnessValue():
+@register("SharpnessValue.SharpnessValue")
+class SharpnessValue:
     def __init__(self,core,**kwargs):
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
@@ -79,38 +98,37 @@ class SharpnessValue():
         elif kwargs['FilterType'] == 'Laplacian':
             self.currentValue = (np.mean(blur_laplace(image)**2))
         else:
-            print('FilterType not recognized')
+            logging.warning("FilterType not recognized")
             self.currentValue = 0
     
     def end(self,core,**kwargs):
         return
     
-    def visualise_init(self): 
+    def visualise_init(self):
         layerName = 'SharpnessMetric'
         layerType = 'points' #layerType has to be from image|labels|points|shapes|surface|tracks|vectors
+        self.firstLayerInit = True
         return layerName,layerType
-    
+
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        # create features for each point
+        # Only the feature value changes each frame
         features = {
             'outputval': self.currentValue
         }
-        textv = {
-            'string': 'Current sharpness: {outputval:.3f}',
-            'size': 15,
-            'color': 'red',
-            'translation': np.array([0, 0]),
-            'anchor': 'upper_left',
-        }
-        napariLayer.data = [0,0]
         napariLayer.features = features
-        napariLayer.text = textv
-        # napariLayer.size = 0
-        
-        # napariLayer.data = np.array([[100,100]])
-        # napariLayer.text = text
-        napariLayer.symbol = 'disc'
-        napariLayer.size = 10
-        napariLayer.edge_color='red'
-        napariLayer.face_color = 'blue'
-        napariLayer.selected_data = []
+        if self.firstLayerInit:
+            napariLayer.data = np.array([[0, 0]])
+            textv = {
+                'string': 'Current sharpness: {outputval:.3f}',
+                'size': 15,
+                'color': 'red',
+                'translation': np.array([0, 0]),
+                'anchor': 'upper_left',
+            }
+            napariLayer.text = textv
+            napariLayer.symbol = 'disc'
+            napariLayer.size = 10
+            napariLayer.edge_color = 'red'
+            napariLayer.face_color = 'blue'
+            napariLayer.selected_data = []
+            self.firstLayerInit = False

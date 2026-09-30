@@ -1,15 +1,22 @@
-import sys,os
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import inspect
+
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
+
 import dask.array as da
 import ndtiff
+import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -38,6 +45,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("checkAgainstList.CheckVsList")
 def CheckVsList(core,**kwargs):
     
     #Check if we have the required kwargs
@@ -48,7 +56,7 @@ def CheckVsList(core,**kwargs):
     
     try:
         listInfo = eval(kwargs['List'])
-    except:
+    except (SyntaxError, NameError, ValueError, TypeError):
         listInfo = kwargs['List']
         
     if len(listInfo)>0:
@@ -56,7 +64,7 @@ def CheckVsList(core,**kwargs):
             if len(entry) == 2:
                 try:
                     totalEuclidianDist = math.sqrt((eval(kwargs['Position'])[0]-entry[0])**2 + (eval(kwargs['Position'])[1]-entry[1])**2)
-                except:
+                except (SyntaxError, NameError, ValueError, TypeError, IndexError):
                     totalEuclidianDist = math.sqrt(((kwargs['Position'])[0]-entry[0])**2 + ((kwargs['Position'])[1]-entry[1])**2)
                 if totalEuclidianDist < float(kwargs['Distance']):
                     output['within_range'] = True

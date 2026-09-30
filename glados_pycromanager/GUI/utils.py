@@ -1,49 +1,51 @@
 #region imports
-import shutil
-import os
-import appdirs
-import logging
-import warnings
-import inspect
-import importlib
-import re
-import numpy as np
-import time
-import datetime
-import json
-import sys
-import markdown
-from pycromanager import Core
-from typing import Any
-import webbrowser
+import ast
 import collections
+import datetime
+import importlib
+import importlib.machinery
+import importlib.util
+import inspect
+import json
+import logging
+import os
+import re
+import shutil
+import sys
+import textwrap
+import time
+import warnings
+import webbrowser
+from dataclasses import dataclass, fields
+from typing import Any
+
+import appdirs
+import markdown
+import numpy as np
+from pycromanager import Core
+from PyQt5.QtCore import QSize, Qt
 
 #Imports for PyQt5 (GUI)
-from PyQt5.QtGui import (
-    QPainter,
-    QIcon,
-    QColor,
-    QFontMetrics,
-    QPen)
-from PyQt5.QtWidgets import (
-    QHBoxLayout,
-    QVBoxLayout,
-    QLayout, 
-    QMainWindow, 
-    QLabel, 
-    QPushButton,
-    QGroupBox,
-    QGridLayout,
-    QWidget,
-    QComboBox,
-    QLineEdit,
-    QFileDialog,
-    QCheckBox,
-    QSpacerItem,
-    QRadioButton,
-    QApplication)
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QColor, QFontMetrics, QIcon, QPainter, QPen
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLayout,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QRadioButton,
+    QSpacerItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 #TODO: Maybe sharedFunctions need to be in the pip-installed list?
 # from sharedFunctions import Shared_data
@@ -52,39 +54,29 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
 import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
+from glados_pycromanager.autonomous import registry as _node_registry
+from glados_pycromanager.errors import NodeDispatchError
+
 #endregion
 
-def cleanUpTemporaryFiles(mainFolder='./',shared_data=None):
-    logging.debug('Cleaning up temporary files')
-    
-    #Remove all the datasets from the internal mdadatasets info, so they are freed up
-    if shared_data != None:
-        if len(shared_data.mdaDatasets) > (3-1):
-            for index,mdadataset in enumerate(shared_data.mdaDatasets):
-                try:
-                    if 'ShouldBeRemoved' in mdadataset.path:
-                        #pop it from the list:
-                        try:
-                            shared_data.mdaDatasets.pop(index)
-                        except:
-                            pass
-                except:
-                    pass #Nowadays in JavaRAMDataStorage, can be safely ignored.
-    
-    #Remove them from disk - keep in mind that the last three will be kept
-    if os.path.exists(os.path.join(mainFolder,'temp')):
-        for folder in os.listdir(os.path.join(mainFolder,'temp')):
-            if 'LiveAcqShouldBeRemoved' in folder or 'MdaAcqShouldBeRemoved' in folder:
-                try:
-                    shutil.rmtree(os.path.join(mainFolder,os.path.join('temp',folder)))
-                    logging.debug(f"Deleted {os.path.join(mainFolder,os.path.join('temp',folder))}")
-                except:
-                    pass
+# Phase 7.1/7.2: body moved to `glados_pycromanager.io.appdata`; shim
+# kept here for back-compat with one-time DeprecationWarning per call.
+import warnings as _shim_warnings_cleanup  # noqa: E402
+
+from glados_pycromanager.io import appdata as _appdata_cleanup  # noqa: E402
+
+
+def cleanUpTemporaryFiles(mainFolder="./", shared_data=None):
+    _shim_warnings_cleanup.warn(
+        "cleanUpTemporaryFiles() has moved to glados_pycromanager.io.appdata."
+        "cleanUpTemporaryFiles; the GUI.utils re-export is scheduled for "
+        "removal in Phase 18.1 of claude_project.md.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata_cleanup.cleanUpTemporaryFiles(mainFolder, shared_data)
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -101,21 +93,141 @@ def function_exists(obj):
 def subfunction_exists(module_name, subfunction_name):
     try:
         if module_name.endswith('.py'):
-            # Module path is provided
-            loader = importlib.machinery.SourceFileLoader('', module_name) #type:ignore
-            module = loader.load_module()
+            # Reuse an already-loaded module to avoid re-executing module-level
+            # @register decorators. __file__ may point to a .pyc in __pycache__,
+            # so normalise both sides to the source path before comparing.
+            abs_path = os.path.abspath(module_name)
+            module = None
+            for m in sys.modules.values():
+                mfile = getattr(m, '__file__', None)
+                if not mfile:
+                    continue
+                if mfile.endswith('.pyc'):
+                    try:
+                        mfile = importlib.util.source_from_cache(mfile)
+                    except (NotImplementedError, ValueError):
+                        continue
+                if os.path.abspath(mfile) == abs_path:
+                    module = m
+                    break
+            if module is None:
+                loader = importlib.machinery.SourceFileLoader('', module_name)  # type:ignore
+                module = loader.load_module()
         else:
             module = importlib.import_module(module_name)
-        a = hasattr(module, subfunction_name)
-        b = callable(getattr(module, subfunction_name))
         return hasattr(module, subfunction_name) and callable(getattr(module, subfunction_name))
     except (ImportError, AttributeError):
         return False
     
+
+# Plugin node modules (e.g. FFT_im) are registered in sys.modules under their
+# full dotted path (glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis.FFT_im),
+# never under their bare stem -- so the sys.modules.get(stem) fast path below
+# always misses for them, and every call falls through to the linear scan.
+# That scan is called once per RT-analysis run() invocation (see
+# realTimeAnalysis_run -> kwargsFromFunction -> _resolve_node_obj), so with a
+# few thousand modules loaded (napari/torch/tensorflow et al. easily import
+# that many), one real-time-analysis frame could cost 5000+ rsplit() calls --
+# directly observed via Performance Mode as a major CPU cost inside an
+# RT-analysis subprocess. Caching the stem->module resolution avoids re-scanning
+# sys.modules on every call; reload_all_node_modules() (dev hot-reload) clears
+# this cache since it deletes/re-adds the exact sys.modules entries this looks up.
+_resolve_node_obj_module_cache: dict[str, object] = {}
+
+
+def clear_resolve_node_obj_cache() -> None:
+    """Invalidate the stem->module cache used by _resolve_node_obj().
+
+    Call this whenever sys.modules entries for node packages are added,
+    removed, or replaced (see plugins/discovery.py's reload_all_node_modules).
+    """
+    _resolve_node_obj_module_cache.clear()
+    _NODE_LIVE_CONTEXT_CACHE.clear()
+
+
+def _resolve_node_obj(name_str):
+    """Resolve a dotted node name (e.g. 'BioImageModelZoo' or 'BioImageModelZoo.BioImageModelZoo')
+    to the named object without using eval. Looks up the stem in sys.modules."""
+    import sys as _sys
+    parts = str(name_str).split('.')
+    stem = parts[0]
+    mod = _sys.modules.get(stem)
+    if mod is None:
+        mod = _resolve_node_obj_module_cache.get(stem)
+    if mod is None:
+        for key, m in list(_sys.modules.items()):
+            if m is not None and key.rsplit('.', 1)[-1] == stem:
+                mod = m
+                _resolve_node_obj_module_cache[stem] = m
+                break
+    if mod is None:
+        raise NameError(f"No loaded module with stem '{stem}' (name_str={name_str!r})")
+    obj = mod
+    for part in parts[1:]:
+        obj = getattr(obj, part)
+    return obj
+
+
+def _node_metadata(name_str):
+    """Cached ``__function_metadata__()`` dict for a node module (T-G1).
+
+    Thin wrapper over :func:`registry.get_metadata` so every metadata read in
+    this module goes through one cache. The returned dict is *shared* — never
+    mutate it.
+    """
+    return _node_registry.get_metadata(name_str)
+
+
+def _nodeFunctionEntry(functionname):
+    """Return the metadata sub-dict of a single node function.
+
+    ``functionname`` is either ``"Module.Function"`` or a bare module stem; a
+    bare stem resolves to the module's *first* declared function, which is what
+    the blob-and-regex helpers this replaced did (they always regexed entry 0).
+
+    Returns None when the module has no usable metadata for that name, so
+    callers degrade to an empty kwarg list exactly as the regex path did.
+    """
+    try:
+        metadata = _node_metadata(functionname)
+        parts = str(functionname).split('.')
+        if len(parts) > 1:
+            return metadata[parts[1]]
+        return next(iter(metadata.values()))
+    except (AttributeError, TypeError, KeyError, NameError, StopIteration):
+        return None
+
+
 # Return all functions that are found in a specific directory
 def functionNamesFromDir(dirname):
     #initialise empty array
     functionnamearr = []
+    def _load_module(functionName, file_path):
+        """Return the already-loaded module or load it fresh from its file path."""
+        import sys
+        abs_file = os.path.abspath(file_path)
+        for mod in sys.modules.values():
+            mfile = getattr(mod, '__file__', None)
+            if mfile and os.path.abspath(mfile) == abs_file:
+                return mod
+        #For files that live inside the glados_pycromanager package tree, prefer
+        #importing via their real dotted package path so this shares the same
+        #sys.modules entry (and node registration) as glados_pycromanager.plugins.discovery,
+        #regardless of which mechanism happens to run first.
+        if not os.path.isabs(dirname):
+            qualified_name = 'glados_pycromanager.' + dirname.replace('\\', '.').replace('/', '.') + '.' + functionName
+            try:
+                return importlib.import_module(qualified_name)
+            except ImportError:
+                pass
+        spec = importlib.util.spec_from_file_location(functionName, file_path)
+        if spec is None or spec.loader is None:
+            return None
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[functionName] = mod
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
     def addFilesToAbsolutePath(functionnamearr,absolute_path):
         #Loop over all files
         for file in os.listdir(absolute_path):
@@ -125,9 +237,13 @@ def functionNamesFromDir(dirname):
                 if not file.startswith("_") and not file == "utils.py" and not file == "utilsHelper.py":
                     #Get the function name
                     functionName = file[:-3]
+                    file_path = os.path.join(absolute_path, file)
+                    mod = _load_module(functionName, file_path)
+                    if mod is None:
+                        continue
                     #Get the metadata from this function and from there obtain
                     try:
-                        functionMetadata = eval(f'{str(functionName)}.__function_metadata__()')
+                        functionMetadata = mod.__function_metadata__()
                         for singlefunctiondata in functionMetadata:
                             #Also check this against the actual sub-routines and raise an error (this should also be present in the __init__ of the folders)
                             subroutineName = f"{functionName}.{singlefunctiondata}"
@@ -139,7 +255,7 @@ def functionNamesFromDir(dirname):
                     except AttributeError:
                         #Get all callable subroutines and store those
                         subroutines = []
-                        for subroutineName, obj in inspect.getmembers(eval(f'{functionName}')):
+                        for subroutineName, obj in inspect.getmembers(mod):
                             if function_exists(obj):
                                 subroutines.append(subroutineName)
                                 functionnamearr.append(subroutineName)
@@ -156,68 +272,42 @@ def functionNamesFromDir(dirname):
     try:
         additional_folder_name = os.path.join("C:\\Users\\Koen Martens\\AppData\\Local\\UniBonn\\Glados",dirname)
         functionnamearr = addFilesToAbsolutePath(functionnamearr,additional_folder_name)
-    except:
-        pass
+    except OSError as exc:
+        logging.debug('Optional hard-coded AppData path %s unavailable: %s', additional_folder_name, exc)
     
     #return all functions
     return functionnamearr
 
 #Returns the 'names' of the required kwargs of a function
 def reqKwargsFromFunction(functionname):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    #Perform a regex match on 'name'
-    name_pattern = r"name:\s*(\S+)"
-    #Get the names of the req_kwargs (allkwarginfo[0])
-    names = re.findall(name_pattern, allkwarginfo[0][0])
-    return names
+    #Read the (cached) metadata directly - this used to serialise the kwarg
+    #dicts into a "key: value" text blob and regex the names back out (T-G1).
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
+        return []
+    return [kwarg['name'] for kwarg in entry.get('required_kwargs', [])]
 
 #Returns a display name (if available) of an individual kwarg name, from a specific function:
 def displayNameFromKwarg(functionname,name):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    
-    #Look through optional args first, then req. kwargs (so that req. kwargs have priority in case something weirdi s happening):
-    for optOrReq in range(1,-1,-1):
-    
-        #Perform a regex match on 'name'
-        name_pattern = r"name:\s*(\S+)"
-        
-        if len(allkwarginfo[optOrReq]) > 0: #Check if we have at least one opt/req kwarg:
-            names = re.findall(name_pattern, allkwarginfo[optOrReq][0])
-            instances = re.split(r'(?=name: )', allkwarginfo[optOrReq][0])[1:]
-
-            #Find which instance this name belongs to:
-            name_id = -1
-            for i,namef in enumerate(names):
-                if namef == name:
-                    name_id = i
-            
-            if name_id > -1:
-                curr_instance = instances[name_id]
-                displayText_pattern = r"display_text: (.*?)\n"
-                displaytext = re.findall(displayText_pattern, curr_instance)
-                if len(displaytext) > 0:
-                    displayName = displaytext[0]
-                else:
-                    displayName = name
-        else:
-            displayName = 'Shouldnt be shown'
-    
+    #Look through optional args first, then req. kwargs (so that req. kwargs
+    #have priority in case something weird is happening).
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
+        return name
+    displayName = name
+    for kwargListName in ('optional_kwargs', 'required_kwargs'):
+        for kwarg in entry.get(kwargListName, []):
+            if kwarg.get('name') == name:
+                displayName = kwarg.get('display_text', name)
     return displayName
 
 #Returns the 'names' of the optional kwargs of a function
 def optKwargsFromFunction(functionname):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    if allkwarginfo[1] != []: #Check if there are any opt kwargs at all
-        #Perform a regex match on 'name'
-        name_pattern = r"name:\s*(\S+)"
-        #Get the names of the optional kwargs (allkwarginfo[1])
-        names = re.findall(name_pattern, allkwarginfo[1][0])
-        return names
-    else:
+    #Read the (cached) metadata directly rather than regexing a text blob (T-G1).
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
         return []
+    return [kwarg['name'] for kwarg in entry.get('optional_kwargs', [])]
 
 def classKwargValuesFromFittingFunction(functionname, class_type):
     #Get all kwarg info
@@ -230,13 +320,13 @@ def kwargsFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _node_metadata(functionname)
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            functionMetadata = _node_metadata(functionparent)
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
@@ -284,20 +374,23 @@ def inputFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _node_metadata(functionname)
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            functionMetadata = _node_metadata(functionparent)
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
         
         input_arr = []
         for i in looprange:
-            input_arr.append(functionMetadata[list(functionMetadata.keys())[i]]["input"])
+            #Not every node declares "input" (e.g. LaserAdjustment) - that used
+            #to be a KeyError here, which crashed anything binding a node's
+            #visualise kwargs (the only path that does not skipInput).
+            input_arr.append(functionMetadata[list(functionMetadata.keys())[i]].get("input", []))
     except AttributeError:
         input_arr = []
         return f"No __function_metadata__ in {functionname}"
@@ -308,20 +401,20 @@ def outputFromFunction(functionname):
     try:
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _node_metadata(functionname)
             #Loop over all entries
             looprange = range(0,len(functionMetadata))
         else: #or specific sub-function
             #get the parent info
             functionparent = functionname.split('.')[0]
-            functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+            functionMetadata = _node_metadata(functionparent)
             #sub-select the looprange
             loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
             looprange = range(loopv,loopv+1) #type:ignore
         
         output_arr = []
         for i in looprange:
-            output_arr.append(functionMetadata[list(functionMetadata.keys())[i]]["output"])
+            output_arr.append(functionMetadata[list(functionMetadata.keys())[i]].get("output", []))
     except AttributeError:
         output_arr = []
         return f"No __function_metadata__ in {functionname}"
@@ -337,7 +430,7 @@ def infoFromMetadata(functionname,**kwargs):
         skipfinalline = False
         #Check if parent function
         if not '.' in functionname:
-            functionMetadata = eval(f'{str(functionname)}.__function_metadata__()')
+            functionMetadata = _node_metadata(functionname)
             finaltext = f"""\
             --------------------------------------------------------------------------------------
             {functionname} contains {len(functionMetadata)} callable functions: {", ".join(str(singlefunctiondata) for singlefunctiondata in functionMetadata)}
@@ -349,7 +442,7 @@ def infoFromMetadata(functionname,**kwargs):
             if specificKwarg == False:
                 #get the parent info
                 functionparent = functionname.split('.')[0]
-                functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+                functionMetadata = _node_metadata(functionparent)
                 #sub-select the looprange
                 loopv = next((index for index in range(0,len(functionMetadata)) if list(functionMetadata.keys())[index] == functionname.split('.')[1]), None)
                 looprange = range(loopv,loopv+1) #type:ignore
@@ -359,7 +452,7 @@ def infoFromMetadata(functionname,**kwargs):
                 #get the parent info
                 functionparent = functionname.split('.')[0]
                 #Get the full function metadata
-                functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+                functionMetadata = _node_metadata(functionparent)
                 #Get the help string of a single kwarg
                 
                 #Find the help text of a single kwarg
@@ -438,39 +531,61 @@ def infoFromMetadata(functionname,**kwargs):
     except AttributeError:
         return f"No __function_metadata__ in {functionname}"
 
-#Run a function with unknown number of parameters via the eval() method
-#Please note that the arg values need to be the string variants of the variable, not the variable itself!
-def createFunctionWithArgs(functionname,*args):
-    #Start string with functionname.functionname - probably changing later for safety/proper usages
+#Build a display-only string for "Module.Function(arg1, arg2, ...)".
+#Phase 9.6: renamed from createFunctionWithArgs. The production call
+#path no longer eval's these strings — use
+#registry.dispatch_from_eval_text instead. Old name preserved as a
+#deprecated alias until the next major release.
+def createFunctionWithArgs_str_for_display(functionname,*args):
     fullstring = functionname+"."+functionname+"("
-    #Add all arguments to the function
     idloop = 0
     for arg in args:
         if idloop>0:
             fullstring = fullstring+","
         fullstring = fullstring+str(arg)
         idloop+=1
-    #Finish the function string
     fullstring = fullstring+")"
-    #run the function
     return fullstring
 
-#Run a function with unknown number of kwargs via the eval() method
-#Please note that the kwarg values need to be the string variants of the variable, not the variable itself!
-def createFunctionWithKwargs(functionname,**kwargs):
-    #Start string with functionname.functionname - probably changing later for safety/proper usages
+
+def createFunctionWithArgs(functionname,*args):
+    """Deprecated. Use ``createFunctionWithArgs_str_for_display``."""
+    import warnings
+    warnings.warn(
+        "utils.createFunctionWithArgs is a display-only helper now; "
+        "eval'ing its result is unsafe — use "
+        "glados_pycromanager.autonomous.registry.dispatch_from_eval_text instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return createFunctionWithArgs_str_for_display(functionname, *args)
+
+
+#Build a display-only string for "Module.Function(kw1=v1, kw2=v2, ...)".
+#Phase 9.6: renamed from createFunctionWithKwargs. Same notes as above.
+def createFunctionWithKwargs_str_for_display(functionname,**kwargs):
     fullstring = functionname+"("
-    #Add all arguments to the function
     idloop = 0
     for key, value in kwargs.items():
         if idloop>0:
             fullstring = fullstring+","
         fullstring = fullstring+str(key)+"="+str(value)
         idloop+=1
-    #Finish the function string
     fullstring = fullstring+")"
-    #run the function
     return fullstring
+
+
+def createFunctionWithKwargs(functionname,**kwargs):
+    """Deprecated. Use ``createFunctionWithKwargs_str_for_display``."""
+    import warnings
+    warnings.warn(
+        "utils.createFunctionWithKwargs is a display-only helper now; "
+        "eval'ing its result is unsafe — use "
+        "glados_pycromanager.autonomous.registry.dispatch_from_eval_text instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return createFunctionWithKwargs_str_for_display(functionname, **kwargs)
 
 
 def defaultValueFromKwarg(functionname,kwargname):
@@ -479,7 +594,7 @@ def defaultValueFromKwarg(functionname,kwargname):
     defaultEntry=None
     functionparent = functionname.split('.')[0]
     #Get the full function metadata
-    functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+    functionMetadata = _node_metadata(functionparent)
     if 'optional_kwargs'  in functionMetadata[functionname.split('.')[1]]:
         for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
             if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
@@ -506,7 +621,7 @@ def createGridFromFunction(functionname):
     #Idea: get all arg and kwarg info, and create a QGridLayout that contains these info, and line-edits, or dropdowns, or checkboxes, etc.
     
     #Create a gridLayout with labels and line-edits, dropdowns or checkboxes based on the function's metadata:
-    motherFunctionMetadata = eval(f'{str(motherFunctionFromFunctionName(functionname))}.__function_metadata__()')
+    motherFunctionMetadata = _node_metadata(motherFunctionFromFunctionName(functionname))
     functionMetadata = motherFunctionMetadata[daughterFunctionsFromFunctionName(functionname)]
     gridLayout = QGridLayout()
     current_row = 0
@@ -563,7 +678,7 @@ def displayNamesFromFunctionNames(functionName, polval):
         subroutineName = function.split('.')[0]
         singlefunctiondata = function.split('.')[1]
         #Check if the subroutine has a display name - if so, use that, otherwise use the subroutineName
-        functionMetadata = eval(f'{str(subroutineName)}.__function_metadata__()')
+        functionMetadata = _node_metadata(subroutineName)
         if 'display_name' in functionMetadata[singlefunctiondata]:
             displayName = functionMetadata[singlefunctiondata]['display_name']
             #Add the polarity info between brackets if required
@@ -594,7 +709,7 @@ def typeFromKwarg(functionname,kwargname):
     try:
         functionparent = functionname.split('.')[0]
         #Get the full function metadata
-        functionMetadata = eval(f'{str(functionparent)}.__function_metadata__()')
+        functionMetadata = _node_metadata(functionparent)
         for k in range(0,len(functionMetadata[functionname.split('.')[1]]["optional_kwargs"])):
             if functionMetadata[functionname.split('.')[1]]["optional_kwargs"][k]['name'] == kwargname:
                 #check if this has a default value:
@@ -606,10 +721,42 @@ def typeFromKwarg(functionname,kwargname):
                 #check if this has a default value:
                 if 'type' in functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]:
                     typing = functionMetadata[functionname.split('.')[1]]["required_kwargs"][k]['type']
-        
-    except:
+
+    except (KeyError, IndexError, TypeError, AttributeError):
         typing=None
     return typing
+
+def createValueEditWidget(functionname,kwargname):
+    """
+    Build the 'Value'-mode widget for a kwarg. Bool-typed kwargs (declared as "type": bool
+    in __function_metadata__) get a QCheckBox instead of a free-text QLineEdit; everything
+    else is unchanged. The object name (LineEdit#function#kwarg) is kept identical for both
+    widget kinds, since hideAdvVariables()/getFunctionEvalTextFromCurrentData_* only ever key
+    off that name, not the widget class - see docs/rt_analysis_parameters.md.
+    """
+    if typeFromKwarg(functionname,kwargname) == bool:
+        widget = QCheckBox()
+    else:
+        widget = QLineEdit()
+    widget.setObjectName(f"LineEdit#{functionname}#{kwargname}")
+    return widget
+
+def wireValueEditWidget(line_edit,defaultValue):
+    """
+    Apply the default value and hook up the change-signal for a widget built by
+    createValueEditWidget(), branching on whether it's a QCheckBox (bool) or QLineEdit (everything else).
+    """
+    if isinstance(line_edit,QCheckBox):
+        if defaultValue is not None:
+            if isinstance(defaultValue,str):
+                line_edit.setChecked(defaultValue.strip().lower() in ('true','1'))
+            else:
+                line_edit.setChecked(bool(defaultValue))
+        line_edit.stateChanged.connect(lambda state,line_edit=line_edit: changeDataVarUponKwargChange(line_edit))
+    else:
+        if defaultValue is not None:
+            line_edit.setText(str(defaultValue))
+        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
 
 def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNameMap,parent=None):
     #Called whenever the dropdown is changed, hides everything and shows selectively only the chosen dropdown
@@ -632,7 +779,8 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
                 if entry[1] == current_selected_function:
                     currentSelectedFunctionReadable = entry[0]
             curr_layout.parent().parent().currentData['__selectedDropdownEntryAnalysis__'] = currentSelectedFunctionReadable
-        except: #This exception is if I'm doing this directly from the GUI, not from nodz
+        except (AttributeError, KeyError):
+            # raised when called directly from the GUI rather than nodz
             pass
         
         #Show/hide varialbes/advanced lineedits and such
@@ -675,12 +823,12 @@ def attemptToEvaluateVariables(value,nodzInfo):
         if checkExactlySingleVariable:
             try:
                 finalVal = nodz_evaluateVar(value,nodzInfo)
-            except:
+            except (KeyError, AttributeError, TypeError, ValueError):
                 finalVal = value
         elif checkAdvanced:
             try:
                 finalVal = nodz_evaluateAdv(value,nodzInfo)
-            except:
+            except (KeyError, AttributeError, TypeError, ValueError, SyntaxError, NameError):
                 finalVal = value
         else:
             finalVal = value
@@ -716,8 +864,8 @@ def nodz_setVariableToValue(variable,value,nodzInfo):
                 if type(eval(value)) in nodzInfo.globalVariables[variableName]['type']:
                     nodzInfo.globalVariables[variableName]['data'] = eval(value)
                     logging.debug(f"Set global variable {variableName} to {eval(value)}")
-            except:
-                logging.error(f'Type mismatch in variable setting! {variableName} and {value}')
+            except (SyntaxError, NameError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                logging.error('Type mismatch in variable setting! %s and %s (%s)', variableName, value, exc)
     return
 
 def nodz_evaluateVar(varName,nodzInfo):
@@ -732,11 +880,18 @@ def nodz_evaluateVar(varName,nodzInfo):
         elif originNodeName == 'Core':
             varData = nodzInfo.coreVariables[variableName]['data']
         else:
-            #Done it like this to have access to kwargvalue if needed (not retported right now)
             nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
-            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
-        
-            varData = eval(kwargvalue)
+            #Name the stale half of the reference: a bare KeyError('node_0')
+            #does not say it came from a decision/kwarg pointing at a node that
+            #was since deleted, re-added (new number) or never existed.
+            if originNodeName not in nodeDict:
+                raise KeyError(f"variable {varName!r} refers to node {originNodeName!r}, "
+                               f"which is not in the graph (nodes: {sorted(nodeDict)})")
+            nodeVars = nodeDict[originNodeName].variablesNodz
+            if variableName not in nodeVars:
+                raise KeyError(f"variable {varName!r}: node {originNodeName!r} has no variable "
+                               f"{variableName!r} (has: {sorted(nodeVars)})")
+            varData = nodeVars[variableName]['data']
         
     return varData
 
@@ -801,12 +956,12 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
                 if calculatable: #if calculatable
                     try:
                         updating_string = updating_string.replace(foundstring,""+data+"")
-                    except:
+                    except TypeError:
                         updating_string = updating_string.replace(foundstring,""+str(data)+"")
                 else: #uncalculatable, add as string
                     try:
                         updating_string = updating_string.replace(foundstring,""+data+"")
-                    except:
+                    except TypeError:
                         updating_string = updating_string.replace(foundstring,""+str(data)+"")
         except KeyError:
             pass
@@ -819,23 +974,23 @@ def nodz_evaluateAdv(varName,nodzInfo,skipEval=False):
         else:
             try:
                 finalData = eval(updating_string_backslash)
-            except:
-                logging.error(f"Error when assessing adv variable {varName}: {updating_string_backslash}")
+            except (SyntaxError, NameError, ValueError, TypeError, AttributeError) as exc:
+                logging.error('Error when assessing adv variable %s: %s (%s)', varName, updating_string_backslash, exc)
                 finalData = None
             return finalData
     else:
         #If not a true advanced, try, in turn, if it's int, if it's float, and if it can be evaluated as a var.
         try:
             varNameN = int(varName)
-        except:
+        except (ValueError, TypeError):
             try:
                 varNameN = float(varName)
-            except:
+            except (ValueError, TypeError):
                 try:
                     varNameN = nodz_evaluateVar(varName,nodzInfo)
                     logging.warning(f"Wrong syntax for advanced variable [but seems to be a variable instead]! Details: {varName} - interpreting as variable")
-                except:
-                    logging.error(f'Wrong syntax for advanced variable! Details: {varName} - interpreting as value')
+                except (KeyError, AttributeError, TypeError, ValueError, NameError):
+                    logging.error('Wrong syntax for advanced variable! Details: %s - interpreting as value', varName)
                     varNameN = varName
         return varNameN
 
@@ -883,87 +1038,13 @@ def nodz_dataFromGeneralAdvancedLineEditDialog(relevantData,nodzInfo,dontEvaluat
     return allData
 
 
-def findIconFolder():
-    import importlib.util
-    if importlib.util.find_spec('glados_pycromanager') is not None:
-        import glados_pycromanager
-        # Get the installation path of the package
-        package_path = os.path.dirname(glados_pycromanager.__file__)
-        # Construct the path to the Icons folder
-        iconFolder = os.path.join(package_path, 'GUI', 'Icons')
-
-        if not os.path.exists(iconFolder):
-            #Find the iconPath folder
-            if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-                iconFolder = './glados_pycromanager/GUI/Icons/'
-            elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-                iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-            else:
-                iconFolder = ''
-    else:
-        # logging.warning("Could not find glados_pycromanager package, using default icons")
-        #Find the iconPath folder
-        if os.path.exists('./glados_pycromanager/GUI/Icons/General_Start.png'):
-            iconFolder = './glados_pycromanager/GUI/Icons/'
-        elif os.path.exists('./glados-pycromanager/glados_pycromanager/GUI/Icons/General_Start.png'):
-            iconFolder = './glados-pycromanager/glados_pycromanager/GUI/Icons/'
-        else:
-            iconFolder = ''
-    return iconFolder
-
-def setWarningErrorInfoIcon(widget,type,iconFolder,alteration = 'grayscale',iconSize = 16):
-    """
-    Sets the warning, error, or info icon for the given widget. The icon is loaded from the specified iconFolder and can be optionally altered to grayscale.
-
-    Args:
-        widget (QWidget): The widget to set the icon for.
-        type (str): The type of icon to set, either 'warning', 'error', or 'info'.
-        iconFolder (str): The folder path containing the icon files.
-        alteration (str, optional): The alteration to apply to the icon, either 'grayscale' or None. Defaults to 'grayscale'.
-        iconSize (int, optional): Size of the icon. Defaults to 16.
-
-    Returns:
-        QWidget: The widget with the icon set.
-    """
-    try:
-        from PyQt5.QtCore import Qt
-        from PyQt5.QtGui import QPixmap, qGray, qRgba, qAlpha, QImage
-        
-        if type == 'warning':
-            iconLoc = iconFolder+os.sep+'WarningIcon.png'
-        elif type == 'error':
-            iconLoc = iconFolder+os.sep+'ErrorIcon.png'
-        else:
-            iconLoc = iconFolder+os.sep+'InfoIcon.png'
-        
-        
-        # Load the original pixmap
-        pixmap = QPixmap(iconLoc)
-
-        if alteration == 'grayscale':
-            # Convert to QImage
-            image = pixmap.toImage()
-
-            #No clue what it's doing here, but Cody proposed it, and its way faster than looping
-            # Convert QImage to NumPy array
-            ptr = image.bits()
-            ptr.setsize(image.byteCount())
-            image_array = np.array(ptr).reshape((image.height(), image.width(), 4))
-            # Perform grayscale conversion
-            gray_array = np.dot(image_array[:, :, :3], [0.299, 0.587, 0.114])
-            image_array[:, :, :3] = gray_array[:, :, np.newaxis]
-            # Convert back to QImage
-            grayscale_image = QImage(image_array.data, image.width(), image.height(), QImage.Format_RGBA8888)
-
-            # Convert back to QPixmap
-            pixmap = QPixmap.fromImage(grayscale_image)
-        scaled_pixmap = pixmap.scaled(iconSize, iconSize, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
-        widget.setPixmap(scaled_pixmap)
-        
-        return widget
-    except:
-        return None
+# Phase 7.3: bodies moved to `glados_pycromanager.ui.widgets.builders`.
+# Re-exported here so existing `utils.findIconFolder(...)` calls keep
+# working unchanged. Phase 18.1 deletes this shim.
+from glados_pycromanager.ui.widgets.builders import (  # noqa: F401
+    findIconFolder,
+    setWarningErrorInfoIcon,
+)
 
 def get_xy_position(core = None,shared_data=None):
     """
@@ -973,7 +1054,7 @@ def get_xy_position(core = None,shared_data=None):
     
     return position
 
-class XYGridManager():
+class XYGridManager:
     """  
     #Idea of XY grid: have methods to create a pop-up dialog, where users can set up the grid (top), setting up top/bottom/left/right/center and specifiy overlap. This then also includes a grid-flow (bottom) with options betwen e.g. normal grid, diagonal grid, spiral grid, etc
     #The class both includes the settings, the positions, and the GUI
@@ -1010,8 +1091,8 @@ class XYGridManager():
         """
         
         #Create a QDialog with OK/Cancel button:
-        from PyQt5.QtWidgets import QDialog, QDialogButtonBox
         from PyQt5.QtCore import Qt
+        from PyQt5.QtWidgets import QDialog, QDialogButtonBox
         
         self.dialog = QDialog()
         self.dialog.setWindowTitle("XY Grid Setup")
@@ -1216,6 +1297,13 @@ class XYGridManager():
         else:
             logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
             corePxSize = 1
+        # Width/height are each a get_roi() round trip to the microscope core (a
+        # real Java-bridge cost on the PYCROMANAGER_JAVA backend). The loops below
+        # previously called get_image_width()/get_image_height() up to 4x per grid
+        # tile; cache them once here since the ROI doesn't change during grid layout.
+        imgWidthUm = self.core.get_image_width() * corePxSize
+        imgHeightUm = self.core.get_image_height() * corePxSize
+
         #Update self.pos_overlap to contain the current value in um:
         text = self.overlapEditField.text()
         if self.overlapDropDown.currentText() == "um":
@@ -1223,14 +1311,14 @@ class XYGridManager():
         elif self.overlapDropDown.currentText() == "px":
             self.pos_overlap = [float(text)*corePxSize,float(text)*corePxSize]
         elif self.overlapDropDown.currentText() == "%":
-            self.pos_overlap = [float(text)/100 * self.core.get_image_width() * corePxSize,float(text)/100 * self.core.get_image_height() * corePxSize]
-            
+            self.pos_overlap = [float(text)/100 * imgWidthUm,float(text)/100 * imgHeightUm]
+
         #Get the grid info:
         self.gridEntries = []
         if self.pos_choice == 'center':
             #If it's from center, we need to create a grid of self.grid_n_rows by self.grid_n_cols, centered around self.pos_center, taking self.pos_overlap (in um units) into account:
-            totXsize = (self.grid_n_cols)* self.core.get_image_width() * corePxSize + (self.grid_n_cols - 1) * -self.pos_overlap[0]
-            totYsize = (self.grid_n_rows)* self.core.get_image_height() * corePxSize + (self.grid_n_rows - 1) * -self.pos_overlap[1]
+            totXsize = (self.grid_n_cols)* imgWidthUm + (self.grid_n_cols - 1) * -self.pos_overlap[0]
+            totYsize = (self.grid_n_rows)* imgHeightUm + (self.grid_n_rows - 1) * -self.pos_overlap[1]
             centerPos = self.pos_center
         elif self.pos_choice == 'corner':
             #Check if any NaNs in the corner entries:
@@ -1240,21 +1328,21 @@ class XYGridManager():
                 totXsize = abs(self.pos_bottom_right[0]-self.pos_top_left[0])
                 totYsize = abs(self.pos_bottom_right[1]-self.pos_top_left[1])
                 #Using this and the overlap, determine the grid n rows/cols:
-                self.grid_n_rows = int(totYsize / (self.core.get_image_height() * corePxSize + self.pos_overlap[1]))+1
-                self.grid_n_cols = int(totXsize / (self.core.get_image_width() * corePxSize + self.pos_overlap[0]))+1
-            
-            
+                self.grid_n_rows = int(totYsize / (imgHeightUm + self.pos_overlap[1]))+1
+                self.grid_n_cols = int(totXsize / (imgWidthUm + self.pos_overlap[0]))+1
+
+
         if self.grid_flow_type == 'hor_normal': #row-by-row
             for yy in range(self.grid_n_rows):
                 for xx in range(self.grid_n_cols):
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*imgWidthUm + xx * -self.pos_overlap[0]+ 0.5*imgWidthUm #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*imgHeightUm + yy * -self.pos_overlap[1]+ 0.5*imgHeightUm #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
         elif self.grid_flow_type == 'ver_normal': #row-by-row
             for xx in range(self.grid_n_cols):
                 for yy in range(self.grid_n_rows):
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*imgWidthUm + xx * -self.pos_overlap[0]+ 0.5*imgWidthUm #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*imgHeightUm + yy * -self.pos_overlap[1]+ 0.5*imgHeightUm #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
         elif self.grid_flow_type == 'hor_snake':
             for yy in range(self.grid_n_rows):
@@ -1263,19 +1351,19 @@ class XYGridManager():
                     #reverse the range
                     rangev = range(self.grid_n_cols-1,-1,-1)
                 for xx in rangev:
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*imgWidthUm + xx * -self.pos_overlap[0]+ 0.5*imgWidthUm #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*imgHeightUm + yy * -self.pos_overlap[1]+ 0.5*imgHeightUm #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
         elif self.grid_flow_type == 'ver_snake':
             for xx in range(self.grid_n_cols):
-                
+
                 rangev = range(self.grid_n_rows)
                 if xx % 2 == 1:
                     #reverse the range
                     rangev = range(self.grid_n_rows-1,-1,-1)
                 for yy in rangev:
-                    xpoint = centerPos[0]-(totXsize/2)+xx*(self.core.get_image_width() * corePxSize ) + xx * -self.pos_overlap[0]+ 0.5*(self.core.get_image_width() * corePxSize ) #type:ignore
-                    ypoint = centerPos[1]-(totYsize/2)+ yy*(self.core.get_image_height() * corePxSize ) + yy * -self.pos_overlap[1]+ 0.5*(self.core.get_image_height() * corePxSize ) #type:ignore
+                    xpoint = centerPos[0]-(totXsize/2)+xx*imgWidthUm + xx * -self.pos_overlap[0]+ 0.5*imgWidthUm #type:ignore
+                    ypoint = centerPos[1]-(totYsize/2)+ yy*imgHeightUm + yy * -self.pos_overlap[1]+ 0.5*imgHeightUm #type:ignore
                     self.gridEntries.append([xpoint,ypoint])
             
         #Set the grid text
@@ -1295,8 +1383,8 @@ class XYGridManager():
         """
         #Create text of these positions with 2 dec places:
         if updateFromStage:
-            xx = "{:.2f}".format(self.core.get_xy_position()[0])
-            yy = "{:.2f}".format(self.core.get_xy_position()[1])
+            xx = f"{self.core.get_xy_position()[0]:.2f}"
+            yy = f"{self.core.get_xy_position()[1]:.2f}"
             text = f"{xx}, {yy}"
             
             if positionAttr == "pos_center":
@@ -1370,7 +1458,7 @@ class XYGridManager():
     def reject(self):
         self.dialog.close()
 
-class createGridFromCenterPopUpBox():
+class createGridFromCenterPopUpBox:
     
     def __init__(self,parent):
         #Idea: Create a quick pop-up box which asks the user for nr of rows, columns. Then use this to find the top/bottom left/right positions (given the overlap). Also flag the self.setFromCenter to True, and self.setFromCorners to False for good interactibility later.
@@ -1382,8 +1470,7 @@ class createGridFromCenterPopUpBox():
         layout = QVBoxLayout()
         #Add two of those rolling integer things to the layout:
         # Create a QSpinBox
-        from PyQt5.QtWidgets import QSpinBox
-        from PyQt5.QtWidgets import QLabel, QLineEdit, QHBoxLayout, QDialogButtonBox
+        from PyQt5.QtWidgets import QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QSpinBox
         self.SpinBoxRows = QSpinBox()
         self.SpinBoxRows.setRange(1,1000)
         self.SpinBoxRows.setValue(parent.grid_n_rows)
@@ -1452,8 +1539,8 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
             logging.error('Wrong entry!')
         
         #Create a random string of 10 characters:
-        import string
         import random
+        import string
         randomName2 = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
         
         #Create a new HBox:
@@ -1532,7 +1619,7 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
 def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
     try:
         logging.debug('Changing layout '+curr_layout.parent().objectName())
-    except:
+    except (AttributeError, RuntimeError):
         pass
     #This removes everything except the first entry (i.e. the drop-down menu)
     # resetLayout(curr_layout,className)
@@ -1576,7 +1663,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     if checkAndShowWidget(curr_layout,label.objectName()) == False:
                         #TODO: actual tooltip
                         label.setToolTip("INPUT DATA")
-                        curr_layout.addWidget(label,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
+                        curr_layout.addWidget(label,2+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
                         
                     #This defaultValue is actually important later, leave it at DefaultInput.
                     defaultValue = 'DefaultInput'
@@ -1592,7 +1679,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     line_edit.setToolTip('TOOLTIP')
                     if defaultValue is not None:
                         line_edit.setText(str(defaultValue))
-                    curr_layout.addLayout(SingleVar_Variables_boxLayout,2+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                    curr_layout.addLayout(SingleVar_Variables_boxLayout,2+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                     #Add a on-change listener:
                     line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                     #Init the parent currentData storage:
@@ -1612,7 +1699,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                 # line_widget = QLabel('LINE')
                 label.setStyleSheet("background-color: black;")  # Set the line color
                 label.setFixedHeight(2)  # Set the line thickness
-                curr_layout.addWidget(label, 3+((k+labelposoffset))%maxNrRows, 0, 1, 10)  # Span one row and one column
+                curr_layout.addWidget(label, 3+(k+labelposoffset)%maxNrRows, 0, 1, 10)  # Span one row and one column
 
             reqKwargs = reqKwargsFromFunction(current_selected_function)
             
@@ -1624,7 +1711,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     label.setObjectName(f"Label#{current_selected_function}#{reqKwargs[k]}")
                     if checkAndShowWidget(curr_layout,label.objectName()) == False:
                         label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                        curr_layout.addWidget(label,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
+                        curr_layout.addWidget(label,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+0)
                     #Check if we want to add a fileLoc-input:
                     if typeFromKwarg(current_selected_function,reqKwargs[k]) == 'fileLoc':
                         #Create a new qhboxlayout:
@@ -1647,7 +1734,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
                             if defaultValue is not None:
                                 line_edit.setText(str(defaultValue))
-                            curr_layout.addLayout(hor_boxLayout,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                            curr_layout.addLayout(hor_boxLayout,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                             #Add a on-change listener:
                             line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                             
@@ -1659,12 +1746,10 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         #Create a new HBox:
                         SingleVar_Variables_boxLayout = QHBoxLayout()
                         
-                        #Creating a line-edit...
-                        line_edit = QLineEdit()
-                        
-                        line_edit.setObjectName(f"LineEdit#{current_selected_function}#{reqKwargs[k]}")
+                        #Creating a line-edit (or, for bool-typed kwargs, a checkbox)...
+                        line_edit = createValueEditWidget(current_selected_function,reqKwargs[k])
                         defaultValue = defaultValueFromKwarg(current_selected_function,reqKwargs[k])
-                        
+
                         #Method for variables in Glados
                         if ShowVariablesOptions:
                             #Advanced - flow + var via maths
@@ -1708,11 +1793,9 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                                 comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
                             
                             line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=reqKwargs[k]))
-                            if defaultValue is not None:
-                                line_edit.setText(str(defaultValue))
-                            curr_layout.addLayout(SingleVar_Variables_boxLayout,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
-                            #Add a on-change listener:
-                            line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                            curr_layout.addLayout(SingleVar_Variables_boxLayout,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                            #Set the default value and add a on-change listener (branches on QCheckBox vs QLineEdit):
+                            wireValueEditWidget(line_edit,defaultValue)
                             #Init the parent currentData storage:
                             changeDataVarUponKwargChange(line_edit)
                             if ShowVariablesOptions:
@@ -1731,7 +1814,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                 label.setObjectName(f"Label#{current_selected_function}#{optKwargs[k]}")
                 if checkAndShowWidget(curr_layout,label.objectName()) == False:
                     label.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                    curr_layout.addWidget(label,4+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
+                    curr_layout.addWidget(label,4+(k+labelposoffset+len(reqKwargs))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+0)
                 #Check if we want to add a fileLoc-input:
                 if typeFromKwarg(current_selected_function,optKwargs[k]) == 'fileLoc':
                     #Create a new qhboxlayout:
@@ -1754,7 +1837,7 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                         line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
                         if defaultValue is not None:
                             line_edit.setText(str(defaultValue))
-                        curr_layout.addLayout(hor_boxLayout,4+((k+labelposoffset))%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
+                        curr_layout.addLayout(hor_boxLayout,4+(k+labelposoffset)%maxNrRows,(((k+labelposoffset))//maxNrRows)*2+1)
                         #Add a on-change listener:
                         line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
                         #Init the parent currentData storage:
@@ -1767,10 +1850,9 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                     #Create a new HBox:
                     SingleVar_Variables_boxLayout = QHBoxLayout()
                         
-                    line_edit = QLineEdit()
-                    line_edit.setObjectName(f"LineEdit#{current_selected_function}#{optKwargs[k]}")
+                    line_edit = createValueEditWidget(current_selected_function,optKwargs[k])
                     defaultValue = defaultValueFromKwarg(current_selected_function,optKwargs[k])
-                    
+
                     #Method for variables in Glados
                     if ShowVariablesOptions:
                         #Advanced - flow + var via maths
@@ -1813,11 +1895,9 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
                             comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=comboBox_switch: hideAdvVariables(comboBox))
                         
                         line_edit.setToolTip(infoFromMetadata(current_selected_function,specificKwarg=optKwargs[k]))
-                        if defaultValue is not None:
-                            line_edit.setText(str(defaultValue))
-                        curr_layout.addLayout(SingleVar_Variables_boxLayout,4+((k+labelposoffset+len(reqKwargs)))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
-                        #Add a on-change listener:
-                        line_edit.textChanged.connect(lambda text,line_edit=line_edit: kwargValueInputChanged(line_edit))
+                        curr_layout.addLayout(SingleVar_Variables_boxLayout,4+(k+labelposoffset+len(reqKwargs))%maxNrRows,(((k+labelposoffset+len(reqKwargs)))//maxNrRows)*2+1)
+                        #Set the default value and add a on-change listener (branches on QCheckBox vs QLineEdit):
+                        wireValueEditWidget(line_edit,defaultValue)
                         #Init the parent currentData storage:
                         changeDataVarUponKwargChange(line_edit)
                         if ShowVariablesOptions:
@@ -2011,7 +2091,16 @@ def hideAdvVariables(comboBox,current_selected_function=None,customParentChildre
                     
 def changeDataVarUponKwargChange(line_edit):
     #Idea: update the parent.currentData{} structure whenever a kwarg is changed, and this can be (re-)loaded when needed
-    if isinstance(line_edit,QLineEdit):
+    if isinstance(line_edit,QCheckBox):
+        #Bool-typed kwarg widget (see createValueEditWidget). Stored as the same "True"/"False"
+        #string a QLineEdit would hold, so every downstream consumer of currentData[...] is unaffected.
+        parentObject = line_edit.parent()
+        newValue = str(line_edit.isChecked())
+        if hasattr(parentObject, 'currentData'):
+            parentObject.currentData[line_edit.objectName()] = newValue
+            #To be sure, also do this routine:
+            updateCurrentDataUponDropdownChange(parentObject)
+    elif isinstance(line_edit,QLineEdit):
         parentObject = line_edit.parent()
         newValue = line_edit.text()
         if hasattr(parentObject, 'currentData'):
@@ -2051,7 +2140,7 @@ def kwargValueInputChanged(line_edit):
             try:
                 value = str(line_edit.text())
                 setLineEditStyle(line_edit,type='Normal')
-            except:
+            except (AttributeError, RuntimeError, TypeError):
                 #Show as warning
                 setLineEditStyle(line_edit,type='Warning')
         elif expectedType is not str:
@@ -2067,45 +2156,19 @@ def kwargValueInputChanged(line_edit):
                         setLineEditStyle(line_edit,type='Normal')
                     else:
                         setLineEditStyle(line_edit,type='Warning')
-            except:
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 #Show as warning
                 setLineEditStyle(line_edit,type='Warning')
     else:
         setLineEditStyle(line_edit,type='Normal')
     pass
 
-def setLineEditStyle(line_edit,type='Normal'):
-    if type == 'Normal':
-        line_edit.setStyleSheet("border: 1px  solid #D5D5E5;")
-    elif type == 'Warning':
-        line_edit.setStyleSheet("border: 1px solid red;")
-
-def checkAndShowWidget(layout, widgetName):
-    # Iterate over the layout's items
-    for index in range(layout.count()):
-        item = layout.itemAt(index)
-        # Check if the item is a widget
-        if item.widget() is not None:
-            widget = item.widget()
-            # Check if the widget has the desired name
-            if widget.objectName() == widgetName:
-                # Widget already exists, unhide it
-                widget.show()
-                # logging.debug('898 showing widget: '+widget.objectName())
-                return
-        else:
-            for index2 in range(item.count()):
-                item_sub = item.itemAt(index2)
-                # Check if the item is a widget
-                if item_sub.widget() is not None:
-                    widget = item_sub.widget()
-                    # Check if the widget has the desired name
-                    if widget.objectName() == widgetName:
-                        # Widget already exists, unhide it
-                        widget.show()
-                        logging.debug('909 showing widget: '+widget.objectName())
-                        return
-    return False
+# Phase 7.3: setLineEditStyle + checkAndShowWidget moved to
+# ui.widgets.builders. Re-exported below.
+from glados_pycromanager.ui.widgets.builders import (  # noqa: F401
+    checkAndShowWidget,
+    setLineEditStyle,
+)
 
 #Remove everythign in this layout except className_dropdown
 def resetLayout(curr_layout,className):
@@ -2165,17 +2228,11 @@ def getMethodDropdownInfo(curr_layout,className):
     return curr_dropdown
 
 
-def lineEditFileLookup(line_edit_objName, text, filter,parent=None):
-    parentFolder = line_edit_objName.text()
-    if parentFolder != "":
-        parentFolder = os.path.dirname(parentFolder)
-    
-    file_path = generalFileSearchButtonAction(parent=parent,text=text,filter=filter,parentFolder=parentFolder)
-    line_edit_objName.setText(file_path)
-        
-def generalFileSearchButtonAction(parent=None,text='Select File',filter='*.txt',parentFolder=""):
-    file_path, _ = QFileDialog.getOpenFileName(parent,text,parentFolder,filter=filter)
-    return file_path
+# Phase 7.3: file-dialog helpers moved to ui.widgets.builders. Shim.
+from glados_pycromanager.ui.widgets.builders import (  # noqa: F401
+    generalFileSearchButtonAction,
+    lineEditFileLookup,
+)
 
 
 def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None,skipp2=False):
@@ -2250,221 +2307,311 @@ def getFunctionEvalTextFromCurrentData(function,currentData,p1,p2,nodzInfo=None,
         return moduleMethodEvalTexts[0]
 
 
-def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    variableValueOrAdvanced={}
-    
-    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
-    variableValueOrAdvanced = {}
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("ComboBoxSwitch#" in key):
-                kwargName = key.split('#')[2]
-                variableValueOrAdvanced[kwargName] = value
-                
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            
-            split_list = key.split('#')
-            kwargName = split_list[2]
-            #If not found, it's a Value:
-            if kwargName not in variableValueOrAdvanced:
-                variableValueOrAdvanced[kwargName] = 'Value'
-            if variableValueOrAdvanced[kwargName] == 'Variable':
-                lineEditNameVarAdv = "LineEditVariable#"
-            elif variableValueOrAdvanced[kwargName] == 'Advanced':
-                lineEditNameVarAdv = "LineEditAdv#"
-            else:
-                lineEditNameVarAdv = "LineEdit#"
-                
-            if (lineEditNameVarAdv in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+#region T-G2: bind-time kwarg coercion
+# __function_metadata__ declares a real Python type for every kwarg, but that
+# type used to pick a *widget class* and nothing else: the value travelled as a
+# string, was re-quoted into a Python string literal on every frame, and was
+# re-parsed inside the node body (float(kwargs.get(...)),
+# str(...).lower() in ('true','1')). These helpers coerce once, at bind time.
+_KWARG_TRUE_STRINGS = ('true', '1', 'yes', 'on')
+_KWARG_FALSE_STRINGS = ('false', '0', 'no', 'off', '')
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    methodKwargTypes_method = []
-    #Get the Value/Variable/Adv:
-    for entry in methodKwargNames_method:
-        if variableValueOrAdvanced[entry]  == 'Variable':
-            methodKwargTypes_method.append('Variable')
-        elif variableValueOrAdvanced[entry]  == 'Advanced':
-            methodKwargTypes_method.append('Advanced')
+
+def coerceKwargValue(value, declaredType, kwargName='', methodName=''):
+    """Coerce one GUI-sourced kwarg string to its declared metadata type.
+
+    Permissive by design: anything that does not convert cleanly is handed back
+    as the original string with a warning, so an existing recipe carrying an
+    unparseable value keeps behaving exactly as it did before (the node's own
+    defensive parsing, or its failure, is unchanged).
+
+    Non-strings pass through untouched - a Variable-mode kwarg resolves to a
+    live object, not text.
+    """
+    if not isinstance(value, str):
+        return value
+    if declaredType is None or declaredType is str or declaredType == 'fileLoc':
+        return value
+    text = value.strip()
+    try:
+        if declaredType is bool:
+            lowered = text.lower()
+            if lowered in _KWARG_TRUE_STRINGS:
+                return True
+            if lowered in _KWARG_FALSE_STRINGS:
+                return False
+            raise ValueError(f'{value!r} is neither true nor false')
+        if declaredType is int:
+            return int(text)
+        if declaredType is float:
+            return float(text)
+    except (ValueError, TypeError) as exc:
+        logging.warning("Keeping kwarg %s.%s as text: %r is not a valid %s (%s)",
+                        methodName, kwargName, value,
+                        getattr(declaredType, '__name__', declaredType), exc)
+        return value
+    #An unrecognised declared type is not an error - leave the text alone.
+    return value
+
+
+def kwargTypesFromFunction(functionname):
+    """Return {kwargName: declared type} for one node function, from the cached
+    metadata. Kwargs that declare no "type" are absent from the map (their
+    values stay strings)."""
+    entry = _nodeFunctionEntry(functionname)
+    if entry is None:
+        return {}
+    declaredTypes = {}
+    for kwargListName in ('required_kwargs', 'optional_kwargs'):
+        for kwarg in entry.get(kwargListName, []):
+            if 'type' in kwarg:
+                declaredTypes[kwarg['name']] = kwarg['type']
+    return declaredTypes
+
+
+def makeNodzVariableGetter(reference, nodzInfo, nodeDict=None):
+    """Return a zero-arg callable reading the **current** value of `name@Origin`.
+
+    Origin is `Global`, `Core`, or another node's name. This replaces the source
+    text `getEvalTextFromGUIFunction` used to emit
+    (`nodeDict['X'].variablesNodz['y']['data']`) — which is the only reason
+    `eval()` needed a live local frame holding `nodeDict`, and therefore the only
+    reason `createNodeDictFromNodes` was rebuilt on every frame (T-G3).
+
+    What is captured is the *container mapping* (`nodzInfo.globalVariables`, or
+    the origin node's `variablesNodz`), never the value and never the per-variable
+    dict: writers replace the per-variable dict wholesale
+    (`globalVariables[name] = {}` then `['data'] = value`, see
+    `autonomous/executor.py`), so capturing one level deeper would silently go
+    stale. The containers themselves are built once, per graph and per node.
+    """
+    variableName, _, originNodeName = str(reference).partition('@')
+    if originNodeName == 'Global':
+        container = nodzInfo.globalVariables
+    elif originNodeName == 'Core':
+        container = nodzInfo.coreVariables
+    else:
+        if nodeDict is None:
+            nodeDict = createNodeDictFromNodes(nodzInfo.nodes)
+        container = nodeDict[originNodeName].variablesNodz
+    return lambda: container[variableName]['data']
+
+
+def resolveNodzVariable(reference, nodzInfo, nodeDict=None):
+    """Read the current value of a `name@Origin` Glados-variable reference once."""
+    return makeNodzVariableGetter(reference, nodzInfo, nodeDict)()
+
+
+@dataclass(frozen=True)
+class BoundKwargs:
+    """A node's kwargs, resolved once at bind time (T-G2/T-G3).
+
+    `values` holds the constants, already coerced to their declared metadata
+    types. `variableGetters` holds one zero-arg callable per Variable-mode kwarg,
+    called on each `resolve()` so a Glados variable changed mid-run is seen.
+    """
+    values: dict
+    variableGetters: dict
+
+    def resolve(self) -> dict:
+        """Return the kwargs dict to call the node with."""
+        if not self.variableGetters:
+            #Overwhelmingly the common case; no per-call copy needed since the
+            #caller splats this into **kwargs anyway.
+            return self.values
+        resolved = dict(self.values)
+        for kwargName, getter in self.variableGetters.items():
+            resolved[kwargName] = getter()
+        return resolved
+
+
+def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
+                              methodKwargTypes=None, removeKwargs=None,
+                              skipInput=False, nodzInfo=None, nodeDict=None):
+    """Build a **typed kwargs dict** for one node function from GUI values.
+
+    The dict-returning sibling of :func:`getEvalTextFromGUIFunction`: same kwarg
+    selection rules (declared required kwargs, plus the function's `input`
+    entries unless ``skipInput``, plus any optional kwarg that has a value, plus
+    `dist_kwarg`/`time_kwarg`), but the values are coerced to the types declared
+    in ``__function_metadata__`` instead of being re-quoted as string literals.
+
+    ``methodKwargTypes`` is the per-kwarg Value/Variable/Advanced *mode* list
+    (the same argument `getEvalTextFromGUIFunction` takes), not a list of Python
+    types. Variable-mode kwargs are resolved through :func:`resolveNodzVariable`;
+    Advanced mode is still unimplemented and falls back to the raw text, exactly
+    as the eval-text path does.
+
+    Returns a :class:`BoundKwargs` (call ``.resolve()`` for the dict to splat into
+    the node), or None when a required kwarg has no value — logging the same error
+    the eval-text path logs, so callers can keep their existing failure handling.
+    """
+    if methodKwargTypes is None:
+        methodKwargTypes = ['Value'] * len(methodKwargNames)
+    if not methodName:
+        return None
+
+    inputKwargs = []
+    if not skipInput:
+        for inputEntry in inputFromFunction(methodName)[0]:
+            inputKwargs.append(inputEntry['name'])
+    reqKwargs = inputKwargs + reqKwargsFromFunction(methodName)
+    if removeKwargs is not None:
+        for removeKwarg in removeKwargs:
+            if removeKwarg in reqKwargs:
+                reqKwargs.remove(removeKwarg)
+
+    if not all(elem in set(methodKwargNames) for elem in reqKwargs):
+        logging.error('SOMETHING VERY STUPID HAPPENED')
+        return None
+
+    declaredTypes = kwargTypesFromFunction(methodName)
+    boundValues = {}
+    variableGetters = {}
+
+    def _bind(kwargName, rawValue, mode):
+        if mode == 'Variable':
+            #Live reference, not a literal - never coerced, never quoted, and
+            #re-read on every resolve() so a variable changed mid-run is seen.
+            try:
+                variableGetters[kwargName] = makeNodzVariableGetter(rawValue, nodzInfo, nodeDict)
+            except (AttributeError, KeyError, TypeError) as exc:
+                #No graph to resolve against (e.g. an RT node started from the
+                #live view, nodzInfo=None), or a stale reference. Hand the raw
+                #reference text through, which is what the eval-text path does
+                #for optional kwargs anyway.
+                logging.warning("Could not resolve Variable kwarg %s.%s = %r (%s); "
+                                "passing the reference through as text",
+                                methodName, kwargName, rawValue, exc)
+                boundValues[kwargName] = rawValue
+        elif mode == 'Advanced':
+            logging.error('To implement!')
+            boundValues[kwargName] = rawValue
         else:
-            methodKwargTypes_method.append('Value')
-        
-    
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart='core=core',methodKwargTypes=methodKwargTypes_method,skipInput=True)
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
+            boundValues[kwargName] = coerceKwargValue(
+                rawValue, declaredTypes.get(kwargName), kwargName, methodName)
 
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
+    for reqKwarg in reqKwargs:
+        GUIbasedIndex = methodKwargNames.index(reqKwarg)
+        if methodKwargValues[GUIbasedIndex] == '':
+            logging.error(f'Missing required keyword argument in {methodName}: {reqKwarg}, NOT CONTINUING')
+            logging.error('NOT ALL KWARGS PROVIDED!')
+            return None
+        _bind(reqKwarg, methodKwargValues[GUIbasedIndex], methodKwargTypes[GUIbasedIndex])
+
+    #Optional kwargs are looked up by name rather than by position. The eval-text
+    #path indexes methodKwargValues positionally here, which turns a kwarg the
+    #GUI did not supply into an IndexError instead of a default-value fallback.
+    for optKwarg in optKwargsFromFunction(methodName):
+        if optKwarg not in methodKwargNames:
+            continue
+        GUIbasedIndex = methodKwargNames.index(optKwarg)
+        if methodKwargValues[GUIbasedIndex] == '':
+            continue
+        _bind(optKwarg, methodKwargValues[GUIbasedIndex], methodKwargTypes[GUIbasedIndex])
+
+    #Distribution/time-fit choices come from combo boxes and stay text.
+    for extraKwarg in ('dist_kwarg', 'time_kwarg'):
+        if extraKwarg in methodKwargNames:
+            boundValues[extraKwarg] = methodKwargValues[methodKwargNames.index(extraKwarg)]
+
+    return BoundKwargs(boundValues, variableGetters)
+#endregion
+
+def _rtAnalysisKwargsFromCurrentData(function, currentData, modeAware=True):
+    """Scan a node parameter panel's `currentData` dict for one function's kwargs.
+
+    `currentData` is keyed by widget object name (`LineEdit#<function>#<kwarg>`,
+    `LineEditVariable#...`, `LineEditAdv#...`, `ComboBoxSwitch#...`) - see
+    Documentation/rt_analysis_parameters.md. Which of the three parallel input
+    widgets is authoritative for a kwarg is decided by that kwarg's
+    `ComboBoxSwitch` value (Value / Variable / Advanced).
+
+    Args:
+        function: the dotted node-function name the keys are scoped to.
+        currentData: the panel's object-name -> value dict.
+        modeAware: False reproduces the visualisation path's looser matching,
+            which accepts *any* `LineEdit*` key and ignores the mode switch.
+
+    Returns:
+        ``(methodName, kwargNames, kwargValues, kwargModes)``; ``methodName`` is
+        '' when nothing matched.
+    """
+    variableValueOrAdvanced = {}
+    if modeAware:
+        for key, value in currentData.items():
+            if "#" + function + "#" in key and "ComboBoxSwitch#" in key:
+                variableValueOrAdvanced[key.split('#')[2]] = value
+
+    methodName = ''
+    kwargNames = []
+    kwargValues = []
+    kwargModes = []
+    for key, value in currentData.items():
+        if "#" + function + "#" not in key:
+            continue
+        split_list = key.split('#')
+        kwargName = split_list[2]
+        #If no switch was found, it's a Value:
+        mode = variableValueOrAdvanced.setdefault(kwargName, 'Value')
+        if modeAware:
+            lineEditNameVarAdv = {'Variable': 'LineEditVariable#',
+                                  'Advanced': 'LineEditAdv#'}.get(mode, 'LineEdit#')
+            matched = lineEditNameVarAdv in key
+        else:
+            mode = 'Value'
+            matched = 'LineEdit' in key
+        if matched:
+            methodName = split_list[1]
+            kwargNames.append(kwargName)
+            #value could contain a file location. Thus, we need to swap out all \ for /:
+            kwargValues.append(value.replace('\\', '/'))
+            kwargModes.append(mode)
+
+    return methodName, kwargNames, kwargValues, kwargModes
+
+
+def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
+    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
+    if methodName_method == '':
+        return None
+    #note that RT analysis methods do not have an input, thus we skipInput.
+    return getEvalTextFromGUIFunction(methodName_method, names, values,
+                                      partialStringStart='core=core',
+                                      methodKwargTypes=modes, skipInput=True)
 
 
 def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2,pshared_data,p3):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    variableValueOrAdvanced={}
-    
-    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
-    variableValueOrAdvanced = {}
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("ComboBoxSwitch#" in key):
-                kwargName = key.split('#')[2]
-                variableValueOrAdvanced[kwargName] = value
-                
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            
-            split_list = key.split('#')
-            kwargName = split_list[2]
-            #If not found, it's a Value:
-            if kwargName not in variableValueOrAdvanced:
-                variableValueOrAdvanced[kwargName] = 'Value'
-            if variableValueOrAdvanced[kwargName] == 'Variable':
-                lineEditNameVarAdv = "LineEditVariable#"
-            elif variableValueOrAdvanced[kwargName] == 'Advanced':
-                lineEditNameVarAdv = "LineEditAdv#"
-            else:
-                lineEditNameVarAdv = "LineEdit#"
-                
-            if (lineEditNameVarAdv in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
+    if methodName_method == '':
+        return None
+    evalText = getEvalTextFromGUIFunction(
+        methodName_method, names, values,
+        partialStringStart=str(p1) + ',' + str(p2) + ',' + str(pshared_data) + ',' + str(p3),
+        methodKwargTypes=modes, skipInput=True)
+    return evalText.replace(methodName_method, '.run') if evalText is not None else None
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    methodKwargTypes_method = []
-    #Get the Value/Variable/Adv:
-    for entry in methodKwargNames_method:
-        if variableValueOrAdvanced[entry]  == 'Variable':
-            methodKwargTypes_method.append('Variable')
-        elif variableValueOrAdvanced[entry]  == 'Advanced':
-            methodKwargTypes_method.append('Advanced')
-        else:
-            methodKwargTypes_method.append('Value')
-    
-    logging.debug(f'RTeval: {methodKwargTypes_method}')
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(pshared_data)+','+str(p3),methodKwargTypes=methodKwargTypes_method,skipInput=True)
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.run') #type:ignore
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
-
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
 
 def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    variableValueOrAdvanced={}
-    
-    #First we determine if we run this with a normal value, with a variable only, or adv (mix of the two):
-    variableValueOrAdvanced = {}
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("ComboBoxSwitch#" in key):
-                kwargName = key.split('#')[2]
-                variableValueOrAdvanced[kwargName] = value
-                
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            
-            split_list = key.split('#')
-            kwargName = split_list[2]
-            #If not found, it's a Value:
-            if kwargName not in variableValueOrAdvanced:
-                variableValueOrAdvanced[kwargName] = 'Value'
-            if variableValueOrAdvanced[kwargName] == 'Variable':
-                lineEditNameVarAdv = "LineEditVariable#"
-            elif variableValueOrAdvanced[kwargName] == 'Advanced':
-                lineEditNameVarAdv = "LineEditAdv#"
-            else:
-                lineEditNameVarAdv = "LineEdit#"
-                
-            if (lineEditNameVarAdv in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
+    if methodName_method == '':
+        return None
+    evalText = getEvalTextFromGUIFunction(methodName_method, names, values,
+                                          partialStringStart=str(p1),
+                                          methodKwargTypes=modes, skipInput=True)
+    return evalText.replace(methodName_method, '.end') if evalText is not None else None
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    methodKwargTypes_method = []
-    #Get the Value/Variable/Adv:
-    for entry in methodKwargNames_method:
-        if variableValueOrAdvanced[entry]  == 'Variable':
-            methodKwargTypes_method.append('Variable')
-        elif variableValueOrAdvanced[entry]  == 'Advanced':
-            methodKwargTypes_method.append('Advanced')
-        else:
-            methodKwargTypes_method.append('Value')
-        
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        #note that RT analysis methods do not have an input, thus we skipInput.
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1),methodKwargTypes=methodKwargTypes_method,skipInput=True)
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.end') #type:ignore
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
-
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
 
 def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,currentData,p1,p2,p3,p4):
-    
-    methodKwargNames_method=[]
-    methodKwargValues_method=[]
-    #Loop over all entries of currentData:
-    for key,value in currentData.items():
-        if "#"+function+"#" in key:
-            if ("LineEdit" in key):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = key.split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
+    methodName_method, names, values, _modes = _rtAnalysisKwargsFromCurrentData(
+        function, currentData, modeAware=False)
+    if methodName_method == '':
+        return None
+    evalText = getEvalTextFromGUIFunction(
+        methodName_method, names, values,
+        partialStringStart=str(p1) + ',' + str(p2) + ',' + str(p3) + ',' + str(p4))
+    return evalText.replace(methodName_method, '.visualise') if evalText is not None else None
 
-                #value could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(value.replace('\\','/'))
-    
-    #Now we create evaluation-texts:
-    moduleMethodEvalTexts = []
-    if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2)+','+str(p3)+','+str(p4))
-        EvalTextMethod = EvalTextMethod.replace(methodName_method,'.visualise') #type:ignore
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
-
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
 
 def getFunctionEvalText(layout,p1,p2):
     #Get the dropdown info
@@ -2533,7 +2680,46 @@ def getFunctionEvalText(layout,p1,p2):
         return moduleMethodEvalTexts[0]
     else:
         return None
-    
+
+_ADVANCED_TOKEN_RE = re.compile(r"\{([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9._%+-]+)\}")
+
+def nodzVariableRefExpr(variableName, originNodeName):
+    """Python expression text reading `variableName@originNodeName` at dispatch time.
+
+    Evaluated in the executor's dispatch scope, which binds `nodeDict` and
+    `nodzInfo` by name (see `autonomous/executor.py`).
+    """
+    if originNodeName == 'Global':
+        return "nodzInfo.globalVariables['"+variableName+"']['data']"
+    if originNodeName == 'Core':
+        return "nodzInfo.coreVariables['"+variableName+"']['data']"
+    return "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+
+def advancedKwargToEvalExpr(text):
+    """Translate an Advanced-mode kwarg (`{name@Origin}` tokens in free text) to an expression.
+
+    Each token becomes the same live reference Variable mode uses, so the
+    referenced object reaches the node as-is (a dataset stays a dataset, not its
+    `str()`), and the rest of the text is kept as Python: `{t@Global}+1` is
+    arithmetic. If the result is not a valid expression (plain templating such
+    as `run_{n@Global}.tif`), it is instead built as string concatenation of the
+    literal chunks and `str()` of each token.
+    """
+    expr = _ADVANCED_TOKEN_RE.sub(lambda m: "(" + nodzVariableRefExpr(m.group(1), m.group(2)) + ")", text)
+    try:
+        ast.parse(expr, mode='eval')
+        return expr
+    except SyntaxError:
+        parts, pos = [], 0
+        for m in _ADVANCED_TOKEN_RE.finditer(text):
+            if m.start() > pos:
+                parts.append(repr(text[pos:m.start()]))
+            parts.append("str(" + nodzVariableRefExpr(m.group(1), m.group(2)) + ")")
+            pos = m.end()
+        if pos < len(text):
+            parts.append(repr(text[pos:]))
+        return "+".join(parts) if parts else repr(text)
+
 def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, partialStringStart=None, removeKwargs=None, methodKwargTypes = None, nodzInfo = None,skipInput=False):
     #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #methodName: the physical name of the method, i.e. StarDist.StarDistSegment
@@ -2609,16 +2795,12 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                         #         varData = node.variablesNodz[variableName]['data']
                         #         #Set it to this kwarg value - str allways
                         
-                        if originNodeName == 'Global':
-                            kwargvalue = "nodzInfo.globalVariables['"+variableName+"']['data']"
-                        elif originNodeName == 'Core':
-                            kwargvalue = "nodzInfo.coreVariables['"+variableName+"']['data']"
-                        else:
-                            kwargvalue = "nodeDict['"+originNodeName+"'].variablesNodz['"+variableName+"']['data']"
+                        kwargvalue = nodzVariableRefExpr(variableName, originNodeName)
                         ignoreQuotes = True #ignore quotes - use it as a variable, not a string
                                 # break
                     elif methodKwargTypes[GUIbasedIndex] == 'Advanced':
-                        logging.error('To implement!')
+                        kwargvalue = advancedKwargToEvalExpr(kwargvalue)
+                        ignoreQuotes = True
                     
                     #Add a comma if there is some info in the partialString already
                     if partialString != '':
@@ -2658,79 +2840,201 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
             return None
         
 
+def _rtAnalysisClassName(rt_analysis_info):
+    """Map an RT-analysis panel's selected dropdown entry to its dotted node name."""
+    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
+    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
+        if function[0] == functionDispName:
+            return function[1]
+    return None
+
+
+#region T-G4: bound node dispatch
+# `realTimeAnalysis_run` used to rebuild a Python call expression from the kwarg
+# dict and eval() it on *every analysed frame* (~13us to compile() alone, plus
+# metadata re-derivation, plus a currentData rescan with per-key split('#')), and
+# `realTimeAnalysis_visualisation` did the same thing on the GUI thread. None of
+# it can change unless the user edits the node's parameter panel -- which is what
+# `BoundNode.signature` detects, cheaply, instead of re-deriving unconditionally.
+_BOUND_NODE_ATTR = '_glados_bound_node'
+
+# Escape hatch: GLADOS_RT_EVAL_DISPATCH=1 restores the pre-T-G4 eval() dispatch
+# for run/end/visualise. Read once, at import.
+RT_ANALYSIS_USE_EVAL_DISPATCH = os.environ.get('GLADOS_RT_EVAL_DISPATCH', '') == '1'
+
+
+@dataclass(frozen=True)
+class BoundNode:
+    """Everything needed to call one RT-analysis node, resolved once.
+
+    Deliberately a dataclass and not a dict/list/tuple: it is stashed on the node
+    instance, and `AnalysisClass._subprocess_analysis_worker` pickles every
+    plain-data attribute of that instance back to the parent after each frame
+    (`_SUBPROCESS_SNAPSHOT_TYPES`). A dataclass is not in that tuple, so this
+    never crosses the process boundary.
+    """
+    className: str
+    metadata: dict
+    kwargs: 'BoundKwargs'                 # run() and end() take the same set
+    visualisationKwargs: 'BoundKwargs'
+    signature: tuple
+
+
+def _rtAnalysisBindingSignature(rt_analysis_info):
+    """Cheap fingerprint of the panel values a binding was built from.
+
+    A user editing a kwarg while the analysis runs mutates `currentData` in
+    place, and that used to take effect on the next frame because every frame
+    re-derived everything. Comparing this tuple keeps that behaviour at a
+    fraction of the cost.
+    """
+    return tuple(rt_analysis_info.items())
+
+
+def buildBoundNode(rt_analysis_info, nodzInfo=None, signature=None):
+    """Resolve a node's kwargs (run/end and visualise) once, from `currentData`."""
+    className = _rtAnalysisClassName(rt_analysis_info)
+    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None
+
+    methodName, names, values, modes = _rtAnalysisKwargsFromCurrentData(className, rt_analysis_info)
+    kwargs = bindKwargsFromGUIFunction(methodName or className, names, values,
+                                       methodKwargTypes=modes, skipInput=True,
+                                       nodzInfo=nodzInfo, nodeDict=nodeDict)
+
+    #The visualisation path deliberately keeps its looser matching and its
+    #skipInput=False - see Documentation/rt_analysis_parameters.md section 4.
+    visMethodName, visNames, visValues, visModes = _rtAnalysisKwargsFromCurrentData(
+        className, rt_analysis_info, modeAware=False)
+    try:
+        visualisationKwargs = bindKwargsFromGUIFunction(
+            visMethodName or className, visNames, visValues, methodKwargTypes=visModes,
+            nodzInfo=nodzInfo, nodeDict=nodeDict)
+    except Exception:  # noqa: BLE001
+        #A node that never visualises must not fail to *run* because of a quirk
+        #in the metadata its visualise binding reads. The error surfaces from
+        #realTimeAnalysis_visualisation instead, where it is actionable.
+        logging.debug('Could not bind visualisation kwargs for %s', className, exc_info=True)
+        visualisationKwargs = None
+
+    #kwargs is None when a required kwarg has no value; the error is raised at
+    #the call site, which knows whether it is run/end or visualise that failed.
+    return BoundNode(
+        className=className,
+        metadata=_nodeFunctionEntry(className) or {},
+        kwargs=kwargs,
+        visualisationKwargs=visualisationKwargs,
+        signature=_rtAnalysisBindingSignature(rt_analysis_info) if signature is None else signature,
+    )
+
+
+def _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo=None):
+    """Return the node's BoundNode, rebuilding it only if the panel changed."""
+    signature = _rtAnalysisBindingSignature(rt_analysis_info)
+    bound = getattr(RT_analysis_object, _BOUND_NODE_ATTR, None)
+    if bound is not None:
+        try:
+            if bound.signature == signature:
+                return bound
+        except Exception:  # noqa: BLE001 - an exotic unequal-comparable value just rebinds
+            logging.debug('RT-analysis binding signature could not be compared, rebinding', exc_info=True)
+        logging.debug('RT-analysis parameters changed, rebinding %s', getattr(bound, 'className', '?'))
+    bound = buildBoundNode(rt_analysis_info, nodzInfo=nodzInfo, signature=signature)
+    try:
+        setattr(RT_analysis_object, _BOUND_NODE_ATTR, bound)
+    except (AttributeError, TypeError):
+        #A node using __slots__ cannot carry the binding; it just rebinds per call.
+        logging.debug('Could not cache the binding on %r', type(RT_analysis_object))
+    return bound
+#endregion
+
+
 def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
     #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
-    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
-        if function[0] == functionDispName:
-            className = function[1]
-    
-    if nodzInfo is not None:
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
-    else:
-        nodeDict = None
+    className = _rtAnalysisClassName(rt_analysis_info)
 
-    #Get the object
-    RT_analysis_object = eval(getFunctionEvalTextFromCurrentData_RTAnalysis_init(className,rt_analysis_info)) #type:ignore
-    
+    #Bind the node's kwargs once, here, with each value coerced to the type its
+    #__function_metadata__ declares (T-G2). This used to build a Python call
+    #expression ("LaserAdjustment.laser_adjustment(core=core, Laser_id='X',
+    #maxFrame='100')") that dispatch_from_eval_text then re-parsed with ast and
+    #eval'ed argument-by-argument, which is also why every value reached the node
+    #as a string regardless of its declared type.
+    bound = buildBoundNode(rt_analysis_info, nodzInfo=nodzInfo)
+    if bound.kwargs is None:
+        raise NodeDispatchError(
+            f"Cannot start RT-analysis node {className!r}: its required kwargs are incomplete"
+        )
+
+    from glados_pycromanager.autonomous import registry as _registry
+    RT_analysis_object = _registry.dispatch(className, core=core, **bound.kwargs.resolve())
+    try:
+        setattr(RT_analysis_object, _BOUND_NODE_ATTR, bound)
+    except (AttributeError, TypeError):
+        logging.debug('Could not cache the binding on %r', type(RT_analysis_object))
     return RT_analysis_object
 
-def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
-    #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
-    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
-        if function[0] == functionDispName:
-            className = function[1]
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','vshared_data','v3')
-    logging.debug(f'RTanalysistext:{evalText}')
-    
-    if nodzInfo is not None:
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
-    else:
-        nodeDict = None
-        
-    #And run the .run function:
-    result = eval("RT_analysis_object" + evalText) #type:ignore
 
-    return result
+def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
+    if RT_ANALYSIS_USE_EVAL_DISPATCH:
+        return _realTimeAnalysis_run_viaEval(RT_analysis_object, rt_analysis_info, v1, v2, vshared_data, v3, nodzInfo)
+    bound = _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo)
+    if bound.kwargs is None:
+        raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
+    return RT_analysis_object.run(v1, v2, vshared_data, v3, **bound.kwargs.resolve())
+
 
 def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None):
-    #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
-    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
-        if function[0] == functionDispName:
-            className = function[1]
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_end(className,rt_analysis_info,'v1')
-    
-    if nodzInfo is not None:
-        nodeDict = createNodeDictFromNodes(nodzInfo.nodes) 
-    else:
-        nodeDict = None
-        
-    #And run the .run function:
-    result = eval("RT_analysis_object" + evalText) #type:ignore
+    if RT_ANALYSIS_USE_EVAL_DISPATCH:
+        return _realTimeAnalysis_end_viaEval(RT_analysis_object, rt_analysis_info, v1, nodzInfo)
+    bound = _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo)
+    if bound.kwargs is None:
+        raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
+    return RT_analysis_object.end(v1, **bound.kwargs.resolve())
 
-    return result
 
 def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,v4):
-    #Get the classname from rt_analysis_info
-    functionDispName = rt_analysis_info['__selectedDropdownEntryRTAnalysis__']
-    for function in rt_analysis_info['__displayNameFunctionNameMap__']:
-        if function[0] == functionDispName:
-            className = function[1]
+    if RT_ANALYSIS_USE_EVAL_DISPATCH:
+        return _realTimeAnalysis_visualisation_viaEval(RT_analysis_object, rt_analysis_info, v1, v2, v3, v4)
+    logging.debug('Attempting to visualise RT Analysis')
+    bound = _boundNodeFor(RT_analysis_object, rt_analysis_info)
+    if bound.visualisationKwargs is None:
+        raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
+    result = RT_analysis_object.visualise(v1, v2, v3, v4, **bound.visualisationKwargs.resolve())
+    logging.debug(result)
+    return result
+
+
+#region T-G4 fallback: the pre-bind eval() dispatch, kept behind
+#GLADOS_RT_EVAL_DISPATCH=1 for one release so a node that misbehaves under bound
+#dispatch has an escape hatch that does not need a code change.
+def _realTimeAnalysis_run_viaEval(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
+    className = _rtAnalysisClassName(rt_analysis_info)
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','vshared_data','v3')
+    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None  # noqa: F841 - read by eval
+    return eval("RT_analysis_object" + evalText)  #type:ignore
+
+
+def _realTimeAnalysis_end_viaEval(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None):
+    className = _rtAnalysisClassName(rt_analysis_info)
+    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_end(className,rt_analysis_info,'v1')
+    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None  # noqa: F841 - read by eval
+    return eval("RT_analysis_object" + evalText)  #type:ignore
+
+
+def _realTimeAnalysis_visualisation_viaEval(RT_analysis_object,rt_analysis_info,v1,v2,v3,v4):
+    className = _rtAnalysisClassName(rt_analysis_info)
     evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3','v4')
     logging.debug('Attempting to visualise RT Analysis')
-    #And run the .visualise function:
-    result = eval("RT_analysis_object" + evalText) #type:ignore
+    result = eval("RT_analysis_object" + evalText)  #type:ignore
     logging.debug(result)
-
     return result
+#endregion
+
 
 def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
     indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
     
     wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
-    functionMetadata = eval(wrapperName+".__function_metadata__()")
+    functionMetadata = _node_metadata(wrapperName)
     functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
     if runOrVis == 'run':
         if 'run_delay' not in functionMetadata2:
@@ -2742,8 +3046,185 @@ def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
             delay = 200 #Default value for vis
         else:
             delay = functionMetadata2['visualise_delay']
-    
+
     return delay
+
+def realTimeAnalysis_snapshotAttrs(rt_analysis_info):
+    """Return the attribute names a subprocess-isolated node wants mirrored back.
+
+    See `AnalysisProcess_customFunction`: `.visualise()` needs a live napari
+    layer, so it runs against a shadow instance in *this* process whose
+    plain-data attributes are refreshed from the child after each frame. That
+    mirror used to be every picklable attribute on the node, pickled and shipped
+    per frame — for `RealTimeFFT` that meant the full-size FFT array *and* the
+    cached Tukey window, every frame (T-G5).
+
+    A node opts in by listing the attributes its `visualise()` actually reads, in
+    a `"__snapshot_attrs__"` key of its `__function_metadata__` entry. Declaring
+    nothing means nothing is mirrored. A node needing something more dynamic can
+    instead define a `snapshot()` method returning a dict, which takes precedence.
+
+    Returns an empty list for anything that is not a resolvable node (the
+    plain-string sentinels used elsewhere, test doubles, ...).
+    """
+    try:
+        entry = _nodeFunctionEntry(_rtAnalysisClassName(rt_analysis_info))
+    except (KeyError, TypeError, AttributeError):
+        return []
+    if not entry:
+        return []
+    return list(entry.get('__snapshot_attrs__', []))
+
+
+def realTimeAnalysis_replayable(rt_analysis_info) -> bool:
+    """Whether this node's overlay may be re-rendered while scrubbing.
+
+    Replay restores a stored per-frame snapshot onto the node and calls its
+    `visualise()` again (see `GUI/rt_history.py`), so it is only meaningful for a
+    node whose `visualise()` is a pure function of that snapshot.
+
+    Resolution order:
+
+    1. An explicit ``"__replayable__"`` in the node's ``__function_metadata__``
+       entry wins. A node that *accumulates* inside `visualise()` -- drawing into a
+       canvas it keeps, say -- must set it False: replaying an arbitrary frame would
+       corrupt that canvas rather than re-render it.
+    2. Otherwise True iff the node declares ``"__snapshot_attrs__"`` or defines a
+       ``snapshot()`` method, since without either there is nothing to restore.
+    3. Otherwise False.
+
+    Conservative by construction: a node that says nothing gets no replay rather
+    than a silently wrong overlay.
+    """
+    try:
+        entry = _nodeFunctionEntry(_rtAnalysisClassName(rt_analysis_info))
+    except (KeyError, TypeError, AttributeError):
+        return False
+    #A sparse/absent metadata entry is not itself disqualifying -- the node may
+    #still define a snapshot() method, which is checked below.
+    entry = entry or {}
+    declared = entry.get('__replayable__')
+    if declared is not None:
+        return bool(declared)
+    if entry.get('__snapshot_attrs__'):
+        return True
+    try:
+        node_obj = _resolve_node_obj(_rtAnalysisClassName(rt_analysis_info))
+        return callable(getattr(node_obj, 'snapshot', None))
+    except (KeyError, TypeError, AttributeError):
+        return False
+
+
+#: Cache for :func:`nodeRunNeedsLiveContext`, keyed by dotted node name.
+#: Cleared with the stem->module cache, since it is derived from the class the
+#: stem resolves to.
+_NODE_LIVE_CONTEXT_CACHE: dict[str, bool] = {}
+
+#: Names that are None inside a subprocess-isolated node's run() (see
+#: AnalysisClass._subprocess_analysis_worker).
+_LIVE_CONTEXT_NAMES = ('core', 'shared_data', 'nodzInfo')
+
+
+def nodeRunNeedsLiveContext(functionname) -> bool:
+    """True when a node's ``run()`` dereferences the live in-process context.
+
+    Reads the node's own source and looks for attribute access on ``core``,
+    ``shared_data`` or ``nodzInfo`` — all three of which are ``None`` inside a
+    subprocess-isolated worker, so such a node would raise on its first frame.
+
+    This is the safety net under the inverted default (T-G10): a node that
+    declares neither ``__runInSubprocess__`` nor ``__needsLiveCore__`` is
+    third-party code dropped into the AppData plugin folder, and isolating it
+    blindly would break it with an ``AttributeError`` in another process.
+    Conservative on doubt: anything that cannot be resolved or parsed counts as
+    needing the live context. It cannot see indirection (a helper that
+    dereferences a passed-in ``shared_data``), which is why an explicit
+    ``__needsLiveCore__`` is still the supported way to say so.
+    """
+    dottedName = str(functionname)
+    cached = _NODE_LIVE_CONTEXT_CACHE.get(dottedName)
+    if cached is not None:
+        return cached
+    needsLiveContext = True
+    try:
+        runMethod = getattr(_resolve_node_obj(dottedName), 'run')
+        tree = ast.parse(textwrap.dedent(inspect.getsource(runMethod)))
+        needsLiveContext = any(
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in _LIVE_CONTEXT_NAMES
+            for node in ast.walk(tree)
+        )
+    except Exception as exc:  # noqa: BLE001 - unreadable source must not isolate blindly
+        logging.debug('Could not inspect %s.run() for live-context use (%s); '
+                      'assuming it needs the live context', dottedName, exc)
+    _NODE_LIVE_CONTEXT_CACHE[dottedName] = needsLiveContext
+    return needsLiveContext
+
+
+#: What a node gets when its `__function_metadata__` says nothing about
+#: subprocess isolation. Inverted by T-G10: a node that cannot be isolated
+#: declares `"__needsLiveCore__": True` rather than relying on the default.
+#: Every shipped node declares one or the other explicitly, so this decides
+#: only what a node dropped into the AppData plugin folder gets - and the
+#: safe answer for unknown third-party code holding the GIL is "its own
+#: process". The Adv.-settings kill switch turns it off globally.
+RT_SUBPROCESS_ISOLATION_DEFAULT = True
+
+
+def realTimeAnalysis_runInSubprocess(rt_analysis_info, shared_data=None) -> bool:
+    """Return whether the selected RT-analysis node should run in a subprocess.
+
+    See https://github.com/kjamartens/Gladoscopy/issues/16 — a node run in a
+    separate OS process (AnalysisProcess_customFunction) instead of a QThread
+    cannot starve the Qt main thread with a GIL-heavy compute, whatever the
+    underlying library does.
+
+    Three metadata-level answers, in order of precedence:
+
+    1. ``"__needsLiveCore__": True`` — the node reads something that does not
+       cross a process boundary: the live ``core``, ``shared_data``, or
+       ``nodzInfo``. Never isolated, whatever else is declared. In the child,
+       ``run()`` receives ``None`` for all three (see
+       ``_subprocess_analysis_worker``), so such a node would silently degrade
+       or raise.
+    2. ``"__runInSubprocess__"`` — the explicit per-node answer.
+    3. :data:`RT_SUBPROCESS_ISOLATION_DEFAULT` — what a node that says neither
+       gets.
+
+    ``shared_data.config.rt_analysis_config.subprocess_isolation`` (Adv.
+    settings, "RT-analysis: use a separate CPU core (subprocess)") is a
+    global kill switch on top of all three: when set to "False" it forces every
+    node back onto the same-process QThread path. ``shared_data`` is optional so
+    existing/test call sites that don't have it keep the pure per-node behaviour.
+    """
+    if shared_data is not None:
+        global_setting = getattr(shared_data.config.rt_analysis_config, 'subprocess_isolation', 'True')
+        if str(global_setting) == 'False':
+            return False
+
+    indexv = next(i for i, sublist in enumerate(rt_analysis_info['__displayNameFunctionNameMap__']) if sublist[0] == rt_analysis_info['__selectedDropdownEntryRTAnalysis__'])
+
+    wrapperName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[0]
+    functionMetadata = _node_metadata(wrapperName)
+    functionMetadata2 = functionMetadata[rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1].split(".")[1]]
+    if functionMetadata2.get('__needsLiveCore__', False):
+        return False
+    explicit = functionMetadata2.get('__runInSubprocess__')
+    if explicit is not None:
+        return bool(explicit)
+    if not RT_SUBPROCESS_ISOLATION_DEFAULT:
+        return False
+    #An undeclared node is third-party code (dropped into the AppData plugin
+    #folder). Before isolating it, check the one thing isolation actually
+    #breaks: a run() that dereferences core/shared_data/nodzInfo, all of which
+    #are None in the child.
+    dottedName = rt_analysis_info['__displayNameFunctionNameMap__'][indexv][1]
+    if nodeRunNeedsLiveContext(dottedName):
+        logging.info("Not isolating %s: its run() reads the live core/shared_data/nodzInfo. "
+                     "Declare \"__needsLiveCore__\": True to make that explicit.", dottedName)
+        return False
+    return True
 
 class SmallWindow(QMainWindow):
     """ 
@@ -2778,7 +3259,7 @@ class SmallWindow(QMainWindow):
             #Get all but the last element of this:
             filefolder = '/'.join(filefolder[:-1])
             folderName = filefolder
-        except:
+        except (AttributeError, IndexError, TypeError):
             folderName = ""
         
         file_name, _ = QFileDialog.getOpenFileName(None, "Open File", folderName, fileArgs, options=options)
@@ -2795,7 +3276,7 @@ class SmallWindow(QMainWindow):
                 LineEditText = LineEditText.split('.')
                 LineEditText[-2] = LineEditText[-2]+textAddPrePeriod
                 LineEditText = '.'.join(LineEditText)
-            except:
+            except (IndexError, AttributeError):
                 pass
         lineedit.setText(LineEditText)
     
@@ -2857,64 +3338,19 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.fileLocationLineEdit
 
-    def addHtml(self,htmlfile,width=700,height=800):
-        from PyQt5.QtWebEngineWidgets import QWebEngineView
-        htmlViewer = QWebEngineView()
-        htmlViewer.setFixedHeight(height)
-        htmlViewer.setFixedWidth(width)
-        html_file = htmlfile
-        with open(html_file, 'r', encoding='utf-8') as file:
-            html_content = file.read()
-        htmlViewer.setHtml(html_content)
-        #Add the html viewer to the central widget:
-        self.centralWidget().layout().addWidget(htmlViewer) #type:ignore
+    def addHtml(self, htmlfile, width=700, height=800):
+        # Body moved to glados_pycromanager.ui.markdown_view (Phase 7.4).
+        from glados_pycromanager.ui.markdown_view import add_html_to_window
 
-    def addMarkdown(self,mdfile,width=700,height=800):
-        
-        newlayout = QVBoxLayout()
-        markdownViewer = QWebEngineView()
-        markdownViewer.setFixedHeight(height)
-        markdownViewer.setFixedWidth(width)
-        md_file = mdfile
-        with open(md_file, 'r', encoding='utf-8') as file:
-            md_content = file.read()
-        # Convert Markdown to HTML
-        html_content = markdown.markdown(md_content, extensions=['markdown_captions','fenced_code', 'codehilite', 'toc', 'attr_list', 'meta'])
-        # Get the directory of the Markdown file
-        base_dir = os.path.dirname(os.path.abspath(md_file))
-        # Create a complete HTML document with MathJax support
-        full_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <script type="text/javascript" async
-                src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
-            </script>
-            <script type="text/x-mathjax-config">
-                MathJax.Hub.Config({{
-                    tex2jax: {{
-                        inlineMath: [['$','$']],
-                        processEscapes: true
-                    }} 
-                }});
-            </script>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
-                img {{ max-width: 100%; height: auto; }}
-            </style>
-        </head>
-        <body>
-            {html_content}
-        </body>
-        </html>
-        """
-        from PyQt5.QtCore import QUrl
-        # Load the HTML content into the web view
-        markdownViewer.setHtml(full_html, QUrl.fromLocalFile(base_dir + "/"))
-        newlayout.addWidget(markdownViewer)
-        self.centralWidget().layout().addLayout(newlayout)
+        add_html_to_window(self, htmlfile, width=width, height=height)
+
+    def addMarkdown(self, mdfile, width=700, height=800):
+        # Body moved to glados_pycromanager.ui.markdown_view (Phase 7.4).
+        from glados_pycromanager.ui.markdown_view import add_markdown_to_window
+
+        add_markdown_to_window(self, mdfile, width=width, height=height)
     
-class HelpGroupBox():
+class HelpGroupBox:
     def __init__(self,parent):
         self.parent = parent
         self.helpGroupBox = QGroupBox("Help")
@@ -3008,7 +3444,7 @@ class HelpGroupBox():
     
 
 def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
-    from FlowChart_dockWidgets import VariablesDialog
+    from glados_pycromanager.GUI.FlowChart_dockWidgets import VariablesDialog
     
     #Find the associated kwarg/function:
     associatedFunction = line_edit.objectName().split('#')[1]
@@ -3026,7 +3462,7 @@ def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
 
 
 def PushButtonAddVariableCallBack(line_edit,nodzInfo):
-    from FlowChart_dockWidgets import VariablesDialog
+    from glados_pycromanager.GUI.FlowChart_dockWidgets import VariablesDialog
     
     #Find the associated kwarg/function:
     associatedFunction = line_edit.objectName().split('#')[1]
@@ -3045,15 +3481,41 @@ def PushButtonAddVariableCallBack(line_edit,nodzInfo):
     else:
         logging.warning("Dialog rejected (Cancel pressed or closed)")
 
+def _is_json_serializable(value):
+    """True when `value` can go into the state JSON as-is.
+
+    `save_state_MDA` iterates `vars(self)` and writes anything that is not a bare
+    QWidget straight into the state dict. A *container* of widgets -- a list, a
+    dict -- passes that check and then blows up inside `json.dump`, which by then
+    has already truncated the file, so the user loses every other setting too.
+    """
+    try:
+        json.dumps(value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 class CustomMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','SLACK-CLIENT']
+        # Attributes never written to the state JSON. Note the QWidget branch in
+        # save_state_MDA only catches a *bare* QWidget attribute -- a container of
+        # widgets (list, dict) falls through to the generic branch and would be
+        # dumped verbatim, so anything holding widgets belongs here.
+        # `sectionGrid` and the two `*ListEditor`s are MDAGlados' layout-toolkit
+        # containers (its sections live on their own attributes). The container-
+        # of-widgets hazard above was hit for real by T-F7's `_guiWrappers` list,
+        # which crashed the whole save until it was listed; it no longer exists.
+        # The two `_mda*Timer`s are MDAGlados' T-H1 debounce QTimers; `_mda` is the
+        # backing store of its lazy `mda` property (T-H2) -- a JSON-encodable event
+        # list, so without this it would be silently written into the state file.
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','sectionGrid','xypositionListEditor','channelListEditor','_mdaEventsUpdateTimer','_mdaStateSaveTimer','_mda']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):
             #Load the mda state
-            with open(filename, 'r') as file:
+            with open(filename) as file:
                 state = json.load(file)
         else:
             state = {}
@@ -3069,17 +3531,24 @@ class CustomMainWindow(QWidget):
             state['GlobalData'] = {}
             
         #Loop over everything in self.shared_data.globalData dict and store the ['value']s:
-        for key, value in self.shared_data.globalData.items():
-            if key not in self.storingExceptions:
-                state['GlobalData'][key] = value['value']
-            
+        # for key, value in self.shared_data.globalData.items():
+        #     if key not in self.storingExceptions:
+        #         state['GlobalData'][key] = value['value']
+                
+        from dataclasses import dataclass, fields
+        cfg = self.shared_data.config
+        for group_field in fields(cfg):
+            group = getattr(cfg, group_field.name)
+            for f in fields(group):
+                state['GlobalData'][f"{group_field.name}.{f.name}"] = getattr(group, f.name)
+        
         with open(filename, 'w') as file:
             json.dump(state, file, indent=4)
 
     def save_state_MMControls(self,filename):
         if os.path.exists(filename):
             #Load the mda state
-            with open(filename, 'r') as file:
+            with open(filename) as file:
                 state = json.load(file)
         else:
             state = {}
@@ -3094,8 +3563,7 @@ class CustomMainWindow(QWidget):
         if 'GlobalData' not in state:
             state['GlobalData'] = {}
         
-        import MMcontrols
-        import napariGlados
+        import glados_pycromanager.GUI.napariGlados as napariGlados
         
         iterable = []
         
@@ -3133,24 +3601,23 @@ class CustomMainWindow(QWidget):
                             if isinstance(currentParent.dockwidget, napariGlados.dockWidget_MMcontrol):
                                 saveState = 'MMControls'
                                 break
-                        except:
+                        except AttributeError:
                             try:
                                 if currentParent.type == 'MMConfig':
                                     saveState = 'MMControls'
                                     break
-                            except:
+                            except AttributeError:
                                 pass
-                            pass
                     
                 if saveState is not None:
                     try:
-                        if hasattr(value,'text'):
+                        if hasattr(value,'text') and callable(value.text):
                             textv = value.text()
-                        elif hasattr(value,'currentText'):
+                        elif hasattr(value,'currentText') and callable(value.currentText):
                             textv = value.currentText()
                         else:
                             textv = None
-                    except:
+                    except (AttributeError, RuntimeError, TypeError):
                         textv = None
                     state[saveState][key] = {
                         'text': textv,
@@ -3165,12 +3632,12 @@ class CustomMainWindow(QWidget):
         self.save_state_globalData(filename)
             
     def save_state_MDA(self, filename):
-        import glados_pycromanager.GUI.napariGlados as napariGlados
         import glados_pycromanager.Core.MDAGlados as MDAGlados
+        import glados_pycromanager.GUI.napariGlados as napariGlados
         logging.debug('SAVING STATE')
         if os.path.exists(filename):
             #Load the mda state
-            with open(filename, 'r') as file:
+            with open(filename) as file:
                 state = json.load(file)
         else:
             state = {}
@@ -3188,43 +3655,61 @@ class CustomMainWindow(QWidget):
         for key, value in vars(self).items():
             saveState = None
             if isinstance(value, QWidget):
-                maxParentInst = 10
-                currentParent = value
-                for _ in range(maxParentInst):
-                    if currentParent == None:
-                        break
-                    if currentParent.parent == None:
-                        break
-                    #Rather difficult method to figure out if we're in MDA or MMControls savestate
-                    if callable(currentParent.parent):
-                        currentParent = currentParent.parent()
-                        if isinstance(currentParent, napariGlados.dockWidget_MDA):
-                            saveState = 'MDA'
+                try:
+                    maxParentInst = 10
+                    currentParent = value
+                    for _ in range(maxParentInst):
+                        if currentParent == None:
                             break
-                    else:
-                        try:
-                            currentParent = currentParent.parent
+                        if currentParent.parent == None:
+                            break
+                        #Rather difficult method to figure out if we're in MDA or MMControls savestate
+                        if callable(currentParent.parent):
+                            currentParent = currentParent.parent()
                             if isinstance(currentParent, napariGlados.dockWidget_MDA):
                                 saveState = 'MDA'
                                 break
-                        except:
-                            break
-                    
-                if saveState is not None:
-                    state[saveState][key] = {
-                        'text': value.text() if hasattr(value, 'text') else None,
-                        'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
-                        # Add more properties as needed
-                    }
+                        else:
+                            try:
+                                currentParent = currentParent.parent
+                                if isinstance(currentParent, napariGlados.dockWidget_MDA):
+                                    saveState = 'MDA'
+                                    break
+                            except AttributeError:
+                                break
+
+                    if saveState is not None:
+                        state[saveState][key] = {
+                            'text': value.text() if hasattr(value, 'text') else None,
+                            'checked': value.isChecked() if hasattr(value, 'isChecked') else None,
+                            # Add more properties as needed
+                        }
+                except RuntimeError as exc:
+                    #Widget was deleted (e.g. mid-rebuild teardown) - skip it.
+                    logging.debug('Skipping deleted widget %s while saving state: %s', key, exc)
             else:
                 if isinstance(self, MDAGlados.MDAGlados):
                     saveState = 'MDA'
                 if saveState is not None:
                     if key not in self.storingExceptions:
-                        state[saveState][key] = value
+                        # One un-encodable attribute must not cost the user every
+                        # other setting in the file: json.dump writes nothing at
+                        # all when it raises partway through. Check each value as
+                        # it goes in, and skip (loudly) what cannot be stored.
+                        if _is_json_serializable(value):
+                            state[saveState][key] = value
+                        else:
+                            logging.warning(
+                                'Not saving MDA state key %r: %s is not JSON '
+                                'serializable. Add it to storingExceptions.',
+                                key, type(value).__name__)
 
+        # Encode before opening the file: `open(..., 'w')` truncates immediately,
+        # so a json.dump that raises partway through would leave the user with a
+        # half-written or empty state file and no settings at all.
+        encoded = json.dumps(state, indent=4)
         with open(filename, 'w') as file:
-            json.dump(state, file, indent=4)
+            file.write(encoded)
 
         #Also save global data:
         self.save_state_globalData(filename)
@@ -3252,35 +3737,52 @@ def forceReset_actual(shared_data):
     """
     logging.debug('Attempting force-reset!')
     import time
+
+    from glados_pycromanager.GUI.napari_bridge import get_bridge
     core=shared_data.core
-    
+
+    # T-F9: this function runs on a ThreadPoolExecutor thread. Assigning
+    # liveMode/mdaMode re-enters acqModeChanged, which reaches moveLayerToTop --
+    # i.e. it mutates viewer.layers from a non-GUI thread. Route the two flips
+    # through the bridge so that whole chain runs where it belongs. The waits
+    # are bounded; forceReset's own 5 s future timeout is the outer bound.
+    bridge = get_bridge(shared_data)
+
+    def _set_mode(attribute):
+        def _apply(_viewer):
+            setattr(shared_data, attribute, False)
+        if bridge is None:
+            _apply(None)
+        else:
+            bridge.submit(_apply, wait=True, timeout=2.0)
+
     #Trying a bunch of different things:
     try:
-        shared_data.liveMode = False
+        _set_mode('liveMode')
         logging.debug("Attempted: shared_data.liveMode=False")
-    except:
+    except (AttributeError, RuntimeError, TimeoutError):
         logging.debug("Attempted but failed: shared_data.liveMode=False")
     try:
-        shared_data.mdaMode = False
+        _set_mode('mdaMode')
         logging.debug("Attempted: shared_data.mdaMode=False")
-    except:
+    except (AttributeError, RuntimeError, TimeoutError):
         logging.debug("Attempted but failed: shared_data.mdaMode=False")
     time.sleep(0.1)
     try:
         core.stop_sequence_acquisition()
         logging.debug("Attempted: core.stop_sequence_acquisition()")
-    except:
+    except (AttributeError, RuntimeError, OSError):
         logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
     try:
         core.stop_exposure_sequence(core.get_camera_device())
         logging.debug("Attempted: core.stop_sequence_acquisition()")
-    except:
-        logging.debug("Attempted but failed: core.stop_sequence_acquisition()")
+    except (AttributeError, RuntimeError, OSError):
+        logging.debug("Attempted but failed: core.stop_exposure_sequence()")
     time.sleep(0.1)
     try:
         core.clear_circular_buffer()
         logging.debug("Attempted: core.clear_circular_buffer()")
-    except:
+    except (AttributeError, RuntimeError, OSError):
         logging.debug("Attempted but failed: core.clear_circular_buffer()")
 
 def forceReset(shared_data):
@@ -3296,45 +3798,98 @@ def forceReset(shared_data):
         except concurrent.futures.TimeoutError:
             logging.warning("Function did not complete within 5 seconds and thus quitted")
 
+# Phase 7.1/7.2: body moved to `glados_pycromanager.io.appdata`; shim
+# kept here for back-compat with one-time DeprecationWarning per call.
+import warnings as _shim_warnings_store  # noqa: E402
+
+from glados_pycromanager.io import appdata as _appdata_store  # noqa: E402
+
+
 def storeSharedData_GlobalData(shared_data):
-    """ Share the shared_data as JSON in the appdata folder"""
-    appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
-    if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
-    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-    os.makedirs(app_specific_folder, exist_ok=True)
-    tempCustomWindow = CustomMainWindow()
-    tempCustomWindow.shared_data = shared_data
-    tempCustomWindow.save_state_globalData(os.path.join(app_specific_folder, 'glados_state.json'))
+    _shim_warnings_store.warn(
+        "storeSharedData_GlobalData() has moved to glados_pycromanager.io."
+        "appdata.storeSharedData_GlobalData; the GUI.utils re-export is "
+        "scheduled for removal in Phase 18.1 of claude_project.md.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _appdata_store.storeSharedData_GlobalData(shared_data)
 
 def openAdvancedSettings(shared_data):
     """
     Allow the user to change the global/advanced settings via some GUI
     """
     def acceptS(dialog,shared_data):
-        #Set the current values in shared_data.globalData:
-        for entry in shared_data.globalData:
-            if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
-                try:
-                    if shared_data.globalData[entry]['inputType'] == 'lineEdit':
-                        shared_data.globalData[entry]['value'] = dialog.findChild(QLineEdit, entry).text()
-                    elif shared_data.globalData[entry]['inputType'] == 'dropdown':
-                        shared_data.globalData[entry]['value'] = dialog.findChild(QComboBox, entry).currentText()
-                    #Try to make integer/float:
+        #Set the current values in shared_data.config:
+        #Loop over all config entries:
+        for group_field in fields(shared_data.config):
+            group = getattr(shared_data.config, group_field.name)
+            for f in fields(group):
+                if not f.metadata.get("hidden", True):
                     try:
-                        shared_data.globalData[entry]['value'] = float(shared_data.globalData[entry]['value'])
-                    except:
-                        pass
-                    try:
-                        shared_data.globalData[entry]['value'] = int(shared_data.globalData[entry]['value'])
-                    except:
-                        pass
-                except:
-                    logging.warning(f"Couldn't save global data of entry {entry}")
+                        if f.metadata['input_type'] == 'lineEdit':
+                            setattr(group, f.name, dialog.findChild(QLineEdit, f.name).text())
+                        elif f.metadata['input_type'] == 'dropdown':
+                            setattr(group, f.name, dialog.findChild(QComboBox, f.name).currentText())
+                        #Try to make integer/float:
+                        try:
+                            setattr(group, f.name,float(getattr(group, f.name)))
+                        except (ValueError, TypeError):
+                            pass
+                        try:
+                            setattr(group, f.name,int(getattr(group, f.name)))
+                        except (ValueError, TypeError):
+                            pass
+                    except (AttributeError, KeyError, TypeError) as exc:
+                        logging.warning("Couldn't save global data of entry %s: %s", f, exc)
+        
+        
+        # for entry in shared_data.globalData:
+        #     if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
+        #         try:
+        #             if shared_data.globalData[entry]['inputType'] == 'lineEdit':
+        #                 shared_data.globalData[entry]['value'] = dialog.findChild(QLineEdit, entry).text()
+        #             elif shared_data.globalData[entry]['inputType'] == 'dropdown':
+        #                 shared_data.globalData[entry]['value'] = dialog.findChild(QComboBox, entry).currentText()
+        #             #Try to make integer/float:
+        #             try:
+        #                 shared_data.globalData[entry]['value'] = float(shared_data.globalData[entry]['value'])
+        #             except:
+        #                 pass
+        #             try:
+        #                 shared_data.globalData[entry]['value'] = int(shared_data.globalData[entry]['value'])
+        #             except:
+        #                 pass
+        #         except:
+        #             logging.warning(f"Couldn't save global data of entry {entry}")
         
         #Store in appdata
         storeSharedData_GlobalData(shared_data)
-        
+
+        # Apply log-level change immediately (no restart needed)
+        try:
+            from glados_pycromanager.observability.logger import set_log_level
+            set_log_level(shared_data.config.logging_config.log_level)
+        except Exception as exc:
+            logging.warning("Could not apply log level: %s", exc)
+
+        # RT-analysis nodes running in a subprocess (see AnalysisClass.
+        # AnalysisProcess_customFunction) have their own, separately-spawned
+        # root logger, which set_log_level() above cannot reach -- push the
+        # new level to each running one explicitly.
+        for entry in shared_data.RTAnalysisQueuesThreads:
+            update_log_level = getattr(entry.get('Thread'), 'update_log_level', None)
+            if update_log_level is not None:
+                update_log_level(shared_data.config.logging_config.log_level)
+
+        # The live-display path caches the parsed contrast-refresh interval;
+        # drop it so a changed value takes effect on the next frame.
+        try:
+            from glados_pycromanager.GUI.napariGlados import invalidate_contrast_refresh_interval
+            invalidate_contrast_refresh_interval(shared_data)
+        except Exception as exc:
+            logging.warning("Could not invalidate contrast-refresh cache: %s", exc)
+
         logging.info('advanced settings stored!')
         dialog.close()
         pass
@@ -3342,7 +3897,7 @@ def openAdvancedSettings(shared_data):
     def rejectS(dialog):
         dialog.close()
     
-    from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QComboBox,  QDialogButtonBox
+    from PyQt5.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit
     #Create a QDialog with OK/Cancel button:
     dialog = QDialog()
     dialog.setWindowTitle("Advanced settings")
@@ -3351,32 +3906,32 @@ def openAdvancedSettings(shared_data):
     layout.addWidget(QLabel("Please restart glados-pycromanager after changing any of these settings!"),0,0,1,2)
     currentRow = 1
     #Loop over all globalData entries:
-    for entry in shared_data.globalData:
-        if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
-            currentRow+=1
-            try:
-                label = QLabel(shared_data.globalData[entry]['displayName'])
-                hoverInfo = shared_data.globalData[entry]['description']
-                layout.addWidget(label,currentRow,0)
-                label.setToolTip(hoverInfo)
-                
-                typeV = shared_data.globalData[entry]['inputType']
-                currentValue = shared_data.globalData[entry]['value']
-                if typeV == 'lineEdit':
-                    editField = QLineEdit()
-                    editField.setText(str(currentValue))
-                    editField.setObjectName(entry)
-                    layout.addWidget(editField,currentRow,1)
-                    label.setToolTip(editField)
-                elif typeV == 'dropdown':
-                    editField = QComboBox()
-                    editField.addItems(shared_data.globalData[entry]['dropDownOptions'])
-                    editField.setObjectName(entry)
-                    editField.setCurrentText(str(currentValue))
-                    layout.addWidget(editField,currentRow,1)
-                    label.setToolTip(editField)
-            except:
-                pass
+    for group_field in fields(shared_data.config):
+        group = getattr(shared_data.config, group_field.name)
+        for f in fields(group):
+            if not f.metadata.get("hidden", True):
+                currentValue = getattr(group, f.name)
+                currentRow+=1
+                try:
+                    label = QLabel(f.metadata['display_name'])
+                    hoverInfo = f.metadata['description']
+                    layout.addWidget(label,currentRow,0)
+                    label.setToolTip(hoverInfo)
+                    
+                    typeV = f.metadata['input_type']
+                    if typeV == 'lineEdit':
+                        editField = QLineEdit()
+                        editField.setText(str(currentValue))
+                        editField.setObjectName(f.name)
+                        layout.addWidget(editField,currentRow,1)
+                    elif typeV == 'dropdown':
+                        editField = QComboBox()
+                        editField.addItems(f.metadata['options'])
+                        editField.setObjectName(f.name)
+                        editField.setCurrentText(str(currentValue))
+                        layout.addWidget(editField,currentRow,1)
+                except (AttributeError, RuntimeError):
+                    pass
 
 
     button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -3389,33 +3944,56 @@ def openAdvancedSettings(shared_data):
     dialog.exec_()
     pass
 
-def getDimensionsFromAcqData(acqData):
-    # time_getdimfromacqdata = time.time()
-    # logging.info(f'acData: {acqData}')
-    # logging.info(f'metadata: {acqData[0]}')
-    try:
-        alldims = acqData[0]['axes']
-        num_dims = len(alldims)
-        dimOrder = [None] * num_dims
-        n_entries_in_dims = [None] * num_dims
-        uniqueEntriesAllDims = {}
+def getAcquisitionDimensions(shared_data):
+    """Cached `getDimensionsFromAcqData` for the current acquisition (T-G8).
 
-        for i, dim in enumerate(alldims):
-            uniqueEntries = []
-            for j in range(0, len(acqData)):
-                uniqueEntries.append(acqData[j]['axes'][dim])
-            uniqueEntries = np.unique(uniqueEntries)
-            nEntries = len(uniqueEntries)
-            n_entries_in_dims[i] = nEntries
-            dimOrder[i] = dim
-            uniqueEntriesAllDims[dim] = uniqueEntries
-            
-            
+    Node code (`pSMLM`, `RT_counter`) used to call `getDimensionsFromAcqData`
+    uncached inside `run()`, which walks every event of the acquisition in pure
+    Python — all 999 of a live-mode plan — on every frame, holding the GIL.
+    Reading `_mdaModeParams` at all also triggers its lazy
+    `useq.MDASequence -> pycromanager event list` conversion on first access.
+
+    Keyed on `shared_data._mdaModeParamsGeneration`, the counter the
+    `_mdaModeParams` setter bumps on every assignment; the generation is read
+    first, so a cache hit never touches the property. Returns None when there is
+    no shared_data (a subprocess-isolated node is handed None) or no plan.
+    """
+    if shared_data is None:
+        return None
+    generation = getattr(shared_data, '_mdaModeParamsGeneration', None)
+    if generation is None:
+        #Not a Shared_data (a test double, say) - correct, just uncached.
+        return getDimensionsFromAcqData(getattr(shared_data, '_mdaModeParams', None))
+    cached = getattr(shared_data, '_dims_cache', None)
+    #Compare rather than test for absence: getDimensionsFromAcqData legitimately
+    #returns None, so a cached None must not read as "nothing cached yet".
+    if cached is None or cached[0] != generation:
+        result = getDimensionsFromAcqData(shared_data._mdaModeParams)
+        shared_data._dims_cache = (generation, result)
+        return result
+    return cached[1]
+
+
+def getDimensionsFromAcqData(acqData):
+    if not acqData:
+        return None
+    try:
+        # Single pass: accumulate unique values per dimension using sets.
+        # Previous implementation made one full pass per dimension (O(n_dims × n_events)).
+        seen: dict = {}
+        for event in acqData:
+            for dim, val in event['axes'].items():
+                seen.setdefault(dim, set()).add(val)
+
+        # Preserve dimension order from the first event (matches np.unique contract).
+        dimOrder = list(acqData[0]['axes'].keys())
+        uniqueEntriesAllDims = {d: np.array(sorted(seen[d])) for d in dimOrder}
+        n_entries_in_dims = [len(uniqueEntriesAllDims[d]) for d in dimOrder]
+
         logging.debug(f"dimOrder: {dimOrder} with n_entries_in_dims: {n_entries_in_dims}")
-        # print(f'Time to get dimensions from acq data: {time.time()-time_getdimfromacqdata}')
         return dimOrder, n_entries_in_dims, uniqueEntriesAllDims
     except Exception as e:
-        print(f'Problem with get Dimensions! {e}')
+        logging.warning("Problem with get Dimensions: %s", e)
 
 def updateNodzVariablesTime(node):
     
@@ -3507,24 +4085,51 @@ def customFunction_outputs_to_variableNodz(currentNode):
             
 
 
+#Int-coded DeviceType -> name, mirroring MMcontrols.py's getDevicesOfDeviceType()
+#deviceTypeArray. See https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html
+_DEVICE_TYPE_NAMES = {
+    1: 'GenericDevice', 2: 'CameraDevice', 3: 'ShutterDevice', 4: 'StateDevice',
+    5: 'StageDevice', 6: 'XYStageDevice', 7: 'GenericDevice', 8: 'GenericDevice',
+    9: 'AutoFocusDevice', 10: 'CoreDevice', 11: 'GenericDevice', 12: 'GenericDevice',
+    13: 'GenericDevice', 14: 'GenericDevice', 15: 'HubDevice',
+}
+
 def getCoreDevicesOfDeviceType(core,devicetype):
     """
     #Find all devices that have a specific devicetype
-    #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
+    #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html
     #for all devicetypes
     """
     #Get devices
     devices = core.get_loaded_devices() #type:ignore
     try:
-        devices = [devices.get(i) for i in range(devices.size())]
+        #Java-proxy StrVector (has .size()/.get()) vs a plain list/tuple of names
+        #(e.g. PYCROMANAGER_PYTHON backend) - normalize to a plain list either way.
+        if hasattr(devices, 'size') and hasattr(devices, 'get'):
+            devices = [devices.get(i) for i in range(devices.size())]
+        else:
+            devices = list(devices)
         devicesOfType = []
         #Loop over devices
         for device in devices:
-            if core.get_device_type(device).to_string() == devicetype: #type:ignore
+            raw_type = core.get_device_type(device) #type:ignore
+            #A raw pycromanager Java Core returns a Java-proxy DeviceType with
+            #.to_string() (pyjavaz auto-aliases Java's toString()). MIL's own
+            #get_device_type() (called here when `core` is shared_data.MILcore,
+            #as FlowChart_dockWidgets._collectCoreVariables does) already
+            #normalizes every backend to a plain SWIG int instead -- calling
+            #.to_string() on that raised "'int' object has no attribute
+            #'to_string'" for every device, every time, on any backend.
+            if hasattr(raw_type, 'to_string'):
+                type_name = raw_type.to_string()
+            else:
+                type_name = _DEVICE_TYPE_NAMES.get(int(raw_type), 'GenericDevice')
+            if type_name == devicetype:
                 logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
-    except:
+    except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as exc:
+        logging.warning('Enumerating devices of type %s failed: %s', devicetype, exc)
         return []
 def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
     """
@@ -3602,56 +4207,29 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
         # else:
         #     errorIcon.setToolTip(errorToolTip)
         #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='grayscale')
-        
 
-def set_up_logger():
-    """
-    Set up a DEBUG and INFO logger, storing to LOG files in the APPDATA folder structure.
-    """
-    
-    # Set up logging at correct level
-    appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
-    if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
-    app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-    
-    # Clear old log files older than a week
-    if os.path.exists(app_specific_folder):
-        one_week_ago = datetime.datetime.now() - datetime.timedelta(weeks=1)
-        for file in os.listdir(app_specific_folder):
-            if file.endswith(".log"):
-                file_path = os.path.join(app_specific_folder, file)
-                file_mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(file_path))
-                if file_mod_time < one_week_ago:
-                    os.remove(file_path)
+import warnings
 
-    # Get the current date and time to add to log file names
-    current_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    try:
-        # Set up file-based INFO and DEBUG logging:
-        log_file_path_DEBUG = os.path.join(app_specific_folder, f'Glados_logpath_DEBUG_{current_datetime}.log')
-        log_file_path_INFO = os.path.join(app_specific_folder, f'Glados_logpath_INFO_{current_datetime}.log')
-
-        # Create the file handlers
-        file_handlerDEBUG = logging.FileHandler(log_file_path_DEBUG)
-        file_handlerDEBUG.setLevel(logging.DEBUG)
-        file_handlerINFO = logging.FileHandler(log_file_path_INFO)
-        file_handlerINFO.setLevel(logging.INFO)
-
-        # Get the root logger
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)  # Set the overall logging level to logging.DEBUG or logging.INFO
-
-        # Add the handlers to the logger
-        logger.addHandler(file_handlerINFO)
-        logger.addHandler(file_handlerDEBUG)
-    except:
-        logging.error('Error in setting up loggers')
+# Logger classes/functions moved to glados_pycromanager.observability.logger (Phase 11.1).
+# These shims keep existing callers working without modification.
+from glados_pycromanager.observability.logger import ColoredFormatter as ColoredFormatter
+from glados_pycromanager.observability.logger import set_up_logger as _set_up_logger
 
 
-    for handler in logger.handlers:
-        handler.formatter = logging.Formatter("%(asctime)s [%(levelname)s] \t %(message)s [%(filename)s:%(lineno)d]")
+def set_up_logger():  # type: ignore[override]
+    warnings.warn(
+        "utils.set_up_logger() is deprecated; use "
+        "glados_pycromanager.observability.logger.set_up_logger() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    _set_up_logger()
+
+
+#: Marks a metadata dict whose `Axes` have already been rebuilt from `mda_event`,
+#: so a second `metadata_refactor` call costs a dict lookup instead of rebuilding
+#: an OrderedDict on the GUI thread once per displayed frame.
+METADATA_REFACTORED_KEY = '__glados_axes_refactored__'
 
 
 def metadata_refactor(metadata, shared_data=None):
@@ -3694,7 +4272,7 @@ def metadata_refactor(metadata, shared_data=None):
         'p': 'position'
     }
 
-    if 'mda_event' in metadata:
+    if 'mda_event' in metadata and not metadata.get(METADATA_REFACTORED_KEY):
         original_axes = metadata['mda_event'].index
         ordered_axes_data = collections.OrderedDict() # Use OrderedDict to guarantee order
 
@@ -3705,5 +4283,13 @@ def metadata_refactor(metadata, shared_data=None):
             ordered_axes_data[new_key] = original_axes[original_key]
 
         metadata['Axes'] = ordered_axes_data
-    
+        # Marked so a second call is a cheap no-op. On MMCORE_PLUS the frame-ring
+        # consumer thread already refactored this dict before the display path
+        # sees it, but the pycromanager backends queue raw metadata straight from
+        # their acquisition callback, so the display-side call cannot simply be
+        # deleted -- it is load-bearing there. The mark works because this
+        # function mutates its argument in place and returns it, so it travels
+        # with the dict across the hand-off.
+        metadata[METADATA_REFACTORED_KEY] = True
+
     return metadata

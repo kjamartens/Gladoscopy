@@ -1,16 +1,21 @@
-import sys,os
+import logging
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-    
-# from stardist.models import StarDist2D
-from csbdeep.utils import normalize
 import inspect
+
 import dask.array as da
 import ndtiff
 import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
+
 # Required function __function_metadata__
 # Should have an entry for every function in this file
 def __function_metadata__():
@@ -58,41 +63,45 @@ def __function_metadata__():
     }
 
 #Normal stardist segmentation, requires image_data and modelStorageLoc as required kwargs
+@register("StarDist_image.StarDistSegment_ImageVis")
 def StarDistSegment_ImageVis(core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
     
     NDTIFFStack = kwargs['Image']
-    
-    mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
+
+    logging.info("Loading csbdeep/stardist for StarDistSegment_ImageVis (first use — may take a few seconds)…")
+    from csbdeep.utils import normalize
     from stardist.models import StarDist2D
+
+    mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
     modelDirectory = kwargs["modelStorageLoc"].rsplit('/', 1)
     #Load the model - better to do this out of the loop for time reasons
     stardistModel = StarDist2D(None,name=modelDirectory[1],basedir=modelDirectory[0]+"/") #type:ignore
 
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}, nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("prob_thresh changed to: %s, nms_thresh changed to %s", kwargs["prob_thresh"], kwargs["nms_thresh"])
         
         try:
             probThreshVal = float(kwargs["prob_thresh"])
             nmsThreshVal = float(kwargs["nms_thresh"])
             labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"]),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-        except:
+        except (TypeError, KeyError, ValueError):
             try:
                 probThreshVal = float(kwargs["prob_thresh"])
                 labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
-            except:
+            except (TypeError, KeyError, ValueError):
                 try:
                     nmsThreshVal = float(kwargs["nms_thresh"])
                     labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-                except:
+                except (TypeError, KeyError, ValueError):
                     labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
+        logging.info("prob_thresh changed to: %s", kwargs["prob_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
     elif "prob_thresh" not in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("nms_thresh changed to: %s", kwargs["nms_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
     else:
         labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
@@ -121,23 +130,28 @@ def StarDistGeneralVis(datastruct,core,**kwargs):
     if core.get_pixel_size_um() != 0:
         layer.scale = [core.get_pixel_size_um(),core.get_pixel_size_um()]
     else:
-        import logging
         logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
         layer.scale = [1,1]
     layer.opacity = 0.6
     layer.contrast_limits=(0,0.1)#(0,rescaled.max())
     layer.blending = 'additive'
 
+@register("StarDist_image.StarDistSegment_ImageVis_visualise")
 def StarDistSegment_ImageVis_visualise(datastruct,core,**kwargs):
     StarDistGeneralVis(datastruct,core,**kwargs)
     
+@register("StarDist_image.StarDistSegment_preLoadedModel_use_visualise")
 def StarDistSegment_preLoadedModel_use_visualise(datastruct,core,**kwargs):
     StarDistGeneralVis(datastruct,core,**kwargs)
     
+@register("StarDist_image.StarDistSegment_preLoadedModel_use")
 def StarDistSegment_preLoadedModel_use(core,**kwargs):
     NDTIFFStack = kwargs['Image']
+
+    logging.info("Loading csbdeep/stardist for StarDistSegment_preLoadedModel_use (first use — may take a few seconds)…")
+    from csbdeep.utils import normalize
+
     mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
-    from stardist.models import StarDist2D
     #Load the model - better to do this out of the loop for time reasons
     stardistModel = kwargs["model"] #type:ignore
 
@@ -145,27 +159,27 @@ def StarDistSegment_preLoadedModel_use(core,**kwargs):
     
     #Run starDist on the normalised image with prob and nms_thresh provided by kwargs (or not)
     if "prob_thresh" in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}, nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("prob_thresh changed to: %s, nms_thresh changed to %s", kwargs["prob_thresh"], kwargs["nms_thresh"])
         
         try:
             probThreshVal = float(kwargs["prob_thresh"])
             nmsThreshVal = float(kwargs["nms_thresh"])
             labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"]),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-        except:
+        except (TypeError, KeyError, ValueError):
             try:
                 probThreshVal = float(kwargs["prob_thresh"])
                 labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
-            except:
+            except (TypeError, KeyError, ValueError):
                 try:
                     nmsThreshVal = float(kwargs["nms_thresh"])
                     labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
-                except:
+                except (TypeError, KeyError, ValueError):
                     labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore
     elif "prob_thresh" in provided_optional_args and "nms_thresh" not in provided_optional_args:
-        print(f'prob_thresh changed to : {str(kwargs["prob_thresh"])}')
+        logging.info("prob_thresh changed to: %s", kwargs["prob_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),prob_thresh=float(kwargs["prob_thresh"])) #type:ignore
     elif "prob_thresh" not in provided_optional_args and "nms_thresh" in provided_optional_args:
-        print(f'nms_thresh changed to {str(kwargs["nms_thresh"])}')
+        logging.info("nms_thresh changed to: %s", kwargs["nms_thresh"])
         labels, details = stardistModel.predict_instances(normalize(mean_image),nms_thresh=float(kwargs["nms_thresh"])) #type:ignore
     else:
         labels, details = stardistModel.predict_instances(normalize(mean_image)) #type:ignore

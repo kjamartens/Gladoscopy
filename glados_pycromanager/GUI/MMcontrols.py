@@ -1,48 +1,210 @@
-import os
-import json
-import time
-import logging
-import appdirs
 import importlib.util
-import numpy as np
+import json
+import logging
+import os
+import sys
+import threading
+import time
 
-from PyQt5 import QtWidgets
+import appdirs
+import numpy as np
 from PyQt5.QtCore import (
+    QEvent,
     Qt,
+    QTimer,
 )
 from PyQt5.QtGui import (
-    QFont,
     QDoubleValidator,
     QIcon,
 )
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
-    QFrame,
+    QFileDialog,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
+    QSlider,
     QSpacerItem,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
-    QSlider,
 )
-import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.GUI.utils import CustomMainWindow
+import glados_pycromanager.GUI.config_group_editor as config_group_editor
+import glados_pycromanager.GUI.device_property_browser as device_property_browser
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.AnalysisClass import *
-from glados_pycromanager.GUI.napariHelperFunctions import checkIfLayerExistsOrCreate, addToExistingOrNewLayer, moveLayerToTop
+from glados_pycromanager.GUI.napariHelperFunctions import (
+    addToExistingOrNewLayer,
+    checkIfLayerExistsOrCreate,
+    moveLayerToTop,
+)
+from glados_pycromanager.GUI.utils import CustomMainWindow
+from glados_pycromanager.ui.layout import (
+    LANDSCAPE,
+    PORTRAIT,
+    ROLE_READONLY,
+    TALL,
+    WIDE,
+    FlowRow,
+    Placement,
+    ResponsiveGrid,
+    Section,
+    classify_shape,
+    set_role,
+)
+
+
+#: How often the Configurations panel auto-refreshes itself from live MM state.
+CONFIG_AUTOREFRESH_INTERVAL_MS = 10_000
+#: A rebuild tick that blocks the GUI thread longer than this stops the
+#: auto-refresh timer silently rather than keep paying that freeze every tick.
+CONFIG_AUTOREFRESH_MAX_FREEZE_MS = 50
+
+
+#: T-B4: a hardware intent from a GUI slot goes to the MicroscopeService owner
+#: thread (T-B3) instead of running on the GUI thread. With no service running
+#: -- tests, the napari-plugin path, a shutdown in progress -- everything falls
+#: back to the direct call it used to be, which T-B1's lock still makes safe.
+
+
+def _hardwareService(shared_data):
+    """The running `MicroscopeService` for `shared_data`, or None."""
+    service = getattr(shared_data, 'microscope_service', None)
+    if service is not None and getattr(service, 'running', False):
+        return service
+    return None
+
+
+class _InlineRequest:
+    """Stands in for a `Request` when there is no service to submit to."""
+
+    __slots__ = ('result', 'exception')
+
+    def __init__(self, result):
+        self.result = result
+        self.exception = None
+
+
+def submitHardware(shared_data, fn, *args, label=None, callback=None, **kwargs):
+    """Queue `fn` on the hardware owner thread; run it inline if there is none.
+
+    Fire-and-forget: these are user intents with no reply the UI blocks on. The
+    queue is FIFO within a priority, so the hardware sees them in the order the
+    user asked for them -- which is what lets a read-back submitted right after
+    a stage move report the post-move position. `callback` receives the
+    completed request on the owner thread; use `guiThreadCall` from it to touch
+    a widget.
+    """
+    service = _hardwareService(shared_data)
+    if service is None:
+        result = fn(*args, **kwargs)
+        if callback is not None:
+            callback(_InlineRequest(result))
+        return None
+    return service.submit(fn, *args, label=label or getattr(fn, '__name__', 'mm'),
+                          callback=callback, **kwargs)
+
+
+def guiThreadCall(shared_data, fn):
+    """Run `fn()` on the GUI thread (inline when already there).
+
+    Invariant 3's mechanism: a hardware job runs on the owner thread and must
+    not touch a widget or a napari layer from there. `NapariBridge.submit`
+    calls back with the viewer as its first argument, which none of these need.
+    """
+    try:
+        from glados_pycromanager.GUI.napari_bridge import get_bridge
+        bridge = get_bridge(shared_data)
+    except Exception:
+        bridge = None
+    if bridge is None:
+        fn()
+        return
+    bridge.submit(lambda _viewer: fn())
+
+
+_CONTROLS_SQUARISH = [
+    Placement("controls.general", 0, 0),
+    Placement("controls.configs", 0, 1),
+    Placement("controls.stages", 1, 0),
+    Placement("controls.rt", 1, 1),
+    Placement("controls.relative_stages", 2, 0),
+]
+CONTROLS_SECTION_PLACEMENTS = {
+    WIDE: [
+        Placement("controls.general", 0, 0),
+        Placement("controls.configs", 0, 1),
+        Placement("controls.stages", 0, 2),
+        Placement("controls.relative_stages", 0, 3),
+        Placement("controls.rt", 0, 4),
+    ],
+    LANDSCAPE: _CONTROLS_SQUARISH,
+    PORTRAIT: _CONTROLS_SQUARISH,
+    TALL: [
+        Placement("controls.general", 0, 0),
+        Placement("controls.configs", 1, 0),
+        Placement("controls.stages", 2, 0),
+        Placement("controls.relative_stages", 3, 0),
+        Placement("controls.rt", 4, 0),
+    ],
+}
+CONTROLS_COLUMN_STRETCH = {
+    WIDE: {"controls.configs": 2, "controls.rt": 1},
+    LANDSCAPE: {"controls.general": 1, "controls.configs": 1},
+    PORTRAIT: {"controls.general": 1, "controls.configs": 1},
+    TALL: {"controls.general": 1},
+}
+
+
+def waitForLiveModeWorkerStopped(shared_data, label):
+    """Block until the previous live-mode acquisition worker has fully torn down.
+
+    `hw.wait_for_system()` (a `MicroscopeProxy` call) only confirms that queued
+    *hardware* calls have completed -- it says nothing about the Python-side
+    worker thread (`run_MILCoreAcquisition_worker`), which still has to drain
+    the frame ring, finish any NDTiff archive, and tear down the visualisation
+    worker before it sets `_worker_stopped_event` in its own `finally`. A
+    live-restart helper (`setROI`/`resetROI`/exposure) that proceeds to flip
+    `liveMode` back to `True` before that event is set races
+    `acqModeChanged`'s *own* internal wait for the same event: if that wait
+    times out it reverts by setting `liveMode = False` again, which re-enters
+    `stopLiveModeVisualisation` and tries to disconnect a signal the first,
+    genuine stop already disconnected -- `TypeError: disconnect() failed
+    between 'yielded' and all its connections`. Waiting for the event
+    ourselves, once, with the same timeout `acqModeChanged` uses, is what
+    actually observed a live acquisition needing several seconds to tear down
+    (frame-ring drain, NDTiff finish) rather than the near-instant
+    `wait_for_system()` return.
+
+    Returns True once the worker is confirmed stopped, False on timeout (in
+    which case the caller should leave live mode off rather than restart onto
+    a worker that has not finished tearing down).
+    """
+    handler = getattr(shared_data, '_livemodeNapariHandler', None)
+    event = getattr(handler, '_worker_stopped_event', None)
+    if event is None:
+        return True
+    timeout = getattr(handler, 'ACQ_STOP_TIMEOUT_S', 10.0)
+    if event.wait(timeout=timeout):
+        return True
+    logging.error(
+        '%s: previous live acquisition worker did not stop within %.0fs; '
+        'leaving live mode off instead of restarting onto a worker that has '
+        'not finished tearing down.', label, timeout)
+    return False
+
+
 
 class ConfigInfo:
     """
@@ -122,55 +284,66 @@ class ConfigInfo:
             upperLimit = 0
         return upperLimit
             
+    def configPropertyPairs(self):
+        """Returns the (device, property) pairs backing this config group.
+
+        Reuses config_group_editor.group_property_set() -- the union of
+        settings across the group's presets -- rather than re-deriving it.
+        """
+        return config_group_editor.group_property_set(shared_data.MILcore, self.configGroupName())
+
+    def isReadOnly(self):
+        """Returns Boolean whether every device property backing this config
+        group is read-only, i.e. the group can only ever be displayed, never
+        set through the GUI (e.g. a status/computed value like an actual
+        frame interval). A group with no properties is not read-only -- it
+        falls through to the existing empty-widget behaviour."""
+        pairs = self.configPropertyPairs()
+        if not pairs:
+            return False
+        try:
+            return all(shared_data.MILcore.is_property_read_only(device, prop) for device, prop in pairs)
+        except (RuntimeError, OSError, ValueError) as exc:
+            logging.debug('isReadOnly() check failed for %s: %s', self.configGroupName(), exc)
+            return False
+
     def isDropDown(self):
-        """Returns Boolean whether the config group should be represented as a drop-down menu"""
-        if self.nrConfigs()>1:
-            return True
-        else:
-            #If there is exactly one option...
-            if self.nrConfigs() == 1:
-                #And the option is 'NewPreset', it means there are no presets specified
-                if shared_data.MILcore.get_available_configs(self.configGroupName())[0] == 'NewPreset':
-                    return False
-                else:
-                    return True
-        
+        """Returns Boolean whether the config group should be represented as a drop-down menu
+
+        Only a group with more than one named preset gets a preset-name
+        dropdown. A group with a single preset (whatever it's named --
+        including the 'NewPreset' sentinel MM/the group editor give an
+        as-yet-uncustomized group) manages one set of property values
+        directly instead: see isSlider()/isInputField(). Previously a
+        single *named* preset (anything but literally 'NewPreset') was
+        also shown as a one-item preset dropdown instead of the
+        underlying property's own widget -- which is what produced a
+        1-item combobox glued next to (or instead of) the property
+        widget for e.g. a single-property group.
+        """
+        return self.nrConfigs() > 1
+
     def isSlider(self):
         """Returns Boolean whether the config group should be represented as a slider"""
-        if self.nrConfigs()>1:
+        if self.nrConfigs() != 1:
             return False
-        else:
-            if self.hasPropertyLimits():
-                return True
-            else:
-                return False
-    
+        return self.hasPropertyLimits()
+
     def isInputField(self):
         """Returns Boolean whether the config group should be represented as an input field"""
-        if self.nrConfigs()>1:
+        if self.nrConfigs() != 1:
             return False
-        else:
-            #If there is exactly one option...
-            if self.nrConfigs() == 1:
-                #And the option is 'NewPreset', it means there are no presets specified
-                if shared_data.MILcore.get_available_configs(self.configGroupName())[0] == 'NewPreset':
-                    #check if it's not a slider...
-                    if self.hasPropertyLimits():
-                        return False
-                    else:
-                        return True
-                else:
-                    return False
+        return not self.hasPropertyLimits()
 
     def helpStringInfo(self):
         """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
         infostring='No option for this config'
         if self.isDropDown():
-            infostring = "Device {} should be an dropdown with {} options".format(self.configGroupName(),self.nrConfigs())
+            infostring = f"Device {self.configGroupName()} should be an dropdown with {self.nrConfigs()} options"
         if self.isSlider():
-            infostring = "Device {} should be an Slider with limits {}-{}".format(self.configGroupName(),self.lowerLimit(),self.upperLimit())
+            infostring = f"Device {self.configGroupName()} should be an Slider with limits {self.lowerLimit()}-{self.upperLimit()}"
         if self.isInputField():
-            infostring = "Device {} should be an input field".format(self.configGroupName())
+            infostring = f"Device {self.configGroupName()} should be an input field"
         return infostring
     
     def getCurrentMMValue(self):
@@ -203,7 +376,8 @@ class ConfigInfo:
             #Finally we get the current value of the slider
             try:
                 currentValue = (self.shared_data.MILcore.get_property(device_label,property_name))
-            except:
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logging.debug('get_property(%s,%s) failed: %s', device_label, property_name, exc)
                 currentValue = 0
             return currentValue
         
@@ -249,8 +423,8 @@ class MMConfigUI(CustomMainWindow):
                 # global core, napariViewer
                 core = shared_data.core
                 napariViewer = shared_data.napariViewer
-            except Exception as e:
-                logging.error(f'Line 237 fails: {e}')
+            except AttributeError as e:
+                logging.error('shared_data.core / napariViewer not set: %s', e)
         super().__init__()
         self.shared_data = shared_data #Set global shared_data also as self.attribute
         self.fullyLoaded = False
@@ -266,10 +440,10 @@ class MMConfigUI(CustomMainWindow):
         self.config_groups = config_groups
         self.number_columns = number_config_columns
         self.changes_update_MM = changes_update_MM
-        if self.config_groups is not None:
-            self.core = self.config_groups[0].core
+        if self.config_groups:
+            self.core = next(iter(self.config_groups.values())).core
         else:
-            self.core = None
+            self.core = self.shared_data.MILcore
         self.dropDownBoxes = {}
         self.sliders = {}
         self.editFields = {}
@@ -300,97 +474,121 @@ class MMConfigUI(CustomMainWindow):
             try:
                 import utils
                 self.iconFolder = utils.findIconFolder()
-            except:
-                logging.error("No glados_pycromanager package found")
+            except (ImportError, AttributeError, OSError) as exc:
+                logging.error("No glados_pycromanager package found: %s", exc)
                 self.iconFolder = ''
-                pass
         
         
+        # Every box is a `ui.layout.Section`, placed by `self.sectionGrid`
+        # according to the dock's shape (`CONTROLS_SECTION_PLACEMENTS`).
+        # `self.mainLayout` stays the QGridLayout hosts embed; it holds only the grid.
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.sectionGrid = ResponsiveGrid(default_bucket=WIDE)
+        self.mainLayout.addWidget(self.sectionGrid, 0, 0)
+        self._GUI_grid_width = None
+
         if showLiveSnapExposureButtons:
-            self.generalImagingGroupBox = QGroupBox("General")
-            
-            #Now add the live mode widget
-            # self.liveModeGroupBox = QGroupBox("Live Mode")
-            self.generalImagingGroupBox.setLayout(self.generalImagingLayout())
-            self.mainLayout.addWidget(self.generalImagingGroupBox, 0, 0)
-            
-            #TODO: add shutter here
-            
-            
-            
+            self.generalImagingGroupBox = Section("General", "controls.general", layout=self.generalImagingLayout())
+            self.sectionGrid.register(self.generalImagingGroupBox.key, self.generalImagingGroupBox)
+
         if showConfigs:
-            #Create a layout for the configs:
-            self.configGroupBox = QGroupBox("Configurations")
+            #Create a layout for the configs: one grid, a label column and a
+            #control column per block of `number_columns` rows (see addRow).
             self.configLayout = QGridLayout()
-            self.configLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
-            #Add this to the mainLayout via the groupbox:
-            self.configGroupBox.setLayout(self.configLayout)
-            self.mainLayout.addWidget(self.configGroupBox,0,2)
+            #The row grid and the button row below it are two separate
+            #layouts (not one widget spanning configLayout's columns) so the
+            #buttons' width never forces the grid to allocate extra, mostly
+            #empty columns -- that used to squeeze the config rows (and their
+            #labels) into a fraction of the group box's real width.
+            self.configOuterLayout = QVBoxLayout()
+            self.configOuterLayout.addLayout(self.configLayout)
+            self.configGroupBox = Section("Configurations", "controls.configs", layout=self.configOuterLayout)
+            self.sectionGrid.register(self.configGroupBox.key, self.configGroupBox)
             #Fill the configLayout
             for config_id in range(len(config_groups)):
                 self.configEntries[config_id] = self.addRow(config_id)
-            pass
-        
-            #Add a button to refresh from MM:
+            self.configOuterLayout.addStretch(1)
+
+            #Add the config-panel button row: refresh, device property
+            #browser, config group editor. Wraps when the section is narrow.
             self.refreshButton = QPushButton("Refresh configs from MM")
-            totalRowsAdded = int(np.ceil(len(config_groups)/self.number_columns))
-            #Add a button spanning the total columns at the bottom
-            self.configLayout.addWidget(self.refreshButton,totalRowsAdded+99,0,1,self.number_columns)
-            #Connect the button:
-            self.refreshButton.clicked.connect(lambda index: self.updateConfigsFromMM())
-            
-        
+            self.refreshButton.clicked.connect(lambda index: self.rebuildConfigLayout())
+            #Auto-refresh the panel from live MM state periodically. Each tick
+            #is timed on the GUI thread (rebuildConfigLayout runs synchronously
+            #there); a tick that freezes the GUI for longer than
+            #CONFIG_AUTOREFRESH_MAX_FREEZE_MS silently stops the timer rather
+            #than continuing to cost that freeze every interval.
+            self._configAutoRefreshTimer = QTimer(self)
+            self._configAutoRefreshTimer.setInterval(CONFIG_AUTOREFRESH_INTERVAL_MS)
+            self._configAutoRefreshTimer.timeout.connect(self._autoRefreshConfigLayout)
+            self._configAutoRefreshTimer.start()
+            self.devicePropertyBrowserButton = QPushButton("Device Property Browser…")
+            self.devicePropertyBrowserButton.clicked.connect(lambda: self.openDevicePropertyBrowser())
+            self.configGroupEditorButton = QPushButton("Config Group Editor…")
+            self.configGroupEditorButton.clicked.connect(lambda: self.openConfigGroupEditor())
+            self.configOuterLayout.addWidget(FlowRow([
+                self.refreshButton, self.devicePropertyBrowserButton, self.configGroupEditorButton]))
+
         #Add the stages widget to the right of this if wanted
         if showStages:
-            #Now add the stages widget
-            # self.stagesWidget()
-            self.stagesGroupBox = QGroupBox("Stages")
-            self.stagesGroupBox.setLayout(self.stagesLayout())
-            self.mainLayout.addWidget(self.stagesGroupBox, 0, 3)
-        
-        
+            self.stagesGroupBox = Section("Stages", "controls.stages", layout=self.stagesLayout())
+            self.sectionGrid.register(self.stagesGroupBox.key, self.stagesGroupBox)
+
         if showRelativeStages:
-            self.relativeStagesGroupBox = QGroupBox("RelativeStages")
-            self.relativeStagesGroupBox.setLayout(self.relativeStagesLayout())
-            # self.relativeStagesGroupBox.setLayout(QLayout())
-            self.mainLayout.addWidget(self.relativeStagesGroupBox, 0, 4)
-        
-        
+            self.relativeStagesGroupBox = Section("Relative stages", "controls.relative_stages", layout=self.relativeStagesLayout())
+            self.sectionGrid.register(self.relativeStagesGroupBox.key, self.relativeStagesGroupBox)
+
         #Add the real-time analysis
         if showRealTimeAnalysis:
-            #Now add the stages widget
-            # self.stagesWidget()
-            self.realTimeAnalysisGroupBox = QGroupBox("Real-time analysis")
-            self.realTimeAnalysisGroupBox.setObjectName('realTimeAnalysisGroupBox')
-            
             self.rtAnalysisLayout = QGridLayout()
-            self.realTimeAnalysisGroupBox.setLayout(self.rtAnalysisLayout)
+            self.realTimeAnalysisGroupBox = Section("Real-time analysis", "controls.rt", layout=self.rtAnalysisLayout)
+            self.realTimeAnalysisGroupBox.setObjectName('realTimeAnalysisGroupBox')
             self.rtAnalysisSubGroupBoxLayout = QGridLayout()
             self.rtAnalysisLayout.addLayout(self.rtAnalysisSubGroupBoxLayout,0,0,1,2)
-            
+
             #Initialise the rt analysis layout:
             self.realTimeAnalysisLayout()
-            self.mainLayout.addWidget(self.realTimeAnalysisGroupBox, 0, 5)
-        
-        #Add a horizontal auto-widening object to mainlayout:
-        spacer = QtWidgets.QSpacerItem(2, 1, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.mainLayout.addItem(spacer,0,99)
-        
+            self.sectionGrid.register(self.realTimeAnalysisGroupBox.key, self.realTimeAnalysisGroupBox)
+
+        self.sectionGrid.set_placements(CONTROLS_SECTION_PLACEMENTS, CONTROLS_COLUMN_STRETCH)
+        self.sectionGrid.set_hidden(self._configuredHiddenSections())
+        self.sectionGrid.apply()
+
         #Update everything for good measure at the end of init
         self.updateAllMMinfo()
         self.fullyLoaded = True
         self.LoadAllMMFromJSON()
-        
+
         #Inactivate all configs if this is wanted
         if checkboxStartInactive and showCheckboxes and showConfigs:
             for config_id in range(len(config_groups)):
                 self.configCheckboxes[config_id].setChecked(False)
-                    
-        #Change the font of everything in the layout
-        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
-        #Twice because it relies on dependancies inside qgridlayouts
-        self.set_font_and_margins_recursive(self.mainLayout, font=QFont("Arial", 7))
-    
+
+    def _configuredHiddenSections(self):
+        """Section keys the (hidden) `layout_config.hidden_sections` setting leaves out."""
+        try:
+            keys = self.shared_data.config.layout_config.hidden_section_keys()
+        except AttributeError:
+            return set()
+        return keys if isinstance(keys, set) else set()
+
+    @property
+    def GUI_grid_width(self):
+        """How the sections are arranged: a `ui.layout.classify_shape` bucket (same name as on MDAGlados)."""
+        return self._GUI_grid_width
+
+    @GUI_grid_width.setter
+    def GUI_grid_width(self, value):
+        if value == self._GUI_grid_width:
+            return
+        self._GUI_grid_width = value
+        if value is not None:
+            self.sectionGrid.apply(value)
+
+    def handleSizeChange(self, size):
+        """Rearrange the sections for the dock's new shape (see `ui.layout.classify_shape`)."""
+        self.GUI_grid_width = classify_shape(size.width(), size.height())
+
     #region General
     def updateAllMMinfo(self):
         """
@@ -398,7 +596,7 @@ class MMConfigUI(CustomMainWindow):
         """
         logging.debug('Updating all MM info')
         if self.showConfigs:
-            self.updateConfigsFromMM()
+            self.rebuildConfigLayout()
         if self.showStages:
             self.updateXYStageInfoWidget()
             self.updateOneDstageLayout()
@@ -411,7 +609,7 @@ class MMConfigUI(CustomMainWindow):
                 #Store in appdata
                 appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
-                    raise EnvironmentError("APPDATA environment variable not found")
+                    raise OSError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
                 os.makedirs(app_specific_folder, exist_ok=True)
                 self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
@@ -448,19 +646,28 @@ class MMConfigUI(CustomMainWindow):
         #Load from APPData, if it exists
         appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
         if appdata_folder is None:
-            raise EnvironmentError("APPDATA environment variable not found")
+            raise OSError("APPDATA environment variable not found")
         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
         
         if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
             #Load the file
-            with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+            with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
                 gladosInfo = json.load(file)
-                MMControlsInfo = gladosInfo['MMControls']
+                # The state file's sections are written independently and any of
+                # them can be absent -- a fresh install has none, and a corrupt
+                # file that save_config_to_json had to overwrite comes back with
+                # only GlobalData. Indexing this directly used to crash startup
+                # with KeyError: 'MMControls'. Every read below is already
+                # guarded by an `if key in MMControlsInfo`, so {} is a no-op.
+                MMControlsInfo = gladosInfo.get('MMControls', {})
         
             #Hand-set the values that I want:
             if 'exposureTimeInputField' in MMControlsInfo:
                 if hasattr(self, 'exposureTimeInputField'):
                     self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
+            if 'scriptPathLineEdit' in MMControlsInfo:
+                if hasattr(self, 'scriptPathLineEdit'):
+                    self.scriptPathLineEdit.setText(MMControlsInfo['scriptPathLineEdit']['text'])
             if 'oneDstageDropdown' in MMControlsInfo:
                 if hasattr(self, 'oneDstageDropdown'):
                     self.oneDstageDropdown.setCurrentText(MMControlsInfo['oneDstageDropdown']['text'])
@@ -487,68 +694,12 @@ class MMConfigUI(CustomMainWindow):
                 #Store in appdata
                 appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
                 if appdata_folder is None:
-                    raise EnvironmentError("APPDATA environment variable not found")
+                    raise OSError("APPDATA environment variable not found")
                 app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
                 os.makedirs(app_specific_folder, exist_ok=True)
                 self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
                 pass
 
-    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
-        """
-        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
-        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
-
-        """
-        # if widget is None:
-        #     return
-        #Testing a few things
-        # try:
-        #     widget.setSizePolicy(
-        #         QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        #     )
-        # except:
-        #     pass
-        # try:
-        #     widget.setMimimumSize(10, 10)
-        # except:
-        #     pass
-        
-        # if not isinstance(widget, (QPushButton,QComboBox)):
-        #     try:
-        #         widget.setSizePolicy(
-        #             QSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
-        #         )
-        #     except:
-        #         pass
-        
-        if isinstance(widget, (QPushButton)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-        if isinstance(widget, (QLabel, QComboBox)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-
-        if isinstance(widget, QGroupBox):
-            # widget.setSizePolicy(
-            #     QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            # )
-            # Ensure QGroupBox respects the size of its contents
-            widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
-
-        if hasattr(widget, 'layout'):
-            layout = widget.layout()
-            if layout:
-                # layout.setContentsMargins(0, 0, 0, 0)
-                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
-                for i in range(layout.count()):
-                    item = layout.itemAt(i)
-                    if hasattr(item, 'widget'):
-                        self.set_font_and_margins_recursive(item.widget(), font=font)
-                    if hasattr(item, 'layout'):
-                        self.set_font_and_margins_recursive(item.layout(), font=font)
-    
     #Get all config information as set by the UI:
     def getUIConfigInfo(self,onlyChecked=False):
         """
@@ -596,14 +747,13 @@ class MMConfigUI(CustomMainWindow):
         """
         #Create a Grid layout:
         liveModeLayout = QGridLayout()
-        liveModeLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
         #Add a 'exposure time' label:
         exposureTimeLabel = QLabel("Exposure time (ms):")
         liveModeLayout.addWidget(exposureTimeLabel,0,0)
         #Add a 'exposure time' input field:
         self.exposureTimeInputField = QLineEdit()
         self.exposureTimeInputField.setText(str(100))
-        self.exposureTimeInputField.editingFinished.connect(lambda: self.storeAllControlValues())
+        self.exposureTimeInputField.editingFinished.connect(lambda: self._onExposureFieldEditingFinished())
         liveModeLayout.addWidget(self.exposureTimeInputField,0,1)
         
         self.livesnapalbumbuttons = QHBoxLayout()
@@ -615,6 +765,10 @@ class MMConfigUI(CustomMainWindow):
         
         #add a connection to the button:
         self.LiveModeButton.clicked.connect(lambda index: self.changeLiveMode())
+        #T-F10: grey the button out while a transition is waiting for the
+        #previous acquisition worker to tear down, so a second click cannot
+        #queue another start behind it.
+        self._connectLiveModeTransitionSignals()
         #Add the button to the layout:
         self.livesnapalbumbuttons.addWidget(self.LiveModeButton)
         
@@ -639,51 +793,52 @@ class MMConfigUI(CustomMainWindow):
         liveModeLayout.addLayout(self.livesnapalbumbuttons,1,0,1,2)
         
         if self.showShutterOptions:
-            self.shutterOptionsGroupBox = QGroupBox("Shutter")
-            self.shutterOptionsGroupBox.setLayout(self.shutterOptionsLayout(orientation='horizontal'))
+            self.shutterOptionsGroupBox = Section("Shutter", "controls.shutter", layout=self.shutterOptionsLayout(orientation='horizontal'))
             liveModeLayout.addWidget(self.shutterOptionsGroupBox, 4,0,1,2)
-            
-        
+
         if self.showROIoptions:
             #Now add the ROI options widget
-            self.roiOptionsGroupBox = QGroupBox("ROI Options")
-            self.roiOptionsGroupBox.setLayout(self.ROIoptionsLayout(orientation='horizontal'))
+            self.roiOptionsGroupBox = Section("ROI Options", "controls.roi", layout=self.ROIoptionsLayout(orientation='horizontal'))
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
-        
-        #Add one of those spacers at the bottom:
-        verticalSpacer = QSpacerItem(2, 1, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        liveModeLayout.addItem(verticalSpacer)
-        
-        #Add a button to update all MM info
-        
-        #Create a 'debug-ish' button list:
-        debugHbox = QHBoxLayout()
-        self.updateAllMMinfoButton = QPushButton("Update all MM info")
+
+        #Now add the Scripts widget
+        self.scriptsGroupBox = Section("Scripts", "controls.scripts", layout=self.scriptsOptionsLayout())
+        liveModeLayout.addWidget(self.scriptsGroupBox, 6,0,1,2)
+
+        #Spare height goes below the sub-sections, above the button row:
+        liveModeLayout.setRowStretch(7, 1)
+
+        #Create a 'debug-ish' button list; it wraps when the section is narrow:
+        debugHbox = FlowRow()
+        self.updateAllMMinfoButton= QPushButton("Update all MM info")
         self.updateAllMMinfoButton.clicked.connect(self.updateAllMMinfo)
         #all the way at the bottom of the layout
-        debugHbox.addWidget(self.updateAllMMinfoButton)
+        debugHbox.add(self.updateAllMMinfoButton)
         #Add a button to close all layers
         self.closeAllLayersButton = QPushButton("Close all Layers")
         self.closeAllLayersButton.clicked.connect(lambda index, shared_data=shared_data: utils.closeAllLayers(shared_data))
         
         #all the way at the bottom of the layout
-        debugHbox.addWidget(self.closeAllLayersButton)
+        debugHbox.add(self.closeAllLayersButton)
         
         self.forceResetButton = QPushButton("Force-reset")
         self.forceResetButton.clicked.connect(lambda index, shared_data=shared_data: utils.forceReset(shared_data))
-        debugHbox.addWidget(self.forceResetButton)
+        debugHbox.add(self.forceResetButton)
         
         
         self.advSettingsButton = QPushButton("Adv. settings")
         self.advSettingsButton.clicked.connect(lambda index, shared_data=shared_data: utils.openAdvancedSettings(shared_data))
-        debugHbox.addWidget(self.advSettingsButton)
-        
-        
+        debugHbox.add(self.advSettingsButton)
+
+        #Device Property Browser / Config Group Editor buttons live in the
+        #Configurations panel itself (next to "Refresh configs from MM"),
+        #not here -- see the showConfigs block above.
+
         self.helpButton = QPushButton("Help")
         self.helpButton.clicked.connect(lambda: self.openHelpWindow())
-        debugHbox.addWidget(self.helpButton)
-        
-        liveModeLayout.addLayout(debugHbox,99,0,1,2)
+        debugHbox.add(self.helpButton)
+
+        liveModeLayout.addWidget(debugHbox,99,0,1,2)
         
         #Return the layout
         return liveModeLayout
@@ -693,18 +848,61 @@ class MMConfigUI(CustomMainWindow):
         help_group_box = utils.HelpGroupBox(help_window)
         help_window.centralWidget().layout().addWidget(help_group_box.helpGroupBox)
         help_window.show()
+
+    def openDevicePropertyBrowser(self):
+        dialog = device_property_browser.DevicePropertyBrowserDialog(shared_data.MILcore, self)
+        dialog.exec_()
+
+    def openConfigGroupEditor(self):
+        dialog = config_group_editor.ConfigGroupEditorDialog(shared_data.MILcore, shared_data, self)
+        dialog.exec_()
+        # Config groups may have changed (new/renamed/deleted presets), so
+        # rebuild the config-group widgets from the live MM state.
+        self.updateAllMMinfo()
     
     def snapImage(self):
         """
         Function that's called when an image is snapped (i.e. get a single image), uses the float(self.exposureTimeInputField.text()) as time in ms
         """
+        # T-B4: the widget read stays here; the exposure write, the snap (which
+        # blocks for the whole exposure) and the image transfer go to the owner
+        # thread, and the layer update comes back to the GUI thread.
+        exposure = float(self.exposureTimeInputField.text())
+        logging.debug("snapImage: exposure=%.1f ms, backend=%s", exposure, shared_data.MILcore.MI())
+        submitHardware(self.shared_data, self._snapImage_hw, exposure,
+                       label='mm.snapImage')
+        return
+
+    def _startLiveAfterExposure(self, request):
+        """Start live mode once the exposure write has landed (T-B4).
+
+        Runs on the owner thread, so the actual flip is bounced to the GUI
+        thread: `shared_data.liveMode` re-enters `acqModeChanged`, which may
+        wait for the previous acquisition worker -- and that worker's own stop
+        call is queued *on* the owner thread, so waiting there would deadlock.
+        """
+        if getattr(request, 'exception', None) is not None:
+            logging.error('Setting the exposure before live mode failed: %s',
+                          request.exception)
+        guiThreadCall(self.shared_data, self._startLiveMode)
+
+    @staticmethod
+    def _startLiveMode():
+        shared_data.liveMode = True
+
+    def _snapImage_hw(self, exposure):
+        """Snap one image on the owner thread, show it on the GUI thread."""
         #Set the correct exposure time
-        shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
+        shared_data.MILcore.set_exposure(exposure)
         #Snap an image
         shared_data.MILcore.snap_image()
         #Get the just-snapped image
         newImage = shared_data.MILcore.get_image()
-        
+        guiThreadCall(self.shared_data, lambda: self._showSnappedImage(newImage))
+
+    @staticmethod
+    def _showSnappedImage(newImage):
+        """GUI-thread half of `_snapImage_hw`."""
         snapLayer = checkIfLayerExistsOrCreate(napariViewer,'Snap',shared_data_throughput = shared_data, required_size = (newImage.shape[0],newImage.shape[1]))
         snapLayer.data = newImage
         #Move the layer to top
@@ -714,11 +912,12 @@ class MMConfigUI(CustomMainWindow):
         ## Testing area
         
         
-        import numpy as np
-        from bioio.writers import OmeTiffWriter # with bioio-ome-tiff installed
         import tempfile
+
+        import numpy as np
+        from bioio.writers import OmeTiffWriter  # with bioio-ome-tiff installed
         tempdataloc = os.path.join(str(tempfile.TemporaryDirectory().name))+"_glmic.zarr"
-        print(tempdataloc)
+        logging.debug("tempdataloc: %s", tempdataloc)
 
 
         image = np.random.rand(10, 3, 512, 512)
@@ -727,7 +926,6 @@ class MMConfigUI(CustomMainWindow):
         
         import numpy as np
         import zarr
-
         from ome_zarr.io import parse_url
         from ome_zarr.writer import write_image
 
@@ -802,10 +1000,38 @@ class MMConfigUI(CustomMainWindow):
         
         return
     
+    def _connectLiveModeTransitionSignals(self):
+        """Disable the Live button while a mode transition is in flight (T-F10).
+
+        `acqModeChanged` may have to wait up to `ACQ_STOP_TIMEOUT_S` for the
+        previous acquisition worker to tear down. That wait now happens on a
+        background thread, so the UI stays responsive -- which means the user
+        can click Live again mid-transition. Greying the button out for the
+        duration is what keeps that from queueing a second start.
+        """
+        handler = getattr(self.shared_data, '_livemodeNapariHandler', None)
+        signals = getattr(handler, 'transition_signals', None)
+        if signals is None:
+            logging.debug('No live-mode transition signals to connect to')
+            return
+        signals.started.connect(lambda: self._setLiveModeButtonBusy(True))
+        signals.finished.connect(lambda ok: self._setLiveModeButtonBusy(False))
+
+    def _setLiveModeButtonBusy(self, busy):
+        """Grey out (or restore) the Live button during a transition."""
+        try:
+            self.LiveModeButton.setEnabled(not busy)
+        except RuntimeError:  # widget already destroyed
+            pass
+
     def changeLiveMode(self):
         """
         Function that should be called when live mode is changed. Sets the shared_data.liveMode to True or False.
         """
+        if not self.LiveModeButton.isEnabled():
+            #A transition is already in flight (T-F10); ignore the click.
+            return
+
             
         if not shared_data.liveMode:
             #update the button text of the live mode:
@@ -814,9 +1040,15 @@ class MMConfigUI(CustomMainWindow):
             # icon: Flaticon.com
             self.LiveModeButton.setIcon(icon)
             #set exposure time first:
-            shared_data.MILcore.set_exposure(float(self.exposureTimeInputField.text()))
-            #Then start live mode, which is just a custom MDA
-            shared_data.liveMode = True
+            # T-B4: queued on the owner thread, and live mode is flipped from
+            # the completion callback (back on the GUI thread) so the camera
+            # cannot start before the new exposure has been applied. With no
+            # service running the submit runs inline and this is exactly the
+            # old ordering.
+            exposure = float(self.exposureTimeInputField.text())
+            submitHardware(self.shared_data, shared_data.MILcore.set_exposure,
+                           exposure, label='mm.setExposure',
+                           callback=self._startLiveAfterExposure)
         else:
             #update the button text of the live mode:
             self.LiveModeButton.setText("Start Live Mode")
@@ -867,13 +1099,17 @@ class MMConfigUI(CustomMainWindow):
         """" 
         Method that's called when the Open/Close shutter button is pressed.
         """
+        # T-B4: the device write is queued; the button updates optimistically,
+        # as it did before -- it never waited for a reply.
         current_text = self.shutterOpenCloseButton.text()
         if current_text == 'Open':
-            self.shared_data.MILcore.set_shutter_open(True)
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_shutter_open,
+                           True, label='mm.set_shutter_open')
             self.shutterOpenCloseButton.setText('Close')
             self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterClosed.png'))
         elif current_text == 'Close':
-            self.shared_data.MILcore.set_shutter_open(False) #type:ignore
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_shutter_open,
+                           False, label='mm.set_shutter_open')
             self.shutterOpenCloseButton.setText('Open')
             self.shutterOpenCloseButton.setIcon(QIcon(self.iconFolder+os.sep+'ShutterOpen.png'))
 
@@ -881,8 +1117,9 @@ class MMConfigUI(CustomMainWindow):
         """
         Set the shutter to the new choice if the dropdown is changed
         """ 
-        selected_item = self.shutterChoiceDropdown.currentText
-        self.shared_data.MILcore.set_shutter_device(selected_item)
+        selected_item = self.shutterChoiceDropdown.currentText()
+        submitHardware(self.shared_data, self.shared_data.MILcore.set_shutter_device,
+                       selected_item, label='mm.set_shutter_device')
 
     def on_shutterAutoCheckboxChanged(self,state):
         """
@@ -890,10 +1127,12 @@ class MMConfigUI(CustomMainWindow):
         """
         if state == 2:
             self.shutterOpenCloseButton.setEnabled(False)
-            self.shared_data.MILcore.set_auto_shutter(True)
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_auto_shutter,
+                           True, label='mm.set_auto_shutter')
         else:
             self.shutterOpenCloseButton.setEnabled(True)
-            self.shared_data.MILcore.set_auto_shutter(False)
+            submitHardware(self.shared_data, self.shared_data.MILcore.set_auto_shutter,
+                           False, label='mm.set_auto_shutter')
     
     def updateShutterOptions(self):
         """" 
@@ -901,7 +1140,7 @@ class MMConfigUI(CustomMainWindow):
         """
         #Set the current shutter device to the one in MM
         currentShutterDevice = self.shared_data.MILcore.get_shutter_device()
-        self.shutterChoiceDropdown.currentText = currentShutterDevice
+        self.shutterChoiceDropdown.setCurrentText(currentShutterDevice)
         #Set the auto-method to the one in MM:
         currentShutterAuto = self.shared_data.MILcore.get_auto_shutter()
         self.shutterAutoCheckbox.setChecked(currentShutterAuto)
@@ -964,17 +1203,46 @@ class MMConfigUI(CustomMainWindow):
 
         This function resets the ROI to its maximum size, which is the size of the image
         """
-        self.shared_data.MILcore.clear_roi() #type:ignore
+        if not shared_data.liveMode:
+            submitHardware(self.shared_data, self.shared_data.MILcore.clear_roi,
+                           label='mm.clear_roi')  # T-B4
+            return
+        # Same stop/change/restart orchestration as setROI() -- clear_roi() while
+        # live is running would otherwise change the frame size out from under
+        # the running acquisition instead of restarting it around the change.
+        threading.Thread(target=self._resetROI_liveRestart,
+                         name='resetROI', daemon=True).start()
+
+    def _resetROI_liveRestart(self):
+        """Stop live, clear the ROI, restart live -- off the GUI thread."""
+        hw = self.shared_data.microscope_proxy()
+        shared_data.liveMode = False
+        if not waitForLiveModeWorkerStopped(self.shared_data, 'resetROI'):
+            return
+        try:
+            hw.clear_roi() #type:ignore
+            hw.wait_for_system() #type:ignore
+        except Exception:
+            logging.exception('resetROI failed; restarting live anyway')
+        finally:
+            shared_data.liveMode = True
     
     def zoomROI(self,option):
         """
         Zoom the ROI in or out from the center
-        
+
         This function zooms the ROI in or out from the center.
         It zooms the ROI by a factor of 2.
         If the option is "ZoomIn", the ROI is zoomed in twice.
         If the option is "ZoomOut", the ROI is zoomed out twice
         """
+        # T-B4: the read and the resulting setROI are one job on the owner
+        # thread, so the ROI cannot change between them.
+        submitHardware(self.shared_data, self._zoomROI_hw, option,
+                       label='mm.zoomROI')
+
+    def _zoomROI_hw(self,option):
+        """Owner-thread half of `zoomROI`: read the ROI, compute, apply."""
         #Get the current ROI info
         #[x,y,width,height]
         roiv = self.shared_data.MILcore.get_roi()
@@ -991,8 +1259,8 @@ class MMConfigUI(CustomMainWindow):
                 newY = int(roiv[1]+(curTotHeight-newTotHeight)/2)
                 #Set the new ROI size
                 self.setROI([newX,newY,newTotWidth,newTotHeight])
-            except:
-                logging.error('ZOOMING IN DIDN\'T WORK!')
+            except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+                logging.error('Zoom-in failed: %s', exc)
         elif option == 'ZoomOut':
             #zoom in twice
             try:
@@ -1005,9 +1273,54 @@ class MMConfigUI(CustomMainWindow):
                 newY = int(roiv[1]-(newTotHeight-curTotHeight)/2)
                 #Set the new ROI size
                 self.setROI([newX,newY,newTotWidth,newTotHeight])
-            except:
-                logging.error('ZOOMING IN DIDN\'T WORK!')
-    
+            except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+                logging.error('Zoom-out failed: %s', exc)
+
+    def _onExposureFieldEditingFinished(self):
+        """Called when the exposure-time field loses focus / Enter is pressed.
+
+        Always persists the field value as before. If live mode is currently
+        running, the new exposure has no effect on the running acquisition
+        until live mode restarts -- so restart it, off the GUI thread, the
+        same way setROI() restarts live mode around an ROI change.
+        """
+        self.storeAllControlValues()
+        if not shared_data.liveMode:
+            return
+        try:
+            exposure = float(self.exposureTimeInputField.text())
+        except ValueError as exc:
+            logging.debug('Invalid exposure time %r: %s', self.exposureTimeInputField.text(), exc)
+            return
+        threading.Thread(target=self._exposureChange_liveRestart, args=(exposure,),
+                         name='exposureLiveRestart', daemon=True).start()
+
+    def _exposureChange_liveRestart(self, exposure):
+        """Stop live, change the exposure, restart live -- off the GUI thread.
+
+        Mirrors _setROI_liveRestart: stop_sequence_acquisition() is
+        fire-and-forget, so waiting for the previous worker to actually tear
+        down (see `waitForLiveModeWorkerStopped`) is what makes restarting
+        correct -- `hw.wait_for_system()` alone returns long before that
+        teardown is done. Live mode is restarted in a `finally`, so a failure
+        anywhere in the exposure write -- a bad value, a transient hardware
+        error, anything not previously caught by the narrow exception list
+        this used to have -- can no longer leave live mode stopped with no
+        automatic restart; the exception is logged (with a full traceback, to
+        actually diagnose what happened) instead of being swallowed.
+        """
+        hw = self.shared_data.microscope_proxy()
+        shared_data.liveMode = False
+        if not waitForLiveModeWorkerStopped(self.shared_data, 'exposure change to %s' % exposure):
+            return
+        try:
+            hw.set_exposure(exposure)
+            hw.wait_for_system() #type:ignore
+        except Exception:
+            logging.exception('exposure change to %s failed; restarting live anyway', exposure)
+        finally:
+            shared_data.liveMode = True
+
     def setROI(self,ROIpos):
         """
         Set the ROI to the specified position and size.
@@ -1016,130 +1329,284 @@ class MMConfigUI(CustomMainWindow):
         """
         #ROIpos should be a list of [x,y,width,height]
         logging.debug('Zooming ROI to ' + str(ROIpos))
-        try:
-            if not shared_data.liveMode:
-                self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
-                self.shared_data.MILcore.wait_for_system() #type:ignore
-            else:
-                shared_data.liveMode = False
-                self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
-                time.sleep(0.5)
-                shared_data.liveMode = True
-        except:
-            logging.error('ZOOMING DIDN\'T WORK!')
-    
-    def shape_drawn_callback(self, event):
-        if len(self.drawROIlayer.data) > 0:
-            if not event.source._is_moving and not event.source._is_selecting and not event.source._is_creating and len(event.source._mouse_drag_gen) > 0 and event.source.name != 'Draw ROI_':
-                logging.debug('Finished drawing an area for the ROI size!')
-                
-                def acceptFun(dialogV):
-                    self.setROItoDrawn()
-                    #Close the dialog:
-                    dialogV.done(QDialog.Accepted)
-                
-                
-                
-                def reDoFun(dialogV,layer):
-                    #Remove the layer
-                    shared_data.napariViewer.layers.remove(layer)
-                    #Restart the drawROI:
-                    self.drawROI()
-                    #Close the dialog:
-                    dialogV.done(QDialog.Rejected)
-                
-                def cancelFun(dialogV,layer):
-                    #Remove the layer
-                    shared_data.napariViewer.layers.remove(layer)
-                    #Close the dialog:
-                    dialogV.done(QDialog.Rejected)
-                
-                #Change the layer name so this won't pop up again after dialog is closed.
-                event.source.name = 'Draw ROI_'
-                #Pop up a dialog box to ask if they like it or not:
-                #Create a dialog box
-                dialog =  QDialog()
-                dialog.setWindowTitle('Draw ROI')
-                #Add 3 buttons: 
-                QButtonOk = QPushButton('OK')
-                QButtonRedraw = QPushButton('Redraw')
-                QButtonCancel = QPushButton('Cancel')
-                #add the box to dialog:
-                layout = QVBoxLayout()
-                layout.addWidget(
-                    QLabel('ROI drawn correctly?')
-                )
-                buttonBox = QHBoxLayout()
-                buttonBox.addWidget(QButtonOk)
-                buttonBox.addWidget(QButtonRedraw)
-                buttonBox.addWidget(QButtonCancel)
-                layout.addLayout(buttonBox)
-                dialog.setLayout(layout)
-                #Connect the buttons to the dialog:
-                QButtonOk.clicked.connect(lambda: acceptFun(dialog))
-                QButtonRedraw.clicked.connect(lambda: reDoFun(dialog,event.source))
-                QButtonCancel.clicked.connect(lambda: cancelFun(dialog,event.source))
-                #Show the dialog:
-                dialog.exec_()
-            
-            
-    def drawROI(self):
-        """
-        Draw a ROI. Idea is to create a new layer, let the user draw a rectangle, and ask if they like it or not. Then a small popup window with 'OK', 'Let me draw again', 'Stop this futile attempt'
-        """
-        
-            
-        # Create a shapes layer
-        self.drawROIlayer = shared_data.napariViewer.add_shapes(name='Draw ROI')
-        self.drawROIlayer.events.set_data.connect(self.shape_drawn_callback)
+        if not shared_data.liveMode:
+            # T-B4: one job on the owner thread -- set and wait belong together.
+            submitHardware(self.shared_data, self._setROI_hw, list(ROIpos),
+                           label='mm.setROI')
+            return
+        # Live mode has to be stopped, the ROI changed, and live restarted. That
+        # orchestration runs on neither the GUI thread (`acqModeChanged` may wait
+        # up to ACQ_STOP_TIMEOUT_S for the previous worker) nor the owner thread
+        # (the live worker's own stop call is queued *on* that thread, so waiting
+        # for it there would deadlock) -- so it gets a short-lived thread of its
+        # own, and reaches the hardware through the owner thread as usual.
+        threading.Thread(target=self._setROI_liveRestart, args=(list(ROIpos),),
+                         name='setROI', daemon=True).start()
 
-
-        # Set the shapes layer mode to 'add_rectangle'
-        self.drawROIlayer.mode = 'add_rectangle'
-        
-        #Changes the button to a different method, which should be pressed once the rectangle is drawn:
-        # self.ROIoptionsButtons['drawROI'].setText('ROI drawn')
-        # self.ROIoptionsButtons['drawROI'].clicked.disconnect()
-        # self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.setROItoDrawn())
-    
-    def setROItoDrawn(self):
-        """
-        The setROItoDrawn function is used to set the ROI of the microscope to a drawn shape.
-        The function first checks if there are any shapes in self.drawROIlayer, and if so, it gets the vertices of the last added shape (which should be a rectangle). It then sets the ROI using these vertices as top left and bottom right corners.
-        It also removes self.drawROIlayer from shared_data.napariViewer
-        """
-        # Get the type of the last added shape
-        if len(self.drawROIlayer.data) > 0:
-            shape_type = self.drawROIlayer.shape_type[-1]
-            if shape_type == 'rectangle':
-                vertices = self.drawROIlayer.data[-1]  # Get the vertices of the last added shape
-                #Get the topleft, bottomright position from the drawn rectangle
-                topleftxy = np.floor(vertices[0][::-1])
-                bottomrightxy = np.ceil(vertices[2][::-1])
-                #Set the boundaries based on the camera
-                mintopleft = [0,0]
-                maxbottomright = [shared_data.MILcore.get_roi().width, shared_data.MILcore.get_roi().height]
-                #Find the bounded positions
-                topleftpos = np.maximum(topleftxy,mintopleft)
-                bottomrightpos = np.minimum(bottomrightxy,maxbottomright)
-                #Set the ROI correclty
-                shared_data.core.set_roi(int(topleftpos[0]),int(topleftpos[1]),int(bottomrightpos[0]-topleftpos[0]),int(bottomrightpos[1]-topleftpos[1]))
-                logging.info(f"Set ROI to {topleftpos[0]},{topleftpos[1]},{bottomrightpos[0]},{bottomrightpos[1]} px")
-        else:
-            logging.warning('Attempted to set ROI to drawn, but no shape was added')
-        
-        #remove the self.drawROIlayer:
+    def _setROI_hw(self, ROIpos):
+        """Apply an ROI with no live mode running (owner thread)."""
         try:
-            shared_data.napariViewer.layers.remove(self.drawROIlayer)
-        except:
-            logging.error('Failed to remove the drawROIlayer')
-        
-        #Reset the Draw ROI button
+            self.shared_data.MILcore.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
+            self.shared_data.MILcore.wait_for_system() #type:ignore
+        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+            logging.error('setROI(%s) failed: %s', ROIpos, exc)
+
+    def _setROI_liveRestart(self, ROIpos):
+        """Stop live, change the ROI, restart live -- off the GUI thread.
+
+        T-F10 part 2: `stop_sequence_acquisition()` is fire-and-forget on the
+        Java side, so waiting for the previous worker to actually tear down
+        (see `waitForLiveModeWorkerStopped`) -- not just `hw.wait_for_system()`,
+        which returns long before that teardown is done -- is what makes
+        restarting correct.
+        """
+        hw = self.shared_data.microscope_proxy()
+        shared_data.liveMode = False
+        if not waitForLiveModeWorkerStopped(self.shared_data, 'setROI(%s)' % (ROIpos,)):
+            return
+        try:
+            hw.set_roi([ROIpos[0],ROIpos[1],ROIpos[2],ROIpos[3]])
+            hw.wait_for_system() #type:ignore
+        except Exception:
+            logging.exception('setROI(%s) failed; restarting live anyway', ROIpos)
+        finally:
+            shared_data.liveMode = True
+    
+    def _restore_draw_roi_button(self):
+        """Restore the 'Draw ROI' button to its default state."""
+        try:
+            self.ROIoptionsButtons['drawROI'].clicked.disconnect()
+        except (RuntimeError, TypeError):
+            pass
         self.ROIoptionsButtons['drawROI'].setText('Draw ROI')
-        self.ROIoptionsButtons['drawROI'].clicked.disconnect()
         self.ROIoptionsButtons['drawROI'].clicked.connect(lambda index: self.drawROI())
+
+    def _cancel_roi_draw(self):
+        """Cancel an in-progress ROI draw: remove the overlay layer and drag callback."""
+        roi_layer = getattr(self, '_roi_draw_layer', None)
+        if roi_layer is not None:
+            try:
+                shared_data.napariViewer.layers.remove(roi_layer)
+            except (ValueError, RuntimeError, KeyError, AttributeError):
+                pass
+            self._roi_draw_layer = None
+
+        cb_ref = getattr(self, '_roi_drag_callback_ref', None)
+        if cb_ref is not None:
+            try:
+                shared_data.napariViewer.mouse_drag_callbacks.remove(cb_ref)
+            except ValueError:
+                pass
+            self._roi_drag_callback_ref = None
+
+        try:
+            shared_data.napariViewer.cursor.style = 'standard'
+        except Exception:
+            pass
+
+        self._restore_draw_roi_button()
+
+    def drawROI(self):
+        """Draw a ROI on the napari canvas via an interactive left-mouse drag.
+
+        Uses napari's public ``mouse_drag_callbacks`` yield pattern for robust
+        drag-start / move / release detection without relying on any private
+        napari internals.  A semi-transparent yellow rectangle overlays the
+        canvas in real time while the user drags.  The ROI is applied
+        immediately on mouse-release via ``setROI()`` (which handles
+        live-mode pausing); no confirmation dialog is shown.
+
+        The button label changes to 'Cancel Draw' during the interaction so
+        the user can abort at any time.
+        """
+        # ------------------------------------------------------------------
+        # 1.  Determine the display scale from the first Image layer present
+        # ------------------------------------------------------------------
+        scale = [1.0, 1.0]
+        for lyr in shared_data.napariViewer.layers:
+            if type(lyr).__name__ == 'Image':
+                lyr_scale = list(lyr.scale)
+                if len(lyr_scale) >= 2:
+                    scale = [float(lyr_scale[-2]), float(lyr_scale[-1])]
+                break
+
+        # ------------------------------------------------------------------
+        # 2.  Obtain full sensor dimensions for ROI upper-bound clamping
+        # ------------------------------------------------------------------
+        sensor_w, sensor_h = 65535, 65535  # generous fallback; microscope will enforce its own limits
+        try:
+            # T-B4: `get_sensor_size()` is a pure query. It does not need the
+            # live-mode stop/start this used to do (nor the 0.2 s GUI-thread
+            # sleep that went with it) -- the owner thread serialises it against
+            # the live pull loop, so it is safe mid-acquisition. This is the one
+            # call in this file the GUI thread still waits on: drawROI needs the
+            # bound before it can install the drag callbacks, and one query
+            # replaces a stop/read/sleep/start round trip.
+            sensor_w, sensor_h = self.shared_data.microscope_proxy().get_sensor_size()
+        except Exception as exc:
+            logging.warning('drawROI: could not determine sensor size, using fallback: %s', exc)
+
+        # ------------------------------------------------------------------
+        # 3.  Visual overlay layer (scale matches live image for correct overlay)
+        # ------------------------------------------------------------------
+        roi_layer = shared_data.napariViewer.add_shapes(
+            data=[],
+            name='ROI Selection',
+            face_color=[1.0, 1.0, 0.0, 0.15],
+            edge_color='yellow',
+            edge_width=2,
+        )
+        roi_layer.scale = scale
+        self._roi_draw_layer = roi_layer
+
+        # ------------------------------------------------------------------
+        # 4.  Switch button to cancel mode
+        # ------------------------------------------------------------------
+        try:
+            self.ROIoptionsButtons['drawROI'].clicked.disconnect()
+        except (RuntimeError, TypeError):
+            pass
+        self.ROIoptionsButtons['drawROI'].setText('Cancel Draw')
+        self.ROIoptionsButtons['drawROI'].clicked.connect(lambda: self._cancel_roi_draw())
+
+        # ------------------------------------------------------------------
+        # 5.  Crosshair cursor
+        # ------------------------------------------------------------------
+        try:
+            shared_data.napariViewer.cursor.style = 'cross'
+        except Exception:
+            pass
+
+        # ------------------------------------------------------------------
+        # 6.  One-shot mouse drag callback (closures capture local variables)
+        # ------------------------------------------------------------------
+        arr_scale = np.array(scale, dtype=float)
+
+        def _cleanup_layer():
+            """Remove overlay and restore button — called on success or cancel."""
+            self._roi_draw_layer = None
+            try:
+                shared_data.napariViewer.layers.remove(roi_layer)
+            except (ValueError, RuntimeError, KeyError, AttributeError) as exc:
+                logging.debug('Draw ROI: layer cleanup: %s', exc)
+            self._restore_draw_roi_button()
+
+        def _apply_and_cleanup(start_px, end_px):
+            """Convert pixel drag coords to (x, y, w, h) and apply via setROI()."""
+            r0, c0 = np.floor(np.minimum(start_px, end_px)).astype(int)
+            r1, c1 = np.ceil(np.maximum(start_px, end_px)).astype(int)
+            x  = int(np.clip(c0, 0, sensor_w))
+            y  = int(np.clip(r0, 0, sensor_h))
+            x2 = int(np.clip(c1, 0, sensor_w))
+            y2 = int(np.clip(r1, 0, sensor_h))
+            w, h = x2 - x, y2 - y
+            if w > 0 and h > 0:
+                self.setROI([x, y, w, h])
+                logging.info('Draw ROI: applied x=%d y=%d w=%d h=%d', x, y, w, h)
+            else:
+                logging.warning('Draw ROI: degenerate rectangle ignored (w=%d h=%d)', w, h)
+            _cleanup_layer()
+
+        def _roi_drag_callback(viewer, event):
+            if event.button != 1:
+                # Not left-click — leave callback registered; ignore event
+                return
+            # Prevent canvas panning while drawing the ROI rectangle
+            event.handled = True
+
+            start_px = np.array(event.position[-2:], dtype=float) / arr_scale
+
+            yield  # ---------- move phase ----------
+
+            while event.type == 'mouse_move':
+                curr_px = np.array(event.position[-2:], dtype=float) / arr_scale
+                r0, c0 = np.minimum(start_px, curr_px)
+                r1, c1 = np.maximum(start_px, curr_px)
+                if r1 > r0 and c1 > c0:
+                    rect_verts = np.array([[r0, c0], [r0, c1], [r1, c1], [r1, c0]])
+                    try:
+                        roi_layer.data = [rect_verts]
+                        roi_layer.shape_type = ['rectangle']
+                    except Exception:
+                        pass
+                yield
+
+            # ---------- mouse released ----------
+            viewer.mouse_drag_callbacks.remove(_roi_drag_callback)
+            self._roi_drag_callback_ref = None
+            try:
+                viewer.cursor.style = 'standard'
+            except Exception:
+                pass
+
+            end_px = np.array(event.position[-2:], dtype=float) / arr_scale
+
+            if np.any(np.abs(end_px - start_px) > 1):
+                _apply_and_cleanup(start_px, end_px)
+            else:
+                logging.debug('Draw ROI: drag too small, ignoring')
+                _cleanup_layer()
+
+        self._roi_drag_callback_ref = _roi_drag_callback
+        shared_data.napariViewer.mouse_drag_callbacks.append(_roi_drag_callback)
     #endregion
-    
+
+    #region Scripts
+    def scriptsOptionsLayout(self):
+        """
+        Create a layout with a path field and Browse/Run buttons for
+        executing an external Python script against the current core.
+
+        Returns
+        -------
+        scriptsLayout : QGridLayout
+            A layout with a path field and Browse/Run buttons
+        """
+        scriptsLayout = QGridLayout()
+        self.scriptPathLineEdit = QLineEdit()
+        self.scriptPathLineEdit.setPlaceholderText("Path to .py script")
+
+        self.scriptBrowseButton = QPushButton("Browse")
+        self.scriptBrowseButton.clicked.connect(lambda index: self.browseScript())
+
+        self.scriptRunButton = QPushButton("Run")
+        self.scriptRunButton.clicked.connect(lambda index: self.runScript())
+
+        scriptsLayout.addWidget(self.scriptPathLineEdit, 0, 0, 1, 2)
+        scriptsLayout.addWidget(self.scriptBrowseButton, 1, 0)
+        scriptsLayout.addWidget(self.scriptRunButton, 1, 1)
+        return scriptsLayout
+
+    def browseScript(self):
+        """
+        Open a file dialog to pick a .py script to run against the current core.
+        """
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Select script", self.scriptPathLineEdit.text(),
+            "Python scripts (*.py);;All Files (*)")
+        if file_name:
+            self.scriptPathLineEdit.setText(file_name)
+            self.storeAllControlValues()
+
+    def runScript(self):
+        """
+        Execute the script at the current path, exposing `core` (the
+        MicroscopeInterfaceLayer) and `shared_data` to it.
+        """
+        script_path = self.scriptPathLineEdit.text()
+        if not script_path or not os.path.isfile(script_path):
+            QMessageBox.warning(self, "No script", f"Script not found: {script_path!r}")
+            return
+        with open(script_path) as f:
+            scriptText = f.read()
+        try:
+            exec(scriptText, {'core': self.shared_data.MILcore, 'shared_data': self.shared_data, 'np': np})
+            logging.debug(f'Ran script succesfully: {script_path}')
+        except Exception as exc:
+            logging.exception(f'Error running script {script_path}')
+            QMessageBox.critical(self, "Error", f"Script failed:\n{exc}")
+    #endregion
+
     #region Stages
     def stagesLayout(self):
         """
@@ -1148,27 +1615,11 @@ class MMConfigUI(CustomMainWindow):
         stageLayout = QHBoxLayout()
         # self.XYstageLayout()
         xyStageLayout = self.XYstageLayout()
-        oneDstageLayout = self.oneDstageLayout()
+        oneDstageWidget = self.oneDstageLayout()
         stageLayout.addLayout(xyStageLayout)
-        stageLayout.addLayout(oneDstageLayout)
+        stageLayout.addWidget(oneDstageWidget)
         #Add a horizontal spacer:
         stageLayout.addStretch(1)
-        stageLayout.setSizeConstraint(QHBoxLayout.SetMinimumSize) #type:ignore
-        # print(stageLayout.children())
-        xyLayoutWidth = 0
-        for i in range(xyStageLayout.columnCount()):
-            xyLayoutWidth += xyStageLayout.columnMinimumWidth(i)
-        oneDstageLayoutWidth = 0
-        for i in range(oneDstageLayout.columnCount()):
-            oneDstageLayoutWidth += oneDstageLayout.columnMinimumWidth(i)
-        
-        containerWidget = QWidget()
-        containerWidget.setLayout(stageLayout)
-        containerWidget.setFixedWidth(xyLayoutWidth+oneDstageLayoutWidth)
-        
-        stageOvercapLayout = QHBoxLayout()
-        stageOvercapLayout.addWidget(containerWidget)
-        
         return stageLayout
     
     def relativeStagesLayout(self):
@@ -1246,14 +1697,15 @@ class MMConfigUI(CustomMainWindow):
             for item in shared_data.RTAnalysisQueuesThreads:
                 if item['Thread'] == self.current_analysis_thread:
                     
-                    #Attempt to remove the napari layer corresponding to it
+                    #Attempt to remove the napari layer(s) corresponding to it. A
+                    #node may own several, so go through the group rather than its
+                    #primary layer alone; remove_all tolerates layers the user has
+                    #already closed.
                     if item['Thread'].visualisationObject is not None:
-                        try:
-                            shared_data.napariViewer.layers.remove(item['Thread'].visualisationObject.napariOverlay.layer.name)
-                        except ValueError as e:
-                            layername = item['Thread'].visualisationObject.napariOverlay.layer
-                            logging.debug(f'Cannot delete an expected layer connected to visualisationLayer - realtime visualisation {e},{layername}')
-                            pass
+                        overlay = getattr(item['Thread'].visualisationObject, 'napariOverlay', None)
+                        group = getattr(overlay, 'group', None)
+                        if group is not None:
+                            group.remove_all(shared_data.napariViewer)
                     
                     #Remove the thread
                     if item['Thread']:
@@ -1279,19 +1731,110 @@ class MMConfigUI(CustomMainWindow):
                     break
         
         
+        def testRealTimeAnalysisFromDockWidget(self):
+            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
+            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
+            current_config['__realTimeVisualisation__'] = False
+
+            viewer = self.shared_data.napariViewer
+            if viewer is None or len(viewer.layers) == 0:
+                QMessageBox.warning(self, "No image", "No napari layers are open.")
+                return
+
+            active_layer = viewer.layers.selection.active or viewer.layers[-1]
+            image = np.asarray(active_layer.data)
+            logging.info("RT test: layer '%s', full data shape=%s, viewer.dims.current_step=%s",
+                         active_layer.name, image.shape, viewer.dims.current_step)
+            if image.ndim > 2:
+                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
+                image = image[step]
+                logging.info("RT test: sliced at step=%s, resulting image shape=%s", step, image.shape)
+
+            metadata = {'ImageNumber': 0}
+            try:
+                rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
+                result = utils.realTimeAnalysis_run(rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
+                overlay = napariOverlay(viewer, RT_analysisObject=rt_object, layer_name='RTtest_VIS')
+                utils.realTimeAnalysis_visualisation(rt_object, current_config, image, metadata, None, overlay.layer)
+                QMessageBox.information(self, "Result", f"Analysis complete.\nResult: {result}")
+            except Exception as exc:
+                logging.exception("Test on current image failed")
+                QMessageBox.critical(self, "Error", f"Analysis failed:\n{exc}")
+
+        def _auto_slice_callback(self, event=None):
+            if not getattr(self, '_auto_slice_active', False):
+                return
+            viewer = self.shared_data.napariViewer
+            if viewer is None or len(viewer.layers) == 0:
+                return
+            active_layer = viewer.layers.selection.active or viewer.layers[-1]
+            image = np.asarray(active_layer.data)
+            if image.ndim > 2:
+                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
+                image = image[step]
+            metadata = {'ImageNumber': 0}
+            try:
+                current_config = self._auto_slice_config
+                utils.realTimeAnalysis_run(self._auto_slice_rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
+                utils.realTimeAnalysis_visualisation(self._auto_slice_rt_object, current_config, image, metadata, None, self._auto_slice_overlay.layer)
+            except Exception:
+                logging.exception("Auto-slice RT analysis failed")
+
+        def enableAutoSliceAnalysis(self):
+            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
+            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
+            current_config['__realTimeVisualisation__'] = False
+            viewer = self.shared_data.napariViewer
+            if viewer is None:
+                self.rtAnalysisAutoSliceButton.setChecked(False)
+                return
+            self._auto_slice_config = current_config
+            self._auto_slice_rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
+            self._auto_slice_overlay = napariOverlay(viewer, RT_analysisObject=self._auto_slice_rt_object, layer_name='RT_AutoSlice_VIS')
+            self._auto_slice_active = True
+            self._auto_slice_cb = lambda event: _auto_slice_callback(self, event)
+            viewer.dims.events.current_step.connect(self._auto_slice_cb)
+
+        def disableAutoSliceAnalysis(self):
+            self._auto_slice_active = False
+            viewer = self.shared_data.napariViewer
+            if viewer is not None and hasattr(self, '_auto_slice_cb'):
+                try:
+                    viewer.dims.events.current_step.disconnect(self._auto_slice_cb)
+                except Exception:
+                    pass
+            if hasattr(self, '_auto_slice_overlay') and self._auto_slice_overlay is not None:
+                try:
+                    viewer.layers.remove(self._auto_slice_overlay.layer.name)
+                except Exception:
+                    pass
+            self._auto_slice_rt_object = None
+            self._auto_slice_overlay = None
+
+        def toggleAutoSliceAnalysis(self):
+            if self.rtAnalysisAutoSliceButton.isChecked():
+                enableAutoSliceAnalysis(self)
+            else:
+                disableAutoSliceAnalysis(self)
+
         self.rtAnalysisActivateButton = QPushButton('Activate')
         #add a clicked-call:
         self.rtAnalysisActivateButton.clicked.connect(lambda: activateRealTimeAnalysisFromDockWidget(self))
         self.rtAnalysisDeactivateButton = QPushButton('Deactivate')
         self.rtAnalysisDeactivateButton.clicked.connect(lambda: deactivateRealTimeAnalysisFromDockWidget(self))
+        self.rtAnalysisTestButton = QPushButton('Test on current napari image')
+        self.rtAnalysisTestButton.clicked.connect(lambda: testRealTimeAnalysisFromDockWidget(self))
+        self.rtAnalysisAutoSliceButton = QPushButton('Auto-update on slice change')
+        self.rtAnalysisAutoSliceButton.setCheckable(True)
+        self.rtAnalysisAutoSliceButton.clicked.connect(lambda: toggleAutoSliceAnalysis(self))
         self.rtAnalysisLayout.addWidget(self.rtAnalysisActivateButton,1,0,1,1)
         self.rtAnalysisLayout.addWidget(self.rtAnalysisDeactivateButton,1,1,1,1)
-        
-        
-        
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisTestButton,2,0,1,2)
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisAutoSliceButton,3,0,1,2)
+
         #Add a spacer at the bottom:
         expandingspacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.rtAnalysisLayout.addItem(expandingspacer,2,0,1,2)
+        self.rtAnalysisLayout.addItem(expandingspacer,4,0,1,2)
         return self.rtAnalysisLayout
     
     def XYstageLayout(self):
@@ -1458,8 +2001,8 @@ class MMConfigUI(CustomMainWindow):
                 if device_found_type == devicetype: #type:ignore
                     logging.debug("found " + device + " of type " + devicetype)
                     devicesOfType.append(device)
-        except Exception as e:
-            print(e)
+        except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as e:
+            logging.warning('Enumerating devices of type %s failed: %s', devicetype, e)
         return devicesOfType
     
     def oneDstageLayout(self):
@@ -1484,8 +2027,8 @@ class MMConfigUI(CustomMainWindow):
         #Set default value to default z stage of MM
         try:
             self.oneDstageDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
-        except:
-            pass
+        except (RuntimeError, OSError, AttributeError) as exc:
+            logging.debug('get_focus_device() not available for oneDstage: %s', exc)
         #Add the dropdown to the layout:
         self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0)
         
@@ -1528,30 +2071,141 @@ class MMConfigUI(CustomMainWindow):
         self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,0)
         #update the text
         self.updateOneDstageLayout()
-        
+
         #Store the values
         self.storeAllControlValues()
-        
-        return self.oneDStageLayout
-    
+
+        #Wrap the grid in a container widget so we can catch mouse-wheel events
+        #anywhere over the z-stage area (buttons, dropdown, step fields) and use
+        #them to move the currently selected 1D stage.
+        self.oneDStageContainerWidget = QWidget()
+        self.oneDStageContainerWidget.setLayout(self.oneDStageLayout)
+        #Wheel events go to whichever child widget is under the cursor (button,
+        #dropdown, line edit, ...), not to the container itself, so the filter
+        #needs to be installed on the container and every descendant widget.
+        self.oneDStageContainerWidget.installEventFilter(self)
+        for childWidget in self.oneDStageContainerWidget.findChildren(QWidget):
+            childWidget.installEventFilter(self)
+
+        #Also allow ctrl/shift-scroll (per the advanced-settings choice) over the
+        #napari image canvas to move the same stage.
+        self.registerImageScrollToZ()
+
+        return self.oneDStageContainerWidget
+
+    def registerImageScrollToZ(self):
+        """
+        Registers a mouse-wheel callback on the napari viewer that moves the
+        currently selected 1D (Z/focus) stage when the user scrolls over the
+        image canvas while holding the modifier key chosen in Advanced
+        Settings (Config.visualisation_config.image_scroll_z_modifier).
+        """
+        napariViewer = getattr(self.shared_data, 'napariViewer', None)
+        if napariViewer is None:
+            return
+
+        modifierKeyMap = {'Ctrl': 'Control', 'Shift': 'Shift'}
+
+        def _imageScrollToZ(viewer, event):
+            modifierSetting = self.shared_data.config.visualisation_config.image_scroll_z_modifier
+            requiredModifier = modifierKeyMap.get(modifierSetting)
+            if requiredModifier is None or requiredModifier not in event.modifiers:
+                return
+            eventDelta = event.delta
+            if eventDelta is None or len(eventDelta) < 2:
+                return
+            delta = eventDelta[1]
+            if delta == 0:
+                return
+            # T-F8: same coalescing as the z-stage widget's wheel handler -- a
+            # scroll burst becomes one relative move of the same total distance
+            # instead of one hardware move plus two read-backs per notch.
+            self._accumulateStageWheel(1 if delta > 0 else -1)
+
+        napariViewer.mouse_wheel_callbacks.append(_imageScrollToZ)
+
+    def eventFilter(self, obj, event):
+        """
+        Catches mouse-wheel events over the z-stage widget area (buttons,
+        dropdown, step-size fields) and uses them to move the currently
+        selected 1D stage, instead of e.g. scrolling the dropdown selection.
+        """
+        container = getattr(self, 'oneDStageContainerWidget', None)
+        if event.type() == QEvent.Wheel and container is not None and (obj is container or container.isAncestorOf(obj)):
+            delta = event.angleDelta().y()
+            if delta != 0:
+                # T-F8: a fast scroll delivers many notches, and each one used to
+                # issue its own stage move plus two position read-backs. Notches
+                # are accumulated and applied as a single relative move of the
+                # same total distance.
+                self._accumulateStageWheel(1 if delta > 0 else -1)
+            event.accept()
+            return True
+        return super().eventFilter(obj, event)
+
+    #: Idle window before accumulated wheel notches reach the stage (T-F8).
+    STAGE_WHEEL_DEBOUNCE_MS = 120
+
+    def _accumulateStageWheel(self, notches):
+        """Add wheel notches to the pending total and (re)arm the flush timer."""
+        self._pendingStageWheelSteps = getattr(self, '_pendingStageWheelSteps', 0) + notches
+
+        timer = getattr(self, '_stageWheelTimer', None)
+        if timer is None:
+            timer = self._stageWheelTimer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._flushStageWheel)
+        timer.start(self.STAGE_WHEEL_DEBOUNCE_MS)
+
+    def _flushStageWheel(self):
+        """Apply the accumulated notches as one relative move."""
+        net = getattr(self, '_pendingStageWheelSteps', 0)
+        self._pendingStageWheelSteps = 0
+        if net == 0:
+            # Equal numbers of up and down notches cancel out, exactly as the
+            # per-notch moves would have.
+            return
+        self.moveOneDStage(2 if net > 0 else -2, steps=abs(net))
+
     def updateOneDstageLayout(self):
         """
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
-        self.oneDinfoWidget.setText(f"{self.oneDstageDropdown.currentText()}\r\n {self.shared_data.MILcore.get_position(self.oneDstageDropdown.currentText()):.1f}") #type:ignore
-        
+        stage_name = self.oneDstageDropdown.currentText()
+        if not stage_name:
+            return
+        # T-B4: read on the owner thread, apply on the GUI thread.
+        submitHardware(self.shared_data, self._readOneDstagePosition, stage_name,
+                       label='mm.get_position')
+
+    def _readOneDstagePosition(self, stage_name):
+        """Owner-thread half of `updateOneDstageLayout`."""
+        try:
+            pos = self.shared_data.MILcore.get_position(stage_name)
+        except Exception:
+            return
+        guiThreadCall(self.shared_data,
+                      lambda: self._applyOneDstageLayout(stage_name, pos))
+
+    def _applyOneDstageLayout(self, stage_name, pos):
+        """GUI-thread half of `updateOneDstageLayout`."""
+        self.oneDinfoWidget.setText(f"{stage_name}\r\n {pos:.1f}") #type:ignore
+
         for widget_id in range(0,self.oneDStackedWidget.count()):
             widget = self.oneDStackedWidget.widget(widget_id)
             if widget.objectName() == self.oneDstageDropdown.currentText():
                 self.oneDStackedWidget.setCurrentIndex(widget_id)
     
-    def moveOneDStage(self,amount):
+    def moveOneDStage(self,amount,steps=1):
         """
         Moves the selected one-D stage by the specified amount
 
         Parameters
         ----------
         amount: int: 1 or 2, 'small step' or 'big step'
+        steps: int: how many of that step to take in one move (T-F8). Defaults
+            to 1, so every existing caller is unaffected; the wheel handler uses
+            it to apply a burst of notches as a single relative move.
         """
         #Get the currently selected one-D stage:
         selectedStage = self.oneDstageDropdown.currentText()
@@ -1562,12 +2216,23 @@ class MMConfigUI(CustomMainWindow):
         
         logging.debug("moving " + selectedStage + " by " + str(amount))
         
-        #Move the stage relatively
+        #Move the stage relatively -- queued on the owner thread (T-B4). A
+        #wheel notch over the napari canvas reaches this slot, so it used to
+        #drive a stage move from the GUI thread on every scroll burst.
         if abs(amount) == 2:
-            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagesmallAmount).astype(float)) #type:ignore
+            distance = float(np.sign(amount)*steps*self.moveoneDstagesmallAmount)
         elif abs(amount) == 1:
-            self.shared_data.MILcore.set_relative_position(selectedStage,(np.sign(amount)*self.moveoneDstagelargeAmount).astype(float)) #type:ignore
+            distance = float(np.sign(amount)*steps*self.moveoneDstagelargeAmount)
+        else:
+            distance = None
+        if distance is not None:
+            submitHardware(self.shared_data,
+                           self.shared_data.MILcore.set_relative_position,
+                           selectedStage, distance, label='mm.moveOneDStage')
+        #Queued behind the move, so it reads the post-move position.
         self.updateOneDstageLayout()
+        # Second read-back after the stage has had time to settle.
+        QTimer.singleShot(500, self.updateOneDstageLayout)
     
     
     def oneDstageRelLayout(self):
@@ -1592,8 +2257,8 @@ class MMConfigUI(CustomMainWindow):
         #Set default value to default z stage of MM
         try:
             self.oneDstageRelDropdown.setCurrentText(self.shared_data.MILcore.get_focus_device()) #type:ignore
-        except:
-            pass
+        except (RuntimeError, OSError, AttributeError) as exc:
+            logging.debug('get_focus_device() not available for oneDstageRel: %s', exc)
         #Add the dropdown to the layout:
         self.oneDStageRelLayout.addWidget(self.oneDstageRelDropdown,0,0)
         
@@ -1634,8 +2299,26 @@ class MMConfigUI(CustomMainWindow):
         Updates the OneD stage layout text with the current values of the stage dropdown and the current position of the stage
         """
         logging.debug("Updating OneD stage layout")
-        self.oneDinfoRelWidget.setText(f"{self.oneDstageRelDropdown.currentText()}\r\n {self.shared_data.MILcore.get_position(self.oneDstageRelDropdown.currentText()):.1f}") #type:ignore
-        
+        # T-B4: the position read goes to the owner thread; the widget text and
+        # the stacked-widget switch come back to the GUI thread.
+        stage_name = self.oneDstageRelDropdown.currentText()
+        submitHardware(self.shared_data, self._readOneDstageRelPosition, stage_name,
+                       label='mm.get_position')
+
+    def _readOneDstageRelPosition(self, stage_name):
+        """Owner-thread half of `updateOneDstageRelLayout`."""
+        try:
+            pos = self.shared_data.MILcore.get_position(stage_name) #type:ignore
+        except Exception as exc:
+            logging.debug('One-D stage position update skipped: %s', exc)
+            return
+        guiThreadCall(self.shared_data,
+                      lambda: self._applyOneDstageRelLayout(stage_name, pos))
+
+    def _applyOneDstageRelLayout(self, stage_name, pos):
+        """GUI-thread half of `updateOneDstageRelLayout`."""
+        self.oneDinfoRelWidget.setText(f"{stage_name}\r\n {pos:.1f}") #type:ignore
+
         for widget_id in range(0,self.oneDRelStackedWidget.count()):
             widget = self.oneDRelStackedWidget.widget(widget_id)
             if widget.objectName() == self.oneDstageRelDropdown.currentText():
@@ -1646,37 +2329,135 @@ class MMConfigUI(CustomMainWindow):
         Updates the XY stage info widget with the current position of the stage
 
         """
-        #Obtain the stage info from MM:
-        XYStageName = self.shared_data.MILcore.get_xy_stage_device() #type:ignore
-        #Get the stage position
-        for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
-            XYStagePos = self.shared_data.MILcore.get_xy_position(XYStageName) #type:ignore
+        #TODO: catch if no xy stage present
+        # T-B4: the four hardware reads happen on the owner thread and only the
+        # final text reaches the GUI thread. The three-read loop below is kept
+        # (see its comment -- the first read reports the pre-move position), but
+        # only its last result was ever visible.
+        submitHardware(self.shared_data, self._readXYStagePosition,
+                       label='mm.get_xy_position')
+
+    def _readXYStagePosition(self):
+        """Owner-thread half of `updateXYStageInfoWidget`."""
+        try:
+            #Obtain the stage info from MM:
+            XYStageName = self.shared_data.MILcore.get_xy_stage_device() #type:ignore
+            #Get the stage position
+            for _ in range(3): #we do this twice on purpose - the first time it doesn't update to the new position. Doing it twice seems to do the trick.
+                XYStagePos = self.shared_data.MILcore.get_xy_position(XYStageName) #type:ignore
+        except (RuntimeError, OSError, AttributeError, TypeError) as exc:
+            logging.debug('XY stage position update skipped: %s', exc)
+            return
+        guiThreadCall(self.shared_data,
+                      lambda: self._applyXYStageInfo(XYStageName, XYStagePos))
+
+    def _applyXYStageInfo(self, XYStageName, XYStagePos):
+        """GUI-thread half of `updateXYStageInfoWidget`."""
+        try:
             self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
-        #Align text center:
-        self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            #Align text center:
+            self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        except RuntimeError:  # widget already destroyed
+            pass
         
     def moveXYStage(self,relX,relY):
         """
         Move XY stage with um positions in relx, rely:
         """
-        #Set the position
-        self.shared_data.MILcore.set_relative_xy_position([relX,relY]) 
-        
-        #Update the XYStageInfoWidget
+        # T-B4: queued on the owner thread, like the one-D stage move. The
+        # read-back below queues behind it, so it reports the post-move position.
+        submitHardware(self.shared_data,
+                       self.shared_data.MILcore.set_relative_xy_position,
+                       [relX,relY], label='mm.moveXYStage')
         self.updateXYStageInfoWidget()
+        # Second read-back after the stage has had time to complete the move.
+        QTimer.singleShot(500, self.updateXYStageInfoWidget)
     #endregion
     
     #region MM-configs
+    def _autoRefreshConfigLayout(self):
+        """Timer-driven tick of rebuildConfigLayout(), self-disabling if it's slow.
+
+        rebuildConfigLayout() runs synchronously on the GUI thread, so its wall
+        time here is the freeze it causes. If a tick takes longer than
+        CONFIG_AUTOREFRESH_MAX_FREEZE_MS, the timer stops itself silently
+        (no dialog/warning to the user) rather than keep freezing the GUI
+        every CONFIG_AUTOREFRESH_INTERVAL_MS.
+        """
+        start = time.perf_counter()
+        self.rebuildConfigLayout()
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if elapsed_ms > CONFIG_AUTOREFRESH_MAX_FREEZE_MS:
+            logging.info(
+                'Configurations panel auto-refresh took %.1f ms (> %d ms) - disabling auto-refresh',
+                elapsed_ms, CONFIG_AUTOREFRESH_MAX_FREEZE_MS)
+            self._configAutoRefreshTimer.stop()
+
+    def rebuildConfigLayout(self):
+        """Fully rebuild the Configurations panel from live MM state.
+
+        Unlike updateConfigsFromMM() (which only pushes new values into
+        already-existing row widgets), this re-fetches the current list of
+        config groups from MIL and recreates every row. That's required
+        after the config group editor adds/renames/deletes a group or
+        preset: self.config_groups, and each dropdown's item list, are
+        otherwise frozen at construction time, so a renamed/added group
+        would never appear and setCurrentText() on a preset name that
+        didn't exist yet at construction would silently do nothing.
+        """
+        if not self.showConfigs:
+            return
+        self._clearConfigLayout()
+
+        self.dropDownBoxes = {}
+        self.sliders = {}
+        self.editFields = {}
+        self.configCheckboxes = {}
+        self.configEntries = {}
+
+        group_count = len(shared_data.MILcore.get_available_config_groups())
+        self.config_groups = {i: ConfigInfo(self.core, self.shared_data, i) for i in range(group_count)}
+
+        for config_id in range(len(self.config_groups)):
+            self.configEntries[config_id] = self.addRow(config_id)
+
+    def _clearConfigLayout(self):
+        """Remove every row (and any leftover widgets) from configLayout."""
+        while self.configLayout.count():
+            self._clearLayoutItem(self.configLayout.takeAt(0))
+
+    def _clearLayoutItem(self, item):
+        child_layout = item.layout()
+        widget = item.widget()
+        if child_layout is not None:
+            while child_layout.count():
+                self._clearLayoutItem(child_layout.takeAt(0))
+        if widget is not None:
+            # Hidden and detached now, not when the event loop gets round to
+            # the deleteLater -- otherwise the old row is painted over the new.
+            widget.hide()
+            widget.setParent(None)
+            widget.deleteLater()
+
     def addRow(self,config_id):
         """
         Add a new row in the configLayout which will be populated with a label-dropdown/slider/inputField combination
         """
         rowLayout = QHBoxLayout()
+        rowLayout.setContentsMargins(0, 0, 0, 0)
         #Add the label to it
         self.addLabel(rowLayout,config_id)
-        #Add the widget to the QVBoxlayout
-        self.configLayout.addLayout(rowLayout,divmod(config_id,self.number_columns)[1],divmod(config_id,self.number_columns)[0])
-        
+        #The label (and checkbox) go in their own grid column so every row's
+        #control starts at the same x; `number_columns` rows per block.
+        labelLayout = QHBoxLayout()
+        labelLayout.setContentsMargins(0, 0, 0, 0)
+        for _ in range(2 if self.showCheckboxes else 1):
+            labelLayout.addWidget(rowLayout.takeAt(0).widget())
+        block, row = divmod(config_id, self.number_columns)
+        self.configLayout.addLayout(labelLayout, row, 2 * block)
+        self.configLayout.addLayout(rowLayout, row, 2 * block + 1)
+        self.configLayout.setColumnStretch(2 * block + 1, 1)
+
         return rowLayout
     
     def addLabel(self,rowLayout,config_id):
@@ -1695,16 +2476,32 @@ class MMConfigUI(CustomMainWindow):
         label = QLabel()
         label.setText(self.config_groups[config_id].configGroupName())
         rowLayout.addWidget(label)
-        #Add the dropdown/slider/inputfield:
-        if self.config_groups[config_id].isDropDown():
+        #Add the read-only display/dropdown/slider/inputfield (mutually
+        #exclusive -- see ConfigInfo.isReadOnly/isDropDown/isSlider/isInputField):
+        if self.config_groups[config_id].isReadOnly():
+            self.addReadOnlyDisplay(rowLayout,config_id)
+        elif self.config_groups[config_id].isDropDown():
             self.addDropDown(rowLayout,config_id)
-        if self.config_groups[config_id].isSlider():
+        elif self.config_groups[config_id].isSlider():
             self.addSlider(rowLayout,config_id)
-        if self.config_groups[config_id].isInputField():
+        elif self.config_groups[config_id].isInputField():
             self.addInputField(rowLayout,config_id)
         return rowLayout
         # pass
-    
+
+    def addReadOnlyDisplay(self,rowLayout,config_id):
+        """
+        Add a static, non-interactive label to the given rowLayout showing
+        this config group's current value -- used when every device property
+        backing the group is read-only (e.g. a computed/status value such as
+        an actual frame interval), so there is nothing the user could set
+        through a dropdown/slider/input field anyway.
+        """
+        self.editFields[config_id] = QLabel()
+        set_role(self.editFields[config_id], ROLE_READONLY)
+        self.editFields[config_id].setText(str(self.config_groups[config_id].getStorableValue()))
+        rowLayout.addWidget(self.editFields[config_id])
+
     def addDropDown(self,rowLayout,config_id):
         """
         Add a drop-down menu to the given rowLayout
@@ -1747,7 +2544,11 @@ class MMConfigUI(CustomMainWindow):
                 #Get the config group name:
                 configGroupName = self.config_groups[config_id].configGroupName()
                 #Set in MM:
-                self.config_groups[config_id].core.set_config(configGroupName,newValue)
+                # T-B4: queued on the hardware owner thread. A config switch
+                # can move a filter wheel, i.e. seconds of hardware time.
+                submitHardware(self.shared_data,
+                               self.config_groups[config_id].core.set_config,
+                               configGroupName, newValue, label='mm.set_config')
     
     def addSlider(self,rowLayout,config_id):
         """
@@ -1799,6 +2600,10 @@ class MMConfigUI(CustomMainWindow):
         self.sliders[config_id].slider_conversion_array = [lowerLimit,upperLimit,sliderPrecision]
         #Add a callback when it is changed:
         self.sliders[config_id].valueChanged.connect(lambda value, config_id = config_id: self.on_sliderChanged(config_id,fromSlider=True,fromText=False))
+        #T-F8: releasing the handle commits immediately rather than waiting out
+        #the debounce, so the device reaches the final value as soon as the drag
+        #ends.
+        self.sliders[config_id].sliderReleased.connect(self._flushSliderPropertyWrites)
         # #Add the slider to the rowLayout:
         rowLayout.addWidget(self.sliders[config_id])
         pass
@@ -1834,19 +2639,17 @@ class MMConfigUI(CustomMainWindow):
         if self.changes_update_MM:
             #Change the value if it's a true value
             if trueValue != "" and trueValue != " ":
-                #Get the config group name:
-                configGroupName = self.config_groups[config_id].configGroupName()
-                #Set in MM:
-                #A slider config by definition (?) only has a single property underneath, so get that:
-                
-                underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
-                configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-                device_label = configdata.getSetting(0).getDeviceLabel()
-                property_name = configdata.getSetting(0).getPropertyName()
+                # T-F8: dragging a slider emits valueChanged per pixel, and each
+                # one of those used to do two hardware getters plus a
+                # set_property. The GUI half below still runs per pixel so the
+                # number tracks the handle; only the device write is deferred to
+                # the end of the drag. A typed value is a deliberate commit, so
+                # it is written straight through.
+                if fromSlider:
+                    self._scheduleSliderPropertyWrite(config_id, trueValue)
+                else:
+                    self._writeSliderProperty(config_id, trueValue)
 
-                #Set this property:
-                self.config_groups[config_id].core.set_property(device_label,property_name,trueValue)
-                
         if trueValue != "" and trueValue != " ":
             trueValue = round(trueValue,3)
             #Set the slider/text if the other is changed
@@ -1856,6 +2659,74 @@ class MMConfigUI(CustomMainWindow):
                 newValue = self.sliders[config_id].slider_conversion_array[2] * (trueValue - self.sliders[config_id].slider_conversion_array[0]) / (self.sliders[config_id].slider_conversion_array[1] - self.sliders[config_id].slider_conversion_array[0])
                 self.sliders[config_id].setValue(int(newValue))
     
+    #: Idle window before a dragged slider's value reaches the device (T-F8).
+    #: `sliderReleased` flushes immediately, so this only matters for a drag
+    #: that pauses mid-flight or a value changed with the arrow keys.
+    SLIDER_WRITE_DEBOUNCE_MS = 200
+
+    def _writeSliderProperty(self, config_id, trueValue):
+        """Queue one slider's value for the device (T-B4).
+
+        The lookups and the write are one job on the owner thread: two getters
+        plus a `set_property`, which on the Java backend is three bridge round
+        trips the GUI thread used to make per flushed drag.
+        """
+        submitHardware(self.shared_data, self._setUnderlyingConfigProperty,
+                       config_id, trueValue, label='mm.set_property')
+
+    def _setUnderlyingConfigProperty(self, config_id, value):
+        """Resolve a single-property config group and write it (owner thread).
+
+        Shared by the slider and the edit field -- both config kinds have, by
+        definition, exactly one property underneath.
+        """
+        try:
+            configGroupName = self.config_groups[config_id].configGroupName()
+            #A slider/editfield config by definition (?) only has a single property underneath, so get that:
+            underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
+            configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
+            device_label = configdata.getSetting(0).getDeviceLabel()
+            property_name = configdata.getSetting(0).getPropertyName()
+
+            #Set this property:
+            self.config_groups[config_id].core.set_property(device_label,property_name,value)
+        except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as exc:
+            logging.warning('Setting property for config %s failed: %s', config_id, exc)
+
+    def _scheduleSliderPropertyWrite(self, config_id, trueValue):
+        """Coalesce a drag into one device write (T-F8).
+
+        Keyed per `config_id`, so dragging one slider never discards another's
+        pending value. Only the newest value for a given slider is kept -- the
+        intermediate positions of a drag are not values the user asked for.
+        """
+        pending = getattr(self, '_pendingSliderWrites', None)
+        if pending is None:
+            pending = self._pendingSliderWrites = {}
+        pending[config_id] = trueValue
+
+        timer = getattr(self, '_sliderWriteTimer', None)
+        if timer is None:
+            timer = self._sliderWriteTimer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._flushSliderPropertyWrites)
+        timer.start(self.SLIDER_WRITE_DEBOUNCE_MS)
+
+    def _flushSliderPropertyWrites(self):
+        """Write every slider whose value is still pending."""
+        pending = getattr(self, '_pendingSliderWrites', None)
+        if not pending:
+            return
+        self._pendingSliderWrites = {}
+        timer = getattr(self, '_sliderWriteTimer', None)
+        if timer is not None:
+            timer.stop()
+        for config_id, trueValue in pending.items():
+            try:
+                self._writeSliderProperty(config_id, trueValue)
+            except (RuntimeError, OSError, AttributeError, KeyError, IndexError) as exc:
+                logging.warning('Setting slider property for %s failed: %s', config_id, exc)
+
     def addInputField(self,rowLayout,config_id):
         """ 
         Add a editfield to a rowLayout for a given MMConfigItem.
@@ -1880,18 +2751,10 @@ class MMConfigUI(CustomMainWindow):
         """
 
         CurrentText = self.editFields[config_id].text()
-        #Get the config group name:
-        configGroupName = self.config_groups[config_id].configGroupName()
-
-        #An Editfield config by definition (?) only has a single property underneath, so get that:
-        underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
-            
-        configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
-        device_label = configdata.getSetting(0).getDeviceLabel()
-        property_name = configdata.getSetting(0).getPropertyName()
-
-        #Set this property:
-        self.config_groups[config_id].core.set_property(device_label,property_name,CurrentText)
+        # T-B4: the widget read stays here; the two lookups and the write go to
+        # the owner thread as one job.
+        submitHardware(self.shared_data, self._setUnderlyingConfigProperty,
+                       config_id, CurrentText, label='mm.set_property')
         
     def updateValuefromMM(self,config_id):
         """
@@ -1908,7 +2771,9 @@ class MMConfigUI(CustomMainWindow):
         currentValue = self.config_groups[config_id].getCurrentMMValue()
         
         #Set the value of the dropdown to the current MM value
-        if self.config_groups[config_id].isDropDown():
+        if self.config_groups[config_id].isReadOnly():
+            self.editFields[config_id].setText(str(self.config_groups[config_id].getStorableValue()))
+        elif self.config_groups[config_id].isDropDown():
             self.dropDownBoxes[config_id].setCurrentText(currentValue)
         elif self.config_groups[config_id].isSlider():
             #A slider config by definition (?) only has a single property underneath, so get that:
@@ -2032,76 +2897,6 @@ class MMConfigUI(CustomMainWindow):
         pass
     #endregion
 
-    #region deprecated
-    def get_device_properties(self):
-        """
-        Get device properties.
-        
-        Args:
-            self: The object itself.
-            
-        Returns:
-            List: A list of dictionaries containing device properties.
-        """
-        
-        core = self.core
-        devices = core.get_loaded_devices() #type:ignore
-        devices = [devices.get(i) for i in range(devices.size())]
-        device_items = []
-        for device in devices:
-            logging.debug('Device: '+device)
-            names = core.get_device_property_names(device) #type:ignore
-            props = [names.get(i) for i in range(names.size())]
-            property_items = []
-            for prop in props:
-                logging.debug('Property',prop)
-                value = core.get_property(device, prop) #type:ignore
-                is_read_only = core.is_property_read_only(device, prop) #type:ignore
-                if core.has_property_limits(device, prop): #type:ignore
-                    lower = core.get_property_lower_limit(device, prop) #type:ignore
-                    upper = core.get_property_upper_limit(device, prop) #type:ignore
-                    allowed = {
-                    "type": "range",
-                    "min": lower,
-                    "max": upper,
-                    "readOnly": is_read_only,
-                    }
-                else:
-                    allowed = core.get_allowed_property_values(device, prop) #type:ignore
-                    allowed = {
-                    "type": "enum",
-                    "options": [allowed.get(i) for i in range(allowed.size())],"readOnly": is_read_only,
-                    }
-                    property_items.append(
-                    {"device": device, "name": prop, "value": value, "allowed": allowed}
-                    )
-                    logging.debug('===>', device, prop, value, allowed)
-            if len(property_items) > 0:
-                device_items.append(
-                {
-                "name": device,
-                "value": "{} properties".format(len(props)),
-                "items": property_items,
-                }
-                )
-        return device_items
-
-    def Vseparator_line(self):
-        """
-        Creates a vertical separator line widget.
-        
-        Args:
-            None
-        
-        Returns:
-            QFrame: A vertical separator line widget with frame shape set to QFrame.VLine, frame shadow set to QFrame.Sunken, and background color set to #FFFFFF with a minimum width of 1px.
-        """
-        
-        separator_line = QFrame()
-        separator_line.setFrameShape(QFrame.VLine)
-        separator_line.setFrameShadow(QFrame.Sunken)
-        separator_line.setStyleSheet("background-color: #FFFFFF; min-width: 1px;")
-        return separator_line
     #endregion
     
 def microManagerControlsUI(main_layout,sshared_data):

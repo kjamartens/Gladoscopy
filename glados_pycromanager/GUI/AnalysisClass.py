@@ -2,31 +2,37 @@
 Handles the GUI display of Glados-pycromanager, as well as the structure for analysis (normal and real-time) to run on secondary threads.
 """
 
+import cProfile
+import io
+import json
+import logging
+import multiprocessing as mp
+import os
+import pickle
+import pstats
+import queue as std_queue
 import sys
 import time
-import time
-import numpy as np
-import logging
 from collections import deque
-from typing import Union, Tuple, List
-from PyQt5.QtCore import pyqtSignal, QThread
-from threading import Event
-from threading import Event
-import os
+from threading import Event, get_native_id
+from typing import List, Tuple, Union
+
+import numpy as np
+from PyQt5.QtCore import QThread, pyqtSignal
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.GUI.utils as utils
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+import glados_pycromanager.GUI.utils as utils
+import glados_pycromanager.GUI.layer_group as layer_group
+import glados_pycromanager.GUI.rt_history as rt_history
 
 
 #Class for overlays and their update and such
-class napariOverlay():
-    def __init__(self,napariViewer,layer_name:Union[str,None]='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None):
+class napariOverlay:
+    def __init__(self,napariViewer,layer_name:str | None='new Layer',colormap='gray',opacity=1,visible=True,blending='translucent',layerType = None,RT_analysisObject=None,shared_data=None):
         """
         Initializes an instance of the class with the specified `napariViewer` and `layer_name`.
 
@@ -49,45 +55,80 @@ class napariOverlay():
         self.blending = blending
         self.RT_analysisObject = RT_analysisObject
         self.layerType = layerType
+        self.shared_data = shared_data
         try:
             self.layer_scale = napariViewer.layers[0].scale
-        except:
+        except (AttributeError, IndexError, TypeError):
             self.layer_scale = [1,1]
         
-        #Get info from a RT analysis object (i.e. outside-based-analysis)
+        #Get info from a RT analysis object (i.e. outside-based-analysis).
+        #
+        #visualise_init() may return the historical `(name, type)` 2-tuple or, since
+        #the layer-group work, a list of specs. `is_legacy` is what decides whether
+        #the node's visualise() is handed the bare napari layer (legacy, so every
+        #node written against the old contract is untouched) or the group.
         if self.RT_analysisObject is not None:
-            self.layer_name, self.layerType = self.RT_analysisObject.visualise_init()
-            logging.debug(f"#nO - Initialised napariOverlay with layer_name: {self.layer_name}, layerType: {self.layerType}")
-            
-        #Create the layer if layer_name is not none
-        #layer_name is None if we only want to instantialise the napariOverlay but not get any shape
-        if self.layer_name is not None:
-            if self.layerType is not None:
-                
-                #check if a layer with this name already exists:
-                if self.layer_name in napariViewer.layers:
-                    self.layer = napariViewer.layers[self.layer_name]
-                        
-                else: #else create the layer
-                    if self.layerType == 'image':
-                        self.layer = napariViewer.add_image(np.zeros((32,32)),name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'labels':
-                        self.layer = napariViewer.add_labels([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'points':
-                        self.layer = napariViewer.add_points(name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'shapes':
-                        self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'surface':
-                        self.layer = napariViewer.add_surface([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'tracks':
-                        self.layer = napariViewer.add_tracks([],name=self.layer_name,scale=self.layer_scale)
-                    elif self.layerType == 'vectors':
-                        self.layer = napariViewer.add_vectors(name=self.layer_name,scale=self.layer_scale)
-            else: #Fallback if no layer type is specified at all
-                self.layer = napariViewer.add_shapes(name=self.layer_name,scale=self.layer_scale)
+            self.specs, self.is_legacy = layer_group.normalise_layer_specs(
+                self.RT_analysisObject.visualise_init())
+            logging.debug("#nO - Initialised napariOverlay with specs: %s (legacy=%s)",
+                          [s.name for s in self.specs], self.is_legacy)
+        elif self.layer_name is not None:
+            #Direct construction with an explicit name (the non-RT callers). A
+            #layerType of None has always meant "give me a shapes layer".
+            self.specs = [layer_group.LayerSpec(
+                name=self.layer_name,
+                type=self.layerType if self.layerType is not None else 'shapes')]
+            self.is_legacy = True
+        else:
+            #layer_name is None if we only want to instantiate the napariOverlay
+            #but not get any shape.
+            self.specs = []
+            self.is_legacy = True
+
+        self.group = layer_group.NapariLayerGroup(specs=self.specs, layers=[])
+        for spec in self.specs:
+            self.group.layers.append(
+                layer_group.create_layer(napariViewer, spec, scale=self.layer_scale))
+
+        if self.group.layers:
+            #`self.layer` stays the primary layer for every existing caller
+            #(getLayer, changeName, the legacy draw*Overlay helpers, the teardown
+            #paths in napariGlados/MMcontrols).
+            self.layer = self.group.primary
+            self.layer_name = self.specs[0].name
+            self.layerType = self.specs[0].type
+            #Side-by-side layers are offset against the acquisition layer when
+            #there is one, so the panel sits beside the image the node analysed
+            #rather than beside its own (possibly tiny) placeholder.
+            self.group.apply_placement(base_layer=self._placementBaseLayer())
+            logging.debug("Using layer(s) %s", self.group.names)
         
-            logging.debug(f"Using layer {self.layer}")
-        
+    def _placementBaseLayer(self):
+        """The layer a side-by-side panel is positioned against.
+
+        The acquisition/live layer when one exists, so an SR panel lands beside the
+        image its localizations came from. Falls back to the group's own primary
+        layer (`apply_placement`'s own default) when there is none -- at node
+        startup the acquisition layer may not exist yet, which is why
+        `apply_placement` is re-run from the visualisation path as the extent
+        settles.
+        """
+        name = getattr(self.shared_data, 'newestLayerName', None)
+        if not name:
+            return None
+        try:
+            if name in self.napariViewer.layers and name not in self.group.names:
+                return self.napariViewer.layers[name]
+        except (AttributeError, KeyError, TypeError) as exc:
+            logging.debug('Could not resolve placement base layer %r: %s', name, exc)
+        return None
+
+    def refreshPlacement(self):
+        """Re-offset side-by-side layers; cheap no-op when nothing moved."""
+        if not self.group.layers:
+            return False
+        return self.group.apply_placement(base_layer=self._placementBaseLayer())
+
     #Update the name of the overlay
     def changeName(self,new_name):
         """
@@ -186,7 +227,7 @@ class napariOverlay():
         self.layer = self.napariViewer.add_shapes(polygons,shape_type='polygon',edge_color='transparent',face_color='transparent',name=self.layer_name,scale=self.layer_scale,opacity = self.opacity,visible=self.visible)
     
     #Update routine for an overlay that only has shapes
-    def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
+    def drawSquaresOverlay(self,shapePosList = [[0,0,10,10]],shapeCol: list[str | tuple[float, float, float]] = ['black']):
         """
         Running loop to draw/update and overlay with one or multiple rectangles. Requires shapesOverlay_init to be ran beforehand
 
@@ -212,7 +253,7 @@ class napariOverlay():
             self.layer.add(polygons,shape_type='polygon',edge_color='transparent',face_color=shapeCol)
     
     #Update routine for an overlay that only has shapes
-    def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: List[Union[str, Tuple[float, float, float]]] = ['black']):
+    def drawShapesOverlay(self,shapePosList = [[0,0],[0,10],[10,10],[10,0]],shapeCol: list[str | tuple[float, float, float]] = ['black']):
         """
         Running loop to draw arbitrary-shaped polygon shapes. Requires shapesOverlay_init to be ran beforehand
 
@@ -225,7 +266,7 @@ class napariOverlay():
         """
         #Update the shapes
         polygons = []
-        for p in range((shapePosList.shape[2])):
+        for p in range(shapePosList.shape[2]):
             polygons.append(shapePosList[:,:,p])
         #Remove the old polygon
         self.layer.data = []
@@ -283,15 +324,31 @@ class napariOverlay():
         """
         del self
 
+#: How long a wait() on an RT-analysis thread's "new image" Event may block
+#: before re-checking its running flag. Purely a deadman: every stop() sets the
+#: event, so a healthy thread wakes immediately (T-G9).
+RT_THREAD_WAIT_TIMEOUT_S = 1.0
+
+#: How long destroy() waits for an RT-analysis thread to actually exit before
+#: logging that it did not. Runs on the GUI thread, so it is deliberately short.
+RT_THREAD_JOIN_TIMEOUT_MS = 1000
+
+#: How long an RT-analysis overlay payload may sit unacknowledged by the GUI
+#: thread before the hand-off slot is force-released. See
+#: AnalysisThread_customFunction_Visualisation._claim_visualise_slot.
+RT_VISUALISE_INFLIGHT_TIMEOUT_S = 5.0
+
+
 class AnalysisThread_customFunction_Visualisation(QThread):
-    finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,analysisObject,shared_data,analysisInfo: Union[str, None] = 'Random',delay=None):
+    finished = pyqtSignal()
+    _do_visualise = pyqtSignal(object)
+    def __init__(self,analysisObject,shared_data,analysisInfo: str | None = 'Random',delay=None):
         super().__init__()
         #Initiate some variables
         if delay==None:
             #Get the delay of the function from the realTimeAnalysis module,
             #ensure that it's never faster than the visualisation rate
-            min_delay_visualisation = int(1000/(float(shared_data.globalData['VISUALISATION-FPS']['value'])))
+            min_delay_visualisation = int(1000/(float(shared_data.config.visualisation_config.fps)))
             delay = max(min_delay_visualisation,utils.realTimeAnalysis_getDelay(analysisInfo,runOrVis='visualise'))
         
         logging.debug('#aC - init analysisThread_customFunction_Visualisation')
@@ -301,57 +358,893 @@ class AnalysisThread_customFunction_Visualisation(QThread):
         self.analysisInfo = analysisInfo
         self.napariViewer = shared_data.napariViewer
         self.sleepTimeMs = delay
-        self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS')
+        self.napariOverlay = napariOverlay(self.napariViewer,RT_analysisObject=analysisObject,layer_name='TestLayer_VIS',shared_data=shared_data)
         self.visualisation_queue = deque(maxlen=10)#queue.Queue()
         self.shared_data = shared_data
         
-        #And start  the thread
         self.running = True
-        self._new_image = Event() #Event when a new image is put in the queue
-        self._new_image = Event() #Event when a new image is put in the queue
-        # self.process_queue()
+        self._new_image = Event()
+        #Depth limit for the hand-off to the GUI thread. _do_visualise is a
+        #queued connection and the loop below sleeps a fixed sleepTimeMs after
+        #emitting, whether or not the GUI thread ever drew the last payload --
+        #so an overlay slower than the analysis used to stack up in Qt's event
+        #queue and drift unboundedly behind the acquisition. None = idle;
+        #otherwise the monotonic timestamp of the unacknowledged payload.
+        self._visualise_in_flight = None
+        self._do_visualise.connect(self._visualise_on_main_thread)
     
     def new_image(self):
         self._new_image.set()
-        
-    
-    def new_image(self):
-        self._new_image.set()
-        
+
+    def _claim_visualise_slot(self):
+        """Reserve the single hand-off slot to the GUI thread, or refuse it.
+
+        The watchdog exists because a payload that never reaches
+        `_visualise_on_main_thread` -- a GUI-side crash, or a teardown that
+        races the emit -- would otherwise silence this node's overlay for the
+        rest of the session.
+        """
+        pending = self._visualise_in_flight
+        if pending is not None:
+            if time.monotonic() - pending < RT_VISUALISE_INFLIGHT_TIMEOUT_S:
+                return False
+            logging.warning('RT-analysis overlay was never drawn by the GUI thread '
+                            'within %ss; releasing the hand-off slot',
+                            RT_VISUALISE_INFLIGHT_TIMEOUT_S)
+        self._visualise_in_flight = time.monotonic()
+        return True
+
+    def _visualise_on_main_thread(self, data):
+        """Slot executed on the main (GUI) thread via Qt queued connection."""
+        try:
+            RT_analysis_object, analysisInfo, image, metadata, shared_data, core = data[:6]
+            #The state the node was in when this frame finished being analysed. See
+            #_visualise_paired for why the node's *current* state is not good enough.
+            state_snapshot = data[6] if len(data) > 6 else None
+            self._visualise_paired(RT_analysis_object, analysisInfo, image, metadata,
+                                   core, state_snapshot)
+        finally:
+            #Always, so one failed overlay cannot wedge the hand-off.
+            self._visualise_in_flight = None
+
+    def _visualise_paired(self, RT_analysis_object, analysisInfo, image, metadata,
+                          core, state_snapshot):
+        """Render `image` against the node state that *this* frame produced.
+
+        The queued payload carries the image by value but the node by reference,
+        and the visualisation thread deliberately runs slower than the analysis
+        (`visualise_delay`, plus the configured display FPS). So by the time this
+        runs, `run()` has usually processed several more frames and overwritten the
+        node's attributes in place -- and the overlay ends up drawing frame N's
+        image with frame N+k's results. That is what made pSMLM's localizations sit
+        on the wrong frame, and it applies to every node with a visualisation.
+
+        Applying the frame's own snapshot fixes the pairing. The previous values are
+        restored afterwards because for an in-process node this *is* the live
+        instance that `run()` is still using: a node that accumulates in `run()`
+        (RT_counter incrementing a tally, say) would otherwise be rewound and lose
+        whatever happened while this frame sat in the queue.
+
+        A node that declares no `__snapshot_attrs__` has no snapshot, so it keeps
+        the old, unpaired behaviour -- declaring them is what buys frame-consistent
+        overlays.
+        """
+        if not state_snapshot:
+            self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+            return
+        _absent = object()
+        previous = {key: getattr(RT_analysis_object, key, _absent)
+                    for key in state_snapshot}
+        try:
+            RT_analysis_object.__dict__.update(state_snapshot)
+            self.updateVisualisation(RT_analysis_object, analysisInfo, image, metadata, core)
+        finally:
+            for key, value in previous.items():
+                if value is _absent:
+                    RT_analysis_object.__dict__.pop(key, None)
+                else:
+                    RT_analysis_object.__dict__[key] = value
+
     def run(self):
-        while self.running:
-            # tic = time.time()
-            # #Only check the vis queue if live or mda is ongoing
-            # if self.shared_data.liveMode or self.shared_data.mdaMode:
-            #     logging.debug(f'#aC - running analysisThread_customFunction_Visualisation, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
-            #     if self.visualisation_queue:
-            self._new_image.wait()#Wait for a new image
-            self._new_image.clear()
+        node_label = self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node') if isinstance(self.analysisInfo, dict) else str(self.analysisInfo)
+        self.shared_data.register_perf_thread_label(get_native_id(), f'RT-analysis visualisation: {node_label}')
+        try:
+            while self.running:
+                #Timed wait: stop() sets the event, so this is only a deadman for
+                #a stop that never reached us (T-G9). Without it a stopped
+                #visualisation thread blocked here forever.
+                self._new_image.wait(RT_THREAD_WAIT_TIMEOUT_S)
+                self._new_image.clear()
+                if not self.visualisation_queue:
+                    continue
+                data = self.visualisation_queue.popleft()
+                #Drop this frame if the GUI thread has not finished drawing the
+                #previous one. Holding it instead would only move the backlog;
+                #the next frame along is fresher and worth more.
+                if not self._claim_visualise_slot():
+                    self.msleep(max(1, self.sleepTimeMs))
+                    continue
+                # Emit to main thread so napari layer ops run on GUI thread (not here).
+                self._do_visualise.emit(data)
+                self.msleep(max(1,self.sleepTimeMs))
+        finally:
+            self.shared_data.unregister_perf_thread_label(get_native_id())
             
-            data = self.visualisation_queue.popleft()
-            RT_analysis_object,analysisInfo,image,metadata,shared_data,core = data
-            self.updateVisualisation(RT_analysis_object,analysisInfo,image,metadata,core)
-                    # self.visualisation_queue.task_done()
-            #Always sleep while running
-            self.msleep(max(1,self.sleepTimeMs))
-            
-            # print(f'Time spend in analysisclass-run; {time.time()-tic}')
-            
+    def stop(self):
+        """Ask run() to return. Sets the wake event, or the loop would only
+        notice at its next timeout (and, before T-G9, never)."""
+        self.running = False
+        self.is_running = False
+        #A payload emitted just before the stop may never be drawn; do not leave
+        #the slot claimed for a restart of this node to inherit.
+        self._visualise_in_flight = None
+        self._new_image.set()
+
+    def destroy(self):
+        self.stop()
+        self.requestInterruption()
+        self.quit()
+        if not self.wait(RT_THREAD_JOIN_TIMEOUT_MS):
+            logging.warning('RT-analysis visualisation thread did not exit within %sms',
+                            RT_THREAD_JOIN_TIMEOUT_MS)
+
     def updateVisualisation(self,RT_analysis_object,analysisInfo,image,metadata=None,core=None):
         # logging.info('visualisation should be updated here :)')
         # tic = time.time()
-        res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,self.napariOverlay.layer)
+        #A node that declared its layers the legacy way gets the bare napari layer
+        #it has always got; only a node that opted in by returning a list sees the
+        #group. utils.realTimeAnalysis_visualisation treats this argument as opaque.
+        target = self.napariOverlay.layer if self.napariOverlay.is_legacy else self.napariOverlay.group
+        res = utils.realTimeAnalysis_visualisation(RT_analysis_object,analysisInfo,image,metadata,core,target)
+        #The node may have just replaced a layer's data (and so its extent) or set
+        #its own scale; re-offset any side-by-side panel. Skips itself when the
+        #base extent has not moved, so this is not per-frame work.
+        self.napariOverlay.refreshPlacement()
         # print(f'Time spend in updateVisualisation; {time.time()-tic}')
+
+
+# Snapshot-safe attribute types forwarded from the analysis subprocess back to the
+# main-process visualisation shadow instance (see AnalysisProcess_customFunction).
+# Deliberately excludes anything that could be a live handle (core, Qt objects,
+# open files, etc.) which wouldn't survive/be meaningful across a process boundary.
+# Since T-G5 this only *filters* the attributes a node explicitly declared via
+# "__snapshot_attrs__" (or returned from its own snapshot() method) -- it is no
+# longer the selection rule. Mirroring every picklable attribute meant, for
+# RealTimeFFT, shipping the full-size FFT array *and* the cached taper window
+# across the process boundary on every single frame.
+_SUBPROCESS_SNAPSHOT_TYPES = (int, float, bool, str, bytes, type(None), np.ndarray, list, dict, tuple)
+
+
+def _build_state_snapshot(RT_analysis_object, snapshot_attrs):
+    """Plain-data mirror of the node, for the main-process visualisation shadow.
+
+    A `snapshot()` method on the node wins; otherwise the attributes it declared
+    in "__snapshot_attrs__"; otherwise nothing at all.
+    """
+    snapshot_fn = getattr(RT_analysis_object, 'snapshot', None)
+    if callable(snapshot_fn):
+        try:
+            return dict(snapshot_fn())
+        except Exception:
+            logging.exception('AnalysisProcess worker: node snapshot() failed, sending nothing')
+            return {}
+    if not snapshot_attrs:
+        return {}
+    snapshot = {}
+    _absent = object()
+    for name in snapshot_attrs:
+        #Not `getattr(..., None)`: None is a legitimate snapshotable value, so a
+        #declared-but-absent attribute would be mirrored as None and clobber
+        #whatever the shadow instance holds.
+        value = getattr(RT_analysis_object, name, _absent)
+        if value is _absent:
+            logging.debug('AnalysisProcess worker: node has no attribute %r to snapshot', name)
+        elif isinstance(value, _SUBPROCESS_SNAPSHOT_TYPES):
+            snapshot[name] = value
+        else:
+            logging.debug('AnalysisProcess worker: skipping non-snapshotable attribute %r (%s)',
+                          name, type(value).__name__)
+    return snapshot
+
+
+def _createReplaySession(shared_data, analysisInfo, node, visualisationObject, label):
+    """Register this node's replay session, or None when it cannot be replayed.
+
+    Called once the visualisation object exists, since the session holds the node's
+    layers. The session outlives the analysis thread deliberately: the thread is
+    `deleteLater`'d at acquisition end and the node instance is only reachable
+    through it, so without this the results could not be re-rendered afterwards.
+    """
+    if visualisationObject is None or node is None:
+        return None
+    try:
+        if not utils.realTimeAnalysis_replayable(analysisInfo):
+            return None
+        registry = shared_data.rt_replay
+        overlay = visualisationObject.napariOverlay
+        session = rt_history.RTReplaySession(
+            key=_rt_config_key(analysisInfo),
+            node=node,
+            analysis_info=analysisInfo,
+            group=overlay.group,
+            is_legacy=overlay.is_legacy,
+            history=rt_history.RTNodeHistory(registry.budget_bytes, label=label),
+            source_layer_name=getattr(shared_data, 'newestLayerName', None),
+            label=label,
+        )
+        registry.register(session)
+        #There is now something worth replaying, so make sure the slider is being
+        #watched. Attaching is idempotent, and costs nothing until a scrub happens.
+        try:
+            from glados_pycromanager.GUI.rt_replay import get_replay_controller
+            get_replay_controller(shared_data)
+        except Exception:
+            logging.exception('Could not attach the RT-analysis replay controller')
+        return session
+    except Exception:
+        #Retention is a convenience; never let it stop an analysis from running.
+        logging.exception('Could not set up replay history for %s', label)
+        return None
+
+
+def _recordReplayFrame(session, shared_data, metadata, snapshot):
+    """Store one analysed frame's snapshot for later replay."""
+    if session is None or not session.enabled:
+        return False
+    try:
+        if not session.note_snapshot(snapshot):
+            return False
+        axes = (metadata or {}).get('Axes')
+        key = rt_history.axes_key(axes)
+        return session.history.record(
+            key, snapshot, metadata,
+            generation=getattr(shared_data, '_mdaModeParamsGeneration', None))
+    except Exception:
+        logging.exception('Could not retain an RT-analysis frame for %s', session.label)
+        session.enabled = False
+        return False
+
+
+def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
+                                 init_fn=None, run_fn=None, end_fn=None,
+                                 control_in_queue=None, control_out_queue=None,
+                                 log_level=None):
+    """Entry point for the child process spawned by AnalysisProcess_customFunction.
+
+    Kept as a free module-level function (not a method/closure) so it's picklable
+    for multiprocessing's 'spawn' start method (required on Windows). init_fn/
+    run_fn/end_fn default to the real utils.realTimeAnalysis_* functions; tests
+    override them with lightweight picklable stand-ins to avoid depending on the
+    GUI-widget-derived rt_analysis_info dict format.
+
+    core and nodzInfo are always passed as None here -- RT-analysis run() is
+    already documented as not allowed to touch the live hardware core, and a
+    node needing nodzInfo (e.g. to read another graph node's data) at init time
+    is not compatible with subprocess isolation (see class docstring).
+
+    control_in_queue/control_out_queue (Performance Mode, see
+    glados_pycromanager/observability/perf_capture.py): a *separate* pair of
+    queues used only for "start/stop profiling this worker" signaling. Kept
+    deliberately apart from in_queue/out_queue (the per-frame pipeline) so
+    Performance Mode can never be confused with a malformed frame and never
+    delays/derails normal frame processing. Both default to None so existing
+    callers/tests that don't pass them are unaffected.
+
+    log_level: the Adv. settings log level (e.g. "DEBUG"/"INFO") at the time
+    this process was spawned. A 'spawn'-started child gets a fresh, unconfigured
+    root logger (WARNING level, no handlers) -- without this, every logging.debug/
+    info call made by a node's init/run/end here would be silently dropped
+    regardless of what the user picked in Adv. settings. A later change to the
+    setting while this worker is already running arrives via control_in_queue
+    (see the '__set_log_level__:' branch below) rather than a restart.
+    """
+    logging.basicConfig(level=getattr(logging, str(log_level or 'INFO').upper(), logging.INFO))
+    if init_fn is None and run_fn is None and end_fn is None:
+        # Node classes (e.g. FFT_im.RealTimeFFT) are resolved via a sys.modules
+        # stem lookup (_resolve_node_obj), not a fresh import. The spawned child
+        # process only imports what's needed to unpickle this function, so the
+        # RT-analysis plugin package -- built-ins plus anything dropped into the
+        # AppData plugin folder, see CLAUDE.md's plugin-discovery section --
+        # must be imported explicitly here to populate sys.modules.
+        import glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis  # noqa: F401
+
+    init_fn = init_fn or utils.realTimeAnalysis_init
+    run_fn = run_fn or utils.realTimeAnalysis_run
+    end_fn = end_fn or utils.realTimeAnalysis_end
+
+    RT_analysis_object = init_fn(rt_analysis_info, core=None, nodzInfo=None)
+    #Which attributes travel back to the main process after each frame - a node
+    #property, so resolved once here rather than per frame (T-G5).
+    snapshot_attrs = utils.realTimeAnalysis_snapshotAttrs(rt_analysis_info)
+    _child_profiler = cProfile.Profile()
+    try:
+        while not stop_event.is_set():
+            if control_in_queue is not None:
+                try:
+                    ctrl = control_in_queue.get_nowait()
+                except std_queue.Empty:
+                    ctrl = None
+                except Exception:
+                    logging.exception('AnalysisProcess worker: failed to read control queue, ignoring')
+                    ctrl = None
+                if ctrl == '__perf_profile_start__':
+                    _child_profiler.enable()
+                elif ctrl == '__perf_profile_stop__':
+                    _child_profiler.disable()
+                    buf = io.StringIO()
+                    pstats.Stats(_child_profiler, stream=buf).sort_stats('cumulative').print_stats(25)
+                    if control_out_queue is not None:
+                        try:
+                            control_out_queue.put({'__perf_report__': True, 'hotspots': buf.getvalue(), 'pid': os.getpid()})
+                        except Exception:
+                            logging.exception('AnalysisProcess worker: failed to enqueue profile report')
+                    _child_profiler = cProfile.Profile()
+                elif isinstance(ctrl, str) and ctrl.startswith('__set_log_level__:'):
+                    new_level = ctrl.split(':', 1)[1]
+                    logging.getLogger().setLevel(getattr(logging, new_level.upper(), logging.INFO))
+                elif isinstance(ctrl, dict) and ctrl.get('__close__'):
+                    # stop() on a still-alive, cacheable worker (see
+                    # _park_subprocess_worker) parks the process instead of
+                    # tearing it down, but the node itself must still be
+                    # properly closed *at stop time* -- end_fn may finalise
+                    # something (e.g. flush/close a dataset) that must not be
+                    # deferred to whenever (or whether) this worker is later
+                    # reclaimed. The object is left in place afterwards (never
+                    # used again unless __reinit__ replaces it); nothing reads
+                    # from in_queue while parked.
+                    try:
+                        end_fn(RT_analysis_object, rt_analysis_info, None, nodzInfo=None)
+                    except Exception:
+                        logging.exception('AnalysisProcess worker: end_fn failed while parking')
+                    if control_out_queue is not None:
+                        # Ack so stop() can confirm the close was actually
+                        # applied before treating the worker as parked -- see
+                        # tests/test_analysis_process.py's
+                        # test_worker_close_control_message_calls_end_fn.
+                        try:
+                            control_out_queue.put({'__close_done__': True})
+                        except Exception:
+                            logging.exception('AnalysisProcess worker: failed to ack close')
+                elif isinstance(ctrl, dict) and ctrl.get('__reinit__'):
+                    # A warm-restart reclaim (see _park_subprocess_worker):
+                    # the process/imports stay warm, but the node's init()
+                    # must run again so a close+reopen doesn't silently reuse
+                    # the previous run's state. The stale object was already
+                    # properly closed via '__close__' when stop() parked this
+                    # worker, so only init_fn runs here -- calling end_fn again
+                    # on the same object would be a second, spurious close.
+                    rt_analysis_info = ctrl['analysisInfo']
+                    try:
+                        RT_analysis_object = init_fn(rt_analysis_info, core=None, nodzInfo=None)
+                        snapshot_attrs = utils.realTimeAnalysis_snapshotAttrs(rt_analysis_info)
+                    except Exception:
+                        logging.exception('AnalysisProcess worker: reinit failed')
+                    if control_out_queue is not None:
+                        # Ack so a caller (or a test) can know the reinit has
+                        # actually applied before relying on it -- there is no
+                        # ordering guarantee between this control message and
+                        # a frame put on in_queue right after it otherwise.
+                        try:
+                            control_out_queue.put({'__reinit_done__': True})
+                        except Exception:
+                            logging.exception('AnalysisProcess worker: failed to ack reinit')
+            try:
+                item = in_queue.get(timeout=0.5)
+            except std_queue.Empty:
+                continue
+            except Exception:
+                # A malformed/partially-received item (e.g. an unpickling error
+                # on this end) must not kill the whole worker process -- that
+                # would silently strand every subsequent frame in a "worker
+                # never responds" state indistinguishable from a hang.
+                logging.exception('AnalysisProcess worker: failed to receive a queued item, skipping')
+                continue
+            if item is None:  # stop sentinel
+                break
+            image, metadata = item
+            try:
+                result = run_fn(RT_analysis_object, rt_analysis_info, image, metadata, None, None, nodzInfo=None)
+            except Exception:
+                logging.exception('AnalysisProcess worker: run_fn failed')
+                continue
+            state_snapshot = _build_state_snapshot(RT_analysis_object, snapshot_attrs)
+            try:
+                out_queue.put([result, metadata, state_snapshot])
+            except Exception:
+                logging.exception('AnalysisProcess worker: failed to enqueue result')
+    finally:
+        try:
+            end_fn(RT_analysis_object, rt_analysis_info, None, nodzInfo=None)
+        except Exception:
+            logging.exception('AnalysisProcess worker: end_fn failed')
+
+
+def _rt_config_key(analysisInfo) -> Union[str, None]:
+    """Stable cache key for AnalysisProcess_customFunction's warm-restart
+    cache (see _park_subprocess_worker below) -- dict-equal configs hash
+    identically regardless of key order, so restarting a node with unchanged
+    kwargs reclaims its still-alive worker instead of a fresh spawn. Returns
+    None (uncacheable) for non-dict analysisInfo (e.g. the plain-string
+    sentinels used elsewhere, like 'LiveModeVisualisation') or anything that
+    isn't JSON-serialisable, in which case callers fall back to today's
+    always-fresh-spawn behaviour.
+    """
+    if not isinstance(analysisInfo, dict):
+        return None
+    try:
+        return json.dumps(analysisInfo, sort_keys=True, default=str)
+    except TypeError:
+        return None
+
+
+_RT_SUBPROCESS_CACHE_MAX_ENTRIES = 3
+_RT_SUBPROCESS_CACHE_IDLE_SECS = 600  # 10 min
+
+
+def _terminate_cached_worker(worker: dict) -> None:
+    try:
+        worker['process'].terminate()
+    except Exception:
+        logging.exception('AnalysisProcess: failed to terminate a parked subprocess')
+
+
+def _park_subprocess_worker(shared_data, key: str, worker: dict) -> None:
+    """Stashes a still-alive, already-warmed-up subprocess (+ its queues and
+    main-process visualisation shadow object) in shared_data._rt_subprocess_cache
+    so a later AnalysisProcess_customFunction.__init__ with the identical
+    config can reclaim it directly. Also opportunistically reaps stale/excess
+    entries so the cache doesn't need a dedicated periodic QTimer."""
+    cache = shared_data._rt_subprocess_cache
+    worker['last_used'] = time.time()
+
+    now = time.time()
+    for stale_key in [k for k, v in cache.items() if now - v['last_used'] > _RT_SUBPROCESS_CACHE_IDLE_SECS]:
+        _terminate_cached_worker(cache.pop(stale_key))
+    while len(cache) >= _RT_SUBPROCESS_CACHE_MAX_ENTRIES:
+        lru_key = min(cache, key=lambda k: cache[k]['last_used'])
+        _terminate_cached_worker(cache.pop(lru_key))
+
+    cache[key] = worker
+
+
+def terminate_all_rt_subprocesses(shared_data) -> None:
+    """Best-effort, non-blocking teardown of every parked RT-analysis
+    subprocess and the warm-pool's blank process. Call this right before
+    forcing app exit (see GUI_napari.py's os._exit(0)) -- idle cached workers
+    now outlive a single node's stop() call (that's the point of the cache),
+    so without this they'd otherwise be orphaned instead of dying with their
+    daemon-process parent."""
+    cache = getattr(shared_data, '_rt_subprocess_cache', None)
+    if cache:
+        for worker in cache.values():
+            _terminate_cached_worker(worker)
+        cache.clear()
+    pool = getattr(shared_data, '_rt_subprocess_pool', None)
+    if pool is not None:
+        pool.terminate()
+
+
+class AnalysisProcess_customFunction(QThread):
+    """Drop-in alternative to AnalysisThread_customFunction that runs a node's
+    init/run/end in a separate OS process instead of on this QThread.
+
+    Why: CPython's GIL serialises all threads within one process. A node whose
+    compute holds the GIL for most of its runtime (e.g. diplib's FourierTransform
+    -- benchmarked at ~80%+ GIL-held during a single call) starves the Qt main
+    thread when it runs back-to-back on a QThread, which happens whenever frames
+    arrive faster than the analysis can keep up (see
+    https://github.com/kjamartens/Gladoscopy/issues/16). A separate OS process has
+    its own GIL, so its compute can never block this process's main thread,
+    regardless of what the underlying library does internally.
+
+    Opt-in only: a node opts in via `"__runInSubprocess__": True` in its
+    __function_metadata__ (see utils.realTimeAnalysis_runInSubprocess). Every
+    node not opting in keeps using AnalysisThread_customFunction unchanged.
+    Users can also force every node back onto the plain QThread path
+    regardless of its own opt-in via Adv. settings -> "RT-analysis: use a
+    separate CPU core (subprocess)" (shared_data.config.rt_analysis_config.
+    subprocess_isolation, "True"/"False") -- useful for troubleshooting.
+    Read fresh on every create_real_time_analysis_thread() call, so no
+    restart is needed for a changed setting to take effect.
+
+    v1 limitations (documented, not solved here):
+      * `run()` always receives core=None and nodzInfo=None in the child process
+        (see _subprocess_analysis_worker) -- a node relying on nodzInfo at init
+        time (to read another graph node's data) is not compatible.
+      * `shared_data` is not available inside the child process either -- a node
+        reading shared_data inside run() will see None there.
+      * Visualisation: `.visualise()` needs a live napari layer object, which
+        cannot cross a process boundary, so a second node instance is created in
+        this process purely to serve visualisation. Its plain-data attributes are
+        refreshed from a snapshot the child sends back after every run() call, so
+        a node that stores its result on `self` (e.g. `self.fft_display`) for
+        `visualise()` to read keeps working unmodified. This duplicates any
+        one-time init cost (e.g. importing diplib) once per process.
+      * Warm restarts (_rt_config_key / _park_subprocess_worker /
+        subprocess_pool.py): stop() parks a still-alive worker instead of
+        killing it, and __init__ reclaims it on an identical restart to skip
+        spawn + package-tree import. The node itself is still properly
+        closed and re-opened, at the times a user would expect: stop()
+        sends a `__close__` control message that calls end_fn *immediately*
+        (so anything end_fn finalises, e.g. flushing/closing a dataset,
+        happens at stop time, not deferred to some future reopen), and a
+        later reclaim's `__reinit__` message calls init_fn again (never
+        end_fn a second time -- that already happened at close) before
+        resuming the frame loop; the main-process visualisation shadow is
+        rebuilt fresh the same way. So a close+reopen always starts from a
+        fresh node instance, it's only the process/imports that are reused.
+        This does mean a heavy one-time init cost (e.g. loading model
+        weights) is paid again on every reopen; only the spawn+import cost
+        is actually saved.
+    """
+    # NOTE: no analysis_done_signal here. It was declared and emitted once per
+    # frame per node but had zero connect() sites anywhere in the repo -- a
+    # cross-thread Qt emission per frame for no receiver.
+    finished = pyqtSignal()
+
+    def __init__(self, shared_data, analysisInfo: str | None = 'Random', analysisQueue=None, sleepTimeMs=1, nodzInfo=None):
+        super().__init__()
+        logging.debug('#aC - started AnalysisProcess_customFunction')
+        self.is_running = True
+        self.shared_data = shared_data
+        self.analysisInfo = analysisInfo
+        self.napariViewer = shared_data.napariViewer
+        self.image_queue_analysis = analysisQueue
+        self.sleepTimeMs = sleepTimeMs
+        self.nodzInfo = nodzInfo
+        self._new_image = Event()
+        self._activity_event = Event()
+        #Cached verdict of the metadata picklability probe (T-G6), keyed by the
+        #metadata type so a changed shape is re-probed rather than assumed.
+        self._metadata_probe_type = None
+        self._metadata_picklable = True
+        self.visualisationObject = None
+        self.RT_analysis_object = None
+        self._cache_key = _rt_config_key(analysisInfo)
+        wants_visualisation = bool(isinstance(analysisInfo, dict) and analysisInfo.get('__realTimeVisualisation__')) #type:ignore
+
+        cached = shared_data._rt_subprocess_cache.pop(self._cache_key, None) if self._cache_key is not None else None
+        if cached is not None:
+            # A previous stop() of this exact node configuration parked its
+            # still-alive worker (see _park_subprocess_worker) instead of
+            # killing it -- its package imports/model weights/GPU context are
+            # already loaded, so this restart skips spawn + import + model-load
+            # entirely rather than paying it again.
+            logging.debug('AnalysisProcess: reusing warm subprocess for %s, reinitialising', self._node_label())
+            self._process = cached['process']
+            self._in_queue = cached['in_queue']
+            self._out_queue = cached['out_queue']
+            self._stop_event = cached['stop_event']
+            self._control_in_queue = cached['control_in_queue']
+            self._control_out_queue = cached['control_out_queue']
+            self._worker_warmed_up = True
+            # The process/imports stay warm (that's the whole point of the
+            # cache), but the node's init() must run again on every
+            # close+reopen -- reusing the parked RT_analysis_object as-is
+            # would silently carry over the previous run's state instead
+            # (see the class docstring's "warm restarts" limitation). Tell
+            # the child to rebuild its object, and rebuild the main-process
+            # visualisation shadow here too rather than reusing the parked one.
+            try:
+                self._control_in_queue.put({'__reinit__': True, 'analysisInfo': analysisInfo})
+            except Exception:
+                logging.exception('AnalysisProcess: failed to request child reinit')
+            if wants_visualisation:
+                self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
+            else:
+                self.RT_analysis_object = None
+        else:
+            # The child process re-imports the *entire* glados_pycromanager package
+            # tree from scratch (spawn shares nothing with the parent) plus whatever
+            # heavy library the node itself needs (e.g. diplib, "may take a few
+            # seconds" per FFT_im.py) before it's ready to process its first frame --
+            # observed up to ~10s in practice. Give that one-time cold start a much
+            # longer grace period than the steady-state per-frame timeout, and don't
+            # log it as a warning (it's expected, not a stall). A pre-warmed pool
+            # process (below) can shortcut most of this.
+            self._worker_warmed_up = False
+
+            claimed = shared_data._rt_subprocess_pool.try_claim()
+            if claimed is not None:
+                # A blank process pre-spawned at app startup (subprocess_pool.py)
+                # already paid the spawn + package-tree (+ diplib) import cost --
+                # hand it this node's real work instead of spawning from scratch.
+                # Its channels were created by the pool and inherited by the child
+                # at spawn time: a multiprocessing Queue/Event cannot be pickled
+                # through assign_queue ("Queue objects should only be shared
+                # between processes through inheritance"), so we adopt the pool's
+                # rather than making our own, and send only plain data.
+                self._process, assign_queue, channels = claimed
+                self._in_queue = channels['in_queue']
+                self._out_queue = channels['out_queue']
+                self._stop_event = channels['stop_event']
+                self._control_in_queue = channels['control_in_queue']
+                self._control_out_queue = channels['control_out_queue']
+                assign_queue.put((analysisInfo,
+                                  shared_data.config.logging_config.log_level))
+            else:
+                mp_ctx = mp.get_context('spawn')
+                self._in_queue = mp_ctx.Queue(maxsize=2)
+                self._out_queue = mp_ctx.Queue(maxsize=2)
+                self._stop_event = mp_ctx.Event()
+                # Separate queue pair used only by Performance Mode (see
+                # glados_pycromanager/observability/perf_capture.py) to start/stop
+                # cProfile inside this worker and get its hotspot report back --
+                # kept apart from _in_queue/_out_queue so profiling control traffic
+                # can never be mistaken for a frame/result and never delays one.
+                self._control_in_queue = mp_ctx.Queue(maxsize=2)
+                self._control_out_queue = mp_ctx.Queue(maxsize=2)
+                self._process = mp_ctx.Process(
+                    target=_subprocess_analysis_worker,
+                    args=(analysisInfo, self._in_queue, self._out_queue, self._stop_event),
+                    kwargs={
+                        'control_in_queue': self._control_in_queue,
+                        'control_out_queue': self._control_out_queue,
+                        'log_level': shared_data.config.logging_config.log_level,
+                    },
+                    daemon=True,
+                )
+                self._process.start()
+
+            # Visualisation shadow instance -- see class docstring. Constructed
+            # in this (main) process only when the node wants real-time
+            # visualisation.
+            if wants_visualisation:
+                self.RT_analysis_object = utils.realTimeAnalysis_init(analysisInfo, core=shared_data.core, nodzInfo=nodzInfo)
+
+        self._replay_session = None
+        if wants_visualisation and self.RT_analysis_object is not None:
+            self.visualisationObject = AnalysisThread_customFunction_Visualisation(self.RT_analysis_object, shared_data, analysisInfo=analysisInfo)
+            self.visualisationObject.start()
+            #A reclaimed warm worker brings back the *same* shadow instance a
+            #previous session recorded against, so that session's history now
+            #describes a node being re-run. Retire it rather than aliasing the two.
+            shared_data.rt_replay.unregister(self._cache_key)
+            self._replay_session = _createReplaySession(
+                shared_data, analysisInfo, self.RT_analysis_object,
+                self.visualisationObject,
+                analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node')
+                if isinstance(analysisInfo, dict) else str(analysisInfo))
+
+    def _picklable_metadata(self, metadata):
+        """Return `metadata`, or {} if it cannot cross the process boundary.
+
+        multiprocessing.Queue.put() hands off to a background feeder thread that
+        pickles asynchronously -- an unpicklable metadata object (e.g. a live
+        Java/SWIG-backed handle from the pycromanager bridge) fails silently
+        there with no exception raised here, which otherwise looks identical to
+        "the worker never responded". So it is validated proactively, and that
+        failure mode degrades (drop metadata, keep the frame) instead of hanging.
+
+        The verdict is invariant for a given backend, so a full `pickle.dumps`
+        used to run on every frame purely as a probe with its result discarded
+        (T-G6). It is now cached per metadata *type*: a different type re-probes,
+        which is the only way a later frame's answer can legitimately differ.
+        """
+        metadata_type = type(metadata)
+        if metadata_type is self._metadata_probe_type:
+            return metadata if self._metadata_picklable else {}
+        try:
+            pickle.dumps(metadata)
+        except Exception:
+            logging.warning('AnalysisProcess: frame metadata is not picklable, forwarding without it', exc_info=True)
+            self._metadata_probe_type = metadata_type
+            self._metadata_picklable = False
+            return {}
+        self._metadata_probe_type = metadata_type
+        self._metadata_picklable = True
+        return metadata
+
+    def new_image(self):
+        self._new_image.set()
+
+    def set_activity(self, is_active):
+        """Matches AnalysisThread_customFunction's interface -- napariGlados.py
+        calls this on every live/MDA mode toggle for every RT-analysis thread.
+        Currently inert (like the QThread version it mirrors: the run() loop
+        doesn't gate on this event either), kept only so callers that iterate
+        shared_data.RTAnalysisQueuesThreads don't AttributeError."""
+        if is_active:
+            self._activity_event.set()
+        else:
+            self._activity_event.clear()
+
+    def _node_label(self) -> str:
+        if isinstance(self.analysisInfo, dict):
+            return str(self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node'))
+        return str(self.analysisInfo)
+
+    def update_log_level(self, level: str) -> None:
+        """Push a new Adv.-settings log level to the already-running child
+        process, so a change takes effect without restarting the analysis
+        (mirrors the main-process behaviour in utils.py's advanced-settings
+        save handler, which calls observability.logger.set_log_level directly)."""
+        try:
+            self._control_in_queue.put_nowait(f'__set_log_level__:{level}')
+        except std_queue.Full:
+            logging.warning('AnalysisProcess: could not push log level update (control queue full)')
+
+    def start_profiling(self) -> None:
+        """Performance Mode: tell the child process to start cProfile."""
+        try:
+            self._control_in_queue.put_nowait('__perf_profile_start__')
+        except std_queue.Full:
+            logging.warning('AnalysisProcess: could not signal profiling start (control queue full)')
+
+    def stop_profiling(self, timeout: float = 3.0):
+        """Performance Mode: tell the child to stop cProfile and dump its
+        hotspot table, plus psutil-based CPU%%/RSS/thread-count for the child
+        PID. Returns a perf_capture.SubprocessReport, never raises."""
+        from glados_pycromanager.observability.perf_capture import SubprocessReport
+        pid = self._process.pid
+        cpu_percent = None
+        rss_mb = None
+        thread_count = None
+        try:
+            import psutil
+            if pid is not None and self._process.is_alive():
+                child_proc = psutil.Process(pid)
+                # cpu_percent() on a freshly-constructed Process object has no
+                # baseline and always returns 0.0 on its first call -- block
+                # briefly here (rare, user-initiated action, not a hot path)
+                # to get a real instantaneous reading instead of a bogus 0.0.
+                cpu_percent = child_proc.cpu_percent(interval=0.1)
+                rss_mb = child_proc.memory_info().rss / (1024 * 1024)
+                thread_count = child_proc.num_threads()
+        except Exception as exc:  # noqa: BLE001 - profiling must never crash
+            logging.warning('AnalysisProcess: could not read subprocess psutil stats: %r', exc)
+
+        try:
+            self._control_in_queue.put_nowait('__perf_profile_stop__')
+        except std_queue.Full:
+            return SubprocessReport(node_label=self._node_label(), pid=pid, cpu_percent=cpu_percent,
+                                     rss_mb=rss_mb, thread_count=thread_count,
+                                     error='could not signal profiling stop (control queue full)')
+        try:
+            report = self._control_out_queue.get(timeout=timeout)
+        except std_queue.Empty:
+            return SubprocessReport(node_label=self._node_label(), pid=pid, cpu_percent=cpu_percent,
+                                     rss_mb=rss_mb, thread_count=thread_count,
+                                     error=f'child did not respond within {timeout}s')
+        return SubprocessReport(
+            node_label=self._node_label(),
+            pid=report.get('pid', pid),
+            cpu_percent=cpu_percent,
+            rss_mb=rss_mb,
+            thread_count=thread_count,
+            hotspots=report.get('hotspots'),
+        )
+
+    def run(self):
+        self.shared_data.register_perf_thread_label(get_native_id(), f'RT-analysis (subprocess proxy): {self._node_label()}')
+        try:
+            self._run_loop()
+        finally:
+            self.shared_data.unregister_perf_thread_label(get_native_id())
+
+    def _run_loop(self):
+        while self.is_running:
+            self._new_image.wait(RT_THREAD_WAIT_TIMEOUT_S)
+            self._new_image.clear()
+            if self.image_queue_analysis:
+                image, metadata = self.image_queue_analysis.popleft() #type:ignore
+                metadata = self._picklable_metadata(metadata)
+                try:
+                    self._in_queue.put_nowait((image, metadata))
+                except std_queue.Full:
+                    logging.debug('AnalysisProcess: worker still busy with a previous frame, dropping this one')
+                else:
+                    get_timeout = 5 if self._worker_warmed_up else 30
+                    try:
+                        result, out_metadata, state_snapshot = self._out_queue.get(timeout=get_timeout)
+                    except std_queue.Empty:
+                        if not self._process.is_alive():
+                            logging.error('AnalysisProcess: worker process is no longer alive, stopping this analysis thread')
+                            self.is_running = False
+                        elif self._worker_warmed_up:
+                            logging.warning('AnalysisProcess: worker did not respond within %ss, skipping frame', get_timeout)
+                        else:
+                            logging.info('AnalysisProcess: worker still starting up (importing its dependencies), skipping frame')
+                    else:
+                        self._worker_warmed_up = True
+                        self.analysis_result = [result, out_metadata]
+                        if self.visualisationObject is not None and self.RT_analysis_object is not None:
+                            self.RT_analysis_object.__dict__.update(state_snapshot)
+                            #Free here: the snapshot is already built and already
+                            #copied (it was unpickled out of the worker's queue).
+                            #Recorded before the visualisation drop-gate below so
+                            #history is not thinned by the display rate too.
+                            if self._replay_session is not None:
+                                _recordReplayFrame(self._replay_session, self.shared_data,
+                                                   out_metadata, state_snapshot)
+                            if len(self.visualisationObject.visualisation_queue) < 1:
+                                #state_snapshot travels with the frame it belongs to:
+                                #the shadow above keeps being updated by later frames
+                                #while this one waits in the queue.
+                                data = (self.RT_analysis_object, self.analysisInfo, image, out_metadata, self.shared_data, self.shared_data.core, state_snapshot)
+                                self.visualisationObject.visualisation_queue.append(data)
+                                self.visualisationObject.new_image()
+            # NOT the duty-cycle cap AnalysisThread_customFunction applies (T-G7).
+            # There, sleeping for as long as the analysis just took is a
+            # deliberate GIL-fairness trade: the compute runs on this thread, in
+            # this process, holding the GIL. Here the compute happens in another
+            # process holding no GIL of ours, and this thread spends the whole
+            # round trip idle-blocked on `_out_queue.get()` -- so the extra sleep
+            # was pure lost throughput, capping the sustained rate at 1/(2T).
+            self.msleep(max(1, self.sleepTimeMs))
+        self.finished.emit()
+
+    def stop(self):
+        self.is_running = False
+        self._new_image.set()  # unblock run() if it's currently waiting
+        if self.visualisationObject is not None:
+            self.visualisationObject.stop()
+
+        if self._cache_key is not None and self._process.is_alive():
+            # Park this still-alive, already-warmed-up worker instead of
+            # tearing it down -- a later __init__() with the identical
+            # configuration reclaims it directly, skipping spawn + import +
+            # model-load entirely. The worker's run loop just idles on
+            # in_queue.get(timeout=0.5) with nothing arriving, so this costs
+            # ~0 CPU while parked (see _park_subprocess_worker).
+            #
+            # The node itself must still be properly closed *now*, not
+            # whenever (or whether) it's later reclaimed -- end_fn may
+            # finalise something (e.g. flush/close a dataset) that a close
+            # right after stop() is what the user expects, not a close
+            # deferred to some future reopen. '__close__' calls end_fn on the
+            # worker's own thread; fire-and-forget like the other control
+            # messages here (queue ordering guarantees any later '__reinit__'
+            # on this same control_in_queue is processed after it).
+            try:
+                self._control_in_queue.put({'__close__': True})
+            except Exception:
+                logging.exception('AnalysisProcess: failed to request child close while parking')
+            _park_subprocess_worker(self.shared_data, self._cache_key, {
+                'process': self._process,
+                'in_queue': self._in_queue,
+                'out_queue': self._out_queue,
+                'stop_event': self._stop_event,
+                'control_in_queue': self._control_in_queue,
+                'control_out_queue': self._control_out_queue,
+            })
+            return
+
+        self._stop_event.set()
+        try:
+            self._in_queue.put_nowait(None)
+        except Exception:
+            pass
+        self._process.join(timeout=3)
+        if self._process.is_alive():
+            self._process.terminate()
+
+    def destroy(self):
+        logging.debug('Destroying AnalysisProcess_customFunction for %s', self.analysisInfo)
+        self.stop()
+        self.requestInterruption()
+        self.quit()
+        if not self.wait(RT_THREAD_JOIN_TIMEOUT_MS):
+            logging.warning('RT-analysis subprocess proxy for %s did not exit within %sms',
+                            self.analysisInfo, RT_THREAD_JOIN_TIMEOUT_MS)
+        if self.visualisationObject is not None:
+            self.visualisationObject.destroy()
+
 
 #This code gets some image and does some analysis on this - does NOT do the visualisation - see AnalysisThread_customFunction_Visualisation specifically for a second thread which does the RT visualisation based on this output
 
 #Has to be a QThread and not e.g. multiprocessing because we rely on pickyyable objects - mostly the pycromanager core that we send around to influence the run during RT analysis
+#
+#UPDATE (see https://github.com/kjamartens/Gladoscopy/issues/16 and
+#AnalysisProcess_customFunction above): nodes that don't need a live core/
+#nodzInfo inside run() can now opt into subprocess isolation via
+#`"__runInSubprocess__": True` in their __function_metadata__, specifically to
+#avoid the GIL-starvation problem multiprocessing here would otherwise solve.
 class AnalysisThread_customFunction(QThread):
-    # Define analysis_done_signal as a class attribute, shared among all instances of AnalysisThread class
-    # Create a signal to communicate between threads
-    analysis_done_signal = pyqtSignal(object)
+    # NOTE: no analysis_done_signal here either -- see the note in
+    # AnalysisProcess_customFunction; it had no connect() sites.
     finished = pyqtSignal()# signal to indicate that the thread has finished
-    def __init__(self,shared_data,analysisInfo: Union[str, None] = 'Random',analysisQueue=None,sleepTimeMs=1,nodzInfo=None):
+    def __init__(self,shared_data,analysisInfo: str | None = 'Random',analysisQueue=None,sleepTimeMs=1,nodzInfo=None):
         """
         Initializes the AnalysisThread object.
 
@@ -376,12 +1269,11 @@ class AnalysisThread_customFunction(QThread):
         self.napariOverlay = None
         self.nodzInfo=nodzInfo
         # self.napariOverlay = napariOverlay(self.napariViewer,layer_name='TestLayer')
+        self._teardown_done = False
         self.initAnalysis()
         self.running = True
-        self._activity_event = Event() #Event when MDA/LIVE is started/stopped.
-        self._new_image = Event() #Event when a new image is put in the queue
-        self._activity_event = Event() #Event when MDA/LIVE is started/stopped.
-        self._new_image = Event() #Event when a new image is put in the queue
+        self._activity_event = Event()
+        self._new_image = Event()
     
     def run(self):
         """
@@ -394,51 +1286,42 @@ class AnalysisThread_customFunction(QThread):
             None
         """
         
+        node_label = self.analysisInfo.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node') if isinstance(self.analysisInfo, dict) else str(self.analysisInfo)
+        self.shared_data.register_perf_thread_label(get_native_id(), f'RT-analysis (in-process): {node_label}')
+        try:
+            self._run_loop()
+        finally:
+            self.shared_data.unregister_perf_thread_label(get_native_id())
+        self.finished.emit()
+
+    def _run_loop(self):
         while self.is_running:
             # # tic = time.time()
             # # Wait until liveMode or mdaMode is active
             # self._activity_event.wait()
-            
+
             # #Only check the vis queue if live or mda is ongoing
             # if self.shared_data.liveMode or self.shared_data.mdaMode:
             #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
             #     #Run analysis on the image from the queue
-            
-            self._new_image.wait()#Wait for a new image
+
+            #Timed wait: stop() sets the event, so this is only a deadman (T-G9).
+            #Before that, stop() cleared is_running but never woke this thread,
+            #so run() blocked here forever and every start/stop cycle leaked a
+            #QThread plus its frame deque.
+            self._new_image.wait(RT_THREAD_WAIT_TIMEOUT_S)
             self._new_image.clear()
-            #Analyse it.
+            analysis_elapsed_ms = 0
             if self.image_queue_analysis:
+                analysis_start = time.time()
                 self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
-                self.analysis_done_signal.emit(self.analysis_result)
-                # self.image_queue_analysis.task_done() #type:ignore
-            #Always sleep while running - at least 1 ms
-            self.msleep(max(1,self.sleepTimeMs))
-            # print(f'Time spend in analysisclass-run; {time.time()-tic}')
-            
-            # # tic = time.time()
-            # # Wait until liveMode or mdaMode is active
-            # self._activity_event.wait()
-            
-            # #Only check the vis queue if live or mda is ongoing
-            # if self.shared_data.liveMode or self.shared_data.mdaMode:
-            #     # logging.debug(f'#aC - running analysisThread_customFunction, liveMode:{self.shared_data.liveMode}, mdaMode: {self.shared_data.mdaMode}')
-            #     #Run analysis on the image from the queue
-            
-            self._new_image.wait()#Wait for a new image
-            self._new_image.clear()
-            #Analyse it.
-            if self.image_queue_analysis:
-                self.analysis_result = self.runAnalysis(self.image_queue_analysis.popleft()) #type:ignore
-                self.analysis_done_signal.emit(self.analysis_result)
-                # self.image_queue_analysis.task_done() #type:ignore
-            #Always sleep while running - at least 1 ms
-            self.msleep(max(1,self.sleepTimeMs))
-            # print(f'Time spend in analysisclass-run; {time.time()-tic}')
-            
-        # Thread has finished, emit the finished signal
-        self.finished.emit()
-    
-        
+                analysis_elapsed_ms = (time.time() - analysis_start) * 1000
+            # Cap this thread's GIL-holding duty cycle: give the rest of the app at
+            # least as much wall-clock time as the analysis call just took, so a
+            # slow/GIL-heavy analysis (e.g. a diplib-based FFT) can't starve the Qt
+            # main thread continuously when frames arrive faster than analysis keeps up.
+            self.msleep(max(1, self.sleepTimeMs, int(analysis_elapsed_ms)))
+
         # while self.running:
         #     if not self.image_queue_analysis.empty():
         #         data = self.image_queue_analysis.get_nowait()
@@ -450,10 +1333,18 @@ class AnalysisThread_customFunction(QThread):
         """
         Stops the execution of the function
         """
+        if self._teardown_done:
+            #destroy() calls stop(), and both used to run endAnalysis - so a
+            #node's end() ran twice per teardown (T-A5 item 5, T-G9).
+            return
+        self._teardown_done = True
         self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         self.is_running = False
+        self.running = False
         self._activity_event.set()
-        self._activity_event.set()
+        #Wake run() so it re-checks is_running instead of blocking on the next
+        #frame that will never arrive.
+        self._new_image.set()
         #Also remove the image queue requestion from live mode
         # if self.image_queue_analysis in self.shared_data.RTAnalysisQueues:
         #     self.shared_data.RTAnalysisQueues.remove(self.image_queue_analysis)
@@ -466,7 +1357,7 @@ class AnalysisThread_customFunction(QThread):
             #and remove it
             self.shared_data.skipAnalysisThreadDeletion = True
             # self.shared_data.napariViewer.layers.remove(layer)
-        except:
+        except (AttributeError, RuntimeError):
             pass
         
     def destroy(self):
@@ -479,18 +1370,23 @@ class AnalysisThread_customFunction(QThread):
         Returns:
             None
         """
-        self.endAnalysis(self.analysisInfo,core=self.shared_data.core)
         try:
             logging.debug('Destroying '+str(self.analysisInfo))
-        except:
+        except (AttributeError, TypeError):
             logging.debug('Destroying some analysis thread')
-        #Wait for the thread to be finished
+        #Wait for the thread to be finished. stop() runs endAnalysis (once) and
+        #wakes run(); waiting here used to hang because run() never woke, which
+        #is what the old "seems to start an infinite loop somewhere" comment was
+        #describing.
         self.stop()
         self.requestInterruption()
         self.quit()
-        #Officially we'd need to wait here, but that seems to start an infinite loop somewhere
-        # self.wait()
-        # self.deleteLater()
+        if not self.wait(RT_THREAD_JOIN_TIMEOUT_MS):
+            logging.warning('RT-analysis thread for %s did not exit within %sms',
+                            self.analysisInfo, RT_THREAD_JOIN_TIMEOUT_MS)
+        visualisationObject = getattr(self, 'visualisationObject', None)
+        if visualisationObject is not None:
+            visualisationObject.destroy()
     
     def set_activity(self, is_active):
         if is_active:
@@ -502,21 +1398,7 @@ class AnalysisThread_customFunction(QThread):
     
     def new_image(self):
         self._new_image.set()
-        # print('setting self.new_image')
-            
-    
-    def set_activity(self, is_active):
-        if is_active:
-            self._activity_event.set()
-            # print('setting self._activity_event')
-        else:
-            self._activity_event.clear()
-            # print('clearing self._activity_event')
-    
-    def new_image(self):
-        self._new_image.set()
-        # print('setting self.new_image')
-            
+
     #Get corresponding layer of napariOverlay
     def getLayer(self):
         """
@@ -568,7 +1450,12 @@ class AnalysisThread_customFunction(QThread):
                     
                 return [analysisResult,metadata]
             elif self.analysisInfo == 'LiveModeVisualisation' or self.analysisInfo == 'mdaVisualisation':
-                self.setPriority(self.TimeCriticalPriority) #type:ignore
+                #Was self.setPriority(self.TimeCriticalPriority) here. Removed:
+                #it ran inside the per-image handler, so it re-set the priority
+                #on every single image, and it raised an *analysis* thread above
+                #the Qt/GUI thread -- the opposite of what the display path
+                #needs. Process-level scheduling is handled once at startup by
+                #observability/process_priority.py instead.
                 return None
             else:
                 return None
@@ -584,6 +1471,17 @@ class AnalysisThread_customFunction(QThread):
             self.queue_visualisation = deque(maxlen=10)
             self.visualisationObject=AnalysisThread_customFunction_Visualisation(self.RT_analysis_object,self.shared_data,analysisInfo=self.analysisInfo)
             self.visualisationObject.start()
+            #Resolved once, not per frame -- same as the subprocess worker does.
+            self._snapshot_attrs = utils.realTimeAnalysis_snapshotAttrs(self.analysisInfo)
+            self._replay_session = _createReplaySession(
+                self.shared_data, self.analysisInfo, self.RT_analysis_object,
+                self.visualisationObject, self._replayLabel())
+
+    def _replayLabel(self):
+        info = self.analysisInfo
+        if isinstance(info, dict):
+            return info.get('__selectedDropdownEntryRTAnalysis__', 'RT-analysis node')
+        return str(info)
     
     def runAnalysisThisImage(self,analysisInfo,image,metadata=None,shared_data=None,core=None):
         # self.msleep(self.sleepTimeMs)
@@ -592,16 +1490,32 @@ class AnalysisThread_customFunction(QThread):
         #We are absolutely not allowed to access the core during the real-time analysis running.
         result = utils.realTimeAnalysis_run(self.RT_analysis_object,analysisInfo,image,metadata,shared_data,None,nodzInfo=self.nodzInfo)
         
-        logging.info(f"Analysis on Image done with result: {result}")
+        # Lazy %s formatting: this runs once per frame per RT-analysis node, and
+        # the eager f-string built a full numpy repr of the result array on every
+        # frame regardless of the active log level.
+        logging.debug("Analysis on Image done with result: %s", result)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
+            #Retain this frame's result so the overlay can be re-rendered for it
+            #later. Done before the visualisation drop-gate below, so history is
+            #not additionally thinned by the display rate. The snapshot holds bare
+            #references to this node's attributes -- RTNodeHistory.record copies.
+            #Built once and used twice: to pair this frame's results with this
+            #frame's image in the visualisation payload below, and to retain them
+            #for scrub-replay.
+            state_snapshot = _build_state_snapshot(
+                self.RT_analysis_object, getattr(self, '_snapshot_attrs', ()))
+            session = getattr(self, '_replay_session', None)
+            if session is not None:
+                _recordReplayFrame(session, shared_data, metadata, state_snapshot)
             logging.debug('Attempting RT visualisation!')
             # self.update_napariLayer(analysisInfo,image,metadata=metadata,core=core)
             # if self.visualisationObject.visualisation_queue.empty():
             # print(f'#ac537 -- len of queue: {len(self.visualisationObject.visualisation_queue)}')
             if len(self.visualisationObject.visualisation_queue) < 1:
-                # data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
-                data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core)
+                #The snapshot travels with the frame it belongs to -- run() keeps
+                #mutating this same node instance while the frame waits here.
+                data = (self.RT_analysis_object,analysisInfo,image,metadata,shared_data,core,state_snapshot)
                 self.visualisationObject.visualisation_queue.append(data)
                 self.visualisationObject.new_image() #Signal that we have a new image in the visualisation object
                 logging.debug('Put data in visualisation_queue!')
@@ -613,8 +1527,8 @@ class AnalysisThread_customFunction(QThread):
         result = utils.realTimeAnalysis_end(self.RT_analysis_object,analysisInfo,core,nodzInfo=self.nodzInfo)
         
         if '__realTimeVisualisation__' in self.analysisInfo and self.analysisInfo['__realTimeVisualisation__']:#type:ignore
-            #End the visualisation
-            self.visualisationObject.running=False
+            #End the visualisation - through stop(), which also wakes it (T-G9).
+            self.visualisationObject.stop()
         return result
 
 
@@ -635,8 +1549,15 @@ def create_real_time_analysis_thread(shared_data,analysisInfo = None,createNewTh
         delay = utils.realTimeAnalysis_getDelay(analysisInfo,runOrVis='run')
     
     # image_queue_analysis = image_queue_transfer
-    #Instantiate an analysis thread and add a signal
-    analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
+    #Instantiate an analysis thread (or, for nodes opting into subprocess
+    #isolation via "__runInSubprocess__", unless overridden by the global
+    #Adv. settings kill switch shared_data.config.rt_analysis_config.
+    #subprocess_isolation -- see https://github.com/kjamartens/Gladoscopy/
+    #issues/16 -- an analysis process) and add a signal
+    if utils.realTimeAnalysis_runInSubprocess(analysisInfo, shared_data):
+        analysis_thread = AnalysisProcess_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
+    else:
+        analysis_thread = AnalysisThread_customFunction(shared_data,analysisInfo=analysisInfo, analysisQueue=image_queue_analysis,sleepTimeMs = delay,nodzInfo=nodzInfo) #type:ignore
     
     
     analysis_thread.start()

@@ -1,14 +1,21 @@
-import sys,os
+import logging
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-import math
-import numpy as np
 import inspect
+import math
+
 import dask.array as da
 import ndtiff
+import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -35,6 +42,7 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("AverageImage.AvgImage")
 def AvgImage(core,**kwargs):
     
     #Check if we have the required kwargs
@@ -42,7 +50,7 @@ def AvgImage(core,**kwargs):
 
     # print(NDTIFFStack._summary_metadata)
     # print(NDTIFFStack.as_array())
-    print(kwargs)
+    logging.debug("kwargs: %s", kwargs)
     NDTIFFStack = kwargs['Image']
     
     # Compute the average image
@@ -57,6 +65,7 @@ def AvgImage(core,**kwargs):
     return output
 
 
+@register("AverageImage.AvgImage_visualise")
 def AvgImage_visualise(datastruct,core,**kwargs):
     # This is how datastruct is organised...
     output,imageLayer = datastruct

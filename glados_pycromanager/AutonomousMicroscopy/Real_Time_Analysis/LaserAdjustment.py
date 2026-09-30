@@ -1,16 +1,22 @@
-import sys,os
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import inspect
+import logging
 
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
-import dask.array as da
 import time
+
+import dask.array as da
+import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
 
 
 # Required function __function_metadata__
@@ -27,7 +33,14 @@ def __function_metadata__():
             "help_string": ".",
             "display_name": "LaserAdj",
             "run_delay": 0,
-            "visualise_delay": 500
+            "visualise_delay": 500,
+            # Drives the microscope directly (core.setProperty on the laser DAC)
+            # from run(), and a subprocess-isolated node is handed core=None.
+            # Never isolate this one - see utils.realTimeAnalysis_runInSubprocess.
+            "__needsLiveCore__": True,
+            #Not replayable while scrubbing: this node acts on the live hardware /
+            #running acquisition, so re-running it for an old frame is meaningless.
+            "__replayable__": False,
         },
         "laser_adjustment_advanced": {
             "required_kwargs": [
@@ -39,7 +52,12 @@ def __function_metadata__():
             "help_string": ".",
             "display_name": "Advanced laser adjustment",
             "run_delay": 0,
-            "visualise_delay": 500
+            "visualise_delay": 500,
+            # Same as above: drives the laser through the live core in run().
+            "__needsLiveCore__": True,
+            #Not replayable while scrubbing: this node acts on the live hardware /
+            #running acquisition, so re-running it for an old frame is meaningless.
+            "__replayable__": False,
         }
     }
 
@@ -47,9 +65,10 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class laser_adjustment():
+@register("LaserAdjustment.laser_adjustment")
+class laser_adjustment:
     def __init__(self,core,**kwargs):
-        print(core)
+        logging.debug("laser_adjustment init, core: %s", core)
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
@@ -58,38 +77,39 @@ class laser_adjustment():
         MMprop_intensity_name = "Volts"
         ValIntMM = 0
         core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM))
-        print('INIT laser_adjustment')
+        logging.info("INIT laser_adjustment")
         return None
 
     def run(self,image,metadata,shared_data,core,**kwargs):
-        print("At frame: "+metadata['ImageNumber'])
+        logging.debug("At frame: %s", metadata['ImageNumber'])
         propertyname = kwargs['Laser_id']
         MMprop_intensity_name = "Volts"
         frame = int(metadata['ImageNumber'])
         ValIntMM = min(5,frame/float(kwargs['maxFrame'])*5)
         core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM))
-        
-            
+
+
         # propertyname = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
         # MMprop_intensity_name = MM_JSON["lasers"]["MM_Property_Intensity_Name"]
 
         # #Translate the value to 0-5
         # ValIntMM = ValIntPerc*float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_slope"])-float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_offset"])
         # #Set value in Micromanager
-    
-    
+
+
     def end(self,core,**kwargs):
-        print('end of laserAdj')
+        logging.debug("end of laserAdj")
         return
-    
+
     def visualise(self,image,metadata,core,**kwargs):
-        print('optional visualising every time this is called!')
+        logging.debug("optional visualising every time this is called!")
 
 
 
-class laser_adjustment_advanced():
+@register("LaserAdjustment.laser_adjustment_advanced")
+class laser_adjustment_advanced:
     def __init__(self,core,**kwargs):
-        print(core)
+        logging.debug("laser_adjustment_advanced init, core: %s", core)
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
@@ -100,34 +120,33 @@ class laser_adjustment_advanced():
         MMprop_intensity_name = "Volts"
         ValIntMM = 0
         core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM))
-        print('INIT laser_adjustment')
-        
-        
+        logging.info("INIT laser_adjustment")
+
         self.LaserKeys = list(eval(kwargs['Laser_power']+".keys()"))
-        print(self.LaserKeys)
+        logging.debug("LaserKeys: %s", self.LaserKeys)
 
     def run(self,image,metadata,core,**kwargs):
-        print("At frame: "+metadata['ImageNumber'])
+        logging.debug("At frame: %s", metadata['ImageNumber'])
         propertyname = kwargs['Laser_id']
         MMprop_intensity_name = "Volts"
         frame = int(metadata['ImageNumber'])
-        
+
         ""
         laserPower = eval(kwargs['Laser_power'])
-        
+
         currentLaserPower=0
         for i in reversed(range(len(laserPower))):
             if frame+1 >= self.LaserKeys[i]:
                 currentLaserPower = laserPower[self.LaserKeys[i]]
-                print(currentLaserPower)
+                logging.debug("currentLaserPower: %s", currentLaserPower)
                 break
-        
+
         ValIntMM = max(0,min(5,currentLaserPower*5))
         core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM))
-    
+
     def end(self,core,**kwargs):
-        print('end of laserAdj')
+        logging.debug("end of laserAdj")
         return
-    
+
     def visualise(self,image,metadata,core,**kwargs):
-        print('optional visualising every time this is called!')
+        logging.debug("optional visualising every time this is called!")

@@ -1,24 +1,24 @@
-import sys
 import os
+import sys
+
 # Add the folder 2 folders up to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import tifffile
 import matplotlib.pyplot as plt
-from matplotlib import colormaps
 import numpy as np
+import tifffile
+from matplotlib import colormaps
 from PIL import Image, ImageDraw
-
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-#Import all scripts in the custom script folders
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
-
 #Obtain the helperfunctions
 import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
+
+#Import all scripts in the custom script folders
+from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 
 #Created Conda environment (Python 3.10.11)
 #Required PIPs: in requirements.txt

@@ -4,43 +4,41 @@ Main function of the multi-dimensional acquisitions in glados-pycromanager.
 Handles the GUI as well as the logic of the multi-dimensional acquisitions.
 Includes classes for Interactive Lists such as the Channels, XY positions.
 """
-import os,sys
-import time
-import logging
-from typing import List, Iterable
 import itertools
+import logging
+import math
+import os
+import sys
+import time
+from collections.abc import Iterable
+from typing import List
 
 import appdirs
+from pycromanager import multi_d_acquisition_events
 from PyQt5.QtCore import (
-    QCoreApplication,
-    QEvent,
+    QTimer,
     pyqtSignal,
 )
 from PyQt5.QtGui import (
-    QFont,
     QDoubleValidator,
     QIntValidator,
 )
 from PyQt5.QtWidgets import (
-    QApplication,
+    QBoxLayout,
     QCheckBox,
     QComboBox,
     QFileDialog,
     QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QRadioButton,
     QSizePolicy,
-    QSpacerItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
-from pycromanager import multi_d_acquisition_events
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
@@ -48,26 +46,94 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.utils
-from glados_pycromanager.GUI.utils import CustomMainWindow
-from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-from glados_pycromanager.GUI.AnalysisClass import *
-from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.MMcontrols import ConfigInfo
+from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
+from glados_pycromanager.GUI.utils import CustomMainWindow
+from glados_pycromanager.ui.layout import (
+    LANDSCAPE,
+    PORTRAIT,
+    ROLE_PRIMARY,
+    TALL,
+    WIDE,
+    FlowRow,
+    ListEditor,
+    Placement,
+    ResponsiveGrid,
+    Section,
+    classify_shape,
+    set_role,
+)
+
+
+#region Section arrangement
+#: Where each MDA section goes per dock shape (`ui.layout.classify_shape`).
+#: "mda.storagebar" is Storage + Acquire; "mda.setup" stacks Dimensions (with
+#: the order), Exposure and Time. Stretch is per section: spare width goes to the tables.
+_SQUARISH = [
+    Placement("mda.storagebar", 0, 0, 1, 2),
+    Placement("mda.setup", 1, 0),
+    Placement("mda.z", 1, 1),
+    Placement("mda.xy", 2, 0),
+    Placement("mda.channel", 2, 1),
+]
+MDA_SECTION_PLACEMENTS = {
+    WIDE: [
+        Placement("mda.storagebar", 0, 0, 1, 4),
+        Placement("mda.setup", 1, 0),
+        Placement("mda.xy", 1, 1),
+        Placement("mda.z", 1, 2),
+        Placement("mda.channel", 1, 3),
+    ],
+    LANDSCAPE: _SQUARISH,
+    PORTRAIT: _SQUARISH,
+    TALL: [
+        Placement("mda.storagebar", 0, 0),
+        Placement("mda.setup", 1, 0),
+        Placement("mda.z", 2, 0),
+        Placement("mda.xy", 3, 0),
+        Placement("mda.channel", 4, 0),
+    ],
+}
+MDA_COLUMN_STRETCH = {
+    WIDE: {"mda.xy": 2, "mda.z": 1, "mda.channel": 2},
+    LANDSCAPE: {"mda.xy": 1, "mda.channel": 1},
+    PORTRAIT: {"mda.xy": 1, "mda.channel": 1},
+    TALL: {"mda.setup": 1},
+}
+
+
+def _bucketFromGridWidth(value):
+    """A layout bucket from a bucket, a stored list (JSON), or a legacy column count (10 / 2 / 1)."""
+    if isinstance(value, list):
+        return tuple(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return value
+    if value == 1:
+        return TALL
+    return WIDE if value > 2 else LANDSCAPE
+#endregion
 
 #region List Widgets
+#: `shared_data` predating per-acquisition dataset tracking (T-D8): fall back to mdaDatasets[-1].
+_DATASET_NOT_TRACKED = object()
+
+
 class InteractiveListWidget(QTableWidget):
     """
     Creation of an interactive list widget, initially created for a nice XY list (similar to POS list in micromanager)
     """
-    def __init__(self,fontsize=6,columnCount=2,parent=None):
+    def __init__(self,fontsize=None,columnCount=2,parent=None):
         """
         Initializes an InteractiveListWidget.
-        
+
+        Sizing (column widths, minimum height) is done by the `ui.layout.ListEditor`
+        that hosts it, and fonts by the theme.
+
         Args:
-            fontsize (int): The font size to be set for the widget. Default is 6.
+            fontsize: Ignored; kept for callers passing it.
             columnCount (int): The number of columns to be displayed in the widget. Default is 2.
-        
+
         Returns:
             None
         """
@@ -75,24 +141,6 @@ class InteractiveListWidget(QTableWidget):
         logging.debug('init InteractiveListWidget')
         self.parent = parent #type: ignore
         super().__init__(rowCount=0, columnCount=columnCount) #type: ignore
-        scaleFactor = 1
-        if parent != None:
-            scaleFactor = parent.shared_data.GUIscaleFactor
-        colWidth = int(60*scaleFactor)
-        # Set the minimum size for the table widget
-        self.setColumnWidth(0, int(colWidth*.9)) #Slightly smaller to prevent scrollbar to appear
-        self.setMinimumWidth(colWidth*columnCount)
-        self.setMinimumHeight(20)
-        self.setFixedHeight(240)
-        # Set the size policy to ensure the widget can expand but not shrink below the minimum size
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        
-        font = QFont()
-        font.setPointSize(int(scaleFactor*fontsize))
-        self.setFont(font)
-        # Reduce padding within cells
-        self.setStyleSheet("QTableWidget::item { padding: 1px; }")
-        
         self.parentWidget=None #type:ignore
             
     def setColumNames(self, names):
@@ -198,7 +246,7 @@ class InteractiveListWidget(QTableWidget):
         self.itemChanged.disconnect()
     
     def reconnectFunGUIConnection(self,runOnce=True):
-        self.itemChanged.connect(lambda: self.parent.get_MDA_events_from_GUI())
+        self.itemChanged.connect(lambda: self.parent.scheduleMDAEventsUpdate())
         if runOnce:
             self.parent.get_MDA_events_from_GUI()
 
@@ -217,7 +265,7 @@ class ChannelList(InteractiveListWidget):
         Returns:
             None
         """
-        super().__init__(columnCount=3)
+        super().__init__(parent=parent,columnCount=2)
         self.channelName = ''
         self.parentWidget=parent #type:ignore
         
@@ -287,9 +335,8 @@ class ChannelList(InteractiveListWidget):
             if channelEntry is not None:
                 try:
                     newdropbox.setCurrentText(channelEntry)
-                except:
-                    logging.warning('Wrong mix of channel and entries')
-                    pass
+                except (AttributeError, RuntimeError) as exc:
+                    logging.warning('Wrong mix of channel and entries: %s', exc)
             self.setCellWidget(rowPosition, 0, newdropbox)
             # self.setItem(rowPosition, 1, QTableWidgetItem(textEntry))
             if exposureEntry == None:
@@ -389,7 +436,7 @@ class XYStageList(InteractiveListWidget):
                     #add the new ID to be the max existing ID + 1
                     existing_ids = [int(self.item(row, 1).text()) for row in range(self.rowCount())]
                     id = max(existing_ids) + 1
-                except:
+                except (ValueError, TypeError, AttributeError):
                     id = self.rowCount() + 1
         rowPosition = self.rowCount()
         self.insertRow(rowPosition)
@@ -403,17 +450,82 @@ class XYStageList(InteractiveListWidget):
             self.setItem(rowPosition, 3, QTableWidgetItem(str(setxy[1]))) #type:ignore
 #endregion
 
+def build_absolute_z_plan(z_start, z_end, z_step):
+    """Build a useq "top"/"bottom" (absolute range) z_plan dict.
+
+    `z_start`/`z_end` are absolute positions of the selected z-stage --
+    `MDAGlados.setZStart()`/`setZEnd()` capture the stage's current absolute
+    position, and a typed-in value is meant the same way. useq's "relative"
+    z_plan key instead treats a value list as literal offsets from wherever the
+    stage happens to be when the MDA actually starts, which silently turned a
+    z-stack set up around an absolute position (e.g. 53-55) into a request to
+    jump ~53 and ~55 units *away* from the stage's position at acquisition
+    start -- the likely cause of z-stage moves timing out / behaving
+    unexpectedly during MDA.
+
+    useq's ZTopBottom requires top >= bottom and a positive step, so those are
+    derived from min/max/abs of the panel values; `go_up` carries the
+    direction the panel's start->end order implied.
+    """
+    z_bottom = min(z_start, z_end)
+    z_top = max(z_start, z_end)
+    z_step_magnitude = abs(z_step) if z_step else 1
+    go_up = z_step is None or z_step >= 0
+    return {"top": z_top, "bottom": z_bottom, "step": z_step_magnitude, "go_up": go_up}
+
 class MDAGlados(CustomMainWindow):
-    """ 
+    """
     Class that handles the multi-Dimensional acquisition of Pycromanager
     """
     #Pysignal should be outside the functions for proper init
     MDA_completed = pyqtSignal(bool)
+    # T-H1: every GUI-edit signal restarts this single-shot timer, so typing
+    # "100000" into a field builds the plan once, not six times.
+    MDA_EVENTS_DEBOUNCE_MS = 200
+    # The glados_state.json write is debounced on its own, decoupled from the
+    # plan rebuild. An edit made within this window of quitting is not saved
+    # (the app leaves via os._exit(0) on aboutToQuit).
+    MDA_STATE_SAVE_DEBOUNCE_MS = 500
+
+    @property
+    def mda(self):
+        """The MDA plan as pycromanager event dicts, converted lazily (T-H2).
+
+        `mda_useq` is the source of truth: `get_MDA_events_from_GUI` builds it and
+        only invalidates this cache, because `to_pycromanager()` materialises and
+        pydantic-validates one dict per event. The conversion runs on first read and
+        is cached until the next rebuild. An explicit assignment (the constructor,
+        `setMDAparams`, a recipe load) is stored as-is.
+        """
+        events = getattr(self, '_mda', None)
+        if events is None:
+            sequence = getattr(self, 'mda_useq', None)
+            if sequence is not None:
+                from useq.pycromanager import to_pycromanager
+                events = to_pycromanager(sequence)
+                self._mda = events
+        return events
+
+    @mda.setter
+    def mda(self, value):
+        self._mda = value
+
+    def _mdaEventsForAcquisition(self):
+        """What an acquire path assigns to `shared_data._mdaModeParams`.
+
+        The event list if one is already materialised (an explicit assignment, or
+        something already read `self.mda`), otherwise the raw `useq.MDASequence` --
+        which `Shared_data._mdaModeParams` converts lazily on first read, i.e. on the
+        acquisition worker for the pycromanager backends rather than on the GUI thread.
+        """
+        events = getattr(self, '_mda', None)
+        return events if events is not None else getattr(self, 'mda_useq', None)
+
     def __init__(self,core,MM_JSON,layout,
                 shared_data,
                 hasGUI=False,
                 num_time_points: int | None = 10, 
-                time_interval_s: float | List[float] = 0, 
+                time_interval_s: float | list[float] = 0, 
                 time_interval_s_or_ms: str = 'ms',
                 z_start: float | None = 0, 
                 z_end: float | None = 1, 
@@ -428,7 +540,7 @@ class MDAGlados(CustomMainWindow):
                 channel_exposures_ms: list | None = None, 
                 xy_positions: Iterable | None = None, 
                 xyz_positions: Iterable | None = None, 
-                position_labels: List[str] | None = None, 
+                position_labels: list[str] | None = None, 
                 order: str = 'tpcz', 
                 exposure_ms: float | None = 90, 
                 exposure_s_or_ms: str = 'ms',
@@ -572,41 +684,48 @@ class MDAGlados(CustomMainWindow):
     @property
     def GUI_grid_width(self):
         """
-        Get the width of the GUI grid.
-        
+        How the sections are arranged: a `ui.layout.classify_shape` bucket.
+
+        Kept under its historical name; it used to be a column count (10, 2 or 1),
+        and an int is still accepted and mapped to the matching bucket.
+
         Returns:
-            int: The width of the GUI grid.
+            tuple: The current bucket, or None before the dock was first sized.
         """
-        
+
         return self._GUI_grid_width
-    
+
     @GUI_grid_width.setter
     def GUI_grid_width(self, value):
         """
-        Updates the width of the GUI grid.
-        
+        Rearranges the sections for a new bucket. Moves widgets only; builds nothing.
+
         Args:
-            value: An integer representing the new width of the GUI grid.
-        
+            value: A `ui.layout` bucket, or a legacy column count.
+
         Returns:
             None
         """
-        
-        if value != self._GUI_grid_width:
-            self._GUI_grid_width = value
-            if self.has_GUI and self.fully_started:
-                try:
-                    logging.debug(f"updating gui with nr of columns: {self._GUI_grid_width}")
-                    self.showOptionChanged()
-                except:
-                    pass
+        value = _bucketFromGridWidth(value)
+        if value == self._GUI_grid_width:
+            return
+        self._GUI_grid_width = value
+        grid = getattr(self, 'sectionGrid', None)
+        if grid is not None and value is not None:
+            grid.apply(value)
     #endregion
     
     #region GUI
     def initGUI(self, GUI_show_exposure=True, GUI_show_xy = True, GUI_show_z=True, GUI_show_channel=True, GUI_show_time=True, GUI_show_order=True, GUI_show_storage=True, GUI_showOptions=True,GUI_acquire_button=True):
         """
         Initiate the GUI.
-        
+
+        Every box is a `ui.layout.Section`, built once and placed by the
+        `ResponsiveGrid` `self.sectionGrid` according to the dock's shape (see
+        `MDA_SECTION_PLACEMENTS`). `self.gui` stays the QGridLayout hosts embed
+        (`addLayout` / `setLayout`); it holds only that grid. Fonts, spacing and
+        colours come from the theme, never from here.
+
         Args:
             GUI_show_exposure (bool): Whether to show the exposure widget. Default is True.
             GUI_show_xy (bool): Whether to show the XY widget. Default is True.
@@ -617,36 +736,24 @@ class MDAGlados(CustomMainWindow):
             GUI_show_storage (bool): Whether to show the Storage widget. Default is True.
             GUI_showOptions (bool): Whether to show the Options widget. Default is True.
             GUI_acquire_button (bool): Whether to show the Acquire button. Default is True.
-        
+
         Returns:
             None
         """
-        
-        #initiate the GUI
-        #Create a Vertical+horizontal layout:
         self.gui = QGridLayout()
-        self.GUI_grid_width = 7
-        
-        # Add groupboxes for xy, z, channel, time, order, storage
-        self.exposureGroupBox = QGroupBox("Exposure")
-        self.xyGroupBox = QGroupBox("XY")
-        self.zGroupBox = QGroupBox("Z")
-        self.channelGroupBox = QGroupBox("Channel")
-        self.timeGroupBox = QGroupBox("Time")
-        self.storageGroupBox = QGroupBox("Storage")
-        self.showOptionsGroupBox = QGroupBox("Options")
+        self.gui.setContentsMargins(0, 0, 0, 0)
+        self.sectionGrid = ResponsiveGrid(default_bucket=LANDSCAPE)
+        self.gui.addWidget(self.sectionGrid, 0, 0)
 
-        # Create layouts for each groupbox
-        exposureLayout=QHBoxLayout()
-        xyLayout = QGridLayout()
-        zLayout = QGridLayout()
-        channelLayout = QGridLayout()
-        timeLayout = QGridLayout()
-        orderLayout = QVBoxLayout()
-        storageLayout = QGridLayout()
-        showOptionsLayout = QGridLayout()
+        self.exposureGroupBox = Section("Exposure", "mda.exposure")
+        self.xyGroupBox = Section("XY", "mda.xy")
+        self.zGroupBox = Section("Z", "mda.z")
+        self.channelGroupBox = Section("Channel", "mda.channel")
+        self.timeGroupBox = Section("Time", "mda.time")
+        self.storageGroupBox = Section("Storage", "mda.storage", layout=QGridLayout())
+        # The dimension switches and the order they are acquired in share one box.
+        self.showOptionsGroupBox = Section("Dimensions", "mda.options")
 
-        # Add widgets to each layout
         # --------------- Exposure widget -----------------------------------------------
         #Exposure: add a label, an entry field, and a dropdown between 'ms' and 's':
         self.exposureLabel = QLabel("Exposure:")
@@ -662,21 +769,20 @@ class MDAGlados(CustomMainWindow):
         self.exposureDropdown.addItem("ms")
         self.exposureDropdown.addItem("s")
         self.exposureDropdown.setCurrentText(self.exposure_s_or_ms)
-        exposureLayout.addWidget(self.exposureLabel)
-        exposureLayout.addWidget(self.exposureEntry)
-        exposureLayout.addWidget(self.exposureDropdown)
+        self.exposureGroupBox.body.add_row(self.exposureLabel, self.exposureEntry, self.exposureDropdown)
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
-        self.exposureEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.exposureDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        
+        self.exposureEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.exposureEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.exposureDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+
         #--------------- Time widget -----------------------------------------------
         #Time: add labels for time points and time intervals, and integer-based entry fields:
-        self.timePointLabel = QLabel("Number time points:")
+        self.timePointLabel = QLabel("Time points:")
         self.timePointEntry = QLineEdit()
         if self.num_time_points is not None:
             self.timePointEntry.setText(str(self.num_time_points))
         self.timePointEntry.setValidator(QIntValidator())
-        self.timeIntervalLabel = QLabel("Time interval:")
+        self.timeIntervalLabel = QLabel("Interval:")
         self.timeIntervalEntry = QLineEdit()
         if self.time_interval_s is not None:
             if self.time_interval_s_or_ms == 's':
@@ -688,51 +794,40 @@ class MDAGlados(CustomMainWindow):
         self.timeIntervalDropdown.addItem("ms")
         self.timeIntervalDropdown.addItem("s")
         self.timeIntervalDropdown.setCurrentText(self.time_interval_s_or_ms)
-        #Adding widgets to layout
-        timeLayout.addWidget(self.timePointLabel,0,0)
-        timeLayout.addWidget(self.timePointEntry,0,1)
-        timeLayout.addWidget(self.timeIntervalLabel,1,0)
-        timeLayout.addWidget(self.timeIntervalEntry,1,1)
-        timeLayout.addWidget(self.timeIntervalDropdown,1,2)
+        self.timeGroupBox.body.add_row(self.timePointLabel, self.timePointEntry)
+        self.timeGroupBox.body.add_row(self.timeIntervalLabel, self.timeIntervalEntry, self.timeIntervalDropdown)
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
-        self.timePointEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.timeIntervalEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.timeIntervalDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        
+        self.timePointEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.timePointEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.timeIntervalEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.timeIntervalEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.timeIntervalDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+
         #--------------- storage widget -----------------------------------------------
-        #storage: first, add a label, entry field, and button with '...' to select a folder of choice:
-        self.storageFolderLabel = QLabel("Storage:")
+        # One row -- folder, '...', file name -- in a bar across the whole dock,
+        # so a long path has room; stacked into two rows when the dock is tall
+        # (`_arrangeStorageBar`). The folder field takes most of the spare width.
+        self.storageFolderLabel = QLabel("Folder:")
         self.storageFolderEntry = QLineEdit()
         if self.storage_folder is not None:
             self.storageFolderEntry.setText(self.storage_folder)
         self.storageFolderButton = QPushButton('...')
         #add a lambda function when this is pressed to search for a folder:
         self.storageFolderButton.clicked.connect(lambda: self.storageFolderEntry.setText(QFileDialog.getExistingDirectory()))
-        #Then add a label and entry field for the file name:
         self.storageFileNameLabel = QLabel("File name:")
         self.storageFileNameEntry = QLineEdit()
         if self.storage_file_name is not None:
             self.storageFileNameEntry.setText(self.storage_file_name)
-        #Adding widgets to layout
-        storageLayout.addWidget(self.storageFolderLabel,0,0)
-        storageLayout.addWidget(self.storageFolderEntry,0,1)
-        storageLayout.addWidget(self.storageFolderButton,0,2)
-        storageLayout.addWidget(self.storageFileNameLabel,1,0)
-        storageLayout.addWidget(self.storageFileNameEntry,1,1)
-        self.storageFolderEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.storageFileNameEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        
+        self.storageFolderEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.storageFolderEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.storageFileNameEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.storageFileNameEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+
         #--------------- XY widget widget -----------------------------------------------
-        #First a dropdown to select the xy stage:
-        
         #Adding a list widget to add a list of xy positions
         self.xypositionListWidget = XYStageList(parent=self)
         self.xypositionListWidget.setColumNames(["Name", "ID","xPos","yPos"])
-        self.xypositionListWidget.setColumnWidth(0, int(90*self.shared_data.GUIscaleFactor))
-        self.xypositionListWidget.setColumnWidth(1, int(30*self.shared_data.GUIscaleFactor))
-        self.xypositionListWidget.setColumnWidth(2, int(60*self.shared_data.GUIscaleFactor))
-        self.xypositionListWidget.setColumnWidth(3, int(60*self.shared_data.GUIscaleFactor))
-        
+
         self.xy_stagesDropdownLabel = QLabel("XY Stage:")
         self.xy_stagesDropdown = QComboBox()
         XYstages = self.getDevicesOfDeviceType('XYStageDevice')
@@ -741,19 +836,20 @@ class MDAGlados(CustomMainWindow):
             self.xy_stagesDropdown.addItem(stage)
         #Add a callback if we change this dropdown:
         self.xy_stagesDropdown.currentIndexChanged.connect(lambda: self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText()))
-        
+
         #Initisalise the XY position list
         self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText)
-        #Buttons for the xy position list
-        self.xypositionListWidget_deleteButton = QPushButton('Delete Selected')
-        self.xypositionListWidget_deleteAllButton = QPushButton('Delete All')
-        self.xypositionListWidget_moveUpButton = QPushButton('Move Up')
-        self.xypositionListWidget_moveDownButton = QPushButton('Move Down')
-        self.xypositionListWidget_moveToButton = QPushButton('Move to Pos')
-        self.xypositionListWidget_addButton = QPushButton('Add New Entry')
+        #Buttons for the xy position list, beside the table
+        self.xypositionListEditor = ListEditor(self.xypositionListWidget, stretch_columns=(0,))
+        self.xypositionListWidget_addButton = self.xypositionListEditor.add_action('Add New Entry')
+        self.xypositionListWidget_deleteButton = self.xypositionListEditor.add_action('Delete Selected')
+        self.xypositionListWidget_deleteAllButton = self.xypositionListEditor.add_action('Delete All')
+        self.xypositionListWidget_moveUpButton = self.xypositionListEditor.add_action('Move Up')
+        self.xypositionListWidget_moveDownButton = self.xypositionListEditor.add_action('Move Down')
+        self.xypositionListWidget_moveToButton = self.xypositionListEditor.add_action('Move to Pos')
+        self.xypositionListWidget_createGridButton = self.xypositionListEditor.add_action('Create Grid')
         #Intialise a gridManager
         self.xypositionListWidget_XYGridManager = utils.XYGridManager(core=self.core,parent=self)
-        self.xypositionListWidget_createGridButton = QPushButton('Create Grid')
         #Adding callbacks to the xy position list buttons
         self.xypositionListWidget_deleteButton.clicked.connect(self.xypositionListWidget.deleteSelected)
         self.xypositionListWidget_deleteAllButton.clicked.connect(self.xypositionListWidget.deleteAll)
@@ -761,30 +857,22 @@ class MDAGlados(CustomMainWindow):
         self.xypositionListWidget_moveDownButton.clicked.connect(self.xypositionListWidget.moveDown)
         self.xypositionListWidget_moveToButton.clicked.connect(self.xypositionListWidget.moveToPos)
         self.xypositionListWidget_addButton.clicked.connect(lambda: self.xypositionListWidget.addNewEntry(textEntry="Your Text Entry"))
-        
+
         #Open the GridManager GUI
         self.xypositionListWidget_createGridButton.clicked.connect(lambda: self.xypositionListWidget_XYGridManager.openGUI())
 
-        #Adding widgets to layout
-        xyLayout.addWidget(self.xy_stagesDropdownLabel,0,0)
-        xyLayout.addWidget(self.xy_stagesDropdown,0,1)
-        xyLayout.addWidget(self.xypositionListWidget,1,0,8,1)
-        xyLayout.addWidget(self.xypositionListWidget_deleteButton,2,1)
-        xyLayout.addWidget(self.xypositionListWidget_deleteAllButton,3,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveUpButton,4,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveDownButton,5,1)
-        xyLayout.addWidget(self.xypositionListWidget_moveToButton,6,1)
-        xyLayout.addWidget(self.xypositionListWidget_addButton,7,1)
-        xyLayout.addWidget(self.xypositionListWidget_createGridButton,8,1)
-        
+        xyLayout = self.xyGroupBox.body
+        xyLayout.add_row(self.xy_stagesDropdownLabel, self.xy_stagesDropdown)
+        xyLayout.setRowStretch(xyLayout.add_full_row(self.xypositionListEditor), 1)
+
         #Pre-load entries if they exist:
         if self.GUI_xy_pos_fullInfo != None:
             for entry in self.GUI_xy_pos_fullInfo:
                 self.xypositionListWidget.addNewEntry(textEntry=entry[0],id=int(entry[1]),setxy=[float(entry[2]),float(entry[3])])
-        
+
         #Add a callback lambda
-        self.xypositionListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        
+        self.xypositionListWidget.itemChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+
         #--------------- Z widget widget -----------------------------------------------
         #First a dropdown to select the 1d stage:
         self.z_oneDstageDropdownLabel = QLabel("Z Stage:")
@@ -811,10 +899,10 @@ class MDAGlados(CustomMainWindow):
         self.z_endEntry.setValidator(QDoubleValidator())
         self.z_endSetButton = QPushButton('Set')
         self.z_endSetButton.clicked.connect(lambda: self.setZEnd())
-        
+
         #add radio buttons:
-        self.z_nrsteps_radio= QRadioButton("Number of steps: ")
-        self.z_stepdistance_radio= QRadioButton("Step distance: ")
+        self.z_nrsteps_radio= QRadioButton("Number of steps:")
+        self.z_stepdistance_radio= QRadioButton("Step distance:")
         #preselect the nr of steps one:
         if self.z_nrsteps_radio_sel == True:
             self.z_nrsteps_radio.setChecked(True)
@@ -831,44 +919,86 @@ class MDAGlados(CustomMainWindow):
         if self.z_step_distance is not None:
             self.z_stepdistance_entry.setText(str(self.z_step_distance))
         self.z_stepdistance_entry.setValidator(QDoubleValidator())
-        
-        #Add all widgets to layout
-        zLayout.addWidget(self.z_oneDstageDropdownLabel,0,0)
-        zLayout.addWidget(self.z_oneDstageDropdown,0,1)
-        zLayout.addWidget(self.z_startLabel,1,0)
-        zLayout.addWidget(self.z_startEntry,1,1)
-        zLayout.addWidget(self.z_startSetButton,1,2)
-        zLayout.addWidget(self.z_endLabel,2,0)
-        zLayout.addWidget(self.z_endEntry,2,1)
-        zLayout.addWidget(self.z_endSetButton,2,2)
-        zLayout.addWidget(self.z_nrsteps_radio,3,0)
-        zLayout.addWidget(self.z_nrsteps_entry,3,1)
-        zLayout.addWidget(self.z_stepdistance_radio,4,0)
-        zLayout.addWidget(self.z_stepdistance_entry,4,1)
-        #Add a spacer at the bottom:
-        zLayout.addItem(QSpacerItem(1, 2, QSizePolicy.Minimum, QSizePolicy.Expanding),5,0,1,2)
-        
+        # Labels showing the value the other field would compute to, kept live-updated (see _updateZStepLabels)
+        self.z_nrsteps_computedLabel = QLabel("")
+        self.z_stepdistance_computedLabel = QLabel("")
+
+        # Toggles the backend's Z-settle-wait-before-arming-camera behaviour live.
+        # MMCORE_PLUS: GUI_napari.register_resilient_mmcore_mda_engine / ZSettleSkippingMDAEngine.
+        # PYCROMANAGER_PYTHON: GUI_napari.register_resilient_pycromanager_python_engine.
+        # PYCROMANAGER_JAVA: no equivalent lever exists (AcqEngJ runs compiled inside
+        # the JVM), so the checkbox is disabled there. See the CLAUDE.md note on the
+        # free-running-trigger-vs-z-settle race for why this exists.
+        self.z_waitForSettle_checkbox = QCheckBox("Wait for Z to settle before arming camera")
+        try:
+            mi = self.shared_data.MILcore.MI()
+        except (AttributeError, RuntimeError):
+            mi = None
+        if mi == MIL.MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.z_waitForSettle_checkbox.setEnabled(False)
+            self.z_waitForSettle_checkbox.setToolTip(
+                "Not available for the PYCROMANAGER_JAVA backend: its acquisition "
+                "engine (AcqEngJ) runs compiled inside the JVM and cannot be patched "
+                "from Python. Switch to the MMCORE_PLUS or PYCROMANAGER_PYTHON "
+                "backend to use this.")
+        else:
+            self.z_waitForSettle_checkbox.setToolTip(
+                "Checked (default OFF) restores the normal behaviour of waiting for "
+                "the Z stage to report settled before arming the camera for the next "
+                "triggered burst -- more accurate Z positioning, but every wait is a "
+                "window where a free-running external trigger's pulses can be "
+                "silently lost (more z-steps = more chances to fall out of sync, up "
+                "to losing the whole acquisition). Unchecked arms the camera "
+                "immediately after issuing the Z move instead, so no trigger pulses "
+                "are missed, at the cost of the leading frame(s) of a burst possibly "
+                "being captured while Z is still in motion.")
+        self.z_waitForSettle_checkbox.setChecked(str(self._zWaitForSettleConfigValue(mi)) == 'True')
+        self.z_waitForSettle_checkbox.toggled.connect(self._onZWaitForSettleToggled)
+
+        zLayout = self.zGroupBox.body
+        zLayout.add_row(self.z_oneDstageDropdownLabel, self.z_oneDstageDropdown)
+        zLayout.add_row(self.z_startLabel, self.z_startEntry, self.z_startSetButton)
+        zLayout.add_row(self.z_endLabel, self.z_endEntry, self.z_endSetButton)
+        zLayout.add_row(self.z_nrsteps_radio, self.z_nrsteps_entry, self.z_nrsteps_computedLabel)
+        zLayout.add_row(self.z_stepdistance_radio, self.z_stepdistance_entry, self.z_stepdistance_computedLabel)
+        zLayout.add_row(self.z_waitForSettle_checkbox)
+        zLayout.add_stretch()
+
         #run get_MDA_events_from_GUI when the text or dropdown is changed:
-        self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_startEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_endEntry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_nrsteps_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_stepdistance_radio.toggled.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_nrsteps_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        self.z_stepdistance_entry.textChanged.connect(lambda: self.get_MDA_events_from_GUI())
+        self.z_oneDstageDropdown.currentIndexChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_startEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_startEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.z_endEntry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_endEntry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.z_nrsteps_radio.toggled.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_stepdistance_radio.toggled.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_nrsteps_entry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_nrsteps_entry.editingFinished.connect(self.flushMDAEventsUpdate)
+        self.z_stepdistance_entry.textChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+        self.z_stepdistance_entry.editingFinished.connect(self.flushMDAEventsUpdate)
+        #Keep the computed-value labels live: any field feeding the computation triggers a refresh
+        self.z_startEntry.textChanged.connect(self._updateZStepLabels)
+        self.z_endEntry.textChanged.connect(self._updateZStepLabels)
+        self.z_nrsteps_entry.textChanged.connect(self._updateZStepLabels)
+        self.z_stepdistance_entry.textChanged.connect(self._updateZStepLabels)
+        self._updateZStepLabels()
 
         # --- Ordering widget ---
-        #Note: only used in updateGUIwidgets
-        
+        # Built once; `_refillOrderDropdown` (from updateGUIwidgets) only changes
+        # which permutations it offers. Placed under the dimension checkboxes.
+        self.orderLabel = QLabel("Order:")
+        self.orderDropdown = QComboBox()
+        self.orderDropdown.currentTextChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+
         #--------------- Channel widget -----------------------------------------------
         #Adding a list widget to add a list of channels
         self.channelListWidget = ChannelList(parent=self)
         self.channelListWidget.setColumNames(["Channel Setting", "Exposure"])
-        
+
         #Add possible channels
         self.channelDropdownLabel = QLabel("Channel:")
         self.channelDropdown = QComboBox()
-        
+
         #Figure out from all config groups which ones are "dropdown"
         nrconfiggroups = len(self.shared_data.MILcore.get_available_config_groups())
         allConfigGroups={}
@@ -880,7 +1010,7 @@ class MDAGlados(CustomMainWindow):
                 comboboxindexes.append(config_group_id)
         ComboBoxes = {key: allConfigGroups[key] for key in comboboxindexes}
         ComboBoxNames = {allConfigGroups[key].configGroupName() for key in comboboxindexes}
-        
+
         #add the options to the dropdown:
         for combobox in ComboBoxes:
             self.channelDropdown.addItem(allConfigGroups[combobox].configGroupName())
@@ -888,17 +1018,17 @@ class MDAGlados(CustomMainWindow):
         self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.setChannelName(self.channelDropdown.currentText()))
         #Also delete all the current entries
         self.channelDropdown.currentIndexChanged.connect(lambda: self.channelListWidget.deleteAll())
-        
+
         #Initisalise the channel  list
         self.channelListWidget.setChannelName(self.channelDropdown.currentText)
-        
-        
-        #Buttons for the channel position list
-        self.channelListWidget_deleteButton = QPushButton('Delete Selected')
-        self.channelListWidget_moveUpButton = QPushButton('Move Up')
-        self.channelListWidget_moveDownButton = QPushButton('Move Down')
-        self.channelListWidget_addButton = QPushButton('Add New Entry')
-        self.channelListWidget_deleteAllButton = QPushButton('Delete All')
+
+        #Buttons for the channel list, beside the table
+        self.channelListEditor = ListEditor(self.channelListWidget, stretch_columns=(0,))
+        self.channelListWidget_addButton = self.channelListEditor.add_action('Add New Entry')
+        self.channelListWidget_deleteButton = self.channelListEditor.add_action('Delete Selected')
+        self.channelListWidget_deleteAllButton = self.channelListEditor.add_action('Delete All')
+        self.channelListWidget_moveUpButton = self.channelListEditor.add_action('Move Up')
+        self.channelListWidget_moveDownButton = self.channelListEditor.add_action('Move Down')
         #Adding callbacks to the channel list buttons
         self.channelListWidget_deleteButton.clicked.connect(self.channelListWidget.deleteSelected)
         self.channelListWidget_deleteAllButton.clicked.connect(self.channelListWidget.deleteAll)
@@ -906,17 +1036,9 @@ class MDAGlados(CustomMainWindow):
         self.channelListWidget_moveDownButton.clicked.connect(self.channelListWidget.moveDown)
         self.channelListWidget_addButton.clicked.connect(lambda: self.channelListWidget.addNewEntry())
 
-        #Adding widgets to layout
-        dropdownQH = QHBoxLayout()
-        dropdownQH.addWidget(self.channelDropdownLabel)
-        dropdownQH.addWidget(self.channelDropdown)
-        channelLayout.addLayout(dropdownQH,0,0,1,3)
-        channelLayout.addWidget(self.channelListWidget,1,0,6,1)
-        channelLayout.addWidget(self.channelListWidget_deleteButton,2,1)
-        channelLayout.addWidget(self.channelListWidget_moveUpButton,3,1)
-        channelLayout.addWidget(self.channelListWidget_moveDownButton,4,1)
-        channelLayout.addWidget(self.channelListWidget_addButton,5,1)
-        channelLayout.addWidget(self.channelListWidget_deleteAllButton,6,1)
+        channelLayout = self.channelGroupBox.body
+        channelLayout.add_row(self.channelDropdownLabel, self.channelDropdown)
+        channelLayout.setRowStretch(channelLayout.add_full_row(self.channelListEditor), 1)
 
         #Add the pre-set channels:
         if self.channel_group in ComboBoxNames:
@@ -925,12 +1047,12 @@ class MDAGlados(CustomMainWindow):
         if self.channels is not None and self.channel_exposures_ms is not None:
             for entry in range(len(self.channels)):
                 self.channelListWidget.addNewEntry(channelEntry=self.channels[entry],exposureEntry=str(self.channel_exposures_ms[entry]))
-                
+
         #Change MDA events when adapted
-        self.channelListWidget.itemChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        
+        self.channelListWidget.itemChanged.connect(lambda: self.scheduleMDAEventsUpdate())
+
         #--------------- Show options widget -----------------------------------------------
-        #This should have checkboxes for exposure, xy, z, channel, time, order, storage. If these checkboxes are clicked, the GUI should be updated accordingly:
+        #Checkboxes that switch whole dimensions on/off. A strip that wraps when narrow.
         self.GUI_show_exposure_chkbox = QCheckBox("Exposure") #Note: created but never rendered
         self.GUI_show_xy_chkbox = QCheckBox("XY")
         self.GUI_show_z_chkbox = QCheckBox("Z")
@@ -945,81 +1067,116 @@ class MDAGlados(CustomMainWindow):
         self.GUI_show_time_chkbox.setChecked(self.GUI_show_time)
         self.GUI_show_storage_chkbox.setChecked(self.GUI_show_storage)
         #Add lambda functions to all of them that all run the same function: showOptionChanged():
-        # self.GUI_show_exposure_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_xy_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_z_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_channel_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_time_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
         self.GUI_show_storage_chkbox.stateChanged.connect(lambda: self.showOptionChanged())
-        
-        font = QFont()
-        font.setPointSize(int(7*self.shared_data.GUIscaleFactor))  # Set the desired font size
+        self.showOptionsGroupBox.body.add_full_row(FlowRow([
+            self.GUI_show_time_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox,
+            self.GUI_show_channel_chkbox, self.GUI_show_storage_chkbox]))
+        self.showOptionsGroupBox.body.add_row(self.orderLabel, self.orderDropdown)
 
-        [checkbox.setFont(font) for checkbox in [self.GUI_show_exposure_chkbox, self.GUI_show_xy_chkbox, self.GUI_show_z_chkbox, self.GUI_show_channel_chkbox, self.GUI_show_time_chkbox, self.GUI_show_storage_chkbox]]
+        # ---------- Acquire button -----------------------------------------------
+        # T-F7: built once for the life of the object, so toggling options never
+        # stacks up buttons (each with its own `clicked` connection).
+        #
+        # The widget is held on `_acquireButton`: `self.GUI_acquire_button`
+        # starts life as the *boolean* set in __init__ and is only replaced by
+        # the widget here, and callers (updateShowHideGUI) pass it back in as the
+        # flag, so it cannot double as the "already built?" test.
+        self._acquireButton = None
+        if GUI_acquire_button:
+            self._acquireButton = QPushButton("Acquire")
+            set_role(self._acquireButton, ROLE_PRIMARY)
+            self._acquireButton.setMinimumWidth(self._acquireButton.fontMetrics().horizontalAdvance("Acquire") * 3)
+            self._acquireButton.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
+            self.GUI_acquire_button = self._acquireButton
 
-        #Add all checkboxes to the options-layout
-        # showOptionsLayout.addWidget(self.GUI_show_exposure_chkbox,0,0)
-        showOptionsLayout.addWidget(self.GUI_show_time_chkbox,0,0)
-        showOptionsLayout.addWidget(self.GUI_show_xy_chkbox,0,1)
-        showOptionsLayout.addWidget(self.GUI_show_z_chkbox,0,2)
-        showOptionsLayout.addWidget(self.GUI_show_channel_chkbox,1,0)
-        showOptionsLayout.addWidget(self.GUI_show_storage_chkbox,1,1)
-        
-        # ---------- Combining all to the main layout -----------------------------------------
-        # Set layouts for each groupbox
-        self.exposureGroupBox.setLayout(exposureLayout)
-        self.xyGroupBox.setLayout(xyLayout)
-        self.zGroupBox.setLayout(zLayout)
-        self.channelGroupBox.setLayout(channelLayout)
-        self.timeGroupBox.setLayout(timeLayout)
-        self.storageGroupBox.setLayout(storageLayout)
-        self.showOptionsGroupBox.setLayout(showOptionsLayout)
+        # ---------- Arranging the sections -----------------------------------------
+        # Storage and Acquire share one bar across the top; the small settings
+        # stack into a single "setup" column.
+        storageBar = QWidget()
+        self._storageBarLayout = QBoxLayout(QBoxLayout.LeftToRight, storageBar)
+        self._storageBarLayout.setContentsMargins(0, 0, 0, 0)
+        self._storageBarLayout.addWidget(self.storageGroupBox, 1)
+        if self._acquireButton is not None:
+            self._storageBarLayout.addWidget(self._acquireButton)
+        self._arrangeStorageBar(None)
+        self.sectionGrid.bucketChanged.connect(self._arrangeStorageBar)
+        setupColumn = QWidget()
+        setupLayout = QVBoxLayout(setupColumn)
+        setupLayout.setContentsMargins(0, 0, 0, 0)
+        for section in (self.showOptionsGroupBox, self.exposureGroupBox, self.timeGroupBox):
+            setupLayout.addWidget(section)
+        setupLayout.addStretch(1)
+        self.sectionGrid.register("mda.storagebar", storageBar)
+        self.sectionGrid.register("mda.setup", setupColumn)
+        for section in (self.xyGroupBox, self.zGroupBox, self.channelGroupBox):
+            self.sectionGrid.register(section.key, section)
+        self.sectionGrid.set_placements(MDA_SECTION_PLACEMENTS, MDA_COLUMN_STRETCH)
 
-        # Add groupboxes to the main layout, only if they should be shown. The position of the gridbox is based on whether the previous ones are added or not:
+        # Enable/disable per option, fill the order dropdown, and place everything:
         self.updateGUIwidgets(GUI_show_exposure=GUI_show_exposure,GUI_show_xy=GUI_show_xy, GUI_show_z=GUI_show_z, GUI_show_channel=GUI_show_channel, GUI_show_time=GUI_show_time, GUI_show_storage=GUI_show_storage,GUI_showOptions=GUI_showOptions,GUI_acquire_button=GUI_acquire_button)
-        
-        #Change the font of everything in the layout
-        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", int(7*self.shared_data.GUIscaleFactor)))
-        #Twice because it relies on dependancies inside qgridlayouts
-        self.set_font_and_margins_recursive(self.gui, font=QFont("Arial", int(7*self.shared_data.GUIscaleFactor)))
-        
+        # Build the plan from the filled-in panel. This used to happen as a side
+        # effect of the order dropdown being re-created and set (a synchronous
+        # rebuild while `fully_started` is False); the refill now blocks signals.
+        self.get_MDA_events_from_GUI()
+
         if self.layout is not None:
             #Add the layout to the main layout
             try:
                 self.layout.addLayout(self.gui,0,0)
-            except:
+            except (AttributeError, RuntimeError, TypeError) as exc:
+                logging.debug('addLayout failed, falling back to setLayout: %s', exc)
                 self.setLayout(self.gui)
                 self.mainLayout = self.gui
-            
-            # Changing font and padding of all widgets
-            font = QFont("Arial", int(7*self.shared_data.GUIscaleFactor))
-            for i in range(self.gui.count()):
-                try:
-                    item = self.gui.itemAt(i)
-                    if item.widget():
-                        item.widget().setFont(font)
-                        item.widget().setStyleSheet("padding: 2px; margin: 1px; spacing: 1px;")  # Change padding as needed
-                except:
-                    pass
-    
+
+    def _arrangeStorageBar(self, bucket):
+        """Storage fields and Acquire on one row, or stacked when the dock is tall."""
+        stacked = bucket == TALL
+        grid = self.storageGroupBox.body
+        for widget in (self.storageFolderLabel, self.storageFolderEntry, self.storageFolderButton,
+                       self.storageFileNameLabel, self.storageFileNameEntry):
+            grid.removeWidget(widget)
+        for col in range(5):
+            grid.setColumnStretch(col, 0)
+        grid.addWidget(self.storageFolderLabel, 0, 0)
+        grid.addWidget(self.storageFolderEntry, 0, 1)
+        grid.addWidget(self.storageFolderButton, 0, 2)
+        if stacked:
+            grid.addWidget(self.storageFileNameLabel, 1, 0)
+            grid.addWidget(self.storageFileNameEntry, 1, 1, 1, 2)
+            grid.setColumnStretch(1, 1)
+        else:
+            grid.addWidget(self.storageFileNameLabel, 0, 3)
+            grid.addWidget(self.storageFileNameEntry, 0, 4)
+            grid.setColumnStretch(1, 3)
+            grid.setColumnStretch(4, 1)
+        self._storageBarLayout.setDirection(QBoxLayout.TopToBottom if stacked else QBoxLayout.LeftToRight)
+        if self._acquireButton is not None:
+            vertical = QSizePolicy.Fixed if stacked else QSizePolicy.Expanding
+            self._acquireButton.setSizePolicy(QSizePolicy.Preferred, vertical)
+
+    def _configuredHiddenSections(self):
+        """Section keys the (hidden) `layout_config.hidden_sections` setting leaves out."""
+        try:
+            keys = self.shared_data.config.layout_config.hidden_section_keys()
+        except AttributeError:
+            return set()
+        return keys if isinstance(keys, set) else set()
+
     def handleSizeChange(self, size):
         """
-        Handle a change in size by adjusting the number of columns in the GUI grid.
-        
+        Rearrange the sections for the dock's new shape (see `ui.layout.classify_shape`).
+
         Args:
             size: The new size of the GUI window.
-        
+
         Returns:
             None
         """
-        #Very practically, it can be 1, many, or 'square'. Since we have 6 widgets total, square is 2.
-        if size.width()>1.25*size.height():
-            newNrColumns = 10
-        elif size.height()>1.25*size.width():
-            newNrColumns = 1
-        else:
-            newNrColumns = 2
-        self.GUI_grid_width = newNrColumns
+        self.GUI_grid_width = classify_shape(size.width(), size.height())
     
     def getDevicesOfDeviceType(self,devicetype):
         """
@@ -1065,22 +1222,14 @@ class MDAGlados(CustomMainWindow):
         #             devicesOfType.append(device)
         #     return devicesOfType
     
-    def createOrderLayout(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice = None):
+    def _refillOrderDropdown(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z):
         """
-        Create an order ('t','tc', etc) layout based on the provided parameters.
-        
-        Args:
-            GUI_show_channel (bool): Whether to include channel in the layout.
-            GUI_show_time (bool): Whether to include time in the layout.
-            GUI_show_xy (bool): Whether to include xy in the layout.
-            GUI_show_z (bool): Whether to include z in the layout.
-            orderChoice (str, optional): The default order choice. Defaults to None.
-        
-        Returns:
-            QVBoxLayout: The layout containing the order dropdown and label.
+        Offer every ordering ('tpcz', ...) of the enabled dimensions in the order dropdown.
+
+        The dropdown is built once in initGUI and only refilled here. The current
+        choice survives a dimension being switched off or on: its remaining
+        letters keep their relative order and a newly enabled letter goes last.
         """
-        
-        orderLayout = QHBoxLayout()
         letters_to_include = ''
         if GUI_show_channel:
             letters_to_include += 'c'
@@ -1090,25 +1239,20 @@ class MDAGlados(CustomMainWindow):
             letters_to_include += 'p'
         if GUI_show_z:
             letters_to_include += 'z'
-        #Now we create an array with all possible combinations of these letters:
-        permuatations = [''.join(comb) for comb in itertools.permutations(letters_to_include, len(letters_to_include))]
-        self.orderDropdown = QComboBox()
-        self.orderDropdown.currentTextChanged.connect(lambda: self.get_MDA_events_from_GUI())
-        #add the options to the dropdown:
-        for option in permuatations:
-            self.orderDropdown.addItem(option)
-        #Create a label:
-        self.orderLabel = QLabel("Order:")
-        
-        #Show the widgets.
-        orderLayout.addWidget(self.orderLabel)
-        orderLayout.addWidget(self.orderDropdown)
-        
-        if orderChoice in permuatations:
-            if orderChoice is not None:
-                self.orderDropdown.setCurrentText(orderChoice)
-        
-        return orderLayout
+        permutations = [''.join(comb) for comb in itertools.permutations(letters_to_include, len(letters_to_include))]
+
+        previous = self.orderDropdown.currentText() or self.order or ''
+        kept = ''.join(letter for letter in previous if letter in letters_to_include)
+        wanted = kept + ''.join(letter for letter in letters_to_include if letter not in kept)
+
+        self.orderDropdown.blockSignals(True)
+        try:
+            self.orderDropdown.clear()
+            self.orderDropdown.addItems(permutations)
+            if wanted in permutations:
+                self.orderDropdown.setCurrentText(wanted)
+        finally:
+            self.orderDropdown.blockSignals(False)
         
     def showOptionChanged(self):
         """
@@ -1155,128 +1299,57 @@ class MDAGlados(CustomMainWindow):
     
     def updateGUIwidgets(self,GUI_show_exposure=True, GUI_show_xy = False, GUI_show_z=True, GUI_show_channel=False, GUI_show_time=True, GUI_show_storage=True,GUI_showOptions=True,gridWidth=4,GUI_acquire_button=True):
         """
-        Updates the GUI widgets based on the specified parameters.
-        
+        Apply the option checkboxes to the (already built) sections and place them.
+
+        Nothing is constructed here: sections are enabled/disabled in place (a
+        disabled section is left out of the acquisition -- `get_MDA_events_from_GUI`
+        reads `isEnabled()`), the order dropdown is refilled, and the section grid
+        is arranged for the current dock shape.
+
         Args:
-            GUI_show_exposure (bool): Whether to show the exposure widget. Default is True.
-            GUI_show_xy (bool): Whether to show the XY widget. Default is False.
-            GUI_show_z (bool): Whether to show the Z widget. Default is True.
-            GUI_show_channel (bool): Whether to show the channel widget. Default is False.
-            GUI_show_time (bool): Whether to show the time widget. Default is True.
-            GUI_show_storage (bool): Whether to show the storage widget. Default is True.
-            GUI_showOptions (bool): Whether to show the options widget. Default is True.
-            gridWidth (int): The width of the grid. Default is 4.
-            GUI_acquire_button (bool): Whether to show the acquire button. Default is True.
-        
+            GUI_show_exposure (bool): Whether to enable the exposure section. Default is True.
+            GUI_show_xy (bool): Whether to enable the XY section. Default is False.
+            GUI_show_z (bool): Whether to enable the Z section. Default is True.
+            GUI_show_channel (bool): Whether to enable the channel section. Default is False.
+            GUI_show_time (bool): Whether to enable the time section. Default is True.
+            GUI_show_storage (bool): Whether to enable the storage section. Default is True.
+            GUI_showOptions (bool): Unused; the options section is always enabled.
+            gridWidth (int): Unused; the arrangement follows `GUI_grid_width`.
+            GUI_acquire_button (bool): Whether to show the acquire button (if one was built). Default is True.
+
         Returns:
             None
         """
-        
-        gridWidth = self.GUI_grid_width
-        # Remove the widgets from their parent
-        self.exposureGroupBox.setParent(None) # type: ignore
-        self.xyGroupBox.setParent(None) # type: ignore
-        self.zGroupBox.setParent(None) # type: ignore
-        self.channelGroupBox.setParent(None) # type: ignore
-        self.timeGroupBox.setParent(None) # type: ignore
-        if hasattr(self,'orderGroupBox'):
-            self.orderGroupBox.setParent(None) # type: ignore
-        self.storageGroupBox.setParent(None) # type: ignore
-        #self.showOptionsGroupBox.setParent(None)  # type: ignore
-        
-        self.gui.setSizeConstraint(QGridLayout.SetMinimumSize)
-        # At the beginning add an options groupbox, which has all the checkboxes and storage/acquire
-        optionsBGroupBox = QWidget()
-        optionsBLayout = None
-        optionsBLayout = QVBoxLayout()
-        optionsBLayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
-        optionsBLayout.setContentsMargins(0, 0, 0, 0)
-        optionsBGroupBox.setLayout(optionsBLayout)
-        self.showOptionsGroupBox.setEnabled(True)
-        if GUI_show_storage: 
-            self.storageGroupBox.setEnabled(True)
-        else:
-            self.storageGroupBox.setEnabled(False)
-        if GUI_acquire_button:
-            
-            self.GUI_acquire_button = QPushButton("Acquire")
-            self.GUI_acquire_button.clicked.connect(lambda index: self.MDA_acq_from_GUI(mdaLayerName='MDA'))
-            self.GUI_acquire_button.setEnabled(True)
-        # else:
-        #     self.GUI_acquire_button.setEnabled(False)
-        
-        #Add order/exposure/time as single groupbox
-        orderexposuretimegroupbox = QWidget()
-        orderexposuretimelayout = QVBoxLayout()
-        orderexposuretimelayout.setSizeConstraint(QVBoxLayout.SetMinimumSize)
-        orderexposuretimelayout.setContentsMargins(0, 0, 0, 0)
-        orderexposuretimegroupbox.setLayout(orderexposuretimelayout)
-        
-        if GUI_show_exposure:
-            self.exposureGroupBox.setEnabled(True)
-        else:
-            self.exposureGroupBox.setEnabled(False)
-            
-        self.orderGroupBox = QGroupBox("Order")
-        orderlayout = self.createOrderLayout(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z, orderChoice=self.order)
-        self.orderGroupBox.setLayout(orderlayout)
-        
-        orderexposuretimelayout.addWidget(self.orderGroupBox) # type: ignore
-        orderexposuretimelayout.addWidget(self.exposureGroupBox) # type: ignore
-        orderexposuretimelayout.addWidget(self.timeGroupBox) # type: ignore
-        if GUI_show_time:
-            self.timeGroupBox.setEnabled(True)
-        else:
-            self.timeGroupBox.setEnabled(False)
-        if GUI_show_xy:
-            self.xyGroupBox.setEnabled(True)
-        else:
-            self.xyGroupBox.setEnabled(False)
-        if GUI_show_z:
-            self.zGroupBox.setEnabled(True)
-        else:
-            self.zGroupBox.setEnabled(False)
-        if GUI_show_channel:
-            self.channelGroupBox.setEnabled(True)
-        else:
-            self.channelGroupBox.setEnabled(False)
-        
-        optionsBLayout.addWidget(self.showOptionsGroupBox) # type: ignore
-        optionsBLayout.addWidget(self.storageGroupBox) # type: ignore
-        if GUI_acquire_button:
-            optionsBLayout.addWidget(self.GUI_acquire_button) # type: ignore
-        
-        self.gui.addWidget(optionsBGroupBox, 0, 0) # type: ignore
-        
-        self.gui.addWidget(orderexposuretimegroupbox, 1//gridWidth, 1%gridWidth) # type: ignore
-        
-        #Add XY, Z, Channel, groupboxes as individual groupboxes
-        curindex = 2
-        self.gui.addWidget(self.xyGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
-        self.gui.addWidget(self.zGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
-        self.gui.addWidget(self.channelGroupBox, curindex//gridWidth, curindex%gridWidth) # type: ignore
-        curindex+=1
-        self.gui.setColumnStretch(99,gridWidth+1) # type: ignore
-        self.gui.setRowStretch(99,gridWidth+1) # type: ignore
-        
-        #try to trigger a dock widget resize event at this point.
+        self.showOptionsGroupBox.set_active(True)
+        self.storageGroupBox.set_active(GUI_show_storage)
+        self.exposureGroupBox.set_active(GUI_show_exposure)
+        self.timeGroupBox.set_active(GUI_show_time)
+        self.xyGroupBox.set_active(GUI_show_xy)
+        self.zGroupBox.set_active(GUI_show_z)
+        self.channelGroupBox.set_active(GUI_show_channel)
+        self._refillOrderDropdown(GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z)
+        if self._acquireButton is not None:
+            self._acquireButton.setVisible(bool(GUI_acquire_button))
+            self._acquireButton.setEnabled(True)
+
+        self.sectionGrid.set_hidden(self._configuredHiddenSections())
+        self.sectionGrid.apply(self.GUI_grid_width)
+
+        # T-F7: ask the parent dock to relayout, *after* this rebuild returns.
+        #
+        # This used to synthesise a QEvent.Resize at the parent's current size,
+        # send it, and then call QCoreApplication.processEvents(). Pumping the
+        # event loop from inside a widget-tree rebuild allowed re-entrant
+        # delivery of showOptionChanged / currentTextChanged straight back into
+        # updateGUIwidgets, and could run napariUpdateLive slots mid-rebuild.
+        # A zero-delay singleShot gets the relayout without ever re-entering.
         mdawidget_object = self.gui.parent() #type:ignore
-        if mdawidget_object is not None:
-            if hasattr(mdawidget_object,'size'):
-                logging.debug('attempting to update parent')
-                current_size = mdawidget_object.size() #type:ignore
-                resize_event = QEvent(QEvent.Resize) #type:ignore
-                resize_event.oldSize = lambda: current_size #type:ignore
-                resize_event.size = lambda: current_size #type:ignore
-                QApplication.sendEvent(mdawidget_object, resize_event)
-            else:
-                logging.debug('did not attempt to update parent')
-        
-        
-        QCoreApplication.processEvents()
-        
+        if mdawidget_object is not None and hasattr(mdawidget_object, 'requestRelayout'):
+            logging.debug('scheduling parent relayout')
+            QTimer.singleShot(0, mdawidget_object.requestRelayout)
+        else:
+            logging.debug('did not attempt to update parent')
+
         #redraw the self.gui:
         self.gui.update()
     
@@ -1299,6 +1372,7 @@ class MDAGlados(CustomMainWindow):
         Returns:
             The MDA events stored in the object.
         """
+        self.flushMDAEventsUpdate()
         return self.mda
     
     def getGui(self):
@@ -1313,49 +1387,89 @@ class MDAGlados(CustomMainWindow):
         """
         return self
     
-    def set_font_and_margins_recursive(self,widget, font=QFont("Arial", 8)):
-        """
-        Recursively sets the font of all buttons/labels in a layout to the specified font, and sets the contents margins to 0.
-        Also sets the size policy of the widget to minimum, so it will only take up as much space as it needs.
-
-        """
-        
-        if isinstance(widget, (QPushButton)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-        if isinstance(widget, (QLabel, QComboBox)):
-            widget.setFont(font)
-            # widget.setContentsMargins(0, 0, 0, 0)
-            # widget.setMinimumSize(20, 20)
-
-        if isinstance(widget, QGroupBox):
-            # widget.setSizePolicy(
-            #     QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            # )
-            # Ensure QGroupBox respects the size of its contents
-            widget.setMinimumSize(widget.minimumSizeHint())  # Set the minimum size of QGroupBox based on its size hint
-
-        if hasattr(widget, 'minimumSizeHint'):
-            minsize = widget.minimumSizeHint()
-            if minsize.width() > -1 and minsize.height() > -1:
-                widget.setMinimumSize(widget.minimumSizeHint())
-
-        if hasattr(widget, 'layout'):
-            layout = widget.layout()
-            if layout:
-                # layout.setContentsMargins(0, 0, 0, 0)
-                # layout.setSpacing(0)  # Optionally, remove spacing between widgets
-                for i in range(layout.count()):
-                    item = layout.itemAt(i)
-                    if hasattr(item, 'widget'):
-                        self.set_font_and_margins_recursive(item.widget(), font=font)
-                    if hasattr(item, 'layout'):
-                        self.set_font_and_margins_recursive(item.layout(), font=font)
-    
     #endregion
     
     #region Multi-D acquisition logic
+    def _resolve_finished_acquisition_data(self):
+        """The acquisition's data object, or None if nothing was captured.
+
+        Two shapes. The pycromanager backends append an NDTiff `Dataset` to
+        `shared_data.mdaDatasets`, and so does MMCORE_PLUS when its save format is
+        'ndtiff' (T-D8). Otherwise MMCORE_PLUS has only the `zarr.Array` it
+        rendered into, in `shared_data.mdaZarrData`, keyed by the napari layer
+        name. `shared_data.mdaCurrentDataset` says which dataset, if any, belongs
+        to *this* acquisition.
+
+        T-D6: this used to be `zarr.open(shared_data.mdaZarrData['MDA'])`, which
+        could not work. `mdaZarrData[...]` is an already-open `zarr.Array`, not a
+        store path, and zarr 3.x rejects one with
+        `TypeError: Unsupported type for store_like: 'Array'` -- swallowed by the
+        `except (KeyError, Exception)` right below it, so `self.data` came back
+        None on *every* MMCORE_PLUS acquisition and every downstream Nodz node
+        consuming `variablesNodz['data']` got None. The key was wrong too: 'MDA'
+        is only the default layer name, and a Nodz-driven acquisition names the
+        layer after its node.
+
+        No try/except is needed now that nothing is re-opened: an empty
+        `mdaDatasets` and a missing zarr entry are both ordinary "nothing here"
+        answers rather than exceptions.
+        """
+        # T-D8: MMCORE_PLUS can append an NDTiff dataset too now, so mdaDatasets[-1]
+        # may belong to an *earlier* acquisition (an NDTiff run, then an OME-Zarr
+        # one). `mdaCurrentDataset` is reset at each acquisition's start and set by
+        # appendNewMDAdataset, so None means "this acquisition produced none".
+        current = getattr(self.shared_data, 'mdaCurrentDataset', _DATASET_NOT_TRACKED)
+        if current is _DATASET_NOT_TRACKED:
+            datasets = getattr(self.shared_data, 'mdaDatasets', None)
+            if datasets:
+                return datasets[-1]
+        elif current is not None:
+            return current
+
+        # MMCORE_PLUS: the zarr array the visualisation path created and wrote.
+        layer_name = getattr(self.shared_data, 'newestLayerName', '')
+        data = self.shared_data.mdaZarrData.get(layer_name)
+        if data is not None:
+            logging.info('MDA data loaded from zarr store for layer %r', layer_name)
+            return data
+
+        logging.warning(
+            'MDA dataset not available in mdaDatasets, and no zarr store for layer %r; '
+            'data not accessible for downstream analysis nodes.',
+            layer_name,
+        )
+        return None
+
+    def _acquisition_storage_path(self):
+        """Filesystem location of the acquired data, for `variablesNodz['storage_path']`.
+
+        An NDTiff `Dataset` exposes `.path`, the directory it wrote to. A
+        `zarr.Array` also has a `.path`, but it means something else entirely --
+        the array's path *within* its store, which is `''` for a root array -- so
+        reading `.path` blindly would hand downstream nodes an empty string
+        (T-D6). The array's real location is its store root.
+
+        Falls back to the path the acquisition was *asked* to write to when there
+        is no data object to ask.
+
+        `shared_data.mdaSavedPath` wins when set. On MMCORE_PLUS the data the
+        user keeps is in their Storage folder -- written by pymmcore-plus' output
+        handler, or by Glados' NDTiff writer; `self.data` can be the scratch display zarr, whose store root
+        is a `TemporaryDirectory` deleted on exit. Reporting that as the
+        acquisition's location would hand downstream nodes a path that stops
+        existing.
+        """
+        saved_path = getattr(self.shared_data, 'mdaSavedPath', None)
+        if saved_path:
+            return str(saved_path)
+        store_root = getattr(getattr(self.data, 'store', None), 'root', None)
+        if store_root is not None:
+            return str(store_root)
+        dataset_path = getattr(self.data, 'path', None)
+        if dataset_path:
+            return dataset_path
+        return self.storage_folder + os.sep + self.storage_file_name + '_1//'
+
     def MDA_acq_finished(self):
         """
         Signal that MDA acquisition has finished.
@@ -1370,10 +1484,7 @@ class MDAGlados(CustomMainWindow):
         """
         
         self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
-        try:
-            self.data = self.shared_data.mdaDatasets[-1]
-        except:
-            logging.error('#TODO: No MDA data found in shared_data.mdaDatasets. fix this with PyMMC (wheres the dataset stored? can we get this?).')
+        self.data = self._resolve_finished_acquisition_data()
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
         
@@ -1414,6 +1525,26 @@ class MDAGlados(CustomMainWindow):
 
         self.MDA_completed.emit(True)
     
+    def _applyFocusDevice(self):
+        """Set the focus device this plan's z-stack moves (T-H3).
+
+        The selected z stage when the z widget is enabled (`GUI_show_z`, which is what
+        enables `zGroupBox`), otherwise the session default -- and the default too if
+        the selected stage is rejected. This used to run inside every plan rebuild,
+        i.e. a hardware call per keystroke; it is only needed once, before acquiring.
+        It reads `z_stage_sel` rather than the dropdown, so a Nodz node's widget-free
+        `mdaData` applies its own stage.
+        """
+        mil = self.shared_data.MILcore
+        default = self.shared_data._defaultFocusDevice
+        if self.GUI_show_z and self.z_stage_sel is not None:
+            try:
+                mil.set_focus_device(self.z_stage_sel)
+                return
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logging.warning('set_focus_device(%s) failed, reverting to default: %s', self.z_stage_sel, exc)
+        mil.set_focus_device(default)
+
     def MDA_acq_from_Node(self, nodeInfo):
         """MDA_acq_from_Node(self, nodeInfo)
         
@@ -1432,6 +1563,9 @@ class MDAGlados(CustomMainWindow):
         This function acquires data from a node and performs various operations based on the node information provided.
         """
         logging.debug('At MDA_acq_from_node')
+        #Apply any GUI edit still waiting on the debounce before the plan is read
+        self.flushMDAEventsUpdate()
+        self.flushMDAStateSave()
         nodeName = nodeInfo.name
         
         self.nodeInfo = nodeInfo
@@ -1479,6 +1613,7 @@ class MDAGlados(CustomMainWindow):
                     rt_analysis_connected_node = node
                     rt_analysis_info = rt_analysis_connected_node.real_time_analysis_currentData
                     
+                    from glados_pycromanager.GUI.AnalysisClass import create_real_time_analysis_thread
                     new_analysis_thread = create_real_time_analysis_thread(self.shared_data,analysisInfo = rt_analysis_info,delay=None,nodzInfo=nodeInfo.flowChart)
                     self.nodz_analysis_threads.append(new_analysis_thread)
                     rt_analysis_connected_node.status = 'running'
@@ -1488,6 +1623,8 @@ class MDAGlados(CustomMainWindow):
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
+        #And the focus device the z-plan moves, before the acquisition worker starts
+        self._applyFocusDevice()
         
         #Set the location where to save the mda
         Evaled_storage_file_name = utils.attemptToEvaluateVariables(self.storage_file_name,nodeInfo.flowChart)
@@ -1497,7 +1634,7 @@ class MDAGlados(CustomMainWindow):
         #Set whether the napariviewer should (also) try to connect to the mda
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
-        self.shared_data._mdaModeParams = self.mda
+        self.shared_data._mdaModeParams = self._mdaEventsForAcquisition()
         self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
@@ -1524,10 +1661,15 @@ class MDAGlados(CustomMainWindow):
             Trelent
         """
         logging.debug('At MDA_acq_from_GUI')
+        #Apply any GUI edit still waiting on the debounce before the plan is read
+        self.flushMDAEventsUpdate()
+        self.flushMDAStateSave()
         self.shared_data._mdaMode = False
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
+        #And the focus device the z-plan moves, before the acquisition worker starts
+        self._applyFocusDevice()
         
         #Set the location where to save the mda
         if self.GUI_storage_enabled:
@@ -1538,7 +1680,7 @@ class MDAGlados(CustomMainWindow):
         # self.shared_data._mdaModeNapariViewer = self.shared_data.napariViewer
         #Set the mda parameters
         
-        self.shared_data._mdaModeParams = self.mda
+        self.shared_data._mdaModeParams = self._mdaEventsForAcquisition()
         self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
@@ -1589,7 +1731,9 @@ class MDAGlados(CustomMainWindow):
     
     def get_MDA_events_from_GUI(self):
         """
-        The get_MDA_events_from_GUI function is called every time the user changes any option in the GUI.
+        The get_MDA_events_from_GUI function rebuilds the MDA plan from the GUI widgets.
+        GUI edits reach it through scheduleMDAEventsUpdate() (debounced); a direct call runs
+        immediately and supersedes any pending debounced rebuild.
         It will then update all variables that are used to create an MDA object, which can be used to run a multi-dimensional acquisition.
         
         
@@ -1597,6 +1741,9 @@ class MDAGlados(CustomMainWindow):
             self: Refer to the object itself
         """
         logging.debug('starting get_MDA_events_from_GUI')
+        pendingUpdate = getattr(self, '_mdaEventsUpdateTimer', None)
+        if pendingUpdate is not None:
+            pendingUpdate.stop()
         #Make this somewhat readable:
         if self.exposureGroupBox.isEnabled():
             try:
@@ -1605,7 +1752,7 @@ class MDAGlados(CustomMainWindow):
                 if self.exposureDropdown.currentText() == 's':
                     self.exposure_ms *= 1000
                     self.exposure_s_or_ms = 's'
-            except:
+            except (ValueError, TypeError):
                 self.exposure_ms = None
                 self.exposure_s_or_ms = 'ms'
         
@@ -1617,7 +1764,7 @@ class MDAGlados(CustomMainWindow):
                 if self.timeIntervalDropdown.currentText() == 'ms':
                     self.time_interval_s_or_ms = 'ms'
                     self.time_interval_s /= 1000
-            except:
+            except (ValueError, TypeError):
                 self.num_time_points = None
                 self.time_interval_s = None
                 self.time_interval_s_or_ms = 'ms'
@@ -1630,12 +1777,7 @@ class MDAGlados(CustomMainWindow):
             self.storage_file_name = self.storageFileNameEntry.text()
         
         if self.zGroupBox.isEnabled():
-            try:
-                #We also need to set the shared_data focus device for proper z-functioning
-                self.shared_data.MILcore.set_focus_device(self.z_oneDstageDropdown.currentText())
-            except:
-                self.shared_data.MILcore.set_focus_device(self.shared_data._defaultFocusDevice)
-                
+            #The focus device itself is applied at acquisition start (_applyFocusDevice, T-H3)
             self.z_stage_sel = self.z_oneDstageDropdown.currentText()
             
             if self.z_startEntry.text() != '':
@@ -1674,15 +1816,17 @@ class MDAGlados(CustomMainWindow):
                     self.z_nr_steps = None
             self.z_nrsteps_radio_sel = self.z_nrsteps_radio.isChecked()
             self.z_stepdistance_radio_sel = self.z_stepdistance_radio.isChecked()
-        else:
-            self.shared_data.MILcore.set_focus_device(self.shared_data._defaultFocusDevice)
-        
+            logging.info('MDA z-panel values: z_start=%s z_step=%s z_end=%s (stage=%s)',
+                         self.z_start, self.z_step, self.z_end,
+                         getattr(self, 'z_stage_sel', None))
+
         #Get the xy positions
         if self.xyGroupBox.isEnabled():
             try:
                 self.xy_positions = self.xypositionListWidget.getPositionsArray()
                 self.xy_positions_saveInfo = self.xypositionListWidget.getSaveInfoPositionsArray()
-            except:
+            except (AttributeError, RuntimeError) as exc:
+                logging.debug('xy positions widget unavailable: %s', exc)
                 self.xy_positions = None
                 self.xy_positions_saveInfo = None
         else:
@@ -1710,7 +1854,8 @@ class MDAGlados(CustomMainWindow):
                             except ValueError:  # Add an empty string for non-float
                                 self.channel_exposures_ms.append("")
 
-            except:
+            except (AttributeError, RuntimeError, KeyError) as exc:
+                logging.debug('channel widget parse failed: %s', exc)
                 self.channel_group = None
                 self.channels = None
                 self.channel_exposures_ms = None
@@ -1732,43 +1877,93 @@ class MDAGlados(CustomMainWindow):
         # self.mda = self.shared_data.MILcore.create_mda(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order)
         
         import useq
-        from useq.pycromanager import to_pycromanager
         
+        channel_group = self.channel_group or "Channel"
         channel_data = []
         for i, channel_name in enumerate(self.channels):
             if i < len(self.channel_exposures_ms) and self.channel_exposures_ms[i] is not None:
-                channel_data.append({"config": channel_name, "exposure": self.channel_exposures_ms[i]})
+                channel_data.append({"config": channel_name, "group": channel_group, "exposure": self.channel_exposures_ms[i]})
             else:
-                channel_data.append({"config": channel_name, "exposure": self.exposure_ms})
+                channel_data.append({"config": channel_name, "group": channel_group, "exposure": self.exposure_ms})
         
         if self.xy_positions is None:
             xy_pos = []
         else:
             xy_pos = [tuple(pos) for pos in self.xy_positions]
         
+        z_plan = build_absolute_z_plan(self.z_start, self.z_end, self.z_step)
+        logging.info('MDA z_plan about to be used: %s', z_plan)
         self.mda_useq = useq.MDASequence(
             axis_order = self.order,
             time_plan = {"interval": self.time_interval_s, "loops": self.num_time_points},
-            z_plan = {"relative":[self.z_start,self.z_step,self.z_end], "go_up":True},
+            z_plan = z_plan,
             channels = channel_data,
             stage_positions=xy_pos
         )
-        self.mda = to_pycromanager(self.mda_useq)
+        #Invalidate the pycromanager event list; the `mda` property converts on first read (T-H2)
+        self._mda = None
         #TODO: improve MDA call from useq
         
-        logging.debug(f"mda: {self.mda}")
-        if self.fully_started:
-            if self.autoSaveLoad:
-                #Store in appdata
-                appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
-                if appdata_folder is None:
-                    raise EnvironmentError("APPDATA environment variable not found")
-                app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-                os.makedirs(app_specific_folder, exist_ok=True)
-                self.save_state_MDA(os.path.join(app_specific_folder, 'glados_state.json'))
+        logging.debug('mda_useq: %s', self.mda_useq)
+        if self.fully_started and self.autoSaveLoad:
+            self._scheduleMDAStateSave()
         logging.debug('ended get_MDA_events_from_GUI')
-        
-        pass
+
+    def scheduleMDAEventsUpdate(self):
+        """Debounced entry point for every GUI-edit signal (T-H1).
+
+        Restarts a single-shot MDA_EVENTS_DEBOUNCE_MS timer; the plan is rebuilt once
+        the edits stop. During construction (`fully_started` False) it rebuilds
+        synchronously, exactly as the signals did before, so a freshly built panel has
+        its plan in place.
+        """
+        if not self.fully_started:
+            self.get_MDA_events_from_GUI()
+            return
+        timer = getattr(self, '_mdaEventsUpdateTimer', None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(self.MDA_EVENTS_DEBOUNCE_MS)
+            timer.timeout.connect(self.get_MDA_events_from_GUI)
+            self._mdaEventsUpdateTimer = timer
+        timer.start()
+
+    def flushMDAEventsUpdate(self):
+        """Run a pending debounced rebuild now; a no-op when nothing is pending.
+
+        Connected to each QLineEdit's editingFinished, and called before anything
+        reads self.mda to acquire, so the plan can never lag the widgets.
+        """
+        timer = getattr(self, '_mdaEventsUpdateTimer', None)
+        if timer is not None and timer.isActive():
+            self.get_MDA_events_from_GUI()
+
+    def _scheduleMDAStateSave(self):
+        timer = getattr(self, '_mdaStateSaveTimer', None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(self.MDA_STATE_SAVE_DEBOUNCE_MS)
+            timer.timeout.connect(self._saveMDAStateNow)
+            self._mdaStateSaveTimer = timer
+        timer.start()
+
+    def flushMDAStateSave(self):
+        """Write a pending glados_state.json save now; a no-op when nothing is pending."""
+        timer = getattr(self, '_mdaStateSaveTimer', None)
+        if timer is not None and timer.isActive():
+            timer.stop()
+            self._saveMDAStateNow()
+
+    def _saveMDAStateNow(self):
+        #Store in appdata
+        appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
+        if appdata_folder is None:
+            raise OSError("APPDATA environment variable not found")
+        app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
+        os.makedirs(app_specific_folder, exist_ok=True)
+        self.save_state_MDA(os.path.join(app_specific_folder, 'glados_state.json'))
     
     def setZStart(self):
         """
@@ -1802,6 +1997,93 @@ class MDAGlados(CustomMainWindow):
         zstagePos = round(float(self.core.get_position(zstage)),2)
         self.z_endEntry.setText(str(zstagePos))
         
+    def _updateZStepLabels(self):
+        """
+        Refresh the labels next to the z nr-of-steps/step-distance entries
+        with the value the *other* field would compute to, so the user can
+        see e.g. how many steps a given step distance takes without having to
+        switch the radio button. Mirrors the formulas in get_MDA_events_from_GUI.
+        """
+        try:
+            z_start = float(self.z_startEntry.text()) if self.z_startEntry.text() != '' else None
+            z_end = float(self.z_endEntry.text()) if self.z_endEntry.text() != '' else None
+        except ValueError:
+            z_start = None
+            z_end = None
+
+        #Step distance implied by the entered number of steps
+        self.z_nrsteps_computedLabel.setText("")
+        if z_start is not None and z_end is not None and self.z_nrsteps_entry.text() != '':
+            try:
+                nr_steps = int(self.z_nrsteps_entry.text())
+                if nr_steps > 0:
+                    step_distance = abs(z_end - z_start) / nr_steps
+                    self.z_nrsteps_computedLabel.setText(f"({step_distance:.4g} /step)")
+            except (ValueError, ZeroDivisionError):
+                pass
+
+        #Number of z-positions implied by the entered step distance.
+        #useq's ZTopBottom.positions() is np.arange(bottom, top + step/2, step),
+        #i.e. floor(range/step) + 1 positions -- the top is "encompassed" but not
+        #always precisely visited when step does not divide the range evenly, so
+        #this is floored (with a small epsilon so an exact division, e.g.
+        #range=10/step=2, doesn't fall just under the next integer and get
+        #floored down to one fewer position than it actually produces).
+        self.z_stepdistance_computedLabel.setText("")
+        if z_start is not None and z_end is not None and self.z_stepdistance_entry.text() != '':
+            try:
+                step_distance = float(self.z_stepdistance_entry.text())
+                if step_distance != 0:
+                    nr_steps = math.floor(abs(z_end - z_start) / abs(step_distance) + 1e-9) + 1
+                    self.z_stepdistance_computedLabel.setText(f"({nr_steps} steps)")
+            except (ValueError, ZeroDivisionError):
+                pass
+
+    def _zWaitForSettleConfigValue(self, mi):
+        """The MDAConfig field backing the Z-settle checkbox for the given
+        MicroscopeInstance (mmcore_wait_for_z_settle / pycromanager_wait_for_z_settle),
+        or 'True' (the safe/no-op default) for a backend with no such lever."""
+        if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+            return getattr(self.shared_data.config.mda_config, 'mmcore_wait_for_z_settle', 'False')
+        if mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+            return getattr(self.shared_data.config.mda_config, 'pycromanager_wait_for_z_settle', 'False')
+        return 'True'
+
+    def _onZWaitForSettleToggled(self, checked):
+        """
+        Persist the backend-appropriate MDAConfig field and apply the change
+        immediately so it takes effect for the next MDA without restarting
+        the app. See GUI_napari.register_resilient_mmcore_mda_engine /
+        register_resilient_pycromanager_python_engine.
+        """
+        try:
+            mi = self.shared_data.MILcore.MI()
+        except (AttributeError, RuntimeError) as exc:
+            logging.warning('Could not determine backend for Z-settle toggle: %s', exc)
+            return
+        value = 'True' if checked else 'False'
+        if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+            self.shared_data.config.mda_config.mmcore_wait_for_z_settle = value
+        elif mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.shared_data.config.mda_config.pycromanager_wait_for_z_settle = value
+        else:
+            logging.warning('Z-settle toggle has no effect on this backend (%s)', mi)
+            return
+        try:
+            from glados_pycromanager.io.appdata import storeSharedData_GlobalData
+            storeSharedData_GlobalData(self.shared_data)
+        except Exception as exc:
+            logging.warning('Could not persist Z-settle setting: %s', exc)
+        try:
+            if mi == MIL.MicroscopeInstance.MMCORE_PLUS:
+                from glados_pycromanager.GUI.GUI_napari import register_resilient_mmcore_mda_engine
+                register_resilient_mmcore_mda_engine(self.shared_data.MILcore.get_core(), self.shared_data)
+            elif mi == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
+                from glados_pycromanager.GUI.GUI_napari import register_resilient_pycromanager_python_engine
+                register_resilient_pycromanager_python_engine(self.shared_data)
+        except Exception as exc:
+            logging.warning('Could not apply Z-settle toggle to the running engine: %s', exc)
+
     def setMDAparams(self,mdaparams):
         """
         Set the MDA parameters.
@@ -1848,12 +2130,8 @@ class MDAGlados(CustomMainWindow):
                 self.nodeInfo.variablesNodz['channels']['data'] = None
                 self.nodeInfo.variablesNodz['n_channels']['data'] = None
             if self.GUI_storage_enabled == True:
-                try:
-                    #Update to the actually-stored-path.
-                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.data.path #type: ignore
-                except AttributeError:
-                    #Update to the expectedpath.
-                    self.nodeInfo.variablesNodz['storage_path']['data'] = self.storage_folder+os.sep+self.storage_file_name+'_1//' #type: ignore
+                #Update to the actually-stored path, falling back to the expected one.
+                self.nodeInfo.variablesNodz['storage_path']['data'] = self._acquisition_storage_path()
             else:
                 self.nodeInfo.variablesNodz['storage_path']['data'] = None
     #endregion

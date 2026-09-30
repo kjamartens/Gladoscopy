@@ -1,19 +1,25 @@
-import sys,os
+import logging
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import inspect
 
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
+import os
+import time
+
 import dask.array as da
 import ndtiff
-import os
-import cv2
-import time
+import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -71,8 +77,11 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-from scipy import signal
 import logging
+
+from scipy import signal
+
+
 def redondo_score(image):
     """Applies a sort-of Laplace filter to an image.
 
@@ -93,6 +102,7 @@ def redondo_score(image):
     return 1/score
 
 def blur_laplace_score(image):
+    logging.info("Loading cv2 for AutoFocusBF (first use — may take a few seconds)…")
     import cv2
     blurrad = 3
     blurim = cv2.GaussianBlur(image, (blurrad,blurrad), 1)
@@ -112,6 +122,7 @@ def volath_score(image):
     return 1/(sum1 - sum2)
 
 from scipy.ndimage import convolve
+
 
 def tenengrad_score(image):
     image = image/np.max(image)
@@ -136,7 +147,7 @@ def testArray_report_sharpNess(core,position_array_test,zmovestage,waitTimeMs,me
     res_arr = []
     import time
     for n in range(len(position_array_test)):
-        print(f"n: {n}, abs_pos_arr[n]: {position_array_test[n]}")
+        logging.debug("n: %s, abs_pos_arr[n]: %s", n, position_array_test[n])
         core.set_position(zmovestage,position_array_test[n]) #type:ignore
         core.wait_for_system()
         time.sleep(waitTimeMs/1000)
@@ -177,9 +188,10 @@ def sharpnessScore_from_image(image,method='Redondo'):
         finalScore = tenengrad_score(image)
     elif method == 'Laplacian':
         finalScore = blur_laplace_score(image)
-    print(f"Sharpness score: {finalScore}")
+    logging.info("Sharpness score: %s", finalScore)
     return finalScore
 
+@register("AutoFocusBF.auto_focus_iter_rel_bf")
 def auto_focus_iter_rel_bf(core,**kwargs):
     
     #Check if we have the required kwargs
@@ -278,6 +290,7 @@ def auto_focus_iter_rel_bf(core,**kwargs):
     
     return output
 
+@register("AutoFocusBF.auto_focus_iter_abs_bf")
 def auto_focus_iter_abs_bf(core,**kwargs):
     
     #Check if we have the required kwargs

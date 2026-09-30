@@ -1,26 +1,29 @@
-import sys,os
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
-import glados_pycromanager.GUI.utils as utils
-# from shapely import Polygon, affinity
-import math
+import inspect
 import logging
-import numpy as np
-import inspect
-import dask.array as da
-import time
-from scipy import signal
+
+# from shapely import Polygon, affinity
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
-import dask.array as da
 import time
+
+import dask.array as da
+import numpy as np
+import pandas as pd
+from scipy import signal
 from scipy.ndimage import gaussian_filter
 from skimage.feature.peak import peak_local_max
+
+import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -42,6 +45,17 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # A phasor fit over every local maximum, in scipy/skimage/pandas,
+            # per frame - exactly the GIL-heavy shape subprocess isolation
+            # exists for. See utils.realTimeAnalysis_runInSubprocess.
+            "__runInSubprocess__": True,
+            # What visualise() reads that run() produces. Note `lastImage` is
+            # deliberately NOT mirrored: it is a full frame, and nothing in the
+            # main process reads it.
+            "__snapshot_attrs__": ["SMLMlocs"],
+            #Replayable while scrubbing: visualise() is a pure function of SMLMlocs,
+            #which is a handful of KB per frame.
+            "__replayable__": True,
         }
     }
 
@@ -111,46 +125,99 @@ def phasor_fitting(ROI,ROIradius,localpeak):
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class pSMLM():
+#: How many per-frame DataFrames `_smlm_frames` may hold before they are
+#: compacted into one (see pSMLM._append_smlm_frame). Bounds the object count,
+#: never the number of localizations.
+SMLM_FRAME_COMPACTION_THRESHOLD = 2000
+
+
+@register("pSMLM.pSMLM")
+class pSMLM:
     def __init__(self,core,**kwargs):
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
         [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
 
         self.SMLMlocs = []
-        self.fullSMLMlocs = []
+        # Per-frame localization DataFrames, concatenated lazily via the fullSMLMlocs
+        # property instead of every frame - pd.concat on every run() copies the whole
+        # accumulated history each time, making a long session O(n^2) in frame count.
+        self._smlm_frames = []
         self.dummyValue = 0
         self.metadatav = []
         self.currentFrame = 0
-        if core.get_pixel_size_um() != 0:
-            self.pxsizeum = core.get_pixel_size_um()
-        else:
+        try:
+            px = core.get_pixel_size_um()
+            self.pxsizeum = px if px != 0 else 1
+        except Exception:
             self.pxsizeum = 1
         return None
+
+    @property
+    def fullSMLMlocs(self):
+        if not self._smlm_frames:
+            return pd.DataFrame()
+        return pd.concat(self._smlm_frames, ignore_index=True)
+
+    def _append_smlm_frame(self, frame):
+        """Accumulate one frame's localizations, compacting periodically (T-G8).
+
+        `_smlm_frames` grew one DataFrame per frame for the whole session. A
+        DataFrame costs a few KB of object overhead no matter how few
+        localizations it holds, so a long run's memory ends up dominated by the
+        container rather than the data, and `fullSMLMlocs` has to concatenate
+        tens of thousands of objects.
+
+        Compacting into a single DataFrame every
+        `SMLM_FRAME_COMPACTION_THRESHOLD` frames bounds the list length without
+        discarding a single localization -- which matters: these *are* the
+        measurement, so a maxlen-style cap would silently throw away data. The
+        concat is amortised O(1) per frame.
+        """
+        self._smlm_frames.append(frame)
+        if len(self._smlm_frames) >= SMLM_FRAME_COMPACTION_THRESHOLD:
+            self._smlm_frames = [pd.concat(self._smlm_frames, ignore_index=True)]
 
     def run(self,image,metadata,shared_data,core,**kwargs):
         # logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
         self.dummyValue = np.random.randint(0, 101)
         locPeaks = getLocalPeaks_rawIm(image, int(kwargs['ROIradius']),stdmult=int(kwargs['stdmult']))
+        logging.debug("pSMLM: image min/max/mean=%.1f/%.1f/%.1f, peaks found=%d (ROIradius=%s, stdmult=%s)",
+                     image.min(), image.max(), image.mean(), len(locPeaks),
+                     kwargs['ROIradius'], kwargs['stdmult'])
         self.SMLMlocs = getLocalizationList(locPeaks, image, 4)*self.pxsizeum
+        logging.debug("pSMLM: localizations after phasor fit=%d", len(self.SMLMlocs))
+        if len(self.SMLMlocs) > 0:
+            logging.debug("pSMLM: loc x range=[%.1f, %.1f], y range=[%.1f, %.1f]",
+                         self.SMLMlocs[:, 0].min(), self.SMLMlocs[:, 0].max(),
+                         self.SMLMlocs[:, 1].min(), self.SMLMlocs[:, 1].max())
+            logging.debug("pSMLM: first 3 locs: %s", self.SMLMlocs[:3])
         
-        #Append to full list with frame info
-        self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-        #Get the headers
-        column_headers = np.hstack([list(self.uniqueEntriesAllDims.keys()), ['x_pos', 'y_pos']])
-        mda_values = []
-        for v in list(self.uniqueEntriesAllDims.keys()):
-            mda_values = np.hstack((mda_values,metadata['Axes'][v]))
-        #Get the columns for the MDA values and append to the current localizations
-        mda_val_column = np.full((self.SMLMlocs.shape[0], 1), mda_values)
-        new_locs_with_mdaVals = np.hstack((mda_val_column, self.SMLMlocs))
-        
-        import pandas as pd
-        if len(self.fullSMLMlocs) == 0:
-            self.fullSMLMlocs = pd.DataFrame(new_locs_with_mdaVals, columns=column_headers)
+        #Append to full list with frame info.
+        #The acquisition's axis names come from the cached dimension map when
+        #there is one (T-G8: this used to walk every event of the plan, in pure
+        #Python, on every frame), and otherwise from the frame's own Axes - which
+        #carry the same names, and are all a subprocess-isolated node has, since
+        #shared_data is None there (T-G10).
+        axes = (metadata.get('Axes', {}) if metadata else {}) or {}
+        _dims = utils.getAcquisitionDimensions(shared_data)
+        if _dims is not None:
+            self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = _dims
+            axisNames = list(self.uniqueEntriesAllDims.keys())
         else:
-            new_df = pd.DataFrame(new_locs_with_mdaVals, columns=column_headers)
-            self.fullSMLMlocs = pd.concat([self.fullSMLMlocs, new_df], ignore_index=True)
+            axisNames = list(axes)
+        if axisNames:
+            column_headers = np.hstack([axisNames, ['x_pos', 'y_pos']])
+            mda_values = []
+            for v in axisNames:
+                mda_values = np.hstack((mda_values, axes.get(v, 0)))
+            mda_val_column = np.full((self.SMLMlocs.shape[0], 1), mda_values)
+            new_locs_with_mdaVals = np.hstack((mda_val_column, self.SMLMlocs))
+        else:
+            column_headers = ['x_pos', 'y_pos']
+            new_locs_with_mdaVals = self.SMLMlocs
+        # Stash this frame's localizations; fullSMLMlocs concatenates them lazily on read.
+        self._append_smlm_frame(pd.DataFrame(new_locs_with_mdaVals, columns=column_headers))
         
         self.lastImage = image
         self.lastMetadata = metadata
@@ -195,22 +262,55 @@ class pSMLM():
         #     'anchor': 'upper_left',
         # }
         try:
-            # logging.info(f'Starting Updating pSMLM layer at time: {time.time()}')
-            # logging.info(f"SMLM locs: {self.SMLMlocs}")
-                # napariLayer.size = 0
-            # napariLayer.data = np.array([[100,100]])
-            # napariLayer.text = text
+            logging.debug("pSMLM visualise: called, SMLMlocs len=%d, napariLayer type=%s",
+                         len(self.SMLMlocs), type(napariLayer).__name__)
             if len(self.SMLMlocs) > 1:
-                # logging.info('Actually SMLM loc vissing')
-                napariLayer.data = self.SMLMlocs[:, [1, 0]].copy() #Needs to be transposed
-                time.sleep(0.005)
-            # napariLayer.features = features
-            # napariLayer.text = textv
+                coords = self.SMLMlocs[:, [1, 0]].copy()  # (N,2): row, col for napari
+                ndim = getattr(napariLayer, 'ndim', 2)
+                if ndim > 2:
+                    try:
+                        import napari
+                        _viewer = napari.current_viewer()
+                        current_step = _viewer.dims.current_step
+                        extra = np.array(current_step[:ndim - 2], dtype=float)
+                        logging.debug("pSMLM visualise: viewer.dims.current_step=%s, using extra dims=%s",
+                                     current_step, extra)
+                    except Exception as e:
+                        extra = np.zeros(ndim - 2)
+                        logging.debug("pSMLM visualise: could not get current_step (%s), using zeros", e)
+                    extra_cols = np.tile(extra, (coords.shape[0], 1))
+                    coords = np.hstack([extra_cols, coords])
+                logging.debug("pSMLM visualise: assigning coords shape=%s, row=[%.1f,%.1f] col=[%.1f,%.1f], ndim=%d",
+                             coords.shape, coords[:,-2].min(), coords[:,-2].max(),
+                             coords[:,-1].min(), coords[:,-1].max(), ndim)
+                napariLayer.data = coords
+                logging.debug("pSMLM visualise: data assigned, layer.data.shape=%s, first 3:\n%s",
+                             napariLayer.data.shape, napariLayer.data[:3])
             napariLayer.selected_data = []
-            napariLayer.symbol = 'disc'
-            napariLayer.size = 0.5
-            napariLayer.edge_color='red'
-            napariLayer.face_color = [0,0,0,0]
-        except:
-            logging.info(f"Issue with pSMLM layer update")
+            try:
+                napariLayer.symbol = 'disc'
+            except Exception as e:
+                logging.debug("pSMLM: symbol failed: %s", e)
+            try:
+                napariLayer.size = 8
+            except Exception as e:
+                logging.debug("pSMLM: size failed: %s", e)
+            try:
+                napariLayer.face_color = [0, 0, 0, 0]  # transparent fill
+            except Exception as e:
+                logging.debug("pSMLM: face_color failed: %s", e)
+            for _attr in ('border_color', 'edge_color'):
+                try:
+                    setattr(napariLayer, _attr, 'red')
+                    break
+                except Exception as e:
+                    logging.debug("pSMLM: %s failed: %s", _attr, e)
+            for _attr in ('border_width', 'edge_width'):
+                try:
+                    setattr(napariLayer, _attr, 0.05)
+                    break
+                except Exception as e:
+                    logging.debug("pSMLM: %s failed: %s", _attr, e)
+        except Exception as exc:
+            logging.debug('Issue with pSMLM layer update: %s', exc)
         return napariLayer

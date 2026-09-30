@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -31,42 +31,155 @@ dependencies = [
     "h5py==3.14.0",
     "xarray==2025.1.2",
     "dask==2025.7.0",
-    "pycromanager==1.0.2",
-    "pymmcore-plus==0.15.3",
-    "bioimageio-core==0.9.0",
-    "bioio==3.0.0",
+    "pycromanager @ git+https://github.com/micro-manager/pycro-manager.git",
+    "pymmcore-plus",
+    "pymmcore",
+    "bioimageio-core", #0.8.0
+    "torchvision==0.23.0",
+    "segment-anything==1.0",
+    "mobile-sam @ git+https://github.com/ChaoningZhang/MobileSAM.git",
+    "timm==0.9.16",
+    "bioio",
     "tifffile==2025.6.11",
     "zarr==3.1.0",
-    "napari[all]==0.5.6",
+    "napari[all]==0.7.0",
     "pyqt5==5.15.11",
     "pyqtgraph==0.13.3",
     "pyqtwebengine==5.15.7",
-    "vispy==0.14.3",
     "tensorflow==2.20.0",
     "keras==3.13.2",
     "csbdeep==0.7.3",
     "flask==3.1.1",
-    "loguru==0.7.3",
     "tqdm==4.67.1",
     "ndtiff==3.1.0",
     "pyperclip==1.11.0",
     "slack==0.0.2",
     "slackeventsapi==3.0.3",
+    "opencv-python==4.13.0.92",
+    "psutil==7.0.0",
+    "pydantic==2.12.5",
+    "diplib==3.6.0",
+    "markdown>=3.7",
+    "markdown-captions>=2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-qt>=4.4",
+    "pytest-mock>=3.14",
+    "pytest-cov>=4.0",
+    "bandit>=1.7",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[tool.mypy]
+python_version = "3.13"
+# Gradual adoption: start permissive, tighten module by module in Phase 15.
+ignore_missing_imports = true
+check_untyped_defs = false
+follow_imports = "silent"
+warn_unused_ignores = false
+warn_redundant_casts = false
+# Vendored Nodz is treated as third-party; see claude_decisions.md.
+exclude = [
+    "glados_pycromanager/GUI/nodz/",
+    "scratch/",
+    "build/",
+    "dist/",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+# Vendored Nodz is treated as third-party; see claude_decisions.md
+# "Vendored Nodz left alone" (2026-05-17).
+extend-exclude = [
+    "glados_pycromanager/GUI/nodz",
+    "scratch",
+    "build",
+    "dist",
+    "scalene-profile.*",
+]
+
+[tool.ruff.lint]
+# E/F = pycodestyle + pyflakes; I = isort; B = bugbear; UP = pyupgrade;
+# SIM = simplify; PL = pylint subset. Per claude_project.md Phase 3.1.
+select = ["E", "F", "I", "B", "UP", "SIM", "PL"]
+# Bulk-tightening of existing code happens phase by phase; for now silence
+# rules that would flag thousands of pre-existing call sites and starve
+# signal on real regressions.
+ignore = [
+    "E501",     # line-too-long — pre-existing churn; tightened per file as we touch them
+    "E402",     # module-level imports not at top — sys.path shim pattern
+    "E741",     # ambiguous variable names (l, I, O) — pre-existing
+    "PLR0911",  # too-many-return-statements — many existing
+    "PLR0912",  # too-many-branches — Qt slots
+    "PLR0913",  # too-many-arguments — Qt slots
+    "PLR0915",  # too-many-statements — god-files; split in Phase 7/8
+    "PLR2004",  # magic-value comparison — pervasive
+    "PLW2901",  # for-loop-variable-overwritten — pre-existing
+    "B007",     # unused loop variable — pre-existing
+    "B008",     # function-call-in-default-argument — Qt patterns
+    "B904",     # raise-from in except — broader sweep in Phase 10
+    "SIM108",   # ternary suggestion — readability preference
+    "SIM117",   # nested with — readability preference
+    "UP007",    # X | Y union — keeps PyQt5 compat clear
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004", "B011"]
+"glados_pycromanager/AutonomousMicroscopy/MainScripts/Main.py" = ["F401", "F403", "F405"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+# Disable napari's auto-registered pytest plugins — they trigger a
+# multi-minute hang during session init/teardown on this codebase.
+addopts = "-ra -p no:napari -p no:npe2 -p no:napari_plugin_engine"
+# Project is PyQt5-pinned (pyproject deps). pytest-qt otherwise grabs
+# PyQt6 from napari[all]'s install and our tests then refuse to import
+# PyQt5 over the top.
+qt_api = "pyqt5"
+# The seven tests that spawn a real multiprocessing worker cost ~80s of the
+# suite's ~140s wall time on Windows -- inherent `spawn` re-import cost, not
+# waste. They are marked `slow`: `pytest -m "not slow"` runs the other 345 in
+# ~60s. Plain `pytest` still runs everything, so nothing rots silently.
+markers = [
+    "slow: spawns a real subprocess; several seconds each (deselect with -m 'not slow')",
 ]
 
 [tool.setuptools.packages.find]
-where = ["glados_pycromanager"]
+# Auto-discover every subpackage (Core, GUI, AutonomousMicroscopy/*, …)
+# under the project root so they ship in the wheel.
+where = ["."]
+include = ["glados_pycromanager*"]
+exclude = [
+    "glados_pycromanager.GUI.nodz.tmp*",
+    "scratch*",
+    "tests*",
+    "docs*",
+]
 
+# scratch/ holds repo-local exploration (Test.py, test.ipynb, etc.) —
+# explicitly excluded from sdist/wheel.
+[tool.setuptools.exclude-package-data]
+"*" = ["scratch/*"]
+
+# Non-Python files shipped inside the package. Paths are relative to
+# each package directory (no leading slash). Dropped the leading-slash
+# globs ("/*", "/Documentation/*") — they pointed at filesystem-root
+# and silently included nothing.
 [tool.setuptools.package-data]
 "glados_pycromanager" = [
-    "napari.yaml",            
-    "GUI/Icons/*",            
-    "GUI/nodz/*",              
-    "GUI/nodz/default_config.json", 
-    "GUI/*",                   
-    "/*",
-    "/Documentation/*",
-    "/Documentation/Images/*",
+    "napari.yaml",
+    "GUI/Icons/*",
+    "GUI/nodz/*",
+    "GUI/nodz/default_config.json",
+    "Documentation/*.md",
+    "Documentation/*.html",
+    "Documentation/Images/*",
 ]
 [project.scripts]
 "glados" = "glados_pycromanager.GUI.GUI_napari:main"

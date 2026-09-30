@@ -1,22 +1,24 @@
-import appdirs
-import os,sys
 import json
-import matplotlib
 import logging
+import os
+import sys
+
+import appdirs
+import matplotlib
 from PyQt5.QtWidgets import QMainWindow
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.GUI.AnalysisClass import *
-import glados_pycromanager.GUI.napariGlados
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.GUI.utils import CustomMainWindow
-from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI
-from glados_pycromanager.GUI.MMcontrols import *
+import glados_pycromanager.GUI.napariGlados
 from glados_pycromanager.Core.MDAGlados import *
-from glados_pycromanager.GUI.FlowChart_dockWidgets import * 
+from glados_pycromanager.GUI.AnalysisClass import *
+from glados_pycromanager.GUI.FlowChart_dockWidgets import *
+from glados_pycromanager.GUI.MMcontrols import *
+from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
+from glados_pycromanager.GUI.utils import CustomMainWindow
 
 #For drawing
 matplotlib.use('Qt5Agg')
@@ -45,7 +47,7 @@ def microManagerControlsUI_plugin(parent):
     allConfigGroups={}
     nrconfiggroups = core.get_available_config_groups().size()
     for config_group_id in range(nrconfiggroups):
-        allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
+        allConfigGroups[config_group_id] = ConfigInfo(core,shared_data,config_group_id)
     
     #Create the MM config via all config groups
     MMconfig = MMConfigUI(allConfigGroups,autoSaveLoad=True,parent=parent)
@@ -70,15 +72,17 @@ def MDAGlados_plugin(parent):
     """
     appdata_folder = appdirs.user_data_dir()#os.getenv('APPDATA')
     if appdata_folder is None:
-        raise EnvironmentError("APPDATA environment variable not found")
+        raise OSError("APPDATA environment variable not found")
     app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
     os.makedirs(app_specific_folder, exist_ok=True)
     
     if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
         #Load the mda state
-        with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
+        with open(os.path.join(app_specific_folder, 'glados_state.json')) as file:
             gladosInfo = json.load(file)
-            mdaInfo = gladosInfo['MDA']
+            # See dockWidget_MDA in napariGlados.py: a missing section must fall
+            # through to the default MDA, not crash the plugin's construction.
+            mdaInfo = gladosInfo.get('MDA', {})
         
         global core, livestate, napariViewer, shared_data, MM_JSON
         core = parent.core
@@ -124,8 +128,7 @@ def MDAGlados_plugin(parent):
                         GUI_xy_pos_fullInfo = mdaInfo['xy_positions_saveInfo'],
                         GUI_acquire_button = True,
                         autoSaveLoad=True).getGui()
-        except:
-            
+        except (KeyError, AttributeError, TypeError):
             dockWidget = MDAGlados(core,None,parent.layout,shared_data,
                         hasGUI=True,
                         GUI_acquire_button = True,

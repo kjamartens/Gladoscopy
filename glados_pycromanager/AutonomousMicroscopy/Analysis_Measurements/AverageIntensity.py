@@ -1,15 +1,23 @@
-import sys,os
+import logging
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import inspect
+
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
+
 import dask.array as da
 import ndtiff
+import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -40,11 +48,12 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
+@register("AverageIntensity.AvgGrayValue")
 def AvgGrayValue(core,**kwargs):
     #Check if we have the required kwargs
     [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),inspect.currentframe().f_code.co_name,kwargs) #type:ignore
 
-    print(kwargs)
+    logging.debug("kwargs: %s", kwargs)
     NDTIFFStack = kwargs['Image']
     
     # Compute the average intensity of each slice
@@ -69,6 +78,7 @@ def AvgGrayValue(core,**kwargs):
     return output
 
 
+@register("AverageIntensity.AvgGrayValue_visualise")
 def AvgGrayValue_visualise(datastruct,core,**kwargs):
     #This is how datastruct is organised...
     output,pointsLayer = datastruct

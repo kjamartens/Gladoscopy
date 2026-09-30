@@ -1,12 +1,13 @@
 
 #region imports
-import napari
-import sys
-import os
-from pycromanager import Core
 import logging
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QSizePolicy, QScrollArea, QSpacerItem
-from PyQt5.QtGui import QFont
+import os
+import sys
+
+import napari
+from pycromanager import Core
+from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QGridLayout, QGroupBox, QLabel, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1'
@@ -16,18 +17,22 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-from glados_pycromanager.GUI.AnalysisClass import * #type:ignore
-from glados_pycromanager.GUI.utils import CustomMainWindow #type:ignore
-from glados_pycromanager.GUI.napariHelperFunctions import getLayerIdFromName, InitateNapariUI #type:ignore
-from glados_pycromanager.GUI.napariGlados import * #type: ignore
-from glados_pycromanager.GUI.sharedFunctions import Shared_data, periodicallyUpdate #type: ignore
-from glados_pycromanager.GUI.utils import * #type: ignore
-#Import all scripts in the custom script folders
-from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import * #type: ignore
-from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import * #type: ignore
+import glados_pycromanager.GUI.napariGlados as napariGladosModule
+
+from glados_pycromanager.GUI.napariGlados import *  #type: ignore
+
 # Obtain the helperfunctions
 # import glados_pycromanager.GUI.HelperFunctions #type: ignore
-from glados_pycromanager.GUI.napariHelperFunctions import showScaleBar #type: ignore
+from glados_pycromanager.GUI.napariHelperFunctions import (  #type:ignore
+    InitateNapariUI,
+    getLayerIdFromName,
+    showScaleBar,  #type: ignore
+)
+from glados_pycromanager.GUI.sharedFunctions import Shared_data  #type: ignore
+from glados_pycromanager.GUI.utils import *  #type: ignore
+from glados_pycromanager.GUI.utils import CustomMainWindow  #type:ignore
+from glados_pycromanager.ui.layout import build_stylesheet, classify_shape
+
 #endregion
 
 #region Widget Definition
@@ -35,6 +40,11 @@ class GladosWidget(QWidget):
     """
     The main Class of glados-pycromanager widget that gets added to napari.
     """
+
+    #: Debounce window for the resize-driven relayout (T-F6). A splitter drag
+    #: delivers a QResizeEvent per pixel; the rebuild runs once at the end.
+    RELAYOUT_DEBOUNCE_MS = 150
+
     def __init__(self, viewer: napari.viewer.Viewer, parent=None): #type: ignore
         """
         Init a glados widget, mostly passing around parent variables to daughter (plugin) variables. Used to be global-specified, but doesn't work with napari plugins for some reason.
@@ -44,6 +54,19 @@ class GladosWidget(QWidget):
         self._viewer = viewer
         self.type = None
         self.layoutInfo = None
+
+        # T-F6: the relayout below tears down and rebuilds the whole scroll area,
+        # so it must not run per pixel of a splitter drag. `resizeEvent` records
+        # what layout the new size wants and restarts this timer; the rebuild
+        # happens once, when the drag settles.
+        self._pendingLayout = None
+        self._appliedLayout = None
+        self._relayoutTimer = QTimer(self)
+        self._relayoutTimer.setSingleShot(True)
+        self._relayoutTimer.setInterval(self.RELAYOUT_DEBOUNCE_MS)
+        self._relayoutTimer.timeout.connect(self._applyPendingLayout)
+        # The same theme stylesheet the standalone docks get (ui/layout/theme.py).
+        self.setStyleSheet(build_stylesheet())
         
         if parent is not None:
             self.core = parent.core
@@ -95,22 +118,85 @@ class GladosWidget(QWidget):
             width = self.size().width()
             height = self.size().height()
             
-            # Determine the layout based on the window size
-            if width > height * 1.25:  # Wide window
-                self.set_groupBoxLayout(rowsOrColumns='rows', n_items=1)
-            elif height > width * 1.25:  # Tall window
-                self.set_groupBoxLayout(rowsOrColumns='columns', n_items=1)
-            elif width > height:  # Landscape
-                self.set_groupBoxLayout(rowsOrColumns='rows', n_items=2)
-            else:  # Portrait
-                self.set_groupBoxLayout(rowsOrColumns='columns', n_items=2)
-                
+            self._scheduleGroupBoxLayout(self._layoutForCurrentSize())
+
             super().resizeEvent(event)
+
+    def _layoutForCurrentSize(self):
+        """Classify the current size into one of the four layout buckets (`ui.layout.classify_shape`)."""
+        return classify_shape(self.size().width(), self.size().height())
+
+    def requestRelayout(self):
+        """Force a relayout even though the size bucket has not changed (T-F7).
+
+        `_scheduleGroupBoxLayout` drops a layout identical to the applied one,
+        which is right for a resize but wrong for a caller whose *widget tree*
+        changed underneath the same geometry -- `MDAGlados.updateGUIwidgets`
+        rebuilding its group boxes, for instance. That used to be expressed by
+        synthesising a `QEvent.Resize` at the current size and sending it, then
+        pumping the event loop.
+        """
+        if self.type is None or self.type == "AutonomousMicroscopy":
+            return
+        self._appliedLayout = None
+        self._scheduleGroupBoxLayout(self._layoutForCurrentSize())
+
+    def _scheduleGroupBoxLayout(self, wanted):
+        """Queue a relayout, coalescing a whole drag into one rebuild (T-F6).
+
+        Most resize events during a drag land in the *same* orientation bucket,
+        so a layout that matches what is already applied is dropped outright and
+        costs nothing at all.
+        """
+        if wanted == self._appliedLayout:
+            self._pendingLayout = None
+            return
+
+        self._pendingLayout = wanted
+        timer = getattr(self, '_relayoutTimer', None)
+        if timer is None:  # pre-__init__ resize; fall back to the direct call
+            self._applyPendingLayout()
+            return
+        timer.start(self.RELAYOUT_DEBOUNCE_MS)
+
+    def _applyPendingLayout(self):
+        pending = self._pendingLayout
+        if pending is None:
+            return
+        self._pendingLayout = None
+        rowsOrColumns, n_items = pending
+        self.set_groupBoxLayout(rowsOrColumns=rowsOrColumns, n_items=n_items)
+        self._appliedLayout = pending
         
+    def _sectionGrid(self):
+        """The hosted panel's `ui.layout.ResponsiveGrid`, if it has been migrated to one."""
+        return getattr(self.layoutInfo, 'sectionGrid', None)
+
+    def _applyToSectionGrid(self, grid, bucket):
+        """Arrange a toolkit panel: move its grid into a scroll area once, then only re-place.
+
+        Unlike the legacy path below, nothing is reparented or rebuilt per
+        relayout: the panel's `ResponsiveGrid` places its own sections.
+        """
+        if getattr(self, 'scrollArea', None) is None or self.scrollArea.widget() is not grid:
+            self.dockWidget.removeWidget(grid)
+            scrollArea = QScrollArea()
+            scrollArea.setWidgetResizable(True)
+            scrollArea.setWidget(grid)
+            self.dockWidget.addWidget(scrollArea, 0, 0)
+            self.scrollArea = scrollArea
+        grid.apply(bucket)
+
     def set_groupBoxLayout(self, rowsOrColumns='rows', n_items=1):
         """"
         Main function that sets individual widgets inside a groupbox to be rows or columns.
         """
+        grid = self._sectionGrid()
+        if grid is not None:
+            self._applyToSectionGrid(grid, (rowsOrColumns, n_items))
+            return
+
+        # Legacy path, for panels not (yet) built on ui.layout.
         #Determine nr rows and columns
         allWidgets = self.getFirstOrderWidgets()
         n_widgets = len(allWidgets)
@@ -133,14 +219,22 @@ class GladosWidget(QWidget):
                 widget.setParent(None)
         
         #remove all children of self.dockWidget:
+        # T-F6: these are orphaned by setParent(None) -- previously that was the
+        # end of it, so every relayout leaked a QScrollArea (plus its container
+        # and grid layout) that nothing ever destroyed. The group boxes are safe:
+        # the loop above already re-parented them out of the old container.
         for i in reversed(range(self.dockWidget.count())):
             widget = self.dockWidget.itemAt(i).widget()
             if widget is not None:
                 logging.debug(f"removing {widget}")
                 self.dockWidget.removeWidget(widget)
                 widget.setParent(None)
-                
-        
+                # Only the scroll area we built here is ours to destroy. Anything
+                # else that turns up as a direct child is left alone rather than
+                # risking the deletion of a live control.
+                if isinstance(widget, QScrollArea):
+                    widget.deleteLater()
+
         #Create the following structure: scrollArea --> container --> mainGridLayout
         #create a QScrollArea
         scrollArea = QScrollArea()
@@ -183,6 +277,7 @@ class GladosWidget(QWidget):
         
         #Finally add this scroll area to the dockWidget.
         self.dockWidget.addWidget(scrollArea,0,0)
+        self.scrollArea = scrollArea
     
 class MMConfigWidget(GladosWidget):
     """
@@ -201,6 +296,7 @@ class MMConfigWidget(GladosWidget):
         logging.info(f"Default focus device set to {self.shared_data._defaultFocusDevice}")
         
         #Start docwidget
+        from glados_pycromanager.GUI.Analysis_dockWidgets import microManagerControlsUI_plugin
         self.MMconfigPlugin = microManagerControlsUI_plugin(self) #type:ignore
         self.dockWidget = self.MMconfigPlugin
         self.setLayout(self.dockWidget)
@@ -211,16 +307,6 @@ class MMConfigWidget(GladosWidget):
         
         logging.debug("dockWidget_MMConfig started")
 
-    def resizeEvent(self, event):
-        """"
-        Called when the window is resized
-        Basically just updates the font/margins
-        """
-        self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
-        # self.adjustSize()
-        self.layoutInfo.adjustSize() #type:ignore
-        super().resizeEvent(event)
-        self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
 
 class MDAWidget(GladosWidget):
     """
@@ -233,9 +319,10 @@ class MDAWidget(GladosWidget):
         super().__init__(viewer = viewer, parent=parent)
         self.type = "MDA"
         
+        from glados_pycromanager.GUI.Analysis_dockWidgets import MDAGlados_plugin
         self.dockWidget = MDAGlados_plugin(self) #type:ignore
         self.setLayout(self.dockWidget)
-        
+
         #Init a few things
         self.getFirstOrderWidgets()
         self.setMinimumSize(200, 200)
@@ -243,16 +330,6 @@ class MDAWidget(GladosWidget):
         
         logging.debug("dockwidget_MDA started")
 
-    def resizeEvent(self, event):
-        """"
-        Called when the window is resized
-        Basically just updates the font/margins
-        """
-        # self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
-        # self.adjustSize()
-        self.layoutInfo.adjustSize() #type:ignore
-        super().resizeEvent(event)
-        # self.layoutInfo.set_font_and_margins_recursive(self.layoutInfo,font=QFont("Arial", 7)) #type:ignore
 
 class AutonomousMicroscopyWidget(GladosWidget):
     """
@@ -305,7 +382,48 @@ class GladosSlidersWidget(GladosWidget):
         We don't want the GladosWidget resizeEvent for AutonomousMicroscopy
         """
         return super().resizeEvent(event)
+
+
+class PerformanceModeWidget(GladosWidget):
+    """
+    Dock widget hosting the Performance Mode start/stop toggle + report.
+    See glados_pycromanager/GUI/performance_mode_widget.py.
+
+    Not opened automatically by MainWidget - it's a hidden/opt-in entry in
+    napari's Plugins menu (see napari.yaml), so it needs to fall back to
+    whichever entry point's `shared_data` is live: this module's (set by
+    MainWidget, the napari-plugin path) or napariGlados.py's (set by
+    runNapariPycroManager, the standalone `glados` command path).
+    """
+    def __init__(self, viewer: napari.viewer.Viewer, parent=None): #type:ignore
+        super().__init__(viewer=viewer, parent=parent)
+
+        if parent is None:
+            self.shared_data = shared_data or getattr(napariGladosModule, 'shared_data', None)
+
+        layout = QVBoxLayout()
+        if self.shared_data is None:
+            layout.addWidget(QLabel(
+                "Open 'Run Glados-PycroManager' first, then reopen Performance Mode from the Plugins menu."
+            ))
+        else:
+            from glados_pycromanager.GUI.performance_mode_widget import PerformanceModeWidget as _PerformanceModePanel
+            self.dockWidget = _PerformanceModePanel(self.shared_data) #type:ignore
+            layout.addWidget(self.dockWidget) # type: ignore
+        self.setLayout(layout)
+        logging.debug("dockWidget_PerformanceMode started")
+
+    def resizeEvent(self, event):
+        """"
+        We don't want the GladosWidget resizeEvent for PerformanceMode
+        """
+        return super().resizeEvent(event)
 #endregion
+
+#Module-level handle to the running session's shared_data, set by MainWidget.
+#Lets standalone Plugins-menu entries (e.g. PerformanceModeWidget) reach the
+#live shared_data without being a dock added by MainWidget itself.
+shared_data = None
 
 #region Main Call
 class MainWidget(QWidget):
@@ -322,28 +440,29 @@ class MainWidget(QWidget):
         self._viewer = viewer
         global shared_data
         
+        #Set up logging in the AppData folder, INFO and DEBUG
+        from glados_pycromanager.observability.logger import set_up_logger
+        set_up_logger()
+
         # Create an instance of the shared_data class
         shared_data = Shared_data()
-        
+
         core = Core()
         shared_data.core = core
         shared_data._headless = False
-        
+
         MM_JSON = None
         livestate = False
-        
+
         self.core = core
         self.shared_data = shared_data
         self.napariViewer = viewer
-        
+
         self.MM_JSON = MM_JSON
         self.livestate = livestate
-    
+
         includecustomUI = False
         include_flowChart_automatedMicroscopy = True
-        
-        #Set up logging in the AppData folder, INFO and DEBUG
-        utils.set_up_logger()
 
         logging.info("Main napari Glados-pycromanager plugin started")
         
@@ -371,6 +490,9 @@ class MainWidget(QWidget):
         #Autonomous microscopy
         autonomousMicroscopyWidget = AutonomousMicroscopyWidget(viewer, parent=self)
         napariViewer.window.add_dock_widget(autonomousMicroscopyWidget, area="top", name="Glados",tabify=True)
+
+        #Performance Mode is a diagnostic tool, not opened by default. Users open it
+        #on demand via Plugins > Glados-PycroManager > Performance Mode.
 
         logging.info('Napari-glados-pycromanager plugin fully loaded')
 

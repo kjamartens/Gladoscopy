@@ -34,10 +34,12 @@ Glados-pycromanager is an attempt to (1) create a usable, user-friendly user-int
 
 Install miniConda or anaConda from their official sources.
 
-Create a new conda environment, python version 3.10:
+The simplest path on Windows is to run `win_create_env.bat` from the repo root, which creates the `GladosEnv` conda environment from `environment.yaml` (Python 3.13) and installs the package in editable mode via `uv pip install -e .`.
+
+Otherwise, create a new conda environment with python version 3.13:
 
 ```batch
-conda create -p C:\CondaEnvironments\GladosPycromanagerEnv python=3.10
+conda create -p C:\CondaEnvironments\GladosPycromanagerEnv python=3.13
 ```
 
 Activate it:
@@ -46,16 +48,10 @@ Activate it:
 conda activate C:\CondaEnvironments\GladosPycromanagerEnv
 ```
 
-Install glados-pycromanager:
+Install glados-pycromanager from the repo root:
 
 ```batch
-pip install "../glados_pycromanager-0.0.1-py3-none-any.whl"
-```
-
-or, for developers, install a full Conda environment:
-
-```batch
-pip install -r glados-pycromanager\glados_pycromanager\requirements.txt
+pip install -e .
 ```
 
 Update micromanager to the latest nightly build:

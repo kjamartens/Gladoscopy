@@ -1,0 +1,245 @@
+"""Autonomous-microscopy function registry.
+
+Phase 9 replaces the `eval(createFunctionWithKwargs(...))` recipe-dispatch
+path with a registry lookup. Plugin modules under
+`glados_pycromanager.AutonomousMicroscopy.{Analysis_Measurements,
+Real_Time_Analysis,CustomFunctions}` decorate their callable functions
+with ``@register("ModuleName.FunctionName")``. At runtime the executor
+calls ``dispatch(name, *args, **kwargs)`` instead of building a Python
+source string and eval'ing it.
+
+The decorator is a no-op at call time — it just records the function in
+the module-level ``_REGISTRY`` dict and returns it unchanged. Functions
+remain importable / callable / testable in the usual way.
+
+Phase 10.12 re-points :class:`NodeDispatchError` to the typed exception
+in :mod:`glados_pycromanager.errors`. The previous local class subclassed
+``KeyError``; an audit confirmed no code in the project catches the
+registry exception via ``except KeyError`` (those blocks all catch
+genuine dict-access errors), so promoting it to ``GladosError`` is
+safe.
+"""
+
+from __future__ import annotations
+
+import ast
+from typing import Any, Callable, Mapping
+
+from glados_pycromanager.errors import NodeDispatchError
+
+__all__ = [
+    "NodeDispatchError",
+    "register",
+    "dispatch",
+    "dispatch_from_eval_text",
+    "get",
+    "is_registered",
+    "registered_names",
+    "get_metadata",
+    "clear_metadata_cache",
+]
+
+
+_REGISTRY: dict[str, Callable] = {}
+
+# T-G1: every node module rebuilds a fresh nested dict literal each time its
+# module-level ``__function_metadata__()`` is called, and the GUI/dispatch code
+# called it several times *per analysed frame* (twice for ``run``, four times
+# for ``visualise``). The dict is a constant for a given loaded module, so it is
+# cached here, keyed by the module stem ("FFT_im"), which is what every caller
+# resolves against. Cleared by plugins.discovery.reload_all_node_modules(), the
+# only supported way a node module's source changes at runtime.
+_METADATA_CACHE: dict[str, dict] = {}
+
+
+def register(name: str) -> Callable[[Callable], Callable]:
+    """Decorator: record ``fn`` under ``name`` in the global registry.
+
+    Args:
+        name: The dotted node-function name as used in recipe JSON and
+            menu strings — typically ``"<module-stem>.<function>"``,
+            e.g. ``"AverageImage.AvgImage"``.
+
+    Returns:
+        Identity decorator; the decorated function is unchanged.
+    """
+
+    def _decorator(fn: Callable) -> Callable:
+        existing = _REGISTRY.get(name)
+        if existing is not None and existing is not fn:
+            # A different *callable* under the same name is almost always a
+            # real conflict (duplicate decorator, AppData-dropped node
+            # shadowing a built-in). But Python test reloaders re-execute
+            # plugin modules, which produces a brand-new function object
+            # for the same source location — that case is idempotent, not
+            # a conflict.
+            same_source = (
+                getattr(existing, "__module__", None) == getattr(fn, "__module__", None)
+                and getattr(existing, "__qualname__", None) == getattr(fn, "__qualname__", None)
+            )
+            if not same_source:
+                raise NodeDispatchError(
+                    f"Refusing to re-register node function {name!r}: "
+                    f"existing {existing!r}, new {fn!r}"
+                )
+        _REGISTRY[name] = fn
+        return fn
+
+    return _decorator
+
+
+def dispatch(name: str, *args, **kwargs):
+    """Call the registered function ``name`` with the given arguments.
+
+    Args:
+        name: Dotted node-function name used at registration time.
+        *args: Positional args forwarded to the function.
+        **kwargs: Keyword args forwarded to the function.
+
+    Raises:
+        NodeDispatchError: If ``name`` is not in the registry.
+    """
+    try:
+        fn = _REGISTRY[name]
+    except KeyError as exc:
+        raise NodeDispatchError(
+            f"No node function registered as {name!r}. "
+            f"Known: {sorted(_REGISTRY)[:8]}..."
+        ) from exc
+    return fn(*args, **kwargs)
+
+
+def is_registered(name: str) -> bool:
+    """Return True if ``name`` resolves to a registered function."""
+    return name in _REGISTRY
+
+
+def registered_names() -> list[str]:
+    """Return all registered names, sorted for stable iteration."""
+    return sorted(_REGISTRY)
+
+
+def get(name: str) -> Callable:
+    """Return the registered callable for ``name`` without invoking it.
+
+    Raises:
+        NodeDispatchError: If ``name`` is not in the registry.
+    """
+    try:
+        return _REGISTRY[name]
+    except KeyError as exc:
+        raise NodeDispatchError(
+            f"No node function registered as {name!r}"
+        ) from exc
+
+
+def _resolve_node_module(stem: str):
+    """Resolve a node-module stem ("FFT_im") to the loaded module object.
+
+    Delegates to ``GUI.utils._resolve_node_obj`` — the sys.modules stem scan
+    that every other node lookup already goes through — imported lazily so
+    this module stays importable without Qt.
+    """
+    from glados_pycromanager.GUI.utils import _resolve_node_obj
+
+    return _resolve_node_obj(stem)
+
+
+def get_metadata(name: str) -> dict:
+    """Return the cached ``__function_metadata__()`` dict for a node.
+
+    Args:
+        name: Either a module stem (``"FFT_im"``) or a dotted node-function
+            name (``"FFT_im.RealTimeFFT"``); only the stem is used, since
+            ``__function_metadata__`` is a module-level function keyed by
+            function name.
+
+    Returns:
+        The metadata dict, as returned by the node module. **Callers must not
+        mutate it** — it is shared.
+
+    Raises:
+        AttributeError: If the module has no ``__function_metadata__``. Not
+            cached, so a module that grows one later is picked up.
+        NameError: If no loaded module matches the stem.
+    """
+    stem = str(name).split('.')[0]
+    metadata = _METADATA_CACHE.get(stem)
+    if metadata is None:
+        metadata = _resolve_node_module(stem).__function_metadata__()
+        _METADATA_CACHE[stem] = metadata
+    return metadata
+
+
+def clear_metadata_cache() -> None:
+    """Drop every cached ``__function_metadata__()`` dict.
+
+    Call whenever node modules are re-imported (see
+    ``plugins.discovery.reload_all_node_modules``) — the cached dicts belong
+    to the pre-reload module objects.
+    """
+    _METADATA_CACHE.clear()
+
+
+def dispatch_from_eval_text(eval_text: str, scope: Mapping[str, Any] | None = None) -> Any:
+    """Parse a ``Module.Function(args)`` source string and dispatch via the registry.
+
+    Phase 9.5 replacement for the bare ``eval(eval_text)`` recipe-call
+    pattern. The *function name* is resolved through :func:`dispatch` —
+    unknown names raise :class:`NodeDispatchError` instead of executing
+    arbitrary code at module scope. Argument expressions are still
+    evaluated (in ``scope``) so identifier references like
+    ``ImageData_3`` and attribute chains like ``self.shared_data.core``
+    continue to resolve the way the legacy eval string did.
+
+    This is a *partial* security improvement: argument expressions can
+    still call functions present in ``scope``. A full mitigation would
+    require a small recipe-expression language and is out of scope for
+    Phase 9. Phase 10.6 will validate recipe schemas before dispatch.
+
+    Args:
+        eval_text: The recipe-built call expression, e.g.
+            ``"AverageImage.AvgImage(self.shared_data.core, Image=ImageData_3)"``.
+        scope: Mapping used as the globals/locals for argument-expression
+            evaluation. Pass everything the legacy ``eval(eval_text)``
+            could see (`self`, `core`, `shared_data`, the nodzVariable
+            dict, plus the module globals if needed).
+
+    Returns:
+        The return value of the registered function.
+
+    Raises:
+        ValueError: If ``eval_text`` does not parse as a single call
+            expression.
+        NodeDispatchError: If the resolved function name is not in the
+            registry.
+    """
+    try:
+        tree = ast.parse(eval_text, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(
+            f"dispatch_from_eval_text could not parse {eval_text!r}: {exc}"
+        ) from exc
+    if not isinstance(tree.body, ast.Call):
+        raise ValueError(
+            f"dispatch_from_eval_text expected a Call expression, got {type(tree.body).__name__}"
+        )
+    call = tree.body
+    func_name = ast.unparse(call.func)
+    scope_dict: dict[str, Any] = dict(scope) if scope else {}
+    args = [
+        eval(compile(ast.Expression(a), "<dispatch-arg>", "eval"), scope_dict)
+        for a in call.args
+    ]
+    kwargs = {
+        kw.arg: eval(compile(ast.Expression(kw.value), "<dispatch-kw>", "eval"), scope_dict)
+        for kw in call.keywords
+        if kw.arg is not None
+    }
+    return dispatch(func_name, *args, **kwargs)
+
+
+def _reset_for_tests() -> None:
+    """Clear the registry. Test-only — never call from production code."""
+    _REGISTRY.clear()
+    _METADATA_CACHE.clear()

@@ -1,0 +1,24 @@
+=== bench_storage 2026-09-11 09:43 | Windows-11-10.0.26200-SP0 | 12 cpus | budget 384 MB/config | shards 64 frames
+    versions: {'ndstorage': '0.1.18', 'ome-writers': '0.3.2', 'tensorstore': '0.1.85', 'zarr': '3.1.0', 'tifffile': '2025.6.11', 'pymmcore-plus': '0.18.1'}
+    ms/frame = (all appends + close) / frames, setup excluded; peakRSS is above the post-import
+    baseline; reads are warm page cache, fresh process;
+    ome-writers rows exclude the pymmcore-plus sink's per-frame metadata conversion.
+format                    size frames setup ms  ms/frame p95 append  close ms    MB/s  files  peakRSS  open ms  read ms  ok
+scratch-zarr               512    732       18     20.49      36.12         0      26    733       4M     23.7     6.05  yes
+ndtiff                     512    732        0      2.44       2.90       451     215      2       1M      9.3     0.25  yes
+ome-zarr                   512    732      205      3.80       0.08      2757     138    734     389M     16.7     2.10  yes
+ome-zarr-sharded           512    732      225     45.31       0.11     33115      12     14     395M      9.7     8.40  yes
+ome-zarr-zarrpy-sharded    512    732      203    464.85    1270.25        17       1     14      72M     43.2    11.34  yes
+ome-tiff                   512    732     4638      2.67       0.01      1950     196      1      43M      6.2     1.96  yes
+scratch-zarr              1024    183       11     19.03      37.04         0     110    184      10M     11.4     8.03  yes
+ndtiff                    1024    183        0      3.36       5.75         3     624      2       0M     17.9     4.10  yes
+ome-zarr                  1024    183      318      9.41       0.02      1717     223    185     386M     14.6     5.34  yes
+ome-zarr-sharded          1024    183      220    238.21       0.02     43589       9      5     393M      7.1     8.60  yes
+ome-zarr-zarrpy-sharded   1024    183      204   1121.31    2954.20        25       2      5     334M      6.3     9.19  yes
+ome-tiff                  1024    183     3345      2.30       0.02       418     911      1      44M      1.1     1.38  yes
+scratch-zarr              2048     48       11     45.94      64.70         0     183     49      38M      8.5     9.18  yes
+ndtiff                    2048     48        0      7.44       9.07        15    1127      2       0M      1.3     4.09  yes
+ome-zarr                  2048     48      237      6.32       0.10       300    1328     50     399M     14.1    15.74  yes
+ome-zarr-sharded          2048     48      165    712.91       0.29     34217      12      3     410M      6.9    17.51  yes
+ome-zarr-zarrpy-sharded   2048     48      190   2741.82    6074.49        36       3      3    1132M      8.6     9.97  yes
+ome-tiff                  2048     48     1521      3.91       0.00       188    2144      1      44M      1.2     3.55  yes

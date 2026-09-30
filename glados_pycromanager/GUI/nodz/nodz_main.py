@@ -21,6 +21,62 @@ import glados_pycromanager.Core.MDAGlados as MDAGlados
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
 
 
+# --- T-F2: per-paint work hoisted out of NodeItem.paint() -------------------
+# `paint()` used to build a QPixmap *from disk* on every repaint, so dragging a
+# node re-decoded a PNG per mouse-move event, per node. These caches are filled
+# lazily on first paint -- never at import, where no QApplication exists yet.
+
+_NODE_STATUS_ICON_FILES = {
+    'idle': 'node_pending.png',
+    'running': 'node_inProgress.png',
+    'finished': 'node_completed.png',
+    'error': 'node_error.png',
+}
+_NODE_STATUS_PIXMAP_CACHE = {}
+_FONT_METRICS_CACHE = {}
+_TEXT_EXTENT_CACHE = {}
+
+
+def _nodeStatusPixmap(iconFolder, status):
+    """Return the (cached) status icon pixmap; unknown statuses paint as error."""
+    fileName = _NODE_STATUS_ICON_FILES.get(status, _NODE_STATUS_ICON_FILES['error'])
+    key = (iconFolder, fileName)
+    pixmap = _NODE_STATUS_PIXMAP_CACHE.get(key)
+    if pixmap is None:
+        pixmap = QPixmap(iconFolder + os.sep + fileName)
+        # A null pixmap means the PNG was missing or unreadable -- keep it
+        # retryable rather than pinning the failure for the whole session.
+        if not pixmap.isNull():
+            _NODE_STATUS_PIXMAP_CACHE[key] = pixmap
+    return pixmap
+
+
+def _fontMetrics(font):
+    """Return a cached QFontMetrics for `font` (QFont.key() identifies it)."""
+    key = font.key()
+    metrics = _FONT_METRICS_CACHE.get(key)
+    if metrics is None:
+        metrics = QtGui.QFontMetrics(font)
+        _FONT_METRICS_CACHE[key] = metrics
+    return metrics
+
+
+def _textExtent(font, text):
+    """Cached (width, height) of `text`'s bounding rect under `font`.
+
+    Text shaping is the expensive half, and `paint()` measured the same string
+    twice per call (once for `.width()`, once for `.height()`). The keys here
+    are node names and font keys -- a small, bounded set.
+    """
+    key = (font.key(), text)
+    extent = _TEXT_EXTENT_CACHE.get(key)
+    if extent is None:
+        rect = _fontMetrics(font).boundingRect(text)
+        extent = (rect.width(), rect.height())
+        _TEXT_EXTENT_CACHE[key] = extent
+    return extent
+
+
 class Nodz(QtWidgets.QGraphicsView):
 
     """
@@ -876,6 +932,10 @@ class Nodz(QtWidgets.QGraphicsView):
 
             self.scene().update()
 
+        # Renaming or re-indexing can disturb the bottom/top ordering that
+        # paint() relies on (T-F2 moved that rebuild out of paint()).
+        node._reorderAttrs()
+
         node.update()
 
         # Emit signal.
@@ -998,12 +1058,15 @@ class Nodz(QtWidgets.QGraphicsView):
                 #Only store mda if its properly initialised as MDAGLados
                 if isinstance(nodeInst.mdaData,MDAGlados.MDAGlados):
                     #Skip some attributes in nodes_mda:
-                    mdaattr_skip = ['MDA_completed','MM_JSON','core','data','shared_data','gui','layout','nodeInfo','xypositionListWidget_XYGridManager','mda_useq']
+                    #`_mda` is the backing store of MDAGlados' lazy `mda` property (T-H2);
+                    #`mda` itself is not in vars(), so it is stored explicitly below.
+                    mdaattr_skip = ['MDA_completed','MM_JSON','core','data','shared_data','gui','layout','nodeInfo','xypositionListWidget_XYGridManager','mda_useq','_mda']
                     for attr in vars(nodeInst.mdaData):
                         if attr not in mdaattr_skip:
                             #Also check if it's a Qtpy object:
                             if not isinstance(getattr(nodeInst.mdaData, attr), QtCore.QObject):
                                 data['NODES_MDA'][node][attr] = getattr(nodeInst.mdaData, attr)
+                    data['NODES_MDA'][node]['mda'] = nodeInst.mdaData.mda
 
                     data['NODES_MDA'][node] = convert_to_string(data['NODES_MDA'][node])
 
@@ -1635,9 +1698,30 @@ class NodeScene(QtWidgets.QGraphicsScene):
         self.regular_callAction()
 
 
-    def regular_callAction(self):
-        # This function will be called every second
-        self.parent().shared_data.warningErrorInfoInfo['Warnings'] = [] # type: ignore
+    def _acquisitionOngoing(self):
+        """True while live mode or an MDA is running (T-F4).
+
+        The periodic warning check is skipped for the duration: it is a
+        GUI-thread rebuild of icons and tooltips that nobody is looking at
+        mid-acquisition, and the frame path needs the GUI thread more.
+        """
+        try:
+            shared_data = self.parent().shared_data # type: ignore
+        except AttributeError:
+            return False
+        return bool(getattr(shared_data, 'liveMode', False)
+                    or getattr(shared_data, 'mdaMode', False))
+
+    def collectWarnings(self):
+        """Build the complete warning list for the current graph state.
+
+        Kept separate from `regular_callAction` so the list is assembled locally
+        and assigned to `warningErrorInfoInfo['Warnings']` exactly **once**
+        (T-F4). It used to be cleared and then `+=`'d up to three times, and
+        every one of those writes drove the full icon-rebuild chain.
+        """
+        warnings = []
+
         #Check whether we have init, score, acq start,end:
         allInitScoreAcqStartEndMissing = ['initStart','initEnd','scoringStart','scoringEnd','acqStart','acqEnd']
         for node in self.nodes:
@@ -1657,17 +1741,26 @@ class NodeScene(QtWidgets.QGraphicsScene):
             singleTextLine = 'Missing the following required nodes: '
             for node in allInitScoreAcqStartEndMissing:
                 singleTextLine += node + ', '
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += [singleTextLine] # type: ignore
-        
+            warnings.append(singleTextLine)
+
         #Check if we have a functioning decision widget:
         decisionRunnable = self.parent().decisionWidget.assessDecision() # type: ignore
         if decisionRunnable == False:
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Decision widget is missing information.'] # type: ignore
-        
+            warnings.append('Decision widget is missing information.')
+
         #Check if we have a functioning scanning widget
         scanRunnable = self.parent().scanningWidget.assessScan() # type: ignore
         if scanRunnable == False:
-            self.parent().shared_data.warningErrorInfoInfo['Warnings'] += ['Scanning widget is missing information.'] # type: ignore
+            warnings.append('Scanning widget is missing information.')
+
+        return warnings
+
+    def regular_callAction(self):
+        # This function will be called every second
+        if self._acquisitionOngoing():
+            return
+
+        self.parent().shared_data.warningErrorInfoInfo['Warnings'] = self.collectWarnings() # type: ignore
         
     def dragEnterEvent(self, event):
         """
@@ -2109,6 +2202,27 @@ class NodeItem(QtWidgets.QGraphicsItem):
     def BGcolChanged(self):
         self._createStyle(self.config)
 
+    def _reorderAttrs(self):
+        """Sort `self.attrs` so bottom/top attributes trail socket/plug ones.
+
+        T-F2: this partition used to be recomputed and reassigned inside
+        `paint()`, i.e. once per repaint per node. It only ever changes when the
+        attribute list itself does, so it is done at those points instead. The
+        assignment is skipped when the order is already correct, so callers that
+        invoke it defensively cost one O(n) scan and no allocation.
+        """
+        socketPlugs = []
+        bottomTop = []
+        for attr in self.attrs:
+            attrData = self.attrsData.get(attr)
+            if attrData is not None and not attrData['topAttr'] and not attrData['bottomAttr']:
+                socketPlugs.append(attr)
+            else:
+                bottomTop.append(attr)
+        ordered = socketPlugs + bottomTop
+        if ordered != self.attrs:
+            self.attrs = ordered
+
     def _createAttribute(self, name, index, preset, plug, socket, bottomAttr, topAttr, dataType, plugMaxConnections, socketMaxConnections):
         """
         Create an attribute by expanding the node, adding a label and
@@ -2209,6 +2323,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
                                 'socketMaxConnections': socketMaxConnections
                                 }
 
+        # Keep bottom/top attributes trailing (T-F2: was done inside paint()).
+        self._reorderAttrs()
+
         # Update node height.
         self.update()
 
@@ -2254,6 +2371,8 @@ class NodeItem(QtWidgets.QGraphicsItem):
         # Remove attribute from node.
         if name in self.attrs:
             self.attrs.remove(name)
+
+        self._reorderAttrs()
 
         self.update()
 
@@ -2332,9 +2451,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         if self.displayName == None:
             painter.setPen(QColor(255,255,255))
-            metrics = QtGui.QFontMetrics(painter.font())
-            text_width = metrics.boundingRect(self.name).width() + 14
-            text_height = metrics.boundingRect(self.name).height() + 14
+            text_width, text_height = _textExtent(painter.font(), self.name)
+            text_width += 14
+            text_height += 14
             margin = (text_width - self.baseWidth) * 0.5
             textRect = QtCore.QRect(int(-margin),
                                     int(-text_height),
@@ -2345,9 +2464,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
                             self.name)
         else:
             painter.setPen(QColor(255,255,255))
-            metrics = QtGui.QFontMetrics(painter.font())
-            text_width = metrics.boundingRect(self.displayName).width() + 14
-            text_height = metrics.boundingRect(self.displayName).height() + 14
+            text_width, text_height = _textExtent(painter.font(), self.displayName)
+            text_width += 14
+            text_height += 14
             margin = (text_width - self.baseWidth) * 0.5
             textRect = QtCore.QRect(int(-margin),
                                     int(-text_height),
@@ -2365,9 +2484,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
             font = painter.font()
             font.setPointSize(9)  # Set font size to 10
             painter.setFont(font)
-            metrics = QtGui.QFontMetrics(painter.font())
-            text_width_small = metrics.boundingRect(self.name).width() + 14
-            text_height_small = metrics.boundingRect(self.name).height() + 14
+            text_width_small, text_height_small = _textExtent(painter.font(), self.name)
+            text_width_small += 14
+            text_height_small += 14
             margin_small = (text_width_small - self.baseWidth) * 0.5
             textRect = QtCore.QRect(int(-margin_small),
                                     int(-text_height-text_height/2),
@@ -2377,18 +2496,9 @@ class NodeItem(QtWidgets.QGraphicsItem):
                             QtCore.Qt.AlignCenter, #type:ignore
                             self.name)
 
-        #Draw the icon
-        if self.status == 'idle':
-            self.icon = QPixmap(self.iconFolder+os.sep+'node_pending.png')
-        elif self.status == 'running':
-            self.icon = QPixmap(self.iconFolder+os.sep+'node_inProgress.png')
-        elif self.status == 'finished':
-            self.icon = QPixmap(self.iconFolder+os.sep+'node_completed.png')
-        elif self.status == 'error':
-            self.icon = QPixmap(self.iconFolder+os.sep+'node_error.png')
-        else:
-            self.icon = QPixmap(self.iconFolder+os.sep+'node_error.png')
-            
+        #Draw the icon (T-F2: cached; this used to hit the disk on every repaint)
+        self.icon = _nodeStatusPixmap(self.iconFolder, self.status)
+
         iconSize = 15
         painter.drawPixmap(int(-margin-iconSize+14-5-iconSize/2), int(-text_height+iconSize*.66), int(iconSize), int(iconSize), self.icon)
         
@@ -2409,17 +2519,10 @@ class NodeItem(QtWidgets.QGraphicsItem):
         nrBottomAttrs = 0
         nrTopAttrs = 0
         
-        #self.attrs should be re-ordered so that bottom/topAttrs are at the bottom of the list
-        orderedAttrs_socketPlugs = []
-        orderedAttrs_bottomTop = []
-        for attr in self.attrs:
-            attrData = self.attrsData[attr]
-            if not attrData['topAttr'] and not attrData['bottomAttr']:
-                orderedAttrs_socketPlugs.append(attr)
-            else:
-                orderedAttrs_bottomTop.append(attr)
-        self.attrs = orderedAttrs_socketPlugs + orderedAttrs_bottomTop
-        
+        # T-F2: self.attrs is ordered by _reorderAttrs() at the points where the
+        # attribute list actually changes. It used to be rebuilt and reassigned
+        # here -- model mutation from inside a render pass, on every repaint.
+
         for attr in self.attrs:
             nodzInst = self.scene().views()[0]
             config = nodzInst.config

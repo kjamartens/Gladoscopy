@@ -1,16 +1,23 @@
-import sys,os
+import os
+import sys
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+import inspect
+import logging
 
 # from shapely import Polygon, affinity
 import math
-import numpy as np
-import inspect
-import dask.array as da
 import time
+
+import dask.array as da
+import numpy as np
+
+from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -31,6 +38,13 @@ def __function_metadata__():
             ],
             "output":[
             ],
+            # run() aborts the acquisition through shared_data._mdaModeAcqData,
+            # and a subprocess-isolated node is handed shared_data=None. Never
+            # isolate this one - see utils.realTimeAnalysis_runInSubprocess.
+            "__needsLiveCore__": True,
+            #Not replayable while scrubbing: this node acts on the live hardware /
+            #running acquisition, so re-running it for an old frame is meaningless.
+            "__replayable__": False,
         }
     }
 
@@ -38,9 +52,10 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class EndAtFrame():
+@register("EndAtFrame.EndAtFrame")
+class EndAtFrame:
     def __init__(self,core,**kwargs):
-        print(core)
+        logging.debug("EndAtFrame init, core: %s", core)
         self.initDone = 'Yea'
         #Check if we have the required kwargs
         class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
@@ -58,7 +73,7 @@ class EndAtFrame():
             shared_data._mdaModeAcqData.abort()
             shared_data._mdaModeAcqData.mark_finished()
             #Print a statement
-            print(f"Ended at frame {self.metadata['Axes']['time']}")
+            logging.info("Ended at frame %s", self.metadata['Axes']['time'])
     
     def end(self,core,**kwargs):
         return

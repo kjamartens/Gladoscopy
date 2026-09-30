@@ -1,14 +1,18 @@
-import numpy as np
 import inspect
-import glados_pycromanager.GUI.utils as utils
 import logging
+import os
+import sys
 import time
-import sys,os
+
+import numpy as np
+
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
+from glados_pycromanager.autonomous.registry import register
+
 
 # Required function __function_metadata__
 # Should have an entry for every function in this file
@@ -22,13 +26,21 @@ def __function_metadata__():
             ],
             "help_string": "RT counter.",
             "display_name": "RT counter",
-            "run_delay": 0,
-            "visualise_delay": 200,
+            "run_delay": 10,
+            "visualise_delay": 50,
             "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
             "input":[
             ],
             "output":[
             ],
+            # run() reads only the frame's metadata, so it is isolated in its own
+            # process - see utils.realTimeAnalysis_runInSubprocess.
+            "__runInSubprocess__": True,
+            # What visualise() reads that run() produces. `firstLayerInit` is set
+            # by visualise_init() on the main-process shadow instance.
+            "__snapshot_attrs__": ["currentValue"],
+            #Replayable while scrubbing: one scalar per frame.
+            "__replayable__": True,
         }
     }
 
@@ -36,7 +48,8 @@ def __function_metadata__():
 #-------------------------------------------------------------------------------------------------------------------------------
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
-class RealTimeCounter():
+@register("RT_counter.RealTimeCounter")
+class RealTimeCounter:
     def __init__(self,core,**kwargs):
         logging.info('INITIALISING COUNTER REAL-TIME ANALYSIS')
         # print(core)
@@ -50,19 +63,28 @@ class RealTimeCounter():
 
     def run(self,image,metadata,shared_data,core,**kwargs):
         run_time = time.time()
+        info_enabled = logging.getLogger(__name__).isEnabledFor(logging.INFO)
         if 'ImageNumber' in metadata:
             self.currentValue = float(metadata['ImageNumber'])
-            logging.info("At frame: "+metadata['ImageNumber']+" (metadata-ImageNumber)")
+            if info_enabled:
+                logging.info("At frame: "+metadata['ImageNumber']+" (metadata-ImageNumber)")
         else:
-            #Append to full list with frame info
-            self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-            mda_values = []
-            for v in list(self.uniqueEntriesAllDims.keys()):
-                mda_values = np.hstack((mda_values,metadata['Axes'][v]))
-                
-            self.currentValue = float(metadata['Axes'][v])
-            logging.info("At frame: "+str(metadata['Axes'][v])+" (metadata-Axes)")
-        logging.info(f"Running time counter rta: {time.time()-run_time}")
+            #The frame's own Axes carry the counter: take the last (innermost)
+            #axis, which is what walking the acquisition plan's dimension map
+            #used to yield - the plan's dimension order is read off its first
+            #event's axes, so the two agree. Reading it from the frame instead
+            #costs nothing and needs no shared_data, which a subprocess-isolated
+            #node does not get (T-G8/T-G10).
+            axes = metadata.get('Axes', {}) if metadata else {}
+            axisName = list(axes)[-1] if axes else None
+            if axisName is None:
+                logging.warning("RT counter: frame carries neither ImageNumber nor Axes")
+            else:
+                self.currentValue = float(axes[axisName])
+                if info_enabled:
+                    logging.info("At frame: "+str(axes[axisName])+" (metadata-Axes)")
+        if info_enabled:
+            logging.info(f"Running time counter rta: {time.time()-run_time}")
     
     def end(self,core,**kwargs):
         logging.info('ENDING COUNTER REAL-TIME ANALYSIS')
@@ -77,13 +99,13 @@ class RealTimeCounter():
     
     def visualise(self,image,metadata,core,napariLayer,**kwargs):
         vis_time = time.time()
-        napariLayer.data = np.array([[0, 0]])
         properties = {
             'outputval': [self.currentValue],
         }
         #Only the properties need to be changed
         napariLayer.properties = properties
         if self.firstLayerInit:
+            napariLayer.data = np.array([[0, 0]])
             #The text data of the napariLayer need to be changed only on init.
             textv = {
                 'string': 'Current frame: {outputval:0.0f}',
@@ -104,4 +126,5 @@ class RealTimeCounter():
             napariLayer.size = 0
             napariLayer.selected_data = []
             self.firstLayerInit = False
-        logging.info(f"Visualising time counter rta: {time.time()-vis_time}")
+        if logging.getLogger(__name__).isEnabledFor(logging.INFO):
+            logging.info(f"Visualising time counter rta: {time.time()-vis_time}")

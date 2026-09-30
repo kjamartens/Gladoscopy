@@ -1,28 +1,82 @@
 # Custom UI for Endefelder lab - deprecated, last used in 2022 or so
 
-import json
-from pycromanager import *
-#from pycromanager import Core
-import numpy as np
-import sys
-import os
-import time
 import asyncio
-import pyqtgraph as pg
+import json
+import os
+import sys
+import time
 
 #For drawing
 import matplotlib
+
+#from pycromanager import Core
+import numpy as np
+import pyqtgraph as pg
+from pycromanager import *
+
 matplotlib.use('Qt5Agg')
-from PyQt5 import QtCore, QtWidgets
+import logging
+import time
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-import time
-from PyQt5.QtCore import QTimer,QDateTime
-import logging
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import QDateTime, QTimer
+
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # General switching functions - MM hooks
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#: T-B4: every hardware touch in this file goes through the MicroscopeService
+#: owner thread when one is running, so a button click returns immediately
+#: instead of driving a TriggerScope serial conversation on the GUI thread.
+#: With no service (tests, the napari-plugin path, a shutdown in progress) the
+#: call runs inline exactly as it used to -- T-B1's lock still makes that safe.
+
+
+def _hardware_service():
+    """The running `MicroscopeService`, or None."""
+    sd = globals().get('shared_data', None)
+    service = getattr(sd, 'microscope_service', None)
+    if service is not None and getattr(service, 'running', False):
+        return service
+    return None
+
+
+def submitHardware(fn, *args, label=None, **kwargs):
+    """Queue `fn` on the hardware owner thread; run it inline if there is none.
+
+    Fire-and-forget on purpose: these are user intents, and the service queue
+    is FIFO within a priority, so the order the user pressed things in is the
+    order the TriggerScope sees them.
+    """
+    service = _hardware_service()
+    if service is None:
+        return fn(*args, **kwargs)
+    service.submit(fn, *args, label=label or getattr(fn, '__name__', 'laser'),
+                   **kwargs)
+    return None
+
+
+def _onGuiThread(fn):
+    """Run `fn()` on the GUI thread (inline when already there).
+
+    Invariant 3's mechanism, reused: a hardware job runs on the owner thread and
+    must not touch a widget from there. `NapariBridge.submit` calls back with
+    the viewer as its first argument, which none of these need.
+    """
+    sd = globals().get('shared_data', None)
+    try:
+        from glados_pycromanager.GUI.napari_bridge import get_bridge
+        bridge = get_bridge(sd)
+    except Exception:
+        bridge = None
+    if bridge is None:
+        fn()
+        return
+    bridge.submit(lambda _viewer: fn())
+
+
 def timerloop(frameduration):
     getFrameTimeInfo(frameduration);
 
@@ -41,29 +95,71 @@ def getFrameTimeInfo(frameduration):
     try:
         if frameduration_new != frameduration:
             drawplot(frameduration_new)
-    except:
-        logging.warning('No plot drawn')
+    except (AttributeError, RuntimeError, ValueError, TypeError) as exc:
+        logging.warning('No plot drawn: %s', exc)
     return frameduration_new
 
 def SwitchOffLaser(laserID):
+    submitHardware(_switchOffLaser_hw, laserID, label='lasers.SwitchOffLaser')
+
+
+def _switchOffLaser_hw(laserID):
     MM_Property_OnOff_Name = MM_JSON["lasers"]["MM_Property_OnOff_Name"]
     MM_Property_Name = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
-    core.set_property(MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"], MM_Property_OnOff_Name, 0)
+    core.set_property(MM_Property_Name, MM_Property_OnOff_Name, 0)
     #Update button labels
-    InitLaserButtonLabels(MM_JSON)
+    _refreshLaserButtonLabels()
+
 
 def SwitchOnOffLaser(laserID):
+    submitHardware(_switchOnOffLaser_hw, laserID, label='lasers.SwitchOnOffLaser')
+
+
+def _switchOnOffLaser_hw(laserID, refresh=True):
+    """Toggle one laser. Runs on the hardware owner thread (T-B4)."""
     MM_Property_OnOff_Name = MM_JSON["lasers"]["MM_Property_OnOff_Name"]
     MM_Property_Name = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
     #Find current onoff State
     CurrOnOffState = core.get_property(MM_Property_Name, MM_Property_OnOff_Name)
     #Switch the on off state
     if CurrOnOffState == MM_JSON["lasers"]["MM_Property_OnOff_OnValue"]:
-        core.set_property(MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"], MM_Property_OnOff_Name, MM_JSON["lasers"]["MM_Property_OnOff_OffValue"])
+        core.set_property(MM_Property_Name, MM_Property_OnOff_Name,
+                          MM_JSON["lasers"]["MM_Property_OnOff_OffValue"])
     else:
-        core.set_property(MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"], MM_Property_OnOff_Name, MM_JSON["lasers"]["MM_Property_OnOff_OnValue"])
+        core.set_property(MM_Property_Name, MM_Property_OnOff_Name,
+                          MM_JSON["lasers"]["MM_Property_OnOff_OnValue"])
     #Update button labels
-    InitLaserButtonLabels(MM_JSON)
+    if refresh:
+        _refreshLaserButtonLabels()
+
+def _refreshLaserButtonLabels():
+    """Read the five on/off states here, apply the labels on the GUI thread.
+
+    T-B4: the split matters because this is called from inside hardware jobs.
+    The read is five `get_property` calls; doing them on the GUI thread (which
+    is what `InitLaserButtonLabels` does, and still does when the GUI calls it
+    directly) is five serial round trips in front of the next repaint.
+    """
+    MMprop_onoff = MM_JSON["lasers"]["MM_Property_OnOff_Name"]
+    on_value = MM_JSON["lasers"]["MM_Property_OnOff_OnValue"]
+    states = []
+    for i in [0, 1, 2, 3, 4]:
+        propertyname = MM_JSON["lasers"]["Laser"+str(i)]["MM_Property_Name"]
+        states.append(core.get_property(propertyname, MMprop_onoff) == on_value)
+    _onGuiThread(lambda: _applyLaserButtonLabels(states))
+
+
+def _applyLaserButtonLabels(states):
+    """GUI-thread half of `_refreshLaserButtonLabels`."""
+    for i, is_on in enumerate(states):
+        getattr(form, "PushLaser_"+str(i)).setText("Now On" if is_on else "Now Off")
+        wavelength = MM_JSON["lasers"]["Laser"+str(i)]["Wavelength"]
+        getattr(form, "NameLaser_"+str(i)).setText(str(wavelength)+" nm")
+        getattr(form, "NameLaser_"+str(i)+"_2").setText(str(wavelength)+" nm")
+        rgbval = GetRGBFromLambda(wavelength)
+        getattr(form, "PushLaser_"+str(i)).setStyleSheet(
+            "color:white; background-color: rgb({},{},{})".format(*rgbval[:3]))
+
 
 def InitLaserButtonLabels(MM_JSON):
     #Get last part of property name in MM
@@ -107,6 +203,12 @@ def GetIntensityLaser(MM_JSON,laserID):
     return MMJSON_to_ValIntPerc(MM_JSON,laserID);
 
 
+#: Last intensity actually sent per laser, recorded here because this is the one
+#: choke point every path goes through (slider and edit field alike). Used by
+#: ChangeIntensityLaserEditField to skip a focus-out that changed nothing (T-F8).
+_lastWrittenLaserIntensity = {}
+
+
 def ChangeIntensityLaser(laserID, ValIntPerc):
     #Get relevant names from JSON
     propertyname = MM_JSON["lasers"]["Laser"+str(laserID)]["MM_Property_Name"]
@@ -114,8 +216,13 @@ def ChangeIntensityLaser(laserID, ValIntPerc):
 
     #Translate the value to 0-5
     ValIntMM = ValIntPerc*float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_slope"])-float(MM_JSON["lasers"]["Laser"+str(laserID)]["Intensity_offset"])
-    #Set value in Micromanager
-    (core.set_property(propertyname, MMprop_intensity_name, str(ValIntMM)))
+    #Set value in Micromanager -- queued on the owner thread (T-B4). Recorded as
+    #written straight away: the queue is FIFO, so this *is* the value the laser
+    #will hold once the queue drains, and the T-F8 duplicate-write skip below
+    #must not be defeated by the write being asynchronous.
+    submitHardware(core.set_property, propertyname, MMprop_intensity_name,
+                   str(ValIntMM), label='lasers.ChangeIntensity')
+    _lastWrittenLaserIntensity[laserID] = ValIntPerc
 
     #Change the PAC of the laser if it's triggering and such
     if form.advancedLasers_RadioButton.isChecked():
@@ -142,15 +249,29 @@ def ChangeIntensityLaser_Slider(laserID):
 
 
 def ChangeIntensityLaserEditField(laserID):
+    """Apply a typed laser intensity.
+
+    T-F8: wired to `editingFinished`, not `textChanged`. On `textChanged` this
+    issued a **serial write per keystroke**, so typing "150" briefly drove the
+    laser to 1 and then 15 on the way to 150 -- the bare `except: pass` below
+    was there precisely to swallow the half-typed values. `editingFinished`
+    fires once, on Enter or focus-out, and (unlike `textChanged`) is not emitted
+    by a programmatic `setText`, so the slider updating this field no longer
+    loops back into a write.
+    """
     try:
         #Create ValIntPerc variable and extract
         exec("global ValIntPerc; ValIntPerc = int(form.EditIntensity_Laser_"+str(laserID)+".text())");
-        #Change the intensity
-        ChangeIntensityLaser(laserID, ValIntPerc); #type:ignore
+        newIntensity = ValIntPerc #type:ignore # noqa: F821 -- defined by the exec above
+        #A focus-out that changed nothing must not repeat the serial write.
+        if _lastWrittenLaserIntensity.get(laserID) == newIntensity:
+            return
+        #Change the intensity (which records it in _lastWrittenLaserIntensity)
+        ChangeIntensityLaser(laserID, newIntensity); #type:ignore
         #Update labels
         InitLaserSliders(MM_JSON)
-    except:
-        #Do nothing
+    except (RuntimeError, OSError, AttributeError, ValueError):
+        #Do nothing - an empty or non-numeric field is not a value to send
         pass
 
 def InitFilterWheelRadioCheckbox():
@@ -177,7 +298,7 @@ def InitBFRadioCheckbox():
     #Get the current BF state from MM
     try:
         curBFstate = float(core.get_property('TIDiaLamp','Intensity')) #Get the intensity of the BF lamp
-    except:
+    except (RuntimeError, OSError, AttributeError, ValueError, TypeError):
         curBFstate = 0
     
     #Set a certain BF state
@@ -222,16 +343,55 @@ def GetRGBFromLambda(w):
 
 #Function that adds text to the verbose text output box
 def addToVerboseBoxText(text):
-    form.VerboseBox.setPlainText(text+'\r\n'+form.VerboseBox.toPlainText());
+    """Prepend a line to the verbose box, from any thread (T-B4)."""
+    _onGuiThread(
+        lambda: form.VerboseBox.setPlainText(text + '\r\n' + form.VerboseBox.toPlainText()))
 
 #Specifically get TriggerScope response to verboxe text box
 def TS_Response_verbose():
-    core.get_property('TriggerScopeMM-Hub', 'Serial Receive');
-    addToVerboseBoxText(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
-    logging.debug(core.get_property('TriggerScopeMM-Hub', 'Serial Receive'));
+    """Read one TriggerScope response and show it.
+
+    Called after *every* serial write, so it is the per-command cost of every
+    loop in this file. It used to make three identical `get_property` reads --
+    one discarded, one displayed, one logged -- i.e. three serial round trips
+    to show one answer. One read now serves all three uses.
+    """
+    response = core.get_property('TriggerScopeMM-Hub', 'Serial Receive')
+    addToVerboseBoxText(response)
+    logging.debug(response)
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Laser trigger drawing functions
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#: Idle window before a laser-trigger edit redraws the plot (T-F8).
+DRAWPLOT_DEBOUNCE_MS = 200
+
+_drawplotTimer = None
+
+
+def scheduleDrawplot(frameduration):
+    """Coalesce laser-trigger edits into one plot rebuild (T-F8).
+
+    `drawplot` clears the graph widget and rebuilds roughly a hundred pyqtgraph
+    items. It was wired to `textChanged` on fifteen line edits, so every
+    keystroke in any of them paid for a full rebuild on the GUI thread.
+
+    The trigger stays `textChanged` rather than moving to `editingFinished`:
+    the plot is a live preview of what the user is typing, and leaving it stale
+    until focus-out would change what the control does. Debouncing changes only
+    when it fires.
+    """
+    global _drawplotTimer
+    if _drawplotTimer is None:
+        _drawplotTimer = QTimer()
+        _drawplotTimer.setSingleShot(True)
+    try:
+        _drawplotTimer.timeout.disconnect()
+    except TypeError:  # nothing connected yet
+        pass
+    _drawplotTimer.timeout.connect(lambda: drawplot(frameduration))
+    _drawplotTimer.start(DRAWPLOT_DEBOUNCE_MS)
+
+
 def drawplot(frameduration):
     #logging.debug('CallingDrawPlot')
     #We're changing something, so warning user that it's not yet armed
@@ -334,6 +494,17 @@ def ResetLasersTriggerButtonPress(frameduration):
     drawplot(frameduration)
 
 def ResetLasersTrigger():
+    """Queue the whole reset onto the hardware owner thread (T-B4).
+
+    This is ~100 serial round trips in one button press. On the GUI thread that
+    froze the UI (and starved the frame path) for its whole duration; the click
+    now returns immediately and the TriggerScope conversation happens on the
+    owner thread.
+    """
+    submitHardware(_resetLasersTrigger_hw, label='lasers.ResetLasersTrigger')
+
+
+def _resetLasersTrigger_hw():
     for i in [0,1,2,3,4]:
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
         TS_Response_verbose();
@@ -342,10 +513,14 @@ def ResetLasersTrigger():
         core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'BAL'+str(i+1)+'-0')
         TS_Response_verbose();
         #if (i != 2):
-        SwitchOnOffLaser(i)
-        SwitchOnOffLaser(i)
+        # Already on the owner thread, so toggle directly rather than queueing
+        # two more jobs -- and refresh the button labels once at the end rather
+        # than ten times mid-loop.
+        _switchOnOffLaser_hw(i, refresh=False)
+        _switchOnOffLaser_hw(i, refresh=False)
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', '*')
     TS_Response_verbose();
+    _refreshLaserButtonLabels()
 
 #Set all boxes to zeros and such
 def initLaserTrigEditBoxes():
@@ -364,14 +539,28 @@ def armLaserTriggering():
 
 #Arm a single laser
 def armLaser(i):
+    """Arm one laser.
+
+    T-B4: the widget reads (and `GetIntensityLaser`, which reads the laser's
+    intensity property) happen on the calling thread, then the serial
+    conversation -- including its `time.sleep(0.1)` per repeat frame -- is
+    queued onto the hardware owner thread. `armLaserTriggering` arms all five,
+    so on the GUI thread that was five conversations plus up to 0.1 s of sleep
+    per repeat frame, per laser.
+    """
+    nrframesrepeat = int(getattr(form, "BlinkFrames_Edit_Laser_"+str(i)).text())
+    delay = int(getattr(form, "Delay_Edit_Laser_"+str(i)).text())
+    length = int(getattr(form, "Length_Edit_Laser_"+str(i)).text())
+    submitHardware(_armLaser_hw, i, nrframesrepeat, delay, length,
+                   label='lasers.armLaser')
+
+
+def _armLaser_hw(i, nrframesrepeat, delay, length):
     #Loop over number of frames after which it repeats
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC'+str(i+1))
     TS_Response_verbose();
 
-    exec("global nrframesrepeat; nrframesrepeat = int(form.BlinkFrames_Edit_Laser_"+str(i)+".text())")
     for k in range(0,nrframesrepeat): #type:ignore
-        exec("global delay; delay = int(form.Delay_Edit_Laser_"+str(i)+".text())");
-        exec("global length; length = int(form.Length_Edit_Laser_"+str(i)+".text())");
         if k == 0:
             if length>0: #type:ignore
                 power_level = 65535*0.01*GetIntensityLaser(MM_JSON,i)
@@ -414,6 +603,16 @@ def armLaser(i):
 
 #UV blinking function
 def blinkUV(duration):
+    """Blink the UV LED for `duration`.
+
+    T-B4: queued whole onto the hardware owner thread -- the `time.sleep` in
+    the middle used to freeze the GUI (and every napari repaint) for the entire
+    blink, since the on and off writes have to bracket it.
+    """
+    submitHardware(_blinkUV_hw, duration, label='lasers.blinkUV')
+
+
+def _blinkUV_hw(duration):
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'PAC9')
     core.set_property('TriggerScopeMM-Hub', 'Serial Send', 'SAO9-65535')
     TS_Response_verbose()
@@ -451,8 +650,8 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         InitLaserButtonLabels(MM_JSON)
         InitLaserSliders(MM_JSON)
         InitFilterWheelRadioCheckbox()
-    except:
-        logging.debug('Error in InitLaserButtonLabels or InitLaserSliders')
+    except (RuntimeError, OSError, AttributeError, KeyError) as exc:
+        logging.debug('Error in InitLaserButtonLabels or InitLaserSliders: %s', exc)
         criticalErrors=True
     #Get frametimeinfo
     InitBFRadioCheckbox()
@@ -484,7 +683,9 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         exec("form.SliderLaser_" + str(i) + ".sliderReleased.connect(lambda: ChangeIntensityLaser_Slider(" + str(i) + "));")
         exec("form.SliderLaser_" + str(i) + ".valueChanged.connect(lambda: ChangeIntensityLaser_Slider_onlySimple(" + str(i) + "));")
         #Change intensity when intensity edit field is changed
-        exec("form.EditIntensity_Laser_" + str(i) + ".textChanged.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
+        #T-F8: editingFinished, not textChanged -- one serial write per commit
+        #instead of one per keystroke.
+        exec("form.EditIntensity_Laser_" + str(i) + ".editingFinished.connect(lambda: ChangeIntensityLaserEditField(" + str(i) + "));")
 
     #Initialise the laser triggering boxes
     initLaserTrigEditBoxes();
@@ -495,11 +696,13 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
 
         #Change laser trigger scheme when values in boxes are changed
         for i in range(0,5):
-            exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-            exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: drawplot(frameduration));")
-    except:
-        logging.error("error in execing forms")
+            #T-F8: still textChanged (the plot is a live preview), but debounced
+            #so a burst of keystrokes costs one rebuild instead of one each.
+            exec("form.Delay_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: scheduleDrawplot(frameduration));")
+            exec("form.Length_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: scheduleDrawplot(frameduration));")
+            exec("form.BlinkFrames_Edit_Laser_" + str(i) + ".textChanged.connect(lambda: scheduleDrawplot(frameduration));")
+    except (AttributeError, NameError, SyntaxError, RuntimeError) as exc:
+        logging.error('error in execing forms: %s', exc)
         criticalErrors=True
     #Arm lasers button
     form.ARMlaserTriggerPushButton.clicked.connect(lambda: armLaserTriggering());
@@ -545,8 +748,8 @@ def runlaserControllerUI(score,sMM_JSON,sform,sshared_data):
         ResetLasersTrigger();
         #Initialise laser trigger edit buttons
         initLaserTrigEditBoxes();
-    except:
-        logging.error("error in resetting laser boxes")
+    except (RuntimeError, OSError, AttributeError) as exc:
+        logging.error('error in resetting laser boxes: %s', exc)
         criticalErrors=True
     
     return form, criticalErrors
