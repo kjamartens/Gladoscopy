@@ -2143,11 +2143,21 @@ class MMConfigUI(CustomMainWindow):
             return True
         return super().eventFilter(obj, event)
 
-    #: Idle window before accumulated wheel notches reach the stage (T-F8).
+    #: Minimum interval between two wheel-driven stage moves (T-F8). A throttle
+    #: window, not an idle window -- see `_accumulateStageWheel`.
     STAGE_WHEEL_DEBOUNCE_MS = 120
 
     def _accumulateStageWheel(self, notches):
-        """Add wheel notches to the pending total and (re)arm the flush timer."""
+        """Add wheel notches to the pending total; move now or at the window's end.
+
+        Throttled on the leading edge, like `rt_replay`'s scrub rendering: the
+        first notch moves the stage immediately, and notches arriving within the
+        next `STAGE_WHEEL_DEBOUNCE_MS` become one move at the end of that window.
+        This used to be a trailing debounce that re-armed on every notch, so a
+        continuous scroll never moved the stage at all until the wheel had been
+        still for the whole interval -- z-scrolling felt stuck, then jumped.
+        The total distance is unchanged either way.
+        """
         self._pendingStageWheelSteps = getattr(self, '_pendingStageWheelSteps', 0) + notches
 
         timer = getattr(self, '_stageWheelTimer', None)
@@ -2155,10 +2165,17 @@ class MMConfigUI(CustomMainWindow):
             timer = self._stageWheelTimer = QTimer(self)
             timer.setSingleShot(True)
             timer.timeout.connect(self._flushStageWheel)
-        timer.start(self.STAGE_WHEEL_DEBOUNCE_MS)
+        elapsed_ms = (time.monotonic()
+                      - getattr(self, '_lastStageWheelFlush', float('-inf'))) * 1000
+        if elapsed_ms >= self.STAGE_WHEEL_DEBOUNCE_MS:
+            timer.stop()
+            self._flushStageWheel()
+        elif not timer.isActive():
+            timer.start(max(1, int(self.STAGE_WHEEL_DEBOUNCE_MS - elapsed_ms)))
 
     def _flushStageWheel(self):
         """Apply the accumulated notches as one relative move."""
+        self._lastStageWheelFlush = time.monotonic()
         net = getattr(self, '_pendingStageWheelSteps', 0)
         self._pendingStageWheelSteps = 0
         if net == 0:

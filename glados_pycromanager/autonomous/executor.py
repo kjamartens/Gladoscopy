@@ -156,13 +156,31 @@ class generalNodzCallActionWorker(QRunnable):
         self.nodzType = nodzType
         self.args = args
         self.signals = WorkerSignals()
-        logging.debug(f"GeneralNodzCallActionworker INIT with nodzType: {self.nodzType} and args: {self.args}")
+        #Set by run() when the node's work raised; read by the GUI-thread slot.
+        self.error = None
+        #Never log self.args: it holds the dock widget, shared_data and the
+        #whole nodeDict, and an f-string stringifies them even when DEBUG is off.
+        logging.debug("GeneralNodzCallActionworker INIT with nodzType: %s", self.nodzType)
     
     def run(self):
         """ 
+        Run the node's work and *always* emit ``finished`` - on failure too,
+        with ``self.error`` set. A worker that raised used to never emit, which
+        left its node 'running' and the whole recipe silently hung.
+        """
+        try:
+            self._run_body()
+        except Exception as exc:
+            logging.exception('Node worker (%s) failed', self.nodzType)
+            self.error = f"{type(exc).__name__}: {exc}"
+        finally:
+            self.signals.finished.emit()
+
+    def _run_body(self):
+        """ 
         Running of the different callActions belonging to all nodes.
         """
-        logging.debug(f"GeneralNodzCallActionworker RUN with nodzType: {self.nodzType} and args: {self.args}")
+        logging.debug("GeneralNodzCallActionworker RUN with nodzType: %s", self.nodzType)
         #Timer
         if self.nodzType == 'Timer':
             time.sleep(self.args['wait_time'])
@@ -228,9 +246,6 @@ class generalNodzCallActionWorker(QRunnable):
                 'shared_data': shared_data,
             }
             node.output = registry.dispatch_from_eval_text(evalText, scope=scope)
-        
-        #Emit that the node is finished :) 
-        self.signals.finished.emit()
 
 
 
@@ -540,12 +555,185 @@ class FlowchartExecutorMixin:
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.scoring_analysis_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
         
-        worker = generalNodzCallActionWorker(nodzType='AnalysisNode',args={"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.analysisNode_finished(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        self._startNodeWorker(node, 'AnalysisNode',
+            {"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data},
+            lambda: self.analysisNode_finished(node))
         
+    def _startNodeWorker(self, node, nodzType, args, on_success):
+        """Run a node's work on the pool and route the outcome back here.
+
+        ``on_success`` runs on the GUI thread when the work completed; a
+        failure - in the worker *or* in ``on_success`` itself - goes to
+        ``_nodeFailed`` instead, so a node can never be left 'running' with
+        nothing downstream ever triggered.
+        """
+        worker = generalNodzCallActionWorker(nodzType=nodzType, args=args)
+        #We hold the worker until its slot has run: with Qt's autoDelete the
+        #runnable (and its WorkerSignals) was destroyed on the pool thread
+        #while the queued finished-call to the GUI thread was still pending.
+        worker.setAutoDelete(False)
+        active = self.__dict__.setdefault('_activeNodeWorkers', set())
+        active.add(worker)
+        worker.signals.finished.connect(
+            lambda: self._nodeWorkerDone(worker, node, on_success))
+        self.thread_pool.start(worker)
+        return worker
+
+    def _nodeWorkerDone(self, worker, node, on_success):
+        """GUI-thread slot for ``_startNodeWorker``."""
+        self.__dict__.get('_activeNodeWorkers', set()).discard(worker)
+        if self.isStaleNode(node):
+            #Its run was stopped; neither its result nor its failure belongs
+            #to whatever run is going now.
+            logging.info('Ignoring late %s result of %s', worker.nodzType, getattr(node, 'name', node))
+            return
+        if worker.error is not None:
+            self._nodeFailed(node, worker.error)
+            return
+        try:
+            on_success()
+        except Exception as exc:
+            logging.exception('Finishing node %s failed', getattr(node, 'name', node))
+            self._nodeFailed(node, f"{type(exc).__name__}: {exc}")
+
+    def _hardwareProxy(self):
+        """MIL facade on the hardware owner thread (the raw core without one)."""
+        proxy = getattr(self.shared_data, 'microscope_proxy', None)
+        return proxy() if callable(proxy) else self.core
+
+    def _hardwareThen(self, node, fn, on_success, label):
+        """Run blocking hardware work ``fn`` on the owner thread, then
+        ``on_success`` on the GUI thread; a failure fails ``node`` (or, with no
+        node, stops the run)."""
+        from glados_pycromanager.GUI.MMcontrols import guiThreadCall, submitHardware
+
+        def done(request):
+            error = request.exception
+            guiThreadCall(self.shared_data, lambda: self._afterHardware(node, error, on_success, label))
+
+        try:
+            submitHardware(self.shared_data, fn, label=label, callback=done)
+        except Exception as exc:
+            #No owner thread: submitHardware ran fn inline and it raised.
+            self._afterHardware(node, exc, on_success, label)
+
+    def _afterHardware(self, node, error, on_success, label):
+        if node is not None and self.isStaleNode(node):
+            return
+        if error is None and not getattr(self, '_runAborted', False):
+            try:
+                on_success()
+                return
+            except Exception as exc:
+                logging.exception('After %s', label)
+                error = exc
+        if error is None:
+            return #Run was stopped while the hardware was busy
+        message = f"{label} failed: {type(error).__name__}: {error}"
+        if node is not None:
+            self._nodeFailed(node, message)
+        else:
+            self._abortRun(message)
+
+    def _nodeFailed(self, node, message):
+        """Mark ``node`` as errored, tell the user, and stop the run."""
+        node.status = 'error'
+        reason = f"Node '{getattr(node, 'name', node)}' failed: {message}"
+        logging.error(reason)
+        try:
+            self.shared_data.warningErrorInfoInfo['Info']['Other'] = [reason]
+        except (AttributeError, KeyError, TypeError):
+            pass
+        self._abortRun(reason)
+
+    def _abortRun(self, reason, user_requested=False):
+        """Stop the recipe: no further nodes, no further positions, and cancel
+        a running acquisition. Node starts are refused from here on by
+        ``NodeItem.oneConnectionAtStartIsFinished`` until the next run entry
+        (``_beginRun``) clears ``_runAborted``.
+        """
+        logging.warning('Autonomous run stopped: %s', reason)
+        self._runAborted = True
+        self._runGeneration = self.currentRunGeneration() + 1
+        self.fullRunOngoing = False
+        self.singleRunOngoing = False
+        self._cancelRunningAcquisition()
+
+        #Nodes caught mid-run: an Interrupt resets them (nothing went wrong),
+        #a failure marks them so it is visible where the run died. Finished
+        #nodes keep showing how far the run got.
+        stoppedStatus = 'idle' if user_requested else 'error'
+        for node in getattr(self, 'nodes', []):
+            if getattr(node, 'status', None) == 'running':
+                node.status = stoppedStatus
+
+        try:
+            self.shared_data.warningErrorInfoInfo['Info']['Other'] = [f"Run stopped: {reason}"]
+        except (AttributeError, KeyError, TypeError):
+            pass
+        update = getattr(self, 'update', None)
+        if callable(update):
+            update()
+
+    def _cancelRunningAcquisition(self):
+        """Cancel the MDA in flight, on whichever backend runs it. Its worker
+        still reports done; the aborted run then refuses the downstream start."""
+        shared_data = self.shared_data
+        if not getattr(shared_data, 'mdaMode', False):
+            return
+        try:
+            if shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+                shared_data.MILcore.core.mda.cancel()
+            else:
+                acq = getattr(shared_data, '_mdaModeAcqData', None)
+                if acq is not None:
+                    acq.abort()
+        except Exception:
+            logging.exception('Cancelling the running acquisition failed')
+
+    def _beginRun(self, label):
+        """Gate for every run button. Returns False (and says why) while a full
+        run is still going; otherwise clears a previous stop."""
+        if getattr(self, 'fullRunOngoing', False) and not getattr(self, '_runAborted', False):
+            logging.warning('Not starting %s: an autonomous run is still going (use Interrupt run first)', label)
+            try:
+                self.shared_data.warningErrorInfoInfo['Info']['Other'] = [
+                    f"Not starting {label}: a run is still going - interrupt it first"]
+            except (AttributeError, KeyError, TypeError):
+                pass
+            return False
+        self._runAborted = False
+        self._runGeneration = self.currentRunGeneration() + 1
+        return True
+
+    def currentRunGeneration(self):
+        """Bumped by every run start and stop. A node is stamped with it when it
+        starts (nodeRan), so work that finishes after its run was stopped - a
+        timer, a worker, a cancelled MDA - cannot trigger nodes in a later run."""
+        return self.__dict__.get('_runGeneration', 0)
+
+    def isStaleNode(self, node):
+        started = getattr(node, '_runGeneration', None)
+        return started is not None and started != self.currentRunGeneration()
+
+    def _advanceToNextPosition(self):
+        """After a position is done: move on, or finish the full run."""
+        if getattr(self, '_runAborted', False) or not self.fullRunOngoing:
+            return
+        nrPositions = self.fullRunPositions['nrPositions']
+        if self.fullRunCurrentPos+1 < nrPositions:
+            logging.info('Just did position %d/%d, continuing', self.fullRunCurrentPos+1, nrPositions)
+            self.fullRunCurrentPos += 1
+            self.startNewScoreAcqAtPos()
+        else:
+            logging.info('All done! Did %d/%d positions', self.fullRunCurrentPos+1, nrPositions)
+            self.fullRunOngoing = False
+            self.singleRunOngoing = False
+            try:
+                self.shared_data.warningErrorInfoInfo['Info']['Other'] = [f"Autonomous run finished ({nrPositions} positions)"]
+            except (AttributeError, KeyError, TypeError):
+                pass
+
     def analysisNode_finished(self,node):
         #Set the status of the nodz-coupled vis and real-time to finished:
         #Look at the 'Visual' bottom attribute and visualise if needed
@@ -637,11 +825,9 @@ class FlowchartExecutorMixin:
         #Figure out the belonging evaluation-text
         evalText = utils.getFunctionEvalTextFromCurrentData(selectedFunction,node.customFunction_currentData,'self.shared_data.core','',nodzInfo=self,skipp2=True)
         
-        worker = generalNodzCallActionWorker(nodzType='CustomFunctionNode',args={"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.CustomFunctionNode_finished(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        self._startNodeWorker(node, 'CustomFunctionNode',
+            {"evalText":evalText, "nodeDict":nodeDict, "nodzInfo":self, "node":node, "core": self.core, "shared_data": self.shared_data},
+            lambda: self.CustomFunctionNode_finished(node))
         
         # #And evaluate the custom function with custom parameters
         # output = eval(evalText) #type:ignore
@@ -678,18 +864,30 @@ class FlowchartExecutorMixin:
             None
         """
         
+        stageToMove = None
+        distToMove = None
         for stor in node.MMconfigInfo.relstage_string_storage:
             if stor[0] == '__chosenRelStage__':
                 stageToMove = stor[1]
-        
+
         for stor in node.MMconfigInfo.relstage_string_storage:
-            if stor[0] == stageToMove:
+            if stageToMove is not None and stor[0] == stageToMove:
                 distToMove = float(stor[1])
-        
-        self.core.set_relative_position(stageToMove,distToMove)
-        
-        self.finishedEmits(node)
-        
+
+        if stageToMove is None or distToMove is None:
+            self._nodeFailed(node, 'no stage/distance chosen - double-click the node to set one')
+            return
+
+        core = self.core
+
+        def move():
+            core.set_relative_position(stageToMove,distToMove)
+            #Wait for the move: the next node (often an acquisition) used to
+            #start while the stage was still travelling.
+            core.wait_for_system()
+
+        self._hardwareThen(node, move, lambda: self.finishedEmits(node), f'{node.name}: relative move')
+
     def MMconfigChangeRan(self,node):
         """
         Handle the configuration change event for a node.
@@ -704,11 +902,11 @@ class FlowchartExecutorMixin:
         
         
         #Create the worker
-        worker = generalNodzCallActionWorker(nodzType='MMconfigChangeRan',args={"config_string_storage":node.MMconfigInfo.config_string_storage, "MMconfig":node.MMconfigInfo, "core": self.core})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.finishedEmits(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        self._startNodeWorker(node, 'MMconfigChangeRan',
+            #The proxy routes each MIL call through the hardware owner thread
+            #instead of driving the core directly from a pool thread.
+            {"config_string_storage":node.MMconfigInfo.config_string_storage, "MMconfig":node.MMconfigInfo, "core": self._hardwareProxy()},
+            lambda: self.finishedEmits(node))
         
         # self.finishedEmits(node)
 
@@ -758,15 +956,7 @@ class FlowchartExecutorMixin:
         self.finishedEmits(node)
         logging.debug("End Acquiring----------------------------------------------------------")
         if self.fullRunOngoing:
-            #if there are more positions to look at...
-            if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                logging.info(f'Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!--------------------------------------------------------')
-                self.fullRunCurrentPos +=1
-                #And start a new score/acq at a new pos:
-                self.startNewScoreAcqAtPos()
-            else:
-                logging.info(f'ALLDONE Just did position {self.fullRunCurrentPos+1}/{self.fullRunPositions["nrPositions"]}, continuing!----------------------------------------------------------')
-                self.singleRunOngoing = False
+            self._advanceToNextPosition()
         else:
             logging.info("ACQUIRING FULL RUN IS NOT ONGOING--------------------------------------------")
         logging.debug("End Acquiring2------------------------------------------------------------")
@@ -840,13 +1030,18 @@ class FlowchartExecutorMixin:
         
         if self.preventScoring == False:
             logging.debug('Starting the score routine!')
-            
+
             #Set all connected nodes to idle
             connectedNodes = nodz_utils.findConnectedToNode(self.evaluateGraph(),node.name,[])
             for connectedNode in connectedNodes:
                 for nodeC in self.nodes:
                     if nodeC.name == connectedNode:
                         nodeC.status='idle'
+                        #Forget the previous position's result, so scoringEnd
+                        #(which waits for all its inputs) never decides on a stale value.
+                        scoringData = getattr(nodeC, 'scoring_analysis_currentData', None)
+                        if isinstance(scoringData, dict):
+                            scoringData.pop('__output__', None)
             
             #Get all connections:
             allConnections = []
@@ -921,11 +1116,15 @@ class FlowchartExecutorMixin:
         except (KeyError, AttributeError, TypeError) as exc:
             logging.debug('Scoring data gather skipped: %s', exc)
         
+        readableText = ''
+        decisionError = None
         try:
             testPassed = self.decisionWidget.testCurrentDecision()
             testPassedText = 'Test is Passed' if testPassed else 'Test is Not Passed'
-            # readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
-            
+            #Used by the reporting node(s) below; was commented out, so a passing
+            #test with a reporting node attached raised NameError.
+            readableText = self._scoreEndReadableText(node, attrs, data, testPassedText)
+
             logging.info('Scoring finished fully!')
             if testPassed:
                 logging.info("Test is... Passed!")
@@ -950,13 +1149,7 @@ class FlowchartExecutorMixin:
                 logging.info("Test is... Not Passed!")
                 #Go to next XY position
                 if self.fullRunOngoing:
-                    if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                        self.fullRunCurrentPos +=1
-                        #And start a new score/acq at a new pos:
-                        self.startNewScoreAcqAtPos()
-                    else:
-                        self.singleRunOngoing = False
-                        logging.info('All done!')
+                    self._advanceToNextPosition()
             logging.info('----------------------')
 
         except (AttributeError, KeyError, TypeError, ValueError) as exc:
@@ -964,8 +1157,9 @@ class FlowchartExecutorMixin:
             testPassed = False
             node.status = 'error'
             testPassedText = 'Error when assessing test'
-            readableText = self.set_readable_text_after_dialogChange(node,[attrs,data,testPassedText],'scoreEnd')
-        
+            readableText = self._scoreEndReadableText(node, attrs, data, testPassedText)
+            decisionError = f"{type(exc).__name__}: {exc}"
+
         
         #Find the reporting node(s)
         connectedNodes = nodz_utils.getConnectedNodes(node, 'bottomAttr')
@@ -994,7 +1188,18 @@ class FlowchartExecutorMixin:
                     node.status = 'error'
 
         self.preventAcq = False
-    
+        if decisionError is not None:
+            #This used to stop the run silently: no next position, no message.
+            self._abortRun(f"scoring decision could not be evaluated ({decisionError})")
+
+    def _scoreEndReadableText(self, node, attrs, data, testPassedText):
+        """The scoreEnd node's text; a display problem must not stop the run."""
+        try:
+            return self.set_readable_text_after_dialogChange(node, [attrs, data, testPassedText], 'scoreEnd') or ''
+        except Exception:
+            logging.exception('Could not render the scoring result text')
+            return testPassedText
+
     def earlyScoringFail(self,node):
         #Sob asically it's the Scoring node, but hard-coded to fail.
         logging.info("Scoring early abandoned!")
@@ -1002,13 +1207,7 @@ class FlowchartExecutorMixin:
         node.status='finished'
         #Go to next XY position
         if self.fullRunOngoing:
-            if self.fullRunCurrentPos+1 < self.fullRunPositions['nrPositions']:
-                self.fullRunCurrentPos +=1
-                #And start a new score/acq at a new pos:
-                self.startNewScoreAcqAtPos()
-            else:
-                self.singleRunOngoing = False
-                logging.info('All done!')
+            self._advanceToNextPosition()
         
     
     def and_logicCallAction(self,node):
@@ -1033,12 +1232,11 @@ class FlowchartExecutorMixin:
         vardata = utils.nodz_dataFromGeneralAdvancedLineEditDialog(node.timerInfo, node.flowChart)
         wait_time = float(vardata['wait_time'][0])
 
-        #Create the worker
-        worker = generalNodzCallActionWorker(nodzType='Timer',args={"wait_time":wait_time})
-        #Add the finished emit
-        worker.signals.finished.connect(lambda: self.finishedEmits(node))
-        #Star the worker
-        self.thread_pool.start(worker)
+        #A single-shot QTimer instead of time.sleep() in a pool worker: the
+        #sleep held a global-pool thread for the whole wait and could not be
+        #cancelled. A stopped (or since restarted) run ignores the timeout via
+        #the node's run generation (see _emitNodeFinished).
+        QTimer.singleShot(max(0, int(round(wait_time*1000))), lambda: self.finishedEmits(node))
     
     def storeDataCallAction(self,node):
         
@@ -1137,7 +1335,7 @@ class FlowchartExecutorMixin:
                     foundNodeName = graphConnection[1].split('.')[0]
                     foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
                     node.status='finished'
-                    foundNode.oneConnectionAtStartIsFinished()
+                    QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                     break    
         elif result == False:
             graph = node.flowChart.evaluateGraph()
@@ -1146,12 +1344,16 @@ class FlowchartExecutorMixin:
                     foundNodeName = graphConnection[1].split('.')[0]
                     foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
                     node.status='finished'
-                    foundNode.oneConnectionAtStartIsFinished()
+                    QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                     break    
     
     def runInlineScriptCallAction(self,node):
         scriptText = node.InlineScriptInfo
-        
+
+        #Names a script line may use. There is no module-level shared_data in
+        #this file, so the old `core = shared_data.core` was a NameError that
+        #hung every recipe containing this node.
+        shared_data = self.shared_data
         core = shared_data.core
         #Go over each line of scriptText, broken by a \n:
         lineData = scriptText.split('\n')
@@ -1164,13 +1366,17 @@ class FlowchartExecutorMixin:
                 logging.debug(f'Ran commdand succesfully: {line}')
             except Exception as e:
                 logging.error(f'Error with line {line}: {e}. Script broken off')
-                errored=True
-        
-        if errored==False:
-            logging.debug('Fully ran custom script!')
-        
+                errored=f"line {line!r}: {type(e).__name__}: {e}"
+
+        if errored:
+            #Carrying on after a half-run script means acting on a microscope
+            #state the recipe did not ask for.
+            self._nodeFailed(node, f"inline script stopped at {errored}")
+            return
+        logging.debug('Fully ran custom script!')
+
         self.finishedEmits(node)
-    
+
     def runCaseSwitchCallAction(self,node):
         """ 
         Call action to runa  case/switch statement.
@@ -1187,7 +1393,7 @@ class FlowchartExecutorMixin:
                 foundNodeName = graphConnection[1].split('.')[0]
                 logging.debug(f"Node {node.name} found a case/switch with value {CurrentValueWantedVariable} connected to node {foundNodeName}")
                 foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
-                foundNode.oneConnectionAtStartIsFinished()
+                QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                 correctPlugFound = True
                 node.status='finished'
                 break
@@ -1199,7 +1405,7 @@ class FlowchartExecutorMixin:
                 if graphConnection[0] == node.name+'.Error':
                     foundNodeName = graphConnection[1].split('.')[0]
                     foundNode = nodz_utils.findNodeByName(node.flowChart,foundNodeName)
-                    foundNode.oneConnectionAtStartIsFinished()
+                    QTimer.singleShot(0, foundNode.oneConnectionAtStartIsFinished) #Deferred: see finishedEmits
                     node.status='finished'
     
     def runslackReportCallAction(self,node):
@@ -1271,6 +1477,8 @@ class FlowchartExecutorMixin:
             None
         """
         logging.info('Starting a full run')
+        if not self._beginRun('a full run'):
+            return
         self.preventAcq = False
         self.preventScoring = False
         
@@ -1311,6 +1519,8 @@ class FlowchartExecutorMixin:
             None
         """
         
+        if getattr(self, '_runAborted', False):
+            return
         positions = self.fullRunPositions
         pos = self.fullRunCurrentPos
         
@@ -1318,23 +1528,27 @@ class FlowchartExecutorMixin:
         
         logging.info(f'Starting new score acq at position {pos} -------------------------------------------------------------------------------')
         
-        #Set all stages correct
-        for stage in positions[pos]['STAGES']:
-            if stage != '':
-                stagepos = positions[pos][stage]
-                #Check if this stage is an XY stage device...
-                #Since then we need to do something 2-dimensional
-                if stage in self.getDevicesOfDeviceType('XYStageDevice'):
-                    logging.debug(f'Moving stage {stage} to position {stagepos}')
-                    self.shared_data.core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
-                    self.shared_data.core.wait_for_system() #type:ignore
-                else:#else we can move a 1d stage:
-                    logging.debug(f'Moving stage {stage} to position {stagepos}')
-                    self.shared_data.core.set_position(stage,stagepos[0]) #type:ignore
-                    self.shared_data.core.wait_for_system() #type:ignore
-        
-        self.runScoring()
-    
+        #Move every stage on the hardware owner thread, then score from the GUI
+        #thread. These moves (and their wait_for_system) used to block the GUI
+        #thread for the whole travel time at every position.
+        core = self.shared_data.MILcore
+        xyStages = self.getDevicesOfDeviceType('XYStageDevice')
+        position = positions[pos]
+
+        def moveToPosition():
+            for stage in position['STAGES']:
+                if stage == '':
+                    continue
+                stagepos = position[stage]
+                logging.debug(f'Moving stage {stage} to position {stagepos}')
+                if stage in xyStages:
+                    core.set_xy_position(stage,stagepos[0],stagepos[1]) #type:ignore
+                else:
+                    core.set_position(stage,stagepos[0]) #type:ignore
+                core.wait_for_system() #type:ignore
+
+        self._hardwareThen(None, moveToPosition, self.runScoring, f'move to position {pos+1}')
+
     def runInitOnly(self):
         """
         Run ONLY the init process at the current position. Actively prevents scoring
@@ -1345,6 +1559,8 @@ class FlowchartExecutorMixin:
         Returns:
             None
         """
+        if not self._beginRun('init only'):
+            return
         self.preventScoring = True
         self.preventAcq = False
         
@@ -1374,6 +1590,8 @@ class FlowchartExecutorMixin:
         Returns:
             None
         """
+        if not self._beginRun('scoring only'):
+            return
         self.preventAcq = True
         self.preventScoring = False
         
@@ -1431,6 +1649,8 @@ class FlowchartExecutorMixin:
         Returns:
             None
         """
+        if not self._beginRun('acquiring only'):
+            return
         logging.info("Run Acquiring")
         
         #Find the acqStart node:
@@ -1453,10 +1673,7 @@ class FlowchartExecutorMixin:
         Interrupt the run - stop the scoring/init/acq and stop ongoing acquisitions.
         """
 
-        #Trying this for now:
-        self.shared_data._mdaModeAcqData.abort()
-
-        return
+        self._abortRun('interrupted by user', user_requested=True)
 
     def _slack_send_enabled(self):
         """Return True if Slack credentials look set up; log + return False otherwise.

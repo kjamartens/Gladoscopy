@@ -615,9 +615,11 @@ class Shared_data(QObject):
             return service.proxy()
         return service.proxy(priority=priority)
 
-    def mdaacqdonefunction(self):
-        logging.debug('mda acq done in shared_data')
-        self.mda_acq_done_signal.emit(True)
+    def mdaacqdonefunction(self, success=True):
+        """Emit ``mda_acq_done_signal(success)``; False means the MDA failed or
+        was refused, and the listener must not treat its data as a result."""
+        logging.debug('mda acq done in shared_data (success=%s)', success)
+        self.mda_acq_done_signal.emit(bool(success))
 
     def register_perf_thread_label(self, native_id, label: str) -> None:
         """Performance Mode: record a human label for a native OS thread id
@@ -809,6 +811,14 @@ class Shared_data(QObject):
     #core property        
     @property
     def core(self):
+        #Only the napari-plugin path ever assigns a core here; the standalone
+        #app drives everything through MILcore and left this as its `[]`
+        #placeholder - so recipe code and every node function handed
+        #`shared_data.core` (e.g. `core.snap_image()`) got an empty list.
+        #Fall back to the MIL, which exposes the same snake_case calls.
+        mil = getattr(self, '_MILcore', None)
+        if isinstance(self._core, list) and not self._core and mil is not None:
+            return mil
         return self._core
     @core.setter
     def core(self, new_value):

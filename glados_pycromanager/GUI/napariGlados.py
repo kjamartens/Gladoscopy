@@ -46,6 +46,7 @@ from glados_pycromanager.GUI.custom_widget_ui import (
     Ui_CustomDockWidget,  # Import the generated UI module
 )
 from glados_pycromanager.GUI.frame_ring import DEFAULT_CAPACITY as FRAME_RING_CAPACITY
+from glados_pycromanager.GUI.fast_image_layer import FastImage, add_fast_image
 from glados_pycromanager.GUI.frame_ring import FrameRing
 from glados_pycromanager.GUI.frame_writer import NDTiffFrameWriter, ZarrFrameWriter
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
@@ -785,7 +786,10 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             #The following line takes 2 seconds to run: #TODO: optimize
             # rendering='attenuated_mip' is a 3-D volumetric mode; for 2-D
             # live images use the default 2-D renderer (omit the kwarg).
-            layer = napariViewer.add_image(liveImage, colormap=DataStructure['layer_color_map'],name = layerName)
+            # FastImage: same-shape frames below skip napari's async slicer
+            # (~23 ms -> ~5 ms of GUI-thread time per frame at 256x256).
+            layer = add_fast_image(napariViewer, liveImage, colormap=DataStructure['layer_color_map'],name = layerName)
+            layer.contrast_every_n_frames = _get_contrast_refresh_interval(shared_data)
             #Set correct scale - in nm
             _apply_pixel_scale(layer, shared_data)
             # New live/MDA/album layers default to napari's native "continuous"
@@ -809,7 +813,9 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             if layer.data.shape == liveImage.shape and layer.data.dtype == liveImage.dtype:
                 layer.data[:] = liveImage
                 layer.refresh()  # in-place mutation doesn't trigger napari's setter; must refresh manually
-                _maybe_refresh_contrast(shared_data, layer, layerName)
+                # A FastImage throttles its own continuous auto-contrast rescan.
+                if not isinstance(layer, FastImage):
+                    _maybe_refresh_contrast(shared_data, layer, layerName)
             else:
                 # Shape/dtype changed (e.g. ROI or binning changed mid-session) --
                 # force an immediate contrast recompute rather than waiting for the
@@ -1104,6 +1110,69 @@ class _AcqTransitionSignals(QObject):
     finished = pyqtSignal(bool)
 
 
+class LivePollPacer:
+    """Idle schedule for the live-sequence pull loop.
+
+    The loop asks "is a frame ready?" and idles when not. A flat 0.5 ms idle
+    polled ~21 times per delivered frame at 50 ms exposure (5595 polls for 268
+    frames), and every poll is a hardware-locked MIL call holding the GIL the
+    GUI thread needs to paint. A frame cannot arrive much sooner than one frame
+    interval after the previous one, so after each frame the pacer idles for
+    `COARSE_FRACTION` of that interval in one go, then polls finely (every
+    `FINE_FRACTION` of it) until the next frame lands. Added latency is bounded
+    by the fine step, not the coarse one.
+
+    The interval is an EMA of the per-frame gap between pulls (gap divided by
+    the camera frames that pull consumed, so a pull that skipped frames under
+    the `latest` policy does not read as one long interval -- that fed back
+    into ever-longer coarse sleeps), seeded from the exposure. A sample is
+    clamped to `MAX_SAMPLE_GROWTH` x the estimate so
+    one long stall (owner thread busy with a stage move) cannot inflate the
+    estimate into oversleeping several frames. Pure logic, clock-injectable.
+    """
+
+    COARSE_FRACTION = 0.9
+    FINE_FRACTION = 0.03
+    MIN_IDLE_S = 0.0005
+    MAX_IDLE_S = 0.05
+    EMA_ALPHA = 0.2
+    MAX_SAMPLE_GROWTH = 2.0
+
+    def __init__(self, expected_interval_s, clock=time.perf_counter):
+        try:
+            expected = float(expected_interval_s)
+        except (TypeError, ValueError):
+            expected = 0.0
+        # A zero/unknown exposure leaves the pacer at its finest step.
+        self.interval_s = max(expected, 0.0)
+        self._clock = clock
+        self._last_frame = None
+
+    def _clamp(self, seconds):
+        return min(max(seconds, self.MIN_IDLE_S), self.MAX_IDLE_S)
+
+    def frame_arrived(self, now=None, frames=1):
+        now = self._clock() if now is None else now
+        if self._last_frame is not None:
+            gap = (now - self._last_frame) / max(int(frames), 1)
+            if self.interval_s > 0:
+                gap = min(gap, self.interval_s * self.MAX_SAMPLE_GROWTH)
+                self.interval_s += self.EMA_ALPHA * (gap - self.interval_s)
+            else:
+                self.interval_s = gap
+        self._last_frame = now
+
+    def idle_sleep(self, now=None):
+        now = self._clock() if now is None else now
+        fine = self._clamp(self.interval_s * self.FINE_FRACTION)
+        if self._last_frame is None:
+            return fine
+        remaining = self.interval_s * self.COARSE_FRACTION - (now - self._last_frame)
+        if remaining > fine:
+            return self._clamp(remaining)
+        return fine
+
+
 class napariHandler:
     # Max time to wait, in acqModeChanged, for a previous acquisition worker to
     # fully stop before allowing a new one to start. Generous relative to normal
@@ -1133,14 +1202,13 @@ class napariHandler:
     # half-built or torn-down handler reads False rather than raising.
     _live_sequence_active = False
 
-    # Idle back-off in run_liveSequence_worker when the circular buffer is empty.
-    # Short enough to stay well inside one frame interval at any realistic
-    # exposure (0.5 ms vs. >=1 ms/frame), so the displayed frame's latency is
-    # set by the camera rather than by this loop. Every poll is one
-    # @_hardware_locked MIL call, so it cannot be zero: on PYCROMANAGER_JAVA it
-    # is a bridge round trip, and the lock is shared with the GUI thread's
-    # stage/config calls.
-    LIVE_SEQUENCE_POLL_S = 0.0005
+    # Floor of the idle back-off in run_liveSequence_worker when the circular
+    # buffer is empty. The actual schedule comes from LivePollPacer, which
+    # paces polls to the frame interval; this is its finest step. Every poll
+    # is one @_hardware_locked MIL call, so it cannot be zero: on
+    # PYCROMANAGER_JAVA it is a bridge round trip, and the lock is shared with
+    # the GUI thread's stage/config calls.
+    LIVE_SEQUENCE_POLL_S = LivePollPacer.MIN_IDLE_S
     #: How often the live worker re-checks `acqstate` while the
     #: MicroscopeService owns the pull loop (T-B3). Coarser than the
     #: pull poll: this thread is only waiting for the stop flag.
@@ -1202,9 +1270,9 @@ class napariHandler:
         self.sleep_time = 1/shared_data.config.visualisation_config.fps #in sec
         self.layerName = 'newLayer'
 
-    def mdaacqdonefunction(self):
+    def mdaacqdonefunction(self, success=True):
         logging.debug('#nH - mdaacqdonefunction called in napariHandler')
-        self.shared_data.mdaacqdonefunction()
+        self.shared_data.mdaacqdonefunction(success)
     
     def put_data_in_visualisation_and_analysis_queues(self,visualisation_queue,analysis_entries,image,metadata):
         """Fan a single acquired frame out to the visualisation queue and to
@@ -1683,19 +1751,23 @@ class napariHandler:
         metadata['Axes'] = {'time': frame_index}
         return metadata
 
-    def _live_sequence_pull_once(self, MILcore, pull_latest, constants, state) -> bool:
+    def _live_sequence_pull_once(self, MILcore, pull_latest, constants, state) -> int:
         """Pull at most one frame from the circular buffer into the ring.
 
-        Returns True if a frame was pushed, False if the camera had nothing
-        ready. Extracted from `run_liveSequence_worker` because T-B3 runs it as
+        Returns how many camera frames this pull consumed (0 if the camera had
+        nothing ready; with `pull_latest` it can be >1, the skipped ones
+        cleared), so truthiness still means "a frame was pushed". The count is
+        what keeps LivePollPacer's interval estimate honest when frames are
+        skipped. Extracted from `run_liveSequence_worker` because T-B3 runs it as
         the `MicroscopeService` loop body (on the hardware's owner thread)
         whenever a service is running, and as a plain worker-thread loop
         otherwise. It calls the raw MIL deliberately: on the owner thread the
         proxy would only add a `Request` object per call, and off it T-B1's
         lock already makes the call safe.
         """
-        if MILcore.get_remaining_image_count() <= 0:
-            return False
+        remaining = MILcore.get_remaining_image_count()
+        if remaining <= 0:
+            return 0
         if pull_latest:
             image, raw = MILcore.get_last_image_and_metadata()
             # Peeking consumes nothing, so the frames we skipped would sit
@@ -1707,7 +1779,7 @@ class napariHandler:
         self.frame_ring.push(
             image, self._live_sequence_metadata(raw, frame_index, constants))
         state['frame_index'] = frame_index + 1
-        return True
+        return remaining if pull_latest else 1
 
     def run_liveSequence_worker(self, parent):
         """Live mode as a continuous sequence acquisition (`live_mode_method='sequence'`).
@@ -1757,7 +1829,7 @@ class napariHandler:
         # Mutable so `_live_sequence_pull_once` can advance it from whichever
         # thread ends up running the pull, and so the finally block's log line
         # can read it. Must exist before anything inside the try can raise.
-        state = {'frame_index': 0}
+        state = {'frame_index': 0, 'camera_frames': 0}
         service = getattr(self.shared_data, 'microscope_service', None)
         if service is not None and not service.running:
             service = None
@@ -1786,17 +1858,28 @@ class napariHandler:
                 policy, 'service' if service is not None else 'worker'
             )
 
+            try:
+                exposure_s = float(constants['Exposure'] or 0) / 1000.0
+            except (TypeError, ValueError):
+                exposure_s = 0.0
+            pacer = LivePollPacer(exposure_s)
+
             def pull_once():
-                return self._live_sequence_pull_once(
+                produced = self._live_sequence_pull_once(
                     MILcore, pull_latest, constants, state)
+                if produced:
+                    state['camera_frames'] += produced
+                    pacer.frame_arrived(frames=produced)
+                return produced
 
             if service is not None:
                 # T-B3: the thread that owns the hardware is the thread that
                 # pulls the frames, so the frame path gains no extra hop. This
                 # worker thread only waits for the stop flag; the service loop
-                # still services queued UI intents between frames.
+                # still services queued UI intents between frames (and its
+                # idle wait wakes early for one, however long the pacer asks).
                 service.start_streaming(pull_once,
-                                        idle_sleep=self.LIVE_SEQUENCE_POLL_S,
+                                        idle_sleep=pacer.idle_sleep,
                                         label='live sequence')
                 while self.acqstate and service.is_streaming:
                     time.sleep(self.LIVE_SEQUENCE_STOP_POLL_S)
@@ -1804,7 +1887,7 @@ class napariHandler:
             else:
                 while self.acqstate:
                     if not pull_once():
-                        time.sleep(self.LIVE_SEQUENCE_POLL_S)
+                        time.sleep(pacer.idle_sleep())
         finally:
             # stop first, then drain: the consumer must not be shut down while
             # the camera is still filling the ring.
@@ -1827,8 +1910,9 @@ class napariHandler:
             except Exception:
                 logging.exception('Live: is_sequence_running() check failed')
             logging.info(
-                'Live: continuous sequence acquisition stopped after %d frames',
-                state['frame_index']
+                'Live: continuous sequence acquisition stopped after %d frames '
+                '(%d camera frames consumed, the rest skipped by the latest-frame policy)',
+                state['frame_index'], state['camera_frames']
             )
 
     @thread_worker
@@ -1855,6 +1939,10 @@ class napariHandler:
         # stop -> start transition (see napariHandler.__init__) is always set when
         # this worker truly exits, even on an uncaught exception -- otherwise a
         # future start would wait out ACQ_STOP_TIMEOUT_S and be refused forever.
+        # An MDA must also always report "done" -- a recipe's acquisition node
+        # waits on it, and an acquisition that raised used to never report,
+        # leaving the node 'running' and mdaMode stuck on for the session.
+        mda_done_reported = self.liveOrMda != 'mda'
         try:
             if self.liveOrMda == 'live':
                 savefolder = None
@@ -2128,6 +2216,7 @@ class napariHandler:
                 self.shared_data.mdaMode = False
 
                 #Signal to all parents that the MDA acquisition is done - in the Nodz MDA, now we would trigger the MDA-based analysis for scoring or so
+                mda_done_reported = True
                 parent.mdaacqdonefunction()
 
                 #We clean up, removing all LiveAcqShouldBeRemoved folders in /Temp:
@@ -2140,7 +2229,23 @@ class napariHandler:
             # Same for the NDTiff archive: finish what was written rather than
             # leaving an unindexed dataset behind. Idempotent.
             self._finish_ndtiff_store()
+            if not mda_done_reported:
+                self._report_failed_mda(parent)
             self._worker_stopped_event.set()
+
+    def _report_failed_mda(self, parent):
+        """The MDA branch exited without reporting: undo the mode and say so."""
+        logging.error('MDA acquisition ended abnormally; reporting it as failed')
+        self.acqstate = False
+        try:
+            self.shared_data.MILcore.stop_sequence_acquisition()
+        except Exception:
+            logging.exception('stop_sequence_acquisition after a failed MDA also failed')
+        try:
+            self.shared_data.mdaMode = False
+        except Exception:
+            logging.exception('Resetting mdaMode after a failed MDA failed')
+        parent.mdaacqdonefunction(success=False)
 
 
     def new_image(self):
@@ -2227,23 +2332,13 @@ class napariHandler:
             DataStructure['finalisationProcedure'] = False
             yield DataStructure#visualisation_queue.get(block = False)
             
-        #Do the final N images
-        if self.shared_data.config.mda_config.backend_method == 'multiDstack':
-            if layerName == 'MDA':
-                logging.debug('Finalising MDA visualisation...')
-                DataStructure = {}
-                DataStructure['data'] = None
-                DataStructure['napariViewer'] = self.shared_data.napariViewer
-                DataStructure['acqState'] = self.acqstate
-                DataStructure['core'] = self.shared_data.core
-                DataStructure['image_queue_analysis'] = self.image_queue_analysis
-                DataStructure['analysisThreads'] = [item['Thread'] for item in self.shared_data.RTAnalysisQueuesThreads]
-                logging.info('adding analysisThread in run_napariVisualisation_worker 3')
-                DataStructure['layer_name'] = layerName
-                DataStructure['layer_color_map'] = layerColorMap
-                DataStructure['finalisationProcedure'] = True
-                napariUpdateLive(DataStructure)
-        
+        #Fill in the slices the fps-throttled display never rendered.
+        #This was dead code: it tested `backend_method` (only ever 'process' or
+        #'saved') against the vis_method value 'multiDstack', and only for a
+        #layer literally named 'MDA' - never a recipe node's layer.
+        if self.liveOrMda == 'mda' and self.shared_data.config.mda_config.vis_method == 'multiDstack':
+            self._finalise_mda_layer(layerName)
+
         logging.debug("#nH - acquisition done")
         self.shared_data.liveModeUpdateOngoing = False
 
@@ -2294,6 +2389,8 @@ class napariHandler:
                     "MMCore/Java-bridge race. Try again once the previous acquisition "
                     "has finished.", self.liveOrMda, self.ACQ_STOP_TIMEOUT_S)
                 setattr(self.shared_data, mode_attribute, False)
+                if self.liveOrMda == 'mda':
+                    self.shared_data.mdaacqdonefunction(False)
 
         stopped_in_time = [False]
 
@@ -2305,6 +2402,35 @@ class napariHandler:
         Thread(target=_wait_off_the_gui_thread,
                name='acq-transition-wait', daemon=True).start()
         return True
+
+    def _finalise_mda_layer(self, layerName):
+        """Backfill a finished multiDstack store and repaint its layer.
+
+        Runs on the visualisation worker thread. The backfill only reads the
+        NDTiff dataset and writes the zarr store, so it stays here; only the
+        repaint goes to the GUI thread. (By the time we get here
+        stopMDAVisualisation has already disconnected `yielded`, so a yield
+        would reach nothing - and calling napariUpdateLive directly would
+        mutate napari from this thread.)
+        """
+        if self.shared_data.mdaZarrData.get(layerName) is None:
+            logging.debug('MDA finalisation skipped: no store for layer %s', layerName)
+            return
+        logging.debug('Finalising MDA visualisation for layer %s', layerName)
+        try:
+            _backfill_missing_slices(self.shared_data, layerName)
+        except Exception:
+            logging.exception('Backfilling MDA layer %s failed', layerName)
+
+        shared_data = self.shared_data
+
+        def _refresh(viewer):
+            #napari does not watch a zarr array for writes.
+            found = getLayerIdFromName(layerName, viewer, shared_data)
+            if found:
+                viewer.layers[found[0]].refresh()
+
+        self._napari_bridge().submit(_refresh)
 
     def _napari_bridge(self):
         """The GUI-thread receiver for this handler's napari mutations (T-F9)."""
@@ -2425,6 +2551,8 @@ class napariHandler:
                             "MMCore/Java-bridge race. Try again once the previous acquisition "
                             "has finished.", self.ACQ_STOP_TIMEOUT_S)
                         self.shared_data.mdaMode = False
+                        #Whoever asked for this MDA (a recipe node) is waiting on it.
+                        self.shared_data.mdaacqdonefunction(False)
                         return
                     self._worker_stopped_event.clear()
 

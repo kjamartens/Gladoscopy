@@ -1,0 +1,1687 @@
+{
+    "CONNECTIONS": [
+        [
+            "acquisition_1.Real-time",
+            "realTimeAnalysis_0.Start"
+        ],
+        [
+            "acquisition_1.Visual",
+            "visualisation_1.Start"
+        ],
+        [
+            "changeStagePos_0.Done",
+            "acqEnd_0.End"
+        ],
+        [
+            "acquisition_1.Finished",
+            "changeStagePos_0.Start"
+        ],
+        [
+            "acqStart_0.Start",
+            "acquisition_1.Acquisition start"
+        ],
+        [
+            "analysisMeasurement_0.Visual",
+            "visualisation_0.Start"
+        ],
+        [
+            "analysisMeasurement_0.Finished",
+            "scoringEndVar_0.End"
+        ],
+        [
+            "acquisition_0.Finished",
+            "analysisMeasurement_0.Analysis start"
+        ],
+        [
+            "scoringStart_0.Start",
+            "acquisition_0.Acquisition start"
+        ],
+        [
+            "timer_0.Finished",
+            "initEnd_0.End"
+        ],
+        [
+            "changeProperties_0.Done",
+            "timer_0.Start"
+        ],
+        [
+            "initStart_0.Start",
+            "changeProperties_0.Start"
+        ]
+    ],
+    "DECISION_WIDGET_INFO": {
+        "PYQTentries": {
+            "": "DirectDecision and Advanced",
+            "directDecision_AND_Score_VAR__dropdown_1": ">",
+            "directDecision_AND_Score_VAR__dropdown_2": ">",
+            "directDecision_AND_Score_VAR__dropdown_3": ">",
+            "directDecision_AND_Score_VAR__dropdown_4": ">",
+            "directDecision_AND_Score_VAR__dropdown_5": ">",
+            "directDecision_AND_Score_VAR__lineedit_1": "100.4",
+            "directDecision_AND_Score_VAR__lineedit_2": "",
+            "directDecision_AND_Score_VAR__lineedit_3": "",
+            "directDecision_AND_Score_VAR__lineedit_4": "",
+            "directDecision_AND_Score_VAR__lineedit_5": "",
+            "directDecision_AND_Score_VAR__varName_1": "overall_avg_intensity@analysisMeasurement_0",
+            "directDecision_AND_Score_VAR__varName_2": "",
+            "directDecision_AND_Score_VAR__varName_3": "",
+            "directDecision_AND_Score_VAR__varName_4": "",
+            "directDecision_AND_Score_VAR__varName_5": ""
+        },
+        "currentDecision": "AND_Score_VAR",
+        "currentMode": "DirectDecision"
+    },
+    "IF_STATEMENT": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES": {
+        "acqEnd_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "End",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquiring end",
+            "position": [
+                2460.0,
+                837.0
+            ],
+            "preset": "acqEnd",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "acqStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquiring start",
+            "position": [
+                150.0,
+                837.0
+            ],
+            "preset": "acqStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "acquisition_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                480.0,
+                438.0
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">10 frames with order t</span><br />50.0 ms exposure time<br />10 time points</p></body></html>",
+            "textboxheight": 68
+        },
+        "acquisition_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Acquisition start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Real-time",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Acquisition",
+            "position": [
+                810.0,
+                868.0
+            ],
+            "preset": "acquisition",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">27 frames with order tz</span><br />50.0 ms exposure time<br />3 time points<br />8 Z positions</p></body></html>",
+            "textboxheight": 88
+        },
+        "analysisMeasurement_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Analysis start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": true,
+                    "dataType": null,
+                    "name": "Visual",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Analysis [Measurement]",
+            "position": [
+                975.0,
+                498.0
+            ],
+            "preset": "analysisMeasurement",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Average gray value</span><br />Input:<br /><span style=\" font-weight:600;\">ReqKwarg1</span>: x<br /><span style=\" font-weight:600;\">ReqKwarg2</span>: 0<br /><span style=\" font-style:italic;\">OptBool2</span>: 20<br /><br />Output:<br /><span style=\" font-weight:600;\">overall_avg_intensity</span>: None<br /><span style=\" font-weight:600;\">slice_avg_intensity</span>: None</p></body></html>",
+            "textboxheight": 188
+        },
+        "changeProperties_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Done",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Change Properties",
+            "position": [
+                480.0,
+                56.0
+            ],
+            "preset": "changeProperties",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Changing 3 config(s):<br />Simulation to Calib<br />PSF to Ext_range<br />Fluorophore to HighInt</p></body></html>",
+            "textboxheight": 88
+        },
+        "changeStagePos_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Done",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Change Stage Position",
+            "position": [
+                1470.0,
+                866.0
+            ],
+            "preset": "changeStagePos",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Relative</span> movement of stage <span style=\" font-weight:600;\">SMLMDemoZStage</span> by <span style=\" font-weight:600;\">0</span> units</p></body></html>",
+            "textboxheight": 108
+        },
+        "initEnd_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "End",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Initialisation end",
+            "position": [
+                1800.0,
+                37.0
+            ],
+            "preset": "initEnd",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "initStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Initialisation start",
+            "position": [
+                150.0,
+                37.0
+            ],
+            "preset": "initStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "realTimeAnalysis_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Real-Time analysis",
+            "position": [
+                1239.0,
+                1129.0
+            ],
+            "preset": "realTimeAnalysis",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Sharpness value</span><br /><span style=\" font-weight:600;\">FilterType</span>: Laplacian</p></body></html>",
+            "textboxheight": 68
+        },
+        "scoringEndVar_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "End",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Scoring end",
+            "position": [
+                1470.0,
+                417.0
+            ],
+            "preset": "scoringEndVar",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "scoringStart_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Scoring start",
+            "position": [
+                150.0,
+                417.0
+            ],
+            "preset": "scoringStart",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>",
+            "textboxheight": 50
+        },
+        "stickyNote_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [],
+            "displayName": "Sticky Note",
+            "position": [
+                1140.0,
+                329.0
+            ],
+            "preset": "stickyNote",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">INTERMEDIATE: 9-spot calibration sample. Scoring records 10 frames and passes only if the mean gray value is above the camera offset (100) by a bit. The acquisition is a z-stack with a live sharpness readout - watch it peak at the focal plane.</p></body></html>",
+            "textboxheight": 268
+        },
+        "timer_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": true,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                },
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Finished",
+                    "plug": true,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": false
+                }
+            ],
+            "displayName": "Timer",
+            "position": [
+                1140.0,
+                37.0
+            ],
+            "preset": "timer",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Timer:</span> wait 1 s</p></body></html>",
+            "textboxheight": 50
+        },
+        "visualisation_0": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                975.0,
+                719.0
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: Score: mean gray value</span><br />Colormap: gray</p></body></html>",
+            "textboxheight": 88
+        },
+        "visualisation_1": {
+            "alternate": true,
+            "alternateFillColor": null,
+            "attributes": [
+                {
+                    "bottomAttr": false,
+                    "dataType": null,
+                    "name": "Start",
+                    "plug": false,
+                    "plugMaxConnections": -1,
+                    "preset": "attr_preset_1",
+                    "socket": false,
+                    "socketMaxConnections": -1,
+                    "topAttr": true
+                }
+            ],
+            "displayName": "Visualisation",
+            "position": [
+                810.0,
+                1129.0
+            ],
+            "preset": "visualisation",
+            "textbox_text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\n</style></head><body style=\" font-family:'Helvetica'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-weight:600;\">Layer name: Z-stack</span><br />Colormap: gray</p></body></html>",
+            "textboxheight": 68
+        }
+    },
+    "NODES_CASE_SWITCH": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_CHANGE_GLOBAL_VAR": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_CUSTOMFUNCTION": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_MDA": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {
+            "GUI_acquire_button": "False",
+            "GUI_channel_enabled": "False",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_orientation": "Horizontal",
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "False",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "False",
+            "GUI_storage_enabled": "False",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_xy_pos_fullInfo": null,
+            "GUI_z_enabled": "False",
+            "_GUI_grid_width": null,
+            "_acquireButton": null,
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "Camera_noise",
+            "channels": [],
+            "exposure_ms": "50.0",
+            "exposure_s_or_ms": "ms",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1790253770.2353303",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "1"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "2"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "3"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "4"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "5"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "6"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "7"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "8"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "9"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0"
+                }
+            ],
+            "mda_analysis_thread": null,
+            "num_time_points": "10",
+            "order": "t",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "mda_useq",
+                "data",
+                "config_groups",
+                "mainLayout",
+                "xypositionListWidget_XYGridManager",
+                "sectionGrid",
+                "xypositionListEditor",
+                "channelListEditor",
+                "_mdaEventsUpdateTimer",
+                "_mdaStateSaveTimer",
+                "_mda"
+            ],
+            "time_interval_s": "0.0",
+            "time_interval_s_or_ms": "ms",
+            "xy_positions": null,
+            "xy_positions_saveInfo": null,
+            "xyz_positions": null,
+            "z_end": "1.0",
+            "z_nr_steps": "2",
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "SMLMDemoZStage",
+            "z_start": "0.0",
+            "z_step": "0.5",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "acquisition_1": {
+            "GUI_acquire_button": "False",
+            "GUI_channel_enabled": "False",
+            "GUI_exposure_enabled": "True",
+            "GUI_order_enabled": "True",
+            "GUI_orientation": "Horizontal",
+            "GUI_show_channel": "False",
+            "GUI_show_exposure": "True",
+            "GUI_show_order": "True",
+            "GUI_show_storage": "False",
+            "GUI_show_time": "True",
+            "GUI_show_xy": "False",
+            "GUI_show_z": "True",
+            "GUI_storage_enabled": "False",
+            "GUI_time_enabled": "True",
+            "GUI_xy_enabled": "False",
+            "GUI_xy_pos_fullInfo": null,
+            "GUI_z_enabled": "True",
+            "_GUI_grid_width": null,
+            "_acquireButton": null,
+            "autoSaveLoad": "False",
+            "channel_exposures_ms": [],
+            "channel_group": "Camera_noise",
+            "channels": [],
+            "exposure_ms": "50.0",
+            "exposure_s_or_ms": "ms",
+            "fully_started": "True",
+            "has_GUI": "True",
+            "lastTimeUpdateSize": "1790253770.4373775",
+            "mda": [
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "0"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-2.0"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "1"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-1.5"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "2"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-1.0"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "3"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-0.5"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "4"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "5"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "0.5"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "6"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "1.0"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "7"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "1.5"
+                },
+                {
+                    "axes": {
+                        "time": "0",
+                        "z": "8"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "2.0"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "0"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-2.0"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "1"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-1.5"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "2"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-1.0"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "3"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-0.5"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "4"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "5"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "0.5"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "6"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "1.0"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "7"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "1.5"
+                },
+                {
+                    "axes": {
+                        "time": "1",
+                        "z": "8"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "2.0"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "0"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-2.0"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "1"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-1.5"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "2"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-1.0"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "3"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "-0.5"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "4"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "0.0"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "5"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "0.5"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "6"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "1.0"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "7"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "1.5"
+                },
+                {
+                    "axes": {
+                        "time": "2",
+                        "z": "8"
+                    },
+                    "keep_shutter_open": "False",
+                    "min_start_time": "0.0",
+                    "z": "2.0"
+                }
+            ],
+            "mda_analysis_thread": null,
+            "num_time_points": "3",
+            "order": "tz",
+            "position_labels": null,
+            "storage_file_name": "",
+            "storage_folder": "",
+            "storingExceptions": [
+                "core",
+                "layout",
+                "shared_data",
+                "gui",
+                "mda",
+                "mda_useq",
+                "data",
+                "config_groups",
+                "mainLayout",
+                "xypositionListWidget_XYGridManager",
+                "sectionGrid",
+                "xypositionListEditor",
+                "channelListEditor",
+                "_mdaEventsUpdateTimer",
+                "_mdaStateSaveTimer",
+                "_mda"
+            ],
+            "time_interval_s": "0.0",
+            "time_interval_s_or_ms": "ms",
+            "xy_positions": null,
+            "xy_positions_saveInfo": null,
+            "xyz_positions": null,
+            "z_end": "2.0",
+            "z_nr_steps": "8",
+            "z_nrsteps_radio_sel": "True",
+            "z_stage_sel": "SMLMDemoZStage",
+            "z_start": "-2.0",
+            "z_step": "0.5",
+            "z_step_distance": null,
+            "z_stepdistance_radio_sel": "False"
+        },
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_MMCONFIGCHANGE": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": [
+            [
+                "Simulation",
+                "Calib"
+            ],
+            [
+                "PSF",
+                "Ext_range"
+            ],
+            [
+                "Fluorophore",
+                "HighInt"
+            ]
+        ],
+        "changeStagePos_0": [],
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_NEW_GLOBAL_VAR": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_RELSTAGECHANGE": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": [],
+        "changeStagePos_0": [
+            [
+                "SMLMDemoZStage",
+                0
+            ],
+            [
+                "__chosenRelStage__",
+                "SMLMDemoZStage"
+            ]
+        ],
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_RT_ANALYSIS": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {
+            "LineEdit#BioImageModelZoo.BioImageModelZoo#imageLayerId": "0",
+            "LineEdit#BioImageModelZoo.BioImageModelZoo#model_id": "affable-shark",
+            "LineEdit#EndAtFrame.EndAtFrame#LastFrame": "50",
+            "LineEdit#FFT_im.RealTimeFFT#LogScale": "True",
+            "LineEdit#FFT_im.RealTimeFFT#WindowTaper": "False",
+            "LineEdit#FFT_im.RealTimeFFT#WindowTaperStrength": "0.25",
+            "LineEdit#LaserAdjustment.laser_adjustment#Laser_id": "TS_DAC02_488Laser",
+            "LineEdit#LaserAdjustment.laser_adjustment#maxFrame": "100",
+            "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_id": "TS_DAC02_488Laser",
+            "LineEdit#LaserAdjustment.laser_adjustment_advanced#Laser_power": "{1:0.01, 2:0.05, 10:1.00}",
+            "LineEdit#RT_counter.RealTimeCounter#Color": "red",
+            "LineEdit#SharpnessValue.SharpnessValue#FilterType": "Laplacian",
+            "LineEdit#pSMLM.pSMLM#ROIradius": "3",
+            "LineEdit#pSMLM.pSMLM#stdmult": "2",
+            "LineEdit#pSMLM_image.pSMLM_image#ROIradius": "3",
+            "LineEdit#pSMLM_image.pSMLM_image#hist_width": "3",
+            "LineEdit#pSMLM_image.pSMLM_image#stdmult": "2",
+            "LineEdit#pSMLM_live.pSMLM_live#ROIradius": "3",
+            "LineEdit#pSMLM_live.pSMLM_live#srSigma": "1.0",
+            "LineEdit#pSMLM_live.pSMLM_live#stdmult": "2",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#AxisAngleTolerance": "0.4",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#BGWindowDivisor": "50",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#CalibrationFrames": "8",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#ColinearityTolerance": "0.2",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#HistoryLength": "200",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#IntegrationRadius": "1",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#LogScale": "True",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#MinPeakDistDivisor": "60",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#PeakMode": "normal",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#PeakThresholdNormal": "0.25",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#PeakThresholdRelaxed": "0.05",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#PhaseColormap": "turbo",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#ShowDebugOverlay": "False",
+            "LineEdit#phase_check_sim.PhaseCheckSIM#TrackIndices": "1",
+            "LineEditAdv#BioImageModelZoo.BioImageModelZoo#imageLayerId": "",
+            "LineEditAdv#BioImageModelZoo.BioImageModelZoo#model_id": "",
+            "LineEditAdv#EndAtFrame.EndAtFrame#LastFrame": "",
+            "LineEditAdv#FFT_im.RealTimeFFT#LogScale": "",
+            "LineEditAdv#FFT_im.RealTimeFFT#WindowTaper": "",
+            "LineEditAdv#FFT_im.RealTimeFFT#WindowTaperStrength": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment#Laser_id": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment#maxFrame": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
+            "LineEditAdv#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
+            "LineEditAdv#RT_counter.RealTimeCounter#Color": "",
+            "LineEditAdv#SharpnessValue.SharpnessValue#FilterType": "",
+            "LineEditAdv#pSMLM.pSMLM#ROIradius": "",
+            "LineEditAdv#pSMLM.pSMLM#stdmult": "",
+            "LineEditAdv#pSMLM_image.pSMLM_image#ROIradius": "",
+            "LineEditAdv#pSMLM_image.pSMLM_image#hist_width": "",
+            "LineEditAdv#pSMLM_image.pSMLM_image#stdmult": "",
+            "LineEditAdv#pSMLM_live.pSMLM_live#ROIradius": "",
+            "LineEditAdv#pSMLM_live.pSMLM_live#srSigma": "",
+            "LineEditAdv#pSMLM_live.pSMLM_live#stdmult": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#AxisAngleTolerance": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#BGWindowDivisor": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#CalibrationFrames": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#ColinearityTolerance": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#HistoryLength": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#IntegrationRadius": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#LogScale": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#MinPeakDistDivisor": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#PeakMode": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#PeakThresholdNormal": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#PeakThresholdRelaxed": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#PhaseColormap": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#ShowDebugOverlay": "",
+            "LineEditAdv#phase_check_sim.PhaseCheckSIM#TrackIndices": "",
+            "LineEditVariable#BioImageModelZoo.BioImageModelZoo#imageLayerId": "",
+            "LineEditVariable#BioImageModelZoo.BioImageModelZoo#model_id": "",
+            "LineEditVariable#EndAtFrame.EndAtFrame#LastFrame": "",
+            "LineEditVariable#FFT_im.RealTimeFFT#LogScale": "",
+            "LineEditVariable#FFT_im.RealTimeFFT#WindowTaper": "",
+            "LineEditVariable#FFT_im.RealTimeFFT#WindowTaperStrength": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment#Laser_id": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment#maxFrame": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_id": "",
+            "LineEditVariable#LaserAdjustment.laser_adjustment_advanced#Laser_power": "",
+            "LineEditVariable#RT_counter.RealTimeCounter#Color": "",
+            "LineEditVariable#SharpnessValue.SharpnessValue#FilterType": "",
+            "LineEditVariable#pSMLM.pSMLM#ROIradius": "",
+            "LineEditVariable#pSMLM.pSMLM#stdmult": "",
+            "LineEditVariable#pSMLM_image.pSMLM_image#ROIradius": "",
+            "LineEditVariable#pSMLM_image.pSMLM_image#hist_width": "",
+            "LineEditVariable#pSMLM_image.pSMLM_image#stdmult": "",
+            "LineEditVariable#pSMLM_live.pSMLM_live#ROIradius": "",
+            "LineEditVariable#pSMLM_live.pSMLM_live#srSigma": "",
+            "LineEditVariable#pSMLM_live.pSMLM_live#stdmult": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#AxisAngleTolerance": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#BGWindowDivisor": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#CalibrationFrames": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#ColinearityTolerance": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#HistoryLength": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#IntegrationRadius": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#LogScale": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#MinPeakDistDivisor": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#PeakMode": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#PeakThresholdNormal": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#PeakThresholdRelaxed": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#PhaseColormap": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#ShowDebugOverlay": "",
+            "LineEditVariable#phase_check_sim.PhaseCheckSIM#TrackIndices": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "BioImage Model Zoo",
+                    "BioImageModelZoo.BioImageModelZoo"
+                ],
+                [
+                    "Example - influence the run by stopping it at a set frame",
+                    "EndAtFrame.EndAtFrame"
+                ],
+                [
+                    "Real-Time FFT",
+                    "FFT_im.RealTimeFFT"
+                ],
+                [
+                    "LaserAdj",
+                    "LaserAdjustment.laser_adjustment"
+                ],
+                [
+                    "Advanced laser adjustment",
+                    "LaserAdjustment.laser_adjustment_advanced"
+                ],
+                [
+                    "SIM Phase Check",
+                    "phase_check_sim.PhaseCheckSIM"
+                ],
+                [
+                    "pSMLM version",
+                    "pSMLM.pSMLM"
+                ],
+                [
+                    "pSMLM image",
+                    "pSMLM_image.pSMLM_image"
+                ],
+                [
+                    "pSMLM live + SR",
+                    "pSMLM_live.pSMLM_live"
+                ],
+                [
+                    "RT counter",
+                    "RT_counter.RealTimeCounter"
+                ],
+                [
+                    "Sharpness value",
+                    "SharpnessValue.SharpnessValue"
+                ]
+            ],
+            "__realTimeVisualisation__": true,
+            "__selectedDropdownEntryAnalysis__": "Sharpness value",
+            "__selectedDropdownEntryRTAnalysis__": "Sharpness value"
+        },
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_RUN_INLINE_SCRIPT": {
+        "acqEnd_0": "",
+        "acqStart_0": "",
+        "acquisition_0": "",
+        "acquisition_1": "",
+        "analysisMeasurement_0": "",
+        "changeProperties_0": "",
+        "changeStagePos_0": "",
+        "initEnd_0": "",
+        "initStart_0": "",
+        "realTimeAnalysis_0": "",
+        "scoringEndVar_0": "",
+        "scoringStart_0": "",
+        "stickyNote_0": "",
+        "timer_0": "",
+        "visualisation_0": "",
+        "visualisation_1": ""
+    },
+    "NODES_SCORING_ANALYSIS": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {
+            "ComboBoxSwitch#AverageImage.AvgImage#Image": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#Image": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#ReqKwarg1": "Value",
+            "ComboBoxSwitch#AverageIntensity.AvgGrayValue#ReqKwarg2": "Value",
+            "ComboBoxSwitch#RandomShapes.DrawRandomShape#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_ImageVis#Image": "Value",
+            "ComboBoxSwitch#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "Value",
+            "ComboBoxSwitch#checkAgainstList.CheckVsList#Position": "Value",
+            "LineEdit#AverageImage.AvgImage#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#Image": "DefaultInput",
+            "LineEdit#AverageIntensity.AvgGrayValue#OptBool2": "20",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg1": "x",
+            "LineEdit#AverageIntensity.AvgGrayValue#ReqKwarg2": "0",
+            "LineEdit#RandomShapes.DrawRandomShape#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "DefaultInput",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEdit#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEdit#checkAgainstList.CheckVsList#Distance": "10",
+            "LineEdit#checkAgainstList.CheckVsList#List": "[]",
+            "LineEdit#checkAgainstList.CheckVsList#Position": "DefaultInput",
+            "LineEditAdv#AverageImage.AvgImage#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditAdv#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditAdv#RandomShapes.DrawRandomShape#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditAdv#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#List": "",
+            "LineEditAdv#checkAgainstList.CheckVsList#Position": "",
+            "LineEditVariable#AverageImage.AvgImage#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#Image": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#OptBool2": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg1": "",
+            "LineEditVariable#AverageIntensity.AvgGrayValue#ReqKwarg2": "",
+            "LineEditVariable#RandomShapes.DrawRandomShape#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#modelStorageLoc": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_ImageVis#prob_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#Image": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#model": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#nms_thresh": "",
+            "LineEditVariable#StarDist_image.StarDistSegment_preLoadedModel_use#prob_thresh": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Distance": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#List": "",
+            "LineEditVariable#checkAgainstList.CheckVsList#Position": "",
+            "__displayNameFunctionNameMap__": [
+                [
+                    "Average image (time)",
+                    "AverageImage.AvgImage"
+                ],
+                [
+                    "Average gray value",
+                    "AverageIntensity.AvgGrayValue"
+                ],
+                [
+                    "Check Position for closeness to List",
+                    "checkAgainstList.CheckVsList"
+                ],
+                [
+                    "Explanatory - draw random shape",
+                    "RandomShapes.DrawRandomShape"
+                ],
+                [
+                    "StarDist Image Segmentation",
+                    "StarDist_image.StarDistSegment_ImageVis"
+                ],
+                [
+                    "StarDist Image Segmentation - via preloaded model",
+                    "StarDist_image.StarDistSegment_preLoadedModel_use"
+                ]
+            ],
+            "__selectedDropdownEntryAnalysis__": "Average gray value"
+        },
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_SCORING_END": {
+        "acqEnd_0": {
+            "Variables": {}
+        },
+        "acqStart_0": {
+            "Variables": {}
+        },
+        "acquisition_0": {
+            "Variables": {}
+        },
+        "acquisition_1": {
+            "Variables": {}
+        },
+        "analysisMeasurement_0": {
+            "Variables": {}
+        },
+        "changeProperties_0": {
+            "Variables": {}
+        },
+        "changeStagePos_0": {
+            "Variables": {}
+        },
+        "initEnd_0": {
+            "Variables": {}
+        },
+        "initStart_0": {
+            "Variables": {}
+        },
+        "realTimeAnalysis_0": {
+            "Variables": {}
+        },
+        "scoringEndVar_0": {
+            "Variables": {}
+        },
+        "scoringStart_0": {
+            "Variables": {}
+        },
+        "stickyNote_0": {
+            "Variables": {}
+        },
+        "timer_0": {
+            "Variables": {}
+        },
+        "visualisation_0": {
+            "Variables": {}
+        },
+        "visualisation_1": {
+            "Variables": {}
+        }
+    },
+    "NODES_SCORING_SCORING": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_SCORING_VISUALISATION": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_SLACK_REPORT": {
+        "acqEnd_0": "",
+        "acqStart_0": "",
+        "acquisition_0": "",
+        "acquisition_1": "",
+        "analysisMeasurement_0": "",
+        "changeProperties_0": "",
+        "changeStagePos_0": "",
+        "initEnd_0": "",
+        "initStart_0": "",
+        "realTimeAnalysis_0": "",
+        "scoringEndVar_0": "",
+        "scoringStart_0": "",
+        "stickyNote_0": "",
+        "timer_0": "",
+        "visualisation_0": "",
+        "visualisation_1": ""
+    },
+    "NODES_STICKY_NOTE": {
+        "acqEnd_0": "",
+        "acqStart_0": "",
+        "acquisition_0": "",
+        "acquisition_1": "",
+        "analysisMeasurement_0": "",
+        "changeProperties_0": "",
+        "changeStagePos_0": "",
+        "initEnd_0": "",
+        "initStart_0": "",
+        "realTimeAnalysis_0": "",
+        "scoringEndVar_0": "",
+        "scoringStart_0": "",
+        "stickyNote_0": "INTERMEDIATE: 9-spot calibration sample. Scoring records 10 frames and passes only if the mean gray value is above the camera offset (100) by a bit. The acquisition is a z-stack with a live sharpness readout - watch it peak at the focal plane.",
+        "timer_0": "",
+        "visualisation_0": "",
+        "visualisation_1": ""
+    },
+    "NODES_STORE_DATA": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_TIMER": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {
+            "ComboBoxSwitch#timerDialog#wait_time": "Value",
+            "LineEdit#timerDialog#wait_time": "1",
+            "LineEditAdv#timerDialog#wait_time": "",
+            "LineEditVariable#timerDialog#wait_time": ""
+        },
+        "visualisation_0": {},
+        "visualisation_1": {}
+    },
+    "NODES_VISUALISATION": {
+        "acqEnd_0": {},
+        "acqStart_0": {},
+        "acquisition_0": {},
+        "acquisition_1": {},
+        "analysisMeasurement_0": {},
+        "changeProperties_0": {},
+        "changeStagePos_0": {},
+        "initEnd_0": {},
+        "initStart_0": {},
+        "realTimeAnalysis_0": {},
+        "scoringEndVar_0": {},
+        "scoringStart_0": {},
+        "stickyNote_0": {},
+        "timer_0": {},
+        "visualisation_0": {
+            "colormap": "gray",
+            "layerName": "Score: mean gray value"
+        },
+        "visualisation_1": {
+            "colormap": "gray",
+            "layerName": "Z-stack"
+        }
+    },
+    "SCANNING_WIDGET_INFO": {
+        "LoadPos": {
+            "fileName": "C:\\GitHub\\Gladoscopy\\glados_pycromanager\\AutonomousMicroscopy\\ExampleRecipes\\demo_zstage_3_planes.pos"
+        },
+        "currentMode": "LoadPos",
+        "scanMode": "LoadPos"
+    }
+}

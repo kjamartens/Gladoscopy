@@ -243,14 +243,19 @@ class MicroscopeService(QObject):
 
     # --- streaming -------------------------------------------------------
 
-    def start_streaming(self, pull_once, idle_sleep: float = 0.0005,
+    def start_streaming(self, pull_once, idle_sleep=0.0005,
                         label: str = "stream") -> None:
         """Run `pull_once()` as the loop body until `stop_streaming()`.
 
         `pull_once` must return True when it produced a frame and False when the
-        camera had nothing ready; on False the loop sleeps `idle_sleep` so an
-        idle camera does not spin a core. Raising is treated as fatal for the
-        stream: it is logged and streaming stops, leaving the service usable.
+        camera had nothing ready; on False the loop idles for `idle_sleep`
+        seconds so an idle camera does not spin a core. `idle_sleep` may be a
+        float or a zero-argument callable returning one, re-evaluated per idle
+        (the live path paces its polls to the frame interval with it). The idle
+        wait blocks on the request queue, so a queued request ends it early
+        and is serviced straight away however long the pacing asked for.
+        Raising is treated as fatal for the stream: it is logged and streaming
+        stops, leaving the service usable.
         """
         with self._lock:
             if self._streaming is not None:
@@ -296,8 +301,27 @@ class MicroscopeService(QObject):
                     self.stop_streaming()
                     continue
                 if not produced:
-                    time.sleep(self._stream_idle_sleep)
+                    self._stream_idle_wait()
         self._drain_pending(ServiceStopped(f"{self.name} stopped"))
+
+    def _stream_idle_wait(self) -> None:
+        """Idle between two empty pulls, waking early for a queued request.
+
+        Capped at IDLE_POLL_S so `stop_streaming()` / `stop()` are still noticed
+        promptly whatever the pacing callable returns.
+        """
+        idle = self._stream_idle_sleep
+        try:
+            timeout = float(idle() if callable(idle) else idle)
+        except Exception:
+            logger.exception("%s idle_sleep callable raised; using 0.5 ms", self.name)
+            timeout = 0.0005
+        timeout = min(max(timeout, 0.0), IDLE_POLL_S)
+        try:
+            _, _, request = self._queue.get(timeout=timeout)
+        except Empty:
+            return
+        self._execute(request)
 
     def _drain(self, budget: int) -> int:
         """Run up to `budget` queued requests without blocking."""

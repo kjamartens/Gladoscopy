@@ -817,13 +817,17 @@ class nodz_visualisationDialog(QDialog):
         self.setWindowTitle("Visualisation Dialog")
         if parentNode is not None:
             layout_sub = QFormLayout()
-            if 'layerName' not in parentNode.visualisation_currentData or parentNode.visualisation_currentData['layerName'] is not None:
+            #Offer the saved name when there is one. This test was inverted, so a
+            #saved name was never shown and OK silently reset it; the fallback
+            #is a *unique* name - two visual nodes both called 'newLayer' shared
+            #one layer and one zarr store and destroyed each other's data.
+            if parentNode.visualisation_currentData.get('layerName') is None:
                 connectedNodes = nodz_utils.getConnectedNodes(parentNode, 'topAttr')
                 if len(connectedNodes)>0:
                     connectedNode = connectedNodes[0]
                     defaultText = connectedNode.name
                 else:
-                    defaultText = 'newLayer'
+                    defaultText = parentNode.name
             else:
                 defaultText = parentNode.visualisation_currentData['layerName']
             self.layerNameEdit = QLineEdit()
@@ -1359,7 +1363,10 @@ class NodeSignalManager(QObject):
         Returns:
             None
         """
-        QObject.__init__(self)
+        #Initialise the QObject exactly once. This used to call both
+        #QObject.__init__(self) and super().__init__(), and a QObject
+        #constructed twice segfaults when it is freed - which every node's
+        #signal manager is when a node is deleted or another recipe loaded.
         super().__init__()
         self.signals = []
 
@@ -1403,9 +1410,10 @@ class NodeSignalManager(QObject):
         Returns:
             None
         """
-        for signal in self.signals:
-            signal.emit()
-            logging.debug(f"emitting signal {signal}")
+        #Every entry is the same class-level `new_signal` (see add_signal), so
+        #emitting each one delivered N calls to every connected node.
+        if self.signals:
+            self.signals[0].emit()
 #endregion
 
 class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
@@ -2289,7 +2297,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             #Also connect the node's finishedMDA
             #This order is important!
             newNode.mdaData.MDA_completed.connect(newNode.finishedmda)
-            newNode.mdaData.MDA_completed.connect(lambda self, node = newNode: node.customFinishedEmits.emit_all_signals())
+            #Through finishedEmits like every other node (it used to emit directly,
+            #skipping the deferral, LastNodeRan and the core-variable refresh).
+            newNode.mdaData.MDA_completed.connect(lambda _ok, node = newNode: self.finishedEmits(node))
             #Note: the recorded MDA data is stored in node.mdaData.data - any analysis method should find/read this.
             #The core is at node.mdaData.core
             
@@ -2473,13 +2483,31 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         Function that's called at the start of every node
         Updates the core variables and the variables in the UI.
         """
+        node._runGeneration = self.currentRunGeneration()
+        self.update()
+        self._scheduleVariablesRefresh()
+        logging.debug(f'Node with name {node.name} ran')
+
+    #How long node starts are coalesced into one variables-table rebuild.
+    VARIABLES_REFRESH_DEBOUNCE_MS = 250
+
+    def _scheduleVariablesRefresh(self):
+        """Rebuild the variables table once per burst of node starts, not per
+        node (it re-reads every variable and snapshots the hardware)."""
+        timer = self.__dict__.get('_variablesRefreshTimer')
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(self.VARIABLES_REFRESH_DEBOUNCE_MS)
+            timer.timeout.connect(self._refreshVariablesWidget)
+            self._variablesRefreshTimer = timer
+        timer.start()
+
+    def _refreshVariablesWidget(self):
         try:
-            self.update()
-            # self.updateCoreVariables()
             self.variablesWidget.updateVariables()
         except (AttributeError, RuntimeError) as exc:
             logging.debug('variablesWidget update skipped: %s', exc)
-        logging.debug(f'Node with name {node.name} ran')
 
     def NodeDoubleClicked(self,nodeName):
         """
@@ -2783,13 +2811,30 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         self.shared_data.warningErrorInfoInfo['Info']['LastNodeRan'] = node.name
         
         self.update()
+        if 'dialogInfo' in vars(node):
+            #Display only - a rendering problem must never stop the recipe.
+            try:
+                self.set_readable_text_after_dialogChange(node,node.dialogInfo)
+            except Exception:
+                logging.exception('Could not refresh the text of node %s', node.name)
+
+        #Start the downstream nodes from the event loop, not from inside this
+        #call. Emitting here ran the next node's callAction nested in this one,
+        #so a chain of synchronous nodes (start/end, if, variables, stage moves)
+        #- and the whole position loop - grew one stack the GUI never returned
+        #from: frozen for a full tour, and at risk of RecursionError. It also let
+        #GraphToSignals rewire signals while one of them was mid-emit.
+        QTimer.singleShot(0, lambda: self._emitNodeFinished(node))
+
+    def _emitNodeFinished(self, node):
+        """Deferred second half of finishedEmits: trigger the downstream nodes."""
+        if self.isStaleNode(node):
+            logging.info('Ignoring late finish of %s: its run was stopped', node.name)
+            return
         if node.customFinishedEmits is not None and len(node.customFinishedEmits.signals)>0:
             node.customFinishedEmits.emit_all_signals()
         if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
             node.customDataEmits.emit_all_signals()
-
-        if 'dialogInfo' in vars(node):
-            self.set_readable_text_after_dialogChange(node,node.dialogInfo)
 
     def giveInfoOnNode(self,node):
         """
@@ -3077,7 +3122,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 if '#'+methodFunctionName+'#' in key:
                     relativeData[key] = dialog.currentData[key]
             
-            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart)
+            #Only the raw text ([1]) is shown, so never eval Advanced expressions here:
+            #this runs after every finish of the node.
+            allValues = utils.nodz_dataFromGeneralAdvancedLineEditDialog(relativeData,currentNode.flowChart,dontEvaluate=True)
             
             for rkw in reqKwargs:
                 displayVal = self.limitTextLength(str(allValues[rkw][1]))
@@ -3090,7 +3137,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             displayHTMLtext += "<br><br>Output:"
             htmloutputadded=False
             for varName in currentNode.variablesNodz:
-                currData = str(currentNode.variablesNodz[varName]['data'])
+                currData = variableDisplayText(currentNode.variablesNodz[varName]['data'])
                 typing = currentNode.variablesNodz[varName]['type']
                 importance = currentNode.variablesNodz[varName]['importance']
                 
@@ -3176,7 +3223,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         elif nodeType == 'earlyScoringFail':
             displayHTMLtext = f"This node will fail this score and go to the next position!"
         elif nodeType == 'timer':
-            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart)
+            values = utils.nodz_dataFromGeneralAdvancedLineEditDialog(dialog.timerInfo,currentNode.flowChart,dontEvaluate=True)
             try:
                 displayHTMLtext = f"<b>Timer:</b> wait {str(values['wait_time'][1])} s"
             except (KeyError, IndexError, TypeError, AttributeError):
@@ -3254,7 +3301,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             htmloutputadded=False
             
             for varName in currentNode.variablesNodz:
-                currData = str(currentNode.variablesNodz[varName]['data'])
+                currData = variableDisplayText(currentNode.variablesNodz[varName]['data'])
                 if currData is not None:
                     currData = self.limitTextLength(currData)
                 else:
@@ -3306,19 +3353,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             list: A list of devices that match the specified devicetype.
         """
         
-        #Find all devices that have a specific devicetype
-        #Look at https://javadoc.scijava.org/Micro-Manager-Core/mmcorej/DeviceType.html 
-        #for all devicetypes
-        #Get devices
-        devices = self.shared_data.core.get_loaded_devices() #type:ignore
-        devices = [devices.get(i) for i in range(devices.size())]
-        devicesOfType = []
-        #Loop over devices
-        for device in devices:
-            if self.shared_data.core.get_device_type(device).to_string() == devicetype: #type:ignore
-                logging.debug("found " + device + " of type " + devicetype)
-                devicesOfType.append(device)
-        return devicesOfType
+        #Was a Java-only copy (.size()/.get()/.to_string() on the raw core) that
+        #crashed on the standalone app's MIL; the shared helper handles every backend.
+        return utils.getCoreDevicesOfDeviceType(self.shared_data.MILcore, devicetype)
 
     def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
@@ -3523,7 +3560,17 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         if service is None or not getattr(service, 'running', False):
             self.coreVariables = self._collectCoreVariables()
             return
-        service.submit(self._refreshCoreVariables, label='nodz.updateCoreVariables')
+        #One queued snapshot serves every request made before it starts: this
+        #is called at every node start and finish, and each snapshot is a read
+        #of every stage and config group, queued ahead of real hardware work.
+        if self.__dict__.get('_coreVariablesRefreshQueued', False):
+            return
+        self._coreVariablesRefreshQueued = True
+        try:
+            service.submit(self._refreshCoreVariables, label='nodz.updateCoreVariables')
+        except Exception:
+            self._coreVariablesRefreshQueued = False
+            raise
 
     def _refreshCoreVariables(self):
         """Owner-thread half of `updateCoreVariables`.
@@ -3532,6 +3579,9 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         concurrent reader sees either the old snapshot or the new one -- never
         a half-filled one.
         """
+        #Cleared *before* reading, so a request arriving mid-read queues a
+        #fresh snapshot instead of being answered by this (older) one.
+        self._coreVariablesRefreshQueued = False
         self.coreVariables = self._collectCoreVariables()
 
     def _collectCoreVariables(self):
@@ -3565,7 +3615,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         if (type(allConfigs != None) == bool and allConfigs != None) or any(allConfigs != None):
             nrconfiggroups = len(allConfigs)
             for config_id in range(nrconfiggroups):
-                configInfo = ConfigInfo(self.core,shared_data,config_id)
+                configInfo = ConfigInfo(self.core,self.shared_data,config_id)
                 configName = configInfo.configGroupName()
                 configValue = configInfo.getStorableValue()
                 try:
@@ -4604,6 +4654,24 @@ class HoverTableWidget(QTableWidget):
         self.cellHovered.emit(-1, -1)
         super().leaveEvent(event)
         
+#Longest value text the variables table shows. It used to str() every
+#variable in full on every node start - whole acquisitions and localisation
+#tables included.
+VARIABLE_DISPLAY_MAX_CHARS = 200
+
+
+def variableDisplayText(data, max_chars=VARIABLE_DISPLAY_MAX_CHARS):
+    """Short, cheap text for a variable's value in the variables table."""
+    shape = getattr(data, 'shape', None)
+    if shape is not None and not np.isscalar(data):
+        dtype = getattr(data, 'dtype', '')
+        return f"{type(data).__name__} {tuple(shape)} {dtype}".rstrip()
+    if isinstance(data, (list, tuple, dict, set)) and len(data) > 20:
+        return f"{type(data).__name__}[{len(data)}]"
+    text = str(data)
+    return text if len(text) <= max_chars else text[:max_chars] + '…'
+
+
 class VariablesBase(QWidget):
     """ 
     Show the variables of all nodz-instances, possibly filtered on connectedNodz only.
@@ -4730,97 +4798,44 @@ class VariablesBase(QWidget):
     def get_selected_entry(self):
         return getattr(self, 'selected_entry', None)
     
+    def _acceptsType(self, variableTypes):
+        """Does a variable of `variableTypes` pass this table's type filter?"""
+        if self.typeInfo is None: #if no typing specified, accept everything
+            return True
+        if isinstance(variableTypes,type):
+            variableTypes = [variableTypes]
+        if isinstance(self.typeInfo,type):
+            self.typeInfo = [self.typeInfo]
+        return any(variableType == selftype for variableType in variableTypes for selftype in self.typeInfo)
+
     def updateVariables(self):
         """
         Update the nodz-variables.
         """
-        
+
         self.nodzinstance.updateCoreVariables()
-        
-        allvariableData = {}
-        #Add all global variables
-        for var in self.nodzinstance.globalVariables:
-            pos = len(allvariableData)
-            correctTyping = False
-            if self.typeInfo is not None:
-                variableTypes = self.nodzinstance.globalVariables[var]['type']
-                if isinstance(variableTypes,type):
-                    variableTypes = [variableTypes]
-                if isinstance(self.typeInfo,type):
-                    self.typeInfo = [self.typeInfo]
-                
-                for variableType in variableTypes:
-                    for selftype in self.typeInfo:
-                        if variableType == selftype:
-                            correctTyping = True
-            else: #if no typing specified, accept everything
-                correctTyping = True
-            
-            if correctTyping:
-                allvariableData[pos] = self.nodzinstance.globalVariables[var]
-                allvariableData[pos]['NodeOrigin'] = 'Global'
-                allvariableData[pos]['VariableName'] = var
-            
-        #Add all core variables
-        for var in self.nodzinstance.coreVariables:
-            pos = len(allvariableData)
-            correctTyping = False
-            if self.typeInfo is not None:
-                variableTypes = self.nodzinstance.coreVariables[var]['type']
-                if isinstance(variableTypes,type):
-                    variableTypes = [variableTypes]
-                if isinstance(self.typeInfo,type):
-                    self.typeInfo = [self.typeInfo]
-                
-                for variableType in variableTypes:
-                    for selftype in self.typeInfo:
-                        if variableType == selftype:
-                            correctTyping = True
-            else: #if no typing specified, accept everything
-                correctTyping = True
-            
-            if correctTyping:
-                allvariableData[pos] = self.nodzinstance.coreVariables[var]
-                allvariableData[pos]['NodeOrigin'] = 'Core'
-                allvariableData[pos]['VariableName'] = var
-            
-        #Add all variables of all nodes
-        allNodes = self.nodzinstance.obtainAllNodes()
-        
-        for node in allNodes:
-            for var in node.variablesNodz:
-                pos = len(allvariableData)
-                correctTyping = False
-                if self.typeInfo is not None:
-                    variableTypes = node.variablesNodz[var]['type']
-                    if isinstance(variableTypes,type):
-                        variableTypes = [variableTypes]
-                    if isinstance(self.typeInfo,type):
-                        self.typeInfo = [self.typeInfo]
-                    
-                    for variableType in variableTypes:
-                        for selftype in self.typeInfo:
-                            if variableType == selftype:
-                                correctTyping = True
-                else: #if no typing specified, accept everything
-                    correctTyping = True
-                
-                if correctTyping:
-                    allvariableData[pos] = node.variablesNodz[var]
-                    allvariableData[pos]['NodeOrigin'] = node.name
-                    allvariableData[pos]['VariableName'] = var
-            
-        
+
+        sources = [('Global', self.nodzinstance.globalVariables),
+                   ('Core', self.nodzinstance.coreVariables)]
+        sources += [(node.name, node.variablesNodz) for node in self.nodzinstance.obtainAllNodes()]
+
+        #Rows are built here rather than by writing 'NodeOrigin'/'VariableName'
+        #into the live variable dicts, as this used to do on every node start.
+        rows = []
+        for origin, variables in sources:
+            for var, varData in list(variables.items()):
+                if self._acceptsType(varData['type']):
+                    rows.append((origin, var, varData))
+
         # Set the number of rows
-        self.variablesTableWidget.setRowCount(len(allvariableData))
+        self.variablesTableWidget.setRowCount(len(rows))
 
         # Fill the table with data
-        for row_id in range(len(allvariableData)):
-            varData = allvariableData[row_id]
+        for row_id, (origin, var, varData) in enumerate(rows):
             # headers = ["CellValue", "Origin", "Name", "Value", "Importance","Type", "LastChanged"]
-            self.variablesTableWidget.setItem(row_id, 1, QTableWidgetItem(str(varData['NodeOrigin'])))
-            self.variablesTableWidget.setItem(row_id, 2, QTableWidgetItem(str(varData['VariableName'])))
-            self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(str(varData['data'])))
+            self.variablesTableWidget.setItem(row_id, 1, QTableWidgetItem(str(origin)))
+            self.variablesTableWidget.setItem(row_id, 2, QTableWidgetItem(str(var)))
+            self.variablesTableWidget.setItem(row_id, 3, QTableWidgetItem(variableDisplayText(varData['data'])))
             self.variablesTableWidget.setItem(row_id, 4, QTableWidgetItem(str(varData['importance'])))
             self.variablesTableWidget.setItem(row_id, 5, QTableWidgetItem(str(varData['type'])))
             if 'lastUpdateTime' in varData and varData['lastUpdateTime'] is not None:

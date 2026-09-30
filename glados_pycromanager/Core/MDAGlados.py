@@ -473,6 +473,27 @@ def build_absolute_z_plan(z_start, z_end, z_step):
     go_up = z_step is None or z_step >= 0
     return {"top": z_top, "bottom": z_bottom, "step": z_step_magnitude, "go_up": go_up}
 
+def claim_mda_done_signal(shared_data, slot):
+    """Make ``slot`` the *only* listener of ``shared_data.mda_acq_done_signal``.
+
+    Every acquisition node owns its own MDAGlados, and each connected its
+    ``MDA_acq_finished`` per acquisition, relying on that slot to disconnect
+    itself. A connection left behind by an acquisition that never reported
+    then also fired on the *next* acquisition, finishing the stale node with
+    the new node's data and re-running its downstream graph. The previous
+    listener - whichever instance it belongs to - is dropped here instead.
+    """
+    signal = shared_data.mda_acq_done_signal
+    previous = getattr(shared_data, '_mdaDoneSlot', None)
+    if previous is not None:
+        try:
+            signal.disconnect(previous)
+        except TypeError:
+            pass #It had already disconnected itself
+    signal.connect(slot)
+    shared_data._mdaDoneSlot = slot
+
+
 class MDAGlados(CustomMainWindow):
     """
     Class that handles the multi-Dimensional acquisition of Pycromanager
@@ -1470,7 +1491,7 @@ class MDAGlados(CustomMainWindow):
             return dataset_path
         return self.storage_folder + os.sep + self.storage_file_name + '_1//'
 
-    def MDA_acq_finished(self):
+    def MDA_acq_finished(self, success=True):
         """
         Signal that MDA acquisition has finished.
         
@@ -1478,12 +1499,21 @@ class MDAGlados(CustomMainWindow):
         
         Args:
             self: The object instance.
+            success: False when the acquisition raised or was refused to start
+                (``mda_acq_done_signal`` carries it). The node is then marked as
+                errored and its downstream graph is *not* triggered.
         
         Returns:
             None
         """
         
-        self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
+        try:
+            self.shared_data.mda_acq_done_signal.disconnect(self.MDA_acq_finished)
+        except TypeError:
+            pass #Already disconnected
+        if not success:
+            self._MDA_acq_failed()
+            return
         self.data = self._resolve_finished_acquisition_data()
         logging.info('MDA acq data finished and data stored!')
         self.shared_data._mdaMode = False
@@ -1525,6 +1555,21 @@ class MDAGlados(CustomMainWindow):
 
         self.MDA_completed.emit(True)
     
+    def _MDA_acq_failed(self):
+        """Tear down after a failed/refused MDA without continuing a recipe."""
+        logging.error('MDA acquisition failed or was refused')
+        self.shared_data._mdaMode = False
+        for analysis_thread in vars(self).get('nodz_analysis_threads', []):
+            analysis_thread.stop()
+        self.resetMDAbutton(mdaLayerName='MDA')
+        node = vars(self).get('nodeInfo')
+        if node is not None:
+            flowChart = node.flowChart
+            if hasattr(flowChart, '_nodeFailed'):
+                flowChart._nodeFailed(node, 'acquisition failed or could not start (see log)')
+            else:
+                node.status = 'error'
+
     def _applyFocusDevice(self):
         """Set the focus device this plan's z-stack moves (T-H3).
 
@@ -1569,13 +1614,34 @@ class MDAGlados(CustomMainWindow):
         nodeName = nodeInfo.name
         
         self.nodeInfo = nodeInfo
+
+        #Never start on top of a running MDA: acqModeChanged would defer the
+        #start until the old worker stops, and the *old* acquisition's done
+        #signal would then finish this node with the old node's data.
+        if self.shared_data.mdaMode:
+            reason = 'another MDA acquisition is still running'
+            logging.error('Not starting acquisition node %s: %s', nodeName, reason)
+            flowChart = nodeInfo.flowChart
+            if hasattr(flowChart, '_nodeFailed'):
+                flowChart._nodeFailed(nodeInfo, reason)
+            else:
+                nodeInfo.status = 'error'
+            return
         
+        #The layer (and zarr store) this acquisition writes to. Without a Visual
+        #node this used to stay whatever the *previous* acquisition set, so the
+        #frames went into another node's store - which could also be discarded
+        #on a shape mismatch while that node's layer still showed it.
+        self.shared_data.newestLayerName = nodeName
+
         #Look at the 'Visual' bottom attribute:
         visualAttr = nodeInfo.bottomAttrs['Visual']
         if len(visualAttr.connections) > 0:
             for connection in visualAttr.connections:
                 if connection.plugAttr is not None and connection.socketAttr is not None and connection.plugItem is not None and connection.socketItem is not None and connection.plugNode is not None and connection.socketNode is not None:
                     visual_connected_node_name = connection.socketNode
+                    #Defaults for a connection whose node cannot be found (was UnboundLocalError)
+                    layerName, colormap = nodeName, 'gray'
                     for node in nodeInfo.flowChart.nodes:
                         if node.name == visual_connected_node_name:
                             visual_connected_node = node
@@ -1618,8 +1684,6 @@ class MDAGlados(CustomMainWindow):
                     self.nodz_analysis_threads.append(new_analysis_thread)
                     rt_analysis_connected_node.status = 'running'
                     
-                    
-        self.shared_data._mdaMode = False
         
         #Set the exposure time:
         self.core.set_exposure(self.exposure_ms)
@@ -1638,7 +1702,7 @@ class MDAGlados(CustomMainWindow):
         self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
-        self.shared_data.mda_acq_done_signal.connect(self.MDA_acq_finished)
+        claim_mda_done_signal(self.shared_data, self.MDA_acq_finished)
         #And set the mdamode to be true
         self.shared_data.mdaMode = True
         logging.debug('ended setting mdamode params')
@@ -1684,7 +1748,7 @@ class MDAGlados(CustomMainWindow):
         self.shared_data._mdaModeParams_useq = self.mda_useq
         #Set this MDA object as the active MDA object in the shared_data
         self.shared_data.activeMDAobject = self
-        self.shared_data.mda_acq_done_signal.connect(self.MDA_acq_finished)
+        claim_mda_done_signal(self.shared_data, self.MDA_acq_finished)
         #And set the mdamode to be true
         self.shared_data.mdaMode = True
         #And start visualization
