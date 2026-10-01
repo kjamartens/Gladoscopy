@@ -45,5 +45,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
+      # Downloads the Micro-Manager device adapters (incl. DemoCamera) that
+      # the CMMCorePlus()-based end-to-end tests load; without them the
+      # runner hit a native access violation inside CMMCorePlus.__init__.
+      - name: Install Micro-Manager device adapters
+        run: python -m pymmcore_plus install
       - name: pytest
         run: python -m pytest -q
