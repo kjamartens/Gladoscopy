@@ -2402,7 +2402,16 @@ class MMConfigUI(CustomMainWindow):
         every CONFIG_AUTOREFRESH_INTERVAL_MS.
         """
         start = time.perf_counter()
-        self.rebuildConfigLayout()
+        try:
+            self.rebuildConfigLayout()
+        except RuntimeError:
+            # The panel's Qt objects were destroyed (dock closed, or a test
+            # tore the widget down) while this timer was still alive: there is
+            # nothing left to refresh, so stop instead of raising into the
+            # event loop on every tick.
+            logging.debug('Configurations panel was destroyed - stopping auto-refresh', exc_info=True)
+            self._configAutoRefreshTimer.stop()
+            return
         elapsed_ms = (time.perf_counter() - start) * 1000
         if elapsed_ms > CONFIG_AUTOREFRESH_MAX_FREEZE_MS:
             logging.info(

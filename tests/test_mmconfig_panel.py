@@ -211,3 +211,21 @@ class TestRebuildConfigLayout:
         panel.rebuildConfigLayout()
 
         panel._clearConfigLayout.assert_not_called()
+
+
+def test_auto_refresh_tick_stops_itself_when_the_panel_was_destroyed():
+    """A timer that outlives its widget used to raise 'wrapped C/C++ object of
+    type QGridLayout has been deleted' into the Qt event loop on every tick,
+    where pytest-qt blamed whichever unrelated test happened to be running."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from glados_pycromanager.GUI.MMcontrols import MMConfigUI
+
+    def destroyed():
+        raise RuntimeError("wrapped C/C++ object of type QGridLayout has been deleted")
+
+    fake = SimpleNamespace(rebuildConfigLayout=destroyed, _configAutoRefreshTimer=MagicMock())
+    MMConfigUI._autoRefreshConfigLayout(fake)
+
+    fake._configAutoRefreshTimer.stop.assert_called_once()
