@@ -51,4 +51,4 @@ jobs:
       - name: Install Micro-Manager device adapters
         run: mmcore install --plain-output
       - name: pytest
-        run: python -m pytest -q
+        run: python -m pytest -q -rfE --tb=short
