@@ -619,19 +619,11 @@ def main(app=None, splash=None):
     print('Creating shared data.')
     shared_data = Shared_data()
     startup_timeline.mark('Shared_data created')
-    # Start pre-warming a blank RT-analysis subprocess as early as possible so
-    # its spawn + package-tree (+ diplib) import cost is hidden behind however
-    # long the user takes to reach the microscope/acquisition setup, instead of
-    # being paid on the critical path of the first subprocess-isolated node's
-    # start (see AnalysisClass.py's AnalysisProcess_customFunction and
-    # subprocess_pool.py).
-    shared_data._rt_subprocess_pool.start()
-    startup_timeline.mark('RT subprocess pool started')
     # Ask Windows not to park us on efficiency cores while unfocused. Done after
     # Shared_data exists (it carries the switch) but before any acquisition, and
-    # deliberately before the subprocess pool's children would inherit anything
-    # -- the priority class is inherited, which is what we want for the isolated
-    # RT-analysis worker too. Entirely best-effort; see the module docstring.
+    # before the RT subprocess pool (started once startup is ready) spawns its
+    # child -- the priority class is inherited, which is what we want for the
+    # isolated RT-analysis worker too. Entirely best-effort; see the module docstring.
     from glados_pycromanager.observability.process_priority import (
         apply_foreground_scheduling_hints,
     )
@@ -842,6 +834,16 @@ def main(app=None, splash=None):
             _write_startup_report(args)
             from PyQt5.QtCore import QTimer
             QTimer.singleShot(0, app.quit)
+            return
+        # Pre-warm a blank RT-analysis subprocess so its spawn + package-tree (+ diplib)
+        # import is paid while the user sets up, not when the first subprocess-isolated
+        # node starts (AnalysisClass.AnalysisProcess_customFunction, subprocess_pool.py).
+        # Only now: during startup that child competed for the same cores (L2.2 of
+        # claude_launcher_project.md).
+        try:
+            shared_data._rt_subprocess_pool.start()
+        except Exception:
+            logging.exception('Could not pre-warm the RT-analysis subprocess pool')
     call_when_startup_ready(_on_startup_ready)
 
     worker = Worker()
