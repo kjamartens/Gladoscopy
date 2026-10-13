@@ -170,3 +170,14 @@ def test_setting_is_true_parses_stored_forms():
 
     assert settingIsTrue(True) and settingIsTrue("True") and settingIsTrue("true")
     assert not settingIsTrue(False) and not settingIsTrue("False") and not settingIsTrue("")
+
+
+def test_field_step_buttons_fill_one_decimal(panel):
+    """0.1 field of a 512 px ROI at 0.1 um/px is 5.12 um -- shown as 5.1, not the
+    full float (which could print 20 digits)."""
+    mil = panel.shared_data.MILcore
+    mil.get_pixel_size_um.return_value = 0.1
+    mil.get_roi.return_value = (0, 0, 512, 333)
+    panel.XYMoveEditField["Button_1"].click()
+    assert panel.XYMoveEditField["X_1"].text() == "5.1"
+    assert panel.XYMoveEditField["Y_1"].text() == "3.3"

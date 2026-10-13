@@ -1950,8 +1950,8 @@ class MMConfigUI(CustomMainWindow):
         
         x_value_um = field_size_um[0]*fieldUnit
         y_value_um = field_size_um[1]*fieldUnit
-        xEditField.setText(str(x_value_um))
-        yEditField.setText(str(y_value_um))
+        xEditField.setText(f"{x_value_um:.1f}")
+        yEditField.setText(f"{y_value_um:.1f}")
         self.storeAllControlValues()
     
     def getDevicesOfDeviceType(self,devicetype):
