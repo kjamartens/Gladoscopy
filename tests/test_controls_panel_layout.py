@@ -133,3 +133,19 @@ def test_hidden_sections_setting_is_applied(panel):
     finally:
         layout_config.hidden_sections = ""
         panel.sectionGrid.set_hidden(())
+
+
+def test_stages_section_is_compact(panel):
+    """The XY cross is three rows (left/right arms horizontal) and the step
+    fields are capped, so the Stages box no longer stretches over the dock."""
+    from PyQt5.QtWidgets import QWIDGETSIZE_MAX
+
+    box = panel.stagesGroupBox
+    box.adjustSize()
+    buttons = panel.XYmoveButtons
+    for side in ("Left", "Right"):
+        assert len({buttons[f"{side}_{m}"].geometry().center().y() for m in (1, 2, 3)}) == 1
+    fields = [f for k, f in panel.XYMoveEditField.items() if not k.startswith("Button")]
+    fields += [f for stage in panel.oneDMoveEditField.values() for f in stage.values()]
+    assert fields and all(f.maximumWidth() < QWIDGETSIZE_MAX for f in fields)
+    assert box.sizeHint().height() < 300

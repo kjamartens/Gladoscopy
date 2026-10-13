@@ -61,6 +61,7 @@ from glados_pycromanager.ui.layout import (
     ResponsiveGrid,
     Section,
     classify_shape,
+    current_theme,
     set_role,
 )
 
@@ -165,6 +166,18 @@ CONTROLS_COLUMN_STRETCH = {
     PORTRAIT: {"controls.general": 1, "controls.configs": 1},
     TALL: {"controls.general": 1},
 }
+
+
+#: Sample text a stage step-size field is sized to fit.
+STEP_FIELD_SAMPLE_TEXT = "-0000.0"
+
+
+def _limitFieldWidth(lineEdit, sample=STEP_FIELD_SAMPLE_TEXT):
+    """Cap a numeric QLineEdit at the width its values need. Unbounded, the
+    stage step fields stretched to fill their section."""
+    theme = current_theme()
+    padding = 2 * (theme.widget_padding_px + theme.widget_margin_px) + 8
+    lineEdit.setMaximumWidth(lineEdit.fontMetrics().horizontalAdvance(sample) + padding)
 
 
 def waitForLiveModeWorkerStopped(shared_data, label):
@@ -1613,12 +1626,10 @@ class MMConfigUI(CustomMainWindow):
         Returns the layout with the XY and 1D stage widgets.
         """
         stageLayout = QHBoxLayout()
-        # self.XYstageLayout()
-        xyStageLayout = self.XYstageLayout()
-        oneDstageWidget = self.oneDstageLayout()
-        stageLayout.addLayout(xyStageLayout)
-        stageLayout.addWidget(oneDstageWidget)
-        #Add a horizontal spacer:
+        stageLayout.addLayout(self.XYstageLayout())
+        stageLayout.addWidget(self.oneDstageLayout(), alignment=Qt.AlignmentFlag.AlignTop)
+        #Pack to the left: the section should be as wide as its content, not
+        #spread its controls over whatever width the grid gives it.
         stageLayout.addStretch(1)
         return stageLayout
     
@@ -1846,48 +1857,17 @@ class MMConfigUI(CustomMainWindow):
     
     def XYstageLayout(self):
         """
-        Returns a layout with the XY stage widgets.
+        Returns a compact layout with the XY stage widgets.
 
-        This layout includes a label with the current position,
-        three arrow buttons to move in the XY stage relative to the current position,
-        and text fields to set the size of the arrow buttons movement
+        A cross of arrow buttons around a label with the stage name and
+        position -- each arm is a row of three buttons (more arrows = larger
+        step) -- and below it the step size per button size, with buttons that
+        set them to 0.1/1/3 fields of view.
         """
-        
-        typeOfXYStageLayout = "Small" #"Big" or "Small" - either a 4x4 grid or a 8x8 grid. The bigger looks somewhat nicer, but is too large to be usefulll
-        
-        #Obtain the stage info from MM:
-        XYStageName = self.shared_data.MILcore.get_xy_stage_device()
-        #Get the stage position
-        XYStagePos = self.shared_data.MILcore.get_xy_stage_position(XYStageName)
-        
-        #Get current pixel size
-        #Then move 0.1, 0.5, or 1 field with the arrows
-        if self.shared_data.MILcore.get_pixel_size_um() != 0:
-            field_size_um = [self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[2],self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[3]]#type: ignore
-        else:
-            field_size_um = [1*self.shared_data.MILcore.get_roi()[2],1*self.shared_data.MILcore.get_roi()[3]]
-        field_move_fraction = [1,.5,.1]
-        
-        #Widget itself is a grid layout with 3x3 entries
-        XYStageLayout = QGridLayout()
-        XYStageLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    
-        
-        if typeOfXYStageLayout == "Small":
-            XY_UpLayout = QGridLayout()
-            XY_DownLayout = QGridLayout()
-            XY_LeftLayout = QGridLayout()
-            XY_RightLayout = QGridLayout()
-            
-            XYStageLayout.addLayout(XY_UpLayout,0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addLayout(XY_DownLayout,2,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addLayout(XY_LeftLayout,1,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addLayout(XY_RightLayout,1,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        #XY move buttons
+        #XY move buttons. A button with n arrows (m = 4-n) moves by the step in
+        #row n of the step-size table below.
         self.XYmoveButtons = {}
         for m in range(1,4):
-            #Initialize buttons
             self.XYmoveButtons[f'Up_{m}'] = QPushButton("⮝"*(4-m))
             self.XYmoveButtons[f'Up_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,float(self.XYMoveEditField[f"Y_{4-m}"].text())))
             self.XYmoveButtons[f'Down_{m}'] = QPushButton("⮟"*(4-m))
@@ -1896,66 +1876,57 @@ class MMConfigUI(CustomMainWindow):
             self.XYmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(float(self.XYMoveEditField[f"X_{4-m}"].text())*-1,0))
             self.XYmoveButtons[f'Right_{m}'] = QPushButton("⮞"*(4-m))
             self.XYmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(float(self.XYMoveEditField[f"X_{4-m}"].text()),0))
-            
-            #Add buttons to layout
-            if typeOfXYStageLayout == "Small":
-                XY_UpLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],0,4-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XY_DownLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],0,4-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XY_LeftLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4-m,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XY_RightLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4-m,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            elif typeOfXYStageLayout == "Big":
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4,8-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        
-        #The next layout is the inputs to let the user choose how much movement each button should be.
+        #The cross: three rows. Left/right arms grow outwards from the centre,
+        #up/down arms read small-to-large from left to right.
+        XYPadLayout = QGridLayout()
+        XYPadLayout.setSpacing(0)
+        arms = {}
+        for direction, order in (('Up', (3, 2, 1)), ('Down', (3, 2, 1)),
+                                 ('Left', (1, 2, 3)), ('Right', (3, 2, 1))):
+            arms[direction] = QHBoxLayout()
+            arms[direction].setSpacing(0)
+            for m in order:
+                arms[direction].addWidget(self.XYmoveButtons[f'{direction}_{m}'])
+        XYPadLayout.addLayout(arms['Up'], 0, 1, alignment=Qt.AlignmentFlag.AlignCenter)
+        XYPadLayout.addLayout(arms['Left'], 1, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        XYPadLayout.addLayout(arms['Right'], 1, 2, alignment=Qt.AlignmentFlag.AlignLeft)
+        XYPadLayout.addLayout(arms['Down'], 2, 1, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        #Central label with the XY stage name and the current position
+        self.XYStageInfoWidget = QLabel()
+        self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        XYPadLayout.addWidget(self.XYStageInfoWidget, 1, 1, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        #The inputs to let the user choose how much movement each button size gives.
         XYStageSetMovementLayout = QGridLayout()
-        
-        #Change the spacing/padding a bit
-        XYStageSetMovementLayout.setHorizontalSpacing(2) #Default 6 
-        XYStageSetMovementLayout.setVerticalSpacing(2)
-        XYStageSetMovementLayout.setContentsMargins(2,2,2,2) #Default 11
-
-        XYStageSetMovementLayout.addWidget(QLabel('X'),0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-        XYStageSetMovementLayout.addWidget(QLabel('Y'),0,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        XYStageSetMovementLayout.setSpacing(0)
+        XYStageSetMovementLayout.addWidget(QLabel('X (μm)'),0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        XYStageSetMovementLayout.addWidget(QLabel('Y (μm)'),0,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
         self.XYMoveEditField = {}
         pushButtonLabelArr = ["0.1 field","1 field","3 fields"]
         for m in range(1,4):
             XYStageSetMovementLayout.addWidget(QLabel("⮞"*(m)),m,0,1,1, alignment=Qt.AlignmentFlag.AlignRight)
-            self.XYMoveEditField[f"X_{m}"] = QLineEdit()
-            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"X_{m}"],m,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.XYMoveEditField[f"X_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
-            
-            self.XYMoveEditField[f"Y_{m}"] = QLineEdit()
-            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Y_{m}"],m,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.XYMoveEditField[f"Y_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
-            XYStageSetMovementLayout.addWidget(QLabel("μm"),m,3,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
+            for axis, column in (('X', 1), ('Y', 2)):
+                field = self.XYMoveEditField[f"{axis}_{m}"] = QLineEdit()
+                _limitFieldWidth(field)
+                field.editingFinished.connect(lambda: self.storeAllControlValues())
+                XYStageSetMovementLayout.addWidget(field,m,column)
             self.XYMoveEditField[f"Button_{m}"] = QPushButton(pushButtonLabelArr[m-1])
-            
+            self.XYMoveEditField[f"Button_{m}"].setToolTip(f"Set the {'⮞'*m} step to {pushButtonLabelArr[m-1]} of view")
             self.XYMoveEditField[f"Button_{m}"].clicked.connect(lambda index, m=m: self.setXYStageMovementValue(m-1,self.XYMoveEditField[f"X_{m}"],self.XYMoveEditField[f"Y_{m}"]))
-            
-            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Button_{m}"],m,4,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
-            
-        #Add the setmovementlayout to the XY stage layout
-        if typeOfXYStageLayout == "Small":
-            XYStageLayout.addLayout(XYStageSetMovementLayout,3,0,1,4, alignment=Qt.AlignmentFlag.AlignCenter)
-        elif typeOfXYStageLayout == "Big":
-            XYStageLayout.addLayout(XYStageSetMovementLayout,8,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
-            
-        #Add a central label for info
-        #this label contains the XY stage name, then an enter, then the current position:
-        self.XYStageInfoWidget = QLabel()
-        if typeOfXYStageLayout == "Small":
-            XYStageLayout.addWidget(self.XYStageInfoWidget,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-        elif typeOfXYStageLayout == "Big":
-            XYStageLayout.addWidget(self.XYStageInfoWidget,4,4, alignment=Qt.AlignmentFlag.AlignCenter)
-        #Update the text of it
+            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Button_{m}"],m,3)
+
+        XYStageLayout = QVBoxLayout()
+        XYStageLayout.setSpacing(0)
+        XYStageLayout.addLayout(XYPadLayout)
+        XYStageLayout.addLayout(XYStageSetMovementLayout)
+        XYStageLayout.addStretch(1)
+        #Update the text of the position label
         self.updateXYStageInfoWidget()
-        
+
         return XYStageLayout
-    
+
     def setXYStageMovementValue(self,m,xEditField,yEditField):
         """
         Set the XY stageLineEdits to specific values based on the Buttons next to the fields.
@@ -2018,6 +1989,8 @@ class MMConfigUI(CustomMainWindow):
         """
         #Create a layout
         self.oneDStageLayout = QGridLayout()
+        self.oneDStageLayout.setContentsMargins(0, 0, 0, 0)
+        self.oneDStageLayout.setSpacing(0)
         
         #Creates a UI layout to move all found 1D stages
         #Find all 1D stages
@@ -2037,7 +2010,7 @@ class MMConfigUI(CustomMainWindow):
         except (RuntimeError, OSError, AttributeError) as exc:
             logging.debug('get_focus_device() not available for oneDstage: %s', exc)
         #Add the dropdown to the layout:
-        self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0)
+        self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0,1,2)
         
         #Add left/right buttons and a label for the position
         self.oneDmoveButtons = {}
@@ -2048,9 +2021,9 @@ class MMConfigUI(CustomMainWindow):
             self.oneDmoveButtons[f'Right_{m}'] = QPushButton("⮟"*(3-m))
             self.oneDmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(-m))
             
-            #Add buttons to layout
-            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],m-1+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],5-m+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+            #Add buttons to layout: one column, top to bottom ⮝⮝ ⮝ ⮟ ⮟⮟ (rows 2-5)
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],m-1+2,0)
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],6-m,0)
         
         #Create a QGridBox for the movement sizes for each stage:
         self.oneDMoveEditFieldGridLayouts={}
@@ -2060,22 +2033,26 @@ class MMConfigUI(CustomMainWindow):
             self.oneDMoveEditFieldGridLayouts[stage] = QWidget()
             self.oneDMoveEditFieldGridLayouts[stage].setObjectName(stage)
             internalLayout = QGridLayout()
+            internalLayout.setContentsMargins(0, 0, 0, 0)
+            internalLayout.setSpacing(0)
             self.oneDMoveEditFieldGridLayouts[stage].setLayout(internalLayout)
             self.oneDMoveEditField[stage] = {}
             for m in range(1,3):
-                internalLayout.addWidget(QLabel("⮞"*(m)),m,0)
+                internalLayout.addWidget(QLabel("⮞"*(m)),m,0, alignment=Qt.AlignmentFlag.AlignRight)
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'] = QLineEdit()
+                _limitFieldWidth(self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'])
                 internalLayout.addWidget(self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'],m,1)
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].setText("10")
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].editingFinished.connect(lambda: self.storeAllControlValues())
             
             self.oneDStackedWidget.addWidget(self.oneDMoveEditFieldGridLayouts[stage])
         
-        self.oneDStageLayout.addWidget(self.oneDStackedWidget,8,0)
+        #Step fields beside the button column (⮞ = the single-arrow step)
+        self.oneDStageLayout.addWidget(self.oneDStackedWidget,2,1,4,1, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         #Get current info of the widget
         self.oneDinfoWidget = QLabel()
-        self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,0)
+        self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,0,1,2)
         #update the text
         self.updateOneDstageLayout()
 
