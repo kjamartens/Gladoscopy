@@ -202,3 +202,24 @@ def test_field_step_buttons_fill_one_decimal(panel):
     panel.XYMoveEditField["Button_1"].click()
     assert panel.XYMoveEditField["X_1"].text() == "5.1"
     assert panel.XYMoveEditField["Y_1"].text() == "3.3"
+
+
+def test_configurations_section_width_is_capped(panel):
+    from glados_pycromanager.GUI import MMcontrols
+    from glados_pycromanager.ui.layout import current_theme
+
+    blocks = max(1, -(-len(panel.config_groups) // panel.number_columns))
+    cap = blocks * MMcontrols.CONFIG_BLOCK_MAX_WIDTH_EM * current_theme().font_px
+    assert panel.configGroupBox.maximumWidth() == cap
+    panel.rebuildConfigLayout()
+    assert panel.configGroupBox.maximumWidth() == cap
+
+
+def test_slider_row_gives_the_width_to_the_slider(panel):
+    from PyQt5.QtWidgets import QWIDGETSIZE_MAX
+
+    config_id = next(iter(panel.sliders))
+    field, slider = panel.editFields[config_id], panel.sliders[config_id]
+    assert field.maximumWidth() < QWIDGETSIZE_MAX
+    row = panel.configEntries[config_id]
+    assert row.stretch(row.indexOf(slider)) == 1

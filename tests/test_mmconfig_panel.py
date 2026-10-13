@@ -192,6 +192,7 @@ class TestRebuildConfigLayout:
         panel.configLayout.count.return_value = 0
         panel._clearConfigLayout = MagicMock()
         panel.addRow = MagicMock(side_effect=lambda config_id: MagicMock())
+        panel._capConfigWidth = MagicMock()
 
         panel.rebuildConfigLayout()
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QGridLayout, QWidget
+from PyQt5.QtWidgets import QWIDGETSIZE_MAX, QGridLayout, QWidget
 
 from glados_pycromanager.ui.layout.theme import current_theme
 
@@ -138,12 +138,15 @@ class ResponsiveGrid(QWidget):
         cols = _Axis([(p.col, p.colspan) for p in visible])
         stretch = self._column_stretch.get(bucket, {})
         placed = set()
+        capped_cols = set()
         for p in visible:
             row, rowspan = rows.map(p.row, p.rowspan)
             col, colspan = cols.map(p.col, p.colspan)
             widget = self._widgets[p.key]
             self._grid.addWidget(widget, row, col, rowspan, colspan)
             placed.add(p.key)
+            if widget.maximumWidth() < QWIDGETSIZE_MAX:
+                capped_cols.update(range(col, col + colspan))
             if p.key in stretch and colspan == 1:
                 self._grid.setColumnStretch(col, stretch[p.key])
                 self._stretched_cols.add(col)
@@ -154,7 +157,11 @@ class ResponsiveGrid(QWidget):
         # section asked for it, so sections keep their natural size.
         self._grid.setRowStretch(rows.count, 1)
         self._stretched_rows.add(rows.count)
-        if not self._stretched_cols:
+        # A column holding a width-capped section cannot grow past the cap (Qt
+        # caps the whole column), so if every stretched column is capped the
+        # spare width goes to the right too -- else Qt hands it to an
+        # unstretched column and pushes the capped section rightwards.
+        if not (self._stretched_cols - capped_cols):
             self._grid.setColumnStretch(cols.count, 1)
             self._stretched_cols.add(cols.count)
 

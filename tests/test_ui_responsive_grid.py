@@ -109,3 +109,28 @@ def test_column_stretch_follows_the_section(grid):
     assert grid._grid.columnStretch(1) == 2
     grid.set_hidden({"a"})
     assert grid._grid.columnStretch(0) == 2           # b is now column 0
+
+
+def test_capped_section_keeps_its_cap_and_spare_width_goes_right(qapp):
+    """A width-capped section in the only stretched column: Qt would hand the spare
+    width to an unstretched column and push the capped one rightwards."""
+    from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QWidget
+
+    from glados_pycromanager.ui.layout.responsive import WIDE, Placement, ResponsiveGrid
+
+    host = QWidget()
+    g = ResponsiveGrid()
+    QVBoxLayout(host).addWidget(g)
+    left, capped = QGroupBox("left"), QGroupBox("capped")
+    capped.setMaximumWidth(200)
+    g.register("left", left)
+    g.register("capped", capped)
+    g.set_placements({WIDE: [Placement("left", 0, 0), Placement("capped", 0, 1)]},
+                     column_stretch={WIDE: {"capped": 2}})
+    g.apply(WIDE)
+    host.resize(1500, 200)
+    host.show()
+    qapp.processEvents()
+    assert capped.width() == 200
+    assert left.width() < 200
+    assert capped.geometry().left() < 400

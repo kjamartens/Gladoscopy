@@ -65,6 +65,7 @@ from glados_pycromanager.ui.layout import (
     compact_margin,
     compact_padding,
     compact_spacing,
+    current_theme,
     set_role,
 )
 
@@ -169,6 +170,12 @@ CONTROLS_COLUMN_STRETCH = {
     PORTRAIT: {"controls.general": 1, "controls.configs": 1},
     TALL: {"controls.general": 1},
 }
+
+
+#: Widest a block of config rows (label + control) may grow, in units of the
+#: theme's font size; the Configurations section is capped at one of these
+#: per block (`number_config_columns` rows each).
+CONFIG_BLOCK_MAX_WIDTH_EM = 42
 
 
 #: Sample text a stage step-size field is sized to fit.
@@ -529,6 +536,7 @@ class MMConfigUI(CustomMainWindow):
             for config_id in range(len(config_groups)):
                 self.configEntries[config_id] = self.addRow(config_id)
             self.configOuterLayout.addStretch(1)
+            self._capConfigWidth()
 
             #Add the config-panel button row: refresh, device property
             #browser, config group editor. Wraps when the section is narrow.
@@ -2438,6 +2446,13 @@ class MMConfigUI(CustomMainWindow):
 
         for config_id in range(len(self.config_groups)):
             self.configEntries[config_id] = self.addRow(config_id)
+        self._capConfigWidth()
+
+    def _capConfigWidth(self):
+        """Cap the Configurations section's width: wider only stretches the
+        dropdowns and sliders. One `CONFIG_BLOCK_MAX_WIDTH_EM` per block of rows."""
+        blocks = max(1, -(-len(self.config_groups) // max(1, self.number_columns)))
+        self.configGroupBox.setMaximumWidth(blocks * CONFIG_BLOCK_MAX_WIDTH_EM * current_theme().font_px)
 
     def _clearConfigLayout(self):
         """Remove every row (and any leftover widgets) from configLayout."""
@@ -2626,6 +2641,9 @@ class MMConfigUI(CustomMainWindow):
         self.editFields[config_id].setText(str(currentSliderValue))
         #Only allow numbers/float values
         self.editFields[config_id].setValidator(QDoubleValidator())
+        #Only as wide as the range's values need; the slider takes the rest.
+        _limitFieldWidth(self.editFields[config_id],
+                         max(STEP_FIELD_SAMPLE_TEXT, f"{upperLimit:.2f}", f"{lowerLimit:.2f}", key=len))
         rowLayout.addWidget(self.editFields[config_id])
         self.editFields[config_id].editingFinished.connect(lambda config_id = config_id: self.on_sliderChanged(config_id,fromText=True,fromSlider=False))
 
@@ -2644,7 +2662,7 @@ class MMConfigUI(CustomMainWindow):
         #ends.
         self.sliders[config_id].sliderReleased.connect(self._flushSliderPropertyWrites)
         # #Add the slider to the rowLayout:
-        rowLayout.addWidget(self.sliders[config_id])
+        rowLayout.addWidget(self.sliders[config_id], 1)
         pass
     
     def on_sliderChanged(self,config_id,fromText=False,fromSlider=True):
