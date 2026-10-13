@@ -55,7 +55,7 @@ def panel(qapp, tmp_path_factory):
     """Built once, without the RT-analysis section: that one imports every RT
     node module (TensorFlow among them) and adds ~2 min to construction."""
     import glados_pycromanager.GUI.MMcontrols as MMc
-    from glados_pycromanager.GUI.sharedFunctions import LayoutConfig
+    from glados_pycromanager.GUI.sharedFunctions import LayoutConfig, VisualisationConfig
 
     appdata = tmp_path_factory.mktemp("appdata")
     (appdata / "Glados-PycroManager" / "AutonomousMicroscopy" / "Real_Time_Analysis").mkdir(parents=True)
@@ -72,6 +72,7 @@ def panel(qapp, tmp_path_factory):
     shared = MagicMock()
     shared.MILcore = shared.core = mil
     shared.config.layout_config = LayoutConfig()
+    shared.config.visualisation_config = VisualisationConfig()
     groups = {i: _Group(i, name, kind) for i, (name, kind) in enumerate(GROUPS)}
     for group in groups.values():
         group.core, group.shared_data = mil, shared
@@ -149,3 +150,23 @@ def test_stages_section_is_compact(panel):
     fields += [f for stage in panel.oneDMoveEditField.values() for f in stage.values()]
     assert fields and all(f.maximumWidth() < QWIDGETSIZE_MAX for f in fields)
     assert box.sizeHint().height() < 300
+
+
+def test_scripts_section_hidden_unless_enabled(panel):
+    layout_config = panel.shared_data.config.visualisation_config
+    assert layout_config.show_scripts_section is False
+    assert panel.scriptsGroupBox.isHidden()
+    assert hasattr(panel, "scriptPathLineEdit")  # still built: the saved path round-trips
+    for stored in (True, "True"):
+        layout_config.show_scripts_section = stored
+        try:
+            assert panel._showScriptsSection()
+        finally:
+            layout_config.show_scripts_section = False
+
+
+def test_setting_is_true_parses_stored_forms():
+    from glados_pycromanager.GUI.utils import settingIsTrue
+
+    assert settingIsTrue(True) and settingIsTrue("True") and settingIsTrue("true")
+    assert not settingIsTrue(False) and not settingIsTrue("False") and not settingIsTrue("")

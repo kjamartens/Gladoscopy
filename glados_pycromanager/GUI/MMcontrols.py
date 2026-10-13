@@ -814,9 +814,12 @@ class MMConfigUI(CustomMainWindow):
             self.roiOptionsGroupBox = Section("ROI Options", "controls.roi", layout=self.ROIoptionsLayout(orientation='horizontal'))
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
 
-        #Now add the Scripts widget
+        #Now add the Scripts widget -- hidden unless enabled in Advanced settings
+        #(VisualisationConfig.show_scripts_section). Built either way, so the saved
+        #script path round-trips.
         self.scriptsGroupBox = Section("Scripts", "controls.scripts", layout=self.scriptsOptionsLayout())
         liveModeLayout.addWidget(self.scriptsGroupBox, 6,0,1,2)
+        self.scriptsGroupBox.setVisible(self._showScriptsSection())
 
         #Spare height goes below the sub-sections, above the button row:
         liveModeLayout.setRowStretch(7, 1)
@@ -1565,6 +1568,11 @@ class MMConfigUI(CustomMainWindow):
     #endregion
 
     #region Scripts
+    def _showScriptsSection(self):
+        """Whether Advanced settings enable the Scripts box (default: no)."""
+        visualisation_config = getattr(getattr(self.shared_data, 'config', None), 'visualisation_config', None)
+        return utils.settingIsTrue(getattr(visualisation_config, 'show_scripts_section', False))
+
     def scriptsOptionsLayout(self):
         """
         Create a layout with a path field and Browse/Run buttons for

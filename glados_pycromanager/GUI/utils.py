@@ -3814,6 +3814,14 @@ def storeSharedData_GlobalData(shared_data):
     )
     return _appdata_store.storeSharedData_GlobalData(shared_data)
 
+def settingIsTrue(value) -> bool:
+    """A boolean setting as stored: a real bool, or 'True'/'False' text from an
+    older or hand-edited glados_state.json."""
+    if isinstance(value, str):
+        return value.strip().lower() in ('true', '1', 'yes')
+    return bool(value)
+
+
 def openAdvancedSettings(shared_data):
     """
     Allow the user to change the global/advanced settings via some GUI
@@ -3826,6 +3834,10 @@ def openAdvancedSettings(shared_data):
             for f in fields(group):
                 if not f.metadata.get("hidden", True):
                     try:
+                        if f.metadata['input_type'] == 'checkbox':
+                            # A real bool: the numeric coercion below would turn True into 1.
+                            setattr(group, f.name, dialog.findChild(QCheckBox, f.name).isChecked())
+                            continue
                         if f.metadata['input_type'] == 'lineEdit':
                             setattr(group, f.name, dialog.findChild(QLineEdit, f.name).text())
                         elif f.metadata['input_type'] == 'dropdown':
@@ -3896,7 +3908,7 @@ def openAdvancedSettings(shared_data):
     def rejectS(dialog):
         dialog.close()
     
-    from PyQt5.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit
+    from PyQt5.QtWidgets import QCheckBox, QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit
     #Create a QDialog with OK/Cancel button:
     dialog = QDialog()
     dialog.setWindowTitle("Advanced settings")
@@ -3928,6 +3940,12 @@ def openAdvancedSettings(shared_data):
                         editField.addItems(f.metadata['options'])
                         editField.setObjectName(f.name)
                         editField.setCurrentText(str(currentValue))
+                        layout.addWidget(editField,currentRow,1)
+                    elif typeV == 'checkbox':
+                        editField = QCheckBox()
+                        editField.setChecked(settingIsTrue(currentValue))
+                        editField.setObjectName(f.name)
+                        editField.setToolTip(hoverInfo)
                         layout.addWidget(editField,currentRow,1)
                 except (AttributeError, RuntimeError):
                     pass

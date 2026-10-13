@@ -167,6 +167,11 @@ class VisualisationConfig:
         options=["Ctrl", "Shift", "Disabled"],
         hidden=False,
     )
+    show_scripts_section: bool = setting(
+        False, "Show the Scripts section (Controls dock)",
+        "Show the 'Scripts' box (run a .py script) in the General section of the "
+        "Controls dock. Takes effect at the next restart.",
+        input_type="checkbox", hidden=False)
 
 
 @dataclass
