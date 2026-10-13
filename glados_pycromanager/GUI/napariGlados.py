@@ -3024,13 +3024,6 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     shared_data.register_perf_thread_label(get_native_id(), 'GUI main thread')
     startup_timeline.mark('event loop running, building GUI')
 
-    if shared_data.MILcore is not None:
-        #Get some info from core to put in shared_data
-        shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
-        logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
-    else:
-        logging.warning("MILcore is None, cannot set default focus device.")
-        
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
     #Resumed (one save) by _sizeControlsDock, once napari's and Glados' docks have settled.
@@ -3050,6 +3043,16 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
     startup_timeline.mark('napari UI initialised')
+
+    #The first hardware read of the GUI build, so it comes after the viewer: until the
+    #owner thread has allocated the circular buffer (GUI_napari._allocate_circular_buffer)
+    #it waits on MIL's hardware lock. The docks below need it.
+    if shared_data.MILcore is not None:
+        #Get some info from core to put in shared_data
+        shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
+        logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
+    else:
+        logging.warning("MILcore is None, cannot set default focus device.")
 
     # --- Developer: "Reload Custom Nodes" menu item -------------------------
     def _reload_custom_nodes():

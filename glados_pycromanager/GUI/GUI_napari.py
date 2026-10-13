@@ -120,6 +120,40 @@ def _build_z_settle_skipping_mda_engine_class():
     return ZSettleSkippingMDAEngine
 
 
+#Buffer the Python backend's start_headless allocates before _allocate_circular_buffer
+#sets the configured size: small, so it costs ~nothing.
+HEADLESS_PLACEHOLDER_BUFFER_MB = 64
+
+def _allocate_circular_buffer(shared_data, size_mb):
+    """Queue the circular-buffer allocation as the owner thread's first job (L2.5).
+
+    Allocating it commits the memory: ~1.75 s for 4096 MB, which was the whole
+    PyMMCorePlus "backend up" step (the Python backend starts headless with
+    HEADLESS_PLACEHOLDER_BUFFER_MB instead and gets its size here). On the owner thread it overlaps the napari viewer
+    and dock build. It still runs before any acquisition, since nothing can queue one
+    before the GUI exists and the queue is FIFO, and it holds MIL's hardware lock, so a
+    direct MIL call waits for it instead of racing it. Without a running service it
+    runs inline, as before. Returns the queued Request, or None.
+    """
+    if size_mb is None:
+        return None
+    mil = shared_data.MILcore
+    service = shared_data.microscope_service
+
+    def _report(request):
+        if request.exception is not None:
+            logging.error('Could not allocate the %s MB circular buffer: %r',
+                          size_mb, request.exception)
+        else:
+            logging.info('Circular buffer of %s MB allocated in %.2f s on the owner thread',
+                         size_mb, request.finished_at - request.started_at)
+
+    if service is not None and service.running:
+        return service.submit(mil.set_circular_buffer_memory_footprint, size_mb,
+                              label='allocate circular buffer', callback=_report)
+    mil.set_circular_buffer_memory_footprint(size_mb)
+    return None
+
 def register_resilient_mmcore_mda_engine(core, shared_data=None):
     """Register an MDAEngine on `core` that survives a stalled/dropped-frame
     sequenced acquisition instead of aborting the whole MDA. See the module-level
@@ -689,6 +723,9 @@ def main(app=None, splash=None):
     # get object representing MMCore, used throughout
     #try to open a running instance:
     print('Finding or creating micromanager instance.')
+    #PyMMCorePlus and Python backends: the circular-buffer size, allocated once the
+    #owner thread runs (JAVA allocates it in the JVM, inside start_headless).
+    circular_buffer_mb = None
     if cli_override:
         # CLI override: go straight to the requested headless backend, no popup,
         # no Core() probe — the override is explicit intent to run headless.
@@ -700,9 +737,14 @@ def main(app=None, splash=None):
         if cli_backend in ('JAVA', 'Python'):
             from pycromanager import Core, start_headless
             logging.info('Headless PycroManager started (CLI override, backend=%s)', cli_backend)
+            python_backend = cli_backend == 'Python'
+            if python_backend:  # the real size is allocated on the owner thread below
+                circular_buffer_mb = int(mm_cfg.buffer_mb)
             start_headless(mm_app_path=mm_cfg.path, config_file=mm_cfg.config_path,
-                           python_backend=cli_backend == 'Python',
-                           buffer_size_mb=int(mm_cfg.buffer_mb), max_memory_mb=int(mm_cfg.max_memory_mb))
+                           python_backend=python_backend,
+                           buffer_size_mb=(HEADLESS_PLACEHOLDER_BUFFER_MB if python_backend
+                                           else int(mm_cfg.buffer_mb)),
+                           max_memory_mb=int(mm_cfg.max_memory_mb))
             startup_timeline.mark('start_headless() returned')
             shared_data._headless = True
             shared_data.backend = cli_backend
@@ -718,7 +760,7 @@ def main(app=None, splash=None):
             startup_timeline.mark('CMMCorePlus created')
             shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
             startup_timeline.mark('system configuration loaded')
-            shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
+            circular_buffer_mb = int(mm_cfg.buffer_mb)  # allocated on the owner thread below
             register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core(), shared_data)
             # Max memory MB is not settable in PyMMCorePlus; only buffer_mb (the
             # circular buffer footprint) applies to this backend. Warn instead of
@@ -772,8 +814,14 @@ def main(app=None, splash=None):
                 logging.info('Headless PycroManager started')
 
                 #Get those settings and use to start headless
+                python_backend = headlessGUIv.backend == 'Python'
+                if python_backend:  # the real size is allocated on the owner thread below
+                    circular_buffer_mb = int(headlessGUIv.buffer_size_mb)
                 try:
-                    start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
+                    start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=python_backend,
+                                   buffer_size_mb=(HEADLESS_PLACEHOLDER_BUFFER_MB if python_backend
+                                                   else int(headlessGUIv.buffer_size_mb)),
+                                   max_memory_mb=int(headlessGUIv.max_memory_mb))
                 except Exception as e:
                     print("Error!")
                     print(e)
@@ -793,7 +841,7 @@ def main(app=None, splash=None):
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
                 shared_data.MILcore.set_core(CMMCorePlus(mm_path=headlessGUIv.mm_app_path))
                 shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
-                shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
+                circular_buffer_mb = int(headlessGUIv.buffer_size_mb)  # allocated on the owner thread below
                 register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core(), shared_data)
                 #Max memory MB is not settable in PyMMCorePlus, so we don't set it
                 logging.warning('max_memory_mb (%s MB) has no effect on the MMCORE_PLUS backend; '
@@ -812,6 +860,7 @@ def main(app=None, splash=None):
         logging.exception('Could not start the MicroscopeService; '
                           'falling back to direct MIL access')
     startup_timeline.mark('MicroscopeService started')
+    _allocate_circular_buffer(shared_data, circular_buffer_mb)
 
     #Open JSON file with MM settings
     try:

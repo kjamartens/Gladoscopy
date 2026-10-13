@@ -165,7 +165,7 @@ is the standalone plan that enforces them — but new code must follow them.
   bandwidth from the frame path. `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` have no such lock.
   **As of T-B1 this is enforced at the MIL level:** `MicroscopeInterfaceLayer` holds a
   per-instance `threading.RLock` (`_hw_lock`) and applies it via the `@_hardware_locked`
-  decorator to every public method that touches `self.core` (53 applications today). Re-entrant
+  decorator to every public method that touches `self.core` (64 applications as of 2026-10-13). Re-entrant
   because MIL methods compose (`get_image_width()` → `get_roi()`), and deliberately
   untimed — a deadlock should be diagnosed, not skipped. `get_exposure` /
   `get_pixel_size_um` are the two exceptions: their cache-hit fast path returns *before*
@@ -1728,6 +1728,17 @@ Three companion files live alongside it:
     *first* GL paint costs ~2 s wherever it happens; hiding the window only moved it from
     the Controls step to the final one.
   - Tests: `tests/test_startup_napari_costs.py`.
+- **The circular buffer is allocated on the owner thread (L2.5).** A 4096 MB
+  `setCircularBufferMemoryFootprint` commits the memory (~1.75 s; pymmcore mostly releases
+  the GIL) and was the whole PyMMCorePlus "backend up" step. `GUI_napari._allocate_circular_buffer`
+  queues `MIL.set_circular_buffer_memory_footprint` (hardware-locked) as the MicroscopeService's
+  first job; the Python backend starts headless with `HEADLESS_PLACEHOLDER_BUFFER_MB` (64)
+  and gets its size the same way. JAVA allocates in the JVM and is unchanged. It is safe
+  because the queue is FIFO and nothing can queue an acquisition before the GUI exists,
+  and a direct MIL call waits on the lock. **The GUI build's first hardware read
+  (`get_focus_device`) therefore sits after `InitateNapariUI`**: before the viewer it
+  blocked the GUI thread for the whole allocation and the overlap was zero. Gain: post-import
+  startup −1.5 s (PyMMCorePlus), −0.6 s (Python). Tests: `tests/test_startup_circular_buffer.py`.
 - **`insiliscope.cfg` + Python backend segfaults in `start_headless`** (2026-10-13), even in a
   bare pycromanager script, while `MMConfig_demo.cfg` in the same install is fine. So the
   documented `--profile-runtime` command currently crashes there. The cause is the

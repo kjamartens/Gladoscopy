@@ -353,6 +353,24 @@ class MicroscopeInterfaceLayer:
             raise ValueError("Unsupported microscope interface type for clear_circular_buffer.")
 
     @_hardware_locked
+    def set_circular_buffer_memory_footprint(self, size_mb: int) -> None:
+        """Reallocate the circular buffer to ``size_mb`` MB.
+
+        The allocation is committed memory: ~1.75 s for 4096 MB on a laptop, which is
+        why startup queues it on the MicroscopeService owner thread instead of making
+        it the critical path (L2.5 of claude_launcher_project.md).
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.set_circular_buffer_memory_footprint(int(size_mb))
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.set_circular_buffer_memory_footprint(int(size_mb))
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.setCircularBufferMemoryFootprint(int(size_mb))
+        else:
+            raise ValueError(
+                "Unsupported microscope interface type for set_circular_buffer_memory_footprint.")
+
+    @_hardware_locked
     def clear_roi(self) -> None:
         """
         Clear the region of interest (ROI) for the camera.
