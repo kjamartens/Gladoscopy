@@ -137,19 +137,40 @@ def test_hidden_sections_setting_is_applied(panel):
 
 
 def test_stages_section_is_compact(panel):
-    """The XY cross is three rows (left/right arms horizontal) and the step
+    """XY is a dial with the step table below it, Z a separate block; step
     fields are capped, so the Stages box no longer stretches over the dock."""
     from PyQt5.QtWidgets import QWIDGETSIZE_MAX
 
+    from glados_pycromanager.ui.widgets.stage_dial import StageDial
+
+    from glados_pycromanager.ui.layout import build_stylesheet
+
     box = panel.stagesGroupBox
+    box.setStyleSheet(build_stylesheet())  # as the dock applies it
     box.adjustSize()
-    buttons = panel.XYmoveButtons
-    for side in ("Left", "Right"):
-        assert len({buttons[f"{side}_{m}"].geometry().center().y() for m in (1, 2, 3)}) == 1
+    assert isinstance(panel.XYStageInfoWidget, StageDial)
     fields = [f for k, f in panel.XYMoveEditField.items() if not k.startswith("Button")]
     fields += [f for stage in panel.oneDMoveEditField.values() for f in stage.values()]
     assert fields and all(f.maximumWidth() < QWIDGETSIZE_MAX for f in fields)
-    assert box.sizeHint().height() < 300
+    # Structure, not pixels: offscreen font fallback makes absolute sizes meaningless.
+    box.resize(box.sizeHint())
+    box.layout().activate()
+    dial, first_field = panel.XYStageInfoWidget, panel.XYMoveEditField["X_1"]
+    assert first_field.mapTo(box, first_field.rect().topLeft()).y() >= dial.mapTo(box, dial.rect().bottomLeft()).y()
+    assert panel.zStageBlock.mapTo(box, panel.zStageBlock.rect().topLeft()).x() >=         panel.xyStageBlock.mapTo(box, panel.xyStageBlock.rect().topRight()).x()
+
+
+def test_dial_ring_moves_by_that_rings_step(panel, monkeypatch):
+    moves = []
+    monkeypatch.setattr(panel, "moveXYStage", lambda dx, dy: moves.append((dx, dy)))
+    for m, (x, y) in enumerate([("1", "2"), ("10", "20"), ("100", "200")], start=1):
+        panel.XYMoveEditField[f"X_{m}"].setText(x)
+        panel.XYMoveEditField[f"Y_{m}"].setText(y)
+    dial = panel.XYStageInfoWidget
+    dial.stepRequested.emit(0, 1, 1)    # up, inner ring
+    dial.stepRequested.emit(-1, 0, 3)   # left, outer ring
+    dial.stepRequested.emit(0, -1, 2)   # down, middle ring
+    assert moves == [(0.0, 2.0), (-100.0, 0.0), (0.0, -20.0)]
 
 
 def test_scripts_section_hidden_unless_enabled(panel):

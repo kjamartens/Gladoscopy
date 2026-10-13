@@ -25,6 +25,8 @@ ROLE_PRIMARY = "primary"
 ROLE_READONLY = "readonly"
 ROLE_WARNING = "warning"
 ROLE_NORMAL = "normal"
+#: Dense controls (e.g. the Stages blocks): thin borders, little padding/margin.
+ROLE_COMPACT = "compact"
 
 
 @dataclass(frozen=True)
@@ -165,4 +167,24 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     QLineEdit[gladosRole="{ROLE_WARNING}"] {{
         border: 1px solid {t.warning};
     }}
+    QWidget[gladosRole="{ROLE_COMPACT}"] QLineEdit,
+    QWidget[gladosRole="{ROLE_COMPACT}"] QPushButton,
+    QWidget[gladosRole="{ROLE_COMPACT}"] QLabel,
+    QWidget[gladosRole="{ROLE_COMPACT}"] QComboBox {{
+        padding: {compact_padding(t)}px {2 * compact_padding(t)}px;
+        margin: {compact_margin(t)}px;
+    }}
+    QWidget[gladosRole="{ROLE_COMPACT}"] QLineEdit {{
+        border-width: 1px;
+    }}
     """
+
+
+def compact_padding(theme: Theme | None = None) -> int:
+    """Vertical padding of a control inside a `ROLE_COMPACT` widget (px)."""
+    return max(1, (theme or current_theme()).widget_padding_px // 3)
+
+
+def compact_margin(theme: Theme | None = None) -> int:
+    """Margin around a control inside a `ROLE_COMPACT` widget (px)."""
+    return max(0, (theme or current_theme()).widget_margin_px // 2)
