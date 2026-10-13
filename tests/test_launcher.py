@@ -270,3 +270,52 @@ def test_a_running_instance_that_never_answers_is_reported(qt_app, monkeypatch):
     _serve_until(qt_app, thread)
     assert result['outcome'] == single_instance.NOT_RESPONDING
     mute.close()
+
+
+# -- fatal startup error box ------------------------------------------------------
+def _run_error_box(monkeypatch, log_path, clicks):
+    """Show the box, pressing the buttons named in `clicks` in turn; returns the
+    opened paths and the button texts offered."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt5.QtWidgets import QApplication, QMessageBox
+
+    app = QApplication.instance() or QApplication([])  # noqa: F841 -- must stay referenced
+    opened, offered = [], []
+    monkeypatch.setattr(startup, 'open_log_file', opened.append)
+    pending = list(clicks)
+
+    def fake_exec(box):
+        buttons = {b.text().replace('&', ''): b for b in box.buttons()}
+        offered[:] = sorted(buttons)
+        buttons[pending.pop(0)].click()
+    monkeypatch.setattr(QMessageBox, 'exec_', fake_exec)
+    startup._show_fatal_startup_error(RuntimeError('boom'), log_path)
+    assert not pending, 'the box closed early'
+    return opened, offered
+
+
+def test_error_box_offers_the_log_file_and_stays_open_until_ok(monkeypatch, tmp_path):
+    log = tmp_path / 'Glados_console.log'
+    log.write_text('Traceback ...\n', encoding='utf-8')
+    opened, offered = _run_error_box(monkeypatch, str(log), ['Open log file', 'Open log file', 'OK'])
+    assert offered == ['OK', 'Open log file', 'Show Details...']
+    assert opened == [str(log), str(log)]
+
+
+def test_error_box_details_hold_the_log_tail(monkeypatch, tmp_path):
+    from PyQt5.QtWidgets import QMessageBox
+
+    log = tmp_path / 'Glados_console.log'
+    log.write_text(''.join(f'line {i}\n' for i in range(1000)) + 'Traceback: boom\n', encoding='utf-8')
+    details = []
+    monkeypatch.setattr(QMessageBox, 'setDetailedText', lambda box, text: details.append(text))
+    _run_error_box(monkeypatch, str(log), ['OK'])
+    assert details and details[0].endswith('Traceback: boom\n')
+    assert 'line 0\n' not in details[0] and 'earlier lines' in details[0]
+
+
+def test_error_box_has_no_log_button_without_a_log_file(monkeypatch, tmp_path):
+    opened, offered = _run_error_box(monkeypatch, str(tmp_path / 'missing.log'), ['OK'])
+    assert offered == ['OK'] and opened == []
+    _, offered = _run_error_box(monkeypatch, None, ['OK'])
+    assert offered == ['OK']
