@@ -182,10 +182,10 @@ exclude = [
     "Documentation/Images/*",
 ]
 [project.scripts]
-"glados" = "glados_pycromanager.GUI.GUI_napari:main"
-"glados-pycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
-"gladospycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
-"glados-pycro-manager" = "glados_pycromanager.GUI.GUI_napari:main"
+"glados" = "glados_pycromanager.GUI.startup:main"
+"glados-pycromanager" = "glados_pycromanager.GUI.startup:main"
+"gladospycromanager" = "glados_pycromanager.GUI.startup:main"
+"glados-pycro-manager" = "glados_pycromanager.GUI.startup:main"
 
 [project.entry-points."napari.manifest"]
 glados-pycromanager = "glados_pycromanager:napari.yaml"

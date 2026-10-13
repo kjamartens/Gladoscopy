@@ -15,6 +15,14 @@ import sys
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
+# Run directly (`python -m ...GUI_napari`, or from an IDE): hand over to the light
+# launcher *before* the heavy imports below, so the startup splash appears first. The
+# launcher then imports this file again as a normal module. multiprocessing's spawned
+# children import it as '__mp_main__', so they never take this branch.
+if __name__ == '__main__':
+    from glados_pycromanager.GUI.startup import main as _launch
+    sys.exit(_launch())
+
 # First Glados import, so the heavy imports below show up in the startup timeline.
 from glados_pycromanager.observability import startup_timeline
 
@@ -323,6 +331,13 @@ class headlessGUI(QWidget):
     """
     Small GUI for user input on a headless Pycromanager start
     """
+    #: Emitted when the dialog closes, by Start or by the window's close button.
+    closed = pyqtSignal()
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self.closed.emit()
+
     def __init__(self, shared_data: Shared_data):
         super().__init__()
         self.shared_data = shared_data
@@ -353,7 +368,8 @@ class headlessGUI(QWidget):
             
         # Add a splash screen at the top
         self.splash_label = QLabel(self)
-        splash_png = iconFolder+os.sep+'GladosSplash_inv.png'
+        from glados_pycromanager.GUI.startup_splash import SPLASH_IMAGE
+        splash_png = SPLASH_IMAGE
         splash_pixmap = QPixmap(splash_png)
         new_width = 500
         self.splash_label.setPixmap(
@@ -504,12 +520,14 @@ class UserManualWidget(QWidget):
 show_UserManualNapari = UserManualWidget
 
 
-def main():
+def main(app=None, splash=None):
     """
     Run the main function to start Glados-PycroManager-Napari interface for autonomous microscopy.
     
     Args:
-        None
+        app: the QApplication, when GUI/startup.py already created it (to show the
+            splash before this module's imports). Created here otherwise.
+        splash: the StartupSplash on screen, if any; closed once startup is ready.
     
     Returns:
         None
@@ -610,11 +628,14 @@ def main():
             shared_data.config.micromanager_config.max_memory_mb = args.max_memory_mb
     # -------------------------------------------------------------------------
 
-    #Some QT attributes
-    print('Setting QT attributes.')
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
-    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
-    QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
+    # The app's one QApplication: the backend dialog and the main window share it.
+    if app is None:
+        app = QApplication.instance()
+    if app is None:
+        from glados_pycromanager.GUI.startup import set_qt_application_attributes
+        set_qt_application_attributes()
+        app = QApplication(sys.argv)
+        startup_timeline.mark('QApplication created')
 
     napariSettings = napari.settings.get_settings() #type: ignore
     if napariSettings.application.playback_fps < shared_data.config.visualisation_config.fps:
@@ -686,11 +707,22 @@ def main():
 
         if not _java_mm_up:
             logging.info('No Java MM server on port 4827 — opening headless dialog')
-            appSmall = QApplication([])
+            from PyQt5.QtCore import QEventLoop
+            if splash is not None:
+                splash.hide()
+            # Closing the dialog must end only the wait below, not the application.
+            quit_on_close = app.quitOnLastWindowClosed()
+            app.setQuitOnLastWindowClosed(False)
+            dialogLoop = QEventLoop()
             headlessGUIv = headlessGUI(shared_data)
+            headlessGUIv.closed.connect(dialogLoop.quit)
             startup_timeline.mark('backend dialog shown')
-            appSmall.exec_()
+            if headlessGUIv.isVisible():
+                dialogLoop.exec_()
+            app.setQuitOnLastWindowClosed(quit_on_close)
             startup_timeline.mark('backend dialog closed (includes user time)')
+            if splash is not None:
+                splash.show_now()
 
             if headlessGUIv.javaRadio.isChecked() or headlessGUIv.pythonRadio.isChecked():
                 from pycromanager import Core, start_headless
@@ -747,12 +779,11 @@ def main():
         MM_JSON = None
         
         
-    app = QApplication(sys.argv)
-    startup_timeline.mark('QApplication created')
-
     shared_data.mainApp = app
 
     def _on_startup_ready():
+        if splash is not None:
+            splash.done()
         logging.info('Startup timeline (from process start):\n%s',
                      startup_timeline.format_report())
         if args.startup_exit:
@@ -765,6 +796,9 @@ def main():
     thread = QThread()
     worker.moveToThread(thread)
     thread.started.connect(lambda: worker.runNapariPycroManagerWrap(MM_JSON, shared_data))
+    if splash is not None:
+        # From here on Glados' own events are queued; the splash only repaints.
+        splash.pump = False
     thread.start()
 
     worker.finished.connect(thread.quit)

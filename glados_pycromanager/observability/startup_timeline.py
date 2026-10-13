@@ -9,6 +9,7 @@ imported before every heavy import in ``GUI_napari.py`` so that those imports ca
 timed as well.
 """
 
+import contextlib
 import threading
 import time
 
@@ -20,17 +21,42 @@ _marks: list[tuple[str, float]] = []
 _EPOCH_MINUS_PERF = time.time() - time.perf_counter()
 
 
+# Called with the label after every mark (the startup splash shows progress this way).
+_listeners: list = []
+
+
 def mark(label: str) -> None:
-    """Stamp ``label`` at the current time. Safe to call from any thread."""
+    """Stamp ``label`` at the current time. Safe to call from any thread.
+
+    Listeners run on the calling thread, after the mark is stored. A listener that
+    raises is ignored: progress display must never break startup.
+    """
     now = time.perf_counter()
     with _lock:
         _marks.append((label, now))
+        listeners = list(_listeners)
+    for fn in listeners:
+        with contextlib.suppress(Exception):
+            fn(label)
+
+
+def add_listener(fn) -> None:
+    """Call ``fn(label)`` after every future mark."""
+    with _lock:
+        _listeners.append(fn)
+
+
+def remove_listener(fn) -> None:
+    with _lock:
+        if fn in _listeners:
+            _listeners.remove(fn)
 
 
 def reset() -> None:
-    """Forget every mark (tests)."""
+    """Forget every mark and listener (tests)."""
     with _lock:
         _marks.clear()
+        _listeners.clear()
 
 
 def _process_start_perf() -> float | None:
