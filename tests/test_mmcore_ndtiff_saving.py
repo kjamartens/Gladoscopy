@@ -166,6 +166,7 @@ _SKIP_ON_CI = pytest.mark.skipif(
 
 @_SKIP_ON_CI
 @pytest.mark.slow
+@pytest.mark.usefixtures("direct_mmcore_signals")
 def test_a_demo_mda_is_archived_as_ndtiff_at_the_acquisition_shape(tmp_path):
     """Against pymmcore-plus' demo camera, through the helpers the worker uses."""
     from pymmcore_plus import CMMCorePlus
