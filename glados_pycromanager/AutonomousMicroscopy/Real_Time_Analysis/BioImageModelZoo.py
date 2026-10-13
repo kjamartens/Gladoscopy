@@ -14,7 +14,6 @@ import math
 import time
 from pprint import pprint
 
-import dask.array as da
 import imageio
 import numpy as np
 # Load general dependencies

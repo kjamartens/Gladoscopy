@@ -13,8 +13,6 @@ import math
 import os
 import time
 
-import dask.array as da
-import ndtiff
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling

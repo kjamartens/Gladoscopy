@@ -1690,6 +1690,30 @@ Three companion files live alongside it:
   the largest startup step (6.5–7.7 s warm → ~3 s). They now run via
   `_ensure_bioimageio_patched()` on first use. `scipy.signal` is **not** exempt from the
   lazy-import rule.
+- **pycromanager, ndtiff, dask.array and pandas load on first use (L2.3, PyMMCorePlus
+  ready 13.6 → 11.6 s).** `pycromanager` (~2.7 s, nearly all `ndstorage → dask.array →
+  xarray → pandas`) was imported by MIL, `napariGlados` and `MDAGlados` at module scope.
+  Now:
+  - MIL resolves `PycroManagerCore`/`JavaObject`/`multi_d_acquisition_events` through a
+    module `__getattr__`. Backend detection uses `_pycromanager_type()`, which returns
+    None while pycromanager is unimported: a pycromanager core can't exist before then.
+  - `MDAGlados.__init__` stores its initial plan's arguments in
+    `_pendingInitialMDAKwargs`; the `mda` property builds it on first read, and a
+    rebuild or assignment drops it. The attribute is in both persistence skip lists.
+  - The acquisition worker gets `HardwareControlException` via
+    `_pycromanager_hardware_control_exception()`, so the first Live click on
+    PyMMCorePlus doesn't import pycromanager either.
+  - Node metadata names `ndtiff.NDTiffDataset` as a port type and **plugin discovery
+    calls every `__function_metadata__()` at startup**, so nodes and the Autonomous dock
+    use `glados_pycromanager.lazy_imports.ndtiff`. Its `NDTiffDataset` is a lazy class
+    tag: a real `type` that equals the real class and defers `isinstance`/calls/
+    attributes to it.
+
+  Tests: `tests/test_lazy_pycromanager.py`, and
+  `test_node_packages_import_light.py::test_startup_modules_do_not_import_pycromanager_or_dask`.
+  To see who imports what at startup, a meta-path finder that records the stack on a
+  module's first import is quicker than reading `-X importtime`, which only shows the
+  first importer's chain.
 - **`insiliscope.cfg` + Python backend segfaults in `start_headless`** (2026-10-13), even in a
   bare pycromanager script, while `MMConfig_demo.cfg` in the same install is fine. So the
   documented `--profile-runtime` command currently crashes there. The cause is the

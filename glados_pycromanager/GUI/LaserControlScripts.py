@@ -12,7 +12,6 @@ import matplotlib
 #from pycromanager import Core
 import numpy as np
 import pyqtgraph as pg
-from pycromanager import *
 
 matplotlib.use('Qt5Agg')
 import logging

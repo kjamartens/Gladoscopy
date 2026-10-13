@@ -35,8 +35,6 @@ from qtpy.QtWidgets import QMainWindow, QScrollArea, QVBoxLayout, QWidget
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from pycromanager import Acquisition, multi_d_acquisition_events
-
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.napariGlados as napariGlados
 import glados_pycromanager.GUI.utils as utils
@@ -1174,6 +1172,23 @@ class LivePollPacer:
         return fine
 
 
+class _NoPycromanagerHardwareError(Exception):
+    """Stands in for pycromanager's HardwareControlException while pycromanager is unimported."""
+
+
+def _pycromanager_hardware_control_exception():
+    """pycromanager's HardwareControlException, without importing pycromanager for it.
+
+    Only pycromanager's acquisition engine raises it, and that engine cannot run before
+    pycromanager is imported (start_headless does that on its two backends). On
+    PyMMCorePlus, importing it would cost ~2.7 s on the first Live click.
+    """
+    if 'pycromanager' not in sys.modules:
+        return _NoPycromanagerHardwareError
+    from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
+    return HardwareControlException
+
+
 class napariHandler:
     # Max time to wait, in acqModeChanged, for a previous acquisition worker to
     # fully stop before allowing a new one to start. Generous relative to normal
@@ -1922,7 +1937,7 @@ class napariHandler:
         Worker which handles live mode on/off turning etc
         
         """
-        from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
+        HardwareControlException = _pycromanager_hardware_control_exception()
         shared_data.register_perf_thread_label(get_native_id(), 'MDA/acquisition worker')
         # T-B2: refresh the mirrored hardware constants once here, on the
         # acquisition thread, so the GUI-thread display path reads plain
@@ -2017,6 +2032,7 @@ class napariHandler:
                             self._stop_frame_ring_consumer()
                             logging.info('Finished live!')
                         else: #Pycromanager backend, either JAVA or Python
+                            from pycromanager import Acquisition, multi_d_acquisition_events
                             if shared_data.config.mda_config.backend_method == 'saved':
                                 with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                                     self.shared_data._mdaModeAcqData = acq
@@ -2186,6 +2202,7 @@ class napariHandler:
                         self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
                         logging.info("Finished MDA!")
                     else: #Pycromanager backend, either JAVA or Python
+                        from pycromanager import Acquisition
                         if shared_data.config.mda_config.backend_method == 'saved':
                             logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
                             with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore

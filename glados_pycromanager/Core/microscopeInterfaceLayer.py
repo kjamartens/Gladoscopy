@@ -31,19 +31,55 @@ is never serialized behind a slow stage move.
 
 import functools
 import logging
+import sys
 import threading
 from enum import Enum
+from typing import TYPE_CHECKING
 
 import numpy as np
-from pycromanager import Core as PycroManagerCore
-from pycromanager import JavaObject, multi_d_acquisition_events
 from pymmcore import CMMCore as PymmcoreCore
 from pymmcore import Metadata as PymmcoreMetadata
 from pymmcore_plus import CMMCorePlus as PymmcorePlusCore
 
 from glados_pycromanager.errors import BackendError, MDAEventError
 
+if TYPE_CHECKING:
+    from pycromanager import Core as PycroManagerCore
+
 logger = logging.getLogger(__name__)
+
+#: pycromanager names this module used to import at module scope. Importing pycromanager
+#: costs ~2.7 s (ndstorage pulls in dask.array, xarray and pandas), which a PyMMCorePlus
+#: session never needs, so they resolve on first use instead (L2.3 of
+#: claude_launcher_project.md). ``MIL.PycroManagerCore`` etc. still work, via __getattr__.
+_LAZY_PYCROMANAGER_NAMES = {
+    'PycroManagerCore': 'Core',
+    'JavaObject': 'JavaObject',
+    'multi_d_acquisition_events': 'multi_d_acquisition_events',
+}
+
+
+def __getattr__(name):
+    if name in _LAZY_PYCROMANAGER_NAMES:
+        import pycromanager
+        value = getattr(pycromanager, _LAZY_PYCROMANAGER_NAMES[name])
+        globals()[name] = value
+        return value
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
+def _pycromanager_type(name):
+    """A pycromanager class for an isinstance check, or None while pycromanager is unimported.
+
+    A pycromanager core cannot exist before pycromanager has been imported, so backend
+    detection never needs to import it. A value already in globals() (resolved before,
+    or set by a test) wins.
+    """
+    if name in globals():
+        return globals()[name]
+    if 'pycromanager' not in sys.modules:
+        return None
+    return __getattr__(name)
 
 
 class MicroscopeInstance(Enum):
@@ -70,7 +106,7 @@ class MicroscopeInterfaceLayer:
         # One re-entrant lock per MIL instance, guarding every method that
         # touches self.core (see the module docstring and @_hardware_locked).
         self._hw_lock = threading.RLock()
-        self.core: PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None = None
+        self.core: 'PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None' = None
         # Cached backend tag — computed once in `set_core` so each MIL call
         # doesn't re-run the isinstance + Java-bridge attribute chain.
         # Phase 6.1 of claude_project.md.
@@ -144,12 +180,14 @@ class MicroscopeInterfaceLayer:
             return MicroscopeInstance.MMCORE_PLUS
         if isinstance(core, PymmcoreCore):
             return MicroscopeInstance.PYCROMANAGER_PYTHON
-        if isinstance(core, PycroManagerCore):
+        pycromanager_core = _pycromanager_type('PycroManagerCore')
+        java_object = _pycromanager_type('JavaObject')
+        if pycromanager_core is not None and isinstance(core, pycromanager_core):
             return MicroscopeInstance.PYCROMANAGER_JAVA
-        if JavaObject and isinstance(core, JavaObject):
+        if java_object and isinstance(core, java_object):
             return MicroscopeInstance.PYCROMANAGER_JAVA
         if (
-            JavaObject
+            java_object
             and hasattr(core, "_interfaces")
             and len(core._interfaces) > 1
             and core._interfaces[1] == "java.lang.Object"
@@ -1397,6 +1435,7 @@ class MicroscopeInterfaceLayer:
             # pycromanager helper's mutex check (xy vs xyz, channels vs
             # exposures, etc.) sees genuine absence rather than empty-list
             # presence.
+            from pycromanager import multi_d_acquisition_events
             try:
                 self.mda = multi_d_acquisition_events(
                     num_time_points=num_time_points,

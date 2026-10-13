@@ -7,6 +7,7 @@ Includes classes for Interactive Lists such as the Channels, XY positions.
 import itertools
 import logging
 import math
+import copy
 import os
 import sys
 import time
@@ -14,7 +15,6 @@ from collections.abc import Iterable
 from typing import List
 
 import appdirs
-from pycromanager import multi_d_acquisition_events
 from PyQt5.QtCore import (
     QTimer,
     pyqtSignal,
@@ -515,10 +515,19 @@ class MDAGlados(CustomMainWindow):
         `mda_useq` is the source of truth: `get_MDA_events_from_GUI` builds it and
         only invalidates this cache, because `to_pycromanager()` materialises and
         pydantic-validates one dict per event. The conversion runs on first read and
-        is cached until the next rebuild. An explicit assignment (the constructor,
-        `setMDAparams`, a recipe load) is stored as-is.
+        is cached until the next rebuild. An explicit assignment (`setMDAparams`, a
+        recipe load) is stored as-is.
+
+        The constructor's initial plan is built on first read as well, from the
+        arguments `_pendingInitialMDAKwargs` holds: `multi_d_acquisition_events` lives in
+        pycromanager, whose import (dask.array via ndstorage, ~2.7 s) must not run while
+        the MDA dock is built (L2.3 of claude_launcher_project.md).
         """
         events = getattr(self, '_mda', None)
+        if events is None and getattr(self, '_pendingInitialMDAKwargs', None) is not None:
+            from pycromanager import multi_d_acquisition_events
+            events = multi_d_acquisition_events(**self._pendingInitialMDAKwargs)  # type:ignore
+            self._mda, self._pendingInitialMDAKwargs = events, None
         if events is None:
             sequence = getattr(self, 'mda_useq', None)
             if sequence is not None:
@@ -530,6 +539,7 @@ class MDAGlados(CustomMainWindow):
     @mda.setter
     def mda(self, value):
         self._mda = value
+        self._pendingInitialMDAKwargs = None
 
     def _mdaEventsForAcquisition(self):
         """What an acquire path assigns to `shared_data._mdaModeParams`.
@@ -539,6 +549,8 @@ class MDAGlados(CustomMainWindow):
         which `Shared_data._mdaModeParams` converts lazily on first read, i.e. on the
         acquisition worker for the pycromanager backends rather than on the GUI thread.
         """
+        if getattr(self, '_pendingInitialMDAKwargs', None) is not None:
+            return self.mda  # the constructor's plan, still unbuilt
         events = getattr(self, '_mda', None)
         return events if events is not None else getattr(self, 'mda_useq', None)
 
@@ -692,8 +704,10 @@ class MDAGlados(CustomMainWindow):
             self.initGUI(GUI_show_exposure=self.GUI_show_exposure,GUI_show_xy=self.GUI_show_xy, GUI_show_z=self.GUI_show_z, GUI_show_channel=self.GUI_show_channel, GUI_show_time=self.GUI_show_time, GUI_show_order=self.GUI_show_order, GUI_show_storage=self.GUI_show_storage, GUI_acquire_button=self.GUI_acquire_button)
             self.has_GUI = True
         
-        #initiate with an empty mda, or mda based on GUI:
-        self.mda = multi_d_acquisition_events(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order) #type:ignore
+        #initiate with an empty mda, or mda based on GUI. Built on first read of `mda`
+        #(see that property): building it here would import pycromanager during startup.
+        self._mda = None
+        self._pendingInitialMDAKwargs = copy.deepcopy(dict(num_time_points=self.num_time_points, time_interval_s=self.time_interval_s,z_start=self.z_start,z_end=self.z_end,z_step=self.z_step,channel_group=self.channel_group,channels=self.channels,channel_exposures_ms=self.channel_exposures_ms,xy_positions=self.xy_positions,xyz_positions=self.xyz_positions,position_labels=self.position_labels,order=self.order))
         
         self.fully_started = True
         #check if mda_state.json exists:
@@ -1966,6 +1980,7 @@ class MDAGlados(CustomMainWindow):
         )
         #Invalidate the pycromanager event list; the `mda` property converts on first read (T-H2)
         self._mda = None
+        self._pendingInitialMDAKwargs = None
         #TODO: improve MDA call from useq
         
         logging.debug('mda_useq: %s', self.mda_useq)

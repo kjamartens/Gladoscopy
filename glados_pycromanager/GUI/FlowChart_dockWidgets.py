@@ -23,7 +23,7 @@ import napari
 import numpy as np
 import pyperclip
 import tifffile
-from ndtiff import NDTiffDataset
+from glados_pycromanager.lazy_imports import ndtiff  # imports on first use (dask)
 from PIL import Image
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import (
@@ -2226,7 +2226,7 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
             
             #Set the variableNodz info, maybe later do this in seperate function?
             newNode.variablesNodz['data'] = {}
-            newNode.variablesNodz['data']['type'] = [NDTiffDataset, np.ndarray]
+            newNode.variablesNodz['data']['type'] = [ndtiff.NDTiffDataset, np.ndarray]
             newNode.variablesNodz['data']['data'] = None
             newNode.variablesNodz['data']['importance'] = 'Default'
             newNode.variablesNodz['order'] = {}

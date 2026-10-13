@@ -10,8 +10,6 @@ import inspect
 # from shapely import Polygon, affinity
 import math
 
-import dask.array as da
-import ndtiff
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
