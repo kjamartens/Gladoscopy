@@ -25,8 +25,6 @@ ROLE_PRIMARY = "primary"
 ROLE_READONLY = "readonly"
 ROLE_WARNING = "warning"
 ROLE_NORMAL = "normal"
-#: Dense controls (e.g. the Stages blocks): thin borders, little padding/margin.
-ROLE_COMPACT = "compact"
 
 
 @dataclass(frozen=True)
@@ -96,16 +94,23 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     """The stylesheet applied to the Glados docks."""
     t = theme or current_theme()
     family = f'font-family: "{t.font_family}";' if t.font_family else ""
-    m = t.widget_margin_px
+    # Dense by design (2026-10-13): the padding/margin actually used are derived
+    # from the theme values (`compact_*` below) rather than taken as-is, so the
+    # look changes for existing installs too -- their glados_state.json stores the
+    # old Theme defaults verbatim.
+    pad, m = compact_padding(t), compact_margin(t)
     return f"""
     QWidget {{
         font-size: {t.font_px}px;
         {family}
-        padding: {t.widget_padding_px}px {t.widget_padding_px}px;
+        padding: {pad}px {2 * pad}px;
         margin: {m}px {m}px {m}px {m}px;
     }}
+    QPushButton {{
+        padding: {pad + 2}px {3 * pad}px;
+    }}
     QLineEdit {{
-        border-width: 3px 3px;
+        border-width: 1px;
         min-height: {t.control_min_px}px;
         min-width: {t.control_min_px}px;
     }}
@@ -167,32 +172,19 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     QLineEdit[gladosRole="{ROLE_WARNING}"] {{
         border: 1px solid {t.warning};
     }}
-    QWidget[gladosRole="{ROLE_COMPACT}"] QLineEdit,
-    QWidget[gladosRole="{ROLE_COMPACT}"] QPushButton,
-    QWidget[gladosRole="{ROLE_COMPACT}"] QLabel,
-    QWidget[gladosRole="{ROLE_COMPACT}"] QComboBox {{
-        padding: {compact_padding(t)}px {2 * compact_padding(t)}px;
-        margin: {compact_margin(t)}px;
-    }}
-    QWidget[gladosRole="{ROLE_COMPACT}"] QLineEdit {{
-        border-width: 1px;
-    }}
-    QWidget[gladosRole="{ROLE_COMPACT}"] QPushButton {{
-        padding: {compact_padding(t) + 2}px {3 * compact_padding(t)}px;
-    }}
     """
 
 
 def compact_padding(theme: Theme | None = None) -> int:
-    """Vertical padding of a control inside a `ROLE_COMPACT` widget (px)."""
+    """Vertical padding of a control in the Glados docks (px); horizontal is twice this."""
     return max(1, (theme or current_theme()).widget_padding_px // 2)
 
 
 def compact_spacing(theme: Theme | None = None) -> int:
-    """Gap between the controls of a `ROLE_COMPACT` widget's grids (px)."""
+    """Gap between the controls of a section's layout (px)."""
     return max(1, (theme or current_theme()).section_spacing_px // 2)
 
 
 def compact_margin(theme: Theme | None = None) -> int:
-    """Margin around a control inside a `ROLE_COMPACT` widget (px)."""
+    """Margin around a control in the Glados docks (px)."""
     return max(0, (theme or current_theme()).widget_margin_px // 2)

@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from glados_pycromanager.ui.layout.theme import ROLE_SECTION, current_theme, set_role
+from glados_pycromanager.ui.layout.theme import ROLE_SECTION, compact_spacing, current_theme, set_role
 
 
 def apply_section_spacing(layout: QLayout, margins: bool = True, title_px: int = 0) -> None:
@@ -32,7 +32,7 @@ def apply_section_spacing(layout: QLayout, margins: bool = True, title_px: int =
     stylesheet zeroes QGroupBox padding, so nothing else reserves it.
     """
     t = current_theme()
-    layout.setSpacing(t.section_spacing_px)
+    layout.setSpacing(compact_spacing(t))
     m = t.section_margin_px if margins else 0
     layout.setContentsMargins(m, m + title_px, m, m)
 
@@ -125,7 +125,7 @@ class FlowLayout(QLayout):
         super().__init__(parent)
         self._items = []
         self.setContentsMargins(0, 0, 0, 0)
-        self.setSpacing(current_theme().section_spacing_px if spacing is None else spacing)
+        self.setSpacing(compact_spacing() if spacing is None else spacing)
 
     def addItem(self, item):  # noqa: N802 -- Qt override
         self._items.append(item)

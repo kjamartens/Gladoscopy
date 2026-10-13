@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from glados_pycromanager.ui.layout.theme import current_theme
+from glados_pycromanager.ui.layout.theme import compact_spacing, current_theme
 
 
 def configure_table_header(table: QTableWidget, stretch_columns=None, min_rows: int | None = None) -> None:
@@ -59,7 +59,7 @@ class ListEditor(QWidget):
         super().__init__(parent)
         self.table = table
         self._stretch_columns = stretch_columns
-        spacing = current_theme().section_spacing_px
+        spacing = compact_spacing()
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(spacing)

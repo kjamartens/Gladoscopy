@@ -852,6 +852,11 @@ acquisition, just materialised.
   `runNapariPycroManager`, and by `GladosWidget.__init__` on the plugin path), styled
   per widget by a `gladosRole` property set with `set_role()` (`section`, `primary`
   for Acquire, `readonly`, `warning`/`normal`). The pieces:
+  - **The docks are dense:** `build_stylesheet` derives padding/margin as
+    `compact_padding`/`compact_margin` (half the stored `widget_padding_px`/`widget_margin_px`;
+    buttons a little taller), line edits get 1 px borders, and section-internal spacing is
+    `compact_spacing`. Derived, not stored, because `glados_state.json` keeps the old
+    Theme defaults verbatim -- changing a default would not reach existing installs.
   - `theme.Theme` — every size/colour; defaults reproduce the old inline
     `ScaledStylesheet` (14 px font and Windows metrics x0.75). Persisted as the
     all-hidden `LayoutConfig` (`config.layout_config`, same field names, fed through
@@ -890,9 +895,7 @@ acquisition, just materialised.
     inner = smallest step; emits `stepRequested(dx, dy, size)`, `_onXYDialStep` moves by
     `XYMoveEditField[X_/Y_<size>]`; it doubles as `XYStageInfoWidget`, a `setText`
     readout) over a step table whose FOV buttons sit under the column they fill. Z is
-    dropdown / rail / step fields. Both carry `ROLE_COMPACT` (theme stylesheet: thin
-    borders, `compact_padding`/`compact_margin`); step columns are sized by
-    `_stepColumnWidth`. The dial colours blend the palette's Window/WindowText only --
+    dropdown / rail / step fields; step columns are sized by `_stepColumnWidth`. The dial colours blend the palette's Window/WindowText only --
     under napari's dark QSS, Button/Base keep Qt's light defaults. Advanced settings
     support `input_type="checkbox"` (stores a real bool; `utils.settingIsTrue` reads either
     form) -- used by `VisualisationConfig.show_scripts_section` (Scripts box, default off).

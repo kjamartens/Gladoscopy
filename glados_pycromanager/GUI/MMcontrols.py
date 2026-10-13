@@ -54,7 +54,6 @@ from glados_pycromanager.ui.widgets.stage_dial import RING_NAMES, StageDial
 from glados_pycromanager.ui.layout import (
     LANDSCAPE,
     PORTRAIT,
-    ROLE_COMPACT,
     ROLE_READONLY,
     TALL,
     WIDE,
@@ -178,7 +177,7 @@ STEP_FIELD_SAMPLE_TEXT = "0000.0"
 
 def _stepColumnWidth(widget, sample=STEP_FIELD_SAMPLE_TEXT):
     """Width of a stage step-size column: what `sample` needs in `widget`'s font."""
-    #Inside a ROLE_COMPACT block: horizontal padding, 1px borders, margins, slack
+    #Horizontal padding, 1px borders and margins of a dock control, plus slack
     padding = 2 * (2 * compact_padding() + 1 + compact_margin()) + 4
     return widget.fontMetrics().horizontalAdvance(sample) + padding
 
@@ -1648,11 +1647,9 @@ class MMConfigUI(CustomMainWindow):
         self.xyStageBlock = QWidget()
         self.xyStageBlock.setLayout(self.XYstageLayout())
         self.xyStageBlock.setVisible(bool(self.shared_data.MILcore.get_xy_stage_device()))
-        set_role(self.xyStageBlock, ROLE_COMPACT)
         stageLayout.addWidget(self.xyStageBlock, alignment=Qt.AlignmentFlag.AlignTop)
         self.zStageBlock = self.oneDstageLayout()
         self.zStageBlock.setVisible(self.oneDstageDropdown.count() > 0)
-        set_role(self.zStageBlock, ROLE_COMPACT)
         stageLayout.addWidget(self.zStageBlock, alignment=Qt.AlignmentFlag.AlignTop)
         #Pack to the left: the section should be as wide as its content, not
         #spread its controls over whatever width the grid gives it.
