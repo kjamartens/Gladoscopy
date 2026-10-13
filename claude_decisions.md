@@ -4242,3 +4242,44 @@ stale-install warning), `shortcuts.py`, `install_check.py`, `pyproject.toml`, `M
 `scripts/profile_startup_full.py`, `Core/microscopeInterfaceLayer.py`
 (`_config_setting`), tests `test_launcher.py`, `test_mil_config_groups.py`, `conftest.py`,
 `test_mmcore_mda_saving.py`, `test_mmcore_ndtiff_saving.py`.
+
+## 2026-10-13 — Startup speed, L2.2–L2.6 of `claude_launcher_project.md`  [launcher]
+
+User: "do all L2 — ignore java backend crash, remove java backend from end-to-end tests,
+put a (deprecated) in the GUI after java option. Ignore the insiliscope crash. Ignore L3."
+That approves the gated L2.5. Every item was an interleaved A/B (`ab_startup.py`, a git
+worktree of the previous commit, medians of 4–5); only wins were kept.
+
+- **JAVA: labelled "Java (deprecated)" in the start dialog and left out of every launch
+  and profiling run.** Its known failures are not being fixed, but it stays selectable and
+  its mocked unit tests stay. `make profile-startup-full` profiles the Python backend on
+  `MMConfig_demo.cfg`, because `insiliscope.cfg` segfaults in `start_headless`.
+- **L2.3 goes further than planned: ndtiff, dask.array and pandas are lazy too.** Making
+  only pycromanager lazy saves little, because ndtiff pulls the same dask chain. Node
+  metadata uses ndtiff's class as a port type, read by plugin discovery at startup, so it
+  gets a lazy class *tag* (a real `type`, equal to the real class) rather than a rewrite of
+  every node's metadata. `LaserControlScripts.py`'s `from pycromanager import *` hid seven
+  undefined names (`ValInt`, `duration`, `delay`, `everyxframes`); they were already bugs
+  and are left as they are.
+- **L2.4: hidden viewer rejected.** It moved the first GL paint (~2 s) without removing it.
+  pint's disk cache and the single napari settings save were kept. The pint cache goes in
+  pint's own `:auto:` folder rather than Glados' AppData, and only while the app registry
+  is still lazy: replacing a built registry would split quantities across registries.
+- **L2.2 is the biggest single win (−5.7 s)**, more than the pool's own spawn cost: the
+  child's imports had been slowing every other startup step.
+- **L2.5 queues only the circular-buffer allocation on the owner thread**, not the whole
+  backend start. The `CMMCorePlus` constructor and `loadSystemConfiguration` take ~20 ms on
+  the demo config, and moving them off the GUI thread would bring the pymmcore/Qt
+  thread-affinity risk the plan flagged, for nothing. The allocation is the only slow
+  part. Queued first on a FIFO owner thread under MIL's lock, it cannot race an
+  acquisition. The GUI build's first hardware read had to move after the viewer, or the
+  GUI thread just waited for the lock (first A/B: zero gain).
+- **L2.6 stays documentation**: the Defender exclusion is a security setting for the
+  user or IT, so nothing applies it.
+
+**Affects:** `GUI/GUI_napari.py`, `GUI/napariGlados.py`, `GUI/napariHelperFunctions.py`,
+`GUI/startup_splash.py` (unchanged after the hidden-viewer revert),
+`Core/microscopeInterfaceLayer.py`, `Core/MDAGlados.py`, `lazy_imports.py`, node modules,
+`Documentation/UserManual.md`, `Makefile`; tests `test_lazy_pycromanager.py`,
+`test_node_packages_import_light.py`, `test_startup_napari_costs.py`,
+`test_startup_deferred_pool.py`, `test_startup_circular_buffer.py`.

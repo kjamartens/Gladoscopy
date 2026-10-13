@@ -198,23 +198,52 @@ and a splash on screen ≤ 1.5 s after the click, on every launch, cold or warm.
     above Glados but not above other apps.
   - On screen 0.6–4 s after launch, depending on machine load. A screen grab confirmed that
     the repaint-only updates (no event loop) reach the screen.
-- [ ] **L2.2 Defer the warm RT subprocess pool** until ready (`QTimer.singleShot` after
-  layout finalisation). Today it spawns and re-imports the package tree while startup is
-  still competing for the same cores.
-- [ ] **L2.3 Lazy `pycromanager`** in `microscopeInterfaceLayer.py` / `GUI_napari.py`: import
-  it only on the JAVA/Python branches (~1.2 s saved on PyMMCorePlus). Also check whether
-  `ndstorage`/`dask.array` can follow.
-- [ ] **L2.4 Investigate after L0:** napari/npe2 plugin discovery at viewer creation (napari[all]
-  brings plugins), dock construction for tabs not visible at start, AppData node discovery,
-  `cleanUpTemporaryFiles`. Optimise only what the timeline shows is large.
-- [ ] **L2.5 Maybe: overlap backend start with GUI build.** JVM start / `loadSystemConfiguration`
-  run serially before the viewer. Running them on a thread while napari builds could hide
-  seconds. **Gated:** it touches the single-owner-thread invariant and the documented
-  pymmcore/Qt crash. Only attempt it if L0 shows backend start dominates, and get user
-  approval first.
-- [ ] **L2.6 Document only (user decision):** `compileall` after `make dev`, and a Defender
-  exclusion for `.venv`, which is often the biggest *cold* start cost on managed Windows. This
-  is a security setting, so we document it and don't apply it.
+- [x] **L2.2 Defer the warm RT subprocess pool** until ready. It now starts in
+  `GUI_napari.main()`'s `_on_startup_ready`, after `apply_foreground_scheduling_hints` (so the
+  child inherits the priority class), and not at all under `--startup-exit`. PyMMCorePlus
+  ready 16.65 → 10.93 s (median of 5, interleaved A/B). Every later step got faster: the
+  child's package-tree + diplib import had been competing for the same cores.
+- [x] **L2.3 Lazy `pycromanager`, `ndtiff`, `dask.array`, `pandas`.** pycromanager costs
+  ~2.7 s, nearly all `ndstorage → dask.array → xarray → pandas`, so ndtiff and dask had to
+  follow. Node metadata names `ndtiff.NDTiffDataset` and plugin discovery reads that
+  metadata at startup, hence `lazy_imports.ndtiff` (a lazy class tag). PyMMCorePlus ready
+  −1.94 s. Python and JAVA still import pycromanager when they start their backend.
+- [x] **L2.4 napari's own costs.** Findings, in order of size:
+  - pint's unit registry, first built by the scale bar: definitions-file parse 0.8 s.
+    `use_cached_unit_registry()` → pint's disk cache: `showScaleBar` 0.90 → 0.22 s.
+  - napari saves its settings file each time a dock's area is recorded: 8 saves
+    (0.51 s) → 1 (0.06 s), by suspending save-on-change from before `napari.Viewer()`
+    until the layout is final.
+  - **Rejected:** creating the viewer hidden. The canvas's *first* GL paint costs ~2 s
+    wherever it happens; ready −0.17 s (noise).
+  - Left alone: npe2 plugin discovery (0.39 s), MDA/Autonomous dock construction
+    (~0.25 s each), AppData node discovery and `cleanUpTemporaryFiles` (both ~0).
+  - A meta-path tracer's "first importer" also catches `find_spec` probes:
+    napari_console looked like a startup import and wasn't.
+- [x] **L2.5 Overlap backend start with GUI build** (approved by the user, 2026-10-13: "do
+  all L2"). The PyMMCorePlus backend step after the config load was entirely the 4 GB
+  circular-buffer allocation (1.75 s; engine registration is 4 ms). It is now the
+  MicroscopeService's first job (`_allocate_circular_buffer`, hardware-locked MIL
+  method), so the single-owner invariant holds. The Python backend starts headless with a
+  64 MB placeholder and gets its size the same way. The first attempt gained nothing: the
+  GUI build's first MIL read (`get_focus_device`) came before the viewer and waited out the
+  allocation on the lock. It now sits after `InitateNapariUI`. Post-import span: −1.5 s
+  PyMMCorePlus (two A/Bs of 5), −0.6 s Python (A/B of 4). JAVA unchanged (out of scope).
+- [x] **L2.6 Documented only:** UserManual "Faster startup on Windows (optional)": the
+  `compileall` command (verified: exit 0, 67 s) and the Defender exclusion, with the
+  security caveat. Neither is applied.
+
+**L2 result** (`make profile-startup-full`, median of 3, warm, ready from process start):
+
+| | L0 baseline | after L2.0/L2.1/L1 | after all of L2 |
+|---|---|---|---|
+| PyMMCorePlus demo | 23.43 s | 11.76 s | **8.28 s** |
+| Python, `MMConfig_demo.cfg` | 18.23 s | 12.26 s | **8.42 s** |
+
+What is left, per step: imports ~3.2–3.5 s (napari.qt ~2.85 s of it is unavoidable),
+Controls dock ~1.9–2 s (much of it is the canvas's first GL paint, which the hidden-viewer
+test moved rather than removed),
+viewer ~0.7–0.8 s, the other two docks ~0.5 s.
 
 ## Phase L3 — Installable bootstrap (optional, for other lab PCs)
 
