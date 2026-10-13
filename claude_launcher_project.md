@@ -103,11 +103,26 @@ Findings that redirect L2:
   outside Glados; see `claude_decisions.md` (2026-10-13). The Python numbers above
   use `MMConfig_demo.cfg` in the same install.
 
-**Proposed L2 target (to confirm):** warm ready ≤ 15 s on the PyMMCorePlus demo (from 23.4),
+**L2 target (accepted 2026-10-13):** warm ready ≤ 15 s on the PyMMCorePlus demo (from 23.4),
 and a splash on screen ≤ 1.5 s after the click, on every launch, cold or warm.
 
-- [ ] **L2.0** Profile `microManagerControlsUI` construction (cProfile on the GUI thread, single
-  thread, so the cumulative times are valid here) and fix the top item(s).
+- [x] **L2.0** Profile `microManagerControlsUI` construction and fix the top item(s).
+  - **Cause:** the dock did almost no widget work. It was **importing libraries**: node
+    discovery imports every Real_Time_Analysis module, and `BioImageModelZoo.py` ran three
+    bioimageio compatibility patches **at module scope**. They imported `bioimageio.spec`,
+    `bioimageio.core` and its PyTorch backend, so torch came in too. Several nodes also had
+    a module-scope `from scipy import signal` (+ `scipy.stats`, ~1 s), unused in three of them.
+  - **Fix:** `_ensure_bioimageio_patched()`, called before the first bioimageio import on
+    each path (`getModel`, `setupSample`, `__init__`). scipy.signal now imports inside the
+    functions that use it (or is dropped where unused). Regression test:
+    `tests/test_node_packages_import_light.py`.
+  - **Interleaved A/B** (fixed/original ×2, on a loaded machine: Firefox was using ~1.5 cores):
+    Controls dock 2.8–4.0 s vs 10.0–14.5 s, ready **12.1–15.5 s vs 19.8–35.3 s**. The node
+    packages import in ~0.1 s, down from 2.3 s standalone.
+  - Not a GUI cost: `_readOneDstagePosition` showed 2.6 s in the profile. It runs on the
+    owner thread (`submitHardware` is fire-and-forget) and was most likely starved of the
+    GIL while the GUI thread imported; Python 3.13's cProfile records other threads too.
+  - Still open: re-run `make profile-startup-full` on an idle machine for clean numbers.
 
 ## Phase L1 — One-click launcher (Windows)
 
@@ -153,11 +168,23 @@ and a splash on screen ≤ 1.5 s after the click, on every launch, cold or warm.
 
 ## Phase L2 — Startup speed (each item is an A/B against the L0 timeline; keep only wins)
 
-- [ ] **L2.1 Splash immediately.** `import pymmcore` → `PyQt5.QtWidgets` → create the
-  **single** `QApplication` → show a `QSplashScreen` (`GladosSplash.png`) with status text
-  from the timeline marks → only *then* import napari and the Glados GUI modules. Reuse that
-  app for the backend dialog, which removes `appSmall`. This is the largest *perceived* win.
-  Risk: the pymmcore-before-Qt ordering, and the napari settings call order.
+- [x] **L2.1 Splash immediately.** Done as planned, with these details:
+  - `GUI/startup.py` is the light entry point. The console scripts point at it, and
+    `GUI_napari.py`'s `__main__` branch delegates to it before its heavy imports. It imports
+    pymmcore, then PyQt5, creates the single `QApplication` and shows `GUI/startup_splash.py`'s
+    `StartupSplash`. Only then does it import `GUI_napari`. `appSmall` is gone: the backend
+    dialog runs in a local `QEventLoop` on the same app.
+  - The splash follows the timeline marks (`STEP_AFTER_MARK`) and shows the next step plus
+    elapsed seconds. It closes at ready.
+  - The image is the **light** splash downscaled to 720 px (`GladosSplash_720.png`, from
+    `scripts/make_splash_images.py`; the 4372 px source alone took ~350 ms to load). The
+    backend dialog uses the same file.
+  - **Not stay-on-top** (user request): it comes up on top once via a Win32
+    topmost/not-topmost bring-to-front, so any window can then go over it. Once napari's
+    window exists the splash becomes its *owned* window (`setTransientParent`), so it stays
+    above Glados but not above other apps.
+  - On screen 0.6–4 s after launch, depending on machine load. A screen grab confirmed that
+    the repaint-only updates (no event loop) reach the screen.
 - [ ] **L2.2 Defer the warm RT subprocess pool** until ready (`QTimer.singleShot` after
   layout finalisation). Today it spawns and re-imports the package tree while startup is
   still competing for the same cores.
