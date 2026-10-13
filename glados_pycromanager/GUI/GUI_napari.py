@@ -307,6 +307,28 @@ def register_resilient_pycromanager_python_engine(shared_data):
                  'live Z-settle-wait control (MDAConfig.pycromanager_wait_for_z_settle)')
 
 
+class MicroManagerStartError(RuntimeError):
+    """Micro-Manager failed to start; the message is the reason it gave."""
+
+
+def connect_headless_core(Core, start_error=None):
+    """Connect to the core `start_headless()` just launched.
+
+    When `start_headless()` itself failed (e.g. a config property the device
+    does not have), `Core()` then fails with pycromanager's generic "Is
+    Micro-Manager running and is the ZMQ server on 4827 option enabled?" --
+    which hides the actual cause. Report the start error instead, with the
+    connection error chained for the log.
+    """
+    try:
+        return Core()
+    except Exception as core_exc:
+        if start_error is None:
+            raise
+        raise MicroManagerStartError(
+            f'Micro-Manager could not start:\n{start_error}') from core_exc
+
+
 def perform_post_closing_actions(shared_data:Shared_data):
     """Performing closing actions
 
@@ -852,21 +874,24 @@ def main(app=None, splash=None):
                 python_backend = headlessGUIv.backend == 'Python'
                 if python_backend:  # the real size is allocated on the owner thread below
                     circular_buffer_mb = int(headlessGUIv.buffer_size_mb)
+                start_error = None
                 try:
                     start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=python_backend,
                                    buffer_size_mb=(HEADLESS_PLACEHOLDER_BUFFER_MB if python_backend
                                                    else int(headlessGUIv.buffer_size_mb)),
                                    max_memory_mb=int(headlessGUIv.max_memory_mb))
                 except Exception as e:
-                    print("Error!")
-                    print(e)
-                    
+                    # Not fatal by itself; connect_headless_core() reports it if
+                    # connecting to the core then fails.
+                    start_error = e
+                    logging.exception('Micro-Manager reported an error while starting')
+
                 #Also store some settings in shared_data
                 shared_data._headless = True
                 shared_data.backend = headlessGUIv.backend
                 # shared_data.core = core
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
-                shared_data.MILcore.set_core(Core())
+                shared_data.MILcore.set_core(connect_headless_core(Core, start_error))
                 if headlessGUIv.backend == 'Python':
                     register_resilient_pycromanager_python_engine(shared_data)
             elif headlessGUIv.pyMMCorePlusRadio.isChecked():
