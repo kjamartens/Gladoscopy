@@ -234,8 +234,12 @@ and a splash on screen ≤ 1.5 s after the click, on every launch, cold or warm.
   focuses the existing window. Tests (`tests/test_launcher_*.py`, < 1 min): shortcut spec
   builder, `--last` arg resolution, stdout redirection, AUMID call (mocked ctypes), single
   instance guard.
-- After L2: the timeline beats the baseline on median-of-3 for both backends, with no
-  regression in `make test`.
+- After L2: the timeline beats the baseline on median-of-3 for both backends (Python and
+  PyMMCorePlus), with no regression in `make test`.
+- **JAVA is out of scope for end-to-end checks** (user decision, 2026-10-13): the backend is
+  labelled "(deprecated)" in the dialog, its known failures (`get_roi` IndexError,
+  javaw left running after quit) are not being fixed, and no launch/profiling run uses it.
+  It stays selectable, and its unit tests (mocked bridge) stay.
 
 ## Open questions (defaults in brackets)
 

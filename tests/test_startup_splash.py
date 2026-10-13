@@ -68,6 +68,14 @@ def test_backend_dialog_uses_the_same_splash_image():
     assert "'GladosSplash_inv.png'" not in text
 
 
+def test_backend_dialog_marks_java_deprecated_but_keeps_it_selectable():
+    text = (GUI / 'GUI_napari.py').read_text(encoding='utf-8')
+    assert "QRadioButton('Java (deprecated)', self)" in text
+    # A saved 'JAVA' setup still selects it, and --last/--backend still accept it.
+    assert "headless_backend == 'JAVA'" in text
+    assert "HEADLESS_BACKENDS = ('JAVA', 'Python', 'PyMMCorePlus')" in text
+
+
 def test_splash_follows_marks_and_stops_when_done(app):
     splash = startup_splash.StartupSplash()
     assert splash._step == startup_splash.FIRST_STEP

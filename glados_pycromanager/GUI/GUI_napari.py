@@ -414,7 +414,9 @@ class headlessGUI(QWidget):
 
         self.pyMMCorePlusRadio = QRadioButton('PyMMCore+ (testing)', self)
         self.pythonRadio = QRadioButton('Python (recommended)', self)
-        self.javaRadio = QRadioButton('Java', self)
+        self.javaRadio = QRadioButton('Java (deprecated)', self)
+        self.javaRadio.setToolTip('The Java Micro-Manager bridge is no longer maintained or tested. '
+                                  'Use Python or PyMMCore+.')
         self.pyMMCorePlusRadio.setChecked(False)
         self.pythonRadio.setChecked(False)
         self.javaRadio.setChecked(False)
@@ -571,7 +573,7 @@ def main(app=None, splash=None):
     parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
     parser.add_argument('--backend', choices=['JAVA', 'Python', 'PyMMCorePlus'],
-                        help='MM backend to start headlessly. Combined with --config, '
+                        help='MM backend to start headlessly (JAVA is deprecated). Combined with --config, '
                              'bypasses the startup popup (useful for testing/profiling).')
     parser.add_argument('--config', help='Path to the Micro-Manager .cfg file (skips popup when set with --backend).')
     parser.add_argument('--mm-path', help='Path to the Micro-Manager install directory (defaults to the config in Shared_data).')
