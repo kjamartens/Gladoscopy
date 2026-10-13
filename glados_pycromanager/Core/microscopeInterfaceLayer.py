@@ -31,19 +31,55 @@ is never serialized behind a slow stage move.
 
 import functools
 import logging
+import sys
 import threading
 from enum import Enum
+from typing import TYPE_CHECKING
 
 import numpy as np
-from pycromanager import Core as PycroManagerCore
-from pycromanager import JavaObject, multi_d_acquisition_events
 from pymmcore import CMMCore as PymmcoreCore
 from pymmcore import Metadata as PymmcoreMetadata
 from pymmcore_plus import CMMCorePlus as PymmcorePlusCore
 
 from glados_pycromanager.errors import BackendError, MDAEventError
 
+if TYPE_CHECKING:
+    from pycromanager import Core as PycroManagerCore
+
 logger = logging.getLogger(__name__)
+
+#: pycromanager names this module used to import at module scope. Importing pycromanager
+#: costs ~2.7 s (ndstorage pulls in dask.array, xarray and pandas), which a PyMMCorePlus
+#: session never needs, so they resolve on first use instead (L2.3 of
+#: claude_launcher_project.md). ``MIL.PycroManagerCore`` etc. still work, via __getattr__.
+_LAZY_PYCROMANAGER_NAMES = {
+    'PycroManagerCore': 'Core',
+    'JavaObject': 'JavaObject',
+    'multi_d_acquisition_events': 'multi_d_acquisition_events',
+}
+
+
+def __getattr__(name):
+    if name in _LAZY_PYCROMANAGER_NAMES:
+        import pycromanager
+        value = getattr(pycromanager, _LAZY_PYCROMANAGER_NAMES[name])
+        globals()[name] = value
+        return value
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
+def _pycromanager_type(name):
+    """A pycromanager class for an isinstance check, or None while pycromanager is unimported.
+
+    A pycromanager core cannot exist before pycromanager has been imported, so backend
+    detection never needs to import it. A value already in globals() (resolved before,
+    or set by a test) wins.
+    """
+    if name in globals():
+        return globals()[name]
+    if 'pycromanager' not in sys.modules:
+        return None
+    return __getattr__(name)
 
 
 class MicroscopeInstance(Enum):
@@ -70,7 +106,7 @@ class MicroscopeInterfaceLayer:
         # One re-entrant lock per MIL instance, guarding every method that
         # touches self.core (see the module docstring and @_hardware_locked).
         self._hw_lock = threading.RLock()
-        self.core: PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None = None
+        self.core: 'PycroManagerCore | PymmcoreCore | PymmcorePlusCore | None' = None
         # Cached backend tag — computed once in `set_core` so each MIL call
         # doesn't re-run the isinstance + Java-bridge attribute chain.
         # Phase 6.1 of claude_project.md.
@@ -144,12 +180,14 @@ class MicroscopeInterfaceLayer:
             return MicroscopeInstance.MMCORE_PLUS
         if isinstance(core, PymmcoreCore):
             return MicroscopeInstance.PYCROMANAGER_PYTHON
-        if isinstance(core, PycroManagerCore):
+        pycromanager_core = _pycromanager_type('PycroManagerCore')
+        java_object = _pycromanager_type('JavaObject')
+        if pycromanager_core is not None and isinstance(core, pycromanager_core):
             return MicroscopeInstance.PYCROMANAGER_JAVA
-        if JavaObject and isinstance(core, JavaObject):
+        if java_object and isinstance(core, java_object):
             return MicroscopeInstance.PYCROMANAGER_JAVA
         if (
-            JavaObject
+            java_object
             and hasattr(core, "_interfaces")
             and len(core._interfaces) > 1
             and core._interfaces[1] == "java.lang.Object"
@@ -315,6 +353,24 @@ class MicroscopeInterfaceLayer:
             raise ValueError("Unsupported microscope interface type for clear_circular_buffer.")
 
     @_hardware_locked
+    def set_circular_buffer_memory_footprint(self, size_mb: int) -> None:
+        """Reallocate the circular buffer to ``size_mb`` MB.
+
+        The allocation is committed memory: ~1.75 s for 4096 MB on a laptop, which is
+        why startup queues it on the MicroscopeService owner thread instead of making
+        it the critical path (L2.5 of claude_launcher_project.md).
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            self.core.set_circular_buffer_memory_footprint(int(size_mb))
+        elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
+            self.core.set_circular_buffer_memory_footprint(int(size_mb))
+        elif self._mi == MicroscopeInstance.MMCORE_PLUS:
+            self.core.setCircularBufferMemoryFootprint(int(size_mb))
+        else:
+            raise ValueError(
+                "Unsupported microscope interface type for set_circular_buffer_memory_footprint.")
+
+    @_hardware_locked
     def clear_roi(self) -> None:
         """
         Clear the region of interest (ROI) for the camera.
@@ -393,7 +449,7 @@ class MicroscopeInterfaceLayer:
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
         """
         if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            return config_data.getSetting(0).get_device_label()
+            return self._config_setting(config_data, 0).get_device_label()
         elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return config_data.getSetting(0).getDeviceLabel()
         elif self._mi == MicroscopeInstance.MMCORE_PLUS:
@@ -421,13 +477,25 @@ class MicroscopeInterfaceLayer:
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
         """
         if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            return config_data.getSetting(0).get_property_name()
+            return self._config_setting(config_data, 0).get_property_name()
         elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return config_data.getSetting(0).getPropertyName()
         elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return config_data.getSetting(0).getPropertyName()
         else:
             raise ValueError("Unsupported microscope interface type for get_config_device_label.")
+
+    def _config_setting(self, config_data, index):
+        """Setting ``index`` of a config_data object, by the backend's method name.
+
+        The Java bridge exposes MMCoreJ's ``Configuration.getSetting`` in snake_case
+        (``get_setting``); pymmcore and pymmcore-plus keep ``getSetting``. Calling
+        ``getSetting`` on the Java object raised AttributeError, which stopped the
+        Controls dock from building, so a JAVA-backend start never got past it.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return config_data.get_setting(index)
+        return config_data.getSetting(index)
 
     @_hardware_locked
     def get_config_settings(self, config_data) -> list:
@@ -440,7 +508,7 @@ class MicroscopeInterfaceLayer:
         """
         settings = []
         for i in range(config_data.size()):
-            setting = config_data.getSetting(i)
+            setting = self._config_setting(config_data, i)
             if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 settings.append({
                     "device": setting.get_device_label(),
@@ -1385,6 +1453,7 @@ class MicroscopeInterfaceLayer:
             # pycromanager helper's mutex check (xy vs xyz, channels vs
             # exposures, etc.) sees genuine absence rather than empty-list
             # presence.
+            from pycromanager import multi_d_acquisition_events
             try:
                 self.mda = multi_d_acquisition_events(
                     num_time_points=num_time_points,

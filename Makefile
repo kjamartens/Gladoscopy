@@ -64,7 +64,8 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build ensure-uv \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup bench-live-display bench-storage \
+        shortcuts shortcuts-uninstall \
+        run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup profile-startup-full bench-live-display bench-storage \
         ci verify \
         clean
 
@@ -92,6 +93,7 @@ ensure-uv:  ## Make sure uv is importable for the active interpreter (installs q
 
 install: .venv ensure-uv  ## Non-editable production install into .venv (no dev extras).
 	$(PIP) .
+	$(PYTHON) -m glados_pycromanager.install_check stamp
 
 dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .venv if absent).
 	$(PIP) -e ".[dev]"
@@ -100,6 +102,8 @@ dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .v
 		$(PIP) --force-reinstall --no-cache-dir diplib==3.6.0 && \
 		$(PYTHON) -c "import diplib" \
 	)
+	@# Fingerprint pyproject's deps/entry points, so Glados can warn when they change.
+	$(PYTHON) -m glados_pycromanager.install_check stamp
 
 build: ensure-uv  ## Build wheel + sdist into dist/.
 	uv build
@@ -153,6 +157,12 @@ PYFLAGS := -X faulthandler
 else
 PYFLAGS :=
 endif
+
+shortcuts:  ## Windows: Start Menu shortcuts (Glados / last setup / debug console) for this .venv; pin one to the taskbar after.
+	$(PYTHON) -m glados_pycromanager.shortcuts install
+
+shortcuts-uninstall:  ## Windows: remove the Glados Start Menu (and Desktop) shortcuts.
+	$(PYTHON) -m glados_pycromanager.shortcuts uninstall
 
 run:  ## Launch the standalone Glados-PycroManager GUI.
 	$(PYTHON) $(PYFLAGS) -m glados_pycromanager.GUI.GUI_napari
@@ -208,6 +218,20 @@ profile-runtime:  ## Auto-launch demo, profile live mode for PROFILE_SECS second
 
 profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.txt.
 	pwsh -File scripts/profile_startup.ps1
+
+# Full click-to-ready startup timeline (imports, backend, viewer, docks), STARTUP_RUNS
+# launches each against the bundled demo (PyMMCorePlus) and the demo_settings.mk backend.
+# ~1-2 min. The second run uses MMConfig_demo.cfg from DEMO_MM_PATH rather than
+# DEMO_CONFIG: insiliscope.cfg crashes the Python backend in start_headless (not Glados'
+# bug). JAVA is deprecated and not profiled. Override with STARTUP_CONFIG=...
+STARTUP_RUNS ?= 3
+STARTUP_CONFIG ?= $(DEMO_MM_PATH)/MMConfig_demo.cfg
+
+profile-startup-full:  ## Startup timeline, median of STARTUP_RUNS launches per backend; appends to docs/perf-startup.txt.
+	$(PYTHON) -m scripts.profile_startup_full --runs $(STARTUP_RUNS) -- --auto-demo
+	$(PYTHON) -m scripts.profile_startup_full --runs $(STARTUP_RUNS) -- \
+	    --backend "$(DEMO_BACKEND)" --config "$(STARTUP_CONFIG)" --mm-path "$(DEMO_MM_PATH)" \
+	    --buffer-mb $(DEMO_BUFFER_MB) --max-memory-mb $(DEMO_MAX_MEMORY_MB)
 
 BENCH_FRAMES ?= 60
 

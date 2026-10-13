@@ -13,10 +13,7 @@ import logging
 import math
 import time
 
-import dask.array as da
 import numpy as np
-import pandas as pd
-from scipy import signal
 from scipy.ndimage import gaussian_filter, zoom
 from skimage.feature.peak import peak_local_max
 
@@ -173,11 +170,13 @@ class pSMLM_image:
 
     @property
     def fullSMLMlocs(self):
+        import pandas as pd  # deferred: not needed until a frame is analysed
         if not self._smlm_frames:
             return pd.DataFrame()
         return pd.concat(self._smlm_frames, ignore_index=True)
 
     def run(self,image,metadata,shared_data,core,**kwargs):
+        import pandas as pd  # deferred: not needed until a frame is analysed
         # logging.info(f'Starting Updating pSMLM running at time: {time.time()}')
         self.dummyValue = np.random.randint(0, 101)
         locPeaks = getLocalPeaks_rawIm(image, int(kwargs['ROIradius']),stdmult=int(kwargs['stdmult']))

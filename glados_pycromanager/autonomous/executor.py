@@ -36,7 +36,6 @@ import napari
 import numpy as np
 import pyperclip
 import tifffile
-from ndtiff import NDTiffDataset
 from PIL import Image
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import (

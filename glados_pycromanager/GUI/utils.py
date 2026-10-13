@@ -22,7 +22,6 @@ from typing import Any
 import appdirs
 import markdown
 import numpy as np
-from pycromanager import Core
 from PyQt5.QtCore import QSize, Qt
 
 #Imports for PyQt5 (GUI)
@@ -3510,7 +3509,7 @@ class CustomMainWindow(QWidget):
         # The two `_mda*Timer`s are MDAGlados' T-H1 debounce QTimers; `_mda` is the
         # backing store of its lazy `mda` property (T-H2) -- a JSON-encodable event
         # list, so without this it would be silently written into the state file.
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','sectionGrid','xypositionListEditor','channelListEditor','_mdaEventsUpdateTimer','_mdaStateSaveTimer','_mda']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','sectionGrid','xypositionListEditor','channelListEditor','_mdaEventsUpdateTimer','_mdaStateSaveTimer','_mda','_pendingInitialMDAKwargs']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):

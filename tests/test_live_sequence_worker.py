@@ -320,7 +320,8 @@ def test_sequence_method_selects_the_new_worker(config, monkeypatch):
         raise AssertionError("legacy Acquisition path must not be used")
 
     handler.run_liveSequence_worker = fake_sequence_worker
-    monkeypatch.setattr(napariGlados, "Acquisition", fail_acquisition)
+    import pycromanager  # the worker imports Acquisition from it on its branch
+    monkeypatch.setattr(pycromanager, "Acquisition", fail_acquisition)
 
     # run_MILCoreAcquisition_worker is a napari @thread_worker: calling it
     # builds a FunctionWorker without starting a thread, and .work() runs the
@@ -352,7 +353,8 @@ def test_mda_method_still_selects_the_legacy_acquisition_path(config, monkeypatc
         raise AssertionError("sequence worker must not run when method == 'mda'")
 
     handler.run_liveSequence_worker = fail_sequence_worker
-    monkeypatch.setattr(napariGlados, "Acquisition", _FakeAcquisition)
+    import pycromanager  # the worker imports Acquisition from it on its branch
+    monkeypatch.setattr(pycromanager, "Acquisition", _FakeAcquisition)
 
     handler.run_MILCoreAcquisition_worker(parent=handler).work()
     assert taken == ["acquisition"]

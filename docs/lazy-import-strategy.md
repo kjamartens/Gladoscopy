@@ -35,8 +35,26 @@ takes > ~500 ms to import cold.  Known offenders in this codebase:
 | `cv2` (opencv-python)      | `AutoFocusBF.py`                 |
 | `tensorflow` / `keras`     | not currently at module scope    |
 
-Standard scientific libs (`numpy`, `scipy`, `dask`, `ndtiff`) are already paid
-for by other packages at startup — they are exempt.
+Standard scientific libs (`numpy`, base `scipy` / `scipy.ndimage`) are already paid
+for by napari at startup — they are exempt. These are **not** (measured 2026-10-13):
+
+- **`scipy.signal`** drags in `scipy.stats`, ~1 s. Import it inside the function.
+- **`dask.array`, `pandas`, `ndtiff`, `pycromanager`**: `dask.array` (with xarray and
+  pandas) is ~1 s after napari, and `ndtiff` and `pycromanager` both import it;
+  `pycromanager` costs ~2.7 s in all. A PyMMCorePlus session never needs any of them
+  at startup (L2.3, −1.9 s). Import them inside the function. For `ndtiff.NDTiffDataset`
+  as a *type tag* (node metadata, port types), use
+  `from glados_pycromanager.lazy_imports import ndtiff`: plugin discovery calls every
+  node's `__function_metadata__()` at startup, and the tag compares, hashes and
+  `isinstance`-checks like the real class without importing ndtiff.
+
+**Module-scope *calls* count too.** A function called at import time that imports a
+heavy library is a heavy import. `BioImageModelZoo.py` ran three bioimageio
+compatibility patches at module scope; they imported `bioimageio.spec`,
+`bioimageio.core` and torch, which made them the largest single cost of a warm start.
+They now run from `_ensure_bioimageio_patched()` on first use.
+`tests/test_node_packages_import_light.py` imports the three node packages in a fresh
+interpreter and fails if any of these libraries appears.
 
 ### Rule 2 — Where to put the deferred import
 

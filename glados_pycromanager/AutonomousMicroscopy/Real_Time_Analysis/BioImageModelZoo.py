@@ -14,12 +14,10 @@ import math
 import time
 from pprint import pprint
 
-import dask.array as da
 import imageio
 import numpy as np
 # Load general dependencies
 from imageio.v2 import imread
-from scipy import signal
 from scipy.ndimage import gaussian_filter
 from skimage.feature.peak import peak_local_max
 
@@ -42,8 +40,6 @@ def _patch_bioimageio_pydantic_compat():
             _fw.inspect_validator = _compat_iv
     except Exception:
         pass
-
-_patch_bioimageio_pydantic_compat()
 
 
 def _patch_bioimageio_scale_linear_v04():
@@ -95,8 +91,6 @@ def _patch_bioimageio_scale_linear_v04():
     except Exception:
         pass
 
-_patch_bioimageio_scale_linear_v04()
-
 
 def _patch_bioimageio_load_state_dict():
     # Some model architecture files (e.g. PredictorAdaptor in affable-shark) define
@@ -128,7 +122,25 @@ def _patch_bioimageio_load_state_dict():
     except Exception:
         pass
 
-_patch_bioimageio_load_state_dict()
+
+_bioimageio_patched = False
+
+def _ensure_bioimageio_patched():
+    """Apply the three bioimageio compatibility patches above, once, on first use.
+
+    They import bioimageio.spec, bioimageio.core and its PyTorch backend (so torch):
+    several seconds. They used to run at module import, and every Real_Time_Analysis
+    module is imported when the Controls dock discovers RT nodes, so every startup paid
+    for them, in the largest single startup step (docs/lazy-import-strategy.md, Rule 1).
+    Call this before the first bioimageio import in any code path.
+    """
+    global _bioimageio_patched
+    if _bioimageio_patched:
+        return
+    _bioimageio_patched = True
+    _patch_bioimageio_pydantic_compat()
+    _patch_bioimageio_scale_linear_v04()
+    _patch_bioimageio_load_state_dict()
 
 
 # Required function __function_metadata__
@@ -215,6 +227,7 @@ def _model_min_spatial_size(model, fallback=64):
 
 
 def getModel(model_id="",model_doi="",model_url=""):
+    _ensure_bioimageio_patched()
     from bioimageio.core import load_description
     if model_id != "":
         model = load_description(model_id)
@@ -257,6 +270,7 @@ def _axis_id(axis):
     return getattr(axis, 'id', getattr(axis, 'type', ''))
 
 def setupSample(model=None,input_image=None):
+    _ensure_bioimageio_patched()
     from bioimageio.core import Tensor
     from bioimageio.core.digest_spec import create_sample_for_model
     if model == None:
@@ -344,6 +358,7 @@ class BioImageModelZoo:
         self.modelId = kwargs['model_id']
         self.imageLayerId = int(kwargs['imageLayerId'])
         logging.info("Loading bioimageio for BioImageModelZoo (first use — may take a few seconds)…")
+        _ensure_bioimageio_patched()
         from bioimageio.core import create_prediction_pipeline
         self.model = getModel(model_id=self.modelId)
         _h, _w, self._step = _model_spatial_constraints(self.model)

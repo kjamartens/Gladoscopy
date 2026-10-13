@@ -8,8 +8,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import inspect
 
-import dask.array as da
-import ndtiff
+from glados_pycromanager.lazy_imports import ndtiff  # imports on first use (dask)
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
@@ -74,6 +73,7 @@ def StarDistSegment_ImageVis(core,**kwargs):
     from csbdeep.utils import normalize
     from stardist.models import StarDist2D
 
+    import dask.array as da  # deferred: ~1 s import (L2.3)
     mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
     modelDirectory = kwargs["modelStorageLoc"].rsplit('/', 1)
     #Load the model - better to do this out of the loop for time reasons
@@ -151,6 +151,7 @@ def StarDistSegment_preLoadedModel_use(core,**kwargs):
     logging.info("Loading csbdeep/stardist for StarDistSegment_preLoadedModel_use (first use — may take a few seconds)…")
     from csbdeep.utils import normalize
 
+    import dask.array as da  # deferred: ~1 s import (L2.3)
     mean_image = da.mean(NDTIFFStack.as_array(), axis=(0)).compute() #type:ignore
     #Load the model - better to do this out of the loop for time reasons
     stardistModel = kwargs["model"] #type:ignore

@@ -9,8 +9,7 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 import inspect
 import math
 
-import dask.array as da
-import ndtiff
+from glados_pycromanager.lazy_imports import ndtiff  # imports on first use (dask)
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
@@ -54,6 +53,7 @@ def AvgImage(core,**kwargs):
     NDTIFFStack = kwargs['Image']
     
     # Compute the average image
+    import dask.array as da  # deferred: ~1 s import (L2.3)
     average_image = da.mean(NDTIFFStack.as_array(), axis=(0)) #type:ignore
 
     #change dask array to np array:

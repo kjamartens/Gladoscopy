@@ -13,8 +13,6 @@ import math
 import os
 import time
 
-import dask.array as da
-import ndtiff
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
@@ -79,7 +77,6 @@ def __function_metadata__():
 
 import logging
 
-from scipy import signal
 
 
 def redondo_score(image):
@@ -91,6 +88,7 @@ def redondo_score(image):
     Returns:
     A NumPy array representing the filtered image.
     """
+    from scipy import signal  # deferred: scipy.signal costs ~1 s at startup (lazy-import-strategy.md)
     
     #Note that this kernel is not a typo - this is how it should be.
     kernel = np.array([[0, 1, 0],
@@ -125,6 +123,7 @@ from scipy.ndimage import convolve
 
 
 def tenengrad_score(image):
+    from scipy import signal  # deferred: scipy.signal costs ~1 s at startup (lazy-import-strategy.md)
     image = image/np.max(image)
     ken1 = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
     ken2 = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]])

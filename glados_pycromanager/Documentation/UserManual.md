@@ -106,6 +106,28 @@ An empty napari viewer will pop up. Within napari, use Plugins --> Glados (glado
 
 Finally, you can fully clone glados-pycromanager from GitHub, and run 'GUI_napari.py' from the python enviroment, and it will open Napari with the glados-pycromanager plugin opened. This will allow you for full debugging accesss to the code, especially usefull when developing.
 
+## Faster startup on Windows (optional)
+
+With the editable `.venv` install, `make shortcuts` adds Start Menu entries ("Glados", "Glados (last setup)" and a debug-console one); pin one to the taskbar for a one-click start. The splash screen shows what Glados is doing while it starts.
+
+A *cold* start (the first after a reboot, or after an install or update) can take several times as long as a warm one: on a test laptop ~60 s against ~23 s, before the later startup work. Most of that difference is reading thousands of small library files from disk, each of which the virus scanner checks. Two things help, and neither is applied for you:
+
+1. **Precompile the bytecode after installing or updating.** Python writes these files itself on the first launch, so this only speeds up that one launch:
+
+   ```batch
+   .venv\Scripts\python.exe -m compileall -q -j 0 glados_pycromanager .venv\Lib\site-packages
+   ```
+
+   It takes about a minute. `SyntaxWarning`s from third-party packages are harmless. With `uv`, `uv pip install --compile-bytecode ...` does the same while installing.
+
+2. **A Microsoft Defender exclusion for the `.venv` folder.** This is often the biggest cold-start saving, but it is a security decision: files in an excluded folder are no longer scanned. On a managed (institute) PC, ask your IT department; their policy may forbid or override it. On a PC you administer, run in an *administrator* PowerShell, with your own path:
+
+   ```powershell
+   Add-MpPreference -ExclusionPath "C:\GitHub\Gladoscopy\.venv"
+   ```
+
+   Remove it again with `Remove-MpPreference -ExclusionPath "C:\GitHub\Gladoscopy\.venv"`.
+
 ## Often-encountered first-run issues
 
 Here is an unorganized list of problems that might occur on a first run.

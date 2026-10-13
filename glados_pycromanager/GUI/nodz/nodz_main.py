@@ -1060,7 +1060,7 @@ class Nodz(QtWidgets.QGraphicsView):
                     #Skip some attributes in nodes_mda:
                     #`_mda` is the backing store of MDAGlados' lazy `mda` property (T-H2);
                     #`mda` itself is not in vars(), so it is stored explicitly below.
-                    mdaattr_skip = ['MDA_completed','MM_JSON','core','data','shared_data','gui','layout','nodeInfo','xypositionListWidget_XYGridManager','mda_useq','_mda']
+                    mdaattr_skip = ['MDA_completed','MM_JSON','core','data','shared_data','gui','layout','nodeInfo','xypositionListWidget_XYGridManager','mda_useq','_mda','_pendingInitialMDAKwargs']
                     for attr in vars(nodeInst.mdaData):
                         if attr not in mdaattr_skip:
                             #Also check if it's a Qtpy object:

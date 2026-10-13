@@ -37,10 +37,38 @@ def getLayerIdFromName(layer_name,napariViewer,shared_data=None):
         cache[layer_name] = ImageLayer[0]
     return ImageLayer
 
+def use_cached_unit_registry() -> bool:
+    """Make pint keep its parsed unit definitions in a disk cache.
+
+    The scale bar is the first thing that uses pint's application registry, and
+    building it parses pint's definitions file: ~0.8 s on the startup path, against
+    ~0.05 s from pint's own cache (written once, ~1.2 s, by the first launch). The
+    replacement registry is still lazy. Nothing is changed if the registry was
+    already built (swapping it would leave existing quantities on another
+    registry) or if the cache folder cannot be written, since pint creates and
+    writes it inside whichever napari call first needs a unit.
+    """
+    try:
+        import pint
+        import platformdirs
+        if type(pint.get_application_registry().get()) is not pint.LazyRegistry:
+            return False
+        folder = platformdirs.user_cache_path(appname='pint', appauthor=False)
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / f'.glados_write_probe_{os.getpid()}'
+        probe.write_bytes(b'')
+        probe.unlink()
+        pint.set_application_registry(pint.LazyRegistry(kwargs={'cache_folder': folder}))
+        return True
+    except Exception as exc:  # best-effort: napari falls back to the uncached registry
+        logging.debug('pint unit-registry cache not enabled: %s', exc)
+        return False
+
 def showScaleBar(napariViewer):
     """
     Shows the scale bar in napari
     """
+    use_cached_unit_registry()
     napariViewer.scale_bar.visible = True
     napariViewer.scale_bar.unit = "um"
 

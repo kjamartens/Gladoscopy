@@ -35,8 +35,6 @@ from qtpy.QtWidgets import QMainWindow, QScrollArea, QVBoxLayout, QWidget
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from pycromanager import Acquisition, multi_d_acquisition_events
-
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.napariGlados as napariGlados
 import glados_pycromanager.GUI.utils as utils
@@ -52,6 +50,7 @@ from glados_pycromanager.GUI.frame_writer import NDTiffFrameWriter, ZarrFrameWri
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName, moveLayerToTop
 from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
+from glados_pycromanager.observability import startup_timeline
 from glados_pycromanager.ui.layout import build_stylesheet, set_current_theme, theme_from_config
 from glados_pycromanager.ui.layout.theme import LEGACY_SCALE_FACTOR
 
@@ -1173,6 +1172,23 @@ class LivePollPacer:
         return fine
 
 
+class _NoPycromanagerHardwareError(Exception):
+    """Stands in for pycromanager's HardwareControlException while pycromanager is unimported."""
+
+
+def _pycromanager_hardware_control_exception():
+    """pycromanager's HardwareControlException, without importing pycromanager for it.
+
+    Only pycromanager's acquisition engine raises it, and that engine cannot run before
+    pycromanager is imported (start_headless does that on its two backends). On
+    PyMMCorePlus, importing it would cost ~2.7 s on the first Live click.
+    """
+    if 'pycromanager' not in sys.modules:
+        return _NoPycromanagerHardwareError
+    from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
+    return HardwareControlException
+
+
 class napariHandler:
     # Max time to wait, in acqModeChanged, for a previous acquisition worker to
     # fully stop before allowing a new one to start. Generous relative to normal
@@ -1921,7 +1937,7 @@ class napariHandler:
         Worker which handles live mode on/off turning etc
         
         """
-        from pycromanager.acquisition.acq_eng_py.internal.engine import HardwareControlException
+        HardwareControlException = _pycromanager_hardware_control_exception()
         shared_data.register_perf_thread_label(get_native_id(), 'MDA/acquisition worker')
         # T-B2: refresh the mirrored hardware constants once here, on the
         # acquisition thread, so the GUI-thread display path reads plain
@@ -2016,6 +2032,7 @@ class napariHandler:
                             self._stop_frame_ring_consumer()
                             logging.info('Finished live!')
                         else: #Pycromanager backend, either JAVA or Python
+                            from pycromanager import Acquisition, multi_d_acquisition_events
                             if shared_data.config.mda_config.backend_method == 'saved':
                                 with Acquisition(directory=None, name=None, show_display=False, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
                                     self.shared_data._mdaModeAcqData = acq
@@ -2185,6 +2202,7 @@ class napariHandler:
                         self.shared_data.MILcore.core.mda.events.sequenceCanceled.disconnect(connected_callback_cancelledAcq)
                         logging.info("Finished MDA!")
                     else: #Pycromanager backend, either JAVA or Python
+                        from pycromanager import Acquisition
                         if shared_data.config.mda_config.backend_method == 'saved':
                             logging.debug(f"Starting mda acq at location %s,%s",savefolder,savename)
                             with Acquisition(directory=savefolder, name=savename, show_display=showdisplay,napari_viewer=napariViewer, image_saved_fn = self.grab_image_liveVisualisation_and_liveAnalysis_savedFn ) as acq: #type:ignore
@@ -2901,8 +2919,63 @@ def layer_removed_event_callback(event, shared_data):
 
 #Delay before the startup layout pass; 0 = first event-loop iteration after startup.
 STARTUP_LAYOUT_DELAY_MS = 0
+
+#Run once, on the GUI thread, when startup is done: the event loop's first idle turn
+#after the startup layout pass (see _sizeControlsDock). Used for the startup timeline.
+_startup_ready_callbacks = []
+_startup_ready_fired = False
+
+def call_when_startup_ready(fn):
+    """Run fn() once startup is done, or now if it already is."""
+    if _startup_ready_fired:
+        fn()
+    else:
+        _startup_ready_callbacks.append(fn)
+
+def _startupReady():
+    global _startup_ready_fired
+    if _startup_ready_fired:
+        return
+    _startup_ready_fired = True
+    startup_timeline.mark('ready (event loop idle after layout)')
+    for fn in _startup_ready_callbacks:
+        try:
+            fn()
+        except Exception:
+            logging.exception('Startup-ready callback failed')
+    _startup_ready_callbacks.clear()
 #The Controls dock never takes more than this fraction of the window height at startup.
 STARTUP_CONTROLS_MAX_HEIGHT_FRACTION = 0.6
+
+def _suspend_napari_settings_saves():
+    """Stop napari writing its settings file on every change; returns a resume token.
+
+    napari records each dock's area in its settings and saves the whole file on every
+    change (``QtViewerDockWidget._update_default_dock_area``): eight saves of 50-100 ms
+    while napari's own docks and then the Glados docks are added and tabified. _resume_napari_settings_saves
+    restores the flag and saves once.
+    """
+    try:
+        from napari.settings import get_settings
+        settings = get_settings()
+        previous = settings._save_on_change
+        settings._save_on_change = False
+        return settings, previous
+    except Exception:
+        logging.debug('Could not suspend napari settings saves', exc_info=True)
+        return None
+
+_startup_settings_save_token = None
+
+def _resume_napari_settings_saves(token):
+    if token is None:
+        return
+    settings, previous = token
+    try:
+        settings._save_on_change = previous
+        settings._maybe_save()
+    except Exception:
+        logging.exception('Could not save napari settings after startup')
 
 def _finaliseStartupLayout(napariViewer, controlsWidget):
     """Maximise the window, show the Controls tab, and make it tall enough for its content.
@@ -2935,26 +3008,28 @@ def _sizeControlsDock(napariViewer, controlsWidget):
         qtWindow.resizeDocks([dock], [min(wanted, cap)], Qt.Vertical)
     except Exception:
         logging.exception("Could not select and size the Controls tab")
+    global _startup_settings_save_token
+    _resume_napari_settings_saves(_startup_settings_save_token)
+    _startup_settings_save_token = None
+    startup_timeline.mark('startup layout finalised')
+    QTimer.singleShot(0, _startupReady)
 
 def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,include_flowChart_automatedMicroscopy:bool = True):
     #Go from self to global variables
-    global core, MM_JSON, livestate, napariViewer, shared_data
+    global core, MM_JSON, livestate, napariViewer, shared_data, _startup_settings_save_token
     # core = score
     MM_JSON = sMM_JSON
     livestate = False
     shared_data = sshared_data
     shared_data.register_perf_thread_label(get_native_id(), 'GUI main thread')
+    startup_timeline.mark('event loop running, building GUI')
 
-    if shared_data.MILcore is not None:
-        #Get some info from core to put in shared_data
-        shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
-        logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
-    else:
-        logging.warning("MILcore is None, cannot set default focus device.")
-        
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
+    #Resumed (one save) by _sizeControlsDock, once napari's and Glados' docks have settled.
+    _startup_settings_save_token = _suspend_napari_settings_saves()
     napariViewer = napari.Viewer()
+    startup_timeline.mark('napari viewer created')
 
     # napariViewer._window._qt_viewer.canvas.view._transform.scale=[2,2,2,2]
     #Add a connect event if a layer is removed - to stop background processes
@@ -2967,6 +3042,17 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
+    startup_timeline.mark('napari UI initialised')
+
+    #The first hardware read of the GUI build, so it comes after the viewer: until the
+    #owner thread has allocated the circular buffer (GUI_napari._allocate_circular_buffer)
+    #it waits on MIL's hardware lock. The docks below need it.
+    if shared_data.MILcore is not None:
+        #Get some info from core to put in shared_data
+        shared_data._defaultFocusDevice = shared_data.MILcore.get_focus_device()
+        logging.debug(f"Default focus device set to {shared_data._defaultFocusDevice}")
+    else:
+        logging.warning("MILcore is None, cannot set default focus device.")
 
     # --- Developer: "Reload Custom Nodes" menu item -------------------------
     def _reload_custom_nodes():
@@ -3019,16 +3105,19 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     custom_widget_MMcontrols.setStyleSheet(dockStyleSheet)
     #Add to napari
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
+    startup_timeline.mark('dock built: Controls')
     
     custom_widget_MDA = dockWidget_MDA()
     custom_widget_MDA.setStyleSheet(dockStyleSheet)
     napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)
+    startup_timeline.mark('dock built: Multi-D acquisition')
     
     if include_flowChart_automatedMicroscopy:
         custom_widget_flowChart = dockWidget_flowChart()
         custom_widget_flowChart.setStyleSheet(dockStyleSheet)
         napariViewer.window.add_dock_widget(custom_widget_flowChart, area="top", name="Autonomous microscopy",tabify=True)
         custom_widget_flowChart.dockWidget.focus()
+        startup_timeline.mark('dock built: Autonomous microscopy')
     
     if includecustomUI:
         gladosLaserInfo = dockWidget_fullGladosUI()
@@ -3036,6 +3125,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
             napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI")
         else:
             logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
+        startup_timeline.mark('dock built: GladosUI')
 
     #Performance Mode is a diagnostic tool, not opened by default. Users open it
     #on demand via Plugins > Glados-PycroManager > Performance Mode.

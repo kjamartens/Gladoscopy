@@ -54,6 +54,12 @@ pytest
 
 Seven tests spawn a real `multiprocessing` worker and account for ~80s of the suite's ~140s wall time on Windows (inherent `spawn` re-import cost). They carry the `slow` marker, so `pytest -m "not slow"` runs the other 345 in ~60s; plain `pytest` still runs everything. Two gotchas if you touch them: (1) a test whose spawned child dies must poll `proc.is_alive()` rather than waiting out a queue timeout, or a crash costs the full timeout in dead waiting (`_get_or_fail_fast` in `test_analysis_process.py`); (2) `pytest.importorskip("diplib")` is **not** enough — once an earlier test has pulled IPython into `sys.modules` (napari does), `import diplib` raises `AttributeError`, which `importorskip` does not catch, so the test fails in a full-suite run while passing in isolation. Apply the documented `import IPython.terminal.pt_inputhooks` guard first.
 
+A test that builds a real `CMMCorePlus` and waits on its MDA events must use the
+`direct_mmcore_signals` fixture (`tests/conftest.py`, sets `PYMM_SIGNALS_BACKEND=psygnal`).
+pymmcore-plus switches to Qt signals whenever a QApplication exists. Any earlier `qapp`
+test leaves one behind, and with no event loop running, `frameReady` is then never
+delivered. The test then fails only in a full-suite run.
+
 Note the `Real_Time_Analysis` node kwarg dicts hand-built in tests (`rt_analysis_info`) must carry one `LineEdit#<function>#<kwarg>` entry **per kwarg** in the node's `__function_metadata__`: `getEvalTextFromGUIFunction` indexes `methodKwargValues` positionally, so a missing kwarg is an `IndexError` in the child, not a default-value fallback. Bool kwargs use the same `LineEdit#` objectName and are stored as `"True"`/`"False"` strings.
 
 `Test.py` and `test.ipynb` at the repo root are unrelated scratch files (DIPlib FFT benchmark, etc.), not part of the suite. There is no lint config.
@@ -159,7 +165,7 @@ is the standalone plan that enforces them — but new code must follow them.
   bandwidth from the frame path. `PYCROMANAGER_PYTHON` and `MMCORE_PLUS` have no such lock.
   **As of T-B1 this is enforced at the MIL level:** `MicroscopeInterfaceLayer` holds a
   per-instance `threading.RLock` (`_hw_lock`) and applies it via the `@_hardware_locked`
-  decorator to every public method that touches `self.core` (53 applications today). Re-entrant
+  decorator to every public method that touches `self.core` (64 applications as of 2026-10-13). Re-entrant
   because MIL methods compose (`get_image_width()` → `get_roi()`), and deliberately
   untimed — a deadlock should be diagnosed, not skipped. `get_exposure` /
   `get_pixel_size_um` are the two exceptions: their cache-hit fast path returns *before*
@@ -1301,7 +1307,7 @@ RT-analysis nodes that opt into subprocess isolation (`"__runInSubprocess__": Tr
 
 **Subprocess-isolated RT-analysis startup speedups** (fixes a ~20s per-start cost reported for e.g. FFT): a cold `spawn` pays for re-importing the whole `Real_Time_Analysis` package tree plus whatever heavy library the node needs (diplib, tensorflow/stardist, …), and — separately — `AnalysisProcess_customFunction.__init__` used to synchronously build a visualisation "shadow" object on the *GUI thread* via `utils.realTimeAnalysis_init(...)`, freezing the UI for however long that model/weight load took. Two mechanisms now cut this down:
 
-- `GUI/subprocess_pool.py`'s `WarmSubprocessPool` pre-spawns one blank child at app startup (`shared_data._rt_subprocess_pool.start()`, called right after `Shared_data()` in `GUI_napari.py`'s `main()`) that pre-imports the package tree and (best-effort, since it's the only node opted in today) `diplib`, then idles waiting to be handed a real node's `analysisInfo` — shortcutting the first-ever subprocess-node start in a session. **The pool, not the claiming caller, creates the worker's channels** (frame in/out queues, stop event, control pair): a `multiprocessing` Queue/Event can only cross a process boundary by *inheritance*, so they are built in `start()` and passed as `Process` args, and `try_claim()` returns them as a `channels` dict for `AnalysisProcess_customFunction.__init__` to adopt. Sending them through `assign_queue` instead raises `RuntimeError: Queue objects should only be shared between processes through inheritance` on the parent's queue-feeder *thread* — the parent continues unaware while the child blocks forever on `assign_queue.get()`, so the node silently never processes a frame (that was the shipped bug; the cold-spawn path was unaffected, which is why only pool-claimed starts broke). `assign_queue` now carries only `(analysisInfo, log_level)`. Tests: `tests/test_subprocess_pool.py`. Extend its pre-imported-library list (or generalize via an optional `"__prewarm_imports__"` metadata key) if more nodes opt into `__runInSubprocess__`.
+- `GUI/subprocess_pool.py`'s `WarmSubprocessPool` pre-spawns one blank child once startup is ready (`shared_data._rt_subprocess_pool.start()`, in `GUI_napari.main()`'s `_on_startup_ready`; skipped under `--startup-exit`. It used to start right after `Shared_data()`, where the child's imports competed with the GUI build: L2.2 took ready 16.7 → 10.9 s, `tests/test_startup_deferred_pool.py`) that pre-imports the package tree and (best-effort, since it's the only node opted in today) `diplib`, then idles waiting to be handed a real node's `analysisInfo` — shortcutting the first-ever subprocess-node start in a session. **The pool, not the claiming caller, creates the worker's channels** (frame in/out queues, stop event, control pair): a `multiprocessing` Queue/Event can only cross a process boundary by *inheritance*, so they are built in `start()` and passed as `Process` args, and `try_claim()` returns them as a `channels` dict for `AnalysisProcess_customFunction.__init__` to adopt. Sending them through `assign_queue` instead raises `RuntimeError: Queue objects should only be shared between processes through inheritance` on the parent's queue-feeder *thread* — the parent continues unaware while the child blocks forever on `assign_queue.get()`, so the node silently never processes a frame (that was the shipped bug; the cold-spawn path was unaffected, which is why only pool-claimed starts broke). `assign_queue` now carries only `(analysisInfo, log_level)`. Tests: `tests/test_subprocess_pool.py`. Extend its pre-imported-library list (or generalize via an optional `"__prewarm_imports__"` metadata key) if more nodes opt into `__runInSubprocess__`.
 - `shared_data._rt_subprocess_cache` (a dict keyed by `AnalysisClass._rt_config_key(analysisInfo)`, a stable hash of the node's config) lets `stop()`/`destroy()` park a still-alive, already-warmed-up worker instead of killing it — `_park_subprocess_worker` handles the cap/idle-timeout eviction opportunistically on each park, no dedicated QTimer needed. A later `__init__` with the identical config reclaims it directly (`_worker_warmed_up = True` immediately, skipping spawn + package-tree import), **but the node itself is still properly closed and reopened, at the times a user would expect** — this is a *process*-level cache, not a node-instance cache: `stop()` sends `{'__close__': True}` on `control_in_queue` immediately when parking (the worker calls `end_fn` right away, so anything it finalises — e.g. flushing/closing a dataset — happens at stop time, never deferred to some future reopen that may not happen), and the *later* reclaiming `__init__` sends `{'__reinit__': True, 'analysisInfo': ...}` to run `init_fn` again (never `end_fn` a second time — that already ran at close). Both are acked on `control_out_queue` (`{'__close_done__': True}` / `{'__reinit_done__': True}`) since there's no ordering guarantee between a control message and a frame put on `in_queue` right after it — see `tests/test_analysis_process.py`'s `test_worker_close_then_reinit_matches_stop_then_reclaim`. **Nothing in the parent reads those acks**, and `control_out_queue` holds 2, so the child sends them with `_ack_nonblocking` (dropped when full): a blocking `put` wedged the worker on the third unread ack, after which a re-activated node never processed a frame ("worker did not respond within 5s"). The reclaim also drains stale acks and stale results (`_drain_queue`), `stop()` drains `in_queue` before parking, and `stop()` is idempotent — `MMcontrols.deactivateRealTimeAnalysisFromDockWidget` removes the node's layers, which already tears the node down via `layer_removed_event_callback`, so it now skips its own teardown when the entry is gone (it used to run `end()` a second time). `stop_profiling` skips acks when waiting for its report. Test: `test_worker_survives_repeated_close_reinit_with_unread_acks`. The main-process visualisation shadow is rebuilt fresh on reclaim too, rather than reusing the parked one. So a close→reopen always starts from fresh node state — only the process/imports are reused, meaning a heavy one-time init cost (e.g. model weights) is paid again on every reopen. `AnalysisClass.terminate_all_rt_subprocesses()` is wired into `GUI_napari.py`'s `aboutToQuit` (before the forced `os._exit(0)`) so parked/warm processes don't get orphaned.
 
 **Stopping an RT-analysis node stops its threads (T-G9).** Every RT loop waits
@@ -1622,6 +1628,121 @@ Three companion files live alongside it:
   the user asks for it by name (e.g. "work on claude_throughput_project.md"). It shares
   the `claude_optimization` branch and logs to `claude_decisions.md` / `claude_issues.md`
   like the main roadmap.
+- **`claude_launcher_project.md`** — standalone plan for a one-click (taskbar) launcher
+  over the editable `.venv` plus measured startup-speed work, on branch
+  `feature/one-click-launch`. Same rule: not advanced by "continue"; run when asked by name.
+  Key planning fact: `GUI_napari` imports ~3.7 s warm (napari.qt 1.7 s, pycromanager 1.2 s).
+  (The planning-time worry about a JVM console window was wrong: `mmpycorex` already starts
+  `jre/bin/javaw.exe` on Windows.)
+- **One-click launch (L1).** `gladosw.exe` (`[project.gui-scripts]`, pythonw) → `GUI/startup.py:main`.
+  Before the splash, `main` does three things:
+  - redirects pythonw's `None` stdout/stderr to `<AppData>/Glados-PycroManager/Glados_console.log`
+    (a per-pid file if a running instance holds it);
+  - sets the AppUserModelID `Glados.Pycromanager`, the same one written on the main
+    "Glados" `.lnk`, so the window groups under the pinned icon. The other two shortcuts
+    get `.LastSetup`/`.DebugConsole` suffixes: the Start Menu lists apps **by AUMID**, so
+    shortcuts sharing one collapse into a single entry (check with `Get-StartApps`);
+  - runs the per-user single-instance check (`GUI/single_instance.py`, a `QLocalServer`).
+    The second launch calls `AllowSetForegroundWindow(<first pid>)` because only it owns
+    the foreground. `--allow-second-instance` bypasses the check.
+
+  Related pieces:
+  - Shortcuts: `make shortcuts` (`glados_pycromanager/shortcuts.py`). Windows 11 can't pin
+    from code; the user pins the Start Menu entry.
+  - `--last` (`GUI_napari.resolve_last_setup`) skips the dialog using the saved backend and
+    config, or falls back to the dialog.
+  - `make dev` stamps a pyproject fingerprint into the venv (`install_check.py`); a mismatch
+    shows a napari warning at startup-ready.
+  - Console-less startup crashes go to a message box naming the console log.
+  - The JAVA bridge spells config settings `get_setting` (snake_case), hence
+    `MIL._config_setting`. Tests: `tests/test_launcher.py`.
+- **Startup timeline.** `observability/startup_timeline.mark(label)` stamps a startup stage,
+  timed from **process creation** (psutil). `GUI_napari.py` imports it before every heavy
+  import, which is why the `sys.path` shim now sits above `import pymmcore`.
+  `napariGlados.call_when_startup_ready(fn)` runs once on the first idle turn after
+  `_sizeControlsDock` ("ready"); the full table is logged at INFO then. `--startup-exit`
+  (popup-free launches only) appends the table to `docs/perf-startup.txt` and quits;
+  `make profile-startup-full` runs 3× per backend and appends medians (~2.3 min). Baseline
+  2026-10-13: ready at ~23 s warm (PyMMCorePlus demo), ~60 s cold. The Controls dock alone
+  takes 6.5–7.7 s warm. Tests: `tests/test_startup_timeline.py`.
+- **Startup splash / light entry point.** Every launch path goes through
+  `GUI/startup.py:main`:
+  - the console scripts point at it, and `GUI_napari.py`'s `if __name__ == '__main__'`
+    branch delegates to it **before** its own heavy imports.
+  It imports pymmcore → PyQt5, creates the app's **only** `QApplication` (attributes via
+  `set_qt_application_attributes()`), shows `GUI/startup_splash.StartupSplash`, and then
+  calls `GUI_napari.main(app=, splash=)`.
+  - The backend dialog runs in a local `QEventLoop` on that app (`headlessGUI.closed`).
+    `appSmall` is gone.
+  - The splash follows timeline marks by **label** (`STEP_AFTER_MARK`; a test pins every key
+    to a real `mark(...)`), so renaming a mark needs the map updated.
+  - It processes events only while `pump` is True (until `thread.start()` in `main()`) and
+    only repaints after that, so queued slots never run re-entrantly mid-dock-build.
+  - It is deliberately **not** stay-on-top: a one-shot Win32 topmost/not-topmost raise, then
+    owned by napari's window from the `'napari viewer created'` mark.
+  - Image: `Icons/GladosSplash_720.png`, regenerated by `scripts/make_splash_images.py`
+    from the 4372 px `GladosSplash_inv.png`; the backend dialog uses it too.
+  - Tests: `tests/test_startup_splash.py`. A test that creates a `QApplication` must set
+    `AA_ShareOpenGLContexts` first, or a later napariGlados import (QtWebEngine) fails.
+- **Node packages must import light** (`tests/test_node_packages_import_light.py`). The
+  Controls dock imports every node module during startup. `BioImageModelZoo.py`'s
+  module-scope bioimageio patches (→ torch) plus module-scope `scipy.signal` made that dock
+  the largest startup step (6.5–7.7 s warm → ~3 s). They now run via
+  `_ensure_bioimageio_patched()` on first use. `scipy.signal` is **not** exempt from the
+  lazy-import rule.
+- **pycromanager, ndtiff, dask.array and pandas load on first use (L2.3, PyMMCorePlus
+  ready 13.6 → 11.6 s).** `pycromanager` (~2.7 s, nearly all `ndstorage → dask.array →
+  xarray → pandas`) was imported by MIL, `napariGlados` and `MDAGlados` at module scope.
+  Now:
+  - MIL resolves `PycroManagerCore`/`JavaObject`/`multi_d_acquisition_events` through a
+    module `__getattr__`. Backend detection uses `_pycromanager_type()`, which returns
+    None while pycromanager is unimported: a pycromanager core can't exist before then.
+  - `MDAGlados.__init__` stores its initial plan's arguments in
+    `_pendingInitialMDAKwargs`; the `mda` property builds it on first read, and a
+    rebuild or assignment drops it. The attribute is in both persistence skip lists.
+  - The acquisition worker gets `HardwareControlException` via
+    `_pycromanager_hardware_control_exception()`, so the first Live click on
+    PyMMCorePlus doesn't import pycromanager either.
+  - Node metadata names `ndtiff.NDTiffDataset` as a port type and **plugin discovery
+    calls every `__function_metadata__()` at startup**, so nodes and the Autonomous dock
+    use `glados_pycromanager.lazy_imports.ndtiff`. Its `NDTiffDataset` is a lazy class
+    tag: a real `type` that equals the real class and defers `isinstance`/calls/
+    attributes to it.
+
+  Tests: `tests/test_lazy_pycromanager.py`, and
+  `test_node_packages_import_light.py::test_startup_modules_do_not_import_pycromanager_or_dask`.
+  To see who imports what at startup, a meta-path finder that records the stack on a
+  module's first import is quicker than reading `-X importtime`, which only shows the
+  first importer's chain.
+- **napari's own startup costs (L2.4).**
+  - **pint's unit registry** is first built by the scale bar, and the build parses pint's
+    definitions file (0.8 s). `napariHelperFunctions.use_cached_unit_registry()` (called
+    by `showScaleBar`) installs a lazy registry that uses pint's disk cache (0.05 s once
+    written; the first launch ever pays ~1.2 s to write it). It changes nothing once the
+    registry is built, since swapping it then would split quantities across registries.
+  - **napari saves its whole settings file each time a dock's area is recorded**
+    (`_update_default_dock_area`): 8 saves, ~0.5 s. `_suspend_napari_settings_saves()`
+    runs just before `napari.Viewer()` and `_sizeControlsDock` resumes it, which does
+    one save.
+  - **Creating the viewer hidden is no gain** (A/B: ready −0.17 s, noise). The canvas's
+    *first* GL paint costs ~2 s wherever it happens; hiding the window only moved it from
+    the Controls step to the final one.
+  - Tests: `tests/test_startup_napari_costs.py`.
+- **The circular buffer is allocated on the owner thread (L2.5).** A 4096 MB
+  `setCircularBufferMemoryFootprint` commits the memory (~1.75 s; pymmcore mostly releases
+  the GIL) and was the whole PyMMCorePlus "backend up" step. `GUI_napari._allocate_circular_buffer`
+  queues `MIL.set_circular_buffer_memory_footprint` (hardware-locked) as the MicroscopeService's
+  first job; the Python backend starts headless with `HEADLESS_PLACEHOLDER_BUFFER_MB` (64)
+  and gets its size the same way. JAVA allocates in the JVM and is unchanged. It is safe
+  because the queue is FIFO and nothing can queue an acquisition before the GUI exists,
+  and a direct MIL call waits on the lock. **The GUI build's first hardware read
+  (`get_focus_device`) therefore sits after `InitateNapariUI`**: before the viewer it
+  blocked the GUI thread for the whole allocation and the overlap was zero. Gain: post-import
+  startup −1.5 s (PyMMCorePlus), −0.6 s (Python). Tests: `tests/test_startup_circular_buffer.py`.
+- **`insiliscope.cfg` + Python backend segfaults in `start_headless`** (2026-10-13), even in a
+  bare pycromanager script, while `MMConfig_demo.cfg` in the same install is fine. So the
+  documented `--profile-runtime` command currently crashes there. The cause is the
+  inSiliScope adapter or its environment, not Glados.
 
 When the user says **"continue"** (or any equivalent like "keep going",
 "resume", "next step"), follow this protocol exactly:

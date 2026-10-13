@@ -12,9 +12,7 @@ import logging
 import math
 import time
 
-import dask.array as da
 import numpy as np
-from scipy import signal
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 from glados_pycromanager.autonomous.registry import register
@@ -64,6 +62,7 @@ def laplace_filter(image):
     Returns:
     A NumPy array representing the filtered image.
     """
+    from scipy import signal  # deferred: scipy.signal costs ~1 s at startup (lazy-import-strategy.md)
     
     #Note that this kernel is not a typo - this is how it should be.
     kernel = np.array([[0, 1, 0],

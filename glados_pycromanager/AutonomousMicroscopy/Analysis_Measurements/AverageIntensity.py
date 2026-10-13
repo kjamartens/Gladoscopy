@@ -11,8 +11,7 @@ import inspect
 # from shapely import Polygon, affinity
 import math
 
-import dask.array as da
-import ndtiff
+from glados_pycromanager.lazy_imports import ndtiff  # imports on first use (dask)
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
@@ -57,6 +56,7 @@ def AvgGrayValue(core,**kwargs):
     NDTIFFStack = kwargs['Image']
     
     # Compute the average intensity of each slice
+    import dask.array as da  # deferred: ~1 s import (L2.3)
     slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2)) #type:ignore
 
     #change dask array to np array:

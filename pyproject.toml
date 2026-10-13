@@ -61,6 +61,8 @@ dependencies = [
     "diplib==3.6.0",
     "markdown>=3.7",
     "markdown-captions>=2.1",
+    # Start Menu shortcuts with a taskbar AppUserModelID (glados_pycromanager/shortcuts.py).
+    "pywin32>=306; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -182,10 +184,15 @@ exclude = [
     "Documentation/Images/*",
 ]
 [project.scripts]
-"glados" = "glados_pycromanager.GUI.GUI_napari:main"
-"glados-pycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
-"gladospycromanager" = "glados_pycromanager.GUI.GUI_napari:main"
-"glados-pycro-manager" = "glados_pycromanager.GUI.GUI_napari:main"
+"glados" = "glados_pycromanager.GUI.startup:main"
+"glados-pycromanager" = "glados_pycromanager.GUI.startup:main"
+"gladospycromanager" = "glados_pycromanager.GUI.startup:main"
+"glados-pycro-manager" = "glados_pycromanager.GUI.startup:main"
+
+# Windowed (pythonw, no console) launcher for the Start Menu / taskbar shortcuts
+# (glados_pycromanager/shortcuts.py). The console scripts above stay for terminals.
+[project.gui-scripts]
+"gladosw" = "glados_pycromanager.GUI.startup:main"
 
 [project.entry-points."napari.manifest"]
 glados-pycromanager = "glados_pycromanager:napari.yaml"

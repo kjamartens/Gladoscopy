@@ -110,6 +110,7 @@ _SKIP_ON_CI = pytest.mark.skipif(
 @_SKIP_ON_CI
 @pytest.mark.slow
 @pytest.mark.parametrize("fmt", ["ome-zarr", "ome-tiff"])
+@pytest.mark.usefixtures("direct_mmcore_signals")
 def test_a_demo_mda_really_lands_on_disk(fmt, tmp_path):
     """No microscope required: pymmcore-plus ships a demo camera, so the actual
     claim -- 'the data saves' -- is testable rather than merely reasoned about."""
@@ -141,6 +142,7 @@ def test_a_demo_mda_really_lands_on_disk(fmt, tmp_path):
 
 @_SKIP_ON_CI
 @pytest.mark.slow
+@pytest.mark.usefixtures("direct_mmcore_signals")
 def test_the_saved_data_reads_back_with_the_acquisition_shape(tmp_path):
     """Saving something is not enough; it has to be the acquisition."""
     import useq

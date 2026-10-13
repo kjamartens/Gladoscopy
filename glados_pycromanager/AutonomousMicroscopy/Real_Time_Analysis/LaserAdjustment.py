@@ -12,7 +12,6 @@ import logging
 import math
 import time
 
-import dask.array as da
 import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling

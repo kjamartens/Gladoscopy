@@ -11,6 +11,23 @@ import os
 import socket
 import sys
 
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# Run directly (`python -m ...GUI_napari`, or from an IDE): hand over to the light
+# launcher *before* the heavy imports below, so the startup splash appears first. The
+# launcher then imports this file again as a normal module. multiprocessing's spawned
+# children import it as '__mp_main__', so they never take this branch.
+if __name__ == '__main__':
+    from glados_pycromanager.GUI.startup import main as _launch
+    sys.exit(_launch())
+
+# First Glados import, so the heavy imports below show up in the startup timeline.
+from glados_pycromanager.observability import startup_timeline
+
+startup_timeline.mark('GUI_napari import started')
+
 # isort: off
 # Must be imported before napari/PyQt5: loading Qt first and then constructing
 # a pymmcore.CMMCore later (headless Python backend) crashes with an access
@@ -41,17 +58,17 @@ from PyQt5.QtWidgets import (
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
 
-#Sys insert to allow for proper importing from module via debug
-if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+startup_timeline.mark('napari + PyQt5 imported')
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 
 #Obtain the helperfunctions
 import glados_pycromanager.GUI.utils as utils
-from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
+from glados_pycromanager.GUI.napariGlados import call_when_startup_ready, runNapariPycroManager
 from glados_pycromanager.GUI.sharedFunctions import Shared_data
 from glados_pycromanager.GUI.utils import *
+
+startup_timeline.mark('Glados modules imported')
 
 #endregion
 
@@ -102,6 +119,40 @@ def _build_z_settle_skipping_mda_engine_class():
 
     return ZSettleSkippingMDAEngine
 
+
+#Buffer the Python backend's start_headless allocates before _allocate_circular_buffer
+#sets the configured size: small, so it costs ~nothing.
+HEADLESS_PLACEHOLDER_BUFFER_MB = 64
+
+def _allocate_circular_buffer(shared_data, size_mb):
+    """Queue the circular-buffer allocation as the owner thread's first job (L2.5).
+
+    Allocating it commits the memory: ~1.75 s for 4096 MB, which was the whole
+    PyMMCorePlus "backend up" step (the Python backend starts headless with
+    HEADLESS_PLACEHOLDER_BUFFER_MB instead and gets its size here). On the owner thread it overlaps the napari viewer
+    and dock build. It still runs before any acquisition, since nothing can queue one
+    before the GUI exists and the queue is FIFO, and it holds MIL's hardware lock, so a
+    direct MIL call waits for it instead of racing it. Without a running service it
+    runs inline, as before. Returns the queued Request, or None.
+    """
+    if size_mb is None:
+        return None
+    mil = shared_data.MILcore
+    service = shared_data.microscope_service
+
+    def _report(request):
+        if request.exception is not None:
+            logging.error('Could not allocate the %s MB circular buffer: %r',
+                          size_mb, request.exception)
+        else:
+            logging.info('Circular buffer of %s MB allocated in %.2f s on the owner thread',
+                         size_mb, request.finished_at - request.started_at)
+
+    if service is not None and service.running:
+        return service.submit(mil.set_circular_buffer_memory_footprint, size_mb,
+                              label='allocate circular buffer', callback=_report)
+    mil.set_circular_buffer_memory_footprint(size_mb)
+    return None
 
 def register_resilient_mmcore_mda_engine(core, shared_data=None):
     """Register an MDAEngine on `core` that survives a stalled/dropped-frame
@@ -262,6 +313,57 @@ def perform_post_closing_actions(shared_data:Shared_data):
     #Clean up temporary files
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
 
+#: Where --startup-exit appends its timeline (repo checkout layout, like docs/perf-runtime.txt).
+STARTUP_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   '..', '..', 'docs', 'perf-startup.txt')
+
+def _warn_if_install_is_stale() -> None:
+    """After startup: say so when pyproject.toml changed since `make dev` (install_check)."""
+    try:
+        from glados_pycromanager.install_check import stale_install_message
+        message = stale_install_message()
+        if message is None:
+            return
+        logging.warning(message)
+        from napari.utils.notifications import show_warning
+        show_warning(message)
+    except Exception:
+        logging.exception('Could not check whether the install is up to date')
+
+#: Backend names as the startup dialog saves them (headlessGUI.start) and --backend takes them.
+HEADLESS_BACKENDS = ('JAVA', 'Python', 'PyMMCorePlus')
+
+def resolve_last_setup(mm_cfg):
+    """``(backend, config_path, mm_path)`` saved by the startup dialog, if still usable.
+
+    ``mm_cfg`` is ``shared_data.config.micromanager_config``. Returns None when the
+    backend is unknown or the install folder or config file has gone, so ``--last``
+    falls back to the dialog rather than failing deep inside a backend start.
+    """
+    backend = str(getattr(mm_cfg, 'headless_backend', '') or '')
+    config = str(getattr(mm_cfg, 'config_path', '') or '')
+    mm_path = str(getattr(mm_cfg, 'path', '') or '')
+    if backend not in HEADLESS_BACKENDS:
+        return None
+    if not (config and os.path.isfile(config) and mm_path and os.path.isdir(mm_path)):
+        return None
+    return backend, config, mm_path
+
+def _write_startup_report(args) -> None:
+    """Append the startup timeline to docs/perf-startup.txt (``--startup-exit``)."""
+    import platform
+    import time as _time
+    source = ('--auto-demo' if args.auto_demo else '--last' if args.last
+              else f'--backend {args.backend} --config {args.config}')
+    header = (f"\n=== Startup timeline {_time.strftime('%Y-%m-%d %H:%M:%S')} "
+              f"({source}, {platform.node()}) ===\n")
+    out_file = os.path.abspath(STARTUP_REPORT_FILE)
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    with open(out_file, 'a', encoding='utf-8') as f:
+        f.write(header)
+        f.write(startup_timeline.format_report())
+    print(f'[startup_exit] wrote {out_file}')
+
 class Worker(QObject):
     """
     Worker wrapper for the runNapariPycroManager function
@@ -295,6 +397,13 @@ class headlessGUI(QWidget):
     """
     Small GUI for user input on a headless Pycromanager start
     """
+    #: Emitted when the dialog closes, by Start or by the window's close button.
+    closed = pyqtSignal()
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self.closed.emit()
+
     def __init__(self, shared_data: Shared_data):
         super().__init__()
         self.shared_data = shared_data
@@ -325,7 +434,8 @@ class headlessGUI(QWidget):
             
         # Add a splash screen at the top
         self.splash_label = QLabel(self)
-        splash_png = iconFolder+os.sep+'GladosSplash_inv.png'
+        from glados_pycromanager.GUI.startup_splash import SPLASH_IMAGE
+        splash_png = SPLASH_IMAGE
         splash_pixmap = QPixmap(splash_png)
         new_width = 500
         self.splash_label.setPixmap(
@@ -338,7 +448,9 @@ class headlessGUI(QWidget):
 
         self.pyMMCorePlusRadio = QRadioButton('PyMMCore+ (testing)', self)
         self.pythonRadio = QRadioButton('Python (recommended)', self)
-        self.javaRadio = QRadioButton('Java', self)
+        self.javaRadio = QRadioButton('Java (deprecated)', self)
+        self.javaRadio.setToolTip('The Java Micro-Manager bridge is no longer maintained or tested. '
+                                  'Use Python or PyMMCore+.')
         self.pyMMCorePlusRadio.setChecked(False)
         self.pythonRadio.setChecked(False)
         self.javaRadio.setChecked(False)
@@ -476,23 +588,26 @@ class UserManualWidget(QWidget):
 show_UserManualNapari = UserManualWidget
 
 
-def main():
+def main(app=None, splash=None):
     """
     Run the main function to start Glados-PycroManager-Napari interface for autonomous microscopy.
     
     Args:
-        None
+        app: the QApplication, when GUI/startup.py already created it (to show the
+            splash before this module's imports). Created here otherwise.
+        splash: the StartupSplash on screen, if any; closed once startup is ready.
     
     Returns:
         None
     """
+    startup_timeline.mark('main() entered')
     print('Glados-pycromanager main function called')
     
     #Create parser
     parser = argparse.ArgumentParser(description='Glados-PycroManager-Napari: an interface for autonomous microscopy via PycroManager')
     parser.add_argument('--debug', '-d', action='store_true', help='Enable debug')
     parser.add_argument('--backend', choices=['JAVA', 'Python', 'PyMMCorePlus'],
-                        help='MM backend to start headlessly. Combined with --config, '
+                        help='MM backend to start headlessly (JAVA is deprecated). Combined with --config, '
                              'bypasses the startup popup (useful for testing/profiling).')
     parser.add_argument('--config', help='Path to the Micro-Manager .cfg file (skips popup when set with --backend).')
     parser.add_argument('--mm-path', help='Path to the Micro-Manager install directory (defaults to the config in Shared_data).')
@@ -506,6 +621,17 @@ def main():
                              'on for SECS seconds, then dump top-25 cumulative stats to '
                              'docs/perf-runtime.txt and quit. Requires a working backend (use '
                              '--auto-demo for a hardware-free run).')
+    parser.add_argument('--startup-exit', action='store_true',
+                        help='Dev only: quit as soon as the GUI is ready and append the startup '
+                             'timeline to docs/perf-startup.txt. Needs a popup-free launch '
+                             '(--auto-demo, or --backend with --config).')
+    parser.add_argument('--last', action='store_true',
+                        help='Start the backend, install and config used last time (saved by the '
+                             'startup dialog) without showing the dialog. Falls back to the '
+                             'dialog if any of them no longer exists.')
+    parser.add_argument('--allow-second-instance', action='store_true',
+                        help='Start even if Glados is already running (normally a second launch '
+                             'brings the running one to the front instead).')
     args = parser.parse_args()
 
     # Validate CLI override combos before any heavy work.
@@ -513,6 +639,11 @@ def main():
         parser.error('--backend requires --config (or use --auto-demo)')
     if args.config and not (args.backend or args.auto_demo):
         parser.error('--config requires --backend (or use --auto-demo)')
+    if args.last and (args.backend or args.config or args.auto_demo):
+        parser.error('--last cannot be combined with --backend/--config/--auto-demo')
+    if args.startup_exit and not (args.auto_demo or args.last or (args.backend and args.config)):
+        parser.error('--startup-exit needs --auto-demo, --last or --backend with --config: a popup '
+                     'would put the time the user takes to answer it in the timeline')
 
     #Set up logging to files in appData folder - INFO and DEBUG
     from glados_pycromanager.observability.logger import set_up_logger
@@ -521,18 +652,12 @@ def main():
     # Create an instance of the shared_data class
     print('Creating shared data.')
     shared_data = Shared_data()
-    # Start pre-warming a blank RT-analysis subprocess as early as possible so
-    # its spawn + package-tree (+ diplib) import cost is hidden behind however
-    # long the user takes to reach the microscope/acquisition setup, instead of
-    # being paid on the critical path of the first subprocess-isolated node's
-    # start (see AnalysisClass.py's AnalysisProcess_customFunction and
-    # subprocess_pool.py).
-    shared_data._rt_subprocess_pool.start()
+    startup_timeline.mark('Shared_data created')
     # Ask Windows not to park us on efficiency cores while unfocused. Done after
     # Shared_data exists (it carries the switch) but before any acquisition, and
-    # deliberately before the subprocess pool's children would inherit anything
-    # -- the priority class is inherited, which is what we want for the isolated
-    # RT-analysis worker too. Entirely best-effort; see the module docstring.
+    # before the RT subprocess pool (started once startup is ready) spawns its
+    # child -- the priority class is inherited, which is what we want for the
+    # isolated RT-analysis worker too. Entirely best-effort; see the module docstring.
     from glados_pycromanager.observability.process_priority import (
         apply_foreground_scheduling_hints,
     )
@@ -540,6 +665,7 @@ def main():
         str(shared_data.config.performance_config.foreground_scheduling_hints) == 'True')
     print('Cleaning up temporary files.')
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
+    startup_timeline.mark('temporary files cleaned up')
 
     # --- CLI overrides for the headless popup --------------------------------
     # If the user passed --auto-demo or (--backend AND --config), we resolve
@@ -548,6 +674,14 @@ def main():
     cli_backend = args.backend
     cli_config = args.config
     cli_mm_path = args.mm_path
+    if args.last:
+        last = resolve_last_setup(shared_data.config.micromanager_config)
+        if last is None:
+            logging.warning('--last: the saved backend/install/config is incomplete or no '
+                            'longer exists; showing the startup dialog instead')
+        else:
+            cli_backend, cli_config, cli_mm_path = last
+            logging.info('--last: reusing backend=%s, mm_path=%s, config=%s', *last)
     if args.auto_demo:
         from pymmcore_plus import find_micromanager
         mm_paths = find_micromanager(return_first=False) or []
@@ -571,20 +705,27 @@ def main():
             shared_data.config.micromanager_config.max_memory_mb = args.max_memory_mb
     # -------------------------------------------------------------------------
 
-    #Some QT attributes
-    print('Setting QT attributes.')
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)# type:ignore
-    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)# type:ignore
-    QApplication.setAttribute(Qt.AA_UseStyleSheetPropagationInWidgetStyles, True)# type:ignore
+    # The app's one QApplication: the backend dialog and the main window share it.
+    if app is None:
+        app = QApplication.instance()
+    if app is None:
+        from glados_pycromanager.GUI.startup import set_qt_application_attributes
+        set_qt_application_attributes()
+        app = QApplication(sys.argv)
+        startup_timeline.mark('QApplication created')
 
     napariSettings = napari.settings.get_settings() #type: ignore
     if napariSettings.application.playback_fps < shared_data.config.visualisation_config.fps:
         napariSettings.application.playback_fps = shared_data.config.visualisation_config.fps
         print(f'Set the napari Playback FPS to {shared_data.config.visualisation_config.fps}!')
+    startup_timeline.mark('napari settings read')
 
     # get object representing MMCore, used throughout
     #try to open a running instance:
     print('Finding or creating micromanager instance.')
+    #PyMMCorePlus and Python backends: the circular-buffer size, allocated once the
+    #owner thread runs (JAVA allocates it in the JVM, inside start_headless).
+    circular_buffer_mb = None
     if cli_override:
         # CLI override: go straight to the requested headless backend, no popup,
         # no Core() probe — the override is explicit intent to run headless.
@@ -596,9 +737,15 @@ def main():
         if cli_backend in ('JAVA', 'Python'):
             from pycromanager import Core, start_headless
             logging.info('Headless PycroManager started (CLI override, backend=%s)', cli_backend)
+            python_backend = cli_backend == 'Python'
+            if python_backend:  # the real size is allocated on the owner thread below
+                circular_buffer_mb = int(mm_cfg.buffer_mb)
             start_headless(mm_app_path=mm_cfg.path, config_file=mm_cfg.config_path,
-                           python_backend=cli_backend == 'Python',
-                           buffer_size_mb=int(mm_cfg.buffer_mb), max_memory_mb=int(mm_cfg.max_memory_mb))
+                           python_backend=python_backend,
+                           buffer_size_mb=(HEADLESS_PLACEHOLDER_BUFFER_MB if python_backend
+                                           else int(mm_cfg.buffer_mb)),
+                           max_memory_mb=int(mm_cfg.max_memory_mb))
+            startup_timeline.mark('start_headless() returned')
             shared_data._headless = True
             shared_data.backend = cli_backend
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
@@ -610,8 +757,10 @@ def main():
             logging.info('Headless PyMMCorePlus started (CLI override)')
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
             shared_data.MILcore.set_core(CMMCorePlus(mm_path=mm_cfg.path))
+            startup_timeline.mark('CMMCorePlus created')
             shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
-            shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
+            startup_timeline.mark('system configuration loaded')
+            circular_buffer_mb = int(mm_cfg.buffer_mb)  # allocated on the owner thread below
             register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core(), shared_data)
             # Max memory MB is not settable in PyMMCorePlus; only buffer_mb (the
             # circular buffer footprint) applies to this backend. Warn instead of
@@ -643,17 +792,36 @@ def main():
 
         if not _java_mm_up:
             logging.info('No Java MM server on port 4827 — opening headless dialog')
-            appSmall = QApplication([])
+            from PyQt5.QtCore import QEventLoop
+            if splash is not None:
+                splash.hide()
+            # Closing the dialog must end only the wait below, not the application.
+            quit_on_close = app.quitOnLastWindowClosed()
+            app.setQuitOnLastWindowClosed(False)
+            dialogLoop = QEventLoop()
             headlessGUIv = headlessGUI(shared_data)
-            appSmall.exec_()
+            headlessGUIv.closed.connect(dialogLoop.quit)
+            startup_timeline.mark('backend dialog shown')
+            if headlessGUIv.isVisible():
+                dialogLoop.exec_()
+            app.setQuitOnLastWindowClosed(quit_on_close)
+            startup_timeline.mark('backend dialog closed (includes user time)')
+            if splash is not None:
+                splash.show_now()
 
             if headlessGUIv.javaRadio.isChecked() or headlessGUIv.pythonRadio.isChecked():
                 from pycromanager import Core, start_headless
                 logging.info('Headless PycroManager started')
 
                 #Get those settings and use to start headless
+                python_backend = headlessGUIv.backend == 'Python'
+                if python_backend:  # the real size is allocated on the owner thread below
+                    circular_buffer_mb = int(headlessGUIv.buffer_size_mb)
                 try:
-                    start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=headlessGUIv.backend=='Python', buffer_size_mb=int(headlessGUIv.buffer_size_mb), max_memory_mb=int(headlessGUIv.max_memory_mb))
+                    start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=python_backend,
+                                   buffer_size_mb=(HEADLESS_PLACEHOLDER_BUFFER_MB if python_backend
+                                                   else int(headlessGUIv.buffer_size_mb)),
+                                   max_memory_mb=int(headlessGUIv.max_memory_mb))
                 except Exception as e:
                     print("Error!")
                     print(e)
@@ -673,7 +841,7 @@ def main():
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
                 shared_data.MILcore.set_core(CMMCorePlus(mm_path=headlessGUIv.mm_app_path))
                 shared_data.MILcore.get_core().loadSystemConfiguration(headlessGUIv.config_file)
-                shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(headlessGUIv.buffer_size_mb))
+                circular_buffer_mb = int(headlessGUIv.buffer_size_mb)  # allocated on the owner thread below
                 register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core(), shared_data)
                 #Max memory MB is not settable in PyMMCorePlus, so we don't set it
                 logging.warning('max_memory_mb (%s MB) has no effect on the MMCORE_PLUS backend; '
@@ -685,11 +853,14 @@ def main():
     # branch above ends with a MILcore bound, so this is the single place that
     # needs to know. Callers that do not use the service keep talking to MIL
     # directly -- T-B1's re-entrant lock still makes that safe.
+    startup_timeline.mark('backend up')
     try:
         shared_data.start_microscope_service()
     except Exception:
         logging.exception('Could not start the MicroscopeService; '
                           'falling back to direct MIL access')
+    startup_timeline.mark('MicroscopeService started')
+    _allocate_circular_buffer(shared_data, circular_buffer_mb)
 
     #Open JSON file with MM settings
     try:
@@ -700,14 +871,37 @@ def main():
         MM_JSON = None
         
         
-    app = QApplication(sys.argv)
-
     shared_data.mainApp = app
+
+    def _on_startup_ready():
+        if splash is not None:
+            splash.done()
+        logging.info('Startup timeline (from process start):\n%s',
+                     startup_timeline.format_report())
+        _warn_if_install_is_stale()
+        if args.startup_exit:
+            _write_startup_report(args)
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(0, app.quit)
+            return
+        # Pre-warm a blank RT-analysis subprocess so its spawn + package-tree (+ diplib)
+        # import is paid while the user sets up, not when the first subprocess-isolated
+        # node starts (AnalysisClass.AnalysisProcess_customFunction, subprocess_pool.py).
+        # Only now: during startup that child competed for the same cores (L2.2 of
+        # claude_launcher_project.md).
+        try:
+            shared_data._rt_subprocess_pool.start()
+        except Exception:
+            logging.exception('Could not pre-warm the RT-analysis subprocess pool')
+    call_when_startup_ready(_on_startup_ready)
 
     worker = Worker()
     thread = QThread()
     worker.moveToThread(thread)
     thread.started.connect(lambda: worker.runNapariPycroManagerWrap(MM_JSON, shared_data))
+    if splash is not None:
+        # From here on Glados' own events are queued; the splash only repaints.
+        splash.pump = False
     thread.start()
 
     worker.finished.connect(thread.quit)

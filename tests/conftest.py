@@ -46,6 +46,18 @@ def tmp_appdata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.fixture
+def direct_mmcore_signals(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make a `CMMCorePlus` built in this test deliver its events directly (psygnal).
+
+    pymmcore-plus picks Qt signals whenever a QApplication exists, and an earlier test
+    in the session (any `qapp` user) leaves one behind. With no event loop running,
+    the MDA runner thread's queued `frameReady`s are then never delivered, and a
+    headless MDA test sees zero frames - but only in a full-suite run.
+    """
+    monkeypatch.setenv("PYMM_SIGNALS_BACKEND", "psygnal")
+
+
+@pytest.fixture
 def mock_core() -> MagicMock:
     """Plain `MagicMock` standing in for a Micro-Manager core.
 
