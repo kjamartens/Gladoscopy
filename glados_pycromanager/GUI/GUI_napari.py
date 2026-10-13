@@ -47,10 +47,13 @@ from PyQt5.QtWidgets import (
     QButtonGroup,
     QFileDialog,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QRadioButton,
+    QToolButton,
     QWidget,
 )
 
@@ -466,13 +469,16 @@ class headlessGUI(QWidget):
         self.buttonGroup.addButton(self.pythonRadio)
         self.buttonGroup.addButton(self.javaRadio)
 
+        mm_cfg = self.shared_data.config.micromanager_config
         self.mm_app_pathLabel = QLabel('MicroManager Path:', self)
-        self.mm_app_pathLineEdit = QLineEdit(self.shared_data.config.micromanager_config.path, self)
+        self.mm_app_pathLineEdit = QLineEdit(mm_cfg.path, self)
+        self.mm_app_history = self._makeHistoryButton(self.mm_app_pathLineEdit, mm_cfg.path_history)
         self.mm_app_browse = QPushButton('...', self)
         self.mm_app_browse.clicked.connect(self.BrowseMMAppPath)
 
         self.config_fileLabel = QLabel('Config File:', self)
-        self.config_fileLineEdit = QLineEdit(self.shared_data.config.micromanager_config.config_path, self)
+        self.config_fileLineEdit = QLineEdit(mm_cfg.config_path, self)
+        self.config_file_history = self._makeHistoryButton(self.config_fileLineEdit, mm_cfg.config_path_history)
         self.config_file_browse = QPushButton('...', self)
         self.config_file_browse.clicked.connect(self.BrowseConfigFile)
 
@@ -498,10 +504,10 @@ class headlessGUI(QWidget):
         layout.addWidget(self.pythonRadio, 3, 2)
         layout.addWidget(self.javaRadio, 3, 3)
         layout.addWidget(self.mm_app_pathLabel, 4, 0)
-        layout.addWidget(self.mm_app_pathLineEdit, 4, 1,1,2)
+        layout.addLayout(self._withHistoryButton(self.mm_app_pathLineEdit, self.mm_app_history), 4, 1,1,2)
         layout.addWidget(self.mm_app_browse, 4, 3)
         layout.addWidget(self.config_fileLabel, 5, 0)
-        layout.addWidget(self.config_fileLineEdit, 5, 1,1,2)
+        layout.addLayout(self._withHistoryButton(self.config_fileLineEdit, self.config_file_history), 5, 1,1,2)
         layout.addWidget(self.config_file_browse, 5, 3)
         layout.addWidget(self.buffer_size_mbLabel, 6, 0)
         layout.addWidget(self.buffer_size_mbLineEdit, 6, 1)
@@ -511,6 +517,31 @@ class headlessGUI(QWidget):
 
         self.setLayout(layout)
         self.show()
+
+    def _makeHistoryButton(self, lineEdit: QLineEdit, history) -> QToolButton:
+        """Small down-arrow next to `lineEdit` listing previously used values
+        (most recent first); picking one fills the line edit."""
+        button = QToolButton(self)
+        button.setArrowType(Qt.DownArrow) #type:ignore
+        button.setPopupMode(QToolButton.InstantPopup)
+        button.setToolTip('Recently used')
+        menu = QMenu(button)
+        entries = history if isinstance(history, list) else []
+        for entry in entries:
+            action = menu.addAction(entry)
+            action.triggered.connect(lambda _checked=False, e=entry: lineEdit.setText(e))
+        button.setMenu(menu)
+        button.setEnabled(bool(entries))
+        return button
+
+    @staticmethod
+    def _withHistoryButton(lineEdit: QLineEdit, button: QToolButton) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        row.addWidget(lineEdit)
+        row.addWidget(button)
+        return row
 
     def BrowseMMAppPath(self):
         options = QFileDialog.Options()
@@ -552,6 +583,10 @@ class headlessGUI(QWidget):
         self.shared_data.config.micromanager_config.config_path = self.config_file
         self.shared_data.config.micromanager_config.buffer_mb = self.buffer_size_mb
         self.shared_data.config.micromanager_config.max_memory_mb = self.max_memory_mb
+        from glados_pycromanager.GUI.headless_validation import push_path_history
+        mm_cfg = self.shared_data.config.micromanager_config
+        mm_cfg.path_history = push_path_history(mm_cfg.path_history, self.mm_app_path)
+        mm_cfg.config_path_history = push_path_history(mm_cfg.config_path_history, self.config_file)
         #And update the JSON
         utils.storeSharedData_GlobalData(self.shared_data)
         

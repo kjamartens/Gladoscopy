@@ -50,6 +50,29 @@ def validate_headless_inputs(
     return errors
 
 
+PATH_HISTORY_LIMIT = 20
+
+
+def push_path_history(history, value: str, limit: int = PATH_HISTORY_LIMIT) -> list[str]:
+    """Return ``history`` with ``value`` moved to the front, capped at ``limit``.
+
+    Entries are compared case- and separator-insensitively (Windows paths),
+    so ``C:/MM`` and ``c:\\MM\\`` count as one; the newest spelling wins.
+    Empty values are not recorded. A non-list ``history`` (e.g. a corrupt
+    state file) is treated as empty.
+    """
+    entries = [h for h in history if isinstance(h, str) and h.strip()] if isinstance(history, list) else []
+    if not isinstance(value, str) or not value.strip():
+        return entries[:limit]
+    value = value.strip()
+
+    def _key(p: str) -> str:
+        return os.path.normcase(os.path.normpath(p.strip()))
+
+    new_key = _key(value)
+    return ([value] + [h for h in entries if _key(h) != new_key])[:limit]
+
+
 def headless_inputs_are_valid(mm_app_path: str, config_file: str) -> bool:
     """Convenience boolean wrapper around :func:`validate_headless_inputs`."""
     return not validate_headless_inputs(mm_app_path, config_file)

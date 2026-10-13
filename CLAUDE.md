@@ -749,7 +749,7 @@ acquisition, just materialised.
 
 ### UI — `GUI/`
 
-- `GUI_napari.py` — standalone entry. Builds a `headlessGUI` for backend choice, spawns Napari, runs `runNapariPycroManager` in a `Worker`/`QThread`. Sets `NAPARI_ASYNC=1` and `NAPARI_OCTREE=1` *before* importing napari.
+- `GUI_napari.py` — standalone entry. Builds a `headlessGUI` for backend choice, spawns Napari, runs `runNapariPycroManager` in a `Worker`/`QThread`. Sets `NAPARI_ASYNC=1` and `NAPARI_OCTREE=1` *before* importing napari. The MM-path and config-file fields each have a down-arrow `QToolButton` listing the last 20 values used (`MicroManagerConfig.path_history` / `config_path_history`, most recent first, recorded on Start via `headless_validation.push_path_history`). List-typed config fields need `setting(..., default_factory=list)`. Tests: `tests/test_headless_path_history.py`.
 - `_dock_widget.py` — napari plugin entry. `MainWidget` constructs `Shared_data`, calls `pycromanager.Core()` directly, and adds four dock widgets — all of which inherit `GladosWidget`:
   - `MMConfigWidget` — Micro-Manager config groups, stages, ROI (`microManagerControlsUI_plugin`)
   - `MDAWidget` — Multi-D acquisition (`MDAGlados_plugin`)

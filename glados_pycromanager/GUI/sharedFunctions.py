@@ -39,17 +39,19 @@ from glados_pycromanager.GUI.utils import updateAutonousErrorWarningInfo
 # up. See claude_decisions.md (T-A5).
 
 
-def setting(default, display_name="", description="", input_type="lineEdit", options=None, hidden=False):
-    return dataclasses.field(
-        default=default,
-        metadata={
-            "display_name": display_name,
-            "description": description,
-            "input_type": input_type,
-            "options": options or [],
-            "hidden": hidden,
-        }
-    )
+def setting(default=None, display_name="", description="", input_type="lineEdit", options=None, hidden=False,
+            default_factory=None):
+    metadata = {
+        "display_name": display_name,
+        "description": description,
+        "input_type": input_type,
+        "options": options or [],
+        "hidden": hidden,
+    }
+    # Mutable defaults (lists) must go through default_factory.
+    if default_factory is not None:
+        return dataclasses.field(default_factory=default_factory, metadata=metadata)
+    return dataclasses.field(default=default, metadata=metadata)
         
 @dataclass
 class MDAConfig:
@@ -179,6 +181,9 @@ class MicroManagerConfig:
                                     hidden=True)
     buffer_mb:        int = setting(4096,  "Buffer size (MB)",  "Buffer size of the headless Micromanager instance",  hidden=True)
     max_memory_mb:    int = setting(12000, "Max memory (MB)",   "Maximum memory footprint of the headless Micromanager instance", hidden=True)
+    # Most-recent-first, offered by the start dialog's history arrows.
+    path_history:        list = setting(display_name="Micromanager path history", hidden=True, default_factory=list)
+    config_path_history: list = setting(display_name="Micromanager config file history", hidden=True, default_factory=list)
 
 
 @dataclass
