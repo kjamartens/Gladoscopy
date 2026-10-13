@@ -220,13 +220,17 @@ profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.
 	pwsh -File scripts/profile_startup.ps1
 
 # Full click-to-ready startup timeline (imports, backend, viewer, docks), STARTUP_RUNS
-# launches each against the bundled demo and the demo_settings.mk backend. ~3-4 min.
+# launches each against the bundled demo (PyMMCorePlus) and the demo_settings.mk backend.
+# ~1-2 min. The second run uses MMConfig_demo.cfg from DEMO_MM_PATH rather than
+# DEMO_CONFIG: insiliscope.cfg crashes the Python backend in start_headless (not Glados'
+# bug). JAVA is deprecated and not profiled. Override with STARTUP_CONFIG=...
 STARTUP_RUNS ?= 3
+STARTUP_CONFIG ?= $(DEMO_MM_PATH)/MMConfig_demo.cfg
 
 profile-startup-full:  ## Startup timeline, median of STARTUP_RUNS launches per backend; appends to docs/perf-startup.txt.
 	$(PYTHON) -m scripts.profile_startup_full --runs $(STARTUP_RUNS) -- --auto-demo
 	$(PYTHON) -m scripts.profile_startup_full --runs $(STARTUP_RUNS) -- \
-	    --backend "$(DEMO_BACKEND)" --config "$(DEMO_CONFIG)" --mm-path "$(DEMO_MM_PATH)" \
+	    --backend "$(DEMO_BACKEND)" --config "$(STARTUP_CONFIG)" --mm-path "$(DEMO_MM_PATH)" \
 	    --buffer-mb $(DEMO_BUFFER_MB) --max-memory-mb $(DEMO_MAX_MEMORY_MB)
 
 BENCH_FRAMES ?= 60
