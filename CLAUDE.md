@@ -1714,6 +1714,20 @@ Three companion files live alongside it:
   To see who imports what at startup, a meta-path finder that records the stack on a
   module's first import is quicker than reading `-X importtime`, which only shows the
   first importer's chain.
+- **napari's own startup costs (L2.4).**
+  - **pint's unit registry** is first built by the scale bar, and the build parses pint's
+    definitions file (0.8 s). `napariHelperFunctions.use_cached_unit_registry()` (called
+    by `showScaleBar`) installs a lazy registry that uses pint's disk cache (0.05 s once
+    written; the first launch ever pays ~1.2 s to write it). It changes nothing once the
+    registry is built, since swapping it then would split quantities across registries.
+  - **napari saves its whole settings file each time a dock's area is recorded**
+    (`_update_default_dock_area`): 8 saves, ~0.5 s. `_suspend_napari_settings_saves()`
+    runs just before `napari.Viewer()` and `_sizeControlsDock` resumes it, which does
+    one save.
+  - **Creating the viewer hidden is no gain** (A/B: ready −0.17 s, noise). The canvas's
+    *first* GL paint costs ~2 s wherever it happens; hiding the window only moved it from
+    the Controls step to the final one.
+  - Tests: `tests/test_startup_napari_costs.py`.
 - **`insiliscope.cfg` + Python backend segfaults in `start_headless`** (2026-10-13), even in a
   bare pycromanager script, while `MMConfig_demo.cfg` in the same install is fine. So the
   documented `--profile-runtime` command currently crashes there. The cause is the

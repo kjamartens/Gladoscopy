@@ -2947,6 +2947,36 @@ def _startupReady():
 #The Controls dock never takes more than this fraction of the window height at startup.
 STARTUP_CONTROLS_MAX_HEIGHT_FRACTION = 0.6
 
+def _suspend_napari_settings_saves():
+    """Stop napari writing its settings file on every change; returns a resume token.
+
+    napari records each dock's area in its settings and saves the whole file on every
+    change (``QtViewerDockWidget._update_default_dock_area``): eight saves of 50-100 ms
+    while napari's own docks and then the Glados docks are added and tabified. _resume_napari_settings_saves
+    restores the flag and saves once.
+    """
+    try:
+        from napari.settings import get_settings
+        settings = get_settings()
+        previous = settings._save_on_change
+        settings._save_on_change = False
+        return settings, previous
+    except Exception:
+        logging.debug('Could not suspend napari settings saves', exc_info=True)
+        return None
+
+_startup_settings_save_token = None
+
+def _resume_napari_settings_saves(token):
+    if token is None:
+        return
+    settings, previous = token
+    try:
+        settings._save_on_change = previous
+        settings._maybe_save()
+    except Exception:
+        logging.exception('Could not save napari settings after startup')
+
 def _finaliseStartupLayout(napariViewer, controlsWidget):
     """Maximise the window, show the Controls tab, and make it tall enough for its content.
 
@@ -2978,12 +3008,15 @@ def _sizeControlsDock(napariViewer, controlsWidget):
         qtWindow.resizeDocks([dock], [min(wanted, cap)], Qt.Vertical)
     except Exception:
         logging.exception("Could not select and size the Controls tab")
+    global _startup_settings_save_token
+    _resume_napari_settings_saves(_startup_settings_save_token)
+    _startup_settings_save_token = None
     startup_timeline.mark('startup layout finalised')
     QTimer.singleShot(0, _startupReady)
 
 def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,include_flowChart_automatedMicroscopy:bool = True):
     #Go from self to global variables
-    global core, MM_JSON, livestate, napariViewer, shared_data
+    global core, MM_JSON, livestate, napariViewer, shared_data, _startup_settings_save_token
     # core = score
     MM_JSON = sMM_JSON
     livestate = False
@@ -3000,6 +3033,8 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
         
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
+    #Resumed (one save) by _sizeControlsDock, once napari's and Glados' docks have settled.
+    _startup_settings_save_token = _suspend_napari_settings_saves()
     napariViewer = napari.Viewer()
     startup_timeline.mark('napari viewer created')
 
