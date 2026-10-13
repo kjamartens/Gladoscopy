@@ -606,6 +606,38 @@ def _recordReplayFrame(session, shared_data, metadata, snapshot):
         return False
 
 
+def _ack_nonblocking(control_out_queue, ack) -> None:
+    """Send a close/reinit ack from the worker without ever blocking on it.
+
+    The parent never waits for these acks (stop() and the reclaim are
+    fire-and-forget), and control_out_queue is small (maxsize 2). A blocking
+    put() therefore wedged the worker for good once two acks had piled up
+    unread -- e.g. after one close + reinit cycle, or a double stop() -- and
+    every later frame timed out ("worker did not respond within 5s"). An ack
+    that does not fit is dropped: nothing depends on it arriving.
+    """
+    try:
+        control_out_queue.put_nowait(ack)
+    except std_queue.Full:
+        logging.debug('AnalysisProcess worker: control_out_queue full, dropping ack %s', ack)
+    except Exception:
+        logging.exception('AnalysisProcess worker: failed to send ack %s', ack)
+
+
+def _drain_queue(q) -> int:
+    """Discard everything currently in a multiprocessing queue; returns the count."""
+    n = 0
+    while True:
+        try:
+            q.get_nowait()
+        except std_queue.Empty:
+            return n
+        except Exception:
+            logging.debug('AnalysisProcess: could not drain a queue', exc_info=True)
+            return n
+        n += 1
+
+
 def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_event,
                                  init_fn=None, run_fn=None, end_fn=None,
                                  control_in_queue=None, control_out_queue=None,
@@ -698,14 +730,10 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
                     except Exception:
                         logging.exception('AnalysisProcess worker: end_fn failed while parking')
                     if control_out_queue is not None:
-                        # Ack so stop() can confirm the close was actually
-                        # applied before treating the worker as parked -- see
-                        # tests/test_analysis_process.py's
+                        # Ack so a caller (or a test) can confirm the close was
+                        # applied -- see tests/test_analysis_process.py's
                         # test_worker_close_control_message_calls_end_fn.
-                        try:
-                            control_out_queue.put({'__close_done__': True})
-                        except Exception:
-                            logging.exception('AnalysisProcess worker: failed to ack close')
+                        _ack_nonblocking(control_out_queue, {'__close_done__': True})
                 elif isinstance(ctrl, dict) and ctrl.get('__reinit__'):
                     # A warm-restart reclaim (see _park_subprocess_worker):
                     # the process/imports stay warm, but the node's init()
@@ -725,10 +753,7 @@ def _subprocess_analysis_worker(rt_analysis_info, in_queue, out_queue, stop_even
                         # actually applied before relying on it -- there is no
                         # ordering guarantee between this control message and
                         # a frame put on in_queue right after it otherwise.
-                        try:
-                            control_out_queue.put({'__reinit_done__': True})
-                        except Exception:
-                            logging.exception('AnalysisProcess worker: failed to ack reinit')
+                        _ack_nonblocking(control_out_queue, {'__reinit_done__': True})
             try:
                 item = in_queue.get(timeout=0.5)
             except std_queue.Empty:
@@ -926,6 +951,13 @@ class AnalysisProcess_customFunction(QThread):
             # (see the class docstring's "warm restarts" limitation). Tell
             # the child to rebuild its object, and rebuild the main-process
             # visualisation shadow here too rather than reusing the parked one.
+            # Leftovers of the previous session go first: unread close acks
+            # (they would crowd control_out_queue) and results of frames the
+            # worker finished after the previous proxy stopped reading (they
+            # would be handed out as the answer to this session's first frames).
+            stale = _drain_queue(self._control_out_queue) + _drain_queue(self._out_queue)
+            if stale:
+                logging.debug('AnalysisProcess: discarded %d stale message(s) from the parked worker', stale)
             try:
                 self._control_in_queue.put({'__reinit__': True, 'analysisInfo': analysisInfo})
             except Exception:
@@ -1101,12 +1133,18 @@ class AnalysisProcess_customFunction(QThread):
             return SubprocessReport(node_label=self._node_label(), pid=pid, cpu_percent=cpu_percent,
                                      rss_mb=rss_mb, thread_count=thread_count,
                                      error='could not signal profiling stop (control queue full)')
-        try:
-            report = self._control_out_queue.get(timeout=timeout)
-        except std_queue.Empty:
-            return SubprocessReport(node_label=self._node_label(), pid=pid, cpu_percent=cpu_percent,
-                                     rss_mb=rss_mb, thread_count=thread_count,
-                                     error=f'child did not respond within {timeout}s')
+        # The queue also carries close/reinit acks; skip those.
+        deadline = time.time() + timeout
+        report = None
+        while report is None:
+            try:
+                item = self._control_out_queue.get(timeout=max(0.0, deadline - time.time()))
+            except std_queue.Empty:
+                return SubprocessReport(node_label=self._node_label(), pid=pid, cpu_percent=cpu_percent,
+                                         rss_mb=rss_mb, thread_count=thread_count,
+                                         error=f'child did not respond within {timeout}s')
+            if isinstance(item, dict) and item.get('__perf_report__'):
+                report = item
         return SubprocessReport(
             node_label=self._node_label(),
             pid=report.get('pid', pid),
@@ -1176,12 +1214,22 @@ class AnalysisProcess_customFunction(QThread):
         self.finished.emit()
 
     def stop(self):
+        # Idempotent, like AnalysisThread_customFunction.stop(): destroy() calls
+        # stop(), and a node can be torn down by both the layer-removed callback
+        # and the dock widget's deactivate. A second pass used to send a second
+        # '__close__' (end() ran twice) and park the worker twice.
+        if getattr(self, '_stopped', False):
+            return
+        self._stopped = True
         self.is_running = False
         self._new_image.set()  # unblock run() if it's currently waiting
         if self.visualisationObject is not None:
             self.visualisationObject.stop()
 
         if self._cache_key is not None and self._process.is_alive():
+            # Frames still queued for this session must not be analysed by the
+            # closed node (nor after a later reinit, as if they were new).
+            _drain_queue(self._in_queue)
             # Park this still-alive, already-warmed-up worker instead of
             # tearing it down -- a later __init__() with the identical
             # configuration reclaims it directly, skipping spawn + import +

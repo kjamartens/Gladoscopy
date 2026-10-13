@@ -166,6 +166,46 @@ def test_worker_close_then_reinit_matches_stop_then_reclaim(mp_ctx):
         assert not proc.is_alive()
 
 
+@pytest.mark.slow
+def test_worker_survives_repeated_close_reinit_with_unread_acks(mp_ctx):
+    """The parent never reads close/reinit acks (stop() and the reclaim are
+    fire-and-forget), and control_out_queue holds 2. A blocking ack put()
+    wedged the worker on the third unread ack, so a node deactivated and
+    re-activated a couple of times never processed another frame ("worker did
+    not respond within 5s"). Acks must be dropped rather than block."""
+    in_queue, out_queue, stop_event = _make_channels(mp_ctx)
+    control_in_queue = mp_ctx.Queue(maxsize=2)
+    control_out_queue = mp_ctx.Queue(maxsize=2)
+    proc = mp_ctx.Process(
+        target=_subprocess_analysis_worker,
+        args=({"initial_value": 0}, in_queue, out_queue, stop_event),
+        kwargs={
+            "init_fn": fake_init_fn, "run_fn": fake_run_fn, "end_fn": fake_end_fn,
+            "control_in_queue": control_in_queue, "control_out_queue": control_out_queue,
+        },
+        daemon=True,
+    )
+    proc.start()
+    try:
+        image = np.ones((2, 2), dtype=np.int64)  # sum == 4
+        # Close twice (the double-stop case) then reinit, three times over:
+        # nine acks against a queue of two, none of them read.
+        for cycle in range(3):
+            for msg in ({"__close__": True}, {"__close__": True},
+                        {"__reinit__": True, "analysisInfo": {"initial_value": 1000 * (cycle + 1)}}):
+                control_in_queue.put(msg, timeout=15)
+        in_queue.put((image, {"frame": 1}))
+        # The worker takes one control message per loop pass, so the frame may
+        # overtake the last reinit(s); what matters is that it is answered.
+        result, _metadata, _snapshot = _get_or_fail_fast(out_queue, proc, timeout=30)
+        assert result % 1000 == 4
+    finally:
+        stop_event.set()
+        in_queue.put(None)
+        proc.join(timeout=15)
+        assert not proc.is_alive()
+
+
 def _get_or_fail_fast(out_queue, proc, timeout=60):
     """`out_queue.get(timeout=...)`, but give up as soon as the child dies.
 
