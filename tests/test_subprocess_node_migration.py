@@ -207,7 +207,7 @@ def test_psmlm_without_axes_still_records_positions():
 #: it (and, at runtime, the AppData plugin folder), and those are exactly the
 #: nodes the default exists for.
 SHIPPED_NODE_MODULES = ('FFT_im', 'EndAtFrame', 'LaserAdjustment', 'RT_counter',
-                        'SharpnessValue', 'pSMLM', 'BioImageModelZoo')
+                        'SharpnessValue', 'pSMLM', 'BioImageModelZoo', 'pSMLM_live_precision')
 
 
 def test_every_shipped_node_declares_its_isolation_explicitly():

@@ -1706,7 +1706,14 @@ class MMConfigUI(CustomMainWindow):
                         group = getattr(overlay, 'group', None)
                         if group is not None:
                             group.remove_all(shared_data.napariViewer)
-                    
+                    #Removing a layer fires layer_removed_event_callback, which already
+                    #destroys the thread, clears the queue, drops this entry and releases
+                    #the replay history. Doing it all again here destroyed the node twice
+                    #(end() ran twice) and logged 'already deleted'.
+                    if item not in shared_data.RTAnalysisQueuesThreads:
+                        logging.debug('RT analysis already torn down by its layer removal')
+                        break
+
                     #Remove the thread
                     if item['Thread']:
                         # Signal the thread to stop

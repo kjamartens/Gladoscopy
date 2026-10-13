@@ -203,6 +203,7 @@ SHIPPED_NODES = {
     'BioImageModelZoo': ('BioImageModelZoo', False),
     'EndAtFrame': ('EndAtFrame', False),
     'LaserAdjustment': ('laser_adjustment', False),
+    'pSMLM_live_precision': ('pSMLM_live_precision', True),
 }
 
 

@@ -2870,10 +2870,17 @@ def layer_removed_event_callback(event, shared_data):
                 #written to by nothing. Drop them in the same pass rather than
                 #leaving orphans behind. (No-op for a single-layer node: the one
                 #layer is the one being removed.)
+                #Deferred to the next event-loop turn: this runs on napari's `removing`
+                #event, *before* the layer is deleted, and napari deletes it by an index
+                #it computed up front (and `remove_selected` deletes a whole list of them).
+                #Removing siblings synchronously shifted those indices and raised
+                #IndexError in napari's own delete. remove_all tolerates layers that are
+                #already gone (e.g. the user selected the siblings too).
                 if len(group) > 1:
                     logging.info('Removing the %d other layer(s) of the node that owned %r',
                                  len(group) - 1, layerRemoved)
-                    group.remove_all(shared_data.napariViewer)
+                    viewer = shared_data.napariViewer
+                    QTimer.singleShot(0, lambda group=group, viewer=viewer: group.remove_all(viewer))
                 #Closing the overlay is the user saying they are done with this
                 #node, so drop its retained results too -- this is the one place
                 #replay history is released, since the analysis thread stopping
