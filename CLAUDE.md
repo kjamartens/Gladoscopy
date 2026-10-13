@@ -885,15 +885,20 @@ acquisition, just materialised.
     imports `GUI.utils`; `show()` on a `QMessageBox` under `offscreen` segfaults (grab
     without showing). A test-made `QApplication` must stay referenced, or it is collected
     and `QApplication.instance()` is `None` again.
-  - Stages section (`MMConfigUI.stagesLayout`): an XY cross of three rows (each arm a row
-    of three buttons around the position label) over the step table, plus a Z column with
-    its step fields beside the buttons; step fields are capped by `_limitFieldWidth`. Packed
-    left, so it no longer spreads over the dock. Advanced settings support
-    `input_type="checkbox"` (stores a real bool; `utils.settingIsTrue` reads either form) —
-    used by `VisualisationConfig.show_scripts_section` (Scripts box, hidden by default).
+  - Stages section (`MMConfigUI.stagesLayout`): two independent blocks, each hidden when
+    its stage is missing. XY is `ui/widgets/stage_dial.StageDial` (3 rings x 4 directions,
+    inner = smallest step; emits `stepRequested(dx, dy, size)`, `_onXYDialStep` moves by
+    `XYMoveEditField[X_/Y_<size>]`; it doubles as `XYStageInfoWidget`, a `setText`
+    readout) over a step table whose FOV buttons sit under the column they fill. Z is
+    dropdown / rail / step fields. Both carry `ROLE_COMPACT` (theme stylesheet: thin
+    borders, `compact_padding`/`compact_margin`); step columns are sized by
+    `_stepColumnWidth`. The dial colours blend the palette's Window/WindowText only --
+    under napari's dark QSS, Button/Base keep Qt's light defaults. Advanced settings
+    support `input_type="checkbox"` (stores a real bool; `utils.settingIsTrue` reads either
+    form) -- used by `VisualisationConfig.show_scripts_section` (Scripts box, default off).
     `LayoutConfig` must stay all-hidden (`test_ui_theme` pins it).
   Tests: `tests/test_ui_theme.py`, `tests/test_ui_responsive_grid.py`,
-  `tests/test_ui_list_editor.py`, `tests/test_mda_gui_rebuild.py`,
+  `tests/test_ui_list_editor.py`, `tests/test_mda_gui_rebuild.py`, `tests/test_stage_dial.py`,
   `tests/test_controls_panel_layout.py`. Widget-identity tests compare
   `sip.unwrapinstance()` addresses, never `id()` of a PyQt wrapper (not stable).
 - `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `Showcase_Basic1.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
