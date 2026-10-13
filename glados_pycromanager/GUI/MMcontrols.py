@@ -175,7 +175,7 @@ CONTROLS_COLUMN_STRETCH = {
 #: Widest a block of config rows (label + control) may grow, in units of the
 #: theme's font size; the Configurations section is capped at one of these
 #: per block (`number_config_columns` rows each).
-CONFIG_BLOCK_MAX_WIDTH_EM = 42
+CONFIG_BLOCK_MAX_WIDTH_EM = 32
 
 
 #: Sample text a stage step-size field is sized to fit.
