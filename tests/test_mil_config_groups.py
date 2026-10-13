@@ -172,15 +172,30 @@ class TestGetConfigSettings:
             {"device": "Shutter", "property": "State", "value": "1"},
         ]
 
+    @staticmethod
+    def _java_config_data(*settings):
+        # spec: the bridge's mmcorej_Configuration has get_setting, *not* getSetting.
+        # A plain MagicMock answered getSetting too, which is how a call that raised
+        # AttributeError on every real JAVA start passed this test.
+        config_data = MagicMock(spec=["size", "get_setting"])
+        config_data.size.return_value = len(settings)
+        config_data.get_setting.side_effect = lambda i: settings[i]
+        return config_data
+
     def test_pycromanager_java_uses_snake_case_setting_methods(self):
         mil = _mil_for(MicroscopeInstance.PYCROMANAGER_JAVA)
-        config_data = MagicMock()
-        config_data.size.return_value = 1
-        config_data.getSetting.return_value = _fake_setting("Wheel", "Label", "DAPI", java_style=True)
+        config_data = self._java_config_data(_fake_setting("Wheel", "Label", "DAPI", java_style=True))
 
         result = mil.get_config_settings(config_data)
 
         assert result == [{"device": "Wheel", "property": "Label", "value": "DAPI"}]
+
+    def test_pycromanager_java_first_setting_label_and_property(self):
+        mil = _mil_for(MicroscopeInstance.PYCROMANAGER_JAVA)
+        config_data = self._java_config_data(_fake_setting("Wheel", "Label", "DAPI", java_style=True))
+
+        assert mil.get_config_device_label(config_data) == "Wheel"
+        assert mil.get_config_property_name(config_data) == "Label"
 
     def test_empty_config_data_returns_empty_list(self):
         mil = _mil_for(MicroscopeInstance.MMCORE_PLUS)

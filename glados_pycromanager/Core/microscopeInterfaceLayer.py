@@ -393,7 +393,7 @@ class MicroscopeInterfaceLayer:
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
         """
         if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            return config_data.getSetting(0).get_device_label()
+            return self._config_setting(config_data, 0).get_device_label()
         elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return config_data.getSetting(0).getDeviceLabel()
         elif self._mi == MicroscopeInstance.MMCORE_PLUS:
@@ -421,13 +421,25 @@ class MicroscopeInterfaceLayer:
         Get the device label from configuration data. Requires a config_data object (see get_config_data).
         """
         if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
-            return config_data.getSetting(0).get_property_name()
+            return self._config_setting(config_data, 0).get_property_name()
         elif self._mi == MicroscopeInstance.PYCROMANAGER_PYTHON:
             return config_data.getSetting(0).getPropertyName()
         elif self._mi == MicroscopeInstance.MMCORE_PLUS:
             return config_data.getSetting(0).getPropertyName()
         else:
             raise ValueError("Unsupported microscope interface type for get_config_device_label.")
+
+    def _config_setting(self, config_data, index):
+        """Setting ``index`` of a config_data object, by the backend's method name.
+
+        The Java bridge exposes MMCoreJ's ``Configuration.getSetting`` in snake_case
+        (``get_setting``); pymmcore and pymmcore-plus keep ``getSetting``. Calling
+        ``getSetting`` on the Java object raised AttributeError, which stopped the
+        Controls dock from building, so a JAVA-backend start never got past it.
+        """
+        if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
+            return config_data.get_setting(index)
+        return config_data.getSetting(index)
 
     @_hardware_locked
     def get_config_settings(self, config_data) -> list:
@@ -440,7 +452,7 @@ class MicroscopeInterfaceLayer:
         """
         settings = []
         for i in range(config_data.size()):
-            setting = config_data.getSetting(i)
+            setting = self._config_setting(config_data, i)
             if self._mi == MicroscopeInstance.PYCROMANAGER_JAVA:
                 settings.append({
                     "device": setting.get_device_label(),
