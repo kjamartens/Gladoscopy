@@ -64,7 +64,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build ensure-uv \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
-        run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup bench-live-display bench-storage \
+        run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup profile-startup-full bench-live-display bench-storage \
         ci verify \
         clean
 
@@ -208,6 +208,16 @@ profile-runtime:  ## Auto-launch demo, profile live mode for PROFILE_SECS second
 
 profile-startup:  ## Capture cold-import timings; appends to docs/perf-baseline.txt.
 	pwsh -File scripts/profile_startup.ps1
+
+# Full click-to-ready startup timeline (imports, backend, viewer, docks), STARTUP_RUNS
+# launches each against the bundled demo and the demo_settings.mk backend. ~3-4 min.
+STARTUP_RUNS ?= 3
+
+profile-startup-full:  ## Startup timeline, median of STARTUP_RUNS launches per backend; appends to docs/perf-startup.txt.
+	$(PYTHON) -m scripts.profile_startup_full --runs $(STARTUP_RUNS) -- --auto-demo
+	$(PYTHON) -m scripts.profile_startup_full --runs $(STARTUP_RUNS) -- \
+	    --backend "$(DEMO_BACKEND)" --config "$(DEMO_CONFIG)" --mm-path "$(DEMO_MM_PATH)" \
+	    --buffer-mb $(DEMO_BUFFER_MB) --max-memory-mb $(DEMO_MAX_MEMORY_MB)
 
 BENCH_FRAMES ?= 60
 

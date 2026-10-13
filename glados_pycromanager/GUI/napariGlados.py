@@ -52,6 +52,7 @@ from glados_pycromanager.GUI.frame_writer import NDTiffFrameWriter, ZarrFrameWri
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
 from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName, moveLayerToTop
 from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
+from glados_pycromanager.observability import startup_timeline
 from glados_pycromanager.ui.layout import build_stylesheet, set_current_theme, theme_from_config
 from glados_pycromanager.ui.layout.theme import LEGACY_SCALE_FACTOR
 
@@ -2901,6 +2902,31 @@ def layer_removed_event_callback(event, shared_data):
 
 #Delay before the startup layout pass; 0 = first event-loop iteration after startup.
 STARTUP_LAYOUT_DELAY_MS = 0
+
+#Run once, on the GUI thread, when startup is done: the event loop's first idle turn
+#after the startup layout pass (see _sizeControlsDock). Used for the startup timeline.
+_startup_ready_callbacks = []
+_startup_ready_fired = False
+
+def call_when_startup_ready(fn):
+    """Run fn() once startup is done, or now if it already is."""
+    if _startup_ready_fired:
+        fn()
+    else:
+        _startup_ready_callbacks.append(fn)
+
+def _startupReady():
+    global _startup_ready_fired
+    if _startup_ready_fired:
+        return
+    _startup_ready_fired = True
+    startup_timeline.mark('ready (event loop idle after layout)')
+    for fn in _startup_ready_callbacks:
+        try:
+            fn()
+        except Exception:
+            logging.exception('Startup-ready callback failed')
+    _startup_ready_callbacks.clear()
 #The Controls dock never takes more than this fraction of the window height at startup.
 STARTUP_CONTROLS_MAX_HEIGHT_FRACTION = 0.6
 
@@ -2935,6 +2961,8 @@ def _sizeControlsDock(napariViewer, controlsWidget):
         qtWindow.resizeDocks([dock], [min(wanted, cap)], Qt.Vertical)
     except Exception:
         logging.exception("Could not select and size the Controls tab")
+    startup_timeline.mark('startup layout finalised')
+    QTimer.singleShot(0, _startupReady)
 
 def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,include_flowChart_automatedMicroscopy:bool = True):
     #Go from self to global variables
@@ -2944,6 +2972,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     livestate = False
     shared_data = sshared_data
     shared_data.register_perf_thread_label(get_native_id(), 'GUI main thread')
+    startup_timeline.mark('event loop running, building GUI')
 
     if shared_data.MILcore is not None:
         #Get some info from core to put in shared_data
@@ -2955,6 +2984,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
     napariViewer = napari.Viewer()
+    startup_timeline.mark('napari viewer created')
 
     # napariViewer._window._qt_viewer.canvas.view._transform.scale=[2,2,2,2]
     #Add a connect event if a layer is removed - to stop background processes
@@ -2967,6 +2997,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     
     #Set some common things for the UI (scale bar on and such)
     InitateNapariUI(napariViewer)
+    startup_timeline.mark('napari UI initialised')
 
     # --- Developer: "Reload Custom Nodes" menu item -------------------------
     def _reload_custom_nodes():
@@ -3019,16 +3050,19 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     custom_widget_MMcontrols.setStyleSheet(dockStyleSheet)
     #Add to napari
     napariViewer.window.add_dock_widget(custom_widget_MMcontrols, area="top", name="Controls",tabify=True)
+    startup_timeline.mark('dock built: Controls')
     
     custom_widget_MDA = dockWidget_MDA()
     custom_widget_MDA.setStyleSheet(dockStyleSheet)
     napariViewer.window.add_dock_widget(custom_widget_MDA, area="top", name="Multi-D acquisition",tabify=True)
+    startup_timeline.mark('dock built: Multi-D acquisition')
     
     if include_flowChart_automatedMicroscopy:
         custom_widget_flowChart = dockWidget_flowChart()
         custom_widget_flowChart.setStyleSheet(dockStyleSheet)
         napariViewer.window.add_dock_widget(custom_widget_flowChart, area="top", name="Autonomous microscopy",tabify=True)
         custom_widget_flowChart.dockWidget.focus()
+        startup_timeline.mark('dock built: Autonomous microscopy')
     
     if includecustomUI:
         gladosLaserInfo = dockWidget_fullGladosUI()
@@ -3036,6 +3070,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
             napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI")
         else:
             logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
+        startup_timeline.mark('dock built: GladosUI')
 
     #Performance Mode is a diagnostic tool, not opened by default. Users open it
     #on demand via Plugins > Glados-PycroManager > Performance Mode.

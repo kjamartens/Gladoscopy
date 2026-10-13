@@ -1622,6 +1622,25 @@ Three companion files live alongside it:
   the user asks for it by name (e.g. "work on claude_throughput_project.md"). It shares
   the `claude_optimization` branch and logs to `claude_decisions.md` / `claude_issues.md`
   like the main roadmap.
+- **`claude_launcher_project.md`** — standalone plan for a one-click (taskbar) launcher
+  over the editable `.venv` plus measured startup-speed work, on branch
+  `feature/one-click-launch`. Same rule: not advanced by "continue"; run when asked by name.
+  Key planning facts: `GUI_napari` imports ~3.7 s warm (napari.qt 1.7 s, pycromanager 1.2 s);
+  pycromanager's JVM `Popen` has no `CREATE_NO_WINDOW`, so a pythonw launch pops a console
+  on the JAVA backend; `main()` builds two `QApplication`s (dialog + main).
+- **Startup timeline.** `observability/startup_timeline.mark(label)` stamps a startup stage,
+  timed from **process creation** (psutil). `GUI_napari.py` imports it before every heavy
+  import, which is why the `sys.path` shim now sits above `import pymmcore`.
+  `napariGlados.call_when_startup_ready(fn)` runs once on the first idle turn after
+  `_sizeControlsDock` ("ready"); the full table is logged at INFO then. `--startup-exit`
+  (popup-free launches only) appends the table to `docs/perf-startup.txt` and quits;
+  `make profile-startup-full` runs 3× per backend and appends medians (~2.3 min). Baseline
+  2026-10-13: ready at ~23 s warm (PyMMCorePlus demo), ~60 s cold. The Controls dock alone
+  takes 6.5–7.7 s warm. Tests: `tests/test_startup_timeline.py`.
+- **`insiliscope.cfg` + Python backend segfaults in `start_headless`** (2026-10-13), even in a
+  bare pycromanager script, while `MMConfig_demo.cfg` in the same install is fine. So the
+  documented `--profile-runtime` command currently crashes there. The cause is the
+  inSiliScope adapter or its environment, not Glados.
 
 When the user says **"continue"** (or any equivalent like "keep going",
 "resume", "next step"), follow this protocol exactly:

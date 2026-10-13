@@ -4148,3 +4148,26 @@ Fixed in its own commit.
 `GUI/nodz/nodz_main.py`, `Core/MDAGlados.py`, `GUI/napariGlados.py`,
 `GUI/sharedFunctions.py`, tests `test_recipe_*`, `test_mda_done_always_fires.py`,
 `test_mda_finalisation_gate.py`, `test_scoring_end_waits_all.py`.
+
+## 2026-10-13 — Startup timeline (L0 of `claude_launcher_project.md`)  [launcher]
+
+- **t0 is process creation, not `main()`.** `startup_timeline` takes t0 from psutil's
+  `create_time()`, so interpreter start, the console-script launcher and the module
+  imports are counted. Those are what a user waits for after clicking. Stdlib only at
+  import time, so it can be the first Glados import in `GUI_napari.py`. For that, the
+  `sys.path` shim moved above `import pymmcore`. It only touches `sys.path` and keeps
+  the same condition, so the pymmcore-before-Qt ordering is unchanged.
+- **"Ready" is the event loop's first idle turn after `_sizeControlsDock`.** That is the
+  last step of startup layout, and the window is maximised and usable from then on.
+- **`--startup-exit` refuses a launch that would show the backend popup.** Otherwise the
+  user's answer time would land in the timeline.
+- **Python-backend baseline uses `MMConfig_demo.cfg`, not `insiliscope.cfg`.** On
+  2026-10-13 `insiliscope.cfg` segfaulted inside pycromanager `start_headless(python_backend=True)`.
+  It does so on unmodified `main` and in a bare script with no Glados or Qt. The same
+  Micro-Manager install with `MMConfig_demo.cfg` starts fine, so the fault is in the
+  inSiliScope device adapter or its environment, not in Glados. The `make
+  profile-startup-full` target still defaults to `demo_settings.mk`; pass `DEMO_CONFIG=` to
+  override it.
+
+**Affects:** `observability/startup_timeline.py`, `GUI/GUI_napari.py`, `GUI/napariGlados.py`,
+`scripts/profile_startup_full.py`, `Makefile`, `tests/test_startup_timeline.py`.

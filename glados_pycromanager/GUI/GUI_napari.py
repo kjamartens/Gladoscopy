@@ -11,6 +11,15 @@ import os
 import socket
 import sys
 
+#Sys insert to allow for proper importing from module via debug
+if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# First Glados import, so the heavy imports below show up in the startup timeline.
+from glados_pycromanager.observability import startup_timeline
+
+startup_timeline.mark('GUI_napari import started')
+
 # isort: off
 # Must be imported before napari/PyQt5: loading Qt first and then constructing
 # a pymmcore.CMMCore later (headless Python backend) crashes with an access
@@ -41,17 +50,17 @@ from PyQt5.QtWidgets import (
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1' #this is rather smoother than async
 
-#Sys insert to allow for proper importing from module via debug
-if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+startup_timeline.mark('napari + PyQt5 imported')
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 
 #Obtain the helperfunctions
 import glados_pycromanager.GUI.utils as utils
-from glados_pycromanager.GUI.napariGlados import runNapariPycroManager
+from glados_pycromanager.GUI.napariGlados import call_when_startup_ready, runNapariPycroManager
 from glados_pycromanager.GUI.sharedFunctions import Shared_data
 from glados_pycromanager.GUI.utils import *
+
+startup_timeline.mark('Glados modules imported')
 
 #endregion
 
@@ -261,6 +270,25 @@ def perform_post_closing_actions(shared_data:Shared_data):
     """
     #Clean up temporary files
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
+
+#: Where --startup-exit appends its timeline (repo checkout layout, like docs/perf-runtime.txt).
+STARTUP_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   '..', '..', 'docs', 'perf-startup.txt')
+
+def _write_startup_report(args) -> None:
+    """Append the startup timeline to docs/perf-startup.txt (``--startup-exit``)."""
+    import platform
+    import time as _time
+    source = ('--auto-demo' if args.auto_demo
+              else f'--backend {args.backend} --config {args.config}')
+    header = (f"\n=== Startup timeline {_time.strftime('%Y-%m-%d %H:%M:%S')} "
+              f"({source}, {platform.node()}) ===\n")
+    out_file = os.path.abspath(STARTUP_REPORT_FILE)
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    with open(out_file, 'a', encoding='utf-8') as f:
+        f.write(header)
+        f.write(startup_timeline.format_report())
+    print(f'[startup_exit] wrote {out_file}')
 
 class Worker(QObject):
     """
@@ -486,6 +514,7 @@ def main():
     Returns:
         None
     """
+    startup_timeline.mark('main() entered')
     print('Glados-pycromanager main function called')
     
     #Create parser
@@ -506,6 +535,10 @@ def main():
                              'on for SECS seconds, then dump top-25 cumulative stats to '
                              'docs/perf-runtime.txt and quit. Requires a working backend (use '
                              '--auto-demo for a hardware-free run).')
+    parser.add_argument('--startup-exit', action='store_true',
+                        help='Dev only: quit as soon as the GUI is ready and append the startup '
+                             'timeline to docs/perf-startup.txt. Needs a popup-free launch '
+                             '(--auto-demo, or --backend with --config).')
     args = parser.parse_args()
 
     # Validate CLI override combos before any heavy work.
@@ -513,6 +546,9 @@ def main():
         parser.error('--backend requires --config (or use --auto-demo)')
     if args.config and not (args.backend or args.auto_demo):
         parser.error('--config requires --backend (or use --auto-demo)')
+    if args.startup_exit and not (args.auto_demo or (args.backend and args.config)):
+        parser.error('--startup-exit needs --auto-demo or --backend with --config: a popup '
+                     'would put the time the user takes to answer it in the timeline')
 
     #Set up logging to files in appData folder - INFO and DEBUG
     from glados_pycromanager.observability.logger import set_up_logger
@@ -521,6 +557,7 @@ def main():
     # Create an instance of the shared_data class
     print('Creating shared data.')
     shared_data = Shared_data()
+    startup_timeline.mark('Shared_data created')
     # Start pre-warming a blank RT-analysis subprocess as early as possible so
     # its spawn + package-tree (+ diplib) import cost is hidden behind however
     # long the user takes to reach the microscope/acquisition setup, instead of
@@ -528,6 +565,7 @@ def main():
     # start (see AnalysisClass.py's AnalysisProcess_customFunction and
     # subprocess_pool.py).
     shared_data._rt_subprocess_pool.start()
+    startup_timeline.mark('RT subprocess pool started')
     # Ask Windows not to park us on efficiency cores while unfocused. Done after
     # Shared_data exists (it carries the switch) but before any acquisition, and
     # deliberately before the subprocess pool's children would inherit anything
@@ -540,6 +578,7 @@ def main():
         str(shared_data.config.performance_config.foreground_scheduling_hints) == 'True')
     print('Cleaning up temporary files.')
     utils.cleanUpTemporaryFiles(shared_data=shared_data)
+    startup_timeline.mark('temporary files cleaned up')
 
     # --- CLI overrides for the headless popup --------------------------------
     # If the user passed --auto-demo or (--backend AND --config), we resolve
@@ -581,6 +620,7 @@ def main():
     if napariSettings.application.playback_fps < shared_data.config.visualisation_config.fps:
         napariSettings.application.playback_fps = shared_data.config.visualisation_config.fps
         print(f'Set the napari Playback FPS to {shared_data.config.visualisation_config.fps}!')
+    startup_timeline.mark('napari settings read')
 
     # get object representing MMCore, used throughout
     #try to open a running instance:
@@ -599,6 +639,7 @@ def main():
             start_headless(mm_app_path=mm_cfg.path, config_file=mm_cfg.config_path,
                            python_backend=cli_backend == 'Python',
                            buffer_size_mb=int(mm_cfg.buffer_mb), max_memory_mb=int(mm_cfg.max_memory_mb))
+            startup_timeline.mark('start_headless() returned')
             shared_data._headless = True
             shared_data.backend = cli_backend
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
@@ -610,7 +651,9 @@ def main():
             logging.info('Headless PyMMCorePlus started (CLI override)')
             shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
             shared_data.MILcore.set_core(CMMCorePlus(mm_path=mm_cfg.path))
+            startup_timeline.mark('CMMCorePlus created')
             shared_data.MILcore.get_core().loadSystemConfiguration(mm_cfg.config_path)
+            startup_timeline.mark('system configuration loaded')
             shared_data.MILcore.get_core().setCircularBufferMemoryFootprint(int(mm_cfg.buffer_mb))
             register_resilient_mmcore_mda_engine(shared_data.MILcore.get_core(), shared_data)
             # Max memory MB is not settable in PyMMCorePlus; only buffer_mb (the
@@ -645,7 +688,9 @@ def main():
             logging.info('No Java MM server on port 4827 — opening headless dialog')
             appSmall = QApplication([])
             headlessGUIv = headlessGUI(shared_data)
+            startup_timeline.mark('backend dialog shown')
             appSmall.exec_()
+            startup_timeline.mark('backend dialog closed (includes user time)')
 
             if headlessGUIv.javaRadio.isChecked() or headlessGUIv.pythonRadio.isChecked():
                 from pycromanager import Core, start_headless
@@ -685,11 +730,13 @@ def main():
     # branch above ends with a MILcore bound, so this is the single place that
     # needs to know. Callers that do not use the service keep talking to MIL
     # directly -- T-B1's re-entrant lock still makes that safe.
+    startup_timeline.mark('backend up')
     try:
         shared_data.start_microscope_service()
     except Exception:
         logging.exception('Could not start the MicroscopeService; '
                           'falling back to direct MIL access')
+    startup_timeline.mark('MicroscopeService started')
 
     #Open JSON file with MM settings
     try:
@@ -701,8 +748,18 @@ def main():
         
         
     app = QApplication(sys.argv)
+    startup_timeline.mark('QApplication created')
 
     shared_data.mainApp = app
+
+    def _on_startup_ready():
+        logging.info('Startup timeline (from process start):\n%s',
+                     startup_timeline.format_report())
+        if args.startup_exit:
+            _write_startup_report(args)
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(0, app.quit)
+    call_when_startup_ready(_on_startup_ready)
 
     worker = Worker()
     thread = QThread()
