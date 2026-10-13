@@ -35,8 +35,18 @@ takes > ~500 ms to import cold.  Known offenders in this codebase:
 | `cv2` (opencv-python)      | `AutoFocusBF.py`                 |
 | `tensorflow` / `keras`     | not currently at module scope    |
 
-Standard scientific libs (`numpy`, `scipy`, `dask`, `ndtiff`) are already paid
-for by other packages at startup — they are exempt.
+Standard scientific libs (`numpy`, `dask`, `ndtiff`, and base `scipy` /
+`scipy.ndimage`) are already paid for by other packages at startup — they are exempt.
+**`scipy.signal` is not**: it drags in `scipy.stats` and cost ~1 s of startup on its
+own (measured 2026-10-13). Import it inside the function that uses it.
+
+**Module-scope *calls* count too.** A function called at import time that imports a
+heavy library is a heavy import. `BioImageModelZoo.py` ran three bioimageio
+compatibility patches at module scope; they imported `bioimageio.spec`,
+`bioimageio.core` and torch, which made them the largest single cost of a warm start.
+They now run from `_ensure_bioimageio_patched()` on first use.
+`tests/test_node_packages_import_light.py` imports the three node packages in a fresh
+interpreter and fails if any of these libraries appears.
 
 ### Rule 2 — Where to put the deferred import
 

@@ -16,7 +16,6 @@ import time
 import dask.array as da
 import numpy as np
 import pandas as pd
-from scipy import signal
 from scipy.ndimage import gaussian_filter
 from skimage.feature.peak import peak_local_max
 

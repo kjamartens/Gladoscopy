@@ -5,7 +5,6 @@ import sys
 import time
 
 import numpy as np
-from scipy.signal.windows import tukey
 
 import glados_pycromanager.GUI.utils as utils
 
@@ -87,6 +86,7 @@ class RealTimeFFT:
 
     def _get_taper_window(self, shape):
         """Builds (and caches) a separable 2D Tukey window matching `shape`."""
+        from scipy.signal.windows import tukey  # deferred: scipy.signal costs ~1 s at startup
         if self._taper_window is None or self._taper_window_shape != shape:
             window_y = tukey(shape[0], self.window_taper_strength)
             window_x = tukey(shape[1], self.window_taper_strength)
