@@ -881,6 +881,17 @@ acquisition, just materialised.
     `GUI_grid_width` now holds the bucket (a legacy int column count still maps).
   - To add a section: build a `Section`, `register` it, add a `Placement` per bucket.
   - Offscreen screenshots need `QT_QPA_FONTDIR=C:/Windows/Fonts`, or Qt renders no text.
+    Import `PyQt5.QtWebEngineWidgets` before creating the `QApplication` when the script
+    imports `GUI.utils`; `show()` on a `QMessageBox` under `offscreen` segfaults (grab
+    without showing). A test-made `QApplication` must stay referenced, or it is collected
+    and `QApplication.instance()` is `None` again.
+  - Stages section (`MMConfigUI.stagesLayout`): an XY cross of three rows (each arm a row
+    of three buttons around the position label) over the step table, plus a Z column with
+    its step fields beside the buttons; step fields are capped by `_limitFieldWidth`. Packed
+    left, so it no longer spreads over the dock. Advanced settings support
+    `input_type="checkbox"` (stores a real bool; `utils.settingIsTrue` reads either form) —
+    used by `VisualisationConfig.show_scripts_section` (Scripts box, hidden by default).
+    `LayoutConfig` must stay all-hidden (`test_ui_theme` pins it).
   Tests: `tests/test_ui_theme.py`, `tests/test_ui_responsive_grid.py`,
   `tests/test_ui_list_editor.py`, `tests/test_mda_gui_rebuild.py`,
   `tests/test_controls_panel_layout.py`. Widget-identity tests compare
@@ -1650,6 +1661,14 @@ Three companion files live alongside it:
   - runs the per-user single-instance check (`GUI/single_instance.py`, a `QLocalServer`).
     The second launch calls `AllowSetForegroundWindow(<first pid>)` because only it owns
     the foreground. `--allow-second-instance` bypasses the check.
+
+  A fatal startup error on a console-less launch shows "Glados could not start"
+  (`_show_fatal_startup_error`): "Show Details..." holds the console log's last
+  `LOG_TAIL_LINES` lines, "Open log file" opens it, and the box re-`exec_`s until OK.
+  Micro-Manager's own start error is what it should show: the start-dialog path used to
+  swallow `start_headless()`'s exception, so `Core()` failed next with pycromanager's
+  generic "Is the ZMQ server on 4827 enabled?". `connect_headless_core(Core, start_error)`
+  now raises `MicroManagerStartError` carrying the real cause (connection error chained).
 
   Related pieces:
   - Shortcuts: `make shortcuts` (`glados_pycromanager/shortcuts.py`). Windows 11 can't pin
