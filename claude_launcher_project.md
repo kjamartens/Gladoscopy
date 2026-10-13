@@ -155,7 +155,9 @@ and a splash on screen ≤ 1.5 s after the click, on every launch, cold or warm.
   planned as `glados_pycromanager.launcher`, but `shortcuts` says what it does.
   - It writes "Glados", "Glados (last setup)" (`--last`) and "Glados (debug console)"
     (`glados.exe`) into `Start Menu\Programs\Glados`.
-  - `build_specs` is the pure, tested part.
+  - `build_specs` is the pure, tested part. Each shortcut has its own AppUserModelID
+    (only "Glados" shares the process's): the Start Menu lists apps by that ID, and the
+    first version, with one shared ID, showed a single entry.
   - `uninstall` retries a deletion for up to 2 s, because the scanner/indexer briefly
     holds a `.lnk` that was just written.
   - `--last` (`GUI_napari.resolve_last_setup`) reuses the saved backend, config and

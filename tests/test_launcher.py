@@ -66,9 +66,12 @@ def test_a_console_log_held_by_a_running_instance_gets_a_per_process_file(no_std
 
 
 # -- taskbar identity -------------------------------------------------------------
-def test_process_and_shortcuts_share_one_app_id():
+def test_main_shortcut_shares_the_process_app_id_and_each_shortcut_has_its_own():
     assert shortcuts.APP_USER_MODEL_ID == startup.APP_USER_MODEL_ID == 'Glados.Pycromanager'
-    assert {s.app_id for s in shortcuts.build_specs(Path('S'), Path('W'))} == {startup.APP_USER_MODEL_ID}
+    specs = {s.name: s for s in shortcuts.build_specs(Path('S'), Path('W'))}
+    assert specs['Glados'].app_id == startup.APP_USER_MODEL_ID  # groups the running window
+    # The Start Menu lists apps by AppUserModelID: a shared one shows a single entry.
+    assert len({s.app_id for s in specs.values()}) == len(specs)
 
 
 @windows_only
@@ -137,7 +140,8 @@ def test_shortcuts_round_trip_with_app_id(tmp_path):
     assert Path(last['target']) == scripts / 'gladosw.exe'
     assert last['arguments'] == '--last'
     assert Path(last['working_dir']) == tmp_path
-    assert last['app_id'] == startup.APP_USER_MODEL_ID
+    assert last['app_id'] == f'{startup.APP_USER_MODEL_ID}.LastSetup'
+    assert shortcuts.read_shortcut(folder / 'Glados.lnk')['app_id'] == startup.APP_USER_MODEL_ID
     assert len(shortcuts.uninstall([folder], specs)) == 3
     assert not folder.exists()  # empty Glados folder removed too
 

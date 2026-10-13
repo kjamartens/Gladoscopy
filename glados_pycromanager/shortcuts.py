@@ -9,9 +9,10 @@ The shortcuts run the scripts of *this* environment. With an editable install
 there is no build step. Windows 11 offers no supported way to pin to the taskbar
 programmatically: right-click the Start Menu entry once and choose "Pin to taskbar".
 
-Every shortcut carries the AppUserModelID that ``GUI/startup.py`` sets on the
+The "Glados" shortcut carries the AppUserModelID that ``GUI/startup.py`` sets on the
 running process. That is what makes the running window group under the pinned icon
-instead of under "Python".
+instead of under "Python". The other two need IDs of their own: the Start Menu lists
+apps by AppUserModelID, so shortcuts sharing one collapse into a single entry.
 """
 
 import argparse
@@ -51,9 +52,11 @@ def build_specs(scripts: Path, working_dir: Path, icon: Path = ICON) -> list[Sho
         ShortcutSpec('Glados', windowed, '', working_dir, icon,
                      'Start Glados-PycroManager (choose the microscope backend)'),
         ShortcutSpec('Glados (last setup)', windowed, '--last', working_dir, icon,
-                     'Start Glados-PycroManager with the backend and config used last time'),
+                     'Start Glados-PycroManager with the backend and config used last time',
+                     app_id=f'{APP_USER_MODEL_ID}.LastSetup'),
         ShortcutSpec('Glados (debug console)', console, '', working_dir, icon,
-                     'Start Glados-PycroManager with a console window showing its output'),
+                     'Start Glados-PycroManager with a console window showing its output',
+                     app_id=f'{APP_USER_MODEL_ID}.DebugConsole'),
     ]
 
 

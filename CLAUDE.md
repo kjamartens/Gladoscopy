@@ -1638,8 +1638,10 @@ Three companion files live alongside it:
   Before the splash, `main` does three things:
   - redirects pythonw's `None` stdout/stderr to `<AppData>/Glados-PycroManager/Glados_console.log`
     (a per-pid file if a running instance holds it);
-  - sets the AppUserModelID `Glados.Pycromanager`, the same one written on the `.lnk`s, so
-    the window groups under the pinned icon;
+  - sets the AppUserModelID `Glados.Pycromanager`, the same one written on the main
+    "Glados" `.lnk`, so the window groups under the pinned icon. The other two shortcuts
+    get `.LastSetup`/`.DebugConsole` suffixes: the Start Menu lists apps **by AUMID**, so
+    shortcuts sharing one collapse into a single entry (check with `Get-StartApps`);
   - runs the per-user single-instance check (`GUI/single_instance.py`, a `QLocalServer`).
     The second launch calls `AllowSetForegroundWindow(<first pid>)` because only it owns
     the foreground. `--allow-second-instance` bypasses the check.
