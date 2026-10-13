@@ -1018,6 +1018,29 @@ for `"type": bool` kwargs) without breaking that switch, is documented in
 `glados_pycromanager/Documentation/rt_analysis_parameters.md`. Read it before
 touching kwarg-widget code in `GUI/utils.py`.
 
+**NeNA/FRC exploration (not a node yet)** lives in
+`AutonomousMicroscopy/exploration_nena_frc/` — deliberately outside the three auto-imported
+folders. `nena_frc_benchmark.py` times candidate implementations per stage (writes
+`benchmark_results.md`); `nena_frc_live.py`'s `IncrementalNeNAFRC` is the streaming winner
+(additive state: fine NN-distance histogram + persistent windowed FRC canvases, ~65 ms per
+1000-frame update on 885k locs). It reproduces **webSMLM**'s conventions (the user's own
+browser tool, `github.com/kjamartens/webSMLM`, single `webSMLM.html`): adaptive 4·p25 NeNA
+range + unweighted LM Endesfelder fit; FRC random halves x3, Hann, N=2048, 1-2-1 smoothing.
+FRC values depend strongly on those conventions (split mode, window, binning kernel) — see
+the benchmark's sweep before changing any. Since then the live default deviates from webSMLM
+in two FRC-only ways: Gaussian curve smoothing (`frc_smoothing='websmlm'` restores 1-2-1) and
+blink merging (`frc_merge_nm=10`, chains of consecutive-frame locs -> mean position, reusing
+the NeNA NN search; 0 disables; open chains wait for `finalize()`) — on the test file FRC
+goes 24.4 (webSMLM) -> 23.1 (smoothing) -> ~30 nm (merging). **RT node:**
+`Real_Time_Analysis/pSMLM_live_precision.py` subclasses `pSMLM_live` and adds a text-overlay
+layer (one constant point + napari `text`, so the count never changes) with NeNA, FRC and the
+stop flag `n_locs > 2.71/(M*3*pi)/NeNA_um^2*w*h`. `run()` only buffers locs (px -> nm via
+`PixelSize_um` metadata, since `core` is None in the child); every `updateEveryNFrames` a
+background thread in the subprocess updates the estimator — which is why the numba kernels
+in `nena_frc_live.py` are `nogil=True`. Frame numbers prefer MM's `ImageNumber` (counts camera
+frames) over `Axes['time']`; a backwards jump restarts the estimator. numba/pyfftw/finufft/pyarrow/scikit-learn were
+installed into `.venv` for this but are **not** in `pyproject.toml`.
+
 **Demo recipes for the SMLMDemoCam install** live in
 `glados_pycromanager/AutonomousMicroscopy/ExampleRecipes/` (01 simple, 02 intermediate, 03 complex,
 04 fun "nuclear pore hunt", plus a 3-plane `.pos`). They are *generated*, not hand-written:
@@ -1279,7 +1302,7 @@ RT-analysis nodes that opt into subprocess isolation (`"__runInSubprocess__": Tr
 **Subprocess-isolated RT-analysis startup speedups** (fixes a ~20s per-start cost reported for e.g. FFT): a cold `spawn` pays for re-importing the whole `Real_Time_Analysis` package tree plus whatever heavy library the node needs (diplib, tensorflow/stardist, …), and — separately — `AnalysisProcess_customFunction.__init__` used to synchronously build a visualisation "shadow" object on the *GUI thread* via `utils.realTimeAnalysis_init(...)`, freezing the UI for however long that model/weight load took. Two mechanisms now cut this down:
 
 - `GUI/subprocess_pool.py`'s `WarmSubprocessPool` pre-spawns one blank child at app startup (`shared_data._rt_subprocess_pool.start()`, called right after `Shared_data()` in `GUI_napari.py`'s `main()`) that pre-imports the package tree and (best-effort, since it's the only node opted in today) `diplib`, then idles waiting to be handed a real node's `analysisInfo` — shortcutting the first-ever subprocess-node start in a session. **The pool, not the claiming caller, creates the worker's channels** (frame in/out queues, stop event, control pair): a `multiprocessing` Queue/Event can only cross a process boundary by *inheritance*, so they are built in `start()` and passed as `Process` args, and `try_claim()` returns them as a `channels` dict for `AnalysisProcess_customFunction.__init__` to adopt. Sending them through `assign_queue` instead raises `RuntimeError: Queue objects should only be shared between processes through inheritance` on the parent's queue-feeder *thread* — the parent continues unaware while the child blocks forever on `assign_queue.get()`, so the node silently never processes a frame (that was the shipped bug; the cold-spawn path was unaffected, which is why only pool-claimed starts broke). `assign_queue` now carries only `(analysisInfo, log_level)`. Tests: `tests/test_subprocess_pool.py`. Extend its pre-imported-library list (or generalize via an optional `"__prewarm_imports__"` metadata key) if more nodes opt into `__runInSubprocess__`.
-- `shared_data._rt_subprocess_cache` (a dict keyed by `AnalysisClass._rt_config_key(analysisInfo)`, a stable hash of the node's config) lets `stop()`/`destroy()` park a still-alive, already-warmed-up worker instead of killing it — `_park_subprocess_worker` handles the cap/idle-timeout eviction opportunistically on each park, no dedicated QTimer needed. A later `__init__` with the identical config reclaims it directly (`_worker_warmed_up = True` immediately, skipping spawn + package-tree import), **but the node itself is still properly closed and reopened, at the times a user would expect** — this is a *process*-level cache, not a node-instance cache: `stop()` sends `{'__close__': True}` on `control_in_queue` immediately when parking (the worker calls `end_fn` right away, so anything it finalises — e.g. flushing/closing a dataset — happens at stop time, never deferred to some future reopen that may not happen), and the *later* reclaiming `__init__` sends `{'__reinit__': True, 'analysisInfo': ...}` to run `init_fn` again (never `end_fn` a second time — that already ran at close). Both are acked on `control_out_queue` (`{'__close_done__': True}` / `{'__reinit_done__': True}`) since there's no ordering guarantee between a control message and a frame put on `in_queue` right after it — see `tests/test_analysis_process.py`'s `test_worker_close_then_reinit_matches_stop_then_reclaim`. The main-process visualisation shadow is rebuilt fresh on reclaim too, rather than reusing the parked one. So a close→reopen always starts from fresh node state — only the process/imports are reused, meaning a heavy one-time init cost (e.g. model weights) is paid again on every reopen. `AnalysisClass.terminate_all_rt_subprocesses()` is wired into `GUI_napari.py`'s `aboutToQuit` (before the forced `os._exit(0)`) so parked/warm processes don't get orphaned.
+- `shared_data._rt_subprocess_cache` (a dict keyed by `AnalysisClass._rt_config_key(analysisInfo)`, a stable hash of the node's config) lets `stop()`/`destroy()` park a still-alive, already-warmed-up worker instead of killing it — `_park_subprocess_worker` handles the cap/idle-timeout eviction opportunistically on each park, no dedicated QTimer needed. A later `__init__` with the identical config reclaims it directly (`_worker_warmed_up = True` immediately, skipping spawn + package-tree import), **but the node itself is still properly closed and reopened, at the times a user would expect** — this is a *process*-level cache, not a node-instance cache: `stop()` sends `{'__close__': True}` on `control_in_queue` immediately when parking (the worker calls `end_fn` right away, so anything it finalises — e.g. flushing/closing a dataset — happens at stop time, never deferred to some future reopen that may not happen), and the *later* reclaiming `__init__` sends `{'__reinit__': True, 'analysisInfo': ...}` to run `init_fn` again (never `end_fn` a second time — that already ran at close). Both are acked on `control_out_queue` (`{'__close_done__': True}` / `{'__reinit_done__': True}`) since there's no ordering guarantee between a control message and a frame put on `in_queue` right after it — see `tests/test_analysis_process.py`'s `test_worker_close_then_reinit_matches_stop_then_reclaim`. **Nothing in the parent reads those acks**, and `control_out_queue` holds 2, so the child sends them with `_ack_nonblocking` (dropped when full): a blocking `put` wedged the worker on the third unread ack, after which a re-activated node never processed a frame ("worker did not respond within 5s"). The reclaim also drains stale acks and stale results (`_drain_queue`), `stop()` drains `in_queue` before parking, and `stop()` is idempotent — `MMcontrols.deactivateRealTimeAnalysisFromDockWidget` removes the node's layers, which already tears the node down via `layer_removed_event_callback`, so it now skips its own teardown when the entry is gone (it used to run `end()` a second time). `stop_profiling` skips acks when waiting for its report. Test: `test_worker_survives_repeated_close_reinit_with_unread_acks`. The main-process visualisation shadow is rebuilt fresh on reclaim too, rather than reusing the parked one. So a close→reopen always starts from fresh node state — only the process/imports are reused, meaning a heavy one-time init cost (e.g. model weights) is paid again on every reopen. `AnalysisClass.terminate_all_rt_subprocesses()` is wired into `GUI_napari.py`'s `aboutToQuit` (before the forced `os._exit(0)`) so parked/warm processes don't get orphaned.
 
 **Stopping an RT-analysis node stops its threads (T-G9).** Every RT loop waits
 on a `threading.Event` with `RT_THREAD_WAIT_TIMEOUT_S` (1 s) rather than
@@ -1379,7 +1402,12 @@ forwards attribute access to its first layer as belt-and-braces, and
   `MMcontrols.deactivateRealTimeAnalysisFromDockWidget` go through `overlay.group`,
   which also fixes a latent crash - both derefed `napariOverlay.layer.name`
   unguarded, while `napariOverlay` legitimately leaves `.layer` unset when
-  constructed with `layer_name=None`.
+  constructed with `layer_name=None`. The sibling removal is **deferred**
+  (`QTimer.singleShot(0, ...)`): the callback runs on napari's `removing` event, before
+  napari deletes the layer by an index it already computed (`remove_selected` deletes a
+  whole list of them), so removing siblings synchronously raised `IndexError` inside
+  napari's own `__delitem__` (Delete key on a node's layer). Never mutate
+  `viewer.layers` synchronously from a `removing`/`removed` handler.
 - Note `visualisation_type` in `__function_metadata__` is **dead metadata for RT
   nodes** - its only readers are `autonomous/executor.py`'s two measurement-node
   sites, which are a different visualisation contract entirely
