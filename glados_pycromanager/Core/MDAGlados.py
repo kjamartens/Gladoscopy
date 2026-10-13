@@ -29,6 +29,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QFileDialog,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -67,6 +68,10 @@ from glados_pycromanager.ui.layout import (
 
 
 #region Section arrangement
+#: Rows the XY and channel tables always show. Fewer than the theme's default, so
+#: the MDA tab fits in the height the Controls tab is sized to at startup.
+MDA_LIST_MIN_ROWS = 3
+
 #: Where each MDA section goes per dock shape (`ui.layout.classify_shape`).
 #: "mda.storagebar" is Storage + Acquire; "mda.setup" stacks Dimensions (with
 #: the order), Exposure and Time. Stretch is per section: spare width goes to the tables.
@@ -875,7 +880,7 @@ class MDAGlados(CustomMainWindow):
         #Initisalise the XY position list
         self.xypositionListWidget.setXYStageName(self.xy_stagesDropdown.currentText)
         #Buttons for the xy position list, beside the table
-        self.xypositionListEditor = ListEditor(self.xypositionListWidget, stretch_columns=(0,))
+        self.xypositionListEditor = ListEditor(self.xypositionListWidget, stretch_columns=(0,), min_rows=MDA_LIST_MIN_ROWS)
         self.xypositionListWidget_addButton = self.xypositionListEditor.add_action('Add New Entry')
         self.xypositionListWidget_deleteButton = self.xypositionListEditor.add_action('Delete Selected')
         self.xypositionListWidget_deleteAllButton = self.xypositionListEditor.add_action('Delete All')
@@ -964,7 +969,7 @@ class MDAGlados(CustomMainWindow):
         # PYCROMANAGER_JAVA: no equivalent lever exists (AcqEngJ runs compiled inside
         # the JVM), so the checkbox is disabled there. See the CLAUDE.md note on the
         # free-running-trigger-vs-z-settle race for why this exists.
-        self.z_waitForSettle_checkbox = QCheckBox("Wait for Z to settle before arming camera")
+        self.z_waitForSettle_checkbox = QCheckBox("Wait for Z to settle")
         try:
             mi = self.shared_data.MILcore.MI()
         except (AttributeError, RuntimeError):
@@ -992,8 +997,12 @@ class MDAGlados(CustomMainWindow):
 
         zLayout = self.zGroupBox.body
         zLayout.add_row(self.z_oneDstageDropdownLabel, self.z_oneDstageDropdown)
-        zLayout.add_row(self.z_startLabel, self.z_startEntry, self.z_startSetButton)
-        zLayout.add_row(self.z_endLabel, self.z_endEntry, self.z_endSetButton)
+        #Start and End share a row to keep the section short.
+        zStartEnd = QHBoxLayout()
+        zStartEnd.setContentsMargins(0, 0, 0, 0)
+        for widget in (self.z_startEntry, self.z_startSetButton, self.z_endLabel, self.z_endEntry, self.z_endSetButton):
+            zStartEnd.addWidget(widget, 1 if isinstance(widget, QLineEdit) else 0)
+        zLayout.add_row(self.z_startLabel, zStartEnd)
         zLayout.add_row(self.z_nrsteps_radio, self.z_nrsteps_entry, self.z_nrsteps_computedLabel)
         zLayout.add_row(self.z_stepdistance_radio, self.z_stepdistance_entry, self.z_stepdistance_computedLabel)
         zLayout.add_row(self.z_waitForSettle_checkbox)
@@ -1058,7 +1067,7 @@ class MDAGlados(CustomMainWindow):
         self.channelListWidget.setChannelName(self.channelDropdown.currentText)
 
         #Buttons for the channel list, beside the table
-        self.channelListEditor = ListEditor(self.channelListWidget, stretch_columns=(0,))
+        self.channelListEditor = ListEditor(self.channelListWidget, stretch_columns=(0,), min_rows=MDA_LIST_MIN_ROWS)
         self.channelListWidget_addButton = self.channelListEditor.add_action('Add New Entry')
         self.channelListWidget_deleteButton = self.channelListEditor.add_action('Delete Selected')
         self.channelListWidget_deleteAllButton = self.channelListEditor.add_action('Delete All')

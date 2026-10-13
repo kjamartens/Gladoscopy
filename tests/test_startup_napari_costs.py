@@ -80,5 +80,5 @@ def test_suspend_spans_viewer_creation_to_layout_finalised():
     from glados_pycromanager.GUI import napariGlados
     run = inspect.getsource(napariGlados.runNapariPycroManager)
     assert run.index('_suspend_napari_settings_saves()') < run.index('napari.Viewer(')
-    size = inspect.getsource(napariGlados._sizeControlsDock)
+    size = inspect.getsource(napariGlados._correctControlsDockHeight)
     assert size.index('_resume_napari_settings_saves(') < size.index("mark('startup layout finalised')")

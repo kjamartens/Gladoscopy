@@ -853,6 +853,13 @@ acquisition, just materialised.
   a `raise_()` on a tabified dock before Qt builds the tab bar is ignored, and the last-added
   tab wins. The maximise first clears `WindowMaximized`, because napari restores a saved
   maximised flag with a stale size and `showMaximized()` is then a no-op.
+  The top area is sized for the **taller of the Controls and Multi-D acquisition tabs**
+  (`alsoFit`), each measured at the Controls width by `_dockContentHeight`
+  (height-for-width, so a wrapped `FlowRow` line counts; the scroll area uses it too).
+  `_correctControlsDockHeight` then re-measures and adds the deficit: Qt takes the
+  tabified docks' tab bar (~25 px) out of the `resizeDocks` height, which used to clip
+  the bottom row. The settings-save resume and the `'startup layout finalised'` mark
+  live there now. Tests: `tests/test_startup_controls_dock_height.py`.
 - **UI toolkit — `ui/layout/` (the MDA and Controls docks are built on it).** Rules:
   **never set a font, margin, padding or colour on an individual widget** — spacing
   comes from `current_theme()` when a layout is built, and looks come from the one
@@ -877,8 +884,13 @@ acquisition, just materialised.
     zeroes group-box padding, so `Section` reserves room for its title itself.
   - `FormGrid` (label | field | trailing, field stretches; a lone field spans the
     trailing column), `FlowRow` (wraps when narrow), `ListEditor` (table + top-aligned
-    button column; `configure_table_header` sizes columns from header text and sets a
-    `table_min_rows` minimum height — never a fixed height/width).
+    button block, `button_columns` wide (default 2), filled row by row;
+    `configure_table_header` sizes columns from header text and widest cell and sets a
+    `table_min_rows` minimum height, overridable per editor with `min_rows` — never a
+    fixed height/width). The MDA lists use `MDA_LIST_MIN_ROWS` (3), so that tab fits
+    the startup dock height. The table's minimum width is recomputed when rows change.
+    It counts the row header via `isHidden()`, not `isVisible()`: the table is unshown
+    at construction, and leaving the row header out clipped "Channel Setting".
   - `ResponsiveGrid` — `register(key, widget)` once, `set_placements({bucket:
     [Placement(...)]}, column_stretch={bucket: {key: n}})`, then `apply(bucket)` only
     **moves** widgets (no-op when unchanged). Buckets come from `classify_shape(w, h)`,
