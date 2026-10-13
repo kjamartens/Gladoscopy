@@ -16,6 +16,7 @@ apps by AppUserModelID, so shortcuts sharing one collapse into a single entry.
 """
 
 import argparse
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -38,11 +39,20 @@ class ShortcutSpec:
     icon: Path
     description: str
     app_id: str = APP_USER_MODEL_ID
+    launcher: Path | None = None  # the venv script run, when `target` is a wrapper (cmd.exe)
+
+    @property
+    def required(self) -> Path:
+        return self.launcher or self.target
 
 
 def scripts_dir() -> Path:
     """Where this environment's console/GUI launchers live (``.venv\\Scripts``)."""
     return Path(sys.prefix) / ('Scripts' if sys.platform == 'win32' else 'bin')
+
+
+def cmd_exe() -> Path:
+    return Path(os.environ.get('ComSpec', r'C:\Windows\System32\cmd.exe'))
 
 
 def build_specs(scripts: Path, working_dir: Path, icon: Path = ICON) -> list[ShortcutSpec]:
@@ -54,9 +64,12 @@ def build_specs(scripts: Path, working_dir: Path, icon: Path = ICON) -> list[Sho
         ShortcutSpec('Glados (last setup)', windowed, '--last', working_dir, icon,
                      'Start Glados-PycroManager with the backend and config used last time',
                      app_id=f'{APP_USER_MODEL_ID}.LastSetup'),
-        ShortcutSpec('Glados (debug console)', console, '', working_dir, icon,
-                     'Start Glados-PycroManager with a console window showing its output',
-                     app_id=f'{APP_USER_MODEL_ID}.DebugConsole'),
+        # Run inside `cmd /k`: the console window belongs to cmd, so it stays open
+        # with the traceback / last log lines after Glados exits or crashes.
+        ShortcutSpec('Glados (debug console)', cmd_exe(), f'/k "{console}"', working_dir, icon,
+                     'Start Glados-PycroManager with a console window showing its output '
+                     '(stays open after Glados exits)',
+                     app_id=f'{APP_USER_MODEL_ID}.DebugConsole', launcher=console),
     ]
 
 
@@ -111,7 +124,7 @@ def read_shortcut(path: Path) -> dict:
 
 
 def install(folders: list[Path], specs: list[ShortcutSpec]) -> list[Path]:
-    missing = sorted({str(s.target) for s in specs if not s.target.exists()})
+    missing = sorted({str(s.required) for s in specs if not s.required.exists()})
     if missing:
         raise FileNotFoundError('Launcher(s) not found, run `make dev` first: ' + ', '.join(missing))
     written = []

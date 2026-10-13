@@ -1648,7 +1648,9 @@ Three companion files live alongside it:
 
   Related pieces:
   - Shortcuts: `make shortcuts` (`glados_pycromanager/shortcuts.py`). Windows 11 can't pin
-    from code; the user pins the Start Menu entry.
+    from code; the user pins the Start Menu entry. "Glados (debug console)" targets
+    `cmd.exe /k "<glados.exe>"` (not `glados.exe` itself) so the console outlives a crash or
+    `os._exit`; `ShortcutSpec.launcher` is the venv script `install` checks for.
   - `--last` (`GUI_napari.resolve_last_setup`) skips the dialog using the saved backend and
     config, or falls back to the dialog.
   - `make dev` stamps a pyproject fingerprint into the venv (`install_check.py`); a mismatch

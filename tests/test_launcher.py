@@ -92,7 +92,11 @@ def test_shortcut_specs():
     assert specs['Glados'].arguments == ''
     assert specs['Glados (last setup)'].target == Path('S') / 'gladosw.exe'
     assert specs['Glados (last setup)'].arguments == '--last'
-    assert specs['Glados (debug console)'].target == Path('S') / 'glados.exe'
+    debug = specs['Glados (debug console)']
+    # cmd /k keeps the console open after Glados exits or crashes.
+    assert debug.target.name.lower() == 'cmd.exe'
+    assert debug.arguments == f'/k "{Path("S") / "glados.exe"}"'
+    assert debug.required == Path('S') / 'glados.exe'
     assert all(s.working_dir == Path('W') and s.icon.name == 'GladosIcon.ico' for s in specs.values())
     assert shortcuts.ICON.is_file()
 
