@@ -71,8 +71,9 @@ def format_summary(summary, walls: list[float], n_runs: int, glados_args: list[s
 def run_once(glados_args: list[str], timeout_s: float) -> tuple[str, float]:
     """One launch; returns (the text it appended to REPORT_FILE, wall seconds)."""
     before = REPORT_FILE.stat().st_size if REPORT_FILE.exists() else 0
+    # --allow-second-instance: a benchmark launch must not just activate a running Glados.
     cmd = [sys.executable, '-m', 'glados_pycromanager.GUI.GUI_napari', *glados_args,
-           '--startup-exit']
+           '--startup-exit', '--allow-second-instance']
     t0 = time.perf_counter()
     try:
         subprocess.run(cmd, timeout=timeout_s, stdout=subprocess.DEVNULL,

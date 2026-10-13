@@ -64,6 +64,7 @@ PACKAGE := glados_pycromanager
 .PHONY: help env venv install dev build ensure-uv \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
+        shortcuts shortcuts-uninstall \
         run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup profile-startup-full bench-live-display bench-storage \
         ci verify \
         clean
@@ -92,6 +93,7 @@ ensure-uv:  ## Make sure uv is importable for the active interpreter (installs q
 
 install: .venv ensure-uv  ## Non-editable production install into .venv (no dev extras).
 	$(PIP) .
+	$(PYTHON) -m glados_pycromanager.install_check stamp
 
 dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .venv if absent).
 	$(PIP) -e ".[dev]"
@@ -100,6 +102,8 @@ dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .v
 		$(PIP) --force-reinstall --no-cache-dir diplib==3.6.0 && \
 		$(PYTHON) -c "import diplib" \
 	)
+	@# Fingerprint pyproject's deps/entry points, so Glados can warn when they change.
+	$(PYTHON) -m glados_pycromanager.install_check stamp
 
 build: ensure-uv  ## Build wheel + sdist into dist/.
 	uv build
@@ -153,6 +157,12 @@ PYFLAGS := -X faulthandler
 else
 PYFLAGS :=
 endif
+
+shortcuts:  ## Windows: Start Menu shortcuts (Glados / last setup / debug console) for this .venv; pin one to the taskbar after.
+	$(PYTHON) -m glados_pycromanager.shortcuts install
+
+shortcuts-uninstall:  ## Windows: remove the Glados Start Menu (and Desktop) shortcuts.
+	$(PYTHON) -m glados_pycromanager.shortcuts uninstall
 
 run:  ## Launch the standalone Glados-PycroManager GUI.
 	$(PYTHON) $(PYFLAGS) -m glados_pycromanager.GUI.GUI_napari

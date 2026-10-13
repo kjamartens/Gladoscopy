@@ -126,45 +126,56 @@ and a splash on screen ≤ 1.5 s after the click, on every launch, cold or warm.
 
 ## Phase L1 — One-click launcher (Windows)
 
-- [ ] **L1.1** `[project.gui-scripts] gladosw = "glados_pycromanager.GUI.GUI_napari:main"`
-  gives a windowed (no console) launcher. It is editable-install aware, so it still points
-  at the source tree. Keep the console scripts for terminal/debug use.
-- [ ] **L1.2 Console-less safety** at the very top of `main()`:
-  - Under pythonw, `sys.stdout`/`sys.stderr` are `None`. `print` tolerates that;
-    `sys.stderr.write` in third-party code raises. Redirect both to
-    `<AppData>/Glados-PycroManager/logs/glados_console.log` (rotate on start).
-  - A startup crash would be invisible. Install a `sys.excepthook` that logs and, when a
-    `QApplication` exists, shows a `QMessageBox` with the log path.
-  - Check that the `spawn` children (warm pool, subprocess RT nodes) are fine with
-    `sys.executable == pythonw.exe`, and that they don't open console windows.
-- [ ] **L1.3 JVM console window.** Try passing `java_loc=<MM install>/jre/bin/javaw.exe`
-  to `start_headless` (the parameter already exists) when that file exists. Fall back to
-  `java`. Verify on the JAVA backend that no window appears and the bridge still connects:
-  the stdout `PIPE` read loop must still see the startup line under `javaw`. If it doesn't,
-  fall back to a narrow `Popen` `creationflags=CREATE_NO_WINDOW` wrapper around the
-  `mmpycorex` call.
-- [ ] **L1.4 Taskbar identity.** Call
-  `SetCurrentProcessExplicitAppUserModelID("Glados.Pycromanager")` before the first window
-  is created, so the running window groups under the pinned icon rather than under
-  "Python". The `.lnk` must carry the **same** AUMID (`PKEY_AppUserModel_ID`, set through
-  pywin32 `propsys`). Add `pywin32; sys_platform == 'win32'` to `pyproject.toml` explicitly.
-- [ ] **L1.5** `python -m glados_pycromanager.launcher install-shortcuts [--desktop]
-  [--uninstall]` creates the Start Menu shortcut(s) (target `.venv\Scripts\gladosw.exe`,
-  icon `GladosIcon.ico`, working dir = repo root, AUMID) and prints "right-click → Pin to
-  taskbar". Shortcuts:
-  - **Glados**: current behaviour (backend dialog).
-  - **Glados (last setup)**: `--last`, a new flag that reuses the persisted
-    `headless_backend`/`config_path`/`path`/memory settings through the existing CLI-override
-    path and skips the dialog. If the saved config file is missing, fall back to the dialog.
-  - **Glados (debug console)**: `glados.exe` (console visible) for tracebacks.
-  `make shortcuts` wraps the command. Keep the arg/target construction a pure function so it
-  can be unit-tested.
-- [ ] **L1.6 Single instance.** A second launch while Glados runs should bring the existing
-  window to the front rather than start a second process that fights over the camera / port
-  4827. Use a `QLocalServer` named per user. Use `--allow-second-instance` to bypass.
-- [ ] **L1.7 Stale-install warning.** If `pyproject.toml`'s dependency block changed since
-  the last `make dev` (hash stamped into `.venv`), log a warning and show a status-bar note:
-  "dependencies changed — run `make dev`". The launch is not blocked.
+- [x] **L1.1** `[project.gui-scripts] gladosw = "glados_pycromanager.GUI.startup:main"`
+  (the light entry point from L2.1, not `GUI_napari:main`) is the windowed launcher. With
+  the editable install it runs the source tree. The four console scripts stay, for terminal
+  and debug use.
+- [x] **L1.2 Console-less safety**, in `GUI/startup.py`:
+  - `redirect_missing_std_streams()` points pythonw's `None` stdout/stderr at
+    `<AppData>/Glados-PycroManager/Glados_console.log`. The previous file is kept as
+    `.previous`. If a running instance still holds the file (Windows will not rename an
+    open file), it writes `Glados_console_<pid>.log` instead.
+  - Not a `sys.excepthook`: `main()` wraps `GUI_napari.main` in try/except. When there
+    is no console it prints the traceback into the log and shows a `QMessageBox` naming
+    the log. With a console it re-raises.
+  - Verified: the warm-pool child runs as `pythonw.exe` and opens no console. The one
+    `cmd.exe /c ver` in the process tree comes from the launcher chain and runs hidden.
+- [x] **L1.3 JVM console window: no change needed.** `mmpycorex` already starts
+  `jre/bin/javaw.exe` on Windows, so no window appears. While verifying this, the JAVA
+  backend hit a `getSetting` AttributeError: the Java bridge spells it `get_setting`.
+  Fixed through `MIL._config_setting`. The other JAVA-only failures (a `get_roi`
+  IndexError in `XYstageLayout`, and javaw left running after quit) predate this branch
+  and are split off as their own task.
+- [x] **L1.4 Taskbar identity.** `set_app_user_model_id()` runs before the
+  QApplication. The shortcuts carry the same `APP_USER_MODEL_ID` as
+  `PKEY_AppUserModel_ID`. `pywin32>=306; sys_platform == 'win32'` is now an explicit
+  dependency.
+- [x] **L1.5 Shortcuts**: `python -m glados_pycromanager.shortcuts install [--desktop] |
+  uninstall | show`, wrapped by `make shortcuts` / `make shortcuts-uninstall`. It was
+  planned as `glados_pycromanager.launcher`, but `shortcuts` says what it does.
+  - It writes "Glados", "Glados (last setup)" (`--last`) and "Glados (debug console)"
+    (`glados.exe`) into `Start Menu\Programs\Glados`.
+  - `build_specs` is the pure, tested part.
+  - `uninstall` retries a deletion for up to 2 s, because the scanner/indexer briefly
+    holds a `.lnk` that was just written.
+  - `--last` (`GUI_napari.resolve_last_setup`) reuses the saved backend, config and
+    install through the CLI-override path. It falls back to the dialog when any of them
+    is missing or unknown.
+- [x] **L1.6 Single instance** (`GUI/single_instance.py`): a per-user `QLocalServer`.
+  - A second launch connects and reads the first instance's PID. It calls
+    `AllowSetForegroundWindow(pid)` (the second process owns the foreground; the first
+    does not), then sends `activate`. Measured: the second launch exits in 1.7 s.
+  - If the first instance connects but never answers (still starting, or hung), the
+    second asks whether to start anyway, defaulting to No.
+  - `--allow-second-instance` bypasses the check. `make profile-startup-full` passes it.
+- [x] **L1.7 Stale-install warning** (`glados_pycromanager/install_check.py`).
+  - `make dev`/`install` stamp a hash into `<venv>/glados_install_stamp.txt`. The hash
+    covers dependencies, optional-dependencies, scripts, gui-scripts, entry-points and
+    requires-python.
+  - At startup-ready, a mismatch shows a napari warning: run `make dev`. A venv that was
+    never stamped stays quiet.
+- Tests: `tests/test_launcher.py`, 21 tests in ~33 s, most of it one `--help`
+  subprocess and the `GUI_napari` import.
 
 ## Phase L2 — Startup speed (each item is an A/B against the L0 timeline; keep only wins)
 

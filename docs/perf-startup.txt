@@ -535,3 +535,138 @@ dock built: Autonomous microscopy        29.81      1.00
 startup layout finalised                 30.00      0.19
 ready (event loop idle after layout)     30.15      0.14
 process CPU 24.50 s (user 16.33, system 8.17), RSS 4681 MB
+
+=== Startup timeline 2026-10-13 11:51:53 (--auto-demo, 5CG43328Y5) ===
+stage                                   at (s)  step (s)
+launcher started                          1.49      1.49
+QApplication created                      4.48      2.99
+splash shown                              7.92      3.44
+GUI_napari import started                 8.00      0.09
+napari + PyQt5 imported                   8.11      0.11
+Glados modules imported                  85.03     76.92
+main() entered                           85.09      0.06
+Shared_data created                      85.31      0.22
+RT subprocess pool started               85.42      0.12
+temporary files cleaned up               85.44      0.01
+napari settings read                     85.92      0.48
+CMMCorePlus created                      85.95      0.03
+system configuration loaded              86.04      0.09
+backend up                               93.29      7.25
+MicroscopeService started                93.32      0.03
+event loop running, building GUI         93.34      0.02
+napari viewer created                    98.24      4.90
+napari UI initialised                    98.88      0.64
+dock built: Controls                    107.98      9.10
+dock built: Multi-D acquisition         109.17      1.19
+dock built: Autonomous microscopy       111.03      1.86
+startup layout finalised                111.32      0.30
+ready (event loop idle after layout)    111.52      0.20
+process CPU 47.34 s (user 26.64, system 20.70), RSS 3266 MB
+
+=== Startup timeline 2026-10-13 11:53:32 (--auto-demo, 5CG43328Y5) ===
+stage                                   at (s)  step (s)
+launcher started                          0.34      0.34
+QApplication created                      1.39      1.05
+splash shown                              2.54      1.15
+GUI_napari import started                 2.57      0.03
+napari + PyQt5 imported                   2.61      0.04
+Glados modules imported                  27.30     24.69
+main() entered                           27.31      0.01
+Shared_data created                      27.34      0.03
+RT subprocess pool started               27.38      0.04
+temporary files cleaned up               27.39      0.00
+napari settings read                     27.63      0.24
+CMMCorePlus created                      27.65      0.02
+system configuration loaded              27.66      0.01
+backend up                               32.86      5.19
+MicroscopeService started                32.89      0.03
+event loop running, building GUI         32.90      0.01
+napari viewer created                    35.36      2.46
+napari UI initialised                    35.82      0.45
+dock built: Controls                     40.43      4.62
+dock built: Multi-D acquisition          41.17      0.74
+dock built: Autonomous microscopy        42.08      0.91
+startup layout finalised                 42.24      0.15
+ready (event loop idle after layout)     42.34      0.10
+process CPU 26.39 s (user 15.44, system 10.95), RSS 2964 MB
+
+=== Startup timeline 2026-10-13 11:54:31 (--auto-demo, 5CG43328Y5) ===
+stage                                   at (s)  step (s)
+launcher started                          0.44      0.44
+QApplication created                      1.46      1.02
+splash shown                              4.12      2.66
+GUI_napari import started                 4.16      0.04
+napari + PyQt5 imported                   4.21      0.05
+Glados modules imported                  14.43     10.21
+main() entered                           14.44      0.01
+Shared_data created                      14.46      0.02
+RT subprocess pool started               14.50      0.04
+temporary files cleaned up               14.50      0.00
+napari settings read                     14.80      0.29
+CMMCorePlus created                      14.81      0.02
+system configuration loaded              14.83      0.01
+backend up                               18.35      3.53
+MicroscopeService started                18.36      0.01
+event loop running, building GUI         18.38      0.01
+napari viewer created                    20.58      2.20
+napari UI initialised                    21.00      0.42
+dock built: Controls                     25.69      4.70
+dock built: Multi-D acquisition          26.32      0.63
+dock built: Autonomous microscopy        27.26      0.94
+startup layout finalised                 27.51      0.25
+ready (event loop idle after layout)     27.63      0.12
+process CPU 21.05 s (user 12.69, system 8.36), RSS 4196 MB
+
+=== Startup timeline 2026-10-13 11:55:12 (--auto-demo, 5CG43328Y5) ===
+stage                                   at (s)  step (s)
+launcher started                          0.38      0.38
+QApplication created                      1.04      0.67
+splash shown                              1.91      0.86
+GUI_napari import started                 1.94      0.03
+napari + PyQt5 imported                   1.97      0.03
+Glados modules imported                   9.91      7.94
+main() entered                            9.92      0.01
+Shared_data created                       9.94      0.02
+RT subprocess pool started                9.98      0.04
+temporary files cleaned up                9.98      0.00
+napari settings read                     10.14      0.15
+CMMCorePlus created                      10.15      0.01
+system configuration loaded              10.16      0.01
+backend up                               12.14      1.99
+MicroscopeService started                12.15      0.01
+event loop running, building GUI         12.16      0.01
+napari viewer created                    14.55      2.39
+napari UI initialised                    15.01      0.46
+dock built: Controls                     19.44      4.43
+dock built: Multi-D acquisition          20.17      0.73
+dock built: Autonomous microscopy        21.03      0.87
+startup layout finalised                 21.22      0.19
+ready (event loop idle after layout)     21.33      0.11
+process CPU 19.25 s (user 12.84, system 6.41), RSS 4508 MB
+
+=== Startup timeline 2026-10-13 11:56:04 (--auto-demo, 5CG43328Y5) ===
+stage                                   at (s)  step (s)
+launcher started                          0.39      0.39
+QApplication created                      1.46      1.07
+splash shown                              2.36      0.90
+GUI_napari import started                 2.39      0.03
+napari + PyQt5 imported                   2.42      0.03
+Glados modules imported                  10.98      8.56
+main() entered                           10.99      0.01
+Shared_data created                      11.02      0.03
+RT subprocess pool started               11.07      0.05
+temporary files cleaned up               11.07      0.00
+napari settings read                     11.28      0.21
+CMMCorePlus created                      11.30      0.01
+system configuration loaded              11.31      0.01
+backend up                               13.66      2.35
+MicroscopeService started                13.67      0.01
+event loop running, building GUI         13.67      0.01
+napari viewer created                    15.96      2.29
+napari UI initialised                    16.47      0.52
+dock built: Controls                     21.34      4.87
+dock built: Multi-D acquisition          22.27      0.93
+dock built: Autonomous microscopy        23.20      0.93
+startup layout finalised                 23.39      0.19
+ready (event loop idle after layout)     23.52      0.13
+process CPU 20.47 s (user 13.53, system 6.94), RSS 4642 MB

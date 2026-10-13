@@ -54,6 +54,12 @@ pytest
 
 Seven tests spawn a real `multiprocessing` worker and account for ~80s of the suite's ~140s wall time on Windows (inherent `spawn` re-import cost). They carry the `slow` marker, so `pytest -m "not slow"` runs the other 345 in ~60s; plain `pytest` still runs everything. Two gotchas if you touch them: (1) a test whose spawned child dies must poll `proc.is_alive()` rather than waiting out a queue timeout, or a crash costs the full timeout in dead waiting (`_get_or_fail_fast` in `test_analysis_process.py`); (2) `pytest.importorskip("diplib")` is **not** enough — once an earlier test has pulled IPython into `sys.modules` (napari does), `import diplib` raises `AttributeError`, which `importorskip` does not catch, so the test fails in a full-suite run while passing in isolation. Apply the documented `import IPython.terminal.pt_inputhooks` guard first.
 
+A test that builds a real `CMMCorePlus` and waits on its MDA events must use the
+`direct_mmcore_signals` fixture (`tests/conftest.py`, sets `PYMM_SIGNALS_BACKEND=psygnal`).
+pymmcore-plus switches to Qt signals whenever a QApplication exists. Any earlier `qapp`
+test leaves one behind, and with no event loop running, `frameReady` is then never
+delivered. The test then fails only in a full-suite run.
+
 Note the `Real_Time_Analysis` node kwarg dicts hand-built in tests (`rt_analysis_info`) must carry one `LineEdit#<function>#<kwarg>` entry **per kwarg** in the node's `__function_metadata__`: `getEvalTextFromGUIFunction` indexes `methodKwargValues` positionally, so a missing kwarg is an `IndexError` in the child, not a default-value fallback. Bool kwargs use the same `LineEdit#` objectName and are stored as `"True"`/`"False"` strings.
 
 `Test.py` and `test.ipynb` at the repo root are unrelated scratch files (DIPlib FFT benchmark, etc.), not part of the suite. There is no lint config.
@@ -1625,9 +1631,29 @@ Three companion files live alongside it:
 - **`claude_launcher_project.md`** — standalone plan for a one-click (taskbar) launcher
   over the editable `.venv` plus measured startup-speed work, on branch
   `feature/one-click-launch`. Same rule: not advanced by "continue"; run when asked by name.
-  Key planning facts: `GUI_napari` imports ~3.7 s warm (napari.qt 1.7 s, pycromanager 1.2 s);
-  pycromanager's JVM `Popen` has no `CREATE_NO_WINDOW`, so a pythonw launch pops a console
-  on the JAVA backend; `main()` builds two `QApplication`s (dialog + main).
+  Key planning fact: `GUI_napari` imports ~3.7 s warm (napari.qt 1.7 s, pycromanager 1.2 s).
+  (The planning-time worry about a JVM console window was wrong: `mmpycorex` already starts
+  `jre/bin/javaw.exe` on Windows.)
+- **One-click launch (L1).** `gladosw.exe` (`[project.gui-scripts]`, pythonw) → `GUI/startup.py:main`.
+  Before the splash, `main` does three things:
+  - redirects pythonw's `None` stdout/stderr to `<AppData>/Glados-PycroManager/Glados_console.log`
+    (a per-pid file if a running instance holds it);
+  - sets the AppUserModelID `Glados.Pycromanager`, the same one written on the `.lnk`s, so
+    the window groups under the pinned icon;
+  - runs the per-user single-instance check (`GUI/single_instance.py`, a `QLocalServer`).
+    The second launch calls `AllowSetForegroundWindow(<first pid>)` because only it owns
+    the foreground. `--allow-second-instance` bypasses the check.
+
+  Related pieces:
+  - Shortcuts: `make shortcuts` (`glados_pycromanager/shortcuts.py`). Windows 11 can't pin
+    from code; the user pins the Start Menu entry.
+  - `--last` (`GUI_napari.resolve_last_setup`) skips the dialog using the saved backend and
+    config, or falls back to the dialog.
+  - `make dev` stamps a pyproject fingerprint into the venv (`install_check.py`); a mismatch
+    shows a napari warning at startup-ready.
+  - Console-less startup crashes go to a message box naming the console log.
+  - The JAVA bridge spells config settings `get_setting` (snake_case), hence
+    `MIL._config_setting`. Tests: `tests/test_launcher.py`.
 - **Startup timeline.** `observability/startup_timeline.mark(label)` stamps a startup stage,
   timed from **process creation** (psutil). `GUI_napari.py` imports it before every heavy
   import, which is why the `sys.path` shim now sits above `import pymmcore`.

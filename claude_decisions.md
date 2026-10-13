@@ -4204,3 +4204,41 @@ Fixed in its own commit.
 `AutonomousMicroscopy/Real_Time_Analysis/{BioImageModelZoo,pSMLM,pSMLM_image,SharpnessValue,FFT_im}.py`,
 `AutonomousMicroscopy/CustomFunctions/AutoFocusBF.py`, `docs/lazy-import-strategy.md`, tests
 `test_startup_splash.py`, `test_node_packages_import_light.py`.
+
+## 2026-10-13 — One-click launcher (L1 of `claude_launcher_project.md`)  [launcher]
+
+- **`gladosw` targets `GUI/startup:main`**, not `GUI_napari:main` as the plan said. That
+  way the console-less launch also gets the L2.1 splash and the one `QApplication`.
+- **No `sys.excepthook`.** A try/except around `GUI_napari.main` in `startup.main` covers
+  the case that matters (a failed startup with no console): it prints the traceback into the
+  console log and shows a message box naming the log. A hook would also fire for errors
+  after startup, which Glados' own logging already records.
+- **The console log has a per-PID fallback.** Windows will not rename a file that another
+  process holds open. A second launch (or the "not responding" path) would otherwise lose
+  its output.
+- **L1.3 needs no change.** `mmpycorex` already launches `javaw.exe`. Verified with a
+  console-less JAVA launch: no window appears.
+- **Shortcuts module is `glados_pycromanager.shortcuts`** (`install | uninstall | show`),
+  not the planned `launcher install-shortcuts`. Three shortcuts: normal, `--last`, and a
+  debug-console one through `glados.exe`. No programmatic taskbar pin, because Windows 11
+  offers no supported way.
+- **Single instance hands the foreground over explicitly.** Only the newly launched process
+  may take the foreground, so it calls `AllowSetForegroundWindow` with the PID the first
+  instance sends on connect, before asking it to activate. A first instance that connects but
+  never answers gets a Yes/No prompt (default No) rather than a silent second Glados fighting
+  over the camera.
+- **Stale-install check hashes only install-relevant `[project]` keys**, so editing tool
+  config in `pyproject.toml` does not trigger the warning. A venv never stamped stays quiet;
+  it is a warning, never a block.
+- **Pre-existing test-order bug fixed on the way** (`direct_mmcore_signals` fixture): three
+  MDA-saving tests received no frames after any `qapp` test, because pymmcore-plus picks Qt
+  signals whenever a QApplication exists. An earlier session wrongly put their failures down
+  to the full disk.
+
+**Affects:** `GUI/startup.py`, `GUI/single_instance.py`, `GUI/window_focus.py`,
+`GUI/startup_splash.py`, `GUI/GUI_napari.py` (`--last`, `--allow-second-instance`,
+stale-install warning), `shortcuts.py`, `install_check.py`, `pyproject.toml`, `Makefile`
+(`shortcuts`, `shortcuts-uninstall`, stamp in `dev`/`install`),
+`scripts/profile_startup_full.py`, `Core/microscopeInterfaceLayer.py`
+(`_config_setting`), tests `test_launcher.py`, `test_mil_config_groups.py`, `conftest.py`,
+`test_mmcore_mda_saving.py`, `test_mmcore_ndtiff_saving.py`.

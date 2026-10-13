@@ -16,13 +16,14 @@ Light on purpose: PyQt5 only, no Glados GUI modules.
 """
 
 import os
-import sys
 import threading
 import time
 
 from PyQt5.QtCore import QEventLoop, QRect, Qt
 from PyQt5.QtGui import QColor, QFont, QPainter, QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplashScreen
+
+from glados_pycromanager.GUI.window_focus import bring_to_front_once
 
 #: 720 px light splash, written by scripts/make_splash_images.py from the oversampled
 #: GladosSplash_inv.png (which alone takes ~350 ms to load). Also used by the backend dialog.
@@ -55,34 +56,6 @@ STEP_AFTER_MARK = {
 OWNER_WINDOW_MARK = 'napari viewer created'
 
 
-def _bring_to_front_once(widget) -> None:
-    """Put ``widget`` above every normal window *now*, without keeping it there.
-
-    ``raise_()`` alone is refused by Windows' foreground lock unless this process owns the
-    foreground (true for a shortcut click, not for a launch from a busy terminal).
-    Topmost-then-not-topmost is the usual way round it: the window ends at the
-    top of the normal z-order and any window activated later goes above it, unlike
-    ``Qt.WindowStaysOnTopHint``.
-    """
-    if sys.platform != 'win32':
-        return
-    try:
-        import ctypes
-        user32 = ctypes.WinDLL('user32', use_last_error=True)
-        user32.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int,
-                                        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
-        hwnd = ctypes.c_void_p(int(widget.winId()))
-        flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-        user32.SetWindowPos(hwnd, ctypes.c_void_p(HWND_TOPMOST), 0, 0, 0, 0, flags)
-        user32.SetWindowPos(hwnd, ctypes.c_void_p(HWND_NOTOPMOST), 0, 0, 0, 0, flags)
-    except Exception:
-        pass
-
-
-HWND_TOPMOST, HWND_NOTOPMOST = -1, -2
-SWP_NOSIZE, SWP_NOMOVE, SWP_NOACTIVATE = 0x0001, 0x0002, 0x0010
-
-
 def _load_pixmap() -> QPixmap:
     pixmap = QPixmap(SPLASH_IMAGE)
     if pixmap.isNull():
@@ -98,6 +71,7 @@ class StartupSplash(QSplashScreen):
         # Not WindowStaysOnTopHint: it comes up on top (show_now), but any other window
         # may then be put over it.
         super().__init__(_load_pixmap())
+        self.setWindowTitle(title)  # what Alt-Tab and the taskbar show, instead of "pythonw"
         self._title = title
         self._step = FIRST_STEP
         self._t0 = time.perf_counter()
@@ -160,8 +134,7 @@ class StartupSplash(QSplashScreen):
     def show_now(self) -> None:
         """Show on top and paint immediately, before any event loop runs."""
         self.show()
-        self.raise_()
-        _bring_to_front_once(self)
+        bring_to_front_once(self)
         app = QApplication.instance()
         if app is not None:
             # The window must be mapped before a synchronous repaint reaches the screen.

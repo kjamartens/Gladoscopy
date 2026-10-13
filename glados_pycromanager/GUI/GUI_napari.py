@@ -283,11 +283,43 @@ def perform_post_closing_actions(shared_data:Shared_data):
 STARTUP_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                    '..', '..', 'docs', 'perf-startup.txt')
 
+def _warn_if_install_is_stale() -> None:
+    """After startup: say so when pyproject.toml changed since `make dev` (install_check)."""
+    try:
+        from glados_pycromanager.install_check import stale_install_message
+        message = stale_install_message()
+        if message is None:
+            return
+        logging.warning(message)
+        from napari.utils.notifications import show_warning
+        show_warning(message)
+    except Exception:
+        logging.exception('Could not check whether the install is up to date')
+
+#: Backend names as the startup dialog saves them (headlessGUI.start) and --backend takes them.
+HEADLESS_BACKENDS = ('JAVA', 'Python', 'PyMMCorePlus')
+
+def resolve_last_setup(mm_cfg):
+    """``(backend, config_path, mm_path)`` saved by the startup dialog, if still usable.
+
+    ``mm_cfg`` is ``shared_data.config.micromanager_config``. Returns None when the
+    backend is unknown or the install folder or config file has gone, so ``--last``
+    falls back to the dialog rather than failing deep inside a backend start.
+    """
+    backend = str(getattr(mm_cfg, 'headless_backend', '') or '')
+    config = str(getattr(mm_cfg, 'config_path', '') or '')
+    mm_path = str(getattr(mm_cfg, 'path', '') or '')
+    if backend not in HEADLESS_BACKENDS:
+        return None
+    if not (config and os.path.isfile(config) and mm_path and os.path.isdir(mm_path)):
+        return None
+    return backend, config, mm_path
+
 def _write_startup_report(args) -> None:
     """Append the startup timeline to docs/perf-startup.txt (``--startup-exit``)."""
     import platform
     import time as _time
-    source = ('--auto-demo' if args.auto_demo
+    source = ('--auto-demo' if args.auto_demo else '--last' if args.last
               else f'--backend {args.backend} --config {args.config}')
     header = (f"\n=== Startup timeline {_time.strftime('%Y-%m-%d %H:%M:%S')} "
               f"({source}, {platform.node()}) ===\n")
@@ -557,6 +589,13 @@ def main(app=None, splash=None):
                         help='Dev only: quit as soon as the GUI is ready and append the startup '
                              'timeline to docs/perf-startup.txt. Needs a popup-free launch '
                              '(--auto-demo, or --backend with --config).')
+    parser.add_argument('--last', action='store_true',
+                        help='Start the backend, install and config used last time (saved by the '
+                             'startup dialog) without showing the dialog. Falls back to the '
+                             'dialog if any of them no longer exists.')
+    parser.add_argument('--allow-second-instance', action='store_true',
+                        help='Start even if Glados is already running (normally a second launch '
+                             'brings the running one to the front instead).')
     args = parser.parse_args()
 
     # Validate CLI override combos before any heavy work.
@@ -564,8 +603,10 @@ def main(app=None, splash=None):
         parser.error('--backend requires --config (or use --auto-demo)')
     if args.config and not (args.backend or args.auto_demo):
         parser.error('--config requires --backend (or use --auto-demo)')
-    if args.startup_exit and not (args.auto_demo or (args.backend and args.config)):
-        parser.error('--startup-exit needs --auto-demo or --backend with --config: a popup '
+    if args.last and (args.backend or args.config or args.auto_demo):
+        parser.error('--last cannot be combined with --backend/--config/--auto-demo')
+    if args.startup_exit and not (args.auto_demo or args.last or (args.backend and args.config)):
+        parser.error('--startup-exit needs --auto-demo, --last or --backend with --config: a popup '
                      'would put the time the user takes to answer it in the timeline')
 
     #Set up logging to files in appData folder - INFO and DEBUG
@@ -605,6 +646,14 @@ def main(app=None, splash=None):
     cli_backend = args.backend
     cli_config = args.config
     cli_mm_path = args.mm_path
+    if args.last:
+        last = resolve_last_setup(shared_data.config.micromanager_config)
+        if last is None:
+            logging.warning('--last: the saved backend/install/config is incomplete or no '
+                            'longer exists; showing the startup dialog instead')
+        else:
+            cli_backend, cli_config, cli_mm_path = last
+            logging.info('--last: reusing backend=%s, mm_path=%s, config=%s', *last)
     if args.auto_demo:
         from pymmcore_plus import find_micromanager
         mm_paths = find_micromanager(return_first=False) or []
@@ -786,6 +835,7 @@ def main(app=None, splash=None):
             splash.done()
         logging.info('Startup timeline (from process start):\n%s',
                      startup_timeline.format_report())
+        _warn_if_install_is_stale()
         if args.startup_exit:
             _write_startup_report(args)
             from PyQt5.QtCore import QTimer
