@@ -481,6 +481,14 @@ two buttons sat in the unrelated debug-button row).
   squeezing the row grid's real column into a fraction of the group box's
   width, which is what made group-name labels render clipped/invisible.
   Tests: `tests/test_mmconfig_panel.py`.
+- **The section's width is capped** (`_capConfigWidth`, re-applied by
+  `rebuildConfigLayout`): `CONFIG_BLOCK_MAX_WIDTH_EM` x theme `font_px` per block of
+  `number_columns` rows. A slider row's number field is capped (`_limitFieldWidth`)
+  and the slider has stretch 1. Qt caps a whole grid **column** at its narrowest
+  item's maximum, and if every stretched column is capped it hands the spare width
+  to an unstretched one (pushing the capped section right), so `ResponsiveGrid.apply`
+  also stretches the trailing column whenever all stretched columns are capped.
+  Tests: `test_controls_panel_layout.py`, `test_ui_responsive_grid.py`.
 
 `Core/MDAGlados.py` is the multi-dimensional acquisition layer that talks to MIL.
 
