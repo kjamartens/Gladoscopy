@@ -465,7 +465,12 @@ two buttons sat in the unrelated debug-button row).
   exist yet at construction silently did nothing (`QComboBox.setCurrentText`
   on a non-matching string is a no-op). The "Refresh configs from MM"
   button, `updateAllMMinfo()`, and `openConfigGroupEditor()`'s post-dialog
-  refresh all now call `rebuildConfigLayout()`.
+  refresh all now call `rebuildConfigLayout()`. Because a rebuild (also the
+  periodic auto-refresh tick) recreates every dropdown, **`addDropDown` itself
+  selects MM's current preset** via `_selectDropDownPreset` (signals blocked, so
+  no `set_config` write-back or checkbox tick); the blank entry shows only when
+  `get_current_config` matches no preset. Before that, every preset dropdown sat
+  blank after each rebuild.
 - **The button row is a sibling of the row grid, not inside it.**
   `configGroupBox`'s layout is `configOuterLayout` (a `QVBoxLayout` holding
   `configLayout`, the `QGridLayout` of rows, plus a separate `QHBoxLayout`

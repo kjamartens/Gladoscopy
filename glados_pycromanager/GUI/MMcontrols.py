@@ -2548,14 +2548,35 @@ class MMConfigUI(CustomMainWindow):
         #Populate with the options:
         for i in range(self.config_groups[config_id].nrConfigs()):
             self.dropDownBoxes[config_id].addItem(self.config_groups[config_id].configName(i))
-        #Update the value to the current MM value:
-        # self.updateValuefromMM(config_id)
+        #Show the preset that is active in MM right now (blank if none matches).
+        #Must happen here: rebuildConfigLayout() (also the auto-refresh tick)
+        #recreates every dropdown, so a selection made later would be lost.
+        try:
+            currentPreset = self.config_groups[config_id].getCurrentMMValue()
+        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+            logging.debug('Could not read current preset of %s: %s',
+                          self.config_groups[config_id].configGroupName(), exc)
+            currentPreset = ''
+        self._selectDropDownPreset(config_id, currentPreset)
         #Add a callback when it is changed:
         self.dropDownBoxes[config_id].currentIndexChanged.connect(lambda index, config_id = config_id: self.on_dropDownChanged(config_id))
         
         #Add dropdown to rowLayout:
         rowLayout.addWidget(self.dropDownBoxes[config_id])
     
+    def _selectDropDownPreset(self, config_id, preset):
+        """Select `preset` in the config dropdown, or the blank entry when it
+        is not one of the listed presets (MM returns '' when the hardware state
+        matches no preset). Signals are blocked: this mirrors MM's state, it
+        must not write it back or tick the row's checkbox."""
+        box = self.dropDownBoxes[config_id]
+        index = box.findText(str(preset)) if preset else -1
+        blocked = box.blockSignals(True)
+        try:
+            box.setCurrentIndex(index if index > 0 else 0)
+        finally:
+            box.blockSignals(blocked)
+
     def on_dropDownChanged(self,config_id):
         """
         Changes a micromanager config when a dropdown has changed
@@ -2807,11 +2828,11 @@ class MMConfigUI(CustomMainWindow):
         if self.config_groups[config_id].isReadOnly():
             self.editFields[config_id].setText(str(self.config_groups[config_id].getStorableValue()))
         elif self.config_groups[config_id].isDropDown():
-            self.dropDownBoxes[config_id].setCurrentText(currentValue)
+            self._selectDropDownPreset(config_id, currentValue)
         elif self.config_groups[config_id].isSlider():
             #A slider config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.config_groups[config_id].configGroupName()
-            
+
             underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
             device_label = configdata.getSetting(0).getDeviceLabel()
