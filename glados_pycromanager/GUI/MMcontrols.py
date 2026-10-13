@@ -65,6 +65,7 @@ from glados_pycromanager.ui.layout import (
     classify_shape,
     compact_margin,
     compact_padding,
+    compact_spacing,
     set_role,
 )
 
@@ -1897,7 +1898,7 @@ class MMConfigUI(CustomMainWindow):
 
         #Step sizes: one column per ring, X and Y rows, FOV presets underneath.
         XYStageSetMovementLayout = QGridLayout()
-        XYStageSetMovementLayout.setSpacing(0)
+        XYStageSetMovementLayout.setSpacing(compact_spacing())
         self.XYMoveEditField = {}
         pushButtonLabelArr = ["0.1","1","3"]
         for m, ringName in enumerate(RING_NAMES, start=1):
@@ -1996,7 +1997,7 @@ class MMConfigUI(CustomMainWindow):
         #Create a layout
         self.oneDStageLayout = QGridLayout()
         self.oneDStageLayout.setContentsMargins(0, 0, 0, 0)
-        self.oneDStageLayout.setSpacing(0)
+        self.oneDStageLayout.setSpacing(compact_spacing())
         
         #Creates a UI layout to move all found 1D stages
         #Find all 1D stages
@@ -2041,7 +2042,7 @@ class MMConfigUI(CustomMainWindow):
             self.oneDMoveEditFieldGridLayouts[stage].setObjectName(stage)
             internalLayout = QGridLayout()
             internalLayout.setContentsMargins(0, 0, 0, 0)
-            internalLayout.setSpacing(0)
+            internalLayout.setSpacing(compact_spacing())
             self.oneDMoveEditFieldGridLayouts[stage].setLayout(internalLayout)
             self.oneDMoveEditField[stage] = {}
             for m in range(1,3):

@@ -177,12 +177,20 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     QWidget[gladosRole="{ROLE_COMPACT}"] QLineEdit {{
         border-width: 1px;
     }}
+    QWidget[gladosRole="{ROLE_COMPACT}"] QPushButton {{
+        padding: {compact_padding(t) + 2}px {3 * compact_padding(t)}px;
+    }}
     """
 
 
 def compact_padding(theme: Theme | None = None) -> int:
     """Vertical padding of a control inside a `ROLE_COMPACT` widget (px)."""
-    return max(1, (theme or current_theme()).widget_padding_px // 3)
+    return max(1, (theme or current_theme()).widget_padding_px // 2)
+
+
+def compact_spacing(theme: Theme | None = None) -> int:
+    """Gap between the controls of a `ROLE_COMPACT` widget's grids (px)."""
+    return max(1, (theme or current_theme()).section_spacing_px // 2)
 
 
 def compact_margin(theme: Theme | None = None) -> int:

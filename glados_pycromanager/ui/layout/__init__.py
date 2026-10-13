@@ -26,6 +26,7 @@ from glados_pycromanager.ui.layout.theme import (
     build_stylesheet,
     compact_margin,
     compact_padding,
+    compact_spacing,
     current_theme,
     set_current_theme,
     set_role,
@@ -37,6 +38,6 @@ __all__ = [
     "FlowLayout", "FlowRow", "FormGrid", "ListEditor", "Placement", "ResponsiveGrid", "Section",
     "ROLE_COMPACT", "ROLE_NORMAL", "ROLE_PRIMARY", "ROLE_READONLY", "ROLE_SECTION", "ROLE_WARNING",
     "Theme", "apply_section_spacing", "build_stylesheet", "classify_shape", "compact_margin",
-    "compact_padding", "configure_table_header",
+    "compact_padding", "compact_spacing", "configure_table_header",
     "current_theme", "set_current_theme", "set_role", "theme_from_config",
 ]
