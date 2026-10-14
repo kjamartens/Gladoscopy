@@ -25,6 +25,8 @@ ROLE_PRIMARY = "primary"
 ROLE_READONLY = "readonly"
 ROLE_WARNING = "warning"
 ROLE_NORMAL = "normal"
+ROLE_MODIFIED = "modified"   # a setting changed from its default
+ROLE_ACTIVE = "active"       # a toggle button whose thing is running
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,8 @@ class Theme:
     muted_text: str = "#868e93"         # napari's 'secondary'
     border: str = "#D5D5E5"
     warning: str = "red"
+    modified: str = "rgba(0, 122, 204, 70)"   # light accent wash behind changed settings
+    active: str = "#2e8b57"             # background of a running toggle (e.g. RT analysis)
 
 
 _current = Theme()
@@ -171,6 +175,19 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     }}
     QLineEdit[gladosRole="{ROLE_WARNING}"] {{
         border: 1px solid {t.warning};
+    }}
+    QLabel[gladosRole="{ROLE_MODIFIED}"], QLineEdit[gladosRole="{ROLE_MODIFIED}"],
+    QCheckBox[gladosRole="{ROLE_MODIFIED}"] {{
+        background-color: {t.modified};
+    }}
+    QPushButton[gladosRole="{ROLE_ACTIVE}"] {{
+        background-color: {t.active};
+        color: {t.accent_text};
+        font-weight: bold;
+    }}
+    QComboBox[gladosRole="{ROLE_ACTIVE}"] {{
+        border: 2px solid {t.active};
+        font-weight: bold;
     }}
     """
 

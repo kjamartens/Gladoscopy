@@ -1615,7 +1615,7 @@ class multiLineEdit_valueVarAdv(QHBoxLayout):
                     self.comboBox_switch.currentIndexChanged.connect(textChangeCallback)
                     # self.comboBox_switch.currentIndexChanged.connect(lambda index, comboBox=self.comboBox_switch: hideAdvVariables(comboBox))
             
-def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False):
+def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropdown=None,parent=None,ignorePolarity=False,maxNrRows=10,showVisualisationBox=False,nodzInfo=None,skipInput=False,showVariableOptions=True):
     try:
         logging.debug('Changing layout '+curr_layout.parent().objectName())
     except (AttributeError, RuntimeError):
@@ -1645,8 +1645,10 @@ def layout_init(curr_layout,className,displayNameToFunctionNameMap,current_dropd
             #Visual max number of rows before a 2nd column is started.
             labelposoffset = 0
             
-            #Want to show variables in advanced mode?
-            ShowVariablesOptions = True 
+            #Want the Value/Variable/Advanced switch per kwarg? Off where there are
+            #no Nodz variables to pick from (the Controls dock's RT-analysis panel):
+            #every kwarg is then a plain Value.
+            ShowVariablesOptions = showVariableOptions
 
             k=0
             if not skipInput:

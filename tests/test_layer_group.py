@@ -366,6 +366,18 @@ def test_remove_all_removes_every_layer_and_tolerates_absent_ones():
     assert 'SR' not in viewer.layers
 
 
+def test_remove_all_spares_a_newer_layer_with_the_same_name():
+    """Teardown removal is deferred; a node restarted in between (RT panel Reset)
+    owns layers of the same names, and those must survive the old group's sweep."""
+    viewer = FakeViewer()
+    old = _group(('raw', 'overlay'), ('SR', 'right'))
+    new = _group(('raw', 'overlay'), ('SR', 'right'))
+    for layer in new.layers:
+        viewer.layers.add(layer)
+    old.remove_all(viewer)
+    assert 'raw' in viewer.layers and 'SR' in viewer.layers
+
+
 # --------------------------------------------------------------------------
 # Pinned napari semantics
 # --------------------------------------------------------------------------

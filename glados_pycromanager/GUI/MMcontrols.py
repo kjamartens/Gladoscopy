@@ -29,7 +29,6 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
-    QSpacerItem,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -569,14 +568,8 @@ class MMConfigUI(CustomMainWindow):
 
         #Add the real-time analysis
         if showRealTimeAnalysis:
-            self.rtAnalysisLayout = QGridLayout()
-            self.realTimeAnalysisGroupBox = Section("Real-time analysis", "controls.rt", layout=self.rtAnalysisLayout)
+            self.realTimeAnalysisGroupBox = Section("Real-time analysis", "controls.rt", layout=self.realTimeAnalysisLayout())
             self.realTimeAnalysisGroupBox.setObjectName('realTimeAnalysisGroupBox')
-            self.rtAnalysisSubGroupBoxLayout = QGridLayout()
-            self.rtAnalysisLayout.addLayout(self.rtAnalysisSubGroupBoxLayout,0,0,1,2)
-
-            #Initialise the rt analysis layout:
-            self.realTimeAnalysisLayout()
             self.sectionGrid.register(self.realTimeAnalysisGroupBox.key, self.realTimeAnalysisGroupBox)
 
         self.sectionGrid.set_placements(CONTROLS_SECTION_PLACEMENTS, CONTROLS_COLUMN_STRETCH)
@@ -1677,215 +1670,16 @@ class MMConfigUI(CustomMainWindow):
     
     def realTimeAnalysisLayout(self):
         """
-        Creates and returns a layout for real-time analysis of e.g. live/snap images that are created.
-        
+        Returns the layout of the real-time analysis section: an `RTAnalysisPanel`
+        (method, parameters, activate/reset/defaults). Its settings persist only
+        for the Controls dock itself (`autoSaveLoad`), not the Nodz dialogs.
         """
-        
-        
-        
-        #Let's try to get all possible RT analysis options
-        realTimeAnalysisFunctions = utils.functionNamesFromDir('AutonomousMicroscopy\\Real_Time_Analysis')
-        realTimeAnalysisFunctionsAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Real_Time_Analysis')
-        #Remove duplicates - not sure why they're here:
-        realTimeAnalysisFunctionsAppData = list(set(realTimeAnalysisFunctionsAppData))
-        
-        realTimeAnalysisFunctionsAll = realTimeAnalysisFunctions + realTimeAnalysisFunctionsAppData
-        
-        
-        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(realTimeAnalysisFunctionsAll,'')
-        #Store this mapping also in the node
-        self.real_time_analysis_currentData = {}
-        self.real_time_analysis_currentData['__displayNameFunctionNameMap__'] = displaynameMapping
-        
-        #Add a dropbox with all the options
-        self.comboBox_RTanalysisFunctions = QComboBox(self)
-        if len(realTimeAnalysisFunctions) > 0:
-            for item in realTimeAnalysisFunctions:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
-        if len(realTimeAnalysisFunctionsAppData) > 0:
-            for item in realTimeAnalysisFunctionsAppData:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
-        
-        self.rtAnalysisSubGroupBoxLayout.addWidget(self.comboBox_RTanalysisFunctions, 0, 1)
-        #give it an objectName:
-        self.comboBox_RTanalysisFunctions.setObjectName('comboBox_RTanalysisFunctions_KEEP')
-        
-        #Give it a connect-callback if it's changed (then the layout should be changed)
-        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, layout=self.rtAnalysisSubGroupBoxLayout, dropdown=self.comboBox_RTanalysisFunctions,displaynameMapping=displaynameMapping: utils.layout_changedDropdown(layout,dropdown,displaynameMapping))
-        #Also give it a connect-callback to store the currentinfo:
-        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
-
-        self.realTimeAnalysisGroupBox.currentData = {}
-        self.realTimeAnalysisGroupBox.currentData['__displayNameFunctionNameMap__'] = displaynameMapping
-        # pre-load all args/kwargs and their edit values - then hide all of them
-        utils.layout_init(self.rtAnalysisSubGroupBoxLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions,nodzInfo=self,skipInput=True)
-        
-        #Pre-load the options if they're in the current node info
-        # if 'real_time_analysis_currentData' in vars(self):
-            
-        #     utils.preLoadOptions_realtime(self.rtAnalysisSubGroupBoxLayout,self.real_time_analysis_currentData) #type:ignore
-        
-        def activateRealTimeAnalysisFromDockWidget(self):
-            #TODO: remove existing analysis if present
-            self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryRTAnalysis__'] = self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryAnalysis__']
-            self.realTimeAnalysisGroupBox.currentData['__realTimeVisualisation__'] = True#dialog.visualisationBox.isChecked() #type:ignore 
-            self.current_analysis_thread = create_real_time_analysis_thread(shared_data,analysisInfo = self.realTimeAnalysisGroupBox.currentData,delay=None,nodzInfo=None)
-            
-        def deactivateRealTimeAnalysisFromDockWidget(self):
-            #remove the current_analysis_thread from shared_data.analysisThreads:
-            #Find the thread/queue:
-            for item in shared_data.RTAnalysisQueuesThreads:
-                if item['Thread'] == self.current_analysis_thread:
-                    
-                    #Attempt to remove the napari layer(s) corresponding to it. A
-                    #node may own several, so go through the group rather than its
-                    #primary layer alone; remove_all tolerates layers the user has
-                    #already closed.
-                    if item['Thread'].visualisationObject is not None:
-                        overlay = getattr(item['Thread'].visualisationObject, 'napariOverlay', None)
-                        group = getattr(overlay, 'group', None)
-                        if group is not None:
-                            group.remove_all(shared_data.napariViewer)
-                    #Removing a layer fires layer_removed_event_callback, which already
-                    #destroys the thread, clears the queue, drops this entry and releases
-                    #the replay history. Doing it all again here destroyed the node twice
-                    #(end() ran twice) and logged 'already deleted'.
-                    if item not in shared_data.RTAnalysisQueuesThreads:
-                        logging.debug('RT analysis already torn down by its layer removal')
-                        break
-
-                    #Remove the thread
-                    if item['Thread']:
-                        # Signal the thread to stop
-                        
-                        item['Thread'].destroy()
-                    #Remove the queue
-                    if item['Queue']:
-                        # Clear the queue
-                        while item['Queue']:
-                            try:
-                                item['Queue'].popleft()
-                            except IndexError: # For deque
-                                break
-                            
-                    #remove from shared_data entry
-                    try:
-                        shared_data.RTAnalysisQueuesThreads.remove(item)
-                    except ValueError as e:
-                        logging.error(f'RT analysis thread-queue is already deleted {e}')
-                        
-                    logging.debug('Removed analysis thread')   
-                    break
-        
-        
-        def testRealTimeAnalysisFromDockWidget(self):
-            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
-            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
-            current_config['__realTimeVisualisation__'] = False
-
-            viewer = self.shared_data.napariViewer
-            if viewer is None or len(viewer.layers) == 0:
-                QMessageBox.warning(self, "No image", "No napari layers are open.")
-                return
-
-            active_layer = viewer.layers.selection.active or viewer.layers[-1]
-            image = np.asarray(active_layer.data)
-            logging.info("RT test: layer '%s', full data shape=%s, viewer.dims.current_step=%s",
-                         active_layer.name, image.shape, viewer.dims.current_step)
-            if image.ndim > 2:
-                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
-                image = image[step]
-                logging.info("RT test: sliced at step=%s, resulting image shape=%s", step, image.shape)
-
-            metadata = {'ImageNumber': 0}
-            try:
-                rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
-                result = utils.realTimeAnalysis_run(rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
-                overlay = napariOverlay(viewer, RT_analysisObject=rt_object, layer_name='RTtest_VIS')
-                utils.realTimeAnalysis_visualisation(rt_object, current_config, image, metadata, None, overlay.layer)
-                QMessageBox.information(self, "Result", f"Analysis complete.\nResult: {result}")
-            except Exception as exc:
-                logging.exception("Test on current image failed")
-                QMessageBox.critical(self, "Error", f"Analysis failed:\n{exc}")
-
-        def _auto_slice_callback(self, event=None):
-            if not getattr(self, '_auto_slice_active', False):
-                return
-            viewer = self.shared_data.napariViewer
-            if viewer is None or len(viewer.layers) == 0:
-                return
-            active_layer = viewer.layers.selection.active or viewer.layers[-1]
-            image = np.asarray(active_layer.data)
-            if image.ndim > 2:
-                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
-                image = image[step]
-            metadata = {'ImageNumber': 0}
-            try:
-                current_config = self._auto_slice_config
-                utils.realTimeAnalysis_run(self._auto_slice_rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
-                utils.realTimeAnalysis_visualisation(self._auto_slice_rt_object, current_config, image, metadata, None, self._auto_slice_overlay.layer)
-            except Exception:
-                logging.exception("Auto-slice RT analysis failed")
-
-        def enableAutoSliceAnalysis(self):
-            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
-            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
-            current_config['__realTimeVisualisation__'] = False
-            viewer = self.shared_data.napariViewer
-            if viewer is None:
-                self.rtAnalysisAutoSliceButton.setChecked(False)
-                return
-            self._auto_slice_config = current_config
-            self._auto_slice_rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
-            self._auto_slice_overlay = napariOverlay(viewer, RT_analysisObject=self._auto_slice_rt_object, layer_name='RT_AutoSlice_VIS')
-            self._auto_slice_active = True
-            self._auto_slice_cb = lambda event: _auto_slice_callback(self, event)
-            viewer.dims.events.current_step.connect(self._auto_slice_cb)
-
-        def disableAutoSliceAnalysis(self):
-            self._auto_slice_active = False
-            viewer = self.shared_data.napariViewer
-            if viewer is not None and hasattr(self, '_auto_slice_cb'):
-                try:
-                    viewer.dims.events.current_step.disconnect(self._auto_slice_cb)
-                except Exception:
-                    pass
-            if hasattr(self, '_auto_slice_overlay') and self._auto_slice_overlay is not None:
-                try:
-                    viewer.layers.remove(self._auto_slice_overlay.layer.name)
-                except Exception:
-                    pass
-            self._auto_slice_rt_object = None
-            self._auto_slice_overlay = None
-
-        def toggleAutoSliceAnalysis(self):
-            if self.rtAnalysisAutoSliceButton.isChecked():
-                enableAutoSliceAnalysis(self)
-            else:
-                disableAutoSliceAnalysis(self)
-
-        self.rtAnalysisActivateButton = QPushButton('Activate')
-        #add a clicked-call:
-        self.rtAnalysisActivateButton.clicked.connect(lambda: activateRealTimeAnalysisFromDockWidget(self))
-        self.rtAnalysisDeactivateButton = QPushButton('Deactivate')
-        self.rtAnalysisDeactivateButton.clicked.connect(lambda: deactivateRealTimeAnalysisFromDockWidget(self))
-        self.rtAnalysisTestButton = QPushButton('Test on current napari image')
-        self.rtAnalysisTestButton.clicked.connect(lambda: testRealTimeAnalysisFromDockWidget(self))
-        self.rtAnalysisAutoSliceButton = QPushButton('Auto-update on slice change')
-        self.rtAnalysisAutoSliceButton.setCheckable(True)
-        self.rtAnalysisAutoSliceButton.clicked.connect(lambda: toggleAutoSliceAnalysis(self))
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisActivateButton,1,0,1,1)
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisDeactivateButton,1,1,1,1)
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisTestButton,2,0,1,2)
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisAutoSliceButton,3,0,1,2)
-
-        #Add a spacer at the bottom:
-        expandingspacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.rtAnalysisLayout.addItem(expandingspacer,4,0,1,2)
+        from glados_pycromanager.GUI.rt_analysis_panel import RTAnalysisPanel
+        self.rtAnalysisPanel = RTAnalysisPanel(self.shared_data, persist=self.autoSaveLoad)
+        self.rtAnalysisLayout = QVBoxLayout()
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisPanel)
         return self.rtAnalysisLayout
-    
+
     def XYstageLayout(self):
         """
         Returns the XY stage block: a `StageDial` (three rings by four

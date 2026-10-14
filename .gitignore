@@ -231,3 +231,4 @@ bash.exe.stackdump
 /bioimageio_unzipped_tf_weights
 /glados_pycromanager/AutonomousMicroscopy/exploration_nena_frc/*
 !/glados_pycromanager/AutonomousMicroscopy/exploration_nena_frc/nena_frc_live.py
+/claude_notes

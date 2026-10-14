@@ -312,6 +312,9 @@ class LayoutConfig:
     muted_text: str = setting("#868e93", "Muted text colour", "Read-only values.", hidden=True)
     border: str = setting("#D5D5E5", "Field border colour", "", hidden=True)
     warning: str = setting("red", "Warning colour", "Border of fields with invalid input.", hidden=True)
+    modified: str = setting("rgba(0, 122, 204, 70)", "Changed-setting highlight",
+                            "Background of settings changed from their default.", hidden=True)
+    active: str = setting("#2e8b57", "Active colour", "Background of a running toggle button.", hidden=True)
     hidden_sections: str = setting(
         "", "Hidden sections",
         "Comma-separated section keys to leave out of the docks, e.g. 'mda.xy,controls.relative_stages'.",
