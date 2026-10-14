@@ -63,3 +63,39 @@ def test_add_action_returns_wired_button_in_order(qapp):
     first.click()
     assert hits == ["add"]
     assert editor.buttons == [first, second]
+
+
+def test_buttons_fill_two_columns_row_by_row(qapp):
+    from glados_pycromanager.ui.layout.list_editor import ListEditor
+
+    editor = ListEditor(_table(["Name"]))
+    buttons = [editor.add_action(str(i)) for i in range(5)]
+    grid = editor._buttons
+    positions = [grid.getItemPosition(grid.indexOf(b))[:2] for b in buttons]
+    assert positions == [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0)]
+    assert editor.buttons == buttons
+
+
+def test_min_rows_overrides_the_theme(qapp):
+    from glados_pycromanager.ui.layout.list_editor import ListEditor
+
+    short = ListEditor(_table(["Name"]), min_rows=2)  # kept: the editor owns its table
+    tall = ListEditor(_table(["Name"]), min_rows=6)
+    rows = short.table.verticalHeader().defaultSectionSize()
+    assert tall.table.minimumHeight() - short.table.minimumHeight() == 4 * rows
+
+
+def test_min_width_counts_the_row_header_before_the_table_is_shown(qapp):
+    from PyQt5.QtWidgets import QTableWidgetItem
+
+    from glados_pycromanager.ui.layout.list_editor import ListEditor
+
+    table = _table(["Channel Setting", "Exposure"])
+    table.insertRow(0)
+    table.setItem(0, 0, QTableWidgetItem("488"))
+    editor = ListEditor(table)
+    assert not table.isVisible()
+    header = table.horizontalHeader()
+    assert table.minimumWidth() >= (header.sectionSizeHint(0) + header.sectionSizeHint(1)
+                                    + table.verticalHeader().sizeHint().width())
+    editor.deleteLater()

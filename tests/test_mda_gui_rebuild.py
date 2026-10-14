@@ -266,7 +266,8 @@ def test_hidden_sections_setting_is_applied(panel):
 
 
 def test_channel_header_is_not_clipped(panel, qapp):
-    panel.sectionGrid.resize(1800, 300)
+    # At any width the panel allows: below its minimum, Qt squeezes every widget.
+    panel.sectionGrid.resize(max(1800, panel.sectionGrid.minimumSizeHint().width()), 300)
     panel.sectionGrid.show()
     qapp.processEvents()
     header = panel.channelListWidget.horizontalHeader()

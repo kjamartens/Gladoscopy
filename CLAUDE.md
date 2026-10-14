@@ -465,7 +465,12 @@ two buttons sat in the unrelated debug-button row).
   exist yet at construction silently did nothing (`QComboBox.setCurrentText`
   on a non-matching string is a no-op). The "Refresh configs from MM"
   button, `updateAllMMinfo()`, and `openConfigGroupEditor()`'s post-dialog
-  refresh all now call `rebuildConfigLayout()`.
+  refresh all now call `rebuildConfigLayout()`. Because a rebuild (also the
+  periodic auto-refresh tick) recreates every dropdown, **`addDropDown` itself
+  selects MM's current preset** via `_selectDropDownPreset` (signals blocked, so
+  no `set_config` write-back or checkbox tick); the blank entry shows only when
+  `get_current_config` matches no preset. Before that, every preset dropdown sat
+  blank after each rebuild.
 - **The button row is a sibling of the row grid, not inside it.**
   `configGroupBox`'s layout is `configOuterLayout` (a `QVBoxLayout` holding
   `configLayout`, the `QGridLayout` of rows, plus a separate `QHBoxLayout`
@@ -476,6 +481,14 @@ two buttons sat in the unrelated debug-button row).
   squeezing the row grid's real column into a fraction of the group box's
   width, which is what made group-name labels render clipped/invisible.
   Tests: `tests/test_mmconfig_panel.py`.
+- **The section's width is capped** (`_capConfigWidth`, re-applied by
+  `rebuildConfigLayout`): `CONFIG_BLOCK_MAX_WIDTH_EM` x theme `font_px` per block of
+  `number_columns` rows. A slider row's number field is capped (`_limitFieldWidth`)
+  and the slider has stretch 1. Qt caps a whole grid **column** at its narrowest
+  item's maximum, and if every stretched column is capped it hands the spare width
+  to an unstretched one (pushing the capped section right), so `ResponsiveGrid.apply`
+  also stretches the trailing column whenever all stretched columns are capped.
+  Tests: `test_controls_panel_layout.py`, `test_ui_responsive_grid.py`.
 
 `Core/MDAGlados.py` is the multi-dimensional acquisition layer that talks to MIL.
 
@@ -749,7 +762,7 @@ acquisition, just materialised.
 
 ### UI — `GUI/`
 
-- `GUI_napari.py` — standalone entry. Builds a `headlessGUI` for backend choice, spawns Napari, runs `runNapariPycroManager` in a `Worker`/`QThread`. Sets `NAPARI_ASYNC=1` and `NAPARI_OCTREE=1` *before* importing napari.
+- `GUI_napari.py` — standalone entry. Builds a `headlessGUI` for backend choice, spawns Napari, runs `runNapariPycroManager` in a `Worker`/`QThread`. Sets `NAPARI_ASYNC=1` and `NAPARI_OCTREE=1` *before* importing napari. The MM-path and config-file fields each have a down-arrow `QToolButton` listing the last 20 values used (`MicroManagerConfig.path_history` / `config_path_history`, most recent first, recorded on Start via `headless_validation.push_path_history`). List-typed config fields need `setting(..., default_factory=list)`. Tests: `tests/test_headless_path_history.py`.
 - `_dock_widget.py` — napari plugin entry. `MainWidget` constructs `Shared_data`, calls `pycromanager.Core()` directly, and adds four dock widgets — all of which inherit `GladosWidget`:
   - `MMConfigWidget` — Micro-Manager config groups, stages, ROI (`microManagerControlsUI_plugin`)
   - `MDAWidget` — Multi-D acquisition (`MDAGlados_plugin`)
@@ -840,6 +853,13 @@ acquisition, just materialised.
   a `raise_()` on a tabified dock before Qt builds the tab bar is ignored, and the last-added
   tab wins. The maximise first clears `WindowMaximized`, because napari restores a saved
   maximised flag with a stale size and `showMaximized()` is then a no-op.
+  The top area is sized for the **taller of the Controls and Multi-D acquisition tabs**
+  (`alsoFit`), each measured at the Controls width by `_dockContentHeight`
+  (height-for-width, so a wrapped `FlowRow` line counts; the scroll area uses it too).
+  `_correctControlsDockHeight` then re-measures and adds the deficit: Qt takes the
+  tabified docks' tab bar (~25 px) out of the `resizeDocks` height, which used to clip
+  the bottom row. The settings-save resume and the `'startup layout finalised'` mark
+  live there now. Tests: `tests/test_startup_controls_dock_height.py`.
 - **UI toolkit — `ui/layout/` (the MDA and Controls docks are built on it).** Rules:
   **never set a font, margin, padding or colour on an individual widget** — spacing
   comes from `current_theme()` when a layout is built, and looks come from the one
@@ -847,6 +867,11 @@ acquisition, just materialised.
   `runNapariPycroManager`, and by `GladosWidget.__init__` on the plugin path), styled
   per widget by a `gladosRole` property set with `set_role()` (`section`, `primary`
   for Acquire, `readonly`, `warning`/`normal`). The pieces:
+  - **The docks are dense:** `build_stylesheet` derives padding/margin as
+    `compact_padding`/`compact_margin` (half the stored `widget_padding_px`/`widget_margin_px`;
+    buttons a little taller), line edits get 1 px borders, and section-internal spacing is
+    `compact_spacing`. Derived, not stored, because `glados_state.json` keeps the old
+    Theme defaults verbatim -- changing a default would not reach existing installs.
   - `theme.Theme` — every size/colour; defaults reproduce the old inline
     `ScaledStylesheet` (14 px font and Windows metrics x0.75). Persisted as the
     all-hidden `LayoutConfig` (`config.layout_config`, same field names, fed through
@@ -859,8 +884,13 @@ acquisition, just materialised.
     zeroes group-box padding, so `Section` reserves room for its title itself.
   - `FormGrid` (label | field | trailing, field stretches; a lone field spans the
     trailing column), `FlowRow` (wraps when narrow), `ListEditor` (table + top-aligned
-    button column; `configure_table_header` sizes columns from header text and sets a
-    `table_min_rows` minimum height — never a fixed height/width).
+    button block, `button_columns` wide (default 2), filled row by row;
+    `configure_table_header` sizes columns from header text and widest cell and sets a
+    `table_min_rows` minimum height, overridable per editor with `min_rows` — never a
+    fixed height/width). The MDA lists use `MDA_LIST_MIN_ROWS` (3), so that tab fits
+    the startup dock height. The table's minimum width is recomputed when rows change.
+    It counts the row header via `isHidden()`, not `isVisible()`: the table is unshown
+    at construction, and leaving the row header out clipped "Channel Setting".
   - `ResponsiveGrid` — `register(key, widget)` once, `set_placements({bucket:
     [Placement(...)]}, column_stretch={bucket: {key: n}})`, then `apply(bucket)` only
     **moves** widgets (no-op when unchanged). Buckets come from `classify_shape(w, h)`,
@@ -876,8 +906,22 @@ acquisition, just materialised.
     `GUI_grid_width` now holds the bucket (a legacy int column count still maps).
   - To add a section: build a `Section`, `register` it, add a `Placement` per bucket.
   - Offscreen screenshots need `QT_QPA_FONTDIR=C:/Windows/Fonts`, or Qt renders no text.
+    Import `PyQt5.QtWebEngineWidgets` before creating the `QApplication` when the script
+    imports `GUI.utils`; `show()` on a `QMessageBox` under `offscreen` segfaults (grab
+    without showing). A test-made `QApplication` must stay referenced, or it is collected
+    and `QApplication.instance()` is `None` again.
+  - Stages section (`MMConfigUI.stagesLayout`): two independent blocks, each hidden when
+    its stage is missing. XY is `ui/widgets/stage_dial.StageDial` (3 rings x 4 directions,
+    inner = smallest step; emits `stepRequested(dx, dy, size)`, `_onXYDialStep` moves by
+    `XYMoveEditField[X_/Y_<size>]`; it doubles as `XYStageInfoWidget`, a `setText`
+    readout) over a step table whose FOV buttons sit under the column they fill. Z is
+    dropdown / rail / step fields; step columns are sized by `_stepColumnWidth`. The dial colours blend the palette's Window/WindowText only --
+    under napari's dark QSS, Button/Base keep Qt's light defaults. Advanced settings
+    support `input_type="checkbox"` (stores a real bool; `utils.settingIsTrue` reads either
+    form) -- used by `VisualisationConfig.show_scripts_section` (Scripts box, default off).
+    `LayoutConfig` must stay all-hidden (`test_ui_theme` pins it).
   Tests: `tests/test_ui_theme.py`, `tests/test_ui_responsive_grid.py`,
-  `tests/test_ui_list_editor.py`, `tests/test_mda_gui_rebuild.py`,
+  `tests/test_ui_list_editor.py`, `tests/test_mda_gui_rebuild.py`, `tests/test_stage_dial.py`,
   `tests/test_controls_panel_layout.py`. Widget-identity tests compare
   `sip.unwrapinstance()` addresses, never `id()` of a PyQt wrapper (not stable).
 - `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `Showcase_Basic1.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
@@ -950,6 +994,37 @@ removes or renames a group they name a different group or none — which left
 warning; >1 preset → `set_config` + `wait_for_system` (MIL has no `wait_for_config`),
 1 preset → write its single property via the MIL `get_config_*` helpers (the old
 Java-only `.get(0)`/`get_setting(0)` calls broke other backends).
+
+**The Controls dock's RT-analysis section is `GUI/rt_analysis_panel.py`'s
+`RTAnalysisPanel`** (built by `MMConfigUI.realTimeAnalysisLayout`). Full-width
+method dropdown; parameters from `utils.layout_init(..., showVariableOptions=False)`
+(no Value/Variable/Advanced switch, so every kwarg resolves as a Value) in a
+`_ParamsScrollArea` whose size hint is capped at `RT_PARAMS_VISIBLE_ROWS`. That hint
+depends on two *other* widgets (the content, the dropdown's row height), so the
+area event-filters both and calls `updateGeometry()` -- without it the layout's
+cached hint went stale on a method switch or when the dock stylesheet landed. One
+toggle button (Activate / highlighted `ROLE_ACTIVE` Deactivate, polled every
+`RT_ACTIVE_POLL_MS` because closing the node's layer ends it elsewhere), Reset
+(deactivate, then re-activate on a 0 ms timer) and Restore defaults. **Each method runs independently**:
+`_runs` maps `Module.Function` to its thread and its *own copy* of the settings,
+and the buttons act on the method selected in the dropdown. Never hand the panel's
+`currentData` itself to a thread: the node re-reads its class from
+`__selectedDropdownEntryRTAnalysis__` every frame (`_rtAnalysisClassName`), so a
+second activation would retarget the first. Edits reach a running method by
+updating existing keys of its copy (`_onParamEdited`). Running methods are marked in
+the dropdown list via item Background/Foreground/Font roles (the combo gets a plain
+`QStyledItemDelegate`: the default menu-style popup delegate ignores them), and the
+closed combo gets `ROLE_ACTIVE` (green border) while the selected one runs; item
+*text* stays the bare display name since methods are looked up by it. Activate with
+no live/MDA running also feeds the shown napari image once (selected image layer,
+else topmost; never a layer an RT node owns; sliced at the viewer's position).
+Non-default values get `ROLE_MODIFIED` and persist in `glados_state.json`'s
+`RTAnalysis` section via `appdata.save_state_section` (only differences, so a
+changed code default still reaches users) -- only when `autoSaveLoad`, so the Nodz
+dialogs' instances never write. `NapariLayerGroup.remove_all` only removes a layer
+while the viewer's layer of that name is still the group's own object: the
+layer-removed callback defers its sibling sweep, and after a Reset the new node
+holds the same names. Tests: `tests/test_rt_analysis_panel.py`.
 
 **Measurement/custom-function dispatch scopes must bind `nodeDict` and `nodzInfo`
 by name.** `utils.getFunctionEvalTextFromCurrentData` emits Variable-mode kwargs as
@@ -1308,7 +1383,7 @@ RT-analysis nodes that opt into subprocess isolation (`"__runInSubprocess__": Tr
 **Subprocess-isolated RT-analysis startup speedups** (fixes a ~20s per-start cost reported for e.g. FFT): a cold `spawn` pays for re-importing the whole `Real_Time_Analysis` package tree plus whatever heavy library the node needs (diplib, tensorflow/stardist, …), and — separately — `AnalysisProcess_customFunction.__init__` used to synchronously build a visualisation "shadow" object on the *GUI thread* via `utils.realTimeAnalysis_init(...)`, freezing the UI for however long that model/weight load took. Two mechanisms now cut this down:
 
 - `GUI/subprocess_pool.py`'s `WarmSubprocessPool` pre-spawns one blank child once startup is ready (`shared_data._rt_subprocess_pool.start()`, in `GUI_napari.main()`'s `_on_startup_ready`; skipped under `--startup-exit`. It used to start right after `Shared_data()`, where the child's imports competed with the GUI build: L2.2 took ready 16.7 → 10.9 s, `tests/test_startup_deferred_pool.py`) that pre-imports the package tree and (best-effort, since it's the only node opted in today) `diplib`, then idles waiting to be handed a real node's `analysisInfo` — shortcutting the first-ever subprocess-node start in a session. **The pool, not the claiming caller, creates the worker's channels** (frame in/out queues, stop event, control pair): a `multiprocessing` Queue/Event can only cross a process boundary by *inheritance*, so they are built in `start()` and passed as `Process` args, and `try_claim()` returns them as a `channels` dict for `AnalysisProcess_customFunction.__init__` to adopt. Sending them through `assign_queue` instead raises `RuntimeError: Queue objects should only be shared between processes through inheritance` on the parent's queue-feeder *thread* — the parent continues unaware while the child blocks forever on `assign_queue.get()`, so the node silently never processes a frame (that was the shipped bug; the cold-spawn path was unaffected, which is why only pool-claimed starts broke). `assign_queue` now carries only `(analysisInfo, log_level)`. Tests: `tests/test_subprocess_pool.py`. Extend its pre-imported-library list (or generalize via an optional `"__prewarm_imports__"` metadata key) if more nodes opt into `__runInSubprocess__`.
-- `shared_data._rt_subprocess_cache` (a dict keyed by `AnalysisClass._rt_config_key(analysisInfo)`, a stable hash of the node's config) lets `stop()`/`destroy()` park a still-alive, already-warmed-up worker instead of killing it — `_park_subprocess_worker` handles the cap/idle-timeout eviction opportunistically on each park, no dedicated QTimer needed. A later `__init__` with the identical config reclaims it directly (`_worker_warmed_up = True` immediately, skipping spawn + package-tree import), **but the node itself is still properly closed and reopened, at the times a user would expect** — this is a *process*-level cache, not a node-instance cache: `stop()` sends `{'__close__': True}` on `control_in_queue` immediately when parking (the worker calls `end_fn` right away, so anything it finalises — e.g. flushing/closing a dataset — happens at stop time, never deferred to some future reopen that may not happen), and the *later* reclaiming `__init__` sends `{'__reinit__': True, 'analysisInfo': ...}` to run `init_fn` again (never `end_fn` a second time — that already ran at close). Both are acked on `control_out_queue` (`{'__close_done__': True}` / `{'__reinit_done__': True}`) since there's no ordering guarantee between a control message and a frame put on `in_queue` right after it — see `tests/test_analysis_process.py`'s `test_worker_close_then_reinit_matches_stop_then_reclaim`. **Nothing in the parent reads those acks**, and `control_out_queue` holds 2, so the child sends them with `_ack_nonblocking` (dropped when full): a blocking `put` wedged the worker on the third unread ack, after which a re-activated node never processed a frame ("worker did not respond within 5s"). The reclaim also drains stale acks and stale results (`_drain_queue`), `stop()` drains `in_queue` before parking, and `stop()` is idempotent — `MMcontrols.deactivateRealTimeAnalysisFromDockWidget` removes the node's layers, which already tears the node down via `layer_removed_event_callback`, so it now skips its own teardown when the entry is gone (it used to run `end()` a second time). `stop_profiling` skips acks when waiting for its report. Test: `test_worker_survives_repeated_close_reinit_with_unread_acks`. The main-process visualisation shadow is rebuilt fresh on reclaim too, rather than reusing the parked one. So a close→reopen always starts from fresh node state — only the process/imports are reused, meaning a heavy one-time init cost (e.g. model weights) is paid again on every reopen. `AnalysisClass.terminate_all_rt_subprocesses()` is wired into `GUI_napari.py`'s `aboutToQuit` (before the forced `os._exit(0)`) so parked/warm processes don't get orphaned.
+- `shared_data._rt_subprocess_cache` (a dict keyed by `AnalysisClass._rt_config_key(analysisInfo)`, a stable hash of the node's config) lets `stop()`/`destroy()` park a still-alive, already-warmed-up worker instead of killing it — `_park_subprocess_worker` handles the cap/idle-timeout eviction opportunistically on each park, no dedicated QTimer needed. A later `__init__` with the identical config reclaims it directly (`_worker_warmed_up = True` immediately, skipping spawn + package-tree import), **but the node itself is still properly closed and reopened, at the times a user would expect** — this is a *process*-level cache, not a node-instance cache: `stop()` sends `{'__close__': True}` on `control_in_queue` immediately when parking (the worker calls `end_fn` right away, so anything it finalises — e.g. flushing/closing a dataset — happens at stop time, never deferred to some future reopen that may not happen), and the *later* reclaiming `__init__` sends `{'__reinit__': True, 'analysisInfo': ...}` to run `init_fn` again (never `end_fn` a second time — that already ran at close). Both are acked on `control_out_queue` (`{'__close_done__': True}` / `{'__reinit_done__': True}`) since there's no ordering guarantee between a control message and a frame put on `in_queue` right after it — see `tests/test_analysis_process.py`'s `test_worker_close_then_reinit_matches_stop_then_reclaim`. **Nothing in the parent reads those acks**, and `control_out_queue` holds 2, so the child sends them with `_ack_nonblocking` (dropped when full): a blocking `put` wedged the worker on the third unread ack, after which a re-activated node never processed a frame ("worker did not respond within 5s"). The reclaim also drains stale acks and stale results (`_drain_queue`), `stop()` drains `in_queue` before parking, and `stop()` is idempotent — `RTAnalysisPanel.deactivate` removes the node's layers, which already tears the node down via `layer_removed_event_callback`, so it now skips its own teardown when the entry is gone (it used to run `end()` a second time). `stop_profiling` skips acks when waiting for its report. Test: `test_worker_survives_repeated_close_reinit_with_unread_acks`. The main-process visualisation shadow is rebuilt fresh on reclaim too, rather than reusing the parked one. So a close→reopen always starts from fresh node state — only the process/imports are reused, meaning a heavy one-time init cost (e.g. model weights) is paid again on every reopen. `AnalysisClass.terminate_all_rt_subprocesses()` is wired into `GUI_napari.py`'s `aboutToQuit` (before the forced `os._exit(0)`) so parked/warm processes don't get orphaned.
 
 **Stopping an RT-analysis node stops its threads (T-G9).** Every RT loop waits
 on a `threading.Event` with `RT_THREAD_WAIT_TIMEOUT_S` (1 s) rather than
@@ -1405,7 +1480,7 @@ forwards attribute access to its first layer as belt-and-braces, and
   array is ambiguous".
 - **Teardown is group-aware**: closing *any* one of a node's layers tears the node
   down and removes its siblings. `layer_removed_event_callback` and
-  `MMcontrols.deactivateRealTimeAnalysisFromDockWidget` go through `overlay.group`,
+  `RTAnalysisPanel.deactivate` go through `overlay.group`,
   which also fixes a latent crash - both derefed `napariOverlay.layer.name`
   unguarded, while `napariOverlay` legitimately leaves `.layer` unset when
   constructed with `layer_name=None`. The sibling removal is **deferred**
@@ -1646,9 +1721,19 @@ Three companion files live alongside it:
     The second launch calls `AllowSetForegroundWindow(<first pid>)` because only it owns
     the foreground. `--allow-second-instance` bypasses the check.
 
+  A fatal startup error on a console-less launch shows "Glados could not start"
+  (`_show_fatal_startup_error`): "Show Details..." holds the console log's last
+  `LOG_TAIL_LINES` lines, "Open log file" opens it, and the box re-`exec_`s until OK.
+  Micro-Manager's own start error is what it should show: the start-dialog path used to
+  swallow `start_headless()`'s exception, so `Core()` failed next with pycromanager's
+  generic "Is the ZMQ server on 4827 enabled?". `connect_headless_core(Core, start_error)`
+  now raises `MicroManagerStartError` carrying the real cause (connection error chained).
+
   Related pieces:
   - Shortcuts: `make shortcuts` (`glados_pycromanager/shortcuts.py`). Windows 11 can't pin
-    from code; the user pins the Start Menu entry.
+    from code; the user pins the Start Menu entry. "Glados (debug console)" targets
+    `cmd.exe /k "<glados.exe>"` (not `glados.exe` itself) so the console outlives a crash or
+    `os._exit`; `ShortcutSpec.launcher` is the venv script `install` checks for.
   - `--last` (`GUI_napari.resolve_last_setup`) skips the dialog using the saved backend and
     config, or falls back to the dialog.
   - `make dev` stamps a pyproject fingerprint into the venv (`install_check.py`); a mismatch

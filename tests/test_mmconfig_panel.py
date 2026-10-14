@@ -192,6 +192,7 @@ class TestRebuildConfigLayout:
         panel.configLayout.count.return_value = 0
         panel._clearConfigLayout = MagicMock()
         panel.addRow = MagicMock(side_effect=lambda config_id: MagicMock())
+        panel._capConfigWidth = MagicMock()
 
         panel.rebuildConfigLayout()
 
@@ -229,3 +230,44 @@ def test_auto_refresh_tick_stops_itself_when_the_panel_was_destroyed():
     MMConfigUI._autoRefreshConfigLayout(fake)
 
     fake._configAutoRefreshTimer.stop.assert_called_once()
+
+
+class TestDropDownShowsActivePreset:
+    """A preset dropdown used to sit on the blank entry even while one of its
+    presets was active: addDropDown() never selected anything, and
+    rebuildConfigLayout() (also the periodic auto-refresh) recreates every
+    dropdown, so it was blank after every rebuild."""
+
+    def _panel_with_dropdown(self, qapp, monkeypatch, current):
+        from PyQt5.QtWidgets import QHBoxLayout
+
+        panel = MMcontrols.MMConfigUI.__new__(MMcontrols.MMConfigUI)
+        panel.dropDownBoxes = {}
+        panel.showCheckboxes = False
+        panel.changes_update_MM = True
+        panel.shared_data = MagicMock()
+        group = MagicMock()
+        group.nrConfigs.return_value = 3
+        group.configName.side_effect = lambda i: f"Preset{i}"
+        group.getCurrentMMValue.return_value = current
+        panel.config_groups = {0: group}
+        submitted = MagicMock()
+        monkeypatch.setattr(MMcontrols, "submitHardware", submitted)
+        panel.addDropDown(QHBoxLayout(), 0)
+        return panel, submitted
+
+    def test_active_preset_is_selected_without_writing_it_back(self, qapp, monkeypatch):
+        panel, submitted = self._panel_with_dropdown(qapp, monkeypatch, "Preset1")
+        assert panel.dropDownBoxes[0].currentText() == "Preset1"
+        submitted.assert_not_called()  # mirroring MM must not call set_config
+
+    def test_blank_only_when_no_preset_matches(self, qapp, monkeypatch):
+        for current in ("", "NotAPreset"):
+            panel, _ = self._panel_with_dropdown(qapp, monkeypatch, current)
+            assert panel.dropDownBoxes[0].currentIndex() == 0
+            assert panel.dropDownBoxes[0].currentText() == ""
+
+    def test_user_selection_still_sets_the_config(self, qapp, monkeypatch):
+        panel, submitted = self._panel_with_dropdown(qapp, monkeypatch, "Preset1")
+        panel.dropDownBoxes[0].setCurrentText("Preset2")
+        assert submitted.call_args.args[2:] == (panel.config_groups[0].configGroupName(), "Preset2")

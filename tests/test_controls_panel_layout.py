@@ -55,7 +55,7 @@ def panel(qapp, tmp_path_factory):
     """Built once, without the RT-analysis section: that one imports every RT
     node module (TensorFlow among them) and adds ~2 min to construction."""
     import glados_pycromanager.GUI.MMcontrols as MMc
-    from glados_pycromanager.GUI.sharedFunctions import LayoutConfig
+    from glados_pycromanager.GUI.sharedFunctions import LayoutConfig, VisualisationConfig
 
     appdata = tmp_path_factory.mktemp("appdata")
     (appdata / "Glados-PycroManager" / "AutonomousMicroscopy" / "Real_Time_Analysis").mkdir(parents=True)
@@ -72,6 +72,7 @@ def panel(qapp, tmp_path_factory):
     shared = MagicMock()
     shared.MILcore = shared.core = mil
     shared.config.layout_config = LayoutConfig()
+    shared.config.visualisation_config = VisualisationConfig()
     groups = {i: _Group(i, name, kind) for i, (name, kind) in enumerate(GROUPS)}
     for group in groups.values():
         group.core, group.shared_data = mil, shared
@@ -133,3 +134,92 @@ def test_hidden_sections_setting_is_applied(panel):
     finally:
         layout_config.hidden_sections = ""
         panel.sectionGrid.set_hidden(())
+
+
+def test_stages_section_is_compact(panel):
+    """XY is a dial with the step table below it, Z a separate block; step
+    fields are capped, so the Stages box no longer stretches over the dock."""
+    from PyQt5.QtWidgets import QWIDGETSIZE_MAX
+
+    from glados_pycromanager.ui.widgets.stage_dial import StageDial
+
+    from glados_pycromanager.ui.layout import build_stylesheet
+
+    box = panel.stagesGroupBox
+    box.setStyleSheet(build_stylesheet())  # as the dock applies it
+    box.adjustSize()
+    assert isinstance(panel.XYStageInfoWidget, StageDial)
+    fields = [f for k, f in panel.XYMoveEditField.items() if not k.startswith("Button")]
+    fields += [f for stage in panel.oneDMoveEditField.values() for f in stage.values()]
+    assert fields and all(f.maximumWidth() < QWIDGETSIZE_MAX for f in fields)
+    # Structure, not pixels: offscreen font fallback makes absolute sizes meaningless.
+    box.resize(box.sizeHint())
+    box.layout().activate()
+    dial, first_field = panel.XYStageInfoWidget, panel.XYMoveEditField["X_1"]
+    assert first_field.mapTo(box, first_field.rect().topLeft()).y() >= dial.mapTo(box, dial.rect().bottomLeft()).y()
+    assert panel.zStageBlock.mapTo(box, panel.zStageBlock.rect().topLeft()).x() >=         panel.xyStageBlock.mapTo(box, panel.xyStageBlock.rect().topRight()).x()
+
+
+def test_dial_ring_moves_by_that_rings_step(panel, monkeypatch):
+    moves = []
+    monkeypatch.setattr(panel, "moveXYStage", lambda dx, dy: moves.append((dx, dy)))
+    for m, (x, y) in enumerate([("1", "2"), ("10", "20"), ("100", "200")], start=1):
+        panel.XYMoveEditField[f"X_{m}"].setText(x)
+        panel.XYMoveEditField[f"Y_{m}"].setText(y)
+    dial = panel.XYStageInfoWidget
+    dial.stepRequested.emit(0, 1, 1)    # up, inner ring
+    dial.stepRequested.emit(-1, 0, 3)   # left, outer ring
+    dial.stepRequested.emit(0, -1, 2)   # down, middle ring
+    assert moves == [(0.0, 2.0), (-100.0, 0.0), (0.0, -20.0)]
+
+
+def test_scripts_section_hidden_unless_enabled(panel):
+    layout_config = panel.shared_data.config.visualisation_config
+    assert layout_config.show_scripts_section is False
+    assert panel.scriptsGroupBox.isHidden()
+    assert hasattr(panel, "scriptPathLineEdit")  # still built: the saved path round-trips
+    for stored in (True, "True"):
+        layout_config.show_scripts_section = stored
+        try:
+            assert panel._showScriptsSection()
+        finally:
+            layout_config.show_scripts_section = False
+
+
+def test_setting_is_true_parses_stored_forms():
+    from glados_pycromanager.GUI.utils import settingIsTrue
+
+    assert settingIsTrue(True) and settingIsTrue("True") and settingIsTrue("true")
+    assert not settingIsTrue(False) and not settingIsTrue("False") and not settingIsTrue("")
+
+
+def test_field_step_buttons_fill_one_decimal(panel):
+    """0.1 field of a 512 px ROI at 0.1 um/px is 5.12 um -- shown as 5.1, not the
+    full float (which could print 20 digits)."""
+    mil = panel.shared_data.MILcore
+    mil.get_pixel_size_um.return_value = 0.1
+    mil.get_roi.return_value = (0, 0, 512, 333)
+    panel.XYMoveEditField["Button_1"].click()
+    assert panel.XYMoveEditField["X_1"].text() == "5.1"
+    assert panel.XYMoveEditField["Y_1"].text() == "3.3"
+
+
+def test_configurations_section_width_is_capped(panel):
+    from glados_pycromanager.GUI import MMcontrols
+    from glados_pycromanager.ui.layout import current_theme
+
+    blocks = max(1, -(-len(panel.config_groups) // panel.number_columns))
+    cap = blocks * MMcontrols.CONFIG_BLOCK_MAX_WIDTH_EM * current_theme().font_px
+    assert panel.configGroupBox.maximumWidth() == cap
+    panel.rebuildConfigLayout()
+    assert panel.configGroupBox.maximumWidth() == cap
+
+
+def test_slider_row_gives_the_width_to_the_slider(panel):
+    from PyQt5.QtWidgets import QWIDGETSIZE_MAX
+
+    config_id = next(iter(panel.sliders))
+    field, slider = panel.editFields[config_id], panel.sliders[config_id]
+    assert field.maximumWidth() < QWIDGETSIZE_MAX
+    row = panel.configEntries[config_id]
+    assert row.stretch(row.indexOf(slider)) == 1

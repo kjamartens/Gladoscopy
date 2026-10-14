@@ -29,7 +29,6 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
-    QSpacerItem,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -50,6 +49,7 @@ from glados_pycromanager.GUI.napariHelperFunctions import (
     moveLayerToTop,
 )
 from glados_pycromanager.GUI.utils import CustomMainWindow
+from glados_pycromanager.ui.widgets.stage_dial import RING_NAMES, StageDial
 from glados_pycromanager.ui.layout import (
     LANDSCAPE,
     PORTRAIT,
@@ -61,6 +61,10 @@ from glados_pycromanager.ui.layout import (
     ResponsiveGrid,
     Section,
     classify_shape,
+    compact_margin,
+    compact_padding,
+    compact_spacing,
+    current_theme,
     set_role,
 )
 
@@ -165,6 +169,29 @@ CONTROLS_COLUMN_STRETCH = {
     PORTRAIT: {"controls.general": 1, "controls.configs": 1},
     TALL: {"controls.general": 1},
 }
+
+
+#: Widest a block of config rows (label + control) may grow, in units of the
+#: theme's font size; the Configurations section is capped at one of these
+#: per block (`number_config_columns` rows each).
+CONFIG_BLOCK_MAX_WIDTH_EM = 32
+
+
+#: Sample text a stage step-size field is sized to fit.
+STEP_FIELD_SAMPLE_TEXT = "0000.0"
+
+
+def _stepColumnWidth(widget, sample=STEP_FIELD_SAMPLE_TEXT):
+    """Width of a stage step-size column: what `sample` needs in `widget`'s font."""
+    #Horizontal padding, 1px borders and margins of a dock control, plus slack
+    padding = 2 * (2 * compact_padding() + 1 + compact_margin()) + 4
+    return widget.fontMetrics().horizontalAdvance(sample) + padding
+
+
+def _limitFieldWidth(lineEdit, sample=STEP_FIELD_SAMPLE_TEXT):
+    """Cap a numeric QLineEdit at the width its values need. Unbounded, the
+    stage step fields stretched to fill their section."""
+    lineEdit.setMaximumWidth(_stepColumnWidth(lineEdit, sample))
 
 
 def waitForLiveModeWorkerStopped(shared_data, label):
@@ -508,6 +535,7 @@ class MMConfigUI(CustomMainWindow):
             for config_id in range(len(config_groups)):
                 self.configEntries[config_id] = self.addRow(config_id)
             self.configOuterLayout.addStretch(1)
+            self._capConfigWidth()
 
             #Add the config-panel button row: refresh, device property
             #browser, config group editor. Wraps when the section is narrow.
@@ -540,14 +568,8 @@ class MMConfigUI(CustomMainWindow):
 
         #Add the real-time analysis
         if showRealTimeAnalysis:
-            self.rtAnalysisLayout = QGridLayout()
-            self.realTimeAnalysisGroupBox = Section("Real-time analysis", "controls.rt", layout=self.rtAnalysisLayout)
+            self.realTimeAnalysisGroupBox = Section("Real-time analysis", "controls.rt", layout=self.realTimeAnalysisLayout())
             self.realTimeAnalysisGroupBox.setObjectName('realTimeAnalysisGroupBox')
-            self.rtAnalysisSubGroupBoxLayout = QGridLayout()
-            self.rtAnalysisLayout.addLayout(self.rtAnalysisSubGroupBoxLayout,0,0,1,2)
-
-            #Initialise the rt analysis layout:
-            self.realTimeAnalysisLayout()
             self.sectionGrid.register(self.realTimeAnalysisGroupBox.key, self.realTimeAnalysisGroupBox)
 
         self.sectionGrid.set_placements(CONTROLS_SECTION_PLACEMENTS, CONTROLS_COLUMN_STRETCH)
@@ -801,9 +823,12 @@ class MMConfigUI(CustomMainWindow):
             self.roiOptionsGroupBox = Section("ROI Options", "controls.roi", layout=self.ROIoptionsLayout(orientation='horizontal'))
             liveModeLayout.addWidget(self.roiOptionsGroupBox, 5,0,1,2)
 
-        #Now add the Scripts widget
+        #Now add the Scripts widget -- hidden unless enabled in Advanced settings
+        #(VisualisationConfig.show_scripts_section). Built either way, so the saved
+        #script path round-trips.
         self.scriptsGroupBox = Section("Scripts", "controls.scripts", layout=self.scriptsOptionsLayout())
         liveModeLayout.addWidget(self.scriptsGroupBox, 6,0,1,2)
+        self.scriptsGroupBox.setVisible(self._showScriptsSection())
 
         #Spare height goes below the sub-sections, above the button row:
         liveModeLayout.setRowStretch(7, 1)
@@ -1552,6 +1577,11 @@ class MMConfigUI(CustomMainWindow):
     #endregion
 
     #region Scripts
+    def _showScriptsSection(self):
+        """Whether Advanced settings enable the Scripts box (default: no)."""
+        visualisation_config = getattr(getattr(self.shared_data, 'config', None), 'visualisation_config', None)
+        return utils.settingIsTrue(getattr(visualisation_config, 'show_scripts_section', False))
+
     def scriptsOptionsLayout(self):
         """
         Create a layout with a path field and Browse/Run buttons for
@@ -1613,12 +1643,17 @@ class MMConfigUI(CustomMainWindow):
         Returns the layout with the XY and 1D stage widgets.
         """
         stageLayout = QHBoxLayout()
-        # self.XYstageLayout()
-        xyStageLayout = self.XYstageLayout()
-        oneDstageWidget = self.oneDstageLayout()
-        stageLayout.addLayout(xyStageLayout)
-        stageLayout.addWidget(oneDstageWidget)
-        #Add a horizontal spacer:
+        #Two independent blocks, so either stands on its own when the other
+        #stage is missing.
+        self.xyStageBlock = QWidget()
+        self.xyStageBlock.setLayout(self.XYstageLayout())
+        self.xyStageBlock.setVisible(bool(self.shared_data.MILcore.get_xy_stage_device()))
+        stageLayout.addWidget(self.xyStageBlock, alignment=Qt.AlignmentFlag.AlignTop)
+        self.zStageBlock = self.oneDstageLayout()
+        self.zStageBlock.setVisible(self.oneDstageDropdown.count() > 0)
+        stageLayout.addWidget(self.zStageBlock, alignment=Qt.AlignmentFlag.AlignTop)
+        #Pack to the left: the section should be as wide as its content, not
+        #spread its controls over whatever width the grid gives it.
         stageLayout.addStretch(1)
         return stageLayout
     
@@ -1635,327 +1670,69 @@ class MMConfigUI(CustomMainWindow):
     
     def realTimeAnalysisLayout(self):
         """
-        Creates and returns a layout for real-time analysis of e.g. live/snap images that are created.
-        
+        Returns the layout of the real-time analysis section: an `RTAnalysisPanel`
+        (method, parameters, activate/reset/defaults). Its settings persist only
+        for the Controls dock itself (`autoSaveLoad`), not the Nodz dialogs.
         """
-        
-        
-        
-        #Let's try to get all possible RT analysis options
-        realTimeAnalysisFunctions = utils.functionNamesFromDir('AutonomousMicroscopy\\Real_Time_Analysis')
-        realTimeAnalysisFunctionsAppData = utils.functionNamesFromDir(appdirs.user_data_dir()+os.sep+'Glados-PycroManager'+os.sep+'AutonomousMicroscopy\\Real_Time_Analysis')
-        #Remove duplicates - not sure why they're here:
-        realTimeAnalysisFunctionsAppData = list(set(realTimeAnalysisFunctionsAppData))
-        
-        realTimeAnalysisFunctionsAll = realTimeAnalysisFunctions + realTimeAnalysisFunctionsAppData
-        
-        
-        allDisplayNames,displaynameMapping = utils.displayNamesFromFunctionNames(realTimeAnalysisFunctionsAll,'')
-        #Store this mapping also in the node
-        self.real_time_analysis_currentData = {}
-        self.real_time_analysis_currentData['__displayNameFunctionNameMap__'] = displaynameMapping
-        
-        #Add a dropbox with all the options
-        self.comboBox_RTanalysisFunctions = QComboBox(self)
-        if len(realTimeAnalysisFunctions) > 0:
-            for item in realTimeAnalysisFunctions:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
-        if len(realTimeAnalysisFunctionsAppData) > 0:
-            for item in realTimeAnalysisFunctionsAppData:
-                displayNameI, displaynameMappingI = utils.displayNamesFromFunctionNames([item],'')
-                self.comboBox_RTanalysisFunctions.addItem(displayNameI[0]) 
-        
-        self.rtAnalysisSubGroupBoxLayout.addWidget(self.comboBox_RTanalysisFunctions, 0, 1)
-        #give it an objectName:
-        self.comboBox_RTanalysisFunctions.setObjectName('comboBox_RTanalysisFunctions_KEEP')
-        
-        #Give it a connect-callback if it's changed (then the layout should be changed)
-        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, layout=self.rtAnalysisSubGroupBoxLayout, dropdown=self.comboBox_RTanalysisFunctions,displaynameMapping=displaynameMapping: utils.layout_changedDropdown(layout,dropdown,displaynameMapping))
-        #Also give it a connect-callback to store the currentinfo:
-        self.comboBox_RTanalysisFunctions.currentIndexChanged.connect(lambda index, parentdata=self: utils.updateCurrentDataUponDropdownChange(parentdata))
-
-        self.realTimeAnalysisGroupBox.currentData = {}
-        self.realTimeAnalysisGroupBox.currentData['__displayNameFunctionNameMap__'] = displaynameMapping
-        # pre-load all args/kwargs and their edit values - then hide all of them
-        utils.layout_init(self.rtAnalysisSubGroupBoxLayout,'',displaynameMapping,current_dropdown = self.comboBox_RTanalysisFunctions,nodzInfo=self,skipInput=True)
-        
-        #Pre-load the options if they're in the current node info
-        # if 'real_time_analysis_currentData' in vars(self):
-            
-        #     utils.preLoadOptions_realtime(self.rtAnalysisSubGroupBoxLayout,self.real_time_analysis_currentData) #type:ignore
-        
-        def activateRealTimeAnalysisFromDockWidget(self):
-            #TODO: remove existing analysis if present
-            self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryRTAnalysis__'] = self.realTimeAnalysisGroupBox.currentData['__selectedDropdownEntryAnalysis__']
-            self.realTimeAnalysisGroupBox.currentData['__realTimeVisualisation__'] = True#dialog.visualisationBox.isChecked() #type:ignore 
-            self.current_analysis_thread = create_real_time_analysis_thread(shared_data,analysisInfo = self.realTimeAnalysisGroupBox.currentData,delay=None,nodzInfo=None)
-            
-        def deactivateRealTimeAnalysisFromDockWidget(self):
-            #remove the current_analysis_thread from shared_data.analysisThreads:
-            #Find the thread/queue:
-            for item in shared_data.RTAnalysisQueuesThreads:
-                if item['Thread'] == self.current_analysis_thread:
-                    
-                    #Attempt to remove the napari layer(s) corresponding to it. A
-                    #node may own several, so go through the group rather than its
-                    #primary layer alone; remove_all tolerates layers the user has
-                    #already closed.
-                    if item['Thread'].visualisationObject is not None:
-                        overlay = getattr(item['Thread'].visualisationObject, 'napariOverlay', None)
-                        group = getattr(overlay, 'group', None)
-                        if group is not None:
-                            group.remove_all(shared_data.napariViewer)
-                    #Removing a layer fires layer_removed_event_callback, which already
-                    #destroys the thread, clears the queue, drops this entry and releases
-                    #the replay history. Doing it all again here destroyed the node twice
-                    #(end() ran twice) and logged 'already deleted'.
-                    if item not in shared_data.RTAnalysisQueuesThreads:
-                        logging.debug('RT analysis already torn down by its layer removal')
-                        break
-
-                    #Remove the thread
-                    if item['Thread']:
-                        # Signal the thread to stop
-                        
-                        item['Thread'].destroy()
-                    #Remove the queue
-                    if item['Queue']:
-                        # Clear the queue
-                        while item['Queue']:
-                            try:
-                                item['Queue'].popleft()
-                            except IndexError: # For deque
-                                break
-                            
-                    #remove from shared_data entry
-                    try:
-                        shared_data.RTAnalysisQueuesThreads.remove(item)
-                    except ValueError as e:
-                        logging.error(f'RT analysis thread-queue is already deleted {e}')
-                        
-                    logging.debug('Removed analysis thread')   
-                    break
-        
-        
-        def testRealTimeAnalysisFromDockWidget(self):
-            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
-            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
-            current_config['__realTimeVisualisation__'] = False
-
-            viewer = self.shared_data.napariViewer
-            if viewer is None or len(viewer.layers) == 0:
-                QMessageBox.warning(self, "No image", "No napari layers are open.")
-                return
-
-            active_layer = viewer.layers.selection.active or viewer.layers[-1]
-            image = np.asarray(active_layer.data)
-            logging.info("RT test: layer '%s', full data shape=%s, viewer.dims.current_step=%s",
-                         active_layer.name, image.shape, viewer.dims.current_step)
-            if image.ndim > 2:
-                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
-                image = image[step]
-                logging.info("RT test: sliced at step=%s, resulting image shape=%s", step, image.shape)
-
-            metadata = {'ImageNumber': 0}
-            try:
-                rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
-                result = utils.realTimeAnalysis_run(rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
-                overlay = napariOverlay(viewer, RT_analysisObject=rt_object, layer_name='RTtest_VIS')
-                utils.realTimeAnalysis_visualisation(rt_object, current_config, image, metadata, None, overlay.layer)
-                QMessageBox.information(self, "Result", f"Analysis complete.\nResult: {result}")
-            except Exception as exc:
-                logging.exception("Test on current image failed")
-                QMessageBox.critical(self, "Error", f"Analysis failed:\n{exc}")
-
-        def _auto_slice_callback(self, event=None):
-            if not getattr(self, '_auto_slice_active', False):
-                return
-            viewer = self.shared_data.napariViewer
-            if viewer is None or len(viewer.layers) == 0:
-                return
-            active_layer = viewer.layers.selection.active or viewer.layers[-1]
-            image = np.asarray(active_layer.data)
-            if image.ndim > 2:
-                step = tuple(int(s) for s in viewer.dims.current_step[:image.ndim - 2])
-                image = image[step]
-            metadata = {'ImageNumber': 0}
-            try:
-                current_config = self._auto_slice_config
-                utils.realTimeAnalysis_run(self._auto_slice_rt_object, current_config, image, metadata, self.shared_data, None, nodzInfo=None)
-                utils.realTimeAnalysis_visualisation(self._auto_slice_rt_object, current_config, image, metadata, None, self._auto_slice_overlay.layer)
-            except Exception:
-                logging.exception("Auto-slice RT analysis failed")
-
-        def enableAutoSliceAnalysis(self):
-            current_config = dict(self.realTimeAnalysisGroupBox.currentData)
-            current_config['__selectedDropdownEntryRTAnalysis__'] = self.comboBox_RTanalysisFunctions.currentText()
-            current_config['__realTimeVisualisation__'] = False
-            viewer = self.shared_data.napariViewer
-            if viewer is None:
-                self.rtAnalysisAutoSliceButton.setChecked(False)
-                return
-            self._auto_slice_config = current_config
-            self._auto_slice_rt_object = utils.realTimeAnalysis_init(current_config, core=self.shared_data.core, nodzInfo=None)
-            self._auto_slice_overlay = napariOverlay(viewer, RT_analysisObject=self._auto_slice_rt_object, layer_name='RT_AutoSlice_VIS')
-            self._auto_slice_active = True
-            self._auto_slice_cb = lambda event: _auto_slice_callback(self, event)
-            viewer.dims.events.current_step.connect(self._auto_slice_cb)
-
-        def disableAutoSliceAnalysis(self):
-            self._auto_slice_active = False
-            viewer = self.shared_data.napariViewer
-            if viewer is not None and hasattr(self, '_auto_slice_cb'):
-                try:
-                    viewer.dims.events.current_step.disconnect(self._auto_slice_cb)
-                except Exception:
-                    pass
-            if hasattr(self, '_auto_slice_overlay') and self._auto_slice_overlay is not None:
-                try:
-                    viewer.layers.remove(self._auto_slice_overlay.layer.name)
-                except Exception:
-                    pass
-            self._auto_slice_rt_object = None
-            self._auto_slice_overlay = None
-
-        def toggleAutoSliceAnalysis(self):
-            if self.rtAnalysisAutoSliceButton.isChecked():
-                enableAutoSliceAnalysis(self)
-            else:
-                disableAutoSliceAnalysis(self)
-
-        self.rtAnalysisActivateButton = QPushButton('Activate')
-        #add a clicked-call:
-        self.rtAnalysisActivateButton.clicked.connect(lambda: activateRealTimeAnalysisFromDockWidget(self))
-        self.rtAnalysisDeactivateButton = QPushButton('Deactivate')
-        self.rtAnalysisDeactivateButton.clicked.connect(lambda: deactivateRealTimeAnalysisFromDockWidget(self))
-        self.rtAnalysisTestButton = QPushButton('Test on current napari image')
-        self.rtAnalysisTestButton.clicked.connect(lambda: testRealTimeAnalysisFromDockWidget(self))
-        self.rtAnalysisAutoSliceButton = QPushButton('Auto-update on slice change')
-        self.rtAnalysisAutoSliceButton.setCheckable(True)
-        self.rtAnalysisAutoSliceButton.clicked.connect(lambda: toggleAutoSliceAnalysis(self))
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisActivateButton,1,0,1,1)
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisDeactivateButton,1,1,1,1)
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisTestButton,2,0,1,2)
-        self.rtAnalysisLayout.addWidget(self.rtAnalysisAutoSliceButton,3,0,1,2)
-
-        #Add a spacer at the bottom:
-        expandingspacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.rtAnalysisLayout.addItem(expandingspacer,4,0,1,2)
+        from glados_pycromanager.GUI.rt_analysis_panel import RTAnalysisPanel
+        self.rtAnalysisPanel = RTAnalysisPanel(self.shared_data, persist=self.autoSaveLoad)
+        self.rtAnalysisLayout = QVBoxLayout()
+        self.rtAnalysisLayout.addWidget(self.rtAnalysisPanel)
         return self.rtAnalysisLayout
-    
+
     def XYstageLayout(self):
         """
-        Returns a layout with the XY stage widgets.
-
-        This layout includes a label with the current position,
-        three arrow buttons to move in the XY stage relative to the current position,
-        and text fields to set the size of the arrow buttons movement
+        Returns the XY stage block: a `StageDial` (three rings by four
+        directions, inner ring = smallest step) showing the position in its
+        centre, and below it the step sizes per ring in µm, with the
+        field-of-view buttons under the column each one fills.
         """
-        
-        typeOfXYStageLayout = "Small" #"Big" or "Small" - either a 4x4 grid or a 8x8 grid. The bigger looks somewhat nicer, but is too large to be usefulll
-        
-        #Obtain the stage info from MM:
-        XYStageName = self.shared_data.MILcore.get_xy_stage_device()
-        #Get the stage position
-        XYStagePos = self.shared_data.MILcore.get_xy_stage_position(XYStageName)
-        
-        #Get current pixel size
-        #Then move 0.1, 0.5, or 1 field with the arrows
-        if self.shared_data.MILcore.get_pixel_size_um() != 0:
-            field_size_um = [self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[2],self.shared_data.MILcore.get_pixel_size_um()*self.shared_data.MILcore.get_roi()[3]]#type: ignore
-        else:
-            field_size_um = [1*self.shared_data.MILcore.get_roi()[2],1*self.shared_data.MILcore.get_roi()[3]]
-        field_move_fraction = [1,.5,.1]
-        
-        #Widget itself is a grid layout with 3x3 entries
-        XYStageLayout = QGridLayout()
-        XYStageLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    
-        
-        if typeOfXYStageLayout == "Small":
-            XY_UpLayout = QGridLayout()
-            XY_DownLayout = QGridLayout()
-            XY_LeftLayout = QGridLayout()
-            XY_RightLayout = QGridLayout()
-            
-            XYStageLayout.addLayout(XY_UpLayout,0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addLayout(XY_DownLayout,2,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addLayout(XY_LeftLayout,1,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            XYStageLayout.addLayout(XY_RightLayout,1,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        XYStageLayout = QVBoxLayout()
+        XYStageLayout.setContentsMargins(0, 0, 0, 0)
 
-        #XY move buttons
-        self.XYmoveButtons = {}
-        for m in range(1,4):
-            #Initialize buttons
-            self.XYmoveButtons[f'Up_{m}'] = QPushButton("⮝"*(4-m))
-            self.XYmoveButtons[f'Up_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,float(self.XYMoveEditField[f"Y_{4-m}"].text())))
-            self.XYmoveButtons[f'Down_{m}'] = QPushButton("⮟"*(4-m))
-            self.XYmoveButtons[f'Down_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(0,float(self.XYMoveEditField[f"Y_{4-m}"].text())*-1))
-            self.XYmoveButtons[f'Left_{m}'] = QPushButton("⮜"*(4-m))
-            self.XYmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(float(self.XYMoveEditField[f"X_{4-m}"].text())*-1,0))
-            self.XYmoveButtons[f'Right_{m}'] = QPushButton("⮞"*(4-m))
-            self.XYmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveXYStage(float(self.XYMoveEditField[f"X_{4-m}"].text()),0))
-            
-            #Add buttons to layout
-            if typeOfXYStageLayout == "Small":
-                XY_UpLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],0,4-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XY_DownLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],0,4-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XY_LeftLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4-m,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XY_RightLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4-m,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            elif typeOfXYStageLayout == "Big":
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Up_{m}'],m-1,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Down_{m}'],8-m,4,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Left_{m}'],4,m-1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-                XYStageLayout.addWidget(self.XYmoveButtons[f'Right_{m}'],4,8-m,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        #The dial; a ring of size n moves by the step in column n below.
+        self.XYStageInfoWidget = StageDial()
+        self.XYStageInfoWidget.stepRequested.connect(self._onXYDialStep)
+        XYStageLayout.addWidget(self.XYStageInfoWidget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        
-        #The next layout is the inputs to let the user choose how much movement each button should be.
+        #Step sizes: one column per ring, X and Y rows, FOV presets underneath.
         XYStageSetMovementLayout = QGridLayout()
-        
-        #Change the spacing/padding a bit
-        XYStageSetMovementLayout.setHorizontalSpacing(2) #Default 6 
-        XYStageSetMovementLayout.setVerticalSpacing(2)
-        XYStageSetMovementLayout.setContentsMargins(2,2,2,2) #Default 11
-
-        XYStageSetMovementLayout.addWidget(QLabel('X'),0,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-        XYStageSetMovementLayout.addWidget(QLabel('Y'),0,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
+        XYStageSetMovementLayout.setSpacing(compact_spacing())
         self.XYMoveEditField = {}
-        pushButtonLabelArr = ["0.1 field","1 field","3 fields"]
+        pushButtonLabelArr = ["0.1","1","3"]
+        for m, ringName in enumerate(RING_NAMES, start=1):
+            XYStageSetMovementLayout.addWidget(QLabel(ringName), 0, m, alignment=Qt.AlignmentFlag.AlignCenter)
+        for row, axis in ((1, 'X'), (2, 'Y')):
+            XYStageSetMovementLayout.addWidget(QLabel(f"{axis} (µm)"), row, 0)
+            for m in range(1,4):
+                field = self.XYMoveEditField[f"{axis}_{m}"] = QLineEdit()
+                _limitFieldWidth(field)
+                field.editingFinished.connect(lambda: self.storeAllControlValues())
+                XYStageSetMovementLayout.addWidget(field, row, m)
+        XYStageSetMovementLayout.addWidget(QLabel("FOV"), 3, 0)
         for m in range(1,4):
-            XYStageSetMovementLayout.addWidget(QLabel("⮞"*(m)),m,0,1,1, alignment=Qt.AlignmentFlag.AlignRight)
-            self.XYMoveEditField[f"X_{m}"] = QLineEdit()
-            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"X_{m}"],m,1,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.XYMoveEditField[f"X_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
-            
-            self.XYMoveEditField[f"Y_{m}"] = QLineEdit()
-            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Y_{m}"],m,2,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.XYMoveEditField[f"Y_{m}"].editingFinished.connect(lambda: self.storeAllControlValues())
-            XYStageSetMovementLayout.addWidget(QLabel("μm"),m,3,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
-            self.XYMoveEditField[f"Button_{m}"] = QPushButton(pushButtonLabelArr[m-1])
-            
-            self.XYMoveEditField[f"Button_{m}"].clicked.connect(lambda index, m=m: self.setXYStageMovementValue(m-1,self.XYMoveEditField[f"X_{m}"],self.XYMoveEditField[f"Y_{m}"]))
-            
-            XYStageSetMovementLayout.addWidget(self.XYMoveEditField[f"Button_{m}"],m,4,1,1, alignment=Qt.AlignmentFlag.AlignLeft)
-            
-        #Add the setmovementlayout to the XY stage layout
-        if typeOfXYStageLayout == "Small":
-            XYStageLayout.addLayout(XYStageSetMovementLayout,3,0,1,4, alignment=Qt.AlignmentFlag.AlignCenter)
-        elif typeOfXYStageLayout == "Big":
-            XYStageLayout.addLayout(XYStageSetMovementLayout,8,0,1,8, alignment=Qt.AlignmentFlag.AlignCenter)
-            
-        #Add a central label for info
-        #this label contains the XY stage name, then an enter, then the current position:
-        self.XYStageInfoWidget = QLabel()
-        if typeOfXYStageLayout == "Small":
-            XYStageLayout.addWidget(self.XYStageInfoWidget,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-        elif typeOfXYStageLayout == "Big":
-            XYStageLayout.addWidget(self.XYStageInfoWidget,4,4, alignment=Qt.AlignmentFlag.AlignCenter)
-        #Update the text of it
+            button = self.XYMoveEditField[f"Button_{m}"] = QPushButton(pushButtonLabelArr[m-1])
+            button.setToolTip(f"Set the {RING_NAMES[m-1]}-ring step to {pushButtonLabelArr[m-1]} field(s) of view")
+            button.clicked.connect(lambda index, m=m: self.setXYStageMovementValue(m-1,self.XYMoveEditField[f"X_{m}"],self.XYMoveEditField[f"Y_{m}"]))
+            XYStageSetMovementLayout.addWidget(button, 3, m)
+        XYStageLayout.addLayout(XYStageSetMovementLayout)
+        XYStageLayout.addStretch(1)
+
+        #Update the position shown in the dial
         self.updateXYStageInfoWidget()
-        
+
         return XYStageLayout
-    
+
+    def _onXYDialStep(self, dx, dy, size):
+        """A dial segment was clicked: move by that ring's step in that direction."""
+        try:
+            stepX = float(self.XYMoveEditField[f"X_{size}"].text())
+            stepY = float(self.XYMoveEditField[f"Y_{size}"].text())
+        except ValueError:
+            logging.warning('XY step size %d is not a number; not moving', size)
+            return
+        self.moveXYStage(dx*stepX, dy*stepY)
+
     def setXYStageMovementValue(self,m,xEditField,yEditField):
         """
         Set the XY stageLineEdits to specific values based on the Buttons next to the fields.
@@ -1971,8 +1748,8 @@ class MMConfigUI(CustomMainWindow):
         
         x_value_um = field_size_um[0]*fieldUnit
         y_value_um = field_size_um[1]*fieldUnit
-        xEditField.setText(str(x_value_um))
-        yEditField.setText(str(y_value_um))
+        xEditField.setText(f"{x_value_um:.1f}")
+        yEditField.setText(f"{y_value_um:.1f}")
         self.storeAllControlValues()
     
     def getDevicesOfDeviceType(self,devicetype):
@@ -2018,6 +1795,8 @@ class MMConfigUI(CustomMainWindow):
         """
         #Create a layout
         self.oneDStageLayout = QGridLayout()
+        self.oneDStageLayout.setContentsMargins(0, 0, 0, 0)
+        self.oneDStageLayout.setSpacing(compact_spacing())
         
         #Creates a UI layout to move all found 1D stages
         #Find all 1D stages
@@ -2037,21 +1816,22 @@ class MMConfigUI(CustomMainWindow):
         except (RuntimeError, OSError, AttributeError) as exc:
             logging.debug('get_focus_device() not available for oneDstage: %s', exc)
         #Add the dropdown to the layout:
-        self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0)
+        self.oneDStageLayout.addWidget(self.oneDstageDropdown,0,0,1,2)
         
-        #Add left/right buttons and a label for the position
+        #The rail: ▲▲ ▲ position ▼ ▼▼ (rows 1-5). moveOneDStage(±1) is the
+        #large step, ±2 the small one.
         self.oneDmoveButtons = {}
         for m in range(1,3):
-            #Initialize buttons
-            self.oneDmoveButtons[f'Left_{m}'] = QPushButton("⮝"*(3-m))
+            self.oneDmoveButtons[f'Left_{m}'] = QPushButton("▲"*(3-m))
             self.oneDmoveButtons[f'Left_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(m))
-            self.oneDmoveButtons[f'Right_{m}'] = QPushButton("⮟"*(3-m))
+            self.oneDmoveButtons[f'Right_{m}'] = QPushButton("▼"*(3-m))
             self.oneDmoveButtons[f'Right_{m}'].clicked.connect(lambda index, m=m: self.moveOneDStage(-m))
-            
-            #Add buttons to layout
-            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],m-1+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],5-m+2,0,1,1, alignment=Qt.AlignmentFlag.AlignCenter)
-        
+            for key in (f'Left_{m}', f'Right_{m}'):
+                #As wide as an XY step column, so they match the FOV buttons
+                self.oneDmoveButtons[key].setFixedWidth(_stepColumnWidth(self.oneDmoveButtons[key]))
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Left_{m}'],m,0,1,2, alignment=Qt.AlignmentFlag.AlignHCenter)
+            self.oneDStageLayout.addWidget(self.oneDmoveButtons[f'Right_{m}'],6-m,0,1,2, alignment=Qt.AlignmentFlag.AlignHCenter)
+
         #Create a QGridBox for the movement sizes for each stage:
         self.oneDMoveEditFieldGridLayouts={}
         self.oneDMoveEditField={}
@@ -2060,22 +1840,29 @@ class MMConfigUI(CustomMainWindow):
             self.oneDMoveEditFieldGridLayouts[stage] = QWidget()
             self.oneDMoveEditFieldGridLayouts[stage].setObjectName(stage)
             internalLayout = QGridLayout()
+            internalLayout.setContentsMargins(0, 0, 0, 0)
+            internalLayout.setSpacing(compact_spacing())
             self.oneDMoveEditFieldGridLayouts[stage].setLayout(internalLayout)
             self.oneDMoveEditField[stage] = {}
             for m in range(1,3):
-                internalLayout.addWidget(QLabel("⮞"*(m)),m,0)
+                internalLayout.addWidget(QLabel("▲"*(m)),m,0, alignment=Qt.AlignmentFlag.AlignRight)
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'] = QLineEdit()
+                _limitFieldWidth(self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'])
                 internalLayout.addWidget(self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'],m,1)
+                internalLayout.addWidget(QLabel("µm"),m,2)
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].setText("10")
                 self.oneDMoveEditField[stage][f'oneDStackedWidget_{stage}_{m}'].editingFinished.connect(lambda: self.storeAllControlValues())
             
             self.oneDStackedWidget.addWidget(self.oneDMoveEditFieldGridLayouts[stage])
         
-        self.oneDStageLayout.addWidget(self.oneDStackedWidget,8,0)
-        
-        #Get current info of the widget
+        #Step sizes at the bottom, labelled like the buttons that use them
+        self.oneDStageLayout.addWidget(self.oneDStackedWidget,6,0,1,2)
+        self.oneDStageLayout.setRowStretch(7, 1)
+
+        #The position, in the middle of the rail
         self.oneDinfoWidget = QLabel()
-        self.oneDStageLayout.addWidget(self.oneDinfoWidget,1,0)
+        self.oneDinfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.oneDStageLayout.addWidget(self.oneDinfoWidget,3,0,1,2)
         #update the text
         self.updateOneDstageLayout()
 
@@ -2213,7 +2000,8 @@ class MMConfigUI(CustomMainWindow):
 
     def _applyOneDstageLayout(self, stage_name, pos):
         """GUI-thread half of `updateOneDstageLayout`."""
-        self.oneDinfoWidget.setText(f"{stage_name}\r\n {pos:.1f}") #type:ignore
+        self.oneDinfoWidget.setText(f"{pos:.1f}") #type:ignore
+        self.oneDinfoWidget.setToolTip(f"{stage_name} position (µm)")
 
         for widget_id in range(0,self.oneDStackedWidget.count()):
             widget = self.oneDStackedWidget.widget(widget_id)
@@ -2378,9 +2166,8 @@ class MMConfigUI(CustomMainWindow):
     def _applyXYStageInfo(self, XYStageName, XYStagePos):
         """GUI-thread half of `updateXYStageInfoWidget`."""
         try:
-            self.XYStageInfoWidget.setText(f"{XYStageName}\r\n {XYStagePos[0]:.0f}/{XYStagePos[1]:.0f}")
-            #Align text center:
-            self.XYStageInfoWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.XYStageInfoWidget.setText(f"{XYStagePos[0]:.1f}\n{XYStagePos[1]:.1f}")
+            self.XYStageInfoWidget.setToolTip(f"{XYStageName} position X / Y (µm)")
         except RuntimeError:  # widget already destroyed
             pass
         
@@ -2453,6 +2240,13 @@ class MMConfigUI(CustomMainWindow):
 
         for config_id in range(len(self.config_groups)):
             self.configEntries[config_id] = self.addRow(config_id)
+        self._capConfigWidth()
+
+    def _capConfigWidth(self):
+        """Cap the Configurations section's width: wider only stretches the
+        dropdowns and sliders. One `CONFIG_BLOCK_MAX_WIDTH_EM` per block of rows."""
+        blocks = max(1, -(-len(self.config_groups) // max(1, self.number_columns)))
+        self.configGroupBox.setMaximumWidth(blocks * CONFIG_BLOCK_MAX_WIDTH_EM * current_theme().font_px)
 
     def _clearConfigLayout(self):
         """Remove every row (and any leftover widgets) from configLayout."""
@@ -2548,14 +2342,35 @@ class MMConfigUI(CustomMainWindow):
         #Populate with the options:
         for i in range(self.config_groups[config_id].nrConfigs()):
             self.dropDownBoxes[config_id].addItem(self.config_groups[config_id].configName(i))
-        #Update the value to the current MM value:
-        # self.updateValuefromMM(config_id)
+        #Show the preset that is active in MM right now (blank if none matches).
+        #Must happen here: rebuildConfigLayout() (also the auto-refresh tick)
+        #recreates every dropdown, so a selection made later would be lost.
+        try:
+            currentPreset = self.config_groups[config_id].getCurrentMMValue()
+        except (RuntimeError, OSError, ValueError, AttributeError) as exc:
+            logging.debug('Could not read current preset of %s: %s',
+                          self.config_groups[config_id].configGroupName(), exc)
+            currentPreset = ''
+        self._selectDropDownPreset(config_id, currentPreset)
         #Add a callback when it is changed:
         self.dropDownBoxes[config_id].currentIndexChanged.connect(lambda index, config_id = config_id: self.on_dropDownChanged(config_id))
         
         #Add dropdown to rowLayout:
         rowLayout.addWidget(self.dropDownBoxes[config_id])
     
+    def _selectDropDownPreset(self, config_id, preset):
+        """Select `preset` in the config dropdown, or the blank entry when it
+        is not one of the listed presets (MM returns '' when the hardware state
+        matches no preset). Signals are blocked: this mirrors MM's state, it
+        must not write it back or tick the row's checkbox."""
+        box = self.dropDownBoxes[config_id]
+        index = box.findText(str(preset)) if preset else -1
+        blocked = box.blockSignals(True)
+        try:
+            box.setCurrentIndex(index if index > 0 else 0)
+        finally:
+            box.blockSignals(blocked)
+
     def on_dropDownChanged(self,config_id):
         """
         Changes a micromanager config when a dropdown has changed
@@ -2620,6 +2435,9 @@ class MMConfigUI(CustomMainWindow):
         self.editFields[config_id].setText(str(currentSliderValue))
         #Only allow numbers/float values
         self.editFields[config_id].setValidator(QDoubleValidator())
+        #Only as wide as the range's values need; the slider takes the rest.
+        _limitFieldWidth(self.editFields[config_id],
+                         max(STEP_FIELD_SAMPLE_TEXT, f"{upperLimit:.2f}", f"{lowerLimit:.2f}", key=len))
         rowLayout.addWidget(self.editFields[config_id])
         self.editFields[config_id].editingFinished.connect(lambda config_id = config_id: self.on_sliderChanged(config_id,fromText=True,fromSlider=False))
 
@@ -2638,7 +2456,7 @@ class MMConfigUI(CustomMainWindow):
         #ends.
         self.sliders[config_id].sliderReleased.connect(self._flushSliderPropertyWrites)
         # #Add the slider to the rowLayout:
-        rowLayout.addWidget(self.sliders[config_id])
+        rowLayout.addWidget(self.sliders[config_id], 1)
         pass
     
     def on_sliderChanged(self,config_id,fromText=False,fromSlider=True):
@@ -2807,11 +2625,11 @@ class MMConfigUI(CustomMainWindow):
         if self.config_groups[config_id].isReadOnly():
             self.editFields[config_id].setText(str(self.config_groups[config_id].getStorableValue()))
         elif self.config_groups[config_id].isDropDown():
-            self.dropDownBoxes[config_id].setCurrentText(currentValue)
+            self._selectDropDownPreset(config_id, currentValue)
         elif self.config_groups[config_id].isSlider():
             #A slider config by definition (?) only has a single property underneath, so get that:
             configGroupName = self.config_groups[config_id].configGroupName()
-            
+
             underlyingProperty = self.config_groups[config_id].core.get_available_configs(configGroupName)[0]
             configdata = self.config_groups[config_id].core.get_config_data(configGroupName,underlyingProperty)
             device_label = configdata.getSetting(0).getDeviceLabel()

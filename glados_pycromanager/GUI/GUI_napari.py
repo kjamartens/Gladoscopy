@@ -47,10 +47,13 @@ from PyQt5.QtWidgets import (
     QButtonGroup,
     QFileDialog,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QRadioButton,
+    QToolButton,
     QWidget,
 )
 
@@ -304,6 +307,28 @@ def register_resilient_pycromanager_python_engine(shared_data):
                  'live Z-settle-wait control (MDAConfig.pycromanager_wait_for_z_settle)')
 
 
+class MicroManagerStartError(RuntimeError):
+    """Micro-Manager failed to start; the message is the reason it gave."""
+
+
+def connect_headless_core(Core, start_error=None):
+    """Connect to the core `start_headless()` just launched.
+
+    When `start_headless()` itself failed (e.g. a config property the device
+    does not have), `Core()` then fails with pycromanager's generic "Is
+    Micro-Manager running and is the ZMQ server on 4827 option enabled?" --
+    which hides the actual cause. Report the start error instead, with the
+    connection error chained for the log.
+    """
+    try:
+        return Core()
+    except Exception as core_exc:
+        if start_error is None:
+            raise
+        raise MicroManagerStartError(
+            f'Micro-Manager could not start:\n{start_error}') from core_exc
+
+
 def perform_post_closing_actions(shared_data:Shared_data):
     """Performing closing actions
 
@@ -466,13 +491,16 @@ class headlessGUI(QWidget):
         self.buttonGroup.addButton(self.pythonRadio)
         self.buttonGroup.addButton(self.javaRadio)
 
+        mm_cfg = self.shared_data.config.micromanager_config
         self.mm_app_pathLabel = QLabel('MicroManager Path:', self)
-        self.mm_app_pathLineEdit = QLineEdit(self.shared_data.config.micromanager_config.path, self)
+        self.mm_app_pathLineEdit = QLineEdit(mm_cfg.path, self)
+        self.mm_app_history = self._makeHistoryButton(self.mm_app_pathLineEdit, mm_cfg.path_history)
         self.mm_app_browse = QPushButton('...', self)
         self.mm_app_browse.clicked.connect(self.BrowseMMAppPath)
 
         self.config_fileLabel = QLabel('Config File:', self)
-        self.config_fileLineEdit = QLineEdit(self.shared_data.config.micromanager_config.config_path, self)
+        self.config_fileLineEdit = QLineEdit(mm_cfg.config_path, self)
+        self.config_file_history = self._makeHistoryButton(self.config_fileLineEdit, mm_cfg.config_path_history)
         self.config_file_browse = QPushButton('...', self)
         self.config_file_browse.clicked.connect(self.BrowseConfigFile)
 
@@ -498,10 +526,10 @@ class headlessGUI(QWidget):
         layout.addWidget(self.pythonRadio, 3, 2)
         layout.addWidget(self.javaRadio, 3, 3)
         layout.addWidget(self.mm_app_pathLabel, 4, 0)
-        layout.addWidget(self.mm_app_pathLineEdit, 4, 1,1,2)
+        layout.addLayout(self._withHistoryButton(self.mm_app_pathLineEdit, self.mm_app_history), 4, 1,1,2)
         layout.addWidget(self.mm_app_browse, 4, 3)
         layout.addWidget(self.config_fileLabel, 5, 0)
-        layout.addWidget(self.config_fileLineEdit, 5, 1,1,2)
+        layout.addLayout(self._withHistoryButton(self.config_fileLineEdit, self.config_file_history), 5, 1,1,2)
         layout.addWidget(self.config_file_browse, 5, 3)
         layout.addWidget(self.buffer_size_mbLabel, 6, 0)
         layout.addWidget(self.buffer_size_mbLineEdit, 6, 1)
@@ -511,6 +539,31 @@ class headlessGUI(QWidget):
 
         self.setLayout(layout)
         self.show()
+
+    def _makeHistoryButton(self, lineEdit: QLineEdit, history) -> QToolButton:
+        """Small down-arrow next to `lineEdit` listing previously used values
+        (most recent first); picking one fills the line edit."""
+        button = QToolButton(self)
+        button.setArrowType(Qt.DownArrow) #type:ignore
+        button.setPopupMode(QToolButton.InstantPopup)
+        button.setToolTip('Recently used')
+        menu = QMenu(button)
+        entries = history if isinstance(history, list) else []
+        for entry in entries:
+            action = menu.addAction(entry)
+            action.triggered.connect(lambda _checked=False, e=entry: lineEdit.setText(e))
+        button.setMenu(menu)
+        button.setEnabled(bool(entries))
+        return button
+
+    @staticmethod
+    def _withHistoryButton(lineEdit: QLineEdit, button: QToolButton) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        row.addWidget(lineEdit)
+        row.addWidget(button)
+        return row
 
     def BrowseMMAppPath(self):
         options = QFileDialog.Options()
@@ -552,6 +605,10 @@ class headlessGUI(QWidget):
         self.shared_data.config.micromanager_config.config_path = self.config_file
         self.shared_data.config.micromanager_config.buffer_mb = self.buffer_size_mb
         self.shared_data.config.micromanager_config.max_memory_mb = self.max_memory_mb
+        from glados_pycromanager.GUI.headless_validation import push_path_history
+        mm_cfg = self.shared_data.config.micromanager_config
+        mm_cfg.path_history = push_path_history(mm_cfg.path_history, self.mm_app_path)
+        mm_cfg.config_path_history = push_path_history(mm_cfg.config_path_history, self.config_file)
         #And update the JSON
         utils.storeSharedData_GlobalData(self.shared_data)
         
@@ -817,21 +874,24 @@ def main(app=None, splash=None):
                 python_backend = headlessGUIv.backend == 'Python'
                 if python_backend:  # the real size is allocated on the owner thread below
                     circular_buffer_mb = int(headlessGUIv.buffer_size_mb)
+                start_error = None
                 try:
                     start_headless(mm_app_path=headlessGUIv.mm_app_path, config_file=headlessGUIv.config_file, python_backend=python_backend,
                                    buffer_size_mb=(HEADLESS_PLACEHOLDER_BUFFER_MB if python_backend
                                                    else int(headlessGUIv.buffer_size_mb)),
                                    max_memory_mb=int(headlessGUIv.max_memory_mb))
                 except Exception as e:
-                    print("Error!")
-                    print(e)
-                    
+                    # Not fatal by itself; connect_headless_core() reports it if
+                    # connecting to the core then fails.
+                    start_error = e
+                    logging.exception('Micro-Manager reported an error while starting')
+
                 #Also store some settings in shared_data
                 shared_data._headless = True
                 shared_data.backend = headlessGUIv.backend
                 # shared_data.core = core
                 shared_data.MILcore = MIL.MicroscopeInterfaceLayer()
-                shared_data.MILcore.set_core(Core())
+                shared_data.MILcore.set_core(connect_headless_core(Core, start_error))
                 if headlessGUIv.backend == 'Python':
                     register_resilient_pycromanager_python_engine(shared_data)
             elif headlessGUIv.pyMMCorePlusRadio.isChecked():

@@ -216,6 +216,42 @@ def save_config_to_json(cfg: "Config") -> None:
                 pass
 
 
+def save_state_section(section: str, data) -> bool:
+    """Replace one top-level section of `glados_state.json`, keeping the rest.
+
+    Atomic like `save_config_to_json`. An unreadable existing file is left alone
+    (and False returned) rather than overwritten: losing one section's update
+    is better than wiping every other section.
+    """
+    json_path = glados_state_path()
+    state: dict = {}
+    if os.path.exists(json_path):
+        try:
+            with open(json_path) as fh:
+                state = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Not saving %s: %s is unreadable: %s", section, json_path, exc)
+            return False
+        if not isinstance(state, dict):
+            logger.warning("Not saving %s: %s is not a JSON object", section, json_path)
+            return False
+    state[section] = data
+    tmp_path = json_path + ".tmp"
+    try:
+        with open(tmp_path, "w") as fh:
+            json.dump(state, fh, indent=4)
+        os.replace(tmp_path, json_path)
+    except (OSError, TypeError, ValueError) as exc:
+        logger.warning("Could not save %s to %s: %s", section, json_path, exc)
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+        return False
+    return True
+
+
 def storeSharedData_GlobalData(shared_data) -> None:
     """Persist `shared_data.config` to the AppData JSON.
 

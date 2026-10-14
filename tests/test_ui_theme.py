@@ -31,7 +31,11 @@ def test_default_theme_reproduces_old_inline_stylesheet_values():
     assert t.indicator_px == int(12 * .75)
     qss = build_stylesheet(t)
     assert "font-size: 10px;" in qss
-    assert "padding: 5px 5px;" in qss
+    # The docks are dense (2026-10-13): padding/margin are derived from the stored
+    # theme values, so installs whose glados_state.json holds the old defaults
+    # get the dense look too.
+    assert "padding: 2px 4px;" in qss and "margin: 1px 1px 1px 1px;" in qss
+    assert "border-width: 1px;" in qss
     assert "min-height: 18px;" in qss
 
 

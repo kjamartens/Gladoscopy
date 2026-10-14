@@ -16,7 +16,7 @@ import napari
 import numpy as np
 import useq
 from napari.qt import thread_worker
-from PyQt5.QtCore import QObject, Qt, QSize, QTimer, pyqtSignal
+from PyQt5.QtCore import QCoreApplication, QEvent, QObject, Qt, QSize, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
     QAbstractButton,
     QAction,
@@ -2977,8 +2977,12 @@ def _resume_napari_settings_saves(token):
     except Exception:
         logging.exception('Could not save napari settings after startup')
 
-def _finaliseStartupLayout(napariViewer, controlsWidget):
+def _finaliseStartupLayout(napariViewer, controlsWidget, alsoFit=()):
     """Maximise the window, show the Controls tab, and make it tall enough for its content.
+
+    The top dock area is shared by the tabified docks, so it is sized for the
+    tallest of `controlsWidget` and the `alsoFit` docks (the Multi-D acquisition
+    tab), capped at STARTUP_CONTROLS_MAX_HEIGHT_FRACTION of the window.
 
     Runs from the event loop (see runNapariPycroManager): Qt only builds the tab bar
     of tabified dock widgets during layout, so raising a tab before that is ignored.
@@ -2993,9 +2997,31 @@ def _finaliseStartupLayout(napariViewer, controlsWidget):
     except Exception:
         logging.exception("Could not maximise the main window")
     #The maximised geometry arrives as a resize event, so size the dock after it.
-    QTimer.singleShot(0, lambda: _sizeControlsDock(napariViewer, controlsWidget))
+    QTimer.singleShot(0, lambda: _sizeControlsDock(napariViewer, controlsWidget, alsoFit))
 
-def _sizeControlsDock(napariViewer, controlsWidget):
+def _dockContentHeight(dockContainer, width=None):
+    """Height a `dockWidgets`' scrolled content needs at `width` (default: its own).
+
+    Uses height-for-width when the content has it, as the scroll area does: a
+    wrapping `FlowRow` (the Configurations buttons) is one line in `sizeHint()`
+    but two once narrow.
+    """
+    content = dockContainer.content_widget
+    if width is None:
+        width = dockContainer.scroll_area.viewport().width()
+    if content.hasHeightForWidth():
+        return max(content.heightForWidth(width), content.minimumSizeHint().height())
+    return content.sizeHint().height()
+
+def _tallestDockContent(controlsWidget, alsoFit):
+    #The other tabs are hidden, so their own viewport sizes are stale: measure
+    #every tab at the Controls tab's width.
+    width = controlsWidget.scroll_area.viewport().width()
+    return max(_dockContentHeight(w, width) for w in (controlsWidget, *alsoFit))
+
+def _sizeControlsDock(napariViewer, controlsWidget, alsoFit=()):
+    """First pass: request content height + the dock's own chrome (up to the cap)."""
+    requested = cap = None
     try:
         qtWindow = napariViewer.window._qt_window
         dock = controlsWidget.parent()
@@ -3003,11 +3029,26 @@ def _sizeControlsDock(napariViewer, controlsWidget):
         #Everything in the dock that is not the scrolled content (title bar, margins,
         #scroll-area frame), measured as laid out rather than guessed.
         overhead = dock.height() - controlsWidget.scroll_area.viewport().height()
-        wanted = controlsWidget.content_widget.sizeHint().height() + max(overhead, 0)
         cap = int(qtWindow.height() * STARTUP_CONTROLS_MAX_HEIGHT_FRACTION)
-        qtWindow.resizeDocks([dock], [min(wanted, cap)], Qt.Vertical)
+        requested = min(_tallestDockContent(controlsWidget, alsoFit) + max(overhead, 0), cap)
+        qtWindow.resizeDocks([dock], [requested], Qt.Vertical)
     except Exception:
         logging.exception("Could not select and size the Controls tab")
+    #The tabified docks' tab bar comes out of the requested height and only
+    #exists once laid out, so measure again and make up the difference.
+    QTimer.singleShot(0, lambda: _correctControlsDockHeight(napariViewer, controlsWidget, alsoFit, requested, cap))
+
+def _correctControlsDockHeight(napariViewer, controlsWidget, alsoFit, requested, cap):
+    try:
+        if requested is not None:
+            QCoreApplication.sendPostedEvents(None, QEvent.LayoutRequest)
+            deficit = (_tallestDockContent(controlsWidget, alsoFit)
+                       - controlsWidget.scroll_area.viewport().height())
+            if deficit > 0 and requested < cap:
+                napariViewer.window._qt_window.resizeDocks(
+                    [controlsWidget.parent()], [min(requested + deficit, cap)], Qt.Vertical)
+    except Exception:
+        logging.exception("Could not correct the Controls tab height")
     global _startup_settings_save_token
     _resume_napari_settings_saves(_startup_settings_save_token)
     _startup_settings_save_token = None
@@ -3026,7 +3067,7 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
 
     #Run the UI on a second thread (hopefully robustly)
     #Napari start
-    #Resumed (one save) by _sizeControlsDock, once napari's and Glados' docks have settled.
+    #Resumed (one save) by _correctControlsDockHeight, once napari's and Glados' docks have settled.
     _startup_settings_save_token = _suspend_napari_settings_saves()
     napariViewer = napari.Viewer()
     startup_timeline.mark('napari viewer created')
@@ -3134,7 +3175,8 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     # only once the event loop has run: Qt builds the tab bar of tabified docks
     # lazily, so a raise_() issued now is lost, and the last-added tab wins.
     QTimer.singleShot(STARTUP_LAYOUT_DELAY_MS,
-                      lambda: _finaliseStartupLayout(napariViewer, custom_widget_MMcontrols))
+                      lambda: _finaliseStartupLayout(napariViewer, custom_widget_MMcontrols,
+                                                     alsoFit=(custom_widget_MDA,)))
 
     returnInfo = {}
     returnInfo['napariViewer'] = napariViewer

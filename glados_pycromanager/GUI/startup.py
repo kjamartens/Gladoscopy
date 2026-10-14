@@ -101,16 +101,69 @@ def set_app_user_model_id(app_id: str = APP_USER_MODEL_ID) -> bool:
         return False
 
 
-def _show_fatal_startup_error(exc: BaseException, log_path: str | None) -> None:
-    """Console-less launch: say that startup failed, and where the traceback is."""
+def open_log_file(path: str) -> bool:
+    """Open `path` in the user's default viewer for it."""
+    from PyQt5.QtCore import QUrl
+    from PyQt5.QtGui import QDesktopServices
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()  # the traceback was just written to it
+        except Exception:
+            pass
+    return QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+
+#: How much of the end of the log the error box's "Show Details..." pane holds.
+LOG_TAIL_LINES = 400
+
+
+def read_log_tail(path: str, max_lines: int = LOG_TAIL_LINES) -> str:
+    """The last `max_lines` lines of `path` ('' if unreadable)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except Exception:
+            pass
     try:
-        from PyQt5.QtWidgets import QApplication, QMessageBox
+        with open(path, encoding='utf-8', errors='replace') as fh:
+            lines = fh.readlines()
+    except OSError:
+        return ''
+    skipped = len(lines) - max_lines
+    head = [f'... ({skipped} earlier lines: use "Open log file" for all of it)\n'] if skipped > 0 else []
+    return ''.join(head + lines[-max_lines:])
+
+
+def _show_fatal_startup_error(exc: BaseException, log_path: str | None) -> None:
+    """Console-less launch: say that startup failed, and where the traceback is.
+
+    With a log file, "Show Details..." unfolds its tail (traceback included) in a
+    selectable text box, and "Open log file" opens the whole file. The box stays
+    up until OK, since the process exits right after it closes.
+    """
+    try:
+        from PyQt5.QtWidgets import QApplication, QMessageBox, QTextEdit
         if QApplication.instance() is None:
             return
         where = log_path or 'the Glados log folder'
-        QMessageBox.critical(None, 'Glados could not start',
-                             f'Glados stopped during startup:\n\n{type(exc).__name__}: {exc}\n\n'
-                             f'The full error is in:\n{where}')
+        box = QMessageBox(QMessageBox.Critical, 'Glados could not start',
+                          f'Glados stopped during startup:\n\n{type(exc).__name__}: {exc}\n\n'
+                          f'The full error is in:\n{where}')
+        ok = box.addButton(QMessageBox.Ok)
+        open_log = None
+        if log_path and os.path.isfile(log_path):
+            tail = read_log_tail(log_path)
+            if tail:
+                box.setDetailedText(tail)
+                for details in box.findChildren(QTextEdit):
+                    details.setMinimumSize(700, 300)  # default is a few lines wide
+            open_log = box.addButton('Open log file', QMessageBox.ActionRole)
+        box.setDefaultButton(ok)
+        while True:
+            box.exec_()
+            if open_log is None or box.clickedButton() is not open_log:
+                break
+            open_log_file(log_path)
     except Exception:
         pass
 

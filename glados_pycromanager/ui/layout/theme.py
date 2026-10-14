@@ -25,6 +25,8 @@ ROLE_PRIMARY = "primary"
 ROLE_READONLY = "readonly"
 ROLE_WARNING = "warning"
 ROLE_NORMAL = "normal"
+ROLE_MODIFIED = "modified"   # a setting changed from its default
+ROLE_ACTIVE = "active"       # a toggle button whose thing is running
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,8 @@ class Theme:
     muted_text: str = "#868e93"         # napari's 'secondary'
     border: str = "#D5D5E5"
     warning: str = "red"
+    modified: str = "rgba(0, 122, 204, 70)"   # light accent wash behind changed settings
+    active: str = "#2e8b57"             # background of a running toggle (e.g. RT analysis)
 
 
 _current = Theme()
@@ -94,16 +98,23 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     """The stylesheet applied to the Glados docks."""
     t = theme or current_theme()
     family = f'font-family: "{t.font_family}";' if t.font_family else ""
-    m = t.widget_margin_px
+    # Dense by design (2026-10-13): the padding/margin actually used are derived
+    # from the theme values (`compact_*` below) rather than taken as-is, so the
+    # look changes for existing installs too -- their glados_state.json stores the
+    # old Theme defaults verbatim.
+    pad, m = compact_padding(t), compact_margin(t)
     return f"""
     QWidget {{
         font-size: {t.font_px}px;
         {family}
-        padding: {t.widget_padding_px}px {t.widget_padding_px}px;
+        padding: {pad}px {2 * pad}px;
         margin: {m}px {m}px {m}px {m}px;
     }}
+    QPushButton {{
+        padding: {pad + 2}px {3 * pad}px;
+    }}
     QLineEdit {{
-        border-width: 3px 3px;
+        border-width: 1px;
         min-height: {t.control_min_px}px;
         min-width: {t.control_min_px}px;
     }}
@@ -165,4 +176,32 @@ def build_stylesheet(theme: Theme | None = None) -> str:
     QLineEdit[gladosRole="{ROLE_WARNING}"] {{
         border: 1px solid {t.warning};
     }}
+    QLabel[gladosRole="{ROLE_MODIFIED}"], QLineEdit[gladosRole="{ROLE_MODIFIED}"],
+    QCheckBox[gladosRole="{ROLE_MODIFIED}"] {{
+        background-color: {t.modified};
+    }}
+    QPushButton[gladosRole="{ROLE_ACTIVE}"] {{
+        background-color: {t.active};
+        color: {t.accent_text};
+        font-weight: bold;
+    }}
+    QComboBox[gladosRole="{ROLE_ACTIVE}"] {{
+        border: 2px solid {t.active};
+        font-weight: bold;
+    }}
     """
+
+
+def compact_padding(theme: Theme | None = None) -> int:
+    """Vertical padding of a control in the Glados docks (px); horizontal is twice this."""
+    return max(1, (theme or current_theme()).widget_padding_px // 2)
+
+
+def compact_spacing(theme: Theme | None = None) -> int:
+    """Gap between the controls of a section's layout (px)."""
+    return max(1, (theme or current_theme()).section_spacing_px // 2)
+
+
+def compact_margin(theme: Theme | None = None) -> int:
+    """Margin around a control in the Glados docks (px)."""
+    return max(0, (theme or current_theme()).widget_margin_px // 2)

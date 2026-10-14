@@ -365,10 +365,22 @@ class NapariLayerGroup:
         return moved
 
     def remove_all(self, viewer):
-        """Remove every layer of this group from the viewer, ignoring absent ones."""
-        for name in self.names:
+        """Remove every layer of this group from the viewer, ignoring absent ones.
+
+        A layer is removed only while the viewer's layer of that name is still
+        this group's own object. Removal is often deferred (see
+        `layer_removed_event_callback`), and by then a new instance of the same
+        node -- an RT-analysis Reset -- may hold the same names.
+        """
+        names = self.names
+        layers = list(self.layers) + [None] * (len(names) - len(self.layers))
+        for name, layer in zip(names, layers):
             try:
-                if name in viewer.layers:
-                    viewer.layers.remove(name)
+                if name not in viewer.layers:
+                    continue
+                if layer is not None and viewer.layers[name] is not layer:
+                    logging.debug('Not removing %r: a newer layer has taken its name', name)
+                    continue
+                viewer.layers.remove(name)
             except (KeyError, ValueError) as exc:
                 logging.debug('Could not remove layer %r: %s', name, exc)

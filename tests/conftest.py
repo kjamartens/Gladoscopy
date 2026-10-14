@@ -17,6 +17,24 @@ if TYPE_CHECKING:  # only for type hints; not imported at runtime
     pass
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _never_touch_real_appdata(tmp_path_factory: pytest.TempPathFactory):
+    """Point `appdirs.user_data_dir` at a temp dir for the whole session.
+
+    Every Glados module resolves AppData through `appdirs.user_data_dir()`, and
+    a test that saved a default `Config` used to overwrite the user's real
+    `glados_state.json` -- resetting their Micro-Manager path, config file and
+    the start dialog's path history. Session-scoped so module/session fixtures
+    are covered too; `tmp_appdata` still gives a test its own fresh directory.
+    """
+    import appdirs
+
+    target = tmp_path_factory.mktemp("session_appdata")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(appdirs, "user_data_dir", lambda *a, **kw: str(target))
+        yield target
+
+
 @pytest.fixture
 def tmp_appdata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Redirect `appdirs.user_data_dir` to a temp directory.

@@ -16,6 +16,8 @@ from glados_pycromanager.ui.layout.responsive import (
 )
 from glados_pycromanager.ui.layout.sections import FlowLayout, FlowRow, FormGrid, Section, apply_section_spacing
 from glados_pycromanager.ui.layout.theme import (
+    ROLE_ACTIVE,
+    ROLE_MODIFIED,
     ROLE_NORMAL,
     ROLE_PRIMARY,
     ROLE_READONLY,
@@ -23,6 +25,9 @@ from glados_pycromanager.ui.layout.theme import (
     ROLE_WARNING,
     Theme,
     build_stylesheet,
+    compact_margin,
+    compact_padding,
+    compact_spacing,
     current_theme,
     set_current_theme,
     set_role,
@@ -32,7 +37,8 @@ from glados_pycromanager.ui.layout.theme import (
 __all__ = [
     "ALL_BUCKETS", "LANDSCAPE", "PORTRAIT", "TALL", "WIDE",
     "FlowLayout", "FlowRow", "FormGrid", "ListEditor", "Placement", "ResponsiveGrid", "Section",
-    "ROLE_NORMAL", "ROLE_PRIMARY", "ROLE_READONLY", "ROLE_SECTION", "ROLE_WARNING",
-    "Theme", "apply_section_spacing", "build_stylesheet", "classify_shape", "configure_table_header",
+    "ROLE_ACTIVE", "ROLE_MODIFIED", "ROLE_NORMAL", "ROLE_PRIMARY", "ROLE_READONLY", "ROLE_SECTION", "ROLE_WARNING",
+    "Theme", "apply_section_spacing", "build_stylesheet", "classify_shape", "compact_margin",
+    "compact_padding", "compact_spacing", "configure_table_header",
     "current_theme", "set_current_theme", "set_role", "theme_from_config",
 ]
