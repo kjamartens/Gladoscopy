@@ -119,6 +119,22 @@ alphabetize `pymmcore` back after `napari`). This does not conflict with the
 `CMMCorePlus` rule above — `pymmcore_plus.CMMCorePlus` is still imported
 lazily, after Qt, elsewhere.
 
+**Update (2026-10-20): the root cause is the C++ runtime, and `import pymmcore`
+first no longer fixes it.** PyQt5 bundles `msvcp140.dll` 14.26 (2020). Windows
+resolves a DLL import by name to an already-loaded module of that name, so once Qt
+is loaded every Micro-Manager device adapter (`mmgr_dal_*.dll`) gets Qt's copy, and
+adapters built with VS 2022 17.10+ crash on a runtime older than 14.40 (the
+`std::mutex` constexpr change), in `initializeDevice` / `loadSystemConfiguration`.
+That affects *both* the Python and PyMMCorePlus backends. `import pymmcore` first used
+to work because pymmcore's extension linked plain `msvcp140.dll` and pulled in the
+System32 copy; current wheels carry a name-mangled private copy
+(`pymmcore.libs/msvcp140-<hash>.dll`), so nothing claims the plain name before Qt. The
+fix is `glados_pycromanager/_msvc_runtime.py`, run from the package `__init__`: it
+loads System32's `msvcp140*.dll` / `concrt140.dll` (when newer than Qt's) before PyQt5
+is imported. Minimal repro: `import PyQt5.QtWidgets; import pymmcore`, then
+`loadDevice('Camera', 'DemoCamera', 'DCam')` + `initializeDevice('Camera')` against
+a current MM nightly. Test: `tests/test_msvc_runtime_preload.py`.
+
 ### Why in-process cProfile, not a wrapper script
 
 The straightforward approach (wrap the launch with `python -m cProfile`) does

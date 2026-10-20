@@ -769,6 +769,7 @@ acquisition, just materialised.
   - `AutonomousMicroscopyWidget` — recipe graph (`autonomousMicroscopy_plugin`)
   - `GladosSlidersWidget` — laser controls (`gladosSliders_plugin`)
   Pattern: the parent `MainWidget` creates `core`, `shared_data`, `MM_JSON`, `livestate`, and child widgets read them off `parent.*` in their `__init__`.
+  napari creates its `QApplication` (without `AA_ShareOpenGLContexts`) *before* importing the plugin, so **nothing on the plugin's import chain may import `PyQt5.QtWebEngineWidgets` at module scope** — import it where a web view is built. `utils.py` had a dead one that broke the whole plugin. Tests: `tests/test_plugin_import_after_qapp.py`.
 - `GUI/napariGlados.py` — `napariHandler` and the real-time visualisation/analysis loop (`napariUpdateLive`, etc.). Uses `napari.qt.thread_worker` and yield-based generators, which is why several update functions live at module scope rather than inside a class.
   - **Live mode (T-C3):** `MDAConfig.live_mode_method` selects the path.
     `sequence` (default) runs `napariHandler.run_liveSequence_worker` — a plain
@@ -1333,6 +1334,20 @@ replaced it is what new code in these files should follow.
   `tests/test_mmcontrols_owner_thread.py::test_exposure_field_during_live_stops_sets_and_restarts_live`,
   `tests/test_mmcontrols_owner_thread.py::test_exposure_field_restarts_live_even_if_set_exposure_raises`.
 
+### Windows C++ runtime vs PyQt5 (`_msvc_runtime.py`)
+
+PyQt5 bundles `msvcp140.dll` 14.26. Windows binds a DLL import by name to an already
+loaded module, so once Qt is loaded every MM device adapter (`mmgr_dal_*.dll`) gets
+Qt's copy, and adapters built with VS 2022 17.10+ access-violate on a runtime < 14.40
+in `initializeDevice` / `loadSystemConfiguration` (Python *and* PyMMCorePlus backends;
+`make run` died with `Error -1073741819`). The old "import pymmcore before PyQt5" guard
+stopped working once pymmcore wheels shipped a name-mangled private
+`pymmcore.libs/msvcp140-<hash>.dll`. `glados_pycromanager/__init__.py` now calls
+`preload_system_msvc_runtime()`, which loads System32's `msvcp140*.dll`/`concrt140.dll`
+(when newer than Qt's) before anything imports PyQt5; it is a no-op once Qt is loaded,
+so a script must import `glados_pycromanager` first — `tests/conftest.py` does, because
+pytest-qt loads PyQt5 before any test. Tests: `tests/test_msvc_runtime_preload.py`.
+
 ### Windows scheduling hints
 
 `observability/process_priority.py`'s `apply_foreground_scheduling_hints()` runs once from
@@ -1826,8 +1841,9 @@ Three companion files live alongside it:
   startup −1.5 s (PyMMCorePlus), −0.6 s (Python). Tests: `tests/test_startup_circular_buffer.py`.
 - **`insiliscope.cfg` + Python backend segfaults in `start_headless`** (2026-10-13), even in a
   bare pycromanager script, while `MMConfig_demo.cfg` in the same install is fine. So the
-  documented `--profile-runtime` command currently crashes there. The cause is the
-  inSiliScope adapter or its environment, not Glados.
+  documented `--profile-runtime` command currently crashes there. Probably the C++
+  runtime clash above (an adapter built with a newer MSVC than the demo's), which
+  `_msvc_runtime.py` now fixes; unverified on that machine.
 
 When the user says **"continue"** (or any equivalent like "keep going",
 "resume", "next step"), follow this protocol exactly:
