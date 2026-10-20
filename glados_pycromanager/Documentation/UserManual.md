@@ -9,10 +9,10 @@ Created 2023-2024
 - [Glados-pycromanager](#glados-pycromanager)
     - [General overview](#general-overview)
     - [Installation instructions](#installation-instructions)
+    - [Micro-Manager setup](#micro-manager-setup)
     - [Running instructions](#running-instructions)
-                - [Run glados-pycromanager directly from conda](#run-glados-pycromanager-directly-from-conda)
-                - [Run napari from conda and open glados-pycromanager](#run-napari-from-conda-and-open-glados-pycromanager)
-                - [Full debugging access via the python interface](#full-debugging-access-via-the-python-interface)
+    - [Faster startup on Windows (optional)](#faster-startup-on-windows-optional)
+    - [Often-encountered first-run issues](#often-encountered-first-run-issues)
     - [First use instructions](#first-use-instructions)
         - [Controls](#controls)
         - [Multi-D acquisition](#multi-d-acquisition)
@@ -32,87 +32,59 @@ Glados-pycromanager is an attempt to (1) create a usable, user-friendly user-int
 
 ## Installation instructions
 
-Install miniConda or anaConda from their official sources.
+Glados runs on Windows. It installs into its own Python environment (a `.venv` folder inside the Glados folder) using [uv](https://docs.astral.sh/uv/), which also downloads the right Python version (3.13) itself. You do not need conda, or Python installed beforehand.
 
-The simplest path on Windows is to run `win_create_env.bat` from the repo root, which creates the `GladosEnv` conda environment from `environment.yaml` (Python 3.13) and installs the package in editable mode via `uv pip install -e .`.
+**You need:**
 
-Otherwise, create a new conda environment with python version 3.13:
+- **Git**: https://git-scm.com/download/win (or `winget install Git.Git`).
+- **uv**: `winget install astral-sh.uv`, or see https://docs.astral.sh/uv/getting-started/installation/. The install script below offers to install it for you if it is missing.
+- **Micro-Manager 2.0**, a recent nightly build: https://micro-manager.org/Micro-Manager_Nightly_Builds
 
-```batch
-conda create -p C:\CondaEnvironments\GladosPycromanagerEnv python=3.13
-```
+**Install:**
 
-Activate it:
+1. Get the code:
 
-```batch
-conda activate C:\CondaEnvironments\GladosPycromanagerEnv
-```
+   ```batch
+   git clone https://github.com/kjamartens/Gladoscopy.git
+   ```
 
-Install glados-pycromanager from the repo root:
+2. Double-click `install_windows.bat` in that folder (or run it from a terminal). It creates `.venv`, installs Glados and its dependencies (a few GB; the first time takes several minutes), and offers to add Glados to the Start Menu. Pin that entry to the taskbar for a one-click start.
 
-```batch
-pip install -e .
-```
-
-Update micromanager to the latest nightly build:
-https://micro-manager.org/Micro-Manager_Nightly_Builds
-
-Ensure that MicroManager is running pycro-manager server (check 'Run pycro-manager server on port 4827' in Tools-->Options)
-
-(Possibly) update pycro-manager and pymmcore to the latest pip version:
+The same steps by hand, from the Glados folder:
 
 ```batch
-pip install --upgrade pycromanager pymmcore
+uv venv --python 3.13 .venv
+uv pip install --python .venv\Scripts\python.exe -e .
+.venv\Scripts\python.exe -m glados_pycromanager.shortcuts install
 ```
+
+**Update:** `git pull`, then run `install_windows.bat` again. Do not upgrade `pycromanager` or `pymmcore` on their own: Glados pins the versions it was tested with, and a mismatched `pymmcore` cannot load the Micro-Manager device adapters.
+
+**Developers:** with `make` installed (e.g. `winget install ezwinports.make`), `make dev` does the same install plus the test/lint tools. See `CONTRIBUTING.md`.
+
+## Micro-Manager setup
+
+Glados asks which backend to use when it starts:
+
+- **PyMMCorePlus** or **Python** (recommended; fastest live display): point the start dialog at your Micro-Manager installation folder and your `.cfg` configuration file. Micro-Manager itself does not need to be running.
+- **Java**: start Micro-Manager first, enable *Tools → Options → Run pycro-manager server on port 4827*, and stop any live mode or acquisition. Use this only when you need a feature of the Java Micro-Manager engine.
+
+To try Glados without hardware, use the PyMMCorePlus backend with Micro-Manager's `MMConfig_demo.cfg`.
 
 ## Running instructions
 
-First, run micromanager as normal, and ensure it is working as expected. Stop all live/acquisition, and follow one of these instructions:
-
-There are a bunch of ways to run Glados-PycroManager. They are listed in order of user-friendliness:
-
-##### Run glados-pycromanager directly from conda
-
-Open the miniconda prompt, and run pycro-manager as follows:
-
-```batch
-conda activate C:\CondaEnvironments\GladosPycromanagerEnv
-glados-pycromanager
-```
-
-This simply activates the correct environment and starts glados-pycromanager. You can create a .bat file as follows which will have a shortcut to do this: 
-
-Please note that this assumes normal miniconda installation, otherwise you have to find your own miniconda installation path:
-
-```batch
-@echo off
-call C:\ProgramData\miniconda3\Scripts\activate.bat C:\CondaEnvironments\GladosPycromanagerEnv
-glados-pycromanager
-```
-
-##### Run napari from conda and open glados-pycromanager
-
-
-Open the miniconda prompt, and run napari as follows:
-
-```batch
-conda activate C:\CondaEnvironments\GladosPycromanagerEnv
-napari
-```
-
-An empty napari viewer will pop up. Within napari, use Plugins --> Glados (glados-pycromanager) to open the software suite.
-
-##### Full debugging access via the python interface
-
-Finally, you can fully clone glados-pycromanager from GitHub, and run 'GUI_napari.py' from the python enviroment, and it will open Napari with the glados-pycromanager plugin opened. This will allow you for full debugging accesss to the code, especially usefull when developing.
+- **Start Menu / taskbar**: the "Glados" entry the installer created. "Glados (last setup)" skips the start dialog and reuses the previous backend and configuration; "Glados (debug console)" keeps a console window open for error messages.
+- **Terminal**: `.venv\Scripts\glados.exe` from the Glados folder (or `glados` after `.venv\Scripts\activate`).
+- **Inside napari** (Java backend, with Micro-Manager already running): start `.venv\Scripts\napari.exe`, then *Plugins → Glados-PycroManager → Run Glados-PycroManager*.
+- **Debugging**: run `glados_pycromanager/GUI/GUI_napari.py` from your IDE with `.venv` as the interpreter, for full debugger access.
 
 ## Faster startup on Windows (optional)
 
-With the editable `.venv` install, `make shortcuts` adds Start Menu entries ("Glados", "Glados (last setup)" and a debug-console one); pin one to the taskbar for a one-click start. The splash screen shows what Glados is doing while it starts.
+The installer's Start Menu entries (re-create them with `make shortcuts` or `.venv\Scripts\python.exe -m glados_pycromanager.shortcuts install`) give a one-click start; the splash screen shows what Glados is doing while it starts.
 
 A *cold* start (the first after a reboot, or after an install or update) can take several times as long as a warm one: on a test laptop ~60 s against ~23 s, before the later startup work. Most of that difference is reading thousands of small library files from disk, each of which the virus scanner checks. Two things help, and neither is applied for you:
 
-1. **Precompile the bytecode after installing or updating.** Python writes these files itself on the first launch, so this only speeds up that one launch:
+1. **Precompile the bytecode after installing or updating.** `install_windows.bat` already does this. Otherwise Python writes these files itself on the first launch, so this only speeds up that one launch:
 
    ```batch
    .venv\Scripts\python.exe -m compileall -q -j 0 glados_pycromanager .venv\Lib\site-packages
@@ -133,6 +105,8 @@ A *cold* start (the first after a reboot, or after an install or update) can tak
 Here is an unorganized list of problems that might occur on a first run.
 
 1. When attempting to run via a Python-backend, it mentions that it cannot find some adapter (e.g. andor_mmgr_dal.dll). If this is the case, add the Micromanager installation folder to the system's PATH, restart the PC, and try again.
+2. `install_windows.bat` stops with an error mentioning git: install Git, open a *new* terminal or Explorer window (so it sees the updated PATH), and run it again.
+3. Glados shows a warning that `pyproject.toml` has changed since the environment was installed: run `install_windows.bat` (or `make dev`) again after a `git pull`.
 
 ## First use instructions
 

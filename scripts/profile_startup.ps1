@@ -1,9 +1,9 @@
 # scripts/profile_startup.ps1
 # Capture cold-import timings for glados_pycromanager.GUI.GUI_napari.
-# Run from the repo root inside the GladosEnv conda environment.
+# Run from the repo root after `make dev` / install_windows.bat.
 #
 # Usage:
-#   conda activate GladosEnv
+#   .\.venv\Scripts\Activate.ps1
 #   .\scripts\profile_startup.ps1
 #
 # Output: docs/perf-baseline.txt (appended with a timestamped header)

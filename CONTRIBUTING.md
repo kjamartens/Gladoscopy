@@ -6,28 +6,23 @@ Please read the relevant section before you open a PR.
 
 ## Quick start
 
+Needs **git**, **[uv](https://docs.astral.sh/uv/)** and **make**. uv downloads
+Python 3.13 itself, so no Python or conda install is required.
+
 ```bash
 make dev      # creates .venv, then editable install with dev extras
 make test     # verify everything works
 ```
 
-That's it — no conda, no manual activation. `make dev` creates a `.venv`
-in the repo root on first run and uses it automatically from then on.
+No manual activation: `make dev` creates a `.venv` in the repo root on
+first run and every target uses it from then on.
 
-**Windows**: `make` is available via **GnuWin32**
-(`C:\Program Files (x86)\GnuWin32\bin\make.exe`) — works from PowerShell
-and cmd.exe directly. Git Bash also works.
+**Windows**: `winget install astral-sh.uv` and `winget install ezwinports.make`
+(GnuWin32 make and Git Bash's make also work). The Makefile uses `uv` from
+PATH; without one it bootstraps uv into whatever `python` is on PATH.
 
-**Conda alternative** (if you prefer conda or already have GladosEnv):
-```bash
-make env                    # create / update GladosEnv
-conda activate GladosEnv
-make dev PYTHON=python      # install into the active conda env
-```
-Or use the all-in-one Windows batch file:
-```pwsh
-.\win_create_env.bat
-```
+Without make, `install_windows.bat` does the same install (no dev extras) and
+offers Start Menu shortcuts; it is what the user manual points end users to.
 
 Run `make help` to list every available target.
 
@@ -59,7 +54,6 @@ If you are adding a new autonomous-microscopy node, read both:
 
 | Target | What it does |
 |--------|-------------|
-| `make env` | Create or update the `GladosEnv` conda env from `environment.yaml` (idempotent) |
 | `make dev` | Editable install with dev extras — use this for day-to-day development |
 | `make install` | Non-editable production install (no dev extras) |
 | `make build` | Build wheel + sdist into `dist/` via `uv build` |

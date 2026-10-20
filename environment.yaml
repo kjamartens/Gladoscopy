@@ -1,8 +1,0 @@
-name: GladosEnv
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - python=3.13
-  - uv
-  - vc=14.3

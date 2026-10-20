@@ -126,7 +126,7 @@ def read_shortcut(path: Path) -> dict:
 def install(folders: list[Path], specs: list[ShortcutSpec]) -> list[Path]:
     missing = sorted({str(s.required) for s in specs if not s.required.exists()})
     if missing:
-        raise FileNotFoundError('Launcher(s) not found, run `make dev` first: ' + ', '.join(missing))
+        raise FileNotFoundError('Launcher(s) not found, run `make dev` or install_windows.bat first: ' + ', '.join(missing))
     written = []
     for folder in folders:
         for spec in specs:
