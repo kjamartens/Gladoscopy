@@ -201,8 +201,8 @@ def main():
     # Before any window exists, so every window carries it.
     set_app_user_model_id()
 
-    # Must precede PyQt5: Qt first and a pymmcore.CMMCore later crashes on Windows
-    # (see docs/perf-runtime-recipe.md "Known gotchas").
+    # Historically had to precede PyQt5 (see docs/perf-runtime-recipe.md "Known
+    # gotchas"); the actual guard is now glados_pycromanager/_msvc_runtime.py.
     import pymmcore  # noqa: F401
     from PyQt5.QtWidgets import QApplication
 

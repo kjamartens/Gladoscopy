@@ -31,8 +31,9 @@ startup_timeline.mark('GUI_napari import started')
 # isort: off
 # Must be imported before napari/PyQt5: loading Qt first and then constructing
 # a pymmcore.CMMCore later (headless Python backend) crashes with an access
-# violation on Windows (see docs/perf-runtime-recipe.md "Known gotchas").
-# Importing pymmcore here first avoids it.
+# violation on Windows (see docs/perf-runtime-recipe.md "Known gotchas"). With
+# current pymmcore wheels this order alone no longer avoids it; the package
+# __init__'s _msvc_runtime preload does.
 import pymmcore  # noqa: F401
 
 import napari

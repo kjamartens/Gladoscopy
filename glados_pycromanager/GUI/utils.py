@@ -26,7 +26,6 @@ from PyQt5.QtCore import QSize, Qt
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import QColor, QFontMetrics, QIcon, QPainter, QPen
-from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,

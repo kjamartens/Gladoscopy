@@ -13,6 +13,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+# Before pytest-qt or any test imports PyQt5: the package __init__ preloads the
+# system C++ runtime, without which a real Micro-Manager adapter crashes in
+# initializeDevice once Qt is loaded (glados_pycromanager/_msvc_runtime.py).
+import glados_pycromanager  # noqa: F401  isort:skip
+
 if TYPE_CHECKING:  # only for type hints; not imported at runtime
     pass
 
