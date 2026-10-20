@@ -7,6 +7,10 @@ Anything bigger should live in its own conftest under `tests/<area>/`.
 """
 from __future__ import annotations
 
+# First, before any test (or pytest-qt) imports PyQt5: on uv's Python, PyQt5's bundled
+# MSVCP140.dll otherwise crashes the next pymmcore.CMMCore() (glados_pycromanager/win_runtime.py).
+import glados_pycromanager  # noqa: F401  isort: skip
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
