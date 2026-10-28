@@ -262,6 +262,62 @@ _NODE_PACKAGES = [
     "glados_pycromanager.AutonomousMicroscopy.CustomFunctions",
 ]
 
+#: Called (no arguments) after every reload_all_node_modules(). Held weakly for
+#: bound methods, so a listening widget does not outlive its dock.
+_reload_listeners: list = []
+
+
+def add_reload_listener(callback) -> None:
+    """Call ``callback()`` after each :func:`reload_all_node_modules`.
+
+    For UI that built widgets from node metadata once (the Controls dock's
+    RT-analysis panel) and must rebuild to show added or removed kwargs.
+    """
+    import weakref
+
+    if hasattr(callback, "__self__"):
+        _reload_listeners.append(weakref.WeakMethod(callback))
+    else:
+        _reload_listeners.append(lambda: callback)
+
+
+def _notify_reload_listeners() -> None:
+    for ref in list(_reload_listeners):
+        callback = ref()
+        if callback is None:
+            _reload_listeners.remove(ref)
+            continue
+        try:
+            callback()
+        except RuntimeError as exc:
+            # A Qt widget whose C++ side is already deleted.
+            logger.debug("Dropping dead node-reload listener: %s", exc)
+            _reload_listeners.remove(ref)
+        except Exception:  # noqa: BLE001 — one bad listener must not stop the rest
+            logger.exception("Node-reload listener %r failed", callback)
+
+
+def _purge_modules_in(folders) -> int:
+    """Drop every ``sys.modules`` entry loaded from a node file in ``folders``.
+
+    Catches copies registered under a name other than the package prefix:
+    ``utils.functionNamesFromDir`` imports an AppData node under its bare stem
+    (``sys.modules["MyNode"]``), and ``utils._resolve_node_obj`` checks the bare
+    stem *first* -- so a surviving copy kept serving the pre-reload metadata.
+    """
+    import sys
+
+    roots = {os.path.normcase(os.path.abspath(f)) for f in folders if f}
+    purged = 0
+    for name, module in list(sys.modules.items()):
+        path = getattr(module, "__file__", None)
+        if not path or os.path.basename(path) == "__init__.py":
+            continue
+        if os.path.normcase(os.path.dirname(os.path.abspath(path))) in roots:
+            del sys.modules[name]
+            purged += 1
+    return purged
+
 
 def reload_all_node_modules() -> tuple[int, list[PluginLoadFailure]]:
     """Re-import every node `.py` from source trees and AppData directories.
@@ -308,6 +364,7 @@ def reload_all_node_modules() -> tuple[int, list[PluginLoadFailure]]:
         prefix = pkg_name + "."
         for key in [k for k in list(sys.modules) if k.startswith(prefix)]:
             del sys.modules[key]
+        _purge_modules_in([getattr(pkg, "_SOURCE_DIR", None), getattr(pkg, "_APPDATA_DIR", None)])
 
         # Reset package-level bookkeeping so _register() and _load_appdata()
         # behave as if the package is being imported for the first time.
@@ -338,4 +395,5 @@ def reload_all_node_modules() -> tuple[int, list[PluginLoadFailure]]:
         total_successes,
         len(all_failures),
     )
+    _notify_reload_listeners()
     return total_successes, all_failures

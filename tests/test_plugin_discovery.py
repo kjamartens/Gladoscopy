@@ -173,3 +173,89 @@ def test_dropin_does_not_leak_across_test_runs(isolated_appdata, monkeypatch):
         "glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements"
     )
     assert "DropInNode" not in pkg.__all__
+
+
+RELOAD_NODE = textwrap.dedent(
+    '''
+    def __function_metadata__():
+        return {"ReloadNode": {"required_kwargs": [%s], "optional_kwargs": [],
+                               "help_string": "", "display_name": "Reload node"}}
+
+
+    class ReloadNode:
+        pass
+    '''
+)
+
+
+def _kwarg(name):
+    return '{"name": "%s", "default": 1, "type": int, "description": ""}' % name
+
+
+@pytest.fixture
+def fake_node_package(tmp_path, monkeypatch):
+    """A node package whose AppData folder is `tmp_path`, as the only one reloaded.
+
+    Reloading the real node tree would import TensorFlow (~2 min).
+    """
+    import types
+
+    from glados_pycromanager.autonomous import registry
+    from glados_pycromanager.plugins import discovery
+
+    pkg = types.ModuleType("fake_reload_pkg")
+    pkg.__all__ = []
+    pkg._appdata_loaded = False
+    pkg._SOURCE_DIR = None
+    pkg._APPDATA_DIR = str(tmp_path)
+    pkg._register = lambda mods: pkg.__all__.extend(m.__name__ for m in mods)
+    monkeypatch.setitem(sys.modules, "fake_reload_pkg", pkg)
+    monkeypatch.setattr(discovery, "_NODE_PACKAGES", ["fake_reload_pkg"])
+    saved_registry = dict(registry._REGISTRY)
+    yield tmp_path / "ReloadNode.py"
+    for name in [n for n in sys.modules if n.split(".")[-1] == "ReloadNode"]:
+        del sys.modules[name]
+    registry._REGISTRY.clear()
+    registry._REGISTRY.update(saved_registry)
+    registry.clear_metadata_cache()
+    from glados_pycromanager.GUI.utils import clear_resolve_node_obj_cache
+    clear_resolve_node_obj_cache()
+
+
+def test_reload_replaces_bare_stem_copy_of_appdata_node(fake_node_package):
+    """The Controls dock's discovery (`functionNamesFromDir`) imports an AppData
+    node as `sys.modules["ReloadNode"]`, which `_resolve_node_obj` checks first.
+    A reload must replace that copy too, or the edited node's new kwargs never
+    appear."""
+    from glados_pycromanager.GUI import utils
+    from glados_pycromanager.plugins.discovery import reload_all_node_modules
+
+    node_file = fake_node_package
+    node_file.write_text(RELOAD_NODE % _kwarg("a"))
+    assert utils.functionNamesFromDir(str(node_file.parent))[0] == "ReloadNode.ReloadNode"
+    assert "ReloadNode" in sys.modules
+    assert utils.reqKwargsFromFunction("ReloadNode.ReloadNode") == ["a"]
+
+    node_file.write_text(RELOAD_NODE % (_kwarg("a") + ", " + _kwarg("b")))
+    n, failures = reload_all_node_modules()
+    assert (n, failures) == (1, [])
+    assert "ReloadNode" not in sys.modules
+    assert utils.reqKwargsFromFunction("ReloadNode.ReloadNode") == ["a", "b"]
+
+
+def test_reload_notifies_listeners(fake_node_package):
+    from glados_pycromanager.plugins import discovery
+
+    calls = []
+
+    class Listener:
+        def on_reload(self):
+            calls.append(True)
+
+    listener = Listener()
+    discovery.add_reload_listener(listener.on_reload)
+    discovery.reload_all_node_modules()
+    assert calls == [True]
+    del listener  # held weakly: a dropped listener is pruned, not called
+    discovery.reload_all_node_modules()
+    assert calls == [True]

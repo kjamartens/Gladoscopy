@@ -3098,7 +3098,12 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
     # --- Developer: "Reload Custom Nodes" menu item -------------------------
     def _reload_custom_nodes():
         from glados_pycromanager.plugins.discovery import reload_all_node_modules
+        from glados_pycromanager.GUI.AnalysisClass import terminate_all_rt_subprocesses
         n, failures = reload_all_node_modules()
+        #Parked RT workers and the warm pool's blank child imported the node
+        #modules before the reload; a reclaim would run the old code. Running
+        #analyses are left alone (they keep their old code until restarted).
+        terminate_all_rt_subprocesses(shared_data)
         msg = f"Reloaded {n} node module(s)."
         if failures:
             msg += f" {len(failures)} failure(s) — see log."
