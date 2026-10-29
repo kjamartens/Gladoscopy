@@ -145,6 +145,39 @@ def test_changed_setting_is_highlighted_and_restored(qapp, fake_node, shared, ap
     assert not panel.restoreDefaultsButton.isEnabled()
 
 
+def test_reload_rebuilds_kwargs_and_keeps_edits(qapp, fake_node, shared, appdata):
+    """Plugins > Reload Glados Custom Nodes: a kwarg added to (or removed from) a
+    node's metadata shows up without restarting, and the user's edits survive."""
+    from glados_pycromanager.autonomous import registry
+    from glados_pycromanager.plugins import discovery
+
+    panel = _panel(shared)
+    assert any(ref() == panel._onNodesReloaded for ref in discovery._reload_listeners)
+    _widget(panel, "count", OTHER).setText("9")
+    panel.methodDropdown.setCurrentText("Other node")
+
+    def edited():
+        meta = _fake_metadata()
+        meta["OtherNode"]["optional_kwargs"] = [
+            {"name": "sigma", "default": 1.5, "type": float, "description": "s", "display_text": "s"}]
+        meta["FakeNode"]["optional_kwargs"] = meta["FakeNode"]["optional_kwargs"][:1]  # drop `label`
+        return meta
+    sys.modules[MODULE].__function_metadata__ = edited
+    registry.clear_metadata_cache()
+    panel.reloadMethods()
+
+    assert {w.objectName() for w in panel.kwargWidgets(OTHER)} == {
+        f"LineEdit#{OTHER}#count", f"LineEdit#{OTHER}#sigma"}
+    assert {w.objectName() for w in panel.kwargWidgets(NODE)} == {
+        f"LineEdit#{NODE}#threshold", f"LineEdit#{NODE}#invert"}
+    assert panel.methodDropdown.currentText() == "Other node"
+    assert _widget(panel, "count", OTHER).text() == "9"
+    assert _widget(panel, "sigma", OTHER).text() == "1.5"
+    assert not _widget(panel, "sigma", OTHER).isHidden() and _widget(panel, "threshold").isHidden()
+    assert panel.currentData[f"LineEdit#{OTHER}#sigma"] == "1.5"
+    assert f"LineEdit#{NODE}#label" not in panel.currentData
+
+
 def test_restore_defaults_touches_only_the_selected_method(qapp, fake_node, shared, appdata):
     panel = _panel(shared)
     _widget(panel, "count", OTHER).setText("9")

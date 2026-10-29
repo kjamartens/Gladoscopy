@@ -940,6 +940,19 @@ acquisition, just materialised.
 
 So **users add new analysis/RT/custom nodes by dropping a `.py` into the AppData folder, not into the source tree.** When searching for a node implementation, check both locations. Adding a file to one of these folders without proper top-level functions will cause it to be imported but not appear as a node.
 
+**Plugins > Reload Glados Custom Nodes** (`discovery.reload_all_node_modules`). The
+package `_load_appdata()` is never called at startup: AppData nodes are first imported
+by `utils.functionNamesFromDir` under their **bare stem** (`sys.modules["MyNode"]`), and
+`_resolve_node_obj` checks the bare stem first. So the reload also purges every
+`sys.modules` entry loaded from a node folder (`_purge_modules_in`); without that an
+edited AppData node kept its old kwargs. UI built from node metadata once must
+rebuild on reload: register with `discovery.add_reload_listener` (held weakly).
+`RTAnalysisPanel` does (`reloadMethods`, keeping the selection and non-default values).
+The menu handler also terminates parked RT subprocess workers and the warm pool,
+whose children imported the pre-reload modules. Still not refreshed: already-placed
+Nodz node dialogs and running analyses. Tests: `test_plugin_discovery.py`,
+`test_rt_analysis_panel.py::test_reload_rebuilds_kwargs_and_keeps_edits`.
+
 **Recipe execution: how a run advances, fails and stops.** Read this before
 touching `executor.py` / `finishedEmits` (2026-09-29 robustness/lag work).
 - **Every downstream node start goes through `NodeItem.oneConnectionAtStartIsFinished`**:

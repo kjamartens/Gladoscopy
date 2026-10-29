@@ -168,10 +168,8 @@ class RTAnalysisPanel(QWidget):
         self.persist = persist
         self._runs = {}
         self._loading = False
-
-        if function_names is None:
-            function_names = discover_rt_function_names()
-        _display_names, self.displayNameMap = utils.displayNamesFromFunctionNames(function_names, '')
+        #Names given by the caller (tests) are reused on a reload; else re-discovered.
+        self._fixedFunctionNames = function_names
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -181,30 +179,12 @@ class RTAnalysisPanel(QWidget):
         self.methodDropdown = QComboBox()
         self.methodDropdown.setObjectName('comboBox_RTanalysisFunctions_KEEP')
         self.methodDropdown.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        for display_name, _function in self.displayNameMap:
-            self.methodDropdown.addItem(display_name)
         #The default (menu-style) popup delegate ignores per-item background and
         #font, which is how running methods are marked in the list.
         self.methodDropdown.setItemDelegate(QStyledItemDelegate(self.methodDropdown))
         layout.addWidget(self.methodDropdown)
 
-        #layout_init's widgets find `currentData` through their parent widget
-        #(`changeDataVarUponKwargChange`) and through `layout.parent().parent()`
-        #(`layout_changedDropdown`), so the grid sits one layout deep inside the
-        #widget that carries it.
-        self.paramsWidget = QWidget()
-        paramsOuter = QVBoxLayout(self.paramsWidget)
-        paramsOuter.setContentsMargins(0, 0, 0, 0)
-        self.paramsLayout = QGridLayout()
-        self.paramsLayout.setSpacing(compact_spacing())
-        self.paramsLayout.setColumnStretch(1, 1)
-        paramsOuter.addLayout(self.paramsLayout)
-        paramsOuter.addStretch(1)
-        self.currentData = {'__displayNameFunctionNameMap__': self.displayNameMap}
-        self.paramsWidget.currentData = self.currentData
-
         self.paramsScroll = _ParamsScrollArea(self.methodDropdown)
-        self.paramsScroll.setWidget(self.paramsWidget)
         layout.addWidget(self.paramsScroll, 1)
 
         buttons = QHBoxLayout()
@@ -230,14 +210,7 @@ class RTAnalysisPanel(QWidget):
         self._activePollTimer.setInterval(RT_ACTIVE_POLL_MS)
         self._activePollTimer.timeout.connect(self.refreshActiveState)
 
-        utils.layout_init(self.paramsLayout, '', self.displayNameMap,
-                          current_dropdown=self.methodDropdown, nodzInfo=None, skipInput=True,
-                          maxNrRows=10_000, showVariableOptions=False)
-        for widget in self.kwargWidgets():
-            if isinstance(widget, QCheckBox):
-                widget.stateChanged.connect(lambda _state, w=widget: self._onParamEdited(w))
-            elif isinstance(widget, QLineEdit):
-                widget.textChanged.connect(lambda _text, w=widget: self._onParamEdited(w))
+        self._buildMethods(function_names if function_names is not None else discover_rt_function_names())
         #Show only the selected method's parameters (layout_init built them all).
         self.methodDropdown.currentIndexChanged.connect(
             lambda _index: utils.layout_changedDropdown(self.paramsLayout, self.methodDropdown,
@@ -248,6 +221,83 @@ class RTAnalysisPanel(QWidget):
             self.loadSettings()
         self._onMethodChanged()
         self.refreshActiveState()
+
+        #Plugins > Reload Glados Custom Nodes: the widgets above were built from
+        #the node metadata once, so added/removed kwargs need a rebuild.
+        from glados_pycromanager.plugins.discovery import add_reload_listener
+        add_reload_listener(self._onNodesReloaded)
+
+    def _buildMethods(self, function_names):
+        """(Re)fill the method dropdown and build every method's parameter widgets.
+
+        Replaces the whole parameter widget (the scroll area deletes the old
+        one), so kwargs a node no longer declares disappear with it.
+        """
+        _display_names, self.displayNameMap = utils.displayNamesFromFunctionNames(function_names, '')
+        self.methodDropdown.blockSignals(True)
+        try:
+            self.methodDropdown.clear()
+            for display_name, _function in self.displayNameMap:
+                self.methodDropdown.addItem(display_name)
+        finally:
+            self.methodDropdown.blockSignals(False)
+
+        #layout_init's widgets find `currentData` through their parent widget
+        #(`changeDataVarUponKwargChange`) and through `layout.parent().parent()`
+        #(`layout_changedDropdown`), so the grid sits one layout deep inside the
+        #widget that carries it.
+        self.paramsWidget = QWidget()
+        paramsOuter = QVBoxLayout(self.paramsWidget)
+        paramsOuter.setContentsMargins(0, 0, 0, 0)
+        self.paramsLayout = QGridLayout()
+        self.paramsLayout.setSpacing(compact_spacing())
+        self.paramsLayout.setColumnStretch(1, 1)
+        paramsOuter.addLayout(self.paramsLayout)
+        paramsOuter.addStretch(1)
+        #A fresh dict: a running method holds its own copy (`_runs`), never this one.
+        self.currentData = {'__displayNameFunctionNameMap__': self.displayNameMap}
+        self.paramsWidget.currentData = self.currentData
+        self.paramsScroll.setWidget(self.paramsWidget)
+
+        utils.layout_init(self.paramsLayout, '', self.displayNameMap,
+                          current_dropdown=self.methodDropdown, nodzInfo=None, skipInput=True,
+                          maxNrRows=10_000, showVariableOptions=False)
+        for widget in self.kwargWidgets():
+            if isinstance(widget, QCheckBox):
+                widget.stateChanged.connect(lambda _state, w=widget: self._onParamEdited(w))
+            elif isinstance(widget, QLineEdit):
+                widget.textChanged.connect(lambda _text, w=widget: self._onParamEdited(w))
+
+    def reloadMethods(self, function_names=None):
+        """Rebuild from the current node metadata, keeping the selection and
+        every non-default value whose kwarg still exists.
+
+        Running analyses are untouched: each keeps its own settings and node
+        instance until it is deactivated.
+        """
+        state = self.settingsState()
+        if function_names is None:
+            function_names = self._fixedFunctionNames or discover_rt_function_names()
+        self._loading = True
+        try:
+            self._buildMethods(function_names)
+            self.methodDropdown.blockSignals(True)
+            try:
+                if self.methodDropdown.findText(state['selected']) >= 0:
+                    self.methodDropdown.setCurrentText(state['selected'])
+            finally:
+                self.methodDropdown.blockSignals(False)
+            for widget in self.kwargWidgets():
+                if widget.objectName() in state['values']:
+                    set_widget_value(widget, state['values'][widget.objectName()])
+        finally:
+            self._loading = False
+        utils.layout_changedDropdown(self.paramsLayout, self.methodDropdown, self.displayNameMap)
+        self._onMethodChanged()
+
+    def _onNodesReloaded(self):
+        logging.info('RT analysis panel: rebuilding after a node reload')
+        self.reloadMethods()
 
     # ------------------------------------------------------------------ params
     def currentFunction(self):
