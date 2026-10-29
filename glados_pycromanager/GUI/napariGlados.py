@@ -40,9 +40,6 @@ import glados_pycromanager.GUI.napariGlados as napariGlados
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.Core.MDAGlados import MDAGlados
 from glados_pycromanager.Core.microscope_service import Priority
-from glados_pycromanager.GUI.custom_widget_ui import (
-    Ui_CustomDockWidget,  # Import the generated UI module
-)
 from glados_pycromanager.GUI.frame_ring import DEFAULT_CAPACITY as FRAME_RING_CAPACITY
 from glados_pycromanager.GUI.fast_image_layer import FastImage, add_fast_image
 from glados_pycromanager.GUI.frame_ring import FrameRing
@@ -2733,36 +2730,6 @@ class dockWidget_PerformanceMode(dockWidgets):
         self.dockWidget = PerformanceModeWidget(shared_data)
         self.layout.addWidget(self.dockWidget, 0, 0) #type:ignore
 
-class dockWidget_fullGladosUI(dockWidgets):
-    def __init__(self): 
-        logging.debug("dockWidget_fullGladosUI started")
-        super().__init__()
-        # #new QWidget:
-        tempWidget = QMainWindow()
-        
-        ui = Ui_CustomDockWidget()
-        ui.setupUi(tempWidget)
-        #Open JSON file with MM settings
-        MM_JSON_path = os.path.join(sys.path[0], 'MM_PycroManager_JSON.json')
-        # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
-        with open(MM_JSON_path) as f:
-            MM_JSON = json.load(f)
-            
-        from glados_pycromanager.GUI.LaserControlScripts import runlaserControllerUI
-        form, self.criticalErrors = runlaserControllerUI(shared_data.MILcore,MM_JSON,ui,shared_data)
-        #Run the laserController UI        
-        #
-        #Create a Vertical+horizontal layout:
-        self.dockwidgetLayout = QGridLayout()
-        #Create a layout for the configs:
-        self.analysisLayout = QGridLayout()
-        #Add this to the mainLayout:
-        self.dockwidgetLayout.addLayout(self.analysisLayout,0,0)
-        
-        self.analysisLayout.addWidget(ui.centralwidget.children()[1].children()[0],1,1)
-        
-        self.dockWidget = self.layout.addLayout(self.dockwidgetLayout,0,0)
-
 #endregion
 
 #region HelpfullFunctions
@@ -3055,7 +3022,7 @@ def _correctControlsDockHeight(napariViewer, controlsWidget, alsoFit, requested,
     startup_timeline.mark('startup layout finalised')
     QTimer.singleShot(0, _startupReady)
 
-def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,include_flowChart_automatedMicroscopy:bool = True):
+def runNapariPycroManager(sMM_JSON,sshared_data,include_flowChart_automatedMicroscopy:bool = True):
     #Go from self to global variables
     global core, MM_JSON, livestate, napariViewer, shared_data, _startup_settings_save_token
     # core = score
@@ -3165,14 +3132,6 @@ def runNapariPycroManager(sMM_JSON,sshared_data,includecustomUI:bool = False,inc
         custom_widget_flowChart.dockWidget.focus()
         startup_timeline.mark('dock built: Autonomous microscopy')
     
-    if includecustomUI:
-        gladosLaserInfo = dockWidget_fullGladosUI()
-        if not gladosLaserInfo.criticalErrors:
-            napariViewer.window.add_dock_widget(gladosLaserInfo, area="right", name="GladosUI")
-        else:
-            logging.warning("GladosUI (specific for Endesfelder lab) not added due to critical errors")
-        startup_timeline.mark('dock built: GladosUI')
-
     #Performance Mode is a diagnostic tool, not opened by default. Users open it
     #on demand via Plugins > Glados-PycroManager > Performance Mode.
 

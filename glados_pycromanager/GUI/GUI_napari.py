@@ -395,27 +395,15 @@ class Worker(QObject):
     """
     finished = pyqtSignal()
 
-    def runNapariPycroManagerWrap(self, MM_JSON, shared_data:Shared_data,includeCustomUI:bool=False):
+    def runNapariPycroManagerWrap(self, MM_JSON, shared_data:Shared_data):
         """
-        Runs the NapariPycroManagerWrap function.
-        
+        Runs runNapariPycroManager, then emits `finished`.
+
         Args:
-            core: The core object.
             MM_JSON: The MM_JSON object.
             shared_data: The shared data object.
-            includeCustomUI (bool, optional): Flag to include custom UI. Defaults to False.
-        
-        Returns:
-            None
         """
-        import platform
-        # Get the computer's hostname
-        if 'SMIPC' in platform.node():
-            includeCustomUI=True
-        else:
-            includeCustomUI=False
-        # Run the NapariPycroManager function
-        runNapariPycroManager(MM_JSON, shared_data,includecustomUI=includeCustomUI)
+        runNapariPycroManager(MM_JSON, shared_data)
         self.finished.emit()
 
 class headlessGUI(QWidget):

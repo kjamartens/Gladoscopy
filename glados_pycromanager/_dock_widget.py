@@ -356,34 +356,6 @@ class AutonomousMicroscopyWidget(GladosWidget):
     
 
 
-class GladosSlidersWidget(GladosWidget):
-    """
-    The GladosSlidersWidget widget plugin
-    """
-    def __init__(self, viewer: napari.viewer.Viewer, parent=None): #type:ignore
-        """
-        Initialize the GladosSlidersWidget plugin
-        """
-
-        super().__init__(viewer=viewer, parent=parent)
-        
-        #Add the full micro manager controls UI
-        from glados_pycromanager.GUI.Analysis_dockWidgets import gladosSliders_plugin
-        self.dockWidget = gladosSliders_plugin(self) #type:ignore
-        
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.dockWidget) # type: ignore
-        self.setLayout(layout)
-        logging.debug("dockWidget_GladosSliders started")
-    
-    def resizeEvent(self, event):
-        """"
-        We don't want the GladosWidget resizeEvent for AutonomousMicroscopy
-        """
-        return super().resizeEvent(event)
-
-
 class PerformanceModeWidget(GladosWidget):
     """
     Dock widget hosting the Performance Mode start/stop toggle + report.
@@ -461,7 +433,6 @@ class MainWidget(QWidget):
         self.MM_JSON = MM_JSON
         self.livestate = livestate
 
-        includecustomUI = False
         include_flowChart_automatedMicroscopy = True
 
         logging.info("Main napari Glados-pycromanager plugin started")
@@ -471,13 +442,6 @@ class MainWidget(QWidget):
         showScaleBar(viewer)
         
         #Add the individual widgets
-        
-        #GladosLasers
-        try:
-            GladosLaserWidget = GladosSlidersWidget(viewer, parent=self)
-            self._viewer.window.add_dock_widget(GladosLaserWidget, area='right',tabify=True,name='Lasers')
-        except Exception as e:
-            logging.error(f"Error loading GladosLaserWidget: {e}")
         
         #Full MM control
         MMconfigWidget = MMConfigWidget(viewer, parent=self)

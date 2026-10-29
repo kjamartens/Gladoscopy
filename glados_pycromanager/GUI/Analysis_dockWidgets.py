@@ -172,43 +172,4 @@ def autonomousMicroscopy_plugin(parent):
     
     return flowChart_dockWidget.mainLayout
 
-def gladosSliders_plugin(parent):
-    """
-    Initializes and returns a custom dock widget for the GladOS GUI.
-    
-    This function sets up a custom dock widget that includes a laser controller UI. It loads the necessary configuration from a JSON file and passes it to the `runlaserControllerUI` function from the `LaserControlScripts` module.
-    
-    The dock widget is returned as the main layout, which can be added to the parent layout.
-    
-    Args:
-        parent (QWidget): The parent widget for the dock widget.
-    
-    Returns:
-        QWidget: The main layout of the custom dock widget.
-    """
-    global shared_data, napariViewer
-    shared_data = parent.shared_data
-    napariViewer = shared_data.napariViewer
-    MM_JSON = None
-    core = shared_data.core
-    
-    logging.debug("dockWidget_fullGladosUI started")
-    
-    #new QWidget:
-    tempWidget = QMainWindow()
-    
-    ui = Ui_CustomDockWidget()
-    ui.setupUi(tempWidget)
-    #Open JSON file with MM settings
-    # with open(os.path.join(sys.path[0], 'MM_PycroManager_JSON.json'), 'r') as f:
-    with open("C:/Users/Koen Martens/Documents/GitHub/ScopeGUI/glados-pycromanager/glados_pycromanager/GUI/MM_PycroManager_JSON.json") as f:
-        MM_JSON = json.load(f)
-    #Run the laserController UI
-    logging.debug("dockWidget_fullGladosUI halfway")
-    from LaserControlScripts import runlaserControllerUI
-    runlaserControllerUI(core,MM_JSON,ui,shared_data)
-    
-    logging.debug("dockWidget_fullGladosUI initted")
-    
-    return ui
 
