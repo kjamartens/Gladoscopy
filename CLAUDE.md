@@ -619,7 +619,12 @@ does, because the stack gets one frame longer each time and only an assignment t
 napari its extent grew. The buffer takes its dtype from the incoming frame — the old
 bare `np.zeros((2, h, w))` was float64, so a uint16 album cost 4x the bytes from its
 second snap on. A frame-shape change mid-album (ROI/binning) starts a fresh stack and
-logs at INFO, where `np.append` raised. Tests: `tests/test_album_layer_growth.py`.
+logs at INFO, where `np.append` raised. The layer is created **3-D from the first snap**
+(`buffer[:1]`, scale `[1, px, px]`): napari 0.7.0's vispy layer sizes
+`_world_to_layer_units_scale` to the layer's ndim once, at creation, so a layer whose ndim
+grows later raises `IndexError: tuple index out of range` in `_on_matrix_change`. **Never
+change a napari layer's ndim after creation**; replace the layer instead.
+Tests: `tests/test_album_layer_growth.py`.
 
 That store is created **uncompressed, one frame per chunk, via
 `zarr.create_array`** (T-D3). `zarr.open` cannot set compression at all on zarr 3.1.0
