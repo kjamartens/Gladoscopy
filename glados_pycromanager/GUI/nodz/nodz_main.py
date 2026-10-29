@@ -14,8 +14,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.GUI.nodz.nodz_utils as utils
 import glados_pycromanager.GUI.utils as full_utils
-from glados_pycromanager.GUI.nodz.nodz_custom import *
-import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 import glados_pycromanager.Core.MDAGlados as MDAGlados
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')

@@ -53,7 +53,6 @@ from PyQt5.QtWidgets import (
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 from glados_pycromanager.autonomous import registry as _node_registry
 from glados_pycromanager.errors import NodeDispatchError

@@ -87,7 +87,6 @@ warn_redundant_casts = false
 # Vendored Nodz is treated as third-party; see claude_decisions.md.
 exclude = [
     "glados_pycromanager/GUI/nodz/",
-    "scratch/",
     "build/",
     "dist/",
 ]
@@ -99,7 +98,6 @@ target-version = "py313"
 # "Vendored Nodz left alone" (2026-05-17).
 extend-exclude = [
     "glados_pycromanager/GUI/nodz",
-    "scratch",
     "build",
     "dist",
     "scalene-profile.*",
@@ -132,7 +130,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["PLR2004", "B011"]
-"glados_pycromanager/AutonomousMicroscopy/MainScripts/Main.py" = ["F401", "F403", "F405"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -158,16 +155,9 @@ markers = [
 where = ["."]
 include = ["glados_pycromanager*"]
 exclude = [
-    "glados_pycromanager.GUI.nodz.tmp*",
-    "scratch*",
     "tests*",
     "docs*",
 ]
-
-# scratch/ holds repo-local exploration (Test.py, test.ipynb, etc.) —
-# explicitly excluded from sdist/wheel.
-[tool.setuptools.exclude-package-data]
-"*" = ["scratch/*"]
 
 # Non-Python files shipped inside the package. Paths are relative to
 # each package directory (no leading slash). Dropped the leading-slash
