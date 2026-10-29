@@ -193,3 +193,82 @@ def test_backfill_cost_does_not_scale_with_rendered_count(tmp_appdata, rendered_
     shared_data._mdaModeAcqData = _FakeAcq(_FakeDataset())
 
     assert _backfill_missing_slices(shared_data, 'MDA') == len(events) - rendered_count
+
+
+# --- fill order follows the viewer's cursor ----------------------------------
+
+def _time_events(n):
+    return [{'axes': {'time': t}} for t in range(n)]
+
+
+def _prepare_time(shared_data, n, h=4, w=4):
+    shared_data._mdaModeParams = _time_events(n)
+    return _create_mda_zarr(shared_data, 'MDA', [n], h, w, np.uint16)
+
+
+def test_without_a_cursor_slices_fill_in_acquisition_order(tmp_appdata):
+    shared_data = Shared_data()
+    _prepare_time(shared_data, 6)
+    dataset = _FakeDataset()
+    shared_data._mdaModeAcqData = _FakeAcq(dataset)
+
+    _backfill_missing_slices(shared_data, 'MDA')
+
+    assert [r['time'] for r in dataset.reads] == [0, 1, 2, 3, 4, 5]
+
+
+def test_slices_nearest_the_cursor_fill_first(tmp_appdata):
+    shared_data = Shared_data()
+    _prepare_time(shared_data, 10)
+    dataset = _FakeDataset()
+    shared_data._mdaModeAcqData = _FakeAcq(dataset)
+
+    _backfill_missing_slices(shared_data, 'MDA', cursor=lambda: (6, 0, 0))
+
+    order = [r['time'] for r in dataset.reads]
+    assert order[0] == 6
+    assert set(order[1:3]) == {5, 7}
+    assert sorted(order) == list(range(10))
+
+
+def test_the_fill_follows_a_moving_cursor(tmp_appdata):
+    shared_data = Shared_data()
+    _prepare_time(shared_data, 20)
+    dataset = _FakeDataset()
+    shared_data._mdaModeAcqData = _FakeAcq(dataset)
+    # The user scrubs from t=2 to t=15 after three slices were filled.
+    cursor = lambda: (2,) if len(dataset.reads) < 3 else (15,)  # noqa: E731
+
+    _backfill_missing_slices(shared_data, 'MDA', cursor=cursor)
+
+    order = [r['time'] for r in dataset.reads]
+    assert order[:3] == [2, 1, 3] or order[:3] == [2, 3, 1]
+    assert order[3] == 15
+    assert sorted(order) == list(range(20))
+
+
+def test_filling_the_slice_under_the_cursor_asks_for_a_redraw(tmp_appdata):
+    shared_data = Shared_data()
+    _prepare_time(shared_data, 5)
+    shared_data._mdaModeAcqData = _FakeAcq(_FakeDataset())
+    redraws = []
+
+    _backfill_missing_slices(shared_data, 'MDA', cursor=lambda: (3,),
+                             on_current_slice_filled=lambda: redraws.append(1))
+
+    assert redraws == [1]
+    assert np.all(shared_data.mdaZarrData['MDA'][3] == 1)  # the first read
+
+
+def test_a_failing_cursor_falls_back_to_acquisition_order(tmp_appdata):
+    shared_data = Shared_data()
+    _prepare_time(shared_data, 4)
+    dataset = _FakeDataset()
+    shared_data._mdaModeAcqData = _FakeAcq(dataset)
+
+    def closed_viewer():
+        raise RuntimeError('viewer closed')
+
+    _backfill_missing_slices(shared_data, 'MDA', cursor=closed_viewer)
+
+    assert [r['time'] for r in dataset.reads] == [0, 1, 2, 3]

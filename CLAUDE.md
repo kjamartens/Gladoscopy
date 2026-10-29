@@ -588,6 +588,33 @@ napari's own `add_image`): `import zarr` (~4 s under GIL contention; now
 (`Shared_data._discard_temp_dir` renames the directory, then `rmtree`s it on a daemon
 thread; 1500 one-frame chunk files took 3.3 s; `release_all_temp_dirs` stays
 synchronous because `os._exit` follows). Tests: `tests/test_fast_mda_display_start.py`.
+**The multiDstack layer is now built at the Acquire click, not on the first frame**
+(first display update 2.1 s -> ~0.05 s on the same MDA). `startMDAVisualisation` ends with
+`_precreate_mda_layer`: a short-lived thread reads the camera size and `_camera_dtype`,
+then posts `_build_mda_layer` to the GUI thread via the napari bridge, skipped if `mdaMode`
+went off or `_mdaModeParamsGeneration` changed meanwhile. Not on `MMCORE_PLUS` (its
+`_preinit_mda_zarr` owns the store). The first frame goes through
+`_prepare_mda_layer_for_frame`: a layer whose shape/dtype matches the plan is just marked
+validated (the pre-build leaves it unvalidated on purpose, since binning is not in the ROI);
+otherwise it builds with the frame as the seed and stamps `ZARR_WRITTEN_SLICE_KEY`.
+`_build_mda_layer` **re-points** a same-ndim existing layer (`layer.data = store`) instead
+of delete + `add_image` (napari's controls, sliders and GL texture are the ~2 s); a
+different ndim still replaces the layer (see the Album note: ndim is fixed at creation).
+`warm_up_napari_image_layer` adds and removes a hidden tiny layer at startup-ready to pay
+napari's first-image-layer cost early. Tests: `tests/test_mda_layer_build.py`.
+**The end-of-MDA backfill fills around the cursor.** `_backfill_missing_slices(...,
+cursor=, on_current_slice_filled=)` re-sorts the remaining slices by L1 distance to
+`viewer.dims.current_step` (only when the cursor moved), and `_finalise_mda_layer`
+connects `dims.events.current_step` for the duration and repaints when the slice under
+the cursor lands (0.23 s after a scrub in the repro, vs. waiting for the whole pass).
+Tests: `tests/test_mda_backfill.py`.
+**Layer-list thumbnails no longer spin forever** (`GUI/napari_layer_list.py`,
+`install_layer_list_patches()` from `InitateNapariUI` and the plugin `MainWidget`). napari
+0.7 marks a layer unloaded per async slice request and paints the spinner *instead of*
+the thumbnail; every displayed MDA frame moves the dims, so the newest request was always
+pending. The patched `LayerDelegate` always paints the thumbnail and overlays the spinner
+only after `SPINNER_DELAY_S` (1 s) of continuous unloading. It patches private napari
+methods; `tests/test_napari_layer_list.py` pins them so an upgrade fails loudly.
 
 **Fixing that reset exposed a second, narrower race in `add_image()` itself**:
 once `_preinit_mda_zarr` reliably produces a correctly-shaped store, frames

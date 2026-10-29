@@ -411,6 +411,8 @@ class MainWidget(QWidget):
         #Set up logging in the AppData folder, INFO and DEBUG
         from glados_pycromanager.observability.logger import set_up_logger
         set_up_logger()
+        from glados_pycromanager.GUI.napari_layer_list import install_layer_list_patches
+        install_layer_list_patches()
 
         # Create an instance of the shared_data class
         shared_data = Shared_data()

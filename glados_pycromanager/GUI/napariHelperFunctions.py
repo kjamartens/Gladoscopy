@@ -261,6 +261,9 @@ def InitateNapariUI(napariViewer):
         None
     """
     logging.debug("Napari UI initiated")
+    # Thumbnails instead of a permanent spinner while an acquisition re-slices.
+    from glados_pycromanager.GUI.napari_layer_list import install_layer_list_patches
+    install_layer_list_patches()
     #Set title, icon
     napariViewer.title="GladOS - napari"
     # Set the window icon

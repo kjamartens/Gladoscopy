@@ -306,6 +306,29 @@ def prewarm_display_imports():
     Thread(target=_import, name='glados-prewarm-imports', daemon=True).start()
 
 
+WARMUP_LAYER_NAME = '__glados_layer_warmup__'
+
+
+def warm_up_napari_image_layer(viewer):
+    """Add and remove a tiny hidden 3-D image layer, once, at startup-ready.
+
+    napari's first image layer of a session is the slowest to build (0.71 s
+    against 0.26 s for the next one, measured): its layer controls, dims
+    slider widgets and vispy visual pay one-off setup costs. Paying them here,
+    while the user is not waiting, makes the first MDA layer cheaper. Both
+    steps run in one GUI-thread call, so the layer is never painted.
+    """
+    t0 = time.perf_counter()
+    try:
+        layer = viewer.add_image(np.zeros((2, 8, 8), dtype=np.uint16),
+                                 name=WARMUP_LAYER_NAME, visible=False)
+        viewer.layers.remove(layer)
+    except Exception:
+        logging.debug('napari layer warm-up failed', exc_info=True)
+        return
+    logging.debug('napari image layer warm-up took %.2f s', time.perf_counter() - t0)
+
+
 def _slice_safe_to_display(shared_data, arrived_slice):
     """Which slice the viewer should actually be pointed at.
 
@@ -544,7 +567,7 @@ def _rendered_axes_lookup(rendered, key_names):
     return lookup
 
 
-def _backfill_missing_slices(shared_data, layerName):
+def _backfill_missing_slices(shared_data, layerName, cursor=None, on_current_slice_filled=None):
     """Fill multiDstack slices the display path never rendered, from NDTiff.
 
     Only the pycromanager backends need this. Their acquisition callbacks
@@ -554,6 +577,15 @@ def _backfill_missing_slices(shared_data, layerName):
     `MMCORE_PLUS` is the mirror image: T-D3's frame-ring writer already puts
     every frame in the store, and there is no NDTiff dataset to read anyway, so
     the whole pass is skipped rather than run to produce N debug lines.
+
+    `cursor`, if given, is a zero-argument callable returning the slice the
+    viewer is on (its leading `current_step` indices) or None. The fill then
+    always takes the missing slice nearest to it next, so scrubbing a fast
+    acquisition while it is being filled shows real frames around where the
+    user is looking instead of waiting for a front-to-back pass. The remaining
+    list is re-sorted only when the cursor has moved. Without a cursor, slices
+    are filled in acquisition order. `on_current_slice_filled` is called after
+    a write to the slice the cursor is on, so that slice can be redrawn.
     """
     dataset = getattr(getattr(shared_data, '_mdaModeAcqData', None), '_dataset', None)
     if dataset is None:
@@ -573,7 +605,7 @@ def _backfill_missing_slices(shared_data, layerName):
     # One lookup set per distinct expected key set (normally exactly one),
     # instead of rescanning every rendered frame for every expected event.
     lookups = {}
-    filled = 0
+    missing = []
     for expectedEntry in expected_events:
         expected_axes = expectedEntry['axes']
         key_names = tuple(sorted(expected_axes))
@@ -583,7 +615,41 @@ def _backfill_missing_slices(shared_data, layerName):
             lookups[key_names] = lookup
         if tuple(expected_axes[name] for name in key_names) in lookup:
             continue
+        try:
+            sliceTuple = tuple(
+                int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]],
+                                    expected_axes[dimensionOrder[dim_id]]))
+                for dim_id in range(len(n_entries_in_dims)))
+        except (KeyError, TypeError, ValueError) as exc:
+            logging.debug('Entry %s tried, but not acquired: %s', expectedEntry, exc)
+            continue
+        missing.append((sliceTuple, expectedEntry))
 
+    n_dims = len(n_entries_in_dims)
+
+    def _current():
+        if cursor is None:
+            return None
+        try:
+            here = cursor()
+        except Exception:  # a closed viewer must not stop the fill
+            return None
+        if here is None or len(here) < n_dims:
+            return None
+        return tuple(int(v) for v in here[:n_dims])
+
+    # Kept so that the *last* element is filled next: pop() from the end.
+    missing.reverse()
+    sorted_for = None
+    filled = 0
+    while missing:
+        here = _current()
+        if here is not None and here != sorted_for:
+            missing.sort(key=lambda item: sum(abs(a - b) for a, b in zip(item[0], here)),
+                         reverse=True)
+            sorted_for = here
+        sliceTuple, expectedEntry = missing.pop()
+        expected_axes = expectedEntry['axes']
         try:
             sliceImage = dataset.read_image(
                 channel=expected_axes.get('channel'),
@@ -592,16 +658,13 @@ def _backfill_missing_slices(shared_data, layerName):
                 position=expected_axes.get('position'),
                 row=expected_axes.get('row'),
                 column=expected_axes.get('column'))
-
-            sliceTuple = ()
-            for dim_id in range(len(n_entries_in_dims)):
-                currentSlice = expected_axes[dimensionOrder[dim_id]]
-                currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
-                sliceTuple += (int(currentSliceID),)
             shared_data.mdaZarrData[layerName][sliceTuple + (slice(None), slice(None))] = sliceImage
             filled += 1
         except (AttributeError, KeyError, IndexError, TypeError, ValueError) as exc:
             logging.debug('Entry %s tried, but not acquired: %s', expectedEntry, exc)
+            continue
+        if on_current_slice_filled is not None and sliceTuple == here:
+            on_current_slice_filled()
 
     logging.debug('Backfill filled %d of %d expected slices from NDTiff.',
                   filled, len(expected_events))
@@ -651,6 +714,183 @@ def _apply_pixel_scale(layer, shared_data) -> None:
     else:
         logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
         layer.scale = [1, 1]
+
+
+def _slice_index_for_axes(shared_data, axes):
+    """The multiDstack store index (leading dims) for a frame's `Axes` dict."""
+    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
+    return tuple(int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]],
+                                     axes[dimensionOrder[dim_id]]))
+                 for dim_id in range(len(n_entries_in_dims)))
+
+
+def _layer_matches_plan(layer, n_entries_in_dims, frame_shape, dtype):
+    """True if `layer` can hold this plan's stack of `frame_shape` frames as is."""
+    data = layer.data
+    expected = tuple(int(n) for n in n_entries_in_dims) + tuple(int(v) for v in frame_shape)
+    return (tuple(int(v) for v in data.shape) == expected
+            and np.dtype(data.dtype) == np.dtype(dtype))
+
+
+def _build_mda_layer(shared_data, viewer, layer_name, colormap, frame_shape, dtype,
+                     seed_image=None, seed_slice=None):
+    """Create, or re-point, the multiDstack layer for the current plan.
+
+    Called on the GUI thread, by `_precreate_mda_layer` when Acquire is
+    clicked and by the display path when the first frame finds no usable
+    layer. Building a layer costs ~2 s of napari work (layer controls, dims
+    sliders, the GL texture) while a fast acquisition competes for the CPU.
+
+    An existing layer with the same number of dimensions is re-pointed at the
+    new store (`layer.data = store`) instead of being deleted and rebuilt: only
+    the dims sliders change then. A layer whose ndim differs is replaced,
+    because napari 0.7's vispy layer cannot change ndim after creation (see
+    the Album note in CLAUDE.md).
+
+    `seed_image` is written at `seed_slice` *before* napari first reads the
+    store: add_image() reads the current slice at once on napari's slicer
+    thread, and zarr's LocalStore truncates a chunk file before writing it, so
+    a write racing that read can hand napari a 0-byte chunk. Returns True if the
+    seed was written.
+    """
+    dimensionOrder, n_entries_in_dims, _unique = _get_cached_dimensions(shared_data)
+    frame_shape = tuple(int(v) for v in frame_shape)
+    expected = tuple(int(n) for n in n_entries_in_dims) + frame_shape
+
+    found = getLayerIdFromName(layer_name, viewer, shared_data)
+    old_layer = viewer.layers[found[0]] if found else None
+
+    _discard_mismatched_mda_zarr(shared_data, layer_name, expected, dtype)
+    seeded = False
+    reused_store = shared_data.mdaZarrData.get(layer_name) is not None
+    if not reused_store:
+        # One creation site, one explicit dtype (T-D1).
+        _create_mda_zarr(shared_data, layer_name, n_entries_in_dims,
+                         frame_shape[0], frame_shape[1], dtype)
+    if seed_image is not None and seed_slice is not None:
+        shared_data.mdaZarrData[layer_name][tuple(seed_slice) + (slice(None), slice(None))] = seed_image
+        seeded = True
+    elif reused_store:
+        # Pre-created by _preinit_mda_zarr (MMCORE_PLUS): its ZarrFrameWriter
+        # may be writing slice (0, ...) right now. Wait for its first write to
+        # land before napari reads the store (see the docstring).
+        _wait_for_zarr_writer_progress(shared_data)
+    store = shared_data.mdaZarrData[layer_name]
+
+    if old_layer is not None and old_layer.ndim == len(expected):
+        logging.info('Re-pointing layer %r at a new %s store', layer_name, expected)
+        old_layer.data = store
+        layer = old_layer
+    else:
+        if old_layer is not None:
+            logging.info('Replacing layer %r: %d dims, the plan needs %d',
+                         layer_name, old_layer.ndim, len(expected))
+            viewer.layers.remove(old_layer)
+        layer = viewer.add_image(store, colormap=colormap, name=layer_name)
+        _apply_pixel_scale(layer, shared_data)
+        viewer.reset_view()
+    # Default to napari's native "continuous" auto-contrast, overridable via
+    # napari's own layer controls. This path re-slices via
+    # `dims.set_current_step`, which goes through napari's slicing pipeline,
+    # so napari's per-slice recompute adapts brightness by itself.
+    layer._keep_auto_contrast = True  # type:ignore
+
+    # Built from this plan's dimensions, so it matches by construction (T-E3).
+    _mark_layer_shape_validated(shared_data, layer_name, layer)
+
+    for dim_id in range(len(n_entries_in_dims)):
+        viewer.dims.set_axis_label(dim_id, dimensionOrder[dim_id])
+    viewer.dims.set_current_step(list(range(len(n_entries_in_dims))),
+                                 [0] * len(n_entries_in_dims))
+    logging.info('MDA layer %r ready: %s %s, axes %s', layer_name, expected,
+                 np.dtype(dtype), list(dimensionOrder))
+    return seeded
+
+
+def _prepare_mda_layer_for_frame(shared_data, viewer, layer_name, colormap, image, metadata):
+    """Make sure the multiDstack layer fits this frame before it is written.
+
+    Validated once per acquisition, not once per frame (T-E3): an existing
+    layer only stops matching when the plan changes or the layer object is
+    replaced, and `_layer_shape_already_validated` keys on exactly those.
+    A layer that does not match (plan, frame size or dtype) is rebuilt; the
+    frame is then written as the seed, and stamped as written.
+    """
+    found = getLayerIdFromName(layer_name, viewer, shared_data)
+    if found:
+        layer = viewer.layers[found[0]]
+        if _layer_shape_already_validated(shared_data, layer_name, layer):
+            return
+        _dims, n_entries_in_dims, _unique = _get_cached_dimensions(shared_data)
+        if _layer_matches_plan(layer, n_entries_in_dims, image.shape[-2:], image.dtype):
+            _mark_layer_shape_validated(shared_data, layer_name, layer)
+            return
+        logging.info('Layer %r no longer matches the acquisition plan; rebuilding it',
+                     layer_name)
+        _invalidate_layer_shape_validation(shared_data, layer_name)
+
+    stamped = metadata.get(ZARR_WRITTEN_SLICE_KEY)
+    seed_slice = None if stamped is not None else _slice_index_for_axes(shared_data, metadata['Axes'])
+    if _build_mda_layer(shared_data, viewer, layer_name, colormap, image.shape[-2:],
+                        image.dtype, seed_image=image if seed_slice is not None else None,
+                        seed_slice=seed_slice):
+        metadata[ZARR_WRITTEN_SLICE_KEY] = seed_slice
+
+
+def _precreate_mda_layer(shared_data, layer_name, colormap='gray'):
+    """Build the MDA layer as soon as Acquire is clicked, not on the first frame.
+
+    The acquisition is not held up: it starts on its own worker as before, and
+    its first frame arrives 1-5 s after the click (measured, Python backend).
+    The frame size and dtype are read from MIL on a short-lived thread (the
+    GUI thread must not call the hardware), and the build is then posted to
+    the GUI thread. Whatever is first -- this build or the first frame --
+    builds the layer; the other finds it matching and does nothing.
+
+    Skipped on MMCORE_PLUS: there the frame-ring writer may already be writing
+    the pre-created store, and napari reading a chunk mid-write fails.
+    """
+    try:
+        if shared_data.config.mda_config.vis_method != 'multiDstack' or layer_name == 'Live':
+            return None
+        mil = shared_data.MILcore
+        if mil.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
+            return None
+    except Exception:
+        logging.debug('MDA layer pre-creation skipped', exc_info=True)
+        return None
+    generation = getattr(shared_data, '_mdaModeParamsGeneration', None)
+
+    def _read_and_build():
+        try:
+            h = int(mil.get_image_height())
+            w = int(mil.get_image_width())
+            dtype = _camera_dtype(shared_data)
+        except Exception:
+            logging.debug('MDA layer pre-creation: could not read the camera', exc_info=True)
+            return
+
+        def _build(viewer):
+            if not shared_data.mdaMode or generation != getattr(
+                    shared_data, '_mdaModeParamsGeneration', None):
+                return  # stopped, or another plan started meanwhile
+            found = getLayerIdFromName(layer_name, viewer, shared_data)
+            if found:
+                _dims, n_entries, _unique = _get_cached_dimensions(shared_data)
+                layer = viewer.layers[found[0]]
+                if _layer_matches_plan(layer, n_entries, (h, w), dtype):
+                    return
+            _build_mda_layer(shared_data, viewer, layer_name, colormap, (h, w), dtype)
+            # Not marked validated: if the camera's real frames differ (a
+            # binning change the ROI does not show), the first frame rebuilds.
+            _invalidate_layer_shape_validation(shared_data, layer_name)
+
+        from glados_pycromanager.GUI.napari_bridge import get_bridge
+        get_bridge(shared_data).submit(_build)
+
+    thread = Thread(target=_read_and_build, name='glados-mda-layer-precreate', daemon=True)
+    thread.start()
+    return thread
 
 
 #: How long a display payload may sit unacknowledged by the GUI thread before the
@@ -853,14 +1093,8 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
             
     #Visualise the MDA data via a 'stack' - i.e. a multiD method where the user can (later) scroll through the frames
     elif shared_data.config.mda_config.vis_method == 'multiDstack':
-        # NOTE: layerName is guaranteed != 'Live' anywhere in this branch. The
-        # frameByFrame branch above already intercepts every DataStructure with
-        # layer_name == 'Live' via its `or DataStructure['layer_name'] == 'Live'`
-        # condition, regardless of vis_method - so a 'Live'-named frame always gets
-        # routed (and contrast-throttled, see _maybe_refresh_contrast) there first
-        # and never reaches this elif. The `layerName == 'Live'` sub-cases below are
-        # therefore unreachable under the current dispatch; left in place rather than
-        # removed to avoid a speculative behavior change outside this audit's scope.
+        # layerName is never 'Live' here: the frameByFrame branch above takes
+        # every 'Live'-named frame regardless of vis_method.
         if DataStructure['finalisationProcedure'] == False:
             latestImage = DataStructure['data'][0]
             metadata = utils.metadata_refactor(DataStructure['data'][1],shared_data)
@@ -870,234 +1104,50 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                 return
             # Guarantee C-contiguous memory for zarr writes (same reason as frameByFrame).
             latestImage = np.ascontiguousarray(latestImage)
-            liveImageLayer = getLayerIdFromName(layerName,napariViewer,shared_data)
-        
-            if layerName != 'Live':
-                #In case MDA is done repeatedly, the layer already exists, but the dimensions might be wrong. If this is the case, we reshape the MDA layer
-                #
-                #Validated once per acquisition, not once per frame (T-E3). An
-                #existing layer's shape only stops matching when the plan changes
-                #or the layer object is replaced, and _layer_shape_already_validated
-                #keys on exactly those two things -- so the steady state here is a
-                #dict lookup plus a weakref deref, instead of re-deriving the plan's
-                #dimensions and walking them with a teardown (layers.pop + zarr
-                #reset + full texture re-upload) waiting on any mismatch.
-                if liveImageLayer and not _layer_shape_already_validated(
-                        shared_data, layerName, napariViewer.layers[liveImageLayer[0]]):
-                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
-                    
-                    #Assume the dimensions are correct
-                    correctDimensions = True
-                    
-                    #Then check if anywhere the dimensions of the layer are wrong
-                    #Check if we have the correct nr of dimensions
-                    CurrentLayer = napariViewer.layers[liveImageLayer[0]]
-                    if CurrentLayer.ndim != len(uniqueEntriesAllDims)+2: #Note: +2 for image xy
-                        correctDimensions = False
-                    else:
-                        layerData = CurrentLayer.data
-                        #Check each dimension as follows:
-                        for dim_id in range(0,len(uniqueEntriesAllDims)):
-                            #Check if it has the correct label
-                            # logging.debug(f'axis_labels: {napariViewer.dims.axis_labels[dim_id]} vs {dimensionOrder[dim_id]}')
-                            # if napariViewer.dims.axis_labels[dim_id] != dimensionOrder[dim_id]:
-                            #     correctDimensions = False
-                            #     break
-                            #Check it has the correct length:
-                            if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
-                                logging.debug(f'range: {layerData.shape[dim_id]} vs {n_entries_in_dims[dim_id]}')
-                            if int(layerData.shape[dim_id]) != n_entries_in_dims[dim_id]:
-                                correctDimensions = False
-                                break
-                        else:
-                            # The leading (acquisition) dims all matched -- also check the
-                            # trailing image plane. A ROI/binning change between two
-                            # acquisitions that reuse the same layer name and happen to
-                            # have the same leading dim counts (e.g. both "5 time points")
-                            # was invisible to the loop above, which only ever looks at
-                            # dims *before* the image plane. The stale store's (h, w) then
-                            # silently stayed whatever the *previous* acquisition's camera
-                            # settings produced, and the first write of the new
-                            # acquisition failed with a zarr "could not broadcast" error
-                            # instead of triggering the rebuild below.
-                            if tuple(layerData.shape[-2:]) != tuple(latestImage.shape[-2:]):
-                                correctDimensions = False
 
-                    #Remove the layer if the dimensions are wrong
-                    if correctDimensions == True:
-                        #Matches the current plan: record it so subsequent frames of
-                        #this acquisition skip the check entirely.
-                        _mark_layer_shape_validated(shared_data, layerName, CurrentLayer)
-                    else:
-                        #Logged at INFO, not DEBUG: after T-E3 this must happen at most
-                        #once per acquisition, so seeing it mid-run is the signal that
-                        #something re-derived different dimensions under a live layer.
-                        logging.info('Layer %r no longer matches the acquisition plan; '
-                                     'rebuilding it (expected %s dims of %s)',
-                                     layerName, len(uniqueEntriesAllDims) + 2, n_entries_in_dims)
-                        _invalidate_layer_shape_validation(shared_data, layerName)
-                        logging.debug('removing mdaZarrData - looping over layers')
-                        #Remove the mdaZarrData array and ensure that we create a new layer
-                        for tLayerIndex in range(0,len(napariViewer.layers)):
-                            tLayer = napariViewer.layers[tLayerIndex]
-                            logging.debug(f'layer: {tLayer}, comparing with {napariViewer.layers[liveImageLayer[0]].name}, boolTest {str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name)}')
-                            if str(tLayer) == str(napariViewer.layers[liveImageLayer[0]].name):
-                                #If we found the layer, delete it, and ensure we create a new one
-                                logging.debug(f'found layer to remove: {tLayer} at {tLayerIndex}')
-                                napariViewer.layers.pop(tLayerIndex)
-                                shared_data.mdaZarrData[layerName] = None
-                                # The layer that referenced this store is gone, so
-                                # the store can go with it (T-D7). A fresh one is
-                                # created just below.
-                                shared_data.release_zarr_temp_dir(layerName)
-                                liveImageLayer = False
-                                break
-        
-            #If it's the first layer
-            if not liveImageLayer:
-                if layerName != 'Live':
-                    logging.debug(f'creating layer with name {layerName} via multiDstack method')
-                    dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
-                    logging.debug(f"obtained dimensions: {dimensionOrder} and n_entries_in_dims: {n_entries_in_dims}")
-                    
-                    shape = n_entries_in_dims
-                    # Zarr may have been pre-created by _preinit_mda_zarr before run_mda()
-                    # started (MMCORE_PLUS fast acquisitions). Reuse it so frameReady writes
-                    # are not lost -- but only if it fits this plan. A store can also be
-                    # left over from an earlier acquisition under the same layer name
-                    # whose layer the user closed (nothing releases the store then).
-                    # Reusing that one made every write of a re-ordered or resized plan
-                    # fail with zarr's BoundsCheckError, and nothing was displayed.
-                    _discard_mismatched_mda_zarr(shared_data, layerName,
-                                                 tuple(shape) + tuple(latestImage.shape[-2:]),
-                                                 latestImage.dtype)
-                    if shared_data.mdaZarrData.get(layerName) is None:
-                        # One creation site, one explicit dtype (T-D1). The frame
-                        # in hand carries the camera's own dtype, so use it rather
-                        # than asking the core from the GUI thread.
-                        _create_mda_zarr(shared_data, layerName, shape,
-                                         latestImage.shape[0], latestImage.shape[1],
-                                         latestImage.dtype)
-                        #Seed position 0 with the current frame
-                        shared_data.mdaZarrData[layerName][(0,) * len(shape) + (slice(None),slice(None))] = latestImage
-                    else:
-                        # Pre-created by _preinit_mda_zarr: no seed write happened
-                        # above, so unlike the branch just above, nothing here has
-                        # guaranteed slice (0, 0, ...) is actually on disk yet --
-                        # only that the ZarrFrameWriter thread has been *handed*
-                        # it (T-D2's metadata stamp, which fires on submit, not on
-                        # completion). add_image() below makes napari read the
-                        # array at its current dims.point (all-zeros for a brand
-                        # new layer) practically immediately, on its own thread
-                        # pool. zarr's LocalStore is not atomic -- writing a chunk
-                        # truncates the file to 0 bytes *before* the bytes are
-                        # written -- so a napari read landing in that window reads
-                        # a 0-byte chunk and crashes its slicer thread with
-                        # "cannot reshape array of size 0" where Glados cannot
-                        # catch it. Wait for the writer to land its first write
-                        # (the frame-ring consumer submits in arrival order, so
-                        # the first frame it submits -- (0, 0, ...) -- is also the
-                        # first one the writer completes).
-                        _wait_for_zarr_writer_progress(shared_data)
+            # Make sure a layer matching this plan and frame exists. Normally it
+            # was already built when Acquire was clicked (_precreate_mda_layer)
+            # and validated by the first frame, so this is a dict lookup.
+            _prepare_mda_layer_for_frame(shared_data, napariViewer, layerName,
+                                         DataStructure['layer_color_map'], latestImage, metadata)
 
-                    layer = napariViewer.add_image(shared_data.mdaZarrData[layerName], colormap=DataStructure['layer_color_map'],name = layerName)
-                    #Set correct scale - in nm
-                    _apply_pixel_scale(layer, shared_data)
-                    # Default to napari's native "continuous" auto-contrast, same
-                    # as the frameByFrame path -- overridable via napari's own
-                    # layer controls (once / continuous / manual slider drag).
-                    # Unlike frameByFrame, this path re-slices via
-                    # `dims.set_current_step` below, which *does* go through
-                    # napari's normal slicing pipeline -- so while continuous is
-                    # selected, napari's own per-slice recompute already adapts
-                    # brightness natively; no separate Glados-side throttle call
-                    # is needed for this path (see the update branch below).
-                    layer._keep_auto_contrast = True #type:ignore
+            # One writer per frame (T-D2). The acquisition side writes every
+            # frame -- that is why it exists, the vis queue drops frames --
+            # and stamps the index it used. When that stamp is present this
+            # frame is already in the store, so writing it again is a full
+            # chunk re-encode of identical data, on the GUI thread. Reuse
+            # the index instead; it is also the one actually written.
+            sliceTuple = metadata.get(ZARR_WRITTEN_SLICE_KEY)
+            if sliceTuple is None:
+                # No acquisition-side write for this frame: both pycromanager
+                # paths, and any frame whose ring write failed. The display
+                # path is then the only writer and must do the work.
+                sliceTuple = _slice_index_for_axes(shared_data, metadata['Axes'])
+                shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = latestImage
 
-                    # Built from this plan's dimensions a few lines up, so it
-                    # matches by construction -- record that, and the first frame
-                    # after creation skips the validation walk too (T-E3).
-                    _mark_layer_shape_validated(shared_data, layerName, layer)
+            #One batched call, not one per dimension (T-E1). Each scalar
+            #call assigns napari's `Dims.point` separately, emitting a
+            #`point` event and forcing a complete re-slice -- chunk fetch,
+            #decompress, contrast rescan, GPU upload -- so a 4-D plan cost
+            #four full re-slices per displayed frame. `set_current_step`
+            #also accepts sequences, and that form routes through a single
+            #`set_point`, which builds the whole tuple and assigns `point`
+            #once. Measured against the pinned napari 0.7.0: 4 point events
+            #for the per-axis loop, 1 for the batched call, same resulting
+            #`current_step`.
+            displaySlice = _slice_safe_to_display(shared_data, sliceTuple)
+            napariViewer.dims.set_current_step(list(range(len(displaySlice))),
+                                               list(displaySlice))
 
-                    for dim_id in range(len(n_entries_in_dims)):
-                        napariViewer.dims.set_axis_label(dim_id, dimensionOrder[dim_id])
-                        logging.info(f"Setting axis label {dim_id} to {dimensionOrder[dim_id]}")
-                    napariViewer.reset_view()
-                    
-                    #set the napariViewer to the correct slices, in one update
-                    #(see the per-frame call below for why the sequence form).
-                    napariViewer.dims.set_current_step(
-                        list(range(len(n_entries_in_dims))),
-                        [0] * len(n_entries_in_dims))
-                    logging.info("Set all %d current steps to 0", len(n_entries_in_dims))
-                else:
-                    nrLayersBefore = len(napariViewer.layers)
-                    layer = napariViewer.add_image(latestImage, colormap=DataStructure['layer_color_map'],name = layerName)
-                    #Set correct scale - in nm
-                    _apply_pixel_scale(layer, shared_data)
-                    layer._keep_auto_contrast = True #type:ignore
-                    napariViewer.reset_view()
-            #Else if the layer already exists, replace it!
-            else:
-                if layerName != 'Live':
-                    # logging.debug(f'updating layer with name {layerName} via multiDstack method')
-                    # One writer per frame (T-D2). The acquisition side writes every
-                    # frame -- that is why it exists, the vis queue drops frames --
-                    # and stamps the index it used. When that stamp is present this
-                    # frame is already in the store, so writing it again is a full
-                    # chunk re-encode of identical data, on the GUI thread. Reuse
-                    # the index instead; it is also the one actually written.
-                    sliceTuple = metadata.get(ZARR_WRITTEN_SLICE_KEY)
-                    if sliceTuple is None:
-                        # No acquisition-side write for this frame: both pycromanager
-                        # paths, and any frame whose ring write failed. The display
-                        # path is then the only writer and must do the work.
-                        dimensionOrder, n_entries_in_dims, uniqueEntriesAllDims = _get_cached_dimensions(shared_data)
+            # No explicit contrast call here: `set_current_step` above
+            # already ran napari's own slicing pipeline, which natively
+            # recomputes contrast limits on every re-slice while the
+            # layer's `_keep_auto_contrast` (napari's own "continuous"
+            # flag) is True, and does nothing while it's False ("once"
+            # already consumed, or the user is holding a manual range).
 
-                        #Determine in which multi-D slice the image should be added:
-                        sliceTuple = ()
-                        for dim_id in range(len(n_entries_in_dims)):
-                            currentSlice = metadata['Axes'][dimensionOrder[dim_id]]
-                            currentSliceID = int(np.searchsorted(uniqueEntriesAllDims[dimensionOrder[dim_id]], currentSlice))
-                            if logging.getLogger(__name__).isEnabledFor(logging.DEBUG):
-                                logging.debug(f"currentSlice[{dim_id}]: {currentSliceID}")
-                            sliceTuple += (int(currentSliceID),)
-
-                        shared_data.mdaZarrData[layerName][sliceTuple + (slice(None),slice(None))] = latestImage
-
-                    #set the napariViewer to the correct slice: reuse the indices
-                    #already computed for sliceTuple above rather than re-running
-                    #the same searchsorted per dimension a second time.
-                    #
-                    #One batched call, not one per dimension (T-E1). Each scalar
-                    #call assigns napari's `Dims.point` separately, emitting a
-                    #`point` event and forcing a complete re-slice -- chunk fetch,
-                    #decompress, contrast rescan, GPU upload -- so a 4-D plan cost
-                    #four full re-slices per displayed frame. `set_current_step`
-                    #also accepts sequences, and that form routes through a single
-                    #`set_point`, which builds the whole tuple and assigns `point`
-                    #once. Measured against the pinned napari 0.7.0: 4 point events
-                    #for the per-axis loop, 1 for the batched call, same resulting
-                    #`current_step`.
-                    displaySlice = _slice_safe_to_display(shared_data, sliceTuple)
-                    napariViewer.dims.set_current_step(list(range(len(displaySlice))),
-                                                       list(displaySlice))
-
-                    # No explicit contrast call here: `set_current_step` above
-                    # already ran napari's own slicing pipeline, which natively
-                    # recomputes contrast limits on every re-slice while the
-                    # layer's `_keep_auto_contrast` (napari's own "continuous"
-                    # flag) is True, and does nothing while it's False ("once"
-                    # already consumed, or the user is holding a manual range).
-
-                    #Store exactly which axes is rendered
-                    _record_rendered_axes(shared_data, metadata['Axes'])
-                else:
-                    # layer is present, replace its data
-                    layer = napariViewer.layers[liveImageLayer[0]]
-                    #Also move to top
-                    napariViewer.layers.move_multiple([liveImageLayer[0]],len(napariViewer.layers))
-                    layer.data = latestImage
+            #Store exactly which axes is rendered
+            _record_rendered_axes(shared_data, metadata['Axes'])
                     
         elif DataStructure['finalisationProcedure'] == True:
             #Render the missing images in the MDA acquisition.
@@ -2456,12 +2506,8 @@ class napariHandler:
             logging.debug('MDA finalisation skipped: no store for layer %s', layerName)
             return
         logging.debug('Finalising MDA visualisation for layer %s', layerName)
-        try:
-            _backfill_missing_slices(self.shared_data, layerName)
-        except Exception:
-            logging.exception('Backfilling MDA layer %s failed', layerName)
-
         shared_data = self.shared_data
+        bridge = self._napari_bridge()
 
         def _refresh(viewer):
             #napari does not watch a zarr array for writes.
@@ -2469,7 +2515,39 @@ class napariHandler:
             if found:
                 viewer.layers[found[0]].refresh()
 
-        self._napari_bridge().submit(_refresh)
+        # The fill follows the slider: the GUI thread records where it is, this
+        # thread only reads that tuple (it never touches napari itself).
+        cursor = {'step': None, 'dims': None}
+
+        def _on_step(event=None):
+            cursor['step'] = tuple(cursor['dims'].current_step)
+
+        def _connect(viewer):
+            cursor['dims'] = viewer.dims
+            viewer.dims.events.current_step.connect(_on_step)
+            _on_step()
+
+        def _disconnect(viewer):
+            viewer.dims.events.current_step.disconnect(_on_step)
+
+        try:
+            bridge.submit(_connect, wait=True)
+            connected = True
+        except Exception:
+            logging.debug('Backfill: could not follow the dims cursor', exc_info=True)
+            connected = False
+        try:
+            _backfill_missing_slices(
+                self.shared_data, layerName,
+                cursor=lambda: cursor['step'],
+                on_current_slice_filled=lambda: bridge.submit(_refresh))
+        except Exception:
+            logging.exception('Backfilling MDA layer %s failed', layerName)
+        finally:
+            if connected:
+                bridge.submit(_disconnect)
+
+        bridge.submit(_refresh)
 
     def _napari_bridge(self):
         """The GUI-thread receiver for this handler's napari mutations (T-F9)."""
@@ -2824,6 +2902,8 @@ def startMDAVisualisation(shared_data,layerName='MDA',layerColorMap='gray'):
     #Start a worker dedicated to running the mda mode visualisation
     shared_data._mdamodeNapariHandler.visualisation_worker = shared_data._mdamodeNapariHandler.run_napariVisualisation_worker(shared_data._mdamodeNapariHandler,layerName = layerName,layerColorMap=layerColorMap)
     shared_data._mdamodeNapariHandler.visualisation_worker.finished.connect(_on_worker_fully_stopped_mda)
+    # Build the layer while the acquisition starts up, not on its first frame.
+    _precreate_mda_layer(shared_data, layerName, layerColorMap)
 
 def _on_worker_fully_stopped_mda():
     logging.debug("MDA worker is confirmed DEAD.")
