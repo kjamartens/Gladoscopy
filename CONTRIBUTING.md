@@ -2,19 +2,19 @@
 
 Thanks for your interest. This project is a Windows-first, PyQt5/napari
 research tool, and Python 3.13 is hard-required (`pyproject.toml`).
-Please read the relevant section before you open a PR.
+Please read the relevant section before you open a pull request.
 
 ## Quick start
 
 Needs **git**, **[uv](https://docs.astral.sh/uv/)** and **make**. uv downloads
-Python 3.13 itself, so no Python or conda install is required.
+Python 3.13 itself, so no separate Python install is required.
 
 ```bash
-make dev      # creates .venv, then editable install with dev extras
+make dev      # creates .venv, then an editable install with the dev and docs extras
 make test     # verify everything works
 ```
 
-No manual activation: `make dev` creates a `.venv` in the repo root on
+No manual activation: `make dev` creates a `.venv` in the repository root on
 first run and every target uses it from then on.
 
 **Windows**: `winget install astral-sh.uv` and `winget install ezwinports.make`
@@ -22,55 +22,80 @@ first run and every target uses it from then on.
 PATH; without one it bootstraps uv into whatever `python` is on PATH.
 
 Without make, `install_windows.bat` does the same install (no dev extras) and
-offers Start Menu shortcuts; it is what the user manual points end users to.
+offers Start Menu shortcuts; it is what the documentation points end users to.
 
-Run `make help` to list every available target.
+Run `make help` to list every target.
 
 ## Where things live
 
-A one-paragraph-per-module map lives at `docs/module-map.md`. Larger
-design decisions are recorded under `docs/adr/`. The active
-optimization plan is in `claude_project.md` and is driven by Claude
-Code via the *continue* protocol documented in `CLAUDE.md`.
+- The [module map](https://kjamartens.github.io/Gladoscopy/module-map/)
+  (`docs/module-map.md`) says where to look for what.
+- Larger design decisions are recorded as ADRs under `docs/adr/`.
+- `CLAUDE.md` holds detailed architecture notes: the threading model, the
+  frame path, storage and recipe execution.
+- Archived planning documents and decision logs from the 2026 optimization
+  work are in `docs/plans/`.
 
-If you are adding a new autonomous-microscopy node, read both:
-- `glados_pycromanager/AutonomousMicroscopy/` — code-side discovery
-  contract.
-- `CLAUDE.md` — explains the plugin discovery mechanism (source folder
-  *and* the user's AppData folder).
+## Adding an autonomous-microscopy node
 
-## Branching & commits
+See [Writing nodes](https://kjamartens.github.io/Gladoscopy/developer/writing-nodes/)
+(`docs/developer/writing-nodes.md`). In short:
 
-- Default branch: `main`. Long-lived work-in-progress: `Code-cleanup`.
-  The active optimization branch is `claude_optimization` (see
-  `claude_project.md`).
+1. Put a `.py` file in one of
+   `glados_pycromanager/AutonomousMicroscopy/{Analysis_Measurements,Real_Time_Analysis,CustomFunctions}/`,
+   or, without touching the source, in the matching folder under
+   `%LOCALAPPDATA%\Glados-PycroManager\AutonomousMicroscopy\`.
+2. Give it a module-level `__function_metadata__()` describing each function
+   (see `Analysis_Measurements/AverageIntensity.py`).
+3. Decorate every callable function or real-time class with
+   `@register("<file stem>.<name>")` from `glados_pycromanager.autonomous.registry`.
+   Without it the recipe cannot call it.
+4. Keep the module light to import: Glados imports every node at startup, so
+   import heavy libraries inside the function. `tests/test_plugin_discovery.py`
+   and `tests/test_node_packages_import_light.py` check discovery and import cost.
+
+## Branching and commits
+
+- Default branch: `main`. Work on a feature branch and open a pull request.
 - Commits follow Conventional Commits:
   `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `tool`,
   `ci`, `style`, `reliability`, `security`, `release`, `ux`, `build`.
-- Keep commits small and atomic. The optimization plan does one commit
-  per step; treat that as the project norm.
+- Keep commits small and atomic.
 
 ## Install targets
 
 | Target | What it does |
 |--------|-------------|
-| `make dev` | Editable install with dev extras — use this for day-to-day development |
-| `make install` | Non-editable production install (no dev extras) |
+| `make dev` | Editable install with the dev and docs extras; use this for day-to-day development |
+| `make install` | Non-editable install (no extras) |
 | `make build` | Build wheel + sdist into `dist/` via `uv build` |
 
 ## Tests
 
 ```bash
-make test          # full suite (python -m pytest -q)
-make test-fast     # stop on first failure (-x -q)
+make test          # full suite
+make test-fast     # stop on first failure
 make test-cov      # with branch coverage report
 ```
 
-Tests live under `tests/`. They must run **without** real hardware —
-use `tests/fakes/` (after Phase 5) or `unittest.mock`. If you add a
-test that hits a Qt widget, use `pytest-qt`. The pytest config in
-`pyproject.toml` disables the auto-loaded napari plugins (they hang for
-10+ minutes via the project's own napari manifest); leave that disabled.
+`pytest -m "not slow"` skips the few tests that spawn a real subprocess.
+Tests live under `tests/` and must run **without** real hardware: use
+`unittest.mock`, or pymmcore-plus' bundled demo camera. Tests that touch Qt
+widgets use `pytest-qt`. The pytest config in `pyproject.toml` disables the
+auto-loaded napari plugins (they hang the suite through the project's own
+napari manifest); leave that disabled.
+
+## Documentation
+
+```bash
+make docs          # build the site into site/ (strict: broken links fail)
+make docs-serve    # live preview at http://127.0.0.1:8000
+```
+
+The site is built from `docs/` (configuration in `mkdocs.yml`) and published
+to GitHub Pages by `.github/workflows/pages.yml` on every push to `main`. The
+API reference is generated from docstrings; to document a new module there,
+add it to `docs/developer/api.md`.
 
 ## Lint, format, types
 
@@ -78,48 +103,33 @@ test that hits a Qt widget, use `pytest-qt`. The pytest config in
 make lint          # ruff check + mypy (informational)
 make format        # ruff format
 make lint-fix      # ruff check --fix
-make ci            # full gate: lint + bandit + tests (run before pushing)
+make ci            # lint + bandit + tests
 ```
 
-The vendored Nodz editor at `glados_pycromanager/GUI/nodz/` is
-**excluded from refactors, lint auto-fixes, and type checks** — leave
-it untouched so we can re-sync with upstream.
+Ruff still reports many pre-existing findings, so `make lint` and `make ci`
+fail on the current code; CI runs ruff and mypy informationally. Do not add
+new findings in the code you touch.
 
-`mypy` is informational right now (Phase 15 of the plan introduces
-typed modules). Only `slack_settings_dialog.py` and the
-`microscopeInterfaceLayer.py` are checked by the pre-commit `mypy` hook.
+The vendored Nodz editor at `glados_pycromanager/GUI/nodz/` is
+**excluded from refactors, lint auto-fixes and type checks**; leave it
+untouched so it can be re-synced with upstream (ADR 0005).
 
 ## Security
 
-See `SECURITY.md` for vulnerability reporting and the historical
-exposure log (a stale Slack token was hard-coded prior to 2026-05).
-Do not paste credentials into source — use the **Slack settings…**
-dialog and let the values persist into per-user AppData.
+See `SECURITY.md` for vulnerability reporting. Do not paste credentials into
+the source: use the **Slack settings…** dialog, which stores them in per-user
+AppData.
 
 ## Pull requests
 
-- Target `main` (or `Code-cleanup` if your work feeds the long-lived
-  cleanup branch — coordinate first).
-- CI must pass. Lint and mypy are informational; **tests are the
-  blocking gate**.
-- Reference any related ADR or `claude_decisions.md` entry in the PR
-  body — it helps future readers understand intent.
+- Target `main`.
+- CI must pass. Lint and mypy are informational; **tests are the blocking
+  gate**.
+- Mention any related ADR in the pull request description.
 
-## Adding a new autonomous-microscopy node
+## Licence
 
-1. Drop a `.py` file into one of:
-   - `glados_pycromanager/AutonomousMicroscopy/Analysis_Measurements/`
-   - `glados_pycromanager/AutonomousMicroscopy/Real_Time_Analysis/`
-   - `glados_pycromanager/AutonomousMicroscopy/CustomFunctions/`
-   …or into the matching subfolder under
-   `<AppData>/Glados-PycroManager/` (no source-tree edit required).
-2. The file's top-level functions need a `__function_metadata__()`
-   accessor — see existing examples (`AverageImage.py`).
-3. Test it loads via the plugin-discovery path (Phase 5 of the plan
-   ships `tests/test_plugin_discovery.py`).
-
-## License
-
-By contributing you agree your contribution will ship under the same
-CC BY-NC-SA 4.0 licence as the project (`LICENCE` in repo root). The vendored
-Nodz editor keeps its own MIT licence (`glados_pycromanager/GUI/nodz/LICENSE.txt`).
+By contributing you agree that your contribution is licensed under the same
+CC BY-NC-SA 4.0 licence as the project (`LICENCE` in the repository root).
+The vendored Nodz editor keeps its own MIT licence
+(`glados_pycromanager/GUI/nodz/LICENSE.txt`).

@@ -1,65 +1,78 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+There are no tagged releases yet; `main` is the current version.
 
-## [Unreleased] — `claude_optimization` branch
+## [Unreleased]
 
-Ongoing optimization driven by `claude_project.md`. See `claude_decisions.md`
-for design rationale per step. Highlights so far:
-
-### Security
-- Removed stale hard-coded Slack token + signing secret from
-  `WebhookConfig` defaults (the token was confirmed expired). Runtime
-  values are now entered via the new **Slack settings…** dialog and
-  persisted to per-user AppData. Cf. `SECURITY.md`.
-- Baseline `bandit` scan checked in at `docs/bandit-baseline.txt`.
-- `docs/eval-inventory.md` catalogs the ~63 `eval()` call sites for
-  the Phase 9 registry replacement.
+Changes since May 2026. Design notes and per-step decisions from this period are archived in
+`docs/plans/`.
 
 ### Added
-- `glados_pycromanager/GUI/slack_settings_dialog.py` — QDialog for
-  entering Slack token/secret/channel at runtime; wired into the
-  autonomous-microscopy dock toolbar.
-- `tests/test_slack_settings_persistence.py` — round-trip the three
-  fields through `save_config_to_json` / `load_config_from_json`.
-- `_slack_send_enabled()` helper centralizes the empty-token guard so
-  the two Slack-send call sites no-op (with an info log pointing at
-  the dialog) when no credentials are set.
-- `SECURITY.md`, `CONTRIBUTING.md`, this file.
-- `docs/baseline.txt`, `docs/bandit-baseline.txt`, `docs/eval-inventory.md`.
 
-### Tooling
-- `ruff`, `mypy`, `pre-commit`, `Makefile`, `.github/workflows/ci.yml`
-  — see `pyproject.toml`. Vendored Nodz excluded from all of them.
-- Pytest now passes `-p no:napari -p no:npe2 -p no:napari_plugin_engine`
-  in `addopts` (the auto-loaded plugins hang the suite via the project's
-  own napari manifest).
+- **One-click Windows install and launch**: `install_windows.bat` sets up a `.venv` with
+  [uv](https://docs.astral.sh/uv/) (Python 3.13 included, no conda), Start Menu shortcuts
+  ("Glados", "last setup", "debug console"), a console-less `gladosw` launcher, a startup splash, a
+  single running instance per user, `--last` and `--auto-demo` start options, and a readable
+  "could not start" dialog with the log.
+- **Microscope service**: one owner thread for all microscope access, with a priority queue, so
+  hardware calls no longer block the GUI.
+- **Live mode from a continuous sequence acquisition** instead of a long MDA, with a selectable
+  pull policy.
+- **Configurations**: device property browser, config group/preset editor (Micro-Manager's own
+  methodology), read-only groups, automatic refresh, and the active preset shown in dropdowns.
+- **Controls dock redesign**: a shared layout toolkit (theme, sections, responsive grid), an XY
+  stage dial, compact Stages and Configurations, and a new Real-time analysis panel where several
+  methods run side by side.
+- **Real-time analysis**: subprocess isolation by default (`__runInSubprocess__` /
+  `__needsLiveCore__`), a pre-warmed worker pool, several napari layers per node, overlays drawn
+  against the frame they belong to, and replay of results while scrolling a finished acquisition.
+  New nodes: `pSMLM_live`, `pSMLM_live_precision` (live NeNA/FRC), SIM phase check.
+- **Storage**: pymmcore-plus acquisitions are saved (NDTiff by default, or OME-TIFF/OME-Zarr),
+  written from a dedicated thread.
+- **MDA**: "Wait for Z to settle" toggle (fixes lost external triggers during z-stacks), live
+  step count/distance next to the Z fields, a stalled camera burst no longer aborts the
+  acquisition.
+- **Autonomous microscopy**: node functions are dispatched through a registry
+  (`@register("Module.Function")`) instead of `eval`; *Plugins → Reload Glados Custom Nodes*;
+  four example recipes for a simulated SMLM microscope in `ExampleRecipes/`.
+- **Slack settings…** dialog; credentials are stored per user, not in the source.
+- Performance Mode (CPU/memory capture) and a startup timeline profiler.
+- Documentation site (MkDocs Material) at <https://kjamartens.github.io/Gladoscopy/>, with an
+  API reference generated from the source; the Help buttons open it.
+- Test suite (~1450 tests, no hardware needed), ruff/mypy/bandit, pre-commit and CI.
+
+### Changed
+
+- Licence: CC BY-NC-SA 4.0 (`LICENCE`). The vendored Nodz editor keeps its MIT licence.
+- Startup is several seconds faster: heavy libraries (pycromanager, dask, pandas, torch…) load on
+  first use, and the circular buffer is allocated in the background.
+- Live display is faster: frames go through a bounded ring buffer, the display only draws frames
+  it can keep up with, and 2-D layers skip napari's asynchronous slicer.
+- Recipe runs: nodes hand off through the event loop, failures and *Interrupt run* reliably stop a
+  run, and late work from a stopped run cannot drive the next one.
+- The process stays off Windows' efficiency cores when the window is not focused.
+- Slack messages use `slack_sdk` (the old `slack` package was a different project).
+
+### Removed
+
+- The site-specific laser control UI (`LaserControlScripts.py` and its Qt Designer files).
+- Dead code: the old `GUI.py` entry, `MainScripts/Main.py`/`HelperFunctions.py`, the RT-analysis
+  `eval` dispatch fallback, unused helpers, and large commented-out blocks.
+- Unused dependencies (torchvision, segment-anything, mobile-sam, timm, flask, slackeventsapi,
+  bioio, markdown); `torch`, `stardist` and `scikit-image` are now declared, since nodes import them.
+- The pdoc HTML pages, the `.docx` manuals and the conda environment files.
 
 ### Fixed
-- Two pre-existing typos at the Slack-send call sites
-  (`webook_config` → `webhook_config`; `shared_dataconfig` →
-  `shared_data.config`) that previously made the code crash on
-  attribute access before the empty-token guard could fire.
 
-### Build / packaging
-- Dropped the leading-slash package-data globs (`"/*"`,
-  `"/Documentation/*"`) — they silently included nothing and on
-  Windows could trigger `Permission denied` against `C:\DumpStack.log`.
-- Switched to `tool.setuptools.packages.find` for auto-discovery.
+- Non-editable installs left out `Core/` (no `__init__.py`).
+- Many acquisition and display bugs: stale zarr stores reused across differently shaped
+  acquisitions, black live view during multi-D acquisitions, ROI and exposure changes during live
+  mode, races between stopping and starting live mode, crashes when a state file section was
+  missing.
 
-### Repo hygiene
-- Untracked the two ~34 MB `scalene-profile.{html,json}` artifacts;
-  history rewrite tracked under `HYG-3`.
-- Moved `Test.py` / `test.ipynb` to `scratch/` (excluded from
-  sdist/wheel).
-- `.gitignore` adds `scalene-profile.*`, `*.docx`, `~$*`, `*.swp`,
-  `bash.exe.stackdump`.
+## [0.0.2]: earlier
 
-## [0.0.2] — earlier
-
-The state of the project at the point the `claude_optimization` branch
-was cut from `Code-cleanup`. No formal changelog existed prior; see
-`git log main` for the historical record.
+The state of the project before May 2026. No changelog was kept; see `git log` for the history.

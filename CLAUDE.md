@@ -34,9 +34,10 @@ Other entry points:
   dialog — same `--backend/--config/--mm-path/--buffer-mb/--max-memory-mb` override path
   as `make run-mm`, but the values come from **`demo_settings.mk`** (`-include`d by the
   `Makefile`; `DEMO_*` vars, all `?=` so `make run-demo-smlm DEMO_BUFFER_MB=1024` still
-  wins). Edit that file, not the recipe. `make run-demo` is unrelated and unchanged: it
+  wins). Edit that file, not the recipe. It is per-machine and git-ignored: copy the
+  tracked `demo_settings.mk.example` (which the tests read) to create it. `make run-demo` is unrelated and unchanged: it
   is `--auto-demo`, the pymmcore-plus *bundled* install + `MMConfig_demo.cfg`, and is what
-  `claude_throughput_project.md`'s verification steps mean. Every CLI-override launch now
+  `docs/plans/claude_throughput_project.md`'s verification steps mean. Every CLI-override launch now
   logs one INFO line naming the backend, install path, config and both memory settings.
   Tests: `tests/test_demo_settings_makefile.py`.
 - **Makefile gotcha (fixed twice):** GNU make on Windows uses `sh.exe` as the recipe
@@ -56,7 +57,7 @@ A small pytest suite lives in `tests/`. Run it with:
 pytest
 ```
 
-(`pytest` is in `[project.optional-dependencies].dev`; install with `pip install -e ".[dev]"`.) Coverage is currently limited to pure-logic surfaces — backend detection and the hardware lock on `MicroscopeInterfaceLayer`, the `java_arr_to_numpy` helper, and the `HelperFunctions` string builders. There is no GUI / hardware integration test.
+(`pytest` is in `[project.optional-dependencies].dev`; install with `pip install -e ".[dev]"`.) Tests need no hardware: they use mocks, offscreen Qt widgets, and pymmcore-plus' bundled demo camera for real-core MDA tests. There is no test against real hardware or a full GUI session.
 
 Seven tests spawn a real `multiprocessing` worker and account for ~80s of the suite's ~140s wall time on Windows (inherent `spawn` re-import cost). They carry the `slow` marker, so `pytest -m "not slow"` runs the other 345 in ~60s; plain `pytest` still runs everything. Two gotchas if you touch them: (1) a test whose spawned child dies must poll `proc.is_alive()` rather than waiting out a queue timeout, or a crash costs the full timeout in dead waiting (`_get_or_fail_fast` in `test_analysis_process.py`); (2) `pytest.importorskip("diplib")` is **not** enough — once an earlier test has pulled IPython into `sys.modules` (napari does), `import diplib` raises `AttributeError`, which `importorskip` does not catch, so the test fails in a full-suite run while passing in isolation. Apply the documented `import IPython.terminal.pt_inputhooks` guard first.
 
@@ -74,28 +75,16 @@ Note the `Real_Time_Analysis` node kwarg dicts hand-built in tests (`rt_analysis
 
 ### Threading model
 
-Three invariants. They are not currently upheld everywhere — `claude_throughput_project.md`
-is the standalone plan that enforces them — but new code must follow them.
+Three invariants. New code must follow them. They were enforced by the (completed,
+archived) throughput plan, `docs/plans/claude_throughput_project.md`, whose task IDs
+(T-B3, T-F9, …) the notes below refer to.
 
 - **The Qt/GUI thread is holy.** It paints, lays out, and handles input. It must not touch
-  hardware, block on I/O, or run analysis. Anything else belongs on a worker. **Tier F of
-  `claude_throughput_project.md` is complete** — both halves, including the two decision
-  gates the user approved on 2026-09-09 — and removed the standing violations it named;
-  see *GUI-thread work removed in Tier F* below. **T-B4 removed the
-  `LaserControlScripts.py` half**: every hardware touch in that file goes through
-  `submitHardware()`, which queues onto the T-B3 owner thread (and runs inline when no
-  service is running, so the plugin path and the tests are unaffected). The three slots
-  that hurt — `ResetLasersTrigger` (~100 serial round trips per click), `armLaser`
-  (0.1 s of sleep per repeat frame, x5 lasers via `armLaserTriggering`) and `blinkUV`
-  (sleeps between its on and off writes) — are queued whole, with widget *reads* done on
-  the caller first and widget *writes* marshalled back through
-  `_onGuiThread` (the `NapariBridge`). Two behaviour notes: `TS_Response_verbose` made
-  three identical `get_property` reads to display one answer and now makes one, and
-  `_refreshLaserButtonLabels`/`_applyLaserButtonLabels` split the five on/off reads from
-  the label writes (the reset loop refreshes once at the end instead of ten times
-  mid-loop). Tests: `tests/test_laser_controls_owner_thread.py`, which pins the emitted
-  serial command sequence so the refactor stays observationally identical at the wire.
-  **`FlowChart_dockWidgets` followed**: `updateCoreVariables` (which the plan
+  hardware, block on I/O, or run analysis. Anything else belongs on a worker. Tier F of
+  the throughput plan removed the standing violations; see *GUI-thread work removed in
+  Tier F* below. T-B4 moved the hardware slots onto the T-B3 owner thread (the
+  site-specific laser UI it also covered, `LaserControlScripts.py`, was deleted in
+  2026-10). **`FlowChart_dockWidgets`**: `updateCoreVariables` (which the plan
   anchored under its old name `createCoreVariables`) runs on every node finish in
   a recipe and is one hardware read per stage plus one `ConfigInfo` per config
   group; it now collects on the owner thread via `_collectCoreVariables()` and
@@ -348,8 +337,7 @@ normalise all three backends' return shapes to `(2-D np.ndarray, dict)` via
 `_metadata_to_dict()` / `_reshape_if_flat()`; the latter prefers the frame's own
 `Height`/`Width` tags and falls back on `_image_shape_cache` (ROI-derived,
 invalidated in `set_core`/`set_roi`/`clear_roi`, same idiom as the exposure and
-pixel-size caches). Nothing calls them yet — T-C3 of `claude_throughput_project.md`
-replaces the 999-frame-MDA live loop with them.
+pixel-size caches). The `sequence` live path (T-C3, below) is built on them.
 
 **Device property browser:** MIL exposes full device/property introspection —
 `get_loaded_devices()`, `get_device_property_names(device)`,
@@ -462,8 +450,8 @@ two buttons sat in the unrelated debug-button row).
 - **The panel can rebuild itself**, via `rebuildConfigLayout()` (clears
   `configLayout` through `_clearConfigLayout()`/`_clearLayoutItem()`,
   re-fetches `get_available_config_groups()` from MIL, and reconstructs
-  `self.config_groups` + every row from scratch). `updateConfigsFromMM()`
-  (the previous single mechanism, still used nowhere else) only pushed new
+  `self.config_groups` + every row from scratch). The previous mechanism
+  (`updateConfigsFromMM()`, since removed) only pushed new
   *values* into already-existing row widgets — a dropdown's item list and
   the row count itself were frozen at construction, so a group added,
   renamed, or given a new preset via the config group editor could never
@@ -643,7 +631,7 @@ back to napari in ~2.8 ms against ~7.9 ms, for ~17% more bytes. Multi-frame chun
 were **rejected**: napari paints a multiDstack layer by reading one slice out of this
 same array, so chunk size is on the display path, and even with perfectly batched
 whole-chunk writes 8-/32-frame chunks were slower to write *and* 5-17x slower to read.
-The cost of that decision is one file per frame (see `claude_issues.md`).
+The cost of that decision is one file per frame (see `docs/plans/claude_issues_and_features.md`).
 
 The zarr write itself runs on a **dedicated writer thread**,
 `GUI/frame_writer.py`'s `ZarrFrameWriter` (T-D3). `_try_write_frame_to_zarr` computes
@@ -740,7 +728,7 @@ because `mdaDatasets[-1]` can now be an earlier acquisition's. The dead scratch
 `NDTiffDataset` `PyMMCore_startedAcqCallback` used to create is gone. Why NDTiff is the
 default -- and why the plan's numbers no longer applied: pymmcore-plus 0.18's
 `run_mda(output=...)` goes through **ome-writers** (tensorstore for `.ome.zarr`), whose
-default buffers the whole acquisition in RAM until close -- see `claude_decisions.md`
+default buffers the whole acquisition in RAM until close -- see `docs/plans/claude_decisions.md`
 (T-D8) and `make bench-storage`. Tests: `tests/test_mmcore_ndtiff_saving.py`,
 `tests/test_ndtiff_frame_writer.py`.
 
@@ -755,6 +743,9 @@ Advanced Settings; a config saved before they existed simply keeps the defaults
 ### Shared state — `GUI/sharedFunctions.py`
 
 `Shared_data` is the single object passed everywhere (UI, worker threads, napari plugins, autonomous microscopy nodes). **`shared_data.core` is only assigned on the napari-plugin path**; on the standalone app it was an empty-list placeholder, so its getter now falls back to `MILcore` while nothing real is assigned (a full recipe run crashed on that `[]`). New code should use `shared_data.MILcore` directly. It holds `core`, the MIL instance, config dataclasses, analysis-thread lists (`LoggingList` is a list subclass that emits Qt signals on mutation), and live/acquisition state flags. When adding cross-component state, add it as a field on `Shared_data` rather than a global.
+The Slack client is `webhook_config.slack_client`, built by `notify/slack.py`'s
+`make_slack_client(token)` (a `slack_sdk.WebClient`, or None without a token); the old
+`slack==0.0.2` dependency was an unrelated package.
 
 `_mdaModeParams` is a property: MDA mode assigns an already-converted pycromanager
 event list, live mode assigns a raw `useq.MDASequence` that the getter converts (and
@@ -769,11 +760,10 @@ acquisition, just materialised.
 ### UI — `GUI/`
 
 - `GUI_napari.py` — standalone entry. Builds a `headlessGUI` for backend choice, spawns Napari, runs `runNapariPycroManager` in a `Worker`/`QThread`. Sets `NAPARI_ASYNC=1` and `NAPARI_OCTREE=1` *before* importing napari. The MM-path and config-file fields each have a down-arrow `QToolButton` listing the last 20 values used (`MicroManagerConfig.path_history` / `config_path_history`, most recent first, recorded on Start via `headless_validation.push_path_history`). List-typed config fields need `setting(..., default_factory=list)`. Tests: `tests/test_headless_path_history.py`.
-- `_dock_widget.py` — napari plugin entry. `MainWidget` constructs `Shared_data`, calls `pycromanager.Core()` directly, and adds four dock widgets — all of which inherit `GladosWidget`:
+- `_dock_widget.py` — napari plugin entry. `MainWidget` constructs `Shared_data`, calls `pycromanager.Core()` directly, and adds three dock widgets — all of which inherit `GladosWidget` (Performance Mode is a separate `napari.yaml` command):
   - `MMConfigWidget` — Micro-Manager config groups, stages, ROI (`microManagerControlsUI_plugin`)
   - `MDAWidget` — Multi-D acquisition (`MDAGlados_plugin`)
   - `AutonomousMicroscopyWidget` — recipe graph (`autonomousMicroscopy_plugin`)
-  - `GladosSlidersWidget` — laser controls (`gladosSliders_plugin`)
   Pattern: the parent `MainWidget` creates `core`, `shared_data`, `MM_JSON`, `livestate`, and child widgets read them off `parent.*` in their `__init__`.
 - `GUI/napariGlados.py` — `napariHandler` and the real-time visualisation/analysis loop (`napariUpdateLive`, etc.). Uses `napari.qt.thread_worker` and yield-based generators, which is why several update functions live at module scope rather than inside a class.
   - **Live mode (T-C3):** `MDAConfig.live_mode_method` selects the path.
@@ -850,7 +840,7 @@ acquisition, just materialised.
     any one of them wedges the display. Any **new** path that marshals frames to the GUI
     thread must claim and release a slot the same way. Tests:
     `tests/test_display_backpressure.py`.
-  - **Live/MDA stop→start race guard:** `napariHandler_liveMode`/`napariHandler_mdaMode` are constructed once per session and reused for every toggle, so rapid Live/MDA on-off-on toggling could previously start a new `run_MILCoreAcquisition_worker` (QThreadPool job) while the old one was still tearing down the same `core.mda`/`Acquisition` object (`stop_sequence_acquisition()` is fire-and-forget) — two threads driving the same native MMCore/Java engine concurrently, causing native access violations under stress testing. `napariHandler` now has `_acq_transition_lock` (an `RLock`, since the worker's own cleanup re-enters `acqModeChanged` from its own thread) and `_worker_stopped_event`: `acqModeChanged`'s ON path waits (`ACQ_STOP_TIMEOUT_S`, default 10s) for the previous worker to fully exit before starting a new one, refusing to start (and reverting the mode flag) rather than racing if the timeout is hit.
+  - **Live/MDA stop→start race guard:** the two `napariHandler`s (`shared_data._livemodeNapariHandler` / `_mdamodeNapariHandler`) are constructed once per session and reused for every toggle, so rapid Live/MDA on-off-on toggling could previously start a new `run_MILCoreAcquisition_worker` (QThreadPool job) while the old one was still tearing down the same `core.mda`/`Acquisition` object (`stop_sequence_acquisition()` is fire-and-forget) — two threads driving the same native MMCore/Java engine concurrently, causing native access violations under stress testing. `napariHandler` now has `_acq_transition_lock` (an `RLock`, since the worker's own cleanup re-enters `acqModeChanged` from its own thread) and `_worker_stopped_event`: `acqModeChanged`'s ON path waits (`ACQ_STOP_TIMEOUT_S`, default 10s) for the previous worker to fully exit before starting a new one, refusing to start (and reverting the mode flag) rather than racing if the timeout is hit.
   - **Frame ring (MMCORE_PLUS `frameReady` path):** `grab_image_liveVis_PyMMCore` is connected with `Qt.DirectConnection`, so it runs synchronously on pymmcore-plus' own MDA thread — everything it does happens in front of the next camera frame. It is therefore a pure hand-off: `frame_ring.push(image, metadata)` and return. `GUI/frame_ring.py`'s `FrameRing` is a bounded, overwrite-oldest, stdlib-only buffer (drop-counting, with an `Event` the consumer waits on); `napariHandler._frame_ring_consumer_loop` (a plain daemon `Thread`, started just before the `frameReady` connect and stopped just after the disconnect, plus an idempotent stop in the acquisition worker's outer `finally`) does the real per-frame work: `metadata_refactor`, the multiDstack zarr write, and `put_data_in_visualisation_and_analysis_queues`. Two capacities: `FRAME_RING_CAPACITY_DISPLAY` (4) for live, since display and RT analysis drop frames at their own gate anyway, and `FRAME_RING_CAPACITY_STORAGE` (256) for multiDstack MDA, where a dropped frame is a permanently black slice with no NDTiff store to backfill from. The per-acquisition drop tally is logged at teardown (WARNING if non-zero). The pycromanager `image_process_fn` / `image_saved_fn` paths do **not** use the ring — `image_process_fn` must return `(image, metadata)` synchronously for pycromanager to store the frame.
 - **Startup window layout** (`napariGlados._finaliseStartupLayout` / `_sizeControlsDock`,
   queued by `QTimer` at the end of `runNapariPycroManager`): maximise, select the Controls
@@ -930,21 +920,18 @@ acquisition, just materialised.
   `tests/test_ui_list_editor.py`, `tests/test_mda_gui_rebuild.py`, `tests/test_stage_dial.py`,
   `tests/test_controls_panel_layout.py`. Widget-identity tests compare
   `sip.unwrapinstance()` addresses, never `id()` of a PyQt wrapper (not stable).
-- `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `Showcase_Basic1.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
-- Hostname gate: `runNapariPycroManagerWrap` flips `includeCustomUI=True` when `'SMIPC' in platform.node()` — site-specific UI add-ons.
+- `GUI/nodz/` — vendored Nodz graph editor, used to render and edit autonomous-microscopy recipes (JSON, e.g. `AutonomousMicroscopy/ExampleRecipes/01_simple_timelapse.json`). Recipes have three regions: Initialisation (pink), Scoring (green), Acquisition (yellow).
 
 ### Autonomous microscopy — `AutonomousMicroscopy/`
 
-- `MainScripts/Main.py`, `FunctionHandling.py`, `HelperFunctions.py` — graph executor, function discovery, kwarg introspection.
+- `MainScripts/FunctionHandling.py` — `argumentChecking`, the kwarg check nodes call. The executor itself is `autonomous/executor.py`; dispatch is `autonomous/registry.py`.
 - `Analysis_Measurements/` — measurement nodes (StarDist, AverageImage, etc.).
 - `Real_Time_Analysis/` — RT analysis nodes (FFT, pSMLM, sharpness, BioImage Model Zoo, frame counters).
 - `CustomFunctions/` — site-defined helpers (autofocus, stroboscopic lasers).
 
-**Plugin discovery (important):** the `__init__.py` in each of these three folders does two things on import:
-1. `load_additional_modules` walks the folder, appends every non-`__init__` `.py` to `__all__`, and `from .<module> import *`s it.
-2. It then walks `appdirs.user_data_dir()/Glados-PycroManager/<subfolder>/` and imports any `.py` files dropped there via `importlib`.
+**Plugin discovery (important):** the `__init__.py` in each of these three folders imports every `.py` in it through `plugins/discovery.py`'s `load_node_modules` (failures are logged, not swallowed). The matching AppData folder, `appdirs.user_data_dir()/Glados-PycroManager/AutonomousMicroscopy/<subfolder>/` (`user_appdata_dir_for`), is scanned too (see the reload note below for when).
 
-So **users add new analysis/RT/custom nodes by dropping a `.py` into the AppData folder, not into the source tree.** When searching for a node implementation, check both locations. Adding a file to one of these folders without proper top-level functions will cause it to be imported but not appear as a node.
+So **users add new analysis/RT/custom nodes by dropping a `.py` into the AppData folder, not into the source tree.** When searching for a node implementation, check both locations. A node needs a module-level `__function_metadata__()` *and* `@register("<stem>.<function>")` on each callable (`autonomous/registry.py`); without the decorator the node shows in the GUI but the recipe cannot dispatch it. The user-facing guide is `docs/developer/writing-nodes.md`.
 
 **Plugins > Reload Glados Custom Nodes** (`discovery.reload_all_node_modules`). The
 package `_load_appdata()` is never called at startup: AppData nodes are first imported
@@ -1001,7 +988,7 @@ touching `executor.py` / `finishedEmits` (2026-09-29 robustness/lag work).
   `variableDisplayText`. Node text refresh uses `dontEvaluate=True` and is guarded.
 Tests: `tests/test_recipe_*.py`, `test_mda_done_always_fires.py`,
 `test_scoring_end_waits_all.py`, `test_mda_finalisation_gate.py`. Open follow-ups:
-`claude_issues_and_features.md` ("Recipe execution, deferred").
+`docs/plans/claude_issues_and_features.md` ("Recipe execution, deferred").
 
 **MM-config nodes resolve groups by name, live.** `executor.py`'s
 `MMconfigChangeRan` branch reads the node's `config_string_storage` (`[group, value]`
@@ -1104,10 +1091,9 @@ run/end and one for visualise), stashed on the node instance as
 - **Editing a parameter mid-run still takes effect.** `currentData` is mutated in
   place by the panel, so `_boundNodeFor` compares `BoundNode.signature`
   (`tuple(rt_analysis_info.items())`) and rebinds when it differs.
-`GLADOS_RT_EVAL_DISPATCH=1` restores the pre-T-G4 eval path
-(`_realTimeAnalysis_*_viaEval`) for one release as an escape hatch. Details and
-the per-path Value/Variable/Advanced table live in
-`Documentation/rt_analysis_parameters.md` §4. Tests:
+The pre-T-G4 eval path and its `GLADOS_RT_EVAL_DISPATCH` escape hatch were
+removed in 2026-10. Details and the per-path Value/Variable/Advanced table live
+in `docs/developer/rt-analysis-parameters.md` §4. Tests:
 `tests/test_rt_kwarg_binding.py`, `tests/test_bound_node_dispatch.py`.
 
 **Node kwarg widgets and the Value/Variable/Advanced switch:** how a node's
@@ -1115,7 +1101,7 @@ the per-path Value/Variable/Advanced table live in
 per-kwarg Value/Variable/Advanced switch (`name@Origin` / `{name@Origin}`
 syntax) is wired, and how to add a new typed widget (e.g. the `QCheckBox` used
 for `"type": bool` kwargs) without breaking that switch, is documented in
-`glados_pycromanager/Documentation/rt_analysis_parameters.md`. Read it before
+`docs/developer/rt-analysis-parameters.md`. Read it before
 touching kwarg-widget code in `GUI/utils.py`.
 
 **NeNA/FRC exploration (not a node yet)** lives in
@@ -1229,7 +1215,7 @@ overwritten. Tests: `tests/test_state_file_missing_sections.py`.
 
 ### GUI-thread work removed in Tier F
 
-Tier F of `claude_throughput_project.md` is complete. Each item below was work the
+Tier F of the throughput plan is complete. Each item below was work the
 GUI thread did repeatedly, competing with the frame path; the mechanism that
 replaced it is what new code in these files should follow.
 
@@ -1553,7 +1539,7 @@ rows on the first real localization so a response that briefly renders them
 unmasked shows nothing stray. Reducing the *number* of layer-property assignments
 per frame (style once, assign `data` last) makes it rarer but does **not** remove
 the trigger -- only the constant length does. `pSMLM.py` still has the old pattern;
-see `claude_issues_and_features.md`.
+see `docs/plans/claude_issues_and_features.md`.
 
 **RT results are retained and replayed while scrubbing a finished acquisition.**
 Dragging napari's time/z slider used to move the image but leave every RT overlay
@@ -1692,42 +1678,38 @@ with the simulator above competing for the same CPU/GPU.
 
 ## Documentation
 
-User-facing docs live at `glados_pycromanager/Documentation/UserManual.md`; the developer overview is at `glados_pycromanager/Documentation/index.html`. Images are in `glados_pycromanager/Documentation/Images/`.
+The documentation is a MkDocs Material site built from `docs/` (`mkdocs.yml`; set up like
+the inSiliScope repo's) and published to <https://kjamartens.github.io/Gladoscopy/> by
+`.github/workflows/pages.yml` on push to `main` (one-time: Settings → Pages → Source:
+GitHub Actions). Pages: `index.md`, `installation.md`, `user-guide/` (controls, mda,
+autonomous, troubleshooting), `developer/` (writing-nodes, rt-analysis-parameters, api,
+contributing — a `pymdownx.snippets` include of the root `CONTRIBUTING.md`), `module-map.md`,
+`adr/`, `changelog.md` (includes `CHANGELOG.md`). Images are in `docs/img/`.
+- `developer/api.md` is generated by **mkdocstrings** (griffe *static* analysis — nothing is
+  imported, so CI installs only mkdocs). A package folder without `__init__.py` cannot be
+  collected (that is how `Core/` turned out to be missing from the wheel).
+- `make docs` builds with `--strict` (a broken link or a docstring griffe cannot parse fails
+  the build); `make docs-serve` previews. The `docs` extra is part of `make dev`.
+- Not published: `docs/plans/` (archived planning docs and decision logs) and `docs/*.txt`
+  (appended perf logs) via `exclude_docs`; the engineering notes `bench-live-display.md`,
+  `perf-runtime-recipe.md`, `lazy-import-strategy.md` build but are `not_in_nav`.
+- In-app help (the Controls **Help** box, the napari *Open the Glados user manual* command)
+  opens the site: `glados_pycromanager/docs_links.py` holds `DOCS_URL` and the page paths.
+  Keep those paths in sync when renaming pages.
 
 ### Keep this file current
 
 Whenever you explore code in this repo and find a module, pattern, or behavior that isn't captured above, add a concise note to the relevant section here (or a new section if none fits) before finishing the task — don't wait to be asked. This applies any time it happens, not just during the optimization plan. Keep additions terse and factual (what/where/why-it-matters), matching the style already used above; prefer extending an existing bullet over adding a new subsection when the topic already has a home. The goal is for each session to leave this file slightly more complete than it found it, so future sessions ramp up faster.
 
-## Optimization plan & "continue" protocol
+## Archived plans
 
-There is a long-form optimization roadmap at `claude_project.md`. It defines a
-multi-phase plan that runs on a dedicated branch named `claude_optimization`
-(already created — make sure you are on that branch before touching code),
-with small atomic commits per step.
+The 2026 optimization work (`claude_project.md`, `claude_throughput_project.md`,
+`claude_launcher_project.md`) and its decision and issue logs (`claude_decisions.md`,
+`claude_issues_and_features.md`) are archived in `docs/plans/`. Task IDs in the notes in
+this file (T-B3, L2.4, …) refer to those plans. Look there for "why was it done this way?".
 
-Three companion files live alongside it:
+## Launcher and startup
 
-- **`claude_issues.md`** — inbox for bugs/regressions/follow-ups that must
-  be fixed *before* further plan progress. Empty checklist is fine until
-  issues appear.
-- **`claude_decisions.md`** — append-only log of design and process decisions
-  taken while executing the plan. Whenever you make a non-trivial choice
-  (which option to pick, what to skip, what to defer), record it there in
-  the documented format. This is the place to look when answering "why was
-  it done this way?" in a future session.
-- **`claude_project.md`** — the plan itself.
-- **`claude_throughput_project.md`** — a *separate*, standalone plan targeting live/MDA
-  data throughput and the threading invariants above. It has its own operating protocol
-  and its own 51-task checklist; it is **not** advanced by "continue". Run it only when
-  the user asks for it by name (e.g. "work on claude_throughput_project.md"). It shares
-  the `claude_optimization` branch and logs to `claude_decisions.md` / `claude_issues.md`
-  like the main roadmap.
-- **`claude_launcher_project.md`** — standalone plan for a one-click (taskbar) launcher
-  over the editable `.venv` plus measured startup-speed work, on branch
-  `feature/one-click-launch`. Same rule: not advanced by "continue"; run when asked by name.
-  Key planning fact: `GUI_napari` imports ~3.7 s warm (napari.qt 1.7 s, pycromanager 1.2 s).
-  (The planning-time worry about a JVM console window was wrong: `mmpycorex` already starts
-  `jre/bin/javaw.exe` on Windows.)
 - **One-click launch (L1).** `gladosw.exe` (`[project.gui-scripts]`, pythonw) → `GUI/startup.py:main`.
   Before the splash, `main` does three things:
   - redirects pythonw's `None` stdout/stderr to `<AppData>/Glados-PycroManager/Glados_console.log`
@@ -1847,31 +1829,3 @@ Three companion files live alongside it:
   bare pycromanager script, while `MMConfig_demo.cfg` in the same install is fine. So the
   documented `--profile-runtime` command currently crashes there. The cause is the
   inSiliScope adapter or its environment, not Glados.
-
-When the user says **"continue"** (or any equivalent like "keep going",
-"resume", "next step"), follow this protocol exactly:
-
-1. **Confirm you are on `claude_optimization`.** If not, `git checkout
-   claude_optimization`. Never commit plan work to another branch.
-2. **Read `claude_issues.md` first.** If it contains any unresolved issues
-   (typically as a checklist of `- [ ] ...` items), fix those one by one,
-   each in its own commit on the `claude_optimization` branch. Mark items
-   `- [x]` as you resolve them and move them under `## Resolved (history)`.
-   Do not proceed to step 3 until the open list is empty.
-3. **Then advance the plan.** Look at the most recent commit on
-   `claude_optimization` and pick up at the next un-committed step from the
-   Actionables section of `claude_project.md`. Execute exactly that step in
-   a single small commit. Do not skip ahead.
-4. **Record decisions.** When you make a non-trivial choice while executing
-   a step (skip an item, pick option A over B, defer something), add an
-   entry to `claude_decisions.md` in the same commit.
-5. **Stop at the next phase verification gate** and wait for the user's
-   confirmation before starting the next phase.
-6. If `claude_project.md` does not exist, or the branch does not exist, ask
-   the user before re-creating them.
-7. Every commit message follows conventional-commits style (`feat:`, `fix:`,
-   `refactor:`, `perf:`, `test:`, `docs:`, `chore:`, `tool:`, `ci:`,
-   `style:`, `reliability:`, `security:`, `release:`, `ux:`, `build:`).
-
-Do not run the optimization plan unprompted — it only kicks off on
-"continue" (or an explicit instruction).
