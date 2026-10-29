@@ -1,0 +1,19 @@
+# Settings for `make run-demo-smlm` — the one-command, no-popup launch against a
+# local (demo) Micro-Manager install. Copy this file to `demo_settings.mk` (which
+# git ignores) and set your own paths there; the Makefile recipe stays generic.
+#
+# All assignments use `?=`, so a command-line override still wins:
+#   make run-demo-smlm DEMO_BUFFER_MB=1024
+#
+# DEMO_BACKEND is one of JAVA, Python, PyMMCorePlus. DEMO_MAX_MEMORY_MB has no
+# effect on PyMMCorePlus (only DEMO_BUFFER_MB, the circular-buffer footprint, is
+# applied there) — Glados logs a warning saying so.
+#
+# `mmcore install` puts a Micro-Manager install, including MMConfig_demo.cfg,
+# under %LOCALAPPDATA%/pymmcore-plus/pymmcore-plus/mm/.
+
+DEMO_BACKEND       ?= PyMMCorePlus
+DEMO_MM_PATH       ?= C:/Users/<you>/AppData/Local/pymmcore-plus/pymmcore-plus/mm/Micro-Manager_<version>
+DEMO_CONFIG        ?= $(DEMO_MM_PATH)/MMConfig_demo.cfg
+DEMO_BUFFER_MB     ?= 4096
+DEMO_MAX_MEMORY_MB ?= 12000

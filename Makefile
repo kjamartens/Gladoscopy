@@ -196,13 +196,14 @@ run-demo:  ## Launch Glados against the pymmcore-plus bundled demo install + MMC
 
 # run-demo-smlm: same headless-bypass mechanism as run-mm, but the values come from
 # demo_settings.mk instead of the command line — edit that file, not this recipe.
+# It is per-machine and git-ignored: copy demo_settings.mk.example to start one.
 # Leading `-` so a missing file is not a hard parse error; the guard below then
 # produces a message that names the real problem.
 -include demo_settings.mk
 
 run-demo-smlm:  ## Launch Glados straight into the local demo backend/config from demo_settings.mk (no popup).
 ifeq ($(strip $(DEMO_CONFIG)),)
-	$(error demo_settings.mk not found, or DEMO_CONFIG is unset in it — see demo_settings.mk for the expected variables)
+	$(error demo_settings.mk not found, or DEMO_CONFIG is unset in it — copy demo_settings.mk.example to demo_settings.mk and set your paths)
 endif
 	$(PYTHON) $(PYFLAGS) -m glados_pycromanager.GUI.GUI_napari \
 	    --backend "$(DEMO_BACKEND)" \

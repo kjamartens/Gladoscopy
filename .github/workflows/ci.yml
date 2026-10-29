@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, Code-cleanup, claude_optimization]
+    branches: [main]
   pull_request:
-    branches: [main, Code-cleanup]
+    branches: [main]
   workflow_dispatch:
 
 # Pin to a single runner / Python so failures point at code, not matrix
