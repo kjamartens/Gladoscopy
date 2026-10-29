@@ -1,6 +1,6 @@
 """Wiring guard for `make run-demo-smlm` and its demo_settings.mk.
 
-Text-level only — no Make, no Qt, no hardware. The point is that a typo in a
+Text-level, plus one check against the real Windows recipe shells — no Make, no Qt, no hardware. The point is that a typo in a
 variable name between the settings file and the recipe cannot go unnoticed
 (the symptom would be a silently empty CLI flag, which argparse turns into a
 confusing "--config requires --backend" error).
@@ -8,7 +8,11 @@ confusing "--config requires --backend" error).
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -75,18 +79,51 @@ def test_run_demo_smlm_passes_the_cli_override_flags(makefile: str, flag: str) -
     assert flag in _recipe(makefile)
 
 
-def test_python_path_separator_follows_the_recipe_shell(makefile: str) -> None:
-    """The Windows `$(subst /,\\,...)` must be conditional on the recipe shell.
+def test_venv_python_is_a_quoted_forward_slash_path(makefile: str) -> None:
+    """The Windows `.venv` interpreter must be one form that runs in both recipe shells.
 
-    GNU make uses sh.exe as SHELL whenever it finds one on PATH (Git for Windows,
-    scoop, MSYS) even when started from PowerShell/cmd, and sh reads the `\\S` in
-    `.venv\\Scripts\\python.exe` as an escape -- every run/test target then dies with
-    `.venvScriptspython.exe: command not found`.
+    GNU make's recipe shell is sh.exe when one is on PATH (Git Bash, scoop, MSYS)
+    and cmd.exe otherwise, while `$(SHELL)` reads "sh.exe" either way -- so keying
+    the separator on it gave cmd `.venv/Scripts/python.exe`, which cmd parses as
+    `.venv` plus a `/Scripts` switch (a plain Git for Windows install only puts
+    `git\cmd` on PATH, so this is the common case). sh, in turn, reads the `\S`
+    of the backslash form as an escape.
     """
-    assert "_WINPATH" in makefile
-    assert "ifeq ($(findstring sh,$(notdir $(SHELL))),sh)" in makefile
-    assert "$(call _WINPATH,$(_VENV_PYTHON))" in makefile
-    assert "$(subst /,\\,$(_VENV_PYTHON))" not in makefile
+    assert 'PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),"$(_VENV_PYTHON)",python)' in makefile
+    assert "_WINPATH" not in makefile
+
+
+def _shells() -> list[list[str]]:
+    shells = [["cmd.exe", "/d", "/c"]]
+    git = shutil.which("git")
+    if git:
+        sh = Path(git).resolve().parents[1] / "usr" / "bin" / "sh.exe"
+        if sh.is_file():
+            shells.append([str(sh), "-c"])
+    return shells
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows recipe shells")
+@pytest.mark.parametrize("shell", _shells(), ids=lambda s: Path(s[0]).stem)
+def test_quoted_forward_slash_path_runs_in_recipe_shell(tmp_path: Path, shell: list[str]) -> None:
+    """What the assertion above relies on, checked against the real shells."""
+    exe = tmp_path / ".venv" / "Scripts" / "python.exe"
+    exe.parent.mkdir(parents=True)
+    shutil.copy(Path(os.environ["SystemRoot"]) / "System32" / "hostname.exe", exe)
+    # Run the line from a script file: Python's argv quoting would turn the quotes
+    # into \", which cmd and the various MSYS sh builds each parse differently.
+    line = '".venv/Scripts/python.exe"'
+    if shell[0] == "cmd.exe":
+        script = tmp_path / "recipe.bat"
+        script.write_text(f"@{line}\r\n", encoding="ascii")
+        command = [*shell, str(script)]
+    else:
+        script = tmp_path / "recipe.sh"
+        script.write_text(f"{line}\n", encoding="ascii")
+        command = [shell[0], script.name]
+    result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip()
 
 
 def test_run_demo_is_still_the_bundled_auto_demo(makefile: str) -> None:

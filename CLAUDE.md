@@ -8,8 +8,11 @@ Glados-pycromanager: a Napari-based UI for Pycromanager (python-Micromanager) pl
 
 ## Environment & install
 
-- Python 3.13 is required (`pyproject.toml`, `environment.yaml`). The user manual still mentions 3.10 — that is outdated; do not follow it.
-- One-shot Windows setup: run `win_create_env.bat`. It creates a conda env named `GladosEnv` from `environment.yaml`, then `uv pip install -e .` for editable install.
+- Python 3.13 is required (`pyproject.toml`). Installs are **uv + `.venv` only** (conda support was dropped 2026-10-20: `environment.yaml`, `win_create_env.bat` and `make env` are gone).
+- End-user Windows setup: `install_windows.bat` (needs git + uv; offers to install uv; `/y` = unattended). It runs `uv venv --python 3.13 --seed .venv`, `uv pip install --compile-bytecode -e .`, the `install_check` stamp and `shortcuts install`. It must stay **CRLF** (`.gitattributes`): cmd mis-parses labels/`goto` in LF batch files.
+- **uv's Python + PyQt5 + pymmcore: load order of `msvcp140.dll`.** PyQt5 bundles an old `MSVCP140.dll` (`PyQt5/Qt5/bin`); if Qt is imported before pymmcore, every later module gets that copy and `pymmcore.CMMCore()` is an access violation. A conda-based Python (the old `.venv`s were built on miniconda 3.13.5) masks it with its own newer `MSVCP140.dll`; uv's python-build-standalone ships none, so on a uv `.venv` the test suite crashed (`test_recipe_stage_devices_real_core.py`), and with pymmcore 12.5.1 so did every GUI launch (in `loadSystemConfiguration`): the `glados_pycromanager.GUI` import chain loads Qt before `startup.py`'s early `import pymmcore` can help. `glados_pycromanager/__init__.py` now calls `win_runtime.preload_system_msvcp140()` (loads `System32\msvcp140.dll` unless some msvcp140 is already loaded) and `tests/conftest.py` imports the package first. A path where something else imports Qt *before* `glados_pycromanager` (napari launching the plugin) is not covered; it only uses the Java `Core()`, not `CMMCore`. Tests: `tests/test_win_runtime.py` (only a uv interpreter can actually fail it).
+- On Windows the Makefile uses `uv` from PATH when `uv --version` answers (`_UV_ON_PATH`), else falls back to `python -m uv` bootstrapped into the PATH `python` — so `make dev` works on a machine with only git + uv + make.
+- Clean-room install check (no VM/Sandbox on the dev laptop): fresh `git init` copy of the tree, PATH = Windows + Git + a copied `uv.exe`, cold `UV_CACHE_DIR`, `UV_PYTHON_PREFERENCE=only-managed`, `APPDATA` redirected (shortcuts). The Claude harness sets `NoDefaultCurrentDirectoryInExePath=1`, so cmd will not run a bare `install_windows.bat` from the cwd there — clear it or use `.\`.
 - The dependency pin set in `pyproject.toml` is strict (numpy/pandas/scipy/napari/pyqt5/tensorflow all hard-pinned). Avoid casually bumping them; the GUI is sensitive to napari/PyQt5 versions.
 - `make dev`/`install`/`build` use `uv` (see `Makefile`'s `PIP`/`_ENSURE_UV`), not plain `pip`. Two gotchas that bit this repo once already: (1) `uv pip install` auto-detects its target env and, with a conda env active (`CONDA_PREFIX` set), can prefer that over `.venv/` — so `PIP` always passes `--python .venv/Scripts/python.exe` (Windows) / `.venv/bin/python` (Unix) explicitly rather than relying on auto-detection. (2) `.venv` is tracked via the real `.venv/pyvenv.cfg` file, not the bare directory — a `make clean` that can't fully remove `.venv` (locked `python.exe` from a still-running process/AV scan) leaves a corrupt skeleton that a directory-only Make target would treat as "already built"; `clean` also now fails loudly (reports unremoved paths) instead of silently swallowing `rmtree` errors.
 
@@ -36,13 +39,16 @@ Other entry points:
   `claude_throughput_project.md`'s verification steps mean. Every CLI-override launch now
   logs one INFO line naming the backend, install path, config and both memory settings.
   Tests: `tests/test_demo_settings_makefile.py`.
-- **Makefile gotcha (fixed):** GNU make on Windows uses `sh.exe` as the recipe shell
-  whenever one is on PATH (Git for Windows, scoop, MSYS) *even when started from
-  PowerShell or cmd* — and `sh` reads the `\S` in `.venv\Scripts\python.exe` as an
-  escape, so every run/test target died with `.venvScriptspython.exe: command not
-  found`. The backslash substitution is therefore conditional on `$(SHELL)`
-  (`_WINPATH`), not on `$(OS)`: cmd.exe gets backslashes, sh gets the forward-slash
-  path it can execute.
+- **Makefile gotcha (fixed twice):** GNU make on Windows uses `sh.exe` as the recipe
+  shell whenever one is on PATH (Git Bash, scoop, MSYS) *even when started from
+  PowerShell or cmd*, and cmd.exe otherwise — but `$(SHELL)` reads `sh.exe` in **both**
+  cases. sh reads the `\S` in `.venv\Scripts\python.exe` as an escape; cmd parses an
+  unquoted `.venv/Scripts/python.exe` as `.venv` + a `/Scripts` switch. The first fix
+  keyed the separator on `$(SHELL)` (`_WINPATH`), which always chose forward slashes
+  and broke `make dev` wherever no sh is on PATH (a stock Git for Windows install only
+  adds `git\cmd`; found by the 2026-10-20 clean-room install). `PYTHON` is now the
+  **quoted** forward-slash path, which both shells run. Tests:
+  `tests/test_demo_settings_makefile.py` (runs it in real cmd and sh).
 
 A small pytest suite lives in `tests/`. Run it with:
 

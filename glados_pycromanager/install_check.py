@@ -1,7 +1,7 @@
 """Warn when the environment is older than ``pyproject.toml`` (editable installs).
 
 With an editable install a code edit is live on the next launch. A changed dependency
-or entry point is not: it needs ``make dev`` again. ``make dev`` / ``make install``
+or entry point is not: it needs ``make dev`` again. ``make dev`` / ``make install`` / ``install_windows.bat``
 stamp a fingerprint of those parts of ``pyproject.toml`` into the environment
 (``python -m glados_pycromanager.install_check stamp``). At startup ``stale_install_message()``
 compares it with the current file, and Glados shows a warning when they differ.
@@ -52,7 +52,7 @@ def stale_install_message(pyproject: Path = PYPROJECT, stamp: Path | None = None
     except Exception:
         return None
     return ('pyproject.toml has changed since this environment was installed '
-            '(dependencies or entry points). Run `make dev` to update it.')
+            '(dependencies or entry points). Run `make dev` (or install_windows.bat) to update it.')
 
 
 def main(argv=None) -> int:

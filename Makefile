@@ -1,7 +1,10 @@
 # Common developer tasks. Works on Windows (GnuWin32 make or Git-Bash make),
 # macOS, and Linux. Targets are thin wrappers so CI can call the same commands.
 #
-# Quick start (new contributor — no conda needed):
+# Needs: git, uv (https://docs.astral.sh/uv/) and make. uv fetches Python 3.13 itself.
+# End users without make: run install_windows.bat instead (same install, no make).
+#
+# Quick start:
 #   make dev       ← creates .venv if absent, then editable install with dev extras
 #   make run-dev   ← dev install + launch in one step
 #   make run-prod  ← non-editable (production) install + launch in one step
@@ -13,10 +16,6 @@
 #   make test      ← run the test suite
 #   make ci        ← full local gate: lint + bandit + tests
 #
-# Conda alternative (existing GladosEnv users):
-#   make env      ← create / update GladosEnv conda env
-#   conda activate GladosEnv && make dev
-#
 # Windows: GnuWin32 make (C:\Program Files (x86)\GnuWin32\bin\make.exe)
 # works from PowerShell / cmd.  Git-Bash make also works.
 
@@ -24,32 +23,37 @@
 # Override by setting PYTHON explicitly: make test PYTHON=python3.13
 ifeq ($(OS),Windows_NT)
     _VENV_PYTHON := .venv/Scripts/python.exe
-    # Bootstrap uv via Anaconda pip, then let uv fetch Python 3.13 if needed.
-    # uv venv does not install pip, so PIP uses the base-env uv (auto-detects .venv).
-    _VENV_CREATE  = python -m pip install --quiet uv && python -m uv venv --python 3.13 --seed .venv
-    # Path separator: cmd.exe cannot reliably execute a forward-slash relative
-    # path, so it needs backslashes — but if make found sh.exe on PATH (Git for
-    # Windows / scoop / MSYS, very common) it uses THAT as the recipe shell even
-    # when make itself was started from PowerShell or cmd, and sh reads `\S` as
-    # an escape, so `.venv\Scripts\python.exe` becomes `.venvScriptspython.exe:
-    # command not found`. Pick the separator from the recipe shell, not the OS.
-    ifeq ($(findstring sh,$(notdir $(SHELL))),sh)
-        _WINPATH = $(1)
+    # Prefer a uv on PATH (the standalone installer / winget / scoop uv.exe, which
+    # needs no Python at all); fall back to bootstrapping uv into whatever `python`
+    # is on PATH. `2>&1` works in both cmd.exe and sh, and a missing uv then yields
+    # an error text whose first word is not "uv".
+    _UV_ON_PATH := $(filter uv,$(firstword $(shell uv --version 2>&1)))
+    ifneq ($(_UV_ON_PATH),)
+        UV ?= uv
+        _VENV_CREATE = uv venv --python 3.13 --seed .venv
     else
-        _WINPATH = $(subst /,\,$(1))
+        UV ?= python -m uv
+        _VENV_CREATE = python -m pip install --quiet uv && python -m uv venv --python 3.13 --seed .venv
     endif
-    PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(call _WINPATH,$(_VENV_PYTHON)),python)
-    # Use the base-env's uv (not $(PYTHON), which is .venv's python once it
-    # exists and doesn't have uv installed in it). Target .venv explicitly
-    # via --python — relying on uv's auto-detection is unsafe when a conda
-    # env is active, since uv can prefer CONDA_PREFIX over .venv/, silently
-    # installing into the wrong environment (the one $(PYTHON) does NOT read).
-    PIP    ?= python -m uv pip install --python $(_VENV_PYTHON)
-    # Whatever "python" is on PATH (base conda env, GladosEnv, plain venv...)
-    # may never have had uv bootstrapped into it — ensure it before using PIP.
-    _ENSURE_UV = python -c "import importlib.util,sys,subprocess as s; sys.exit(0) if importlib.util.find_spec('uv') else s.check_call([sys.executable,'-m','pip','install','--quiet','uv'])"
+    # The recipe shell is sh.exe when one is on PATH (Git Bash, scoop, MSYS) and
+    # cmd.exe otherwise -- and $(SHELL) reads "sh.exe" in both cases, so it cannot
+    # tell them apart. cmd parses an unquoted `.venv/Scripts/python.exe` as `.venv`
+    # plus a `/Scripts` switch; sh reads the `\S` of the backslash form as an
+    # escape. A *quoted* forward-slash path runs in both.
+    PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),"$(_VENV_PYTHON)",python)
+    # Not $(PYTHON)'s uv: that is .venv's python once it exists, which has no uv.
+    # Target .venv explicitly via --python: uv's auto-detection can prefer an
+    # active conda env (CONDA_PREFIX) over .venv/ and silently install there.
+    PIP    ?= $(UV) pip install --python $(_VENV_PYTHON)
+    ifneq ($(_UV_ON_PATH),)
+        _ENSURE_UV = uv --version
+    else
+        # Whatever "python" is on PATH may never have had uv bootstrapped into it.
+        _ENSURE_UV = python -c "import importlib.util,sys,subprocess as s; sys.exit(0) if importlib.util.find_spec('uv') else s.check_call([sys.executable,'-m','pip','install','--quiet','uv'])"
+    endif
 else
     _VENV_PYTHON := .venv/bin/python
+    UV ?= uv
     _VENV_CREATE := uv venv --python 3.13 .venv
     PYTHON ?= $(if $(wildcard $(_VENV_PYTHON)),$(_VENV_PYTHON),python)
     PIP    ?= uv pip install --python $(_VENV_PYTHON)
@@ -61,7 +65,7 @@ MYPY   ?= $(PYTHON) -m mypy
 BANDIT ?= $(PYTHON) -m bandit
 PACKAGE := glados_pycromanager
 
-.PHONY: help env venv install dev build ensure-uv \
+.PHONY: help venv install dev build ensure-uv \
         test test-fast test-cov \
         lint lint-fix format mypy bandit \
         shortcuts shortcuts-uninstall \
@@ -82,11 +86,7 @@ help:  ## Show this help.
 
 .venv: .venv/pyvenv.cfg
 
-venv: .venv  ## Create .venv using the system Python (skipped if already present).
-
-env:  ## Create or update the GladosEnv conda env from environment.yaml (conda users).
-	conda env create --name GladosEnv -f environment.yaml 2>/dev/null \
-	    || conda env update --name GladosEnv -f environment.yaml
+venv: .venv  ## Create .venv with uv's Python 3.13 (skipped if already present).
 
 ensure-uv:  ## Make sure uv is importable for the active interpreter (installs quietly if missing).
 	@$(_ENSURE_UV)
@@ -102,11 +102,12 @@ dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .v
 		$(PIP) --force-reinstall --no-cache-dir diplib==3.6.0 && \
 		$(PYTHON) -c "import diplib" \
 	)
-	@# Fingerprint pyproject's deps/entry points, so Glados can warn when they change.
+# Fingerprint pyproject's deps/entry points, so Glados can warn when they change.
+# (A make comment, not an `@#` recipe line: cmd.exe would run that as a command.)
 	$(PYTHON) -m glados_pycromanager.install_check stamp
 
 build: ensure-uv  ## Build wheel + sdist into dist/.
-	uv build
+	$(UV) build
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
