@@ -62,7 +62,7 @@ Changes since May 2026. Design notes and per-step decisions from this period are
 - Dead code: the old `GUI.py` entry, `MainScripts/Main.py`/`HelperFunctions.py`, the RT-analysis
   `eval` dispatch fallback, unused helpers, and large commented-out blocks.
 - Unused dependencies (torchvision, segment-anything, mobile-sam, timm, flask, slackeventsapi,
-  bioio, markdown); `torch`, `stardist` and `scikit-image` are now declared, since nodes import them.
+  bioio, markdown); `torch` and `scikit-image` are now declared, since nodes import them.
 - The pdoc HTML pages, the `.docx` manuals and the conda environment files.
 
 ### Fixed
