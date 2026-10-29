@@ -13,8 +13,13 @@ a thumbnail, for MDA and Live alike.
 they still exist):
 
 * the thumbnail is always painted, loaded or not, and
-* the spinner is painted over it only once a layer has been unloaded for
-  `SPINNER_DELAY_S`, so a real long load still shows one.
+* the spinner is painted over it only once a layer has been unloaded *and* its
+  thumbnail has not changed for `SPINNER_DELAY_S`, so a real long load still
+  shows one. "Unloaded" alone is not enough: during an MDA a layer is unloaded
+  for the whole acquisition while its slices (and thumbnail) keep arriving, so
+  an unloaded-time rule alone left a permanent spinner over a working
+  thumbnail. The thumbnail setter assigns a new array, so its identity is the
+  progress signal.
 
 The loading movie is still started while a layer is unloaded, as napari does:
 its frame ticks are what repaint the list, which is how the delayed spinner
@@ -32,34 +37,40 @@ from qtpy.QtGui import QPixmap
 #: How long a layer must stay unloaded before the spinner is painted.
 SPINNER_DELAY_S = 1.0
 
-_unloaded_since: WeakKeyDictionary = WeakKeyDictionary()
+_load_state: WeakKeyDictionary = WeakKeyDictionary()
 _installed = False
 
 
-def _unloaded_long_enough(layer, loaded, now=None):
-    """Track when `layer` went unloaded; True once it has been for SPINNER_DELAY_S."""
+def _spinner_due(layer, loaded, now=None):
+    """True once `layer` has been unloaded, with an unchanged thumbnail, for SPINNER_DELAY_S."""
     if layer is None:
         return not loaded
     if loaded:
-        _unloaded_since.pop(layer, None)
+        _load_state.pop(layer, None)
         return False
     if now is None:
         now = time.monotonic()
-    since = _unloaded_since.setdefault(layer, now)
-    return now - since >= SPINNER_DELAY_S
+    thumb = getattr(layer, 'thumbnail', None)
+    state = _load_state.get(layer)
+    if state is None:
+        state = _load_state[layer] = {'since': now, 'thumb': thumb, 'thumb_t': now}
+    elif thumb is not state['thumb']:
+        state['thumb'], state['thumb_t'] = thumb, now
+    return (now - state['since'] >= SPINNER_DELAY_S
+            and now - state['thumb_t'] >= SPINNER_DELAY_S)
 
 
 def _paint_loading(self, painter, option, index):
-    """Start the loading movie while unloaded; paint it only after the delay."""
+    """Start the loading movie while unloaded; paint it only once loading has stalled."""
     from napari._qt.containers._base_item_model import ItemRole
     from napari._qt.containers.qt_layer_model import LoadedRole
 
     loaded = index.data(LoadedRole)
     if loaded:
-        _unloaded_long_enough(index.data(ItemRole), True)
+        _spinner_due(index.data(ItemRole), True)
         return
     self._load_movie.start()
-    if _unloaded_long_enough(index.data(ItemRole), False):
+    if _spinner_due(index.data(ItemRole), False):
         load_rect = option.rect.translated(4, 8)
         h = index.data(Qt.ItemDataRole.SizeHintRole).height() - 16
         load_rect.setWidth(h)

@@ -613,7 +613,10 @@ Tests: `tests/test_mda_backfill.py`.
 0.7 marks a layer unloaded per async slice request and paints the spinner *instead of*
 the thumbnail; every displayed MDA frame moves the dims, so the newest request was always
 pending. The patched `LayerDelegate` always paints the thumbnail and overlays the spinner
-only after `SPINNER_DELAY_S` (1 s) of continuous unloading. It patches private napari
+only once a layer has been unloaded *and* its thumbnail unchanged for `SPINNER_DELAY_S`
+(1 s); unloaded time alone left a permanent spinner over a working MDA thumbnail (the
+layer stays unloaded all acquisition). Thumbnail progress = identity of `layer.thumbnail`
+(its setter assigns a new array). It patches private napari
 methods; `tests/test_napari_layer_list.py` pins them so an upgrade fails loudly.
 
 **Fixing that reset exposed a second, narrower race in `add_image()` itself**:

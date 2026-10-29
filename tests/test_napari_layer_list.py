@@ -5,7 +5,9 @@ layer-list delegate painted a spinner *instead of* the thumbnail until a
 response for the latest request arrived. During an MDA every displayed frame
 moves the dims, so the newest request was always pending and the MDA and Live
 thumbnails were a permanent spinner. `napari_layer_list` always paints the
-thumbnail and shows the spinner only after `SPINNER_DELAY_S`.
+thumbnail and shows the spinner only after `SPINNER_DELAY_S` with no new
+thumbnail: an MDA layer stays "not loaded" while its thumbnail keeps updating,
+and a spinner over a working thumbnail is just noise.
 """
 from __future__ import annotations
 
@@ -32,21 +34,33 @@ def test_napari_still_has_the_patched_delegate_methods():
 
 
 class _Layer:
-    pass
+    thumbnail = None
 
 
 def test_spinner_only_after_the_delay():
     layer = _Layer()
-    assert not nll._unloaded_long_enough(layer, False, now=100.0)
-    assert not nll._unloaded_long_enough(layer, False, now=100.0 + nll.SPINNER_DELAY_S / 2)
-    assert nll._unloaded_long_enough(layer, False, now=100.0 + nll.SPINNER_DELAY_S)
+    assert not nll._spinner_due(layer, False, now=100.0)
+    assert not nll._spinner_due(layer, False, now=100.0 + nll.SPINNER_DELAY_S / 2)
+    assert nll._spinner_due(layer, False, now=100.0 + nll.SPINNER_DELAY_S)
 
 
 def test_loading_again_restarts_the_delay():
     layer = _Layer()
-    nll._unloaded_long_enough(layer, False, now=0.0)
-    nll._unloaded_long_enough(layer, True, now=5.0)
-    assert not nll._unloaded_long_enough(layer, False, now=5.5)
+    nll._spinner_due(layer, False, now=0.0)
+    nll._spinner_due(layer, True, now=5.0)
+    assert not nll._spinner_due(layer, False, now=5.5)
+
+
+def test_no_spinner_while_the_thumbnail_keeps_changing():
+    # An MDA layer: never "loaded", but a new thumbnail arrives every 0.5 s.
+    layer = _Layer()
+    t = 0.0
+    while t < 10 * nll.SPINNER_DELAY_S:
+        layer.thumbnail = object()
+        assert not nll._spinner_due(layer, False, now=t)
+        t += nll.SPINNER_DELAY_S / 2
+    # ...and once the thumbnail stalls, the spinner comes back.
+    assert nll._spinner_due(layer, False, now=t + nll.SPINNER_DELAY_S)
 
 
 def _index(loaded, layer=None):
@@ -90,7 +104,7 @@ def test_no_spinner_for_a_layer_that_just_started_loading(qapp):
 
 def test_spinner_for_a_layer_loading_for_long(qapp, monkeypatch):
     layer = _Layer()
-    nll._unloaded_long_enough(layer, False, now=0.0)
+    nll._spinner_due(layer, False, now=0.0)
     monkeypatch.setattr(nll.time, 'monotonic', lambda: nll.SPINNER_DELAY_S + 1)
     delegate = MagicMock()
     painter = MagicMock()
