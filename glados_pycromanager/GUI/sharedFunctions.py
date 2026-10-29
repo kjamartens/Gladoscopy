@@ -3,8 +3,10 @@ import dataclasses
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
+import threading
 from dataclasses import dataclass
 
 import appdirs
@@ -614,10 +616,34 @@ class Shared_data(QObject):
     # deletes a store a napari layer may still be rendering from.
 
     @staticmethod
-    def _discard_temp_dir(tmpdir) -> None:
-        """Delete one temporary store now, tolerating a locked directory."""
+    def _discard_temp_dir(tmpdir, background: bool = True) -> None:
+        """Delete one temporary store, tolerating a locked directory.
+
+        With `background` (the default) the directory is renamed out of the way
+        at once and its files are deleted on a daemon thread. These calls run on
+        the GUI thread when an MDA layer is rebuilt, and a store holds one file
+        per frame: deleting 1500 of them took 3.3 s on Windows, a frozen display
+        at the start of the next acquisition. The rename keeps the old path free
+        immediately. If it fails (a file still open), deletion falls back to
+        the synchronous path. Pass `background=False` where the process is about
+        to exit and a daemon thread would be killed mid-way.
+        """
         if tmpdir is None:
             return
+        if background:
+            trash = f'{tmpdir.name}.discarded'
+            try:
+                os.rename(tmpdir.name, trash)
+            except OSError:
+                pass
+            else:
+                finalizer = getattr(tmpdir, '_finalizer', None)
+                if finalizer is not None:
+                    finalizer.detach()
+                threading.Thread(target=shutil.rmtree, args=(trash,),
+                                 kwargs={'ignore_errors': True}, daemon=True,
+                                 name='glados-temp-store-cleanup').start()
+                return
         try:
             tmpdir.cleanup()
         except OSError as exc:
@@ -670,9 +696,10 @@ class Shared_data(QObject):
         force-exits via `os._exit(0)`, so no finalizer would otherwise run and
         every store would be left behind in the OS temp directory.
         """
+        # Synchronous: os._exit follows, which would kill a cleanup thread.
         for layer_name in list(self.mdaZarrTempDirs):
-            self.release_zarr_temp_dir(layer_name)
-        self._discard_temp_dir(self.pyMMCdatasetTempDir)
+            self._discard_temp_dir(self.mdaZarrTempDirs.pop(layer_name, None), background=False)
+        self._discard_temp_dir(self.pyMMCdatasetTempDir, background=False)
         self.pyMMCdatasetTempDir = None
     
     @property

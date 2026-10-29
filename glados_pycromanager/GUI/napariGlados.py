@@ -268,6 +268,44 @@ def _create_mda_zarr(shared_data, layer_name, shape, h, w, dtype):
     return array
 
 
+def _discard_mismatched_mda_zarr(shared_data, layer_name, expected_shape, dtype):
+    """Drop `layer_name`'s store unless it has exactly this shape and dtype.
+
+    Returns True if a store was discarded. A missing store is left alone.
+    """
+    existing = shared_data.mdaZarrData.get(layer_name)
+    if existing is None:
+        return False
+    if tuple(existing.shape) == tuple(expected_shape) and existing.dtype == np.dtype(dtype):
+        return False
+    logging.info('Stale multiDstack store for %r: shape=%s dtype=%s, expected shape=%s '
+                 'dtype=%s; recreating', layer_name, existing.shape, existing.dtype,
+                 tuple(expected_shape), np.dtype(dtype))
+    shared_data.mdaZarrData[layer_name] = None
+    shared_data.release_zarr_temp_dir(layer_name)
+    _invalidate_layer_shape_validation(shared_data, layer_name)
+    return True
+
+
+def prewarm_display_imports():
+    """Import zarr on a background thread, ahead of the first MDA frame.
+
+    `_create_mda_zarr` imports zarr lazily (it stays off the startup path),
+    so the first multiDstack frame used to pay for that import on the GUI
+    thread. zarr scans every installed package's entry points while importing.
+    With a 10 ms acquisition competing for the GIL, that took about 4 s of a
+    7 s frozen first display update. Importing it here, once startup is ready,
+    moves the cost off the GUI thread. A GUI-thread import that arrives while
+    this one is still running waits for it rather than starting over.
+    """
+    def _import():
+        try:
+            import zarr  # noqa: F401
+        except Exception:
+            logging.exception('Background import of zarr failed')
+    Thread(target=_import, name='glados-prewarm-imports', daemon=True).start()
+
+
 def _slice_safe_to_display(shared_data, arrived_slice):
     """Which slice the viewer should actually be pointed at.
 
@@ -925,7 +963,14 @@ def _napariUpdateLive_locked(DataStructure, napariViewer, acqstate, core, image_
                     shape = n_entries_in_dims
                     # Zarr may have been pre-created by _preinit_mda_zarr before run_mda()
                     # started (MMCORE_PLUS fast acquisitions). Reuse it so frameReady writes
-                    # are not lost.
+                    # are not lost -- but only if it fits this plan. A store can also be
+                    # left over from an earlier acquisition under the same layer name
+                    # whose layer the user closed (nothing releases the store then).
+                    # Reusing that one made every write of a re-ordered or resized plan
+                    # fail with zarr's BoundsCheckError, and nothing was displayed.
+                    _discard_mismatched_mda_zarr(shared_data, layerName,
+                                                 tuple(shape) + tuple(latestImage.shape[-2:]),
+                                                 latestImage.dtype)
                     if shared_data.mdaZarrData.get(layerName) is None:
                         # One creation site, one explicit dtype (T-D1). The frame
                         # in hand carries the camera's own dtype, so use it rather
@@ -1617,26 +1662,15 @@ class napariHandler:
             w = int(self.shared_data.MILcore.get_image_width())
             dtype = _camera_dtype(self.shared_data)
             expected_shape = tuple(n_entries_in_dims) + (h, w)
-            existing = shared_data.mdaZarrData.get(layerName)
-            if existing is not None:
-                if tuple(existing.shape) == expected_shape and existing.dtype == np.dtype(dtype):
-                    # Already the right shape/dtype for this acquisition -- reusing
-                    # it is what lets frameReady callbacks write immediately even
-                    # for a repeated acquisition under the same layer name.
-                    return False
-                # A store from a previous acquisition under the same layer name
-                # (repeated MDA, or a ROI/binning change) with the wrong shape --
-                # reusing it as-is is what made every ZarrFrameWriter write of
-                # this acquisition fail with a zarr "could not broadcast" error.
-                # Discard it so the fresh array below actually matches what this
-                # acquisition is about to write.
-                logging.info('Stale multiDstack store for %r: shape=%s dtype=%s, '
-                             'expected shape=%s dtype=%s; recreating',
-                             layerName, existing.shape, existing.dtype,
-                             expected_shape, np.dtype(dtype))
-                shared_data.mdaZarrData[layerName] = None
-                shared_data.release_zarr_temp_dir(layerName)
-                _invalidate_layer_shape_validation(shared_data, layerName)
+            # A store from a previous acquisition under the same layer name
+            # (repeated MDA, or a ROI/binning change) with the wrong shape is
+            # discarded: reusing it as-is made every ZarrFrameWriter write of this
+            # acquisition fail with a zarr "could not broadcast" error. A matching
+            # one is kept, which lets frameReady callbacks write immediately even
+            # for a repeated acquisition under the same layer name.
+            _discard_mismatched_mda_zarr(shared_data, layerName, expected_shape, dtype)
+            if shared_data.mdaZarrData.get(layerName) is not None:
+                return False
             _create_mda_zarr(shared_data, layerName, n_entries_in_dims, h, w, dtype)
             return True
         except Exception as exc:

@@ -576,6 +576,18 @@ reusing it only on an exact match and otherwise discarding it (`mdaZarrData[laye
 creating a fresh one — the layer-shape-validation cache invalidation is what
 then makes the display path above rebuild the napari layer too, on the first
 frame of the new acquisition. Tests: `tests/test_preinit_mda_zarr_reset.py`.
+Both reuse sites (`_preinit_mda_zarr` and the display path's layer-creation branch) now
+go through `_discard_mismatched_mda_zarr(shared_data, layer, expected_shape, dtype)`. The
+display branch used to reuse *any* existing store: after the user closed the `MDA`
+layer (nothing releases its store then) and changed the plan, every frame of the next
+pycromanager-backend MDA failed with zarr `BoundsCheckError` and nothing was shown.
+Two first-frame GUI-thread costs were moved off it (measured on a 10 ms, 500 t x 3 z
+Python-backend MDA on inSiliScope: first display update 6.9 s -> 2.1 s, the rest is
+napari's own `add_image`): `import zarr` (~4 s under GIL contention; now
+`prewarm_display_imports()` on a daemon thread at startup-ready) and store deletion
+(`Shared_data._discard_temp_dir` renames the directory, then `rmtree`s it on a daemon
+thread; 1500 one-frame chunk files took 3.3 s; `release_all_temp_dirs` stays
+synchronous because `os._exit` follows). Tests: `tests/test_fast_mda_display_start.py`.
 
 **Fixing that reset exposed a second, narrower race in `add_image()` itself**:
 once `_preinit_mda_zarr` reliably produces a correctly-shaped store, frames

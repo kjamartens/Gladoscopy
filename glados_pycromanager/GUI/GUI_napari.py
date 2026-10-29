@@ -926,6 +926,9 @@ def main(app=None, splash=None):
             shared_data._rt_subprocess_pool.start()
         except Exception:
             logging.exception('Could not pre-warm the RT-analysis subprocess pool')
+        # zarr off the GUI thread, before the first MDA frame needs it.
+        from glados_pycromanager.GUI.napariGlados import prewarm_display_imports
+        prewarm_display_imports()
     call_when_startup_ready(_on_startup_ready)
 
     worker = Worker()
