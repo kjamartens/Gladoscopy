@@ -8,7 +8,7 @@ version = "0.0.2"
 authors = [
   { name="Koen J.A. Martens", email="koenjamartens@gmail.com" }
 ]
-license = { file = "LICENSE" }
+license = { file = "LICENCE" }
 
 description = "Glados-pycromanager: Napari interface for Pycromanager and autonomous microscopy"
 
@@ -18,7 +18,7 @@ requires-python = ">=3.13, <3.14"
 
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License :: Free for non-commercial use",
 ]
 
 keywords = ["microscopy", "molecule", "pycromanager", "micromanager"]
@@ -28,39 +28,34 @@ dependencies = [
     "pandas==2.3.1",
     "scipy==1.16.0",
     "matplotlib==3.10.3",
-    "h5py==3.14.0",
     "xarray==2025.1.2",
     "dask==2025.7.0",
     "pycromanager @ git+https://github.com/micro-manager/pycro-manager.git",
     "pymmcore-plus",
     "pymmcore",
     "bioimageio-core", #0.8.0
-    "torchvision==0.23.0",
-    "segment-anything==1.0",
-    "mobile-sam @ git+https://github.com/ChaoningZhang/MobileSAM.git",
-    "timm==0.9.16",
-    "bioio",
+    # The BioImageModelZoo node runs models through bioimageio-core's PyTorch backend.
+    "torch==2.8.0",
     "tifffile==2025.6.11",
     "zarr==3.1.0",
     "napari[all]==0.7.0",
     "pyqt5==5.15.11",
-    "pyqtgraph==0.13.3",
     "pyqtwebengine==5.15.7",
     "tensorflow==2.20.0",
+    # Not imported by Glados; pinned so tensorflow/stardist keep the tested versions.
     "keras==3.13.2",
-    "csbdeep==0.7.3",
-    "flask==3.1.1",
+    "h5py==3.14.0",
     "tqdm==4.67.1",
+    "csbdeep==0.7.3",
+    "stardist",
+    "scikit-image==0.26.0",
     "ndtiff==3.1.0",
     "pyperclip==1.11.0",
-    "slack==0.0.2",
-    "slackeventsapi==3.0.3",
+    "slack-sdk>=3.33",
     "opencv-python==4.13.0.92",
     "psutil==7.0.0",
     "pydantic==2.12.5",
     "diplib==3.6.0",
-    "markdown>=3.7",
-    "markdown-captions>=2.1",
     # Start Menu shortcuts with a taskbar AppUserModelID (glados_pycromanager/shortcuts.py).
     "pywin32>=306; sys_platform == 'win32'",
 ]
@@ -74,6 +69,9 @@ dev = [
     "bandit>=1.7",
     "ruff>=0.6",
     "mypy>=1.10",
+    "pre-commit>=3.7",
+    # scripts/bench_pyqtgraph_vs_napari.py only.
+    "pyqtgraph==0.13.3",
 ]
 
 [tool.mypy]
@@ -141,10 +139,10 @@ addopts = "-ra -p no:napari -p no:npe2 -p no:napari_plugin_engine"
 # PyQt6 from napari[all]'s install and our tests then refuse to import
 # PyQt5 over the top.
 qt_api = "pyqt5"
-# The seven tests that spawn a real multiprocessing worker cost ~80s of the
-# suite's ~140s wall time on Windows -- inherent `spawn` re-import cost, not
-# waste. They are marked `slow`: `pytest -m "not slow"` runs the other 345 in
-# ~60s. Plain `pytest` still runs everything, so nothing rots silently.
+# Tests that spawn a real multiprocessing worker pay the Windows `spawn`
+# re-import cost (several seconds each). They are marked `slow`:
+# `pytest -m "not slow"` skips them. Plain `pytest` still runs everything,
+# so nothing rots silently.
 markers = [
     "slow: spawns a real subprocess; several seconds each (deselect with -m 'not slow')",
 ]
@@ -169,9 +167,8 @@ exclude = [
     "GUI/Icons/*",
     "GUI/nodz/*",
     "GUI/nodz/default_config.json",
-    "Documentation/*.md",
-    "Documentation/*.html",
-    "Documentation/Images/*",
+    "GUI/*.json",
+    "AutonomousMicroscopy/ExampleRecipes/*",
 ]
 [project.scripts]
 "glados" = "glados_pycromanager.GUI.startup:main"

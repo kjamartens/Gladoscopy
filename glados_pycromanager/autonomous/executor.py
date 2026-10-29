@@ -1419,10 +1419,10 @@ class FlowchartExecutorMixin:
                     # Save the image as a PNG file
                     image.save(tempFile, "PNG")
                     #Send the message with the read-tempFile
-                    slack_image = cfg.slack_client.files_upload(
+                    cfg.slack_client.files_upload_v2(
                         title="Glados Image",
-                        channels=cfg.slack_channel,
-                        content=open(tempFile, 'rb').read(),
+                        channel=cfg.slack_channel,
+                        file=tempFile,
                         initial_comment = restText,
                     )
         except Exception as e:  # noqa: BLE001 — wide net for any Slack/image error

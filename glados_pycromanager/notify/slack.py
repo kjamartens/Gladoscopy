@@ -1,7 +1,6 @@
 """Defensive Slack send helper (Phase 10.10).
 
-Wraps :meth:`slack.WebClient.chat_postMessage` (slack-sdk legacy
-import path used elsewhere in the project) so that:
+Wraps :meth:`slack_sdk.WebClient.chat_postMessage` so that:
 
 * an unconfigured install (empty token, missing client) **no-ops**
   with a single ``logging.info`` line instead of raising;
@@ -22,6 +21,19 @@ from typing import Any
 from glados_pycromanager.errors import BackendError
 
 logger = logging.getLogger(__name__)
+
+
+def make_slack_client(token: str | None) -> Any:
+    """A ``slack_sdk.WebClient`` for ``token``, or None when there is no token
+    or slack-sdk is not installed. Creating the client makes no network call."""
+    if not token or not token.strip():
+        return None
+    try:
+        from slack_sdk import WebClient
+    except ImportError:
+        logger.error("slack-sdk is not installed; Slack messages are disabled")
+        return None
+    return WebClient(token=token)
 
 
 def slack_is_configured(webhook_cfg: Any) -> bool:

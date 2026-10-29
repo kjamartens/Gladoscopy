@@ -478,13 +478,8 @@ class Shared_data(QObject):
                 except (KeyError, TypeError, AttributeError) as exc:
                     logging.debug('globalData key %r not present in current schema (%s)', key, exc)
         
-        if self.config.webhook_config.slack_token is not None and not len(self.config.webhook_config.slack_token) == 0:
-            try:
-                import slack
-                self.config.webhook_config.slack_client = slack.WebClient(token=self.config.webhook_config.slack_token)
-                logging.debug('Slack client initialised')
-            except (ValueError, TypeError, AttributeError, OSError) as exc:
-                logging.error('Slack client initialisation failed: %s', exc)
+        from glados_pycromanager.notify.slack import make_slack_client
+        self.config.webhook_config.slack_client = make_slack_client(self.config.webhook_config.slack_token)
     
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
