@@ -121,4 +121,5 @@ dialog and let the values persist into per-user AppData.
 ## License
 
 By contributing you agree your contribution will ship under the same
-GPLv3 license as the project (`LICENCE` in repo root).
+CC BY-NC-SA 4.0 licence as the project (`LICENCE` in repo root). The vendored
+Nodz editor keeps its own MIT licence (`glados_pycromanager/GUI/nodz/LICENSE.txt`).
