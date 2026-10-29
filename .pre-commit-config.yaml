@@ -7,9 +7,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: "^glados_pycromanager/GUI/nodz/|^glados_pycromanager/Documentation/.*\\.html$|\\.svg$"
+        exclude: "^glados_pycromanager/GUI/nodz/|\\.svg$"
       - id: end-of-file-fixer
-        exclude: "^glados_pycromanager/GUI/nodz/|^glados_pycromanager/Documentation/.*\\.html$|\\.svg$"
+        exclude: "^glados_pycromanager/GUI/nodz/|\\.svg$"
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
@@ -31,9 +31,9 @@ repos:
     hooks:
       - id: mypy
         # Skip dependency installation; mypy + the project deps live in
-        # the dev env. The Phase 15 strictness bump will revisit this.
+        # the dev env.
         additional_dependencies: []
         args: ["--config-file=pyproject.toml"]
         # Mypy on a per-file basis is noisy with the current god-files;
-        # keep it informational only until Phase 15 carves typed modules.
+        # keep it to these two typed modules for now.
         files: "^glados_pycromanager/(GUI/slack_settings_dialog\\.py|Core/microscopeInterfaceLayer\\.py)$"

@@ -25,7 +25,7 @@ jobs:
           python -m pip install "ruff>=0.6" "mypy>=1.10"
       # Informational only at this gate — the codebase carries ~1000
       # pre-existing ruff findings (bare-except, unused-variable, etc.)
-      # that Phase 9/10/11 progressively clean up. `--exit-zero` keeps the
+      # that are cleaned up gradually. `--exit-zero` keeps the
       # job green while still printing the violations in the build log.
       - name: ruff check (informational)
         run: python -m ruff check glados_pycromanager tests --exit-zero

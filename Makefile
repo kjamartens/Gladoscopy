@@ -67,7 +67,7 @@ PACKAGE := glados_pycromanager
 
 .PHONY: help venv install dev build ensure-uv \
         test test-fast test-cov \
-        lint lint-fix format mypy bandit \
+        lint lint-fix format mypy bandit         docs docs-serve \
         shortcuts shortcuts-uninstall \
         run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup profile-startup-full bench-live-display bench-storage \
         ci verify \
@@ -95,8 +95,8 @@ install: .venv ensure-uv  ## Non-editable production install into .venv (no dev 
 	$(PIP) .
 	$(PYTHON) -m glados_pycromanager.install_check stamp
 
-dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .venv if absent).
-	$(PIP) -e ".[dev]"
+dev: .venv ensure-uv  ## Editable install with dev + docs extras into .venv (creates .venv if absent).
+	$(PIP) -e ".[dev,docs]"
 	@$(PYTHON) -c "import diplib" || ( \
 		echo "diplib failed to import after install -- this is usually a Windows locked-file pip reinstall (a stale python.exe, VSCode's Pylance, or an AV scan held PyDIP_bin*.pyd open, so pip renamed the old folder to '~iplib' and left diplib/ a stale/new mix); forcing a clean reinstall..." && \
 		$(PIP) --force-reinstall --no-cache-dir diplib==3.6.0 && \
@@ -108,6 +108,14 @@ dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .v
 
 build: ensure-uv  ## Build wheel + sdist into dist/.
 	$(UV) build
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+
+docs:  ## Build the documentation site into site/ (strict: broken links fail).
+	NO_MKDOCS_2_WARNING=1 $(PYTHON) -m mkdocs build --strict
+
+docs-serve:  ## Serve the documentation site with live reload at http://127.0.0.1:8000.
+	NO_MKDOCS_2_WARNING=1 $(PYTHON) -m mkdocs serve
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 

@@ -1,74 +1,62 @@
-# Glados-pycromanager Developer manual
+# Writing nodes
 
-Author: Koen J.A. Martens  
-koenjamartens@gmail.com  
-Created 2023-2024
-
-<!-- TOC -->
-
-- [Glados-pycromanager Developer manual](#glados-pycromanager-developer-manual)
-    - [General overview](#general-overview)
-    - [Debug notes](#debug-notes)
-    - [Types of extensions](#types-of-extensions)
-    - [General framework for extendability](#general-framework-for-extendability)
-    - [Function structure](#function-structure)
-    - [Difference between extension types](#difference-between-extension-types)
-        - [Custom functions](#custom-functions)
-        - [Analysis functions](#analysis-functions)
-            - [Visualisation of 'value'/'points' data](#visualisation-of-valuepoints-data)
-            - [Visualisation of 'image' data](#visualisation-of-image-data)
-            - [Visualisation of 'shapes' data](#visualisation-of-shapes-data)
-        - [Real-Time analysis](#real-time-analysis)
-
-<!-- /TOC -->
-
-## General overview
-
-Glados-pycromanager is an attempt to (1) create a usable, user-friendly user-interface for Pycromanager (i.e. python-Micromanager) with Napari, and (2) to create easy, user-friendly autonomous microscopy via Pycromanager.
-
-This manual contains information about how to extend the autonomous microscopy of Glados-pycromanager.
-
-## Debug notes
-
-It is by far easiest to run Glados-pycromanager in debug mode, via a github clone, running `GUI_napari.py`. This allows you to add breakpoints to developed code and scripts.
+Glados' autonomous microscopy can be extended with your own nodes. This page describes how.
 
 ## Types of extensions
 
-Generally, in the Glados-pycromanager autonomous microscopy, there are 3 (plus one semi) methods to implement extensions:
+1. **Custom functions** are called by a recipe without an image input. Examples: iterative
+   autofocus, stroboscopic laser modes, controlling a device that is connected to Python but not to
+   Micro-Manager.
+2. **Analysis functions** run after an acquisition has finished ("offline") and get the whole
+   dataset. Examples: segmentation, an average image, counting fiducial markers. Their outputs
+   become variables the rest of the recipe can use.
+3. **Real-time analysis** runs on every frame during live mode or an acquisition. It gets only the
+   current frame and its metadata, produces no variables, and can influence the running acquisition.
+   Examples: laser adjustment, live localisation, stopping an acquisition early. Real-time analysis
+   methods also appear in the *Real-time analysis* section of the Controls tab.
 
-1. **Custom Functions** are functions which do not expect any input or output, but are simply called by glados-pycromanager. Examples for this are iterative auto-focus finding, setting advanced stroboscopic laser modes, or controlling external devices (i.e. python-connected, but not micromanager-connected).  
-    - The semi-custom method is related to this: **Run advanced script**. This is simply a location for users to put a JAVA, Micro-Manager script (i.e. micro-manager's tools-script panel). It's not advised to use this and transfer this logic to CustomFunctions.
-2. **Analysis methods** are methods that are designed to perform some kind of 'off-line' analysis, i.e. after the acquisition is completed. General examples are to perform segmentation, calculate an average image, or counting the number of fiducial markers.
-3. **Real-Time analysis methods** are similar to analysis methods, but should be designed to run in real-time, and do _not_ create output variables. Rather than getting the full acquisition dataset, they only get the current frame and information about the acquisition. Note that these can also influence the ongoing acquisition. Examples of these methods are real-time laser adjustment, real-time localization, or premature stopping of the acquisition.
+The *Run advanced script* node runs a few lines of Python inside the recipe; anything more than a
+few lines is better written as a custom function.
 
-These extensions are implemented in the `Showcase_Developer_1.json` recipe, where by running `Init Only`, the **Custom Functions** are explained, `Scoring Only` will show **Analysis Methods**, and `Acquiring Only` will show **Real-Time analysis**.
+## Where nodes live
 
-## General framework for extendability
+| Type | Shipped with Glados | Your own nodes |
+|------|---------------------|----------------|
+| Analysis | `glados_pycromanager/AutonomousMicroscopy/Analysis_Measurements/` | `%LOCALAPPDATA%\Glados-PycroManager\AutonomousMicroscopy\Analysis_Measurements\` |
+| Real-time analysis | `.../AutonomousMicroscopy/Real_Time_Analysis/` | `%LOCALAPPDATA%\Glados-PycroManager\AutonomousMicroscopy\Real_Time_Analysis\` |
+| Custom function | `.../AutonomousMicroscopy/CustomFunctions/` | `%LOCALAPPDATA%\Glados-PycroManager\AutonomousMicroscopy\CustomFunctions\` |
 
-The analysis methods and functions are implemented in the python codebase located in `glados-pycromanager\glados_pycromanager\AutonomousMicroscopy`. There is the folder `Analysis_Measurements` for Analysis methods, `Real_Time_Analsysis` for Real-Time analysis methods, and `CustomFunctions` for Custom functions. 
+Put your own nodes in the AppData folders: no change to the Glados source is needed, and an update
+does not overwrite them. Every `.py` file in these folders is imported at startup.
+*Plugins → Reload Glados Custom Nodes* re-imports them without restarting Glados (nodes already
+placed in a recipe keep their old settings until re-opened).
 
-The functions inside these folders follow the same structure. In this example, we will use the `Analysis_Measurements/AverageIntensity.py` file as an example. This simply calculates the average grayscale value of a provided input image (stack). Note that in addition to providing the code for the functionality, it also has to provide information about what options to give the user. This average intensity method provides the following GUI interface to the user:
+## The structure of a node file
 
-![Average gray value GUI](Images/AdvManual_1.png)
+We use `Analysis_Measurements/AverageIntensity.py` as the example: it computes the average gray
+value of an image stack. Its node dialog looks like this:
 
-Note the following contents:
+![Average gray value node](../img/AdvManual_1.png)
 
-- It has a user-facing **display name**
-- It shows a required **Image** input
-- It has two different **required key-word arguments** (reqKwargs or rkwargs), named ReqKwarg1 and ReqKwarg2. These are the inputs that the user has to provide and will be used in the code.
-- It has a single **optional key-word arguments** (optKwargs or okwargs), named OptBool2. These are the inputs that the user can provide, but are not required - it suggests a lower importance to the user.
-- Hovering the mouse over any of the input fields will show a tooltip with a description of the input.
+- a **display name**,
+- a required **Image** input,
+- two **required keyword arguments** (`ReqKwarg1`, `ReqKwarg2`) the user must fill in,
+- one **optional keyword argument** (`OptBool2`),
+- a tooltip with a description on each field.
 
-This GUI functionality is created by the `__function_metadata__()` definition at the start of the `AverageIntensity.py` file. This is a required function, and has to follow this structure closely:
+All of that comes from the `__function_metadata__()` function in the file:
 
 ```python
+from glados_pycromanager.lazy_imports import ndtiff
+from glados_pycromanager.autonomous.registry import register
+
 def __function_metadata__():
     return {
         "AvgGrayValue": {
-            "input":[
+            "input": [
                 {"name": "Image", "type": [ndtiff.NDTiffDataset]}
             ],
-            "output":[
+            "output": [
                 {"name": "overall_avg_intensity", "type": float, "importance": "Default"},
                 {"name": "slice_avg_intensity", "type": [np.array]}
             ],
@@ -81,82 +69,63 @@ def __function_metadata__():
             ],
             "help_string": "Average gray value.",
             "display_name": "Average gray value",
-            "visualisation_type" : "image" #'image', 'points', 'value', or 'shapes'
+            "visualisation_type": "value"  # 'image', 'points', 'value' or 'shapes'
         }
     }
 ```
 
-Most of the inputs are self-explanatory, but there are a few things to note:
+- The key (`AvgGrayValue`) must be the name of a function (or, for real-time analysis, a class) in
+  the same file.
+- One file can hold several functions: add one key per function.
+- Every **output** becomes a variable in the *Variables* tab.
+- Each kwarg needs `name` and `default`. Give it a `description` and a `type` too: the type picks
+  the widget (`bool` gets a checkbox, `'fileLoc'` a file picker) and real-time analysis kwargs are
+  converted to it. See [Node parameters](rt-analysis-parameters.md) for how the
+  Value/Variable/Advanced switch works.
+- `help_string` and `display_name` are required. Analysis functions also need `visualisation_type`
+  (see below).
+- Use `glados_pycromanager.lazy_imports.ndtiff` rather than importing `ndtiff` directly, and import
+  heavy libraries (torch, tensorflow, scipy.signal…) inside the function rather than at the top of
+  the file: Glados imports every node file at startup, and `__function_metadata__()` is called then
+  too.
 
-- You can add as many outpus as you want, following this structure. These outputs will be added to the Variables section in the GUI.
-- You can add as many required and optional kwargs as wanted. The name and default arguments are required. The description and type are optional, but strongly recommended.
-- The `visualisation_type` is required and a choice of one of the options: 'image', 'points', 'value', or 'shapes'. (we come back to visualisation later)
-- help_string and display_name are required.
-- The title of the structure (`AvgGrayValue`) has to be linked to a function in the same script with the same name (i.e. `def AvgGrayValue():`).
-- You can add multiple functions in the same script, by having something like this. This will simply show all functions in the GUI.
+### Registering the function
 
-```python
-def __function_metadata__():
-    return {
-        "AvgGrayValue": {
-          \\All inputs here
-        },
-        "Function2": {
-          \\All inputs here
-        },
-        "Function3": {
-          \\All inputs here
-        }
-    }
-```
-
-Finally, note that the analysis functions are ran on a different thread as the main napari/pycromanager/python code. This is to ensure that the GUI is not blocked by the analysis, but makes debugging way more difficult. For debugging purposes, you can use the `DEBUG Analysis [Measurement]` node, which runs on the main thread. CustomFunctions can simply be placed in the analysis folder and will be run normally. Real-time analysis cannot be properly debugged.
-
-## Function structure
-
-We continue with the `AverageIntensity.py` file as explanation. The `AvgGrayValue(core,**kwargs)` function is called by Glados-pycromanager.
-The `core` provides all information of the current pycromanager core structure (see Pycromanager documentation for more detail) - this e.g. provides info about the current microscope settings.
-The `kwargs` (keyword arguments) will be based on the `__function_metadata__()` definition. Generally, they can be accessed by `kwargs['name_of_input']`, e.g. `kwargs['Image']` and `kwargs['ReqKwarg1']`. Please note that they are always defined as strings, so you will have to convert them to the correct type if needed.
-
-In our example code, we simply quickly calculate the average intensity, as well as the average intensity for every slice as follows:
+Every callable function (and real-time analysis class) must be registered under
+`"<file name without .py>.<function name>"`, or the recipe cannot call it:
 
 ```python
-NDTIFFStack = kwargs['Image']
-# Compute the average intensity of each slice
-slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2))
-# change dask array to np array:
-slice_avg_intensity_np = slice_avg_intensity.compute()
-# Compute the overall average intensity
-overall_avg_intensity = slice_avg_intensity.mean().compute()
+@register("AverageIntensity.AvgGrayValue")
+def AvgGrayValue(core, **kwargs):
+    NDTIFFStack = kwargs['Image']
+    import dask.array as da
+    slice_avg_intensity = da.mean(NDTIFFStack.as_array(), axis=(1, 2))
+    output = {}
+    output['slice_avg_intensity'] = slice_avg_intensity.compute()
+    output['overall_avg_intensity'] = slice_avg_intensity.mean().compute()
+    return output
 ```
 
-Finally, we have to return the outputs, based on the `__function_metadata__()` definition. We thus need to return a dictionary with the outputs with `slice_avg_intensity` and `overall_avg_intensity` as keys:
+The function receives `core`, the core of the active backend (pycromanager's `Core` or
+pymmcore-plus' `CMMCorePlus`), and the kwargs by name: `kwargs['Image']`, `kwargs['ReqKwarg1']`.
+Analysis and custom-function kwargs arrive as strings, so convert them yourself
+(`int(kwargs['ReqKwarg2'])`). It returns a dictionary with one entry per declared output.
 
-```python
-output = {}
-output['slice_avg_intensity'] = slice_avg_intensity_np
-output['overall_avg_intensity'] = overall_avg_intensity
+Analysis functions run on a worker thread, which makes breakpoints hard to use. The
+*DEBUG Analysis [Measurement]* node runs the same function on the main thread instead. Running
+Glados from your IDE (`glados_pycromanager/GUI/GUI_napari.py`) makes debugging easiest.
 
-return output
-```
+## Custom functions
 
-## Difference between extension types
-
-So far, this is common between all extension types (i.e. off-line analysis, real-time analysis, and custom functions). However, here we will discuss the differences between the different extension types.
-
-### Custom functions
-
-See the `Initialisation` part (run via `Init Only`) of the `Showcase_developer_1.json` recipe for full examples of this section:
-
-Custom functions do not have extra functionality beyond this discussed structure. In fact, they are minimal versions of the other extension types, and do also not have inputs or outputs. Thus, the `__function_metadata__()` will look something like this (see `CustomFunctions/ExampleCustomFunction_DiceRoll.py`):
+A custom function has no inputs, and its outputs are optional
+(`CustomFunctions/ExampleCustomFunction_DiceRoll.py`):
 
 ```python
 def __function_metadata__():
     return {
         "DiceRoll": {
-            "input":[
-            ],
-            "output":[
+            "input": [],
+            "output": [
                 {"name": "DiceResult", "type": [int], "importance": "Default"}
             ],
             "required_kwargs": [
@@ -166,236 +135,143 @@ def __function_metadata__():
             "display_name": "Example custom function - Roll a dice"
         }
     }
+
+@register("ExampleCustomFunction_DiceRoll.DiceRoll")
+def DiceRoll(core, **kwargs):
+    diceRoll = np.random.randint(1, int(kwargs['MaxDiceValue']))
+    return {"DiceResult": diceRoll}
 ```
 
-Note that input is present but empty. Output can also be empty if wanted.
+Custom functions are mostly useful for changing microscope settings through `core`.
 
-This function will be called as discussed earlier, and roll a dice:
+## Analysis functions
+
+An analysis function usually takes the `Image` input and produces outputs for the rest of the
+recipe. The Analysis node also has a **Visual** plug:
+
+![Analysis node](../img/AdvManual_2.png)
+
+Connect a *Visualisation* node to it to show the result in napari. This is for the user only; the
+recipe does not use it. Glados creates a napari layer whose type follows `visualisation_type`:
+`'value'` or `'points'` a Points layer, `'image'` an Image layer, `'shapes'` a Shapes layer. Fill it
+in a function with the same name plus `_visualise`, registered the same way:
 
 ```python
-def DiceRoll(core,**kwargs):
-    import logging
-    diceRoll = np.random.randint(1,int(kwargs['MaxDiceValue']))
-
-    logging.info(f"The dice rolled a {diceRoll}!")
-
-    #Return the output
-    output = {}
-    output["DiceResult"] = diceRoll
-    return output
+@register("AverageIntensity.AvgGrayValue_visualise")
+def AvgGrayValue_visualise(datastruct, core, **kwargs):
+    output, pointsLayer = datastruct   # the function's output dict, and the napari layer
+    pointsLayer.data = [0, 0]
+    pointsLayer.features = {'outputval': output['overall_avg_intensity']}
+    pointsLayer.text = {'string': 'GrayValue {outputval:.2f}', 'size': 10, 'color': 'red',
+                        'translation': np.array([0, 0]), 'anchor': 'upper_left'}
+    pointsLayer.size = 0               # hide the point, keep the text
 ```
 
-From the structure, it follows that custom functions are mostly usefull for setting advanced microscope settings by altering the `core` based on the `kwargs`.
+![A value shown as text](../img/AdvManual_3.png)
 
-### Analysis functions
-
-See the `Scoring` part (run via `Scoring Only`) of the `Showcase_developer_1.json` recipe for full examples of this section:
-
-![Examplary routine for all analysis methods](Images/AdvManual_5.png)
-
-The earlier example for mean grayscale value was an example of an analysis function. Note that these functions normally require the `Image` kwarg input, and will normally provide *variable output* for the user to further use in the autonomous microscopy.
-
-Additionally, the Analysis node has a `Visual` attachment point in the GUI:
-
-![Analysis Node in the autonomous microscopy GUI](Images/AdvManual_2.png)
-
-We should provide the functionality for this, if wanted - this visualisation is only for the user, i.e. it's not used in the autonomous microscopy routine. Note here that the analysis functions should be placed in `Analysis_Measurements`, `Analysis_Shapes` or `Analysis_Images` folders. Whilst they are presented to the user as equivalents, the `_Measurements` will provide a point-layer for displaying text, the `_Shapes` will provide a shape layer to draw shapes, and the `_Images` will provide a layer for displaying images.
-
-Following the example of the `AvgGrayValue` function, we should also provide the following function in the code:
+An image result (`AverageImage.py`):
 
 ```python
-def AvgGrayValue_visualise(datastruct,core,**kwargs):
-  # Code here
+@register("AverageImage.AvgImage_visualise")
+def AvgImage_visualise(datastruct, core, **kwargs):
+    output, imageLayer = datastruct
+    imageLayer.data = output['average_image']
+    imageLayer.reset_contrast_limits()
 ```
 
-Note that this is the same function name (`AvgGrayValue`), but appended with `_visualise`. This is the required nomenclature. The inputs are a datastructure (more info later), core, and key-word arguments (same as the analysis function).
+Shapes (`RandomShapes.py`) work the same way, with `shapesLayer.data = [polygon]`:
 
-The `datastruct` is a tuple which should be unpacked as follows:
+![Shapes result](../img/AdvManual_4.png)
 
-```python
-output,layer = datastruct
-```
+## Real-time analysis
 
-`output` is the output of the analysis function (i.e. the dictionary with the outputs). `layer` is a napari layer, of type `napari.layers.Points`, `napari.layers.Shapes` or `napari.layers.Image` for `visualisation_type` being [`value, points`], `shapes`, `image`, respectively.
+Real-time analysis builds on analysis functions; read those sections first. The example is
+`Real_Time_Analysis/RT_counter.py`, which shows the current frame number.
 
-#### Visualisation of 'value'/'points' data
-
-The easiest example here is to display the text as a feature belonging to a point at an arbitrary position to the image. This is exemplified as follows (`AverageIntensity.py`):
-
-```python
-# create features for each point
-features = {
-    'outputval': output['overall_avg_intensity']
-}
-textv = {
-    'string': 'GrayValue {outputval:.2f}',
-    'size': 15,
-    'color': 'red',
-    'translation': np.array([0, 0]),
-    'anchor': 'upper_left',
-}
-pointsLayer.data = [0,0]
-pointsLayer.features = features
-pointsLayer.text = textv
-pointsLayer.size = 0
-```
-
-This will add a red-coloured text with the value of the `overall_avg_intensity` to the point layer, and hide the point itself (setting `.size` to 0), and will show something like this:
-
-![Visualisation of Measurement analysis](Images/AdvManual_3.png)
-
-#### Visualisation of 'image' data
-
-Image-based analysis is similar, except that an image layer is created. This is exemplified in `AverageImage.py`, calculating and displaying the average image of the stack.
-
-Here is the code responsible for the visualisation:
-
-```python
-def AvgImage_visualise(datastruct,core,**kwargs):
-  # This is how datastruct is organised...
-  output,imageLayer = datastruct
-  # Set the layer data
-  imageLayer.data = output['average_image']
-  # Reset the contrast limits so we can nicely view
-  imageLayer.reset_contrast_limits()
-```
-
-Similar, the datastruct is unpacked, and the image is set to the `data` attribute of the layer. We also update the contrast limits to have a little nicer viewing of the image.
-
-#### Visualisation of 'shapes' data
-
-The visualisation of shapes is similar to the image visualisation, except that the layer is of type `napari.layers.Shapes`. Take a look at the `DrawRandomShape.py` for an example.
-
-```python
-def DrawRandomShape_visualise(datastruct,core,**kwargs):
-  output,shapesLayer = datastruct
-
-  # Generate random points
-  points = np.random.rand(5, 2) * 512 
-
-  #Make a convex hull out of this to get a nicer polygon
-  from scipy.spatial import ConvexHull
-  hull = ConvexHull(points)
-  convex_shape = points[hull.vertices]
-
-  # Set this to the layer data
-  shapesLayer.data = [convex_shape]
-  shapesLayer.shape_type = 'polygon'
-  shapesLayer.edge_color = 'red'
-  shapesLayer.face_color = 'royalblue'
-```
-
-This will provide an image like this:
-
-![Visualisation of Shape analysis](Images/AdvManual_4.png)
-
-### Real-Time analysis
-
-Real-time analysis is basically an extension of Analysis methods, so be comfortable with these before continuing with real-time analysis methods. Please follow the code in `Real_Time_Analysis\RT_counter.py` to showcase a real-time counting method:
-
-The `__function_metadata__` is similar, but with two extra fields:
+Its metadata has a few extra fields:
 
 ```python
 def __function_metadata__():
-    return { 
+    return {
         "RealTimeCounter": {
             "required_kwargs": [
-                {"name": "ReqKwarg1", "description": "First required kwarg", "default": 'DefaultKwarg', "type": str}
+                {"name": "Color", "description": "Color of the text", "default": 'red', "type": str}
             ],
-            "optional_kwargs": [
-                {"name": "OptBool2", "description": "OptBool", "default": False, "type": bool}
-            ],
+            "optional_kwargs": [],
             "help_string": "RT counter.",
             "display_name": "RT counter",
-            "run_delay": 0,
-            "visualise_delay": 100,
-            "visualisation_type": "points", #'image', 'points', 'value', or 'shapes'
-            "input":[
-            ],
-            "output":[
-            ],
+            "run_delay": 10,
+            "visualise_delay": 50,
+            "input": [],
+            "output": [],
+            "__runInSubprocess__": True,
+            "__snapshot_attrs__": ["currentValue"],
+            "__replayable__": True,
         }
     }
 ```
 
-The `run_delay` and `visualise_delay` are the time in milliseconds that the software is forced to wait before running the analysis method and visualising the results, respectively. I.e. a run_delay of 1000 would mean that the analysis method is run every 1 second, or slower, based on the data stream. These delays are usefull to limit the processing power required to run the real-time methods.
+- `run_delay` and `visualise_delay` are the minimum time in milliseconds between two runs and two
+  visualisations. They limit how much processing the method takes; frames that arrive while the
+  method is busy are skipped.
+- `__runInSubprocess__`: run `run()` in a separate process, so a slow analysis does not slow down
+  the GUI or the acquisition. This is the default. In a subprocess `run()` gets `None` for `core`
+  and `shared_data`.
+- `__needsLiveCore__: True`: the method uses `core`, `shared_data` or the recipe in `run()` and must
+  stay in the Glados process (for example `LaserAdjustment.py` and `EndAtFrame.py`). It overrides
+  `__runInSubprocess__`.
+- `__snapshot_attrs__`: the attributes `run()` sets that `visualise()` reads. They are copied with
+  each frame so the overlay matches the frame it is drawn on, and so it survives the trip back from
+  the subprocess. **An attribute not listed here does not reach `visualise()` from a subprocess.**
+- `__replayable__`: whether Glados may store the results per frame and redraw them when you scroll
+  through a finished acquisition. Set it to `False` when `visualise()` accumulates (such as a
+  super-resolution image that grows frame by frame).
 
-The real-time analysis is also differently structured in its functions. Rather than a function, a class should be provided with the following functions:
-
-```python 
-class RealTimeCounter():
-    def __init__(self,core,**kwargs):
-        print('INITIALISING COUNTER REAL-TIME ANALYSIS')
-        # Check if we have the required kwargs
-        class_name = inspect.currentframe().f_locals.get('self', None).__class__.__name__ #type:ignore
-        [provided_optional_args, missing_optional_args] = FunctionHandling.argumentChecking(__function_metadata__(),class_name,kwargs) #type:ignore
-
-        print('in RT_counter at time '+str(time.time()))
-
-    def run(self,image,metadata,shared_data,core,**kwargs):
-        print('RUNNING COUNTER REAL-TIME ANALYSIS')
-        if 'ImageNumber' in metadata:
-            self.currentValue = metadata['ImageNumber']
-            print("At frame: "+metadata['ImageNumber'])
-        else:
-            self.currentValue = metadata['Axes']['time']
-            print("At axis-time: "+str(metadata['Axes']['time']))
-    
-    def end(self,core,**kwargs):
-        print('ENDING COUNTER REAL-TIME ANALYSIS')
-    
-    def visualise_init(self): 
-        print('INITIALISING VISUALISATION COUNTER REAL-TIME ANALYSIS')
-        layerName = 'RT counter'
-        layerType = 'points' # layerType has to be from image|labels|points|shapes|surface|tracks|vectors
-        return layerName,layerType
-    
-    def visualise(self,image,metadata,core,napariLayer,**kwargs):
-        print('RUNNING VISUALISATION COUNTER REAL-TIME ANALYSIS')
-        features = {
-            'outputval': self.currentValue
-        }
-        textv = {
-            'string': 'Current frame: {outputval:.0f}',
-            'size': 10,
-            'color': 'cyan',
-            'translation': np.array([0, 0]),
-            'anchor': 'upper_left',
-        }
-        napariLayer.data = [0, 256]
-        napariLayer.features = features
-        napariLayer.text = textv
-        napariLayer.symbol = 'disc'
-        napariLayer.size = 0
-        napariLayer.selected_data = []
-```
-
-As you can see, it requires init, run, and end functions for the real-time analysis, and init/run functions for the visualisation. They act as expected: the `__init__()` function is run when the real-time analysis is started, i.e. only once. The `run()` function is run every time the real-time analysis is requested. The `end()` is called once when the real-time analysis is stopped. `visualise_init()` is ran once when the visualisation is started, and should provide the layer name and layer type. `visualise()` is ran every time the visualisation is requested, and should update the napari layer.
-
-Importantly, the `run()` and `visualise()` are completely separated - meaning that the real-time analysis is not required to visualise the results. Normally, visualisation is quite computationally heavy (especially since we're already streaming data to napari), thus this should be used sparingly, whereas real-time analysis should be normally done as often as possible.
-
-Also note that the functions have different arguments. Most importantly, the `run()` function has the **single, current** image, metadata, core, and kwargs arguments, while the `visualise()` function has the **single, current** image, metadata, core, napariLayer, and kwargs arguments. Arguments can be passed between run/visualise and init/run/end with the `self`-argument.
-
-As expected, real-time counter will visualise the current frame.
-
-![Results of real-time analysis with visualisation](Images/AdvManual_6.png)
-
-Finally, you can use the real-time analysis to affect the acquisition. A minimal example of this is provided in `Real_Time_Analysis/EndAtFrame.py`:
-
-The relevant code is the following:
+A real-time analysis is a class:
 
 ```python
-def run(self,image,metadata,shared_data,core,**kwargs):
-    self.image = image
-    self.metadata = metadata
-    self.shared_data = shared_data
-    self.kwargs = kwargs
-    if self.metadata['Axes']['time'] >= int(self.kwargs['LastFrame']):
-        # Abort and mark-finished the pycromanager acquisition
-        shared_data._mdaModeAcqData.abort()
-        shared_data._mdaModeAcqData.mark_finished()
-        # Print a statement
-        print(f"Ended at frame {self.metadata['Axes']['time']}")
+@register("RT_counter.RealTimeCounter")
+class RealTimeCounter:
+    def __init__(self, core, **kwargs):
+        self.currentValue = 0                     # once, when the analysis starts
+
+    def run(self, image, metadata, shared_data, core, **kwargs):
+        axes = metadata.get('Axes', {})           # every analysed frame
+        self.currentValue = float(axes[list(axes)[-1]]) if axes else 0
+
+    def end(self, core, **kwargs):
+        pass                                      # once, when it stops
+
+    def visualise_init(self):
+        return 'RT counter', 'points'             # layer name and napari layer type
+
+    def visualise(self, image, metadata, core, napariLayer, **kwargs):
+        napariLayer.data = np.array([[0, 0]])     # every visualised frame
+        napariLayer.properties = {'outputval': [self.currentValue]}
+        napariLayer.text = {'string': 'Current frame: {outputval:.0f}', 'color': kwargs['Color']}
+        napariLayer.size = 0
 ```
 
-Note that were are affecting the mdaAcquisition data directly via affecting shared_data._mdaModeAcqData. This will also allow you to add more frames.
+`run()` and `visualise()` are independent: drawing in napari is expensive, so it usually runs less
+often than the analysis. Pass state between them through `self` (and list it in
+`__snapshot_attrs__`). Real-time analysis kwargs arrive already converted to their declared type.
+
+![Real-time counter](../img/AdvManual_6.png)
+
+`visualise_init()` may also return a **list** of layers, as `(name, type)` pairs or dicts with
+`name`, `type`, `colormap`, `blending`, `opacity`, `visible`, `scale` and `placement`
+(`'overlay'`, `'right'` or `'below'`). `visualise()` then gets a group addressed by layer name,
+`napariLayer['My node: render'].data = ...`. `pSMLM_live.py` is the full example: the analysed
+frame, its localisations, and a super-resolution render placed to the right.
+
+### Influencing the acquisition
+
+`Real_Time_Analysis/EndAtFrame.py` stops an acquisition at a given frame. It declares
+`__needsLiveCore__: True`, because it needs `shared_data`:
+
+```python
+def run(self, image, metadata, shared_data, core, **kwargs):
+    if metadata['Axes']['time'] >= int(kwargs['LastFrame']):
+        shared_data._mdaModeAcqData.abort()
+        shared_data._mdaModeAcqData.mark_finished()
+```

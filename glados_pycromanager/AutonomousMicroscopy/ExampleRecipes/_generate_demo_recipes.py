@@ -11,7 +11,7 @@ graph through the app's own `saveGraph`, so the files are exactly what the GUI w
     .venv/Scripts/python.exe glados_pycromanager/AutonomousMicroscopy/ExampleRecipes/_generate_demo_recipes.py
 
 Set `GLADOS_DEMO_MM_PATH` / `GLADOS_DEMO_CFG` if the demo install lives elsewhere (defaults
-are the values in `demo_settings.mk`). Regenerating overwrites the recipes.
+are `DemoSMLM.cfg` in the pymmcore-plus install folder). Regenerating overwrites the recipes.
 """
 from __future__ import annotations
 

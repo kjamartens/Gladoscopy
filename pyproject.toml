@@ -73,16 +73,22 @@ dev = [
     # scripts/bench_pyqtgraph_vs_napari.py only.
     "pyqtgraph==0.13.3",
 ]
+# The documentation site (mkdocs.yml, `make docs`).
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",
+]
 
 [tool.mypy]
 python_version = "3.13"
-# Gradual adoption: start permissive, tighten module by module in Phase 15.
+# Gradual adoption: start permissive, tighten module by module.
 ignore_missing_imports = true
 check_untyped_defs = false
 follow_imports = "silent"
 warn_unused_ignores = false
 warn_redundant_casts = false
-# Vendored Nodz is treated as third-party; see claude_decisions.md.
+# Vendored Nodz is treated as third-party; see docs/adr/0005-vendored-nodz.md.
 exclude = [
     "glados_pycromanager/GUI/nodz/",
     "build/",
@@ -92,8 +98,7 @@ exclude = [
 [tool.ruff]
 line-length = 100
 target-version = "py313"
-# Vendored Nodz is treated as third-party; see claude_decisions.md
-# "Vendored Nodz left alone" (2026-05-17).
+# Vendored Nodz is treated as third-party; see docs/adr/0005-vendored-nodz.md.
 extend-exclude = [
     "glados_pycromanager/GUI/nodz",
     "build",
@@ -103,9 +108,9 @@ extend-exclude = [
 
 [tool.ruff.lint]
 # E/F = pycodestyle + pyflakes; I = isort; B = bugbear; UP = pyupgrade;
-# SIM = simplify; PL = pylint subset. Per claude_project.md Phase 3.1.
+# SIM = simplify; PL = pylint subset.
 select = ["E", "F", "I", "B", "UP", "SIM", "PL"]
-# Bulk-tightening of existing code happens phase by phase; for now silence
+# Bulk-tightening of existing code happens gradually; for now silence
 # rules that would flag thousands of pre-existing call sites and starve
 # signal on real regressions.
 ignore = [
@@ -115,12 +120,12 @@ ignore = [
     "PLR0911",  # too-many-return-statements — many existing
     "PLR0912",  # too-many-branches — Qt slots
     "PLR0913",  # too-many-arguments — Qt slots
-    "PLR0915",  # too-many-statements — god-files; split in Phase 7/8
+    "PLR0915",  # too-many-statements — large legacy modules
     "PLR2004",  # magic-value comparison — pervasive
     "PLW2901",  # for-loop-variable-overwritten — pre-existing
     "B007",     # unused loop variable — pre-existing
     "B008",     # function-call-in-default-argument — Qt patterns
-    "B904",     # raise-from in except — broader sweep in Phase 10
+    "B904",     # raise-from in except — pre-existing
     "SIM108",   # ternary suggestion — readability preference
     "SIM117",   # nested with — readability preference
     "UP007",    # X | Y union — keeps PyQt5 compat clear
@@ -158,9 +163,7 @@ exclude = [
 ]
 
 # Non-Python files shipped inside the package. Paths are relative to
-# each package directory (no leading slash). Dropped the leading-slash
-# globs ("/*", "/Documentation/*") — they pointed at filesystem-root
-# and silently included nothing.
+# each package directory (no leading slash).
 [tool.setuptools.package-data]
 "glados_pycromanager" = [
     "napari.yaml",

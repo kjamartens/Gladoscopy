@@ -88,7 +88,7 @@ def register(name: str) -> Callable[[Callable], Callable]:
     return _decorator
 
 
-def dispatch(name: str, *args, **kwargs):
+def dispatch(name: str, *args: Any, **kwargs: Any):
     """Call the registered function ``name`` with the given arguments.
 
     Args:

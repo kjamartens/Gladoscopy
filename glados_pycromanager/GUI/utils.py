@@ -625,7 +625,7 @@ def createValueEditWidget(functionname,kwargname):
     in __function_metadata__) get a QCheckBox instead of a free-text QLineEdit; everything
     else is unchanged. The object name (LineEdit#function#kwarg) is kept identical for both
     widget kinds, since hideAdvVariables()/getFunctionEvalTextFromCurrentData_* only ever key
-    off that name, not the widget class - see docs/rt_analysis_parameters.md.
+    off that name, not the widget class - see docs/developer/rt-analysis-parameters.md.
     """
     if typeFromKwarg(functionname,kwargname) == bool:
         widget = QCheckBox()
@@ -2294,9 +2294,9 @@ def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
 
     ``methodKwargTypes`` is the per-kwarg Value/Variable/Advanced *mode* list
     (the same argument `getEvalTextFromGUIFunction` takes), not a list of Python
-    types. Variable-mode kwargs are resolved through :func:`resolveNodzVariable`;
-    Advanced mode is still unimplemented and falls back to the raw text, exactly
-    as the eval-text path does.
+    types. Variable-mode kwargs are resolved through :func:`makeNodzVariableGetter`;
+    Advanced mode is not implemented here (it is on the eval-text path, via
+    :func:`advancedKwargToEvalExpr`) and falls back to the raw text.
 
     Returns a :class:`BoundKwargs` (call ``.resolve()`` for the dict to splat into
     the node), or None when a required kwarg has no value — logging the same error
@@ -2379,7 +2379,7 @@ def _rtAnalysisKwargsFromCurrentData(function, currentData, modeAware=True):
 
     `currentData` is keyed by widget object name (`LineEdit#<function>#<kwarg>`,
     `LineEditVariable#...`, `LineEditAdv#...`, `ComboBoxSwitch#...`) - see
-    Documentation/rt_analysis_parameters.md. Which of the three parallel input
+    docs/developer/rt-analysis-parameters.md. Which of the three parallel input
     widgets is authoritative for a kwarg is decided by that kwarg's
     `ComboBoxSwitch` value (Value / Variable / Advanced).
 
@@ -2637,7 +2637,7 @@ def buildBoundNode(rt_analysis_info, nodzInfo=None, signature=None):
                                        nodzInfo=nodzInfo, nodeDict=nodeDict)
 
     #The visualisation path deliberately keeps its looser matching and its
-    #skipInput=False - see Documentation/rt_analysis_parameters.md section 4.
+    #skipInput=False - see docs/developer/rt-analysis-parameters.md section 4.
     visMethodName, visNames, visValues, visModes = _rtAnalysisKwargsFromCurrentData(
         className, rt_analysis_info, modeAware=False)
     try:

@@ -1,7 +1,7 @@
 # Live video feed throughput — benchmark methodology and results
 
 Standalone deep-dive into raw display throughput for the live video feed,
-independent of `claude_project.md` Phase 13 (which already covers the same
+independent of Phase 13 of `docs/plans/claude_project.md` (which already covers the same
 pipeline but was driven entirely by one-off `cProfile` dumps from a full
 end-to-end app run, with no repeatable, hardware-free way to A/B test
 competing fixes). This doc covers the harness built for that, the six
@@ -10,8 +10,7 @@ follow-up (candidate 7) that landed the "reduce `useq.MDAEvent` Pydantic
 validations per frame" item from `docs/perf-runtime-recipe.md`'s "Next perf
 passes" list.
 
-See also: `docs/napari-vis-strategy.md` (Phase 13.5's pipeline/bottleneck
-writeup), `docs/perf-runtime-recipe.md` (the existing end-to-end `cProfile`
+See also: `docs/perf-runtime-recipe.md` (the existing end-to-end `cProfile`
 harness this work complements).
 
 ## Methodology
@@ -149,7 +148,7 @@ overlays") from consideration. `--hide-existing-layers` on
 What remains is capping or recycling the layers themselves: an RT-analysis node
 that reuses one overlay layer instead of adding a new one per run, and/or an
 upper bound on accumulated overlay layers with oldest-first eviction. Logged in
-`claude_issues_and_features.md`; not attempted here, since T-E5 is explicitly a
+`docs/plans/claude_issues_and_features.md`; not attempted here, since T-E5 is explicitly a
 measurement task.
 
 ### 3 — Hot-path logging guards (implemented)
@@ -210,8 +209,8 @@ against a UI-thread-bound display), `maxlen` 1 vs. 2 vs. 3 produced
 *identical* rendered/dropped counts in every configuration tested — a
 deeper queue only changes which frames get shown (adds latency to the
 displayed frame), it doesn't increase total throughput. This confirms the
-qualitative reasoning already in `docs/napari-vis-strategy.md` B2. No
-change made.
+earlier qualitative reasoning (the since-removed napari visualisation
+strategy note, B2). No change made.
 
 ### 6 — pyqtgraph vs. napari (rejected)
 

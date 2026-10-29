@@ -1,13 +1,12 @@
-# RT-analysis / Analysis node parameters: metadata, widgets, and Value/Variable/Advanced
+# Node parameters: metadata, widgets and Value/Variable/Advanced
 
 This document describes how kwargs of Analysis-measurement and Real-Time-Analysis
 nodes (`AutonomousMicroscopy/Analysis_Measurements/`, `AutonomousMicroscopy/Real_Time_Analysis/`,
 `AutonomousMicroscopy/CustomFunctions/`) become editable fields in the node-graph
 parameter panel, and how the "Value / Variable / Advanced" switch works. Read this
-before changing anything in `GUI/utils.py` related to kwarg widgets — the mechanism
-is not covered by `CLAUDE.md`'s high-level architecture section and is easy to
-break silently because most of the wiring is done by object-name convention
-rather than by type.
+before changing anything in `GUI/utils.py` related to kwarg widgets: the mechanism
+is easy to break silently because most of the wiring is done by object-name
+convention rather than by type.
 
 ## 1. Where kwargs come from: `__function_metadata__()`
 
@@ -60,9 +59,8 @@ layout at all times (only visibility toggles):
 
 `Origin` is `Global` (a user-created global variable), `Core` (a microscope-state
 variable), or another node's name (that node's output variable). See
-`glados_pycromanager/Documentation/UserManual.md` (section on Glados variables)
-for the user-facing explanation and the `Showcase_Variables_1.json` example
-recipe.
+[Autonomous microscopy → Variables](../user-guide/autonomous.md#variables) for
+the user-facing explanation.
 
 Switching the combo box calls `hideAdvVariables()`, which shows/hides the three
 widget groups **purely by matching the `#`-delimited object-name prefix**
@@ -73,8 +71,8 @@ name and slot into the switch without any change to `hideAdvVariables`.
 
 Whenever a widget's value changes, `changeDataVarUponKwargChange()` copies its
 current value into `parentObject.currentData[<objectName>]` (a plain dict on the
-panel widget). All downstream readers — `getFunctionEvalTextFromCurrentData_RTAnalysis_init/_run/_end/_visualisation()`
-and `getEvalTextFromGUIFunction()` — read from this `currentData` dict by object
+panel widget). All downstream readers (`_rtAnalysisKwargsFromCurrentData()`,
+`getEvalTextFromGUIFunction()`) read from this `currentData` dict by object
 name, never from the widgets directly. **Any new widget kind used for a kwarg's
 Value mode must therefore be wired into `changeDataVarUponKwargChange()`
 (add an `isinstance(...)` branch) or its value will never reach `currentData`.**
@@ -116,16 +114,16 @@ reference is not itself a boolean literal.
 turns a panel's `currentData` dict into `(methodName, kwargNames, kwargValues,
 kwargModes)`. Two consumers take it from there:
 
-- **`getEvalTextFromGUIFunction()`** — the original: builds a Python call
-  expression as *text*, which `autonomous/registry.py`'s
-  `dispatch_from_eval_text()` re-parses and evaluates. Still used by the
-  Analysis-measurement / recipe paths.
-- **`bindKwargsFromGUIFunction()`** (T-G2/T-G3) — returns a `BoundKwargs`
+- **`getEvalTextFromGUIFunction()`**: builds a Python call expression as
+  *text*, which `autonomous/registry.py`'s `dispatch_from_eval_text()` re-parses
+  and evaluates. Used by the Analysis-measurement and custom-function nodes in
+  recipes.
+- **`bindKwargsFromGUIFunction()`**: returns a `BoundKwargs`
   instead: the constants, each coerced by `coerceKwargValue()` to the `"type"` its
   metadata declares, plus one zero-arg closure per Variable-mode kwarg.
   `.resolve()` gives the dict to splat into the node, re-reading every Variable
   kwarg so one changed mid-run is seen. This is what the RT-analysis path uses
-  (node construction as of T-G2; `run`/`visualise`/`end` as of T-G4).
+  (node construction, `run`, `visualise` and `end`).
 
   A Variable closure captures the *container mapping* — `nodzInfo.globalVariables`
   / `nodzInfo.coreVariables` / the origin node's `variablesNodz` — never the value
@@ -151,14 +149,16 @@ existing recipe changes behaviour. A kwarg that declares no `"type"`, or declare
 
 | | required kwarg | optional kwarg |
 |---|---|---|
-| `getEvalTextFromGUIFunction` | Variable resolved to an unquoted expression; **Advanced unimplemented** (`logging.error('To implement!')`, falls back to a quoted literal) | **mode ignored entirely** — the raw widget text is always quoted as a string literal |
-| `bindKwargsFromGUIFunction` | Variable read live via `resolveNodzVariable()`; Advanced unimplemented, same fallback | Variable **is** honoured, same as required |
+| `getEvalTextFromGUIFunction` | Variable resolved to an unquoted expression; Advanced translated by `advancedKwargToEvalExpr()` (each `{name@Origin}` becomes the same live reference, the rest stays Python, or string concatenation if that is not a valid expression) | **mode ignored entirely**: the raw widget text is always quoted as a string literal |
+| `bindKwargsFromGUIFunction` | Variable read live via `makeNodzVariableGetter()`; **Advanced unimplemented** (`logging.error('To implement!')`, the raw text is passed through) | Variable **is** honoured, same as required; Advanced as for required |
 
 Honouring the mode for optional kwargs in the binder is a deliberate fix of the
-old asymmetry (T-G2), not an accident: a user who picks Variable mode for an
+old asymmetry, not an accident: a user who picks Variable mode for an
 optional kwarg previously got the literal string `"WaitTime@Global"` passed to
-the node. It is safe because `resolveNodzVariable()` falls back to that same raw
-reference text (with a warning) whenever there is no graph to resolve against —
+the node. It is safe because the binder falls back to that same raw
+reference text (with a warning) whenever there is no graph to resolve against,
 e.g. an RT node started from the live view, where `nodzInfo` is None.
 
-**Advanced (`{name@Origin}`) mode is still unimplemented on both paths.**
+**Advanced (`{name@Origin}`) mode works for required kwargs of Analysis and
+custom-function nodes only.** RT-analysis nodes (the binder) and optional kwargs
+on the eval-text path still receive the raw text.
