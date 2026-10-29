@@ -10,18 +10,10 @@ import logging
 
 # from shapely import Polygon, affinity
 # from shapely import Polygon, affinity
-import math
-import time
-from pprint import pprint
 
-import imageio
 import numpy as np
 # Load general dependencies
-from imageio.v2 import imread
-from scipy.ndimage import gaussian_filter
-from skimage.feature.peak import peak_local_max
 
-import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 from glados_pycromanager.autonomous.registry import register
 

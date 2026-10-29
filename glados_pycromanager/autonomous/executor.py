@@ -21,81 +21,46 @@ can resolve node-function names at this module's globals scope.
 
 from __future__ import annotations
 
-import json
+# Script nodes eval() user lines in this module's namespace, so the modules
+# below stay importable from a script even where this file does not use them.
+import json  # noqa: F401
 import logging
 import os
 import re
 import sys
 import tempfile
 import time
-import webbrowser
-from datetime import datetime
+import webbrowser  # noqa: F401
+from datetime import datetime  # noqa: F401
 
-import appdirs
-import napari
+import appdirs  # noqa: F401
+import napari  # noqa: F401
 import numpy as np
-import pyperclip
+import pyperclip  # noqa: F401
 import tifffile
 from PIL import Image
-from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import (
     QObject,
     QRunnable,
-    QSize,
-    Qt,
-    QThreadPool,
     QTimer,
     pyqtSignal,
 )
-from PyQt5.QtGui import QColor, QFont, QIcon, QTextCursor
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
-    QAction,
-    QApplication,
-    QCheckBox,
-    QColorDialog,
-    QComboBox,
     QDialog,
-    QDialogButtonBox,
-    QFileDialog,
-    QFormLayout,
-    QGraphicsDropShadowEffect,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QLineEdit,
-    QMenu,
-    QMessageBox,
-    QPlainTextEdit,
-    QPushButton,
-    QScrollArea,
-    QSizePolicy,
-    QSpacerItem,
-    QSpinBox,
-    QSplitter,
-    QTableWidget,
-    QTableWidgetItem,
-    QTabWidget,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
 )
 
 if "glados_pycromanager" not in sys.modules and "site-packages" not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
 import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.autonomous import registry
-from glados_pycromanager.autonomous.types import GladosGraph
+from glados_pycromanager.io import appdata
 from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
 from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
 from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
-from glados_pycromanager.Core.MDAGlados import MDAGlados
-from glados_pycromanager.GUI.MMcontrols import ConfigInfo, MMConfigUI
 from glados_pycromanager.GUI.slack_settings_dialog import (
     SlackSettingsDialog,
 )
@@ -1711,7 +1676,7 @@ class FlowchartExecutorMixin:
         if dialog.exec_() == QDialog.Accepted:
             token, secret, channel = dialog.values
             _apply_slack_settings(self.shared_data, token, secret, channel)
-            utils.storeSharedData_GlobalData(self.shared_data)
+            appdata.storeSharedData_GlobalData(self.shared_data)
     
     def debugScoring(self):
         """

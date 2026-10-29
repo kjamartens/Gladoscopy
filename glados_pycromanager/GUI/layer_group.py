@@ -292,12 +292,6 @@ class NapariLayerGroup:
         except KeyError:
             return default
 
-    def spec_for(self, name) -> LayerSpec:
-        for spec in self.specs:
-            if spec.name == name:
-                return spec
-        raise KeyError(f'{name!r} is not one of this node\'s layers: {self.names}')
-
     def __contains__(self, name):
         return name in self.names
 

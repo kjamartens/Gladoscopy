@@ -7,7 +7,7 @@ import sys
 import napari
 from pycromanager import Core
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QGridLayout, QGroupBox, QLabel, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QGridLayout, QLabel, QScrollArea, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
 os.environ['NAPARI_ASYNC'] = '1'
 os.environ['NAPARI_OCTREE'] = '1'
@@ -16,7 +16,6 @@ os.environ['NAPARI_OCTREE'] = '1'
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.napariGlados as napariGladosModule
 
 from glados_pycromanager.GUI.napariGlados import *  #type: ignore
@@ -24,13 +23,10 @@ from glados_pycromanager.GUI.napariGlados import *  #type: ignore
 # Obtain the helperfunctions
 # import glados_pycromanager.GUI.HelperFunctions #type: ignore
 from glados_pycromanager.GUI.napariHelperFunctions import (  #type:ignore
-    InitateNapariUI,
-    getLayerIdFromName,
     showScaleBar,  #type: ignore
 )
 from glados_pycromanager.GUI.sharedFunctions import Shared_data  #type: ignore
 from glados_pycromanager.GUI.utils import *  #type: ignore
-from glados_pycromanager.GUI.utils import CustomMainWindow  #type:ignore
 from glados_pycromanager.ui.layout import build_stylesheet, classify_shape
 
 #endregion

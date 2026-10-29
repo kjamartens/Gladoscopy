@@ -12,7 +12,6 @@ import os
 import sys
 import time
 from collections.abc import Iterable
-from typing import List
 
 import appdirs
 from PyQt5.QtCore import (
@@ -46,10 +45,8 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-import glados_pycromanager.GUI.utils
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.GUI.MMcontrols import ConfigInfo
-from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
 from glados_pycromanager.GUI.utils import CustomMainWindow
 from glados_pycromanager.ui.layout import (
     LANDSCAPE,
@@ -229,23 +226,6 @@ class InteractiveListWidget(QTableWidget):
         #Move the stage to this position
         logging.debug(f"Moving stage {self.XYstageName()} to pos {xpos_goto},{ypos_goto}")
         self.parent.core.set_xy_position(self.XYstageName(),xpos_goto,ypos_goto)
-
-    def getIDValues(self):
-        """
-        Get the ID values from the second column of the table.
-        
-        Args:
-            None
-        
-        Returns:
-            list: A list of float values extracted from the second column of the table.
-        """
-        id_values = []
-        for row in range(self.rowCount()):
-            item_id = self.takeItem(row, 1)
-            if item_id:
-                id_values.append(float(item_id.text()))
-        return id_values
 
     def disconnectFunGUIConnection(self):
         self.itemChanged.disconnect()
@@ -1256,15 +1236,6 @@ class MDAGlados(CustomMainWindow):
                 logging.debug("found " + device + " of type " + devicetype)
                 devicesOfType.append(device)
         return devicesOfType
-        # elif self.shared_data.backend == 'JAVA':
-        #     devices = [devices.get(i) for i in range(devices.size())]
-        #     devicesOfType = []
-        #     #Loop over devices
-        #     for device in devices:
-        #         if self.core.get_device_type(device).to_string() == devicetype: #type:ignore
-        #             logging.debug("found " + device + " of type " + devicetype)
-        #             devicesOfType.append(device)
-        #     return devicesOfType
     
     def _refillOrderDropdown(self,GUI_show_channel, GUI_show_time, GUI_show_xy, GUI_show_z):
         """
@@ -1396,18 +1367,6 @@ class MDAGlados(CustomMainWindow):
 
         #redraw the self.gui:
         self.gui.update()
-    
-    def printText(self):
-        """
-        Prints the events obtained from the getEvents method.
-        
-        Args:
-            self: The object instance.
-        
-        Returns:
-            None
-        """
-        logging.info(self.getEvents())
     
     def getEvents(self):
         """
@@ -2172,17 +2131,6 @@ class MDAGlados(CustomMainWindow):
         except Exception as exc:
             logging.warning('Could not apply Z-settle toggle to the running engine: %s', exc)
 
-    def setMDAparams(self,mdaparams):
-        """
-        Set the MDA parameters.
-        
-        Args:
-            mdaparams: The MDA parameters to be set.
-        
-        Returns:
-            None
-        """
-        self.mda = mdaparams
     #endregion
     
     #region Nodz-based

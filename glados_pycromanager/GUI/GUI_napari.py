@@ -67,6 +67,7 @@ import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 
 #Obtain the helperfunctions
 import glados_pycromanager.GUI.utils as utils
+from glados_pycromanager.io import appdata
 from glados_pycromanager.GUI.napariGlados import call_when_startup_ready, runNapariPycroManager
 from glados_pycromanager.GUI.sharedFunctions import Shared_data
 from glados_pycromanager.GUI.utils import *
@@ -329,15 +330,6 @@ def connect_headless_core(Core, start_error=None):
             f'Micro-Manager could not start:\n{start_error}') from core_exc
 
 
-def perform_post_closing_actions(shared_data:Shared_data):
-    """Performing closing actions
-
-    Args:
-        shared_data: shared_data class (Shared_data())
-    """
-    #Clean up temporary files
-    utils.cleanUpTemporaryFiles(shared_data=shared_data)
-
 #: Where --startup-exit appends its timeline (repo checkout layout, like docs/perf-runtime.txt).
 STARTUP_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                    '..', '..', 'docs', 'perf-startup.txt')
@@ -598,34 +590,27 @@ class headlessGUI(QWidget):
         mm_cfg.path_history = push_path_history(mm_cfg.path_history, self.mm_app_path)
         mm_cfg.config_path_history = push_path_history(mm_cfg.config_path_history, self.config_file)
         #And update the JSON
-        utils.storeSharedData_GlobalData(self.shared_data)
+        appdata.storeSharedData_GlobalData(self.shared_data)
         
         self.close()
 
 
 class UserManualWidget(QWidget):
-    """Napari dock widget that renders the Glados user manual as HTML."""
+    """Napari dock widget showing the online Glados docs (docs_links.DOCS_URL)."""
 
     def __init__(self, viewer=None):
         super().__init__()
-        import glados_pycromanager
         from PyQt5.QtCore import QUrl
         from PyQt5.QtWebEngineWidgets import QWebEngineView
         from PyQt5.QtWidgets import QVBoxLayout
-        from glados_pycromanager.ui.markdown_view import markdown_to_html
+
+        from glados_pycromanager.docs_links import USER_GUIDE_PAGE, docs_url
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         view = QWebEngineView()
         view.setMinimumSize(680, 800)
-
-        pkg_root = os.path.dirname(glados_pycromanager.__file__)
-        md_path = os.path.join(pkg_root, "Documentation", "UserManual.md")
-        base_dir = os.path.dirname(os.path.abspath(md_path))
-        try:
-            view.setHtml(markdown_to_html(md_path), QUrl.fromLocalFile(base_dir + "/"))
-        except Exception as exc:
-            view.setHtml(f"<p>Could not load user manual: {exc}</p>")
+        view.setUrl(QUrl(docs_url(USER_GUIDE_PAGE)))
         layout.addWidget(view)
 
 
@@ -709,7 +694,7 @@ def main(app=None, splash=None):
     apply_foreground_scheduling_hints(
         str(shared_data.config.performance_config.foreground_scheduling_hints) == 'True')
     print('Cleaning up temporary files.')
-    utils.cleanUpTemporaryFiles(shared_data=shared_data)
+    appdata.cleanUpTemporaryFiles(shared_data=shared_data)
     startup_timeline.mark('temporary files cleaned up')
 
     # --- CLI overrides for the headless popup --------------------------------

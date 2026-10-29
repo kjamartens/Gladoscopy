@@ -1,24 +1,18 @@
 import json
-import logging
 import os
 import sys
 
 import appdirs
 import matplotlib
-from PyQt5.QtWidgets import QMainWindow
 
 #Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
-import glados_pycromanager.GUI.napariGlados
 from glados_pycromanager.Core.MDAGlados import *
 from glados_pycromanager.GUI.AnalysisClass import *
 from glados_pycromanager.GUI.FlowChart_dockWidgets import *
 from glados_pycromanager.GUI.MMcontrols import *
-from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
-from glados_pycromanager.GUI.utils import CustomMainWindow
 
 #For drawing
 matplotlib.use('Qt5Agg')

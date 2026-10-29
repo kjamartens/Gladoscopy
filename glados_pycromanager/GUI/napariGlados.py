@@ -1,6 +1,4 @@
 import datetime
-import gc
-import importlib
 import json
 import logging
 import os
@@ -18,16 +16,9 @@ import useq
 from napari.qt import thread_worker
 from PyQt5.QtCore import QCoreApplication, QEvent, QObject, Qt, QSize, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
-    QAbstractButton,
-    QAction,
     QApplication,
-    QCheckBox,
-    QComboBox,
     QGridLayout,
-    QGroupBox,
-    QLineEdit,
     QMessageBox,
-    QPushButton,
 )
 from qtpy.QtWidgets import QMainWindow, QScrollArea, QVBoxLayout, QWidget
 
@@ -45,8 +36,8 @@ from glados_pycromanager.GUI.fast_image_layer import FastImage, add_fast_image
 from glados_pycromanager.GUI.frame_ring import FrameRing
 from glados_pycromanager.GUI.frame_writer import NDTiffFrameWriter, ZarrFrameWriter
 from glados_pycromanager.GUI.MMcontrols import microManagerControlsUI
-from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName, moveLayerToTop
-from glados_pycromanager.GUI.utils import cleanUpTemporaryFiles
+from glados_pycromanager.GUI.napariHelperFunctions import InitateNapariUI, getLayerIdFromName
+from glados_pycromanager.io.appdata import cleanUpTemporaryFiles
 from glados_pycromanager.observability import startup_timeline
 from glados_pycromanager.ui.layout import build_stylesheet, set_current_theme, theme_from_config
 from glados_pycromanager.ui.layout.theme import LEGACY_SCALE_FACTOR
@@ -2368,7 +2359,6 @@ class napariHandler:
         mode: a user who toggles back off while the previous worker is still
         stopping gets the OFF path, not a stale start.
         """
-        from PyQt5.QtWidgets import QApplication
 
         from glados_pycromanager.GUI.napari_bridge import NapariBridge, get_bridge
 
@@ -2593,13 +2583,6 @@ class napariHandler:
                     # worker2.start()
                     logging.debug("MDA mode started from acqModeChanged")
 
-class napariHandler_liveMode(napariHandler):
-    def __init__(self, shared_data) -> None:
-        super().__init__(shared_data, liveOrMda='live')
-
-class napariHandler_mdaMode(napariHandler):
-    def __init__(self, shared_data) -> None:
-        super().__init__(shared_data, liveOrMda='mda')
 #endregion
 
 #region NapariWidgets
@@ -2875,15 +2858,7 @@ def layer_removed_event_callback(event, shared_data):
                     shared_data.rt_replay.unregister(session.key)
                 
                 
-                # if 'skipAnalysisThreadDeletion' in vars(shared_data):
-                #     if not shared_data.skipAnalysisThreadDeletion:
-                #         l.destroy()
-                #     else:
-                #         shared_data.skipAnalysisThreadDeletion = False
-                # else:
-                #     l.destroy()
 #endregion
-
 #Delay before the startup layout pass; 0 = first event-loop iteration after startup.
 STARTUP_LAYOUT_DELAY_MS = 0
 
@@ -3075,7 +3050,6 @@ def runNapariPycroManager(sMM_JSON,sshared_data,include_flowChart_automatedMicro
         if failures:
             msg += f" {len(failures)} failure(s) — see log."
         logging.info(msg)
-        from PyQt5.QtWidgets import QMessageBox
         QMessageBox.information(None, "Glados — Reload Custom Nodes", msg)
 
     try:

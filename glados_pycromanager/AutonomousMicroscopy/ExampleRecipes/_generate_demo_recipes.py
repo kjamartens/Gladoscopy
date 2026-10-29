@@ -31,7 +31,7 @@ sys.path.insert(0, REPO)
 # WebEngine must be imported before the QApplication exists (utils.py imports it).
 from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401,E402
 from PyQt5.QtCore import QPointF  # noqa: E402
-from PyQt5.QtWidgets import QApplication, QComboBox, QGridLayout, QLineEdit  # noqa: E402
+from PyQt5.QtWidgets import QApplication, QGridLayout, QLineEdit  # noqa: E402
 
 _PYMMC = os.path.join(os.path.expanduser('~'), 'AppData', 'Local', 'pymmcore-plus', 'pymmcore-plus', 'mm')
 MM_PATH = os.environ.get('GLADOS_DEMO_MM_PATH', os.path.join(_PYMMC, 'Micro-Manager_2.0.3_20260724'))

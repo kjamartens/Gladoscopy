@@ -27,7 +27,6 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSizePolicy,
     QSlider,
     QStackedWidget,
     QVBoxLayout,
@@ -38,7 +37,6 @@ from PyQt5.QtWidgets import (
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.config_group_editor as config_group_editor
 import glados_pycromanager.GUI.device_property_browser as device_property_browser
 import glados_pycromanager.GUI.utils as utils
@@ -232,7 +230,6 @@ def waitForLiveModeWorkerStopped(shared_data, label):
     return False
 
 
-
 class ConfigInfo:
     """
     This class contains information about a pycromanager config group
@@ -362,17 +359,6 @@ class ConfigInfo:
             return False
         return not self.hasPropertyLimits()
 
-    def helpStringInfo(self):
-        """Provides some info about the config group, whether it should be a dropdown, slider, input field"""
-        infostring='No option for this config'
-        if self.isDropDown():
-            infostring = f"Device {self.configGroupName()} should be an dropdown with {self.nrConfigs()} options"
-        if self.isSlider():
-            infostring = f"Device {self.configGroupName()} should be an Slider with limits {self.lowerLimit()}-{self.upperLimit()}"
-        if self.isInputField():
-            infostring = f"Device {self.configGroupName()} should be an input field"
-        return infostring
-    
     def getCurrentMMValue(self):
         """Get the current MM value of this config group:"""
         return shared_data.MILcore.get_current_config(self.configGroupName())
@@ -636,30 +622,6 @@ class MMConfigUI(CustomMainWindow):
                 os.makedirs(app_specific_folder, exist_ok=True)
                 self.save_state_MMControls(os.path.join(app_specific_folder, 'glados_state.json'))
                 
-        #         #Store in appdata
-        #         appdata_folder = os.getenv('APPDATA')
-        #         if appdata_folder is None:
-        #             raise EnvironmentError("APPDATA environment variable not found")
-        #         app_specific_folder = os.path.join(appdata_folder, 'Glados-PycroManager')
-        #         os.makedirs(app_specific_folder, exist_ok=True)
-                
-                
-        #         if os.path.exists(os.path.join(app_specific_folder, 'glados_state.json')):
-        #             with open(os.path.join(app_specific_folder, 'glados_state.json'), 'r') as file:
-        #                 gladosInfo = json.load(file)
-        #                 MMControlsInfo = gladosInfo['MMControls']
-                
-        #             #Hand-set the values that I want:
-        #             if 'exposureTimeInputField' in MMControlsInfo:
-        #                 self.exposureTimeInputField.setText(MMControlsInfo['exposureTimeInputField']['text'])
-        #             for key, object in self.XYMoveEditField.items():
-        #                 if key in MMControlsInfo:
-        #                     object.setText(MMControlsInfo[key]['text'])
-        #             for key,object in self.oneDMoveEditField.items():
-        #                 for objectLineEditKey in object:
-        #                     objectLineEdit = object[objectLineEditKey]
-        #                     if objectLineEditKey in MMControlsInfo:
-        #                         objectLineEdit.setText(MMControlsInfo[objectLineEditKey]['text'])
 
     def LoadAllMMFromJSON(self):
         """
@@ -934,82 +896,6 @@ class MMConfigUI(CustomMainWindow):
         moveLayerToTop(napariViewer,'Snap')
         return
     
-        ## Testing area
-        
-        
-        import tempfile
-
-        import numpy as np
-        from bioio.writers import OmeTiffWriter  # with bioio-ome-tiff installed
-        tempdataloc = os.path.join(str(tempfile.TemporaryDirectory().name))+"_glmic.zarr"
-        logging.debug("tempdataloc: %s", tempdataloc)
-
-
-        image = np.random.rand(10, 3, 512, 512)
-        OmeTiffWriter.save(image, tempdataloc+"file.ome.tiff", dim_order="ZCYX")
-        
-        
-        import numpy as np
-        import zarr
-        from ome_zarr.io import parse_url
-        from ome_zarr.writer import write_image
-
-        
-        path = tempdataloc
-
-        size_xy = 128
-        size_z = 10
-        rng = np.random.default_rng(0)
-        data = rng.poisson(lam=10, size=(size_z, size_xy, size_xy)).astype(np.uint8)
-
-        # write the image data
-        store = parse_url(path, mode="w").store
-        root = zarr.group(store=store)
-        write_image(image=data, group=root, axes="zyx", storage_options=dict(chunks=(1, size_xy, size_xy)))
-        
-        
-        shape = (3, 2, 2, 4, 4)
-        data = np.random.randint(0,255,size=shape,dtype=np.uint8)
-
-        writer = OmeZarrWriterV3(
-            store=tempdataloc+"_glmic.zarr",
-            shape=shape,
-            dtype=data.dtype,
-            scale_factors=(1,1,2,2,2)
-        )
-
-        for t in range(shape[0]):
-            # extract single timepoint (C,Z,Y,X)
-            slice_t = data[t]
-            writer.write_timepoint(t, slice_t)
-        
-        
-        image = np.random.rand(10, 3, 256, 256)
-        bioio_ome_zarr.writers.OmeTiffWriter.save(image, tempdataloc+"_glmic.ome.tiff", dim_order="TCYX")
-
-        from ndstorage import NDTiffDataset
-        
-        summary_metadata = {'name_1': 123, 'name_2': 'something else'} # make this whatever you want
-        shared_data.pyMMCdataset = NDTiffDataset(tempdataloc, summary_metadata=summary_metadata, writable=True)
-
-        image_height = 256
-        image_width = 256
-
-        for time in range(10):
-            # generate random image
-            pixels = np.random.randint(0, 2 ** 16, (image_height, image_width), dtype=np.uint16)
-            
-            # a dict with strings as keys and strings or ints as values that uniquely identifies this image
-            image_coordinates = {'time': time, 'other_axis_name': 4} 
-            image_metadata = {'name_1': 123, 'name_2': 'something'} # whatever you want
-            shared_data.pyMMCdataset.put_image(image_coordinates, pixels, image_metadata)
-
-        shared_data.pyMMCdataset.finish()
-        
-        
-        
-        ## End testing
-    
     
     def addImageToAlbum(self):
         """
@@ -1082,10 +968,8 @@ class MMConfigUI(CustomMainWindow):
             self.LiveModeButton.setIcon(icon)
             #update live mode:
             shared_data.liveMode = False
-            
-            
-    
-        
+
+
     #endregion
 
     #region Shutter
@@ -2735,17 +2619,6 @@ class MMConfigUI(CustomMainWindow):
                 enableDisableLayout(self, self.configEntries[config_id],config_id,False)
         return
     
-    def updateConfigsFromMM(self):
-        """
-        Updates all configs from the Micro-Manager backend.
-        
-        This function iterates over all configs and updates their values in the GUI
-        based on the current values in the Micro-Manager backend.
-        """
-        #Update all values from MM:
-        for config_id in range(len(self.config_groups)):
-            self.updateValuefromMM(config_id)
-        pass
     #endregion
 
     #endregion
