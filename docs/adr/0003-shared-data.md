@@ -27,10 +27,11 @@ into every component that needs state. Field categories:
   `_mdaModeAcqData`, the various `*Queues` / `*Threads` lists.
 - **Napari**: `_napariViewer`, `mdaDatasets`, `mdaZarrData`,
   `last_display_update_time`, `newestLayerName`.
-- **Config** (a `Config()` dataclass tree — `mda_config`,
-  `webhook_config`, `visualisation_config`, `micromanager_config`).
-- **Cross-thread signals**: `mda_acq_done_signal`, `liveUpdateEvent`
-  (`pyqtSignal`s) — `Shared_data` subclasses `QObject` for this.
+- **Config** (a `Config()` dataclass tree: `mda_config`,
+  `webhook_config`, `visualisation_config`, `micromanager_config`,
+  `rt_analysis_config`, `performance_config`, …).
+- **Cross-thread signals**: `mda_acq_done_signal` (a `pyqtSignal`);
+  `Shared_data` subclasses `QObject` for this.
 - **Misc lists** that emit on mutation (`LoggingList`,
   `_RTAnalysisQueuesThreads`).
 
@@ -50,8 +51,9 @@ into every component that needs state. Field categories:
   without thinking. The current `Shared_data` is around 50 fields.
 - Mutation is unconstrained — any code with a reference can flip
   `_liveMode`. The codebase tolerates this because it's
-  single-process and the threads cooperate through signals; we don't
-  use locks.
+  single-process and the threads cooperate through signals. (Hardware
+  access is the exception: it is serialised by the MIL lock and the
+  single owner thread, see ADR 0001.)
 - Serialization (the JSON state at AppData) only covers the `config`
   sub-tree; the rest is runtime state.
 
@@ -68,5 +70,5 @@ into every component that needs state. Field categories:
 
 - `glados_pycromanager/GUI/sharedFunctions.py` — definition.
 - `CLAUDE.md` — "Shared state — `GUI/sharedFunctions.py`".
-- Phase 10.3 / 10.4 adds atomic write + schema validation to the
-  `config` sub-tree's JSON path.
+- `glados_pycromanager/io/appdata.py`: reading and writing the
+  `config` sub-tree's JSON.

@@ -2,17 +2,11 @@ name: glados-pycromanager
 display_name: Glados-PycroManager
 contributions:
   commands:
-    - id: glados-pycromanager.say_hi
-      title: Say hello, world!
-      python_name: glados_pycromanager:show_hello_message
-    - id: glados-pycromanager.run_gladospycromanager
-      title: Run glados-pycromanager
-      python_name: glados_pycromanager:run_glados_pycromanager
     - id: glados-pycromanager.mainWidgetCall
-      title: Open my widget
+      title: Run Glados-PycroManager
       python_name: glados_pycromanager._dock_widget:MainWidget
     - id: glados-pycromanager.UserManual
-      title: Open my widget
+      title: Open the Glados user manual
       python_name: glados_pycromanager.GUI.GUI_napari:show_UserManualNapari
     - id: glados-pycromanager.performanceModeWidgetCall
       title: Open Performance Mode

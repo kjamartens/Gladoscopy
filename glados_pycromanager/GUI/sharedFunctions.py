@@ -3,10 +3,11 @@ import dataclasses
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
-from dataclasses import dataclass, fields
-from typing import Optional
+import threading
+from dataclasses import dataclass
 
 import appdirs
 import useq
@@ -336,38 +337,7 @@ class Config:
     performance_config:   PerformanceConfig   = dataclasses.field(default_factory=PerformanceConfig)
 
 
-# Phase 7.1 moved the JSON load/save bodies to
-# `glados_pycromanager.io.appdata`. Phase 7.2 adds `DeprecationWarning`
-# shims so call sites that still import from `sharedFunctions` (the
-# legacy path) see a one-time warning. Phase 18.1 deletes both wrappers
-# entirely.
-import warnings as _shim_warnings  # noqa: E402
-
 from glados_pycromanager.io import appdata as _appdata  # noqa: E402
-
-_DEPRECATION_MSG = (
-    "{name}() has moved to glados_pycromanager.io.appdata.{name}; the "
-    "GUI.sharedFunctions re-export is scheduled for removal in Phase 18.1 "
-    "of claude_project.md."
-)
-
-
-def load_config_from_json(cfg):
-    _shim_warnings.warn(
-        _DEPRECATION_MSG.format(name="load_config_from_json"),
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _appdata.load_config_from_json(cfg)
-
-
-def save_config_to_json(cfg):
-    _shim_warnings.warn(
-        _DEPRECATION_MSG.format(name="save_config_to_json"),
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _appdata.save_config_to_json(cfg)
 
 
 class Shared_data(QObject):
@@ -479,7 +449,7 @@ class Shared_data(QObject):
         self.perfThreadLabels: dict = {}
         
         self.config = Config()
-        load_config_from_json(self.config)
+        _appdata.load_config_from_json(self.config)
 
         # Apply the persisted log level immediately after config is loaded
         try:
@@ -510,13 +480,8 @@ class Shared_data(QObject):
                 except (KeyError, TypeError, AttributeError) as exc:
                     logging.debug('globalData key %r not present in current schema (%s)', key, exc)
         
-        if self.config.webhook_config.slack_token is not None and not len(self.config.webhook_config.slack_token) == 0:
-            try:
-                import slack
-                self.config.webhook_config.slack_client = slack.WebClient(token=self.config.webhook_config.slack_token)
-                logging.debug('Slack client initialised')
-            except (ValueError, TypeError, AttributeError, OSError) as exc:
-                logging.error('Slack client initialisation failed: %s', exc)
+        from glados_pycromanager.notify.slack import make_slack_client
+        self.config.webhook_config.slack_client = make_slack_client(self.config.webhook_config.slack_token)
     
         # self._mdamodeNapariHandler.mda_acq_done_signal.connect(self.mdaacqdonefunction)
         self._livemodeNapariHandler = napariHandler(self,liveOrMda='live')
@@ -651,10 +616,34 @@ class Shared_data(QObject):
     # deletes a store a napari layer may still be rendering from.
 
     @staticmethod
-    def _discard_temp_dir(tmpdir) -> None:
-        """Delete one temporary store now, tolerating a locked directory."""
+    def _discard_temp_dir(tmpdir, background: bool = True) -> None:
+        """Delete one temporary store, tolerating a locked directory.
+
+        With `background` (the default) the directory is renamed out of the way
+        at once and its files are deleted on a daemon thread. These calls run on
+        the GUI thread when an MDA layer is rebuilt, and a store holds one file
+        per frame: deleting 1500 of them took 3.3 s on Windows, a frozen display
+        at the start of the next acquisition. The rename keeps the old path free
+        immediately. If it fails (a file still open), deletion falls back to
+        the synchronous path. Pass `background=False` where the process is about
+        to exit and a daemon thread would be killed mid-way.
+        """
         if tmpdir is None:
             return
+        if background:
+            trash = f'{tmpdir.name}.discarded'
+            try:
+                os.rename(tmpdir.name, trash)
+            except OSError:
+                pass
+            else:
+                finalizer = getattr(tmpdir, '_finalizer', None)
+                if finalizer is not None:
+                    finalizer.detach()
+                threading.Thread(target=shutil.rmtree, args=(trash,),
+                                 kwargs={'ignore_errors': True}, daemon=True,
+                                 name='glados-temp-store-cleanup').start()
+                return
         try:
             tmpdir.cleanup()
         except OSError as exc:
@@ -707,9 +696,10 @@ class Shared_data(QObject):
         force-exits via `os._exit(0)`, so no finalizer would otherwise run and
         every store would be left behind in the OS temp directory.
         """
+        # Synchronous: os._exit follows, which would kill a cleanup thread.
         for layer_name in list(self.mdaZarrTempDirs):
-            self.release_zarr_temp_dir(layer_name)
-        self._discard_temp_dir(self.pyMMCdatasetTempDir)
+            self._discard_temp_dir(self.mdaZarrTempDirs.pop(layer_name, None), background=False)
+        self._discard_temp_dir(self.pyMMCdatasetTempDir, background=False)
         self.pyMMCdatasetTempDir = None
     
     @property
@@ -838,16 +828,6 @@ class Shared_data(QObject):
         if new_value != self._core:
             self._core = new_value
 
-    # @property
-    # def RTAnalysisQueues(self):
-    #     return self._RTAnalysisQueues
-    # @RTAnalysisQueues.setter
-    # def RTAnalysisQueues(self, new_value):
-    #     if new_value != self._RTAnalysisQueues:
-    #         self._RTAnalysisQueues = new_value
-    #         self.on_RTAnalysisQueues_value_change()
-    # def on_RTAnalysisQueues_value_change(self):
-    #     logging.debug('RTAnalysisQueues changed')
         
     @property
     def RTAnalysisQueuesThreads(self):

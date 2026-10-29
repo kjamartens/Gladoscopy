@@ -9,7 +9,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 import inspect
 
 # from shapely import Polygon, affinity
-import math
 import os
 import time
 
@@ -75,7 +74,6 @@ def __function_metadata__():
 #Callable functions
 #-------------------------------------------------------------------------------------------------------------------------------
 
-import logging
 
 
 
@@ -119,7 +117,6 @@ def volath_score(image):
     sum2 = np.sum(image[:, :w-2] * image[:, 2:w])
     return 1/(sum1 - sum2)
 
-from scipy.ndimage import convolve
 
 
 def tenengrad_score(image):
@@ -144,7 +141,6 @@ def tenengrad_score(image):
 
 def testArray_report_sharpNess(core,position_array_test,zmovestage,waitTimeMs,method='Redondo',n_images=5):
     res_arr = []
-    import time
     for n in range(len(position_array_test)):
         logging.debug("n: %s, abs_pos_arr[n]: %s", n, position_array_test[n])
         core.set_position(zmovestage,position_array_test[n]) #type:ignore
@@ -165,7 +161,6 @@ def testArray_report_sharpNess(core,position_array_test,zmovestage,waitTimeMs,me
     return res_arr
 
 def single_sharpnessTest(core,position,zmovestage,waitTimeMs,method='Redondo',n_images=5):
-    import time
     core.set_position(zmovestage,position) #type:ignore
     core.wait_for_system()
     time.sleep(waitTimeMs/1000)
@@ -198,7 +193,6 @@ def auto_focus_iter_rel_bf(core,**kwargs):
 
     
     #General idea: take images throughout z-stack of BF images, compuate the value/deriv, find the best, set position to that
-    import time
     zmovestage = kwargs['StageName']#"TIPFSOffset"
     startp = float(kwargs['startPosition'])#-75 #relative wrt current position
     endp = float(kwargs['endPosition'])#75 #relative wrt current position
@@ -297,7 +291,6 @@ def auto_focus_iter_abs_bf(core,**kwargs):
 
     
     #General idea: take images throughout z-stack of BF images, compuate the value/deriv, find the best, set position to that
-    import time
     zmovestage = kwargs['StageName']#"TIPFSOffset"
     startp = float(kwargs['startPosition'])#-75 #ABSOLUTE
     endp = float(kwargs['endPosition'])#75 #ABSOLUTE

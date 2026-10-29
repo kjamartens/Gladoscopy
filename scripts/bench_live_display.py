@@ -24,7 +24,6 @@ Results are appended to docs/bench-live-display.txt.
 from __future__ import annotations
 
 import argparse
-import contextlib
 import datetime
 import logging
 import os

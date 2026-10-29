@@ -84,10 +84,25 @@ def _snap(viewer, shared_data, value, dtype=np.uint16, shape=(4, 6)):
     return image
 
 
-def test_first_snap_creates_a_two_dimensional_layer(viewer, shared_data):
+def test_first_snap_creates_a_one_frame_stack(viewer, shared_data):
     _snap(viewer, shared_data, 7)
     assert len(viewer.layers) == 1
-    assert viewer.layers[0].data.shape == (4, 6)
+    layer = viewer.layers[0]
+    assert layer.data.shape == (1, 4, 6)
+    assert np.array_equal(layer.data[0], np.full((4, 6), 7, dtype=np.uint16))
+    assert len(layer.scale) == 3
+
+
+def test_layer_ndim_never_changes(viewer, shared_data):
+    # napari 0.7.0's vispy layer sizes its units scale to ndim at creation only;
+    # a 2-D album layer that became 3-D on the second snap raised IndexError in
+    # `_on_matrix_change` on the next redraw.
+    _snap(viewer, shared_data, 0)
+    ndims = {viewer.layers[0].data.ndim}
+    for value in range(1, 6):
+        _snap(viewer, shared_data, value)
+        ndims.add(viewer.layers[0].data.ndim)
+    assert ndims == {3}
 
 
 def test_twenty_snaps_are_all_present_and_in_order(viewer, shared_data):

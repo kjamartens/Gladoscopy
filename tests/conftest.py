@@ -43,10 +43,9 @@ def _never_touch_real_appdata(tmp_path_factory: pytest.TempPathFactory):
 def tmp_appdata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Redirect `appdirs.user_data_dir` to a temp directory.
 
-    Both `Shared_data` (`glados_pycromanager.GUI.sharedFunctions`) and
-    `utils.storeSharedData_GlobalData` resolve the JSON state file via
-    `appdirs.user_data_dir()`. Patching that single call point makes
-    every test that touches the JSON layer fully sandboxed.
+    `Shared_data` and `io.appdata` (the JSON state file) both resolve it via
+    `appdirs.user_data_dir()`. They share the one `appdirs` module object, so
+    patching it once sandboxes every test that touches the JSON layer.
 
     Returns the redirected directory (its `Glados-PycroManager`
     subdirectory is created lazily by the production code).
@@ -56,13 +55,6 @@ def tmp_appdata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(
         "glados_pycromanager.GUI.sharedFunctions.appdirs.user_data_dir",
         lambda *a, **kw: str(target),
-    )
-    # `utils.storeSharedData_GlobalData` re-imports appdirs at module
-    # scope, so patch that one too if/when a test routes through it.
-    monkeypatch.setattr(
-        "glados_pycromanager.GUI.utils.appdirs.user_data_dir",
-        lambda *a, **kw: str(target),
-        raising=False,
     )
     return target
 

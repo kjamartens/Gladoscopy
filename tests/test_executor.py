@@ -85,12 +85,9 @@ def test_workers_live_in_executor_module():
     assert hasattr(executor, "generalNodzCallActionWorker")
 
 
-def test_back_compat_reexports_on_flowchart_module():
-    """Old import sites continue to resolve."""
+def test_flowchart_module_uses_the_executor_mixin():
     from glados_pycromanager.GUI import FlowChart_dockWidgets as f
 
-    assert f.WorkerSignals is executor.WorkerSignals
-    assert f.generalNodzCallActionWorker is executor.generalNodzCallActionWorker
     assert f.FlowchartExecutorMixin is executor.FlowchartExecutorMixin
 
 

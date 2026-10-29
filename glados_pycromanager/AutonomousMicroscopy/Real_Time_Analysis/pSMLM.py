@@ -10,8 +10,6 @@ import logging
 
 # from shapely import Polygon, affinity
 # from shapely import Polygon, affinity
-import math
-import time
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -55,7 +53,6 @@ def __function_metadata__():
             "__replayable__": True,
         }
     }
-
 
 
 def DoGFilter(im,g1,g2):
@@ -221,15 +218,6 @@ class pSMLM:
         
         self.lastImage = image
         self.lastMetadata = metadata
-        # logging.info(f'Finishing Updating pSMLM running at time: {time.time()}')
-        # logging.info(f"Nr locs: {len(self.SMLMlocs)} ")
-        
-        # self.dimensionOrder, self.n_entries_in_dims, self.uniqueEntriesAllDims = utils.getDimensionsFromAcqData(shared_data._mdaModeParams)
-        # mda_values = []
-        # for v in list(self.uniqueEntriesAllDims.keys()):
-        #     mda_values = np.hstack((mda_values,metadata['Axes'][v]))
-            
-        # self.currentFrame = metadata['Axes'][v]
         
         return f'pSMLM2 result - frame'
     

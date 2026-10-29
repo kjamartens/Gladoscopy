@@ -26,10 +26,10 @@ code.
 `Core/microscopeInterfaceLayer.py` defines
 `MicroscopeInterfaceLayer` (alias **MIL**). Every other module that
 needs Micro-Manager goes through MIL. The backend object lives in
-`MIL._core`; `MIL.set_core(core)` is called once at startup with the
+`MIL.core`; `MIL.set_core(core)` is called once at startup with the
 chosen backend's object. The `MicroscopeInstance` enum encodes which
-of the three backends is active, and MIL methods branch on
-`isinstance(self._core, ...)` checks.
+of the three backends is active; `set_core` detects it once and caches
+it, and MIL methods branch on that cached value.
 
 ## Consequences
 
@@ -42,9 +42,9 @@ of the three backends is active, and MIL methods branch on
 
 **Negative**
 
-- `isinstance(...)` dispatch runs on every MIL call. Profile-relevant
-  for hot paths; addressed by Phase 6.1 / PERF-4 of the optimization
-  plan (cache `MicroscopeInstance` once in `set_core`).
+- Every MIL call branches on the backend. The backend is detected once
+  in `set_core` (originally an `isinstance` check on every call), so the
+  branch itself is cheap.
 - The MIL surface area is large (~50 public methods) and any new
   capability needs three implementations. We treat that as the cost of
   the abstraction.
@@ -65,6 +65,8 @@ of the three backends is active, and MIL methods branch on
 ## Related
 
 - `docs/module-map.md` — MIL entry.
-- `claude_project.md` — Phase 6.1 caches the backend tag.
-- `tests/test_microscope_interface_layer.py` — covers backend
-  detection.
+- `tests/test_microscope_interface_layer.py`, `tests/test_mil_dispatch.py`,
+  `tests/test_mil_set_core_strict.py`: backend detection and dispatch.
+- Later additions on top of this seam: the per-instance hardware lock
+  (`tests/test_mil_hardware_lock.py`) and the single owner thread
+  (`Core/microscope_service.py`).

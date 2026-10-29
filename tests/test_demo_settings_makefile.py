@@ -1,5 +1,8 @@
 """Wiring guard for `make run-demo-smlm` and its demo_settings.mk.
 
+The real demo_settings.mk is per-machine and git-ignored; the tracked
+demo_settings.mk.example is what this checks.
+
 Text-level, plus one check against the real Windows recipe shells — no Make, no Qt, no hardware. The point is that a typo in a
 variable name between the settings file and the recipe cannot go unnoticed
 (the symptom would be a silently empty CLI flag, which argparse turns into a
@@ -29,8 +32,8 @@ DEMO_VARS = (
 
 @pytest.fixture(scope="module")
 def demo_settings() -> str:
-    path = REPO_ROOT / "demo_settings.mk"
-    assert path.is_file(), "demo_settings.mk is missing from the repo root"
+    path = REPO_ROOT / "demo_settings.mk.example"
+    assert path.is_file(), "demo_settings.mk.example is missing from the repo root"
     return path.read_text(encoding="utf-8")
 
 
@@ -43,7 +46,7 @@ def makefile() -> str:
 def test_demo_settings_defines_var_with_soft_assignment(demo_settings: str, var: str) -> None:
     """`?=` (not `=`) so `make run-demo-smlm DEMO_BUFFER_MB=1024` still wins."""
     assert re.search(rf"^{var}\s*\?=", demo_settings, re.MULTILINE), (
-        f"{var} must be defined in demo_settings.mk with ?="
+        f"{var} must be defined in demo_settings.mk.example with ?="
     )
 
 

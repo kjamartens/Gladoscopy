@@ -408,9 +408,6 @@ class MicroscopeProxy:
     def mil(self):
         return self._service.mil
 
-    def with_priority(self, priority: Priority) -> "MicroscopeProxy":
-        return MicroscopeProxy(self._service, priority=priority, timeout=self._timeout)
-
     def __getattr__(self, name):
         if name.startswith("__"):
             raise AttributeError(name)

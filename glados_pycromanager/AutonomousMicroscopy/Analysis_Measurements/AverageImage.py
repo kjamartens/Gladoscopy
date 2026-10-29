@@ -7,7 +7,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import inspect
-import math
 
 from glados_pycromanager.lazy_imports import ndtiff  # imports on first use (dask)
 import numpy as np

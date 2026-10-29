@@ -9,8 +9,8 @@ microscope access is serialized, regardless of which thread calls it.
 The lock is not theoretical. Commit ``cd01032`` exists because two threads drove
 the same ``core.mda``/``Acquisition`` object concurrently and produced a **native
 access violation / JVM fatal crash**. Hardware is touched from at least five
-thread contexts today: the Qt/GUI thread (``MMcontrols.py``,
-``LaserControlScripts.py``), the acquisition worker, RT-analysis QThreads
+thread contexts: the Qt/GUI thread (``MMcontrols.py``),
+the acquisition worker, RT-analysis QThreads
 (``LaserAdjustment.py`` calls ``set_property()`` per frame), nodz executor
 ``QRunnable``s (``AutoFocusBF.py``, ``Strobo_lasers.py``), and a
 ``ThreadPoolExecutor`` in ``utils.forceReset``. Interleaving two threads' serial

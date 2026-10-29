@@ -9,10 +9,7 @@ import inspect
 import logging
 
 # from shapely import Polygon, affinity
-import math
-import time
 
-import numpy as np
 
 from glados_pycromanager.AutonomousMicroscopy.MainScripts import FunctionHandling
 from glados_pycromanager.autonomous.registry import register

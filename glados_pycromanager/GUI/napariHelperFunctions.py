@@ -202,13 +202,22 @@ def addToExistingOrNewLayer(napariViewer,layer_name,image_data,layer_type='image
 
     else: #create the layer
         logging.debug('creating layer')
-        layer = napariViewer.add_image(image_data,name = layer_name)
+        # Created as a one-frame 3-D stack, never as a 2-D image: napari 0.7.0's
+        # vispy layer sizes its per-axis units scale to the layer's ndim once, at
+        # creation, and does not recompute it when the data changes. A 2-D layer
+        # that became 3-D on the second snap then raised `IndexError: tuple index
+        # out of range` in `_on_matrix_change` on the next redraw.
+        buffer = np.zeros((ALBUM_INITIAL_CAPACITY,) + image_data.shape, dtype=image_data.dtype)
+        buffer[0] = image_data
+        layer = napariViewer.add_image(buffer[:1],name = layer_name)
+        layer.metadata[ALBUM_BUFFER_KEY] = buffer
+        layer.metadata[ALBUM_COUNT_KEY] = 1
         #Set correct scale - in nm
         if shared_dataF.MILcore.get_pixel_size_um() != 0:
-            layer.scale = [shared_dataF.MILcore.get_pixel_size_um(),shared_dataF.MILcore.get_pixel_size_um()] #type:ignore
+            layer.scale = [1,shared_dataF.MILcore.get_pixel_size_um(),shared_dataF.MILcore.get_pixel_size_um()] #type:ignore
         else:
             logging.error('Pixel size in MM set to 1, probably not set properly in MicroManager, please set this!')
-            layer.scale = [1,1]
+            layer.scale = [1,1,1]
         layer._keep_auto_contrast = True #type:ignore
         napariViewer.reset_view()
 
@@ -252,6 +261,9 @@ def InitateNapariUI(napariViewer):
         None
     """
     logging.debug("Napari UI initiated")
+    # Thumbnails instead of a permanent spinner while an acquisition re-slices.
+    from glados_pycromanager.GUI.napari_layer_list import install_layer_list_patches
+    install_layer_list_patches()
     #Set title, icon
     napariViewer.title="GladOS - napari"
     # Set the window icon

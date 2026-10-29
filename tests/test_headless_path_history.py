@@ -77,7 +77,7 @@ def test_dialog_arrow_fills_line_edit_and_start_records_history(tmp_path):
     assert dlg.config_fileLineEdit.text() == "C:/old2.cfg"
 
     dlg.mm_app_pathLineEdit.setText(str(tmp_path))
-    with mock.patch("glados_pycromanager.GUI.utils.storeSharedData_GlobalData"):
+    with mock.patch("glados_pycromanager.io.appdata.storeSharedData_GlobalData"):
         dlg.start()
     assert mm_cfg.path_history == [str(tmp_path)]
     assert mm_cfg.config_path_history == ["C:/old2.cfg", "C:/old1.cfg"]

@@ -6,7 +6,6 @@ import time
 
 import numpy as np
 
-import glados_pycromanager.GUI.utils as utils
 
 # Sys insert to allow for proper importing from module via debug
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:

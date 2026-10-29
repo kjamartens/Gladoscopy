@@ -1,4 +1,4 @@
-"""T-F10 part 2 + T-F8 laser half: no blind sleeps, no per-keystroke serial writes.
+"""T-F10 part 2: no blind sleeps in the live/MDA mode setters.
 
 **T-F10 part 2.** `on_liveMode_value_change` / `on_mdaMode_value_change` each did
 `time.sleep(0.1)` before dispatching to `acqModeChanged`. The sleep blocked
@@ -8,11 +8,6 @@ synchronously either side of it, so the only effect was to delay the dispatch.
 The audit of every caller found exactly one that depended on the delay,
 `MMcontrols.setROI`, which changes the ROI immediately after stopping live mode;
 it now waits on the core explicitly.
-
-**T-F8 laser half.** `ChangeIntensityLaserEditField` was wired to `textChanged`,
-so typing "150" issued three serial writes and briefly drove the laser to 1 and
-then 15. `drawplot` -- which clears and rebuilds roughly a hundred pyqtgraph items
--- was wired to `textChanged` on fifteen line edits.
 """
 from __future__ import annotations
 
@@ -262,111 +257,3 @@ def test_exposure_live_restart_orders_stop_wait_set_wait_start(qapp):
         elif "liveMode = True" in stripped:
             order.append("start")
     assert order == ["stop", "wait", "set", "wait", "start"]
-
-
-# ------------------------------------------------------------- laser control
-
-
-@pytest.fixture(scope="module")
-def laser_mod(qapp):
-    import glados_pycromanager.GUI.LaserControlScripts as laser
-
-    return laser
-
-
-def test_intensity_edit_is_wired_to_editing_finished(laser_mod):
-    source = inspect.getsource(laser_mod)
-    assert 'EditIntensity_Laser_" + str(i) + ".editingFinished.connect' in source
-    assert 'EditIntensity_Laser_" + str(i) + ".textChanged.connect' not in source, (
-        "a serial write per keystroke drove the laser through every partial value"
-    )
-
-
-def test_drawplot_triggers_are_debounced(laser_mod):
-    source = inspect.getsource(laser_mod)
-    for field in ("Delay_Edit_Laser_", "Length_Edit_Laser_", "BlinkFrames_Edit_Laser_"):
-        assert (
-            '%s" + str(i) + ".textChanged.connect(lambda: scheduleDrawplot(frameduration));'
-            % field in source
-        ), "%s must go through the debounce" % field
-    assert "textChanged.connect(lambda: drawplot(frameduration))" not in source
-
-
-def test_drawplot_stays_on_text_changed(laser_mod):
-    """The plot is a live preview; editingFinished would leave it stale."""
-    assert "DRAWPLOT_DEBOUNCE_MS" in dir(laser_mod)
-    source = inspect.getsource(laser_mod.scheduleDrawplot)
-    assert "setSingleShot(True)" in source
-    assert "DRAWPLOT_DEBOUNCE_MS" in source
-
-
-def test_schedule_drawplot_coalesces_a_burst(laser_mod, qapp, monkeypatch):
-    from PyQt5.QtCore import QCoreApplication, QElapsedTimer, QEventLoop
-
-    redraws = []
-    monkeypatch.setattr(laser_mod, "drawplot", lambda fd: redraws.append(fd))
-    monkeypatch.setattr(laser_mod, "_drawplotTimer", None)
-
-    for _ in range(25):
-        laser_mod.scheduleDrawplot(33.0)
-    assert redraws == [], "nothing redraws while the user is still typing"
-
-    clock = QElapsedTimer()
-    clock.start()
-    while not redraws and clock.elapsed() < 3000:
-        QCoreApplication.processEvents(QEventLoop.AllEvents, 10)
-
-    assert redraws == [33.0], "25 keystrokes must cost one rebuild"
-
-
-def test_intensity_bookkeeping_lives_at_the_single_choke_point(laser_mod):
-    """Both the slider and the edit field write through ChangeIntensityLaser."""
-    source = inspect.getsource(laser_mod.ChangeIntensityLaser)
-    assert "_lastWrittenLaserIntensity[laserID] = ValIntPerc" in source
-
-    handler = inspect.getsource(laser_mod.ChangeIntensityLaserEditField)
-    assert "_lastWrittenLaserIntensity.get(laserID) == newIntensity" in handler
-    assert "_lastWrittenLaserIntensity[laserID] =" not in handler, (
-        "recording it in two places lets the slider's writes go unrecorded"
-    )
-
-
-def test_a_focus_out_that_changed_nothing_writes_nothing(laser_mod, monkeypatch):
-    """editingFinished fires on every focus-out, changed or not."""
-    writes = []
-
-    class _Field:
-        def __init__(self, text):
-            self._text = text
-
-        def text(self):
-            return self._text
-
-    class _Form:
-        EditIntensity_Laser_0 = _Field("40")
-
-    monkeypatch.setattr(laser_mod, "form", _Form, raising=False)
-    monkeypatch.setattr(
-        laser_mod, "ChangeIntensityLaser",
-        lambda laserID, value: (
-            writes.append((laserID, value)),
-            laser_mod._lastWrittenLaserIntensity.__setitem__(laserID, value),
-        ),
-        raising=False,
-    )
-    monkeypatch.setattr(laser_mod, "InitLaserSliders", lambda *a: None, raising=False)
-    monkeypatch.setattr(laser_mod, "MM_JSON", {}, raising=False)
-    laser_mod._lastWrittenLaserIntensity.clear()
-
-    laser_mod.ChangeIntensityLaserEditField(0)
-    assert writes == [(0, 40)]
-
-    for _ in range(5):
-        laser_mod.ChangeIntensityLaserEditField(0)
-    assert writes == [(0, 40)], "an unchanged value must not repeat the serial write"
-
-    _Form.EditIntensity_Laser_0 = _Field("70")
-    laser_mod.ChangeIntensityLaserEditField(0)
-    assert writes == [(0, 40), (0, 70)]
-
-    laser_mod._lastWrittenLaserIntensity.clear()

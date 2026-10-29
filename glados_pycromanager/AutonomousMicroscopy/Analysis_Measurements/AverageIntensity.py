@@ -9,7 +9,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 import inspect
 
 # from shapely import Polygon, affinity
-import math
 
 from glados_pycromanager.lazy_imports import ndtiff  # imports on first use (dask)
 import numpy as np

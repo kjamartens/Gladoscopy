@@ -11,7 +11,7 @@ graph through the app's own `saveGraph`, so the files are exactly what the GUI w
     .venv/Scripts/python.exe glados_pycromanager/AutonomousMicroscopy/ExampleRecipes/_generate_demo_recipes.py
 
 Set `GLADOS_DEMO_MM_PATH` / `GLADOS_DEMO_CFG` if the demo install lives elsewhere (defaults
-are the values in `demo_settings.mk`). Regenerating overwrites the recipes.
+are `DemoSMLM.cfg` in the pymmcore-plus install folder). Regenerating overwrites the recipes.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ sys.path.insert(0, REPO)
 # WebEngine must be imported before the QApplication exists (utils.py imports it).
 from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401,E402
 from PyQt5.QtCore import QPointF  # noqa: E402
-from PyQt5.QtWidgets import QApplication, QComboBox, QGridLayout, QLineEdit  # noqa: E402
+from PyQt5.QtWidgets import QApplication, QGridLayout, QLineEdit  # noqa: E402
 
 _PYMMC = os.path.join(os.path.expanduser('~'), 'AppData', 'Local', 'pymmcore-plus', 'pymmcore-plus', 'mm')
 MM_PATH = os.environ.get('GLADOS_DEMO_MM_PATH', os.path.join(_PYMMC, 'Micro-Manager_2.0.3_20260724'))

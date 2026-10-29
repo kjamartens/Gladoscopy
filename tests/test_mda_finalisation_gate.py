@@ -23,13 +23,15 @@ def _handler(store):
 def test_finalise_backfills_off_the_gui_thread_and_repaints_on_it(monkeypatch):
     backfilled = []
     monkeypatch.setattr(napariGlados, '_backfill_missing_slices',
-                        lambda sd, name: backfilled.append(name))
+                        lambda sd, name, **kw: backfilled.append(name))
     handler, bridge = _handler(store=object())
 
     napariHandler._finalise_mda_layer(handler, 'acquisition_1')
 
     assert backfilled == ['acquisition_1']            # ran here, synchronously
-    bridge.submit.assert_called_once()                # repaint marshalled
+    # Marshalled to the GUI thread: following the dims cursor (connect,
+    # disconnect) and, last, the repaint.
+    assert bridge.submit.call_count == 3
 
     layer = MagicMock()
     viewer = SimpleNamespace(layers=[layer])
@@ -50,11 +52,15 @@ def test_finalise_skips_a_layer_without_a_store(monkeypatch):
 
 
 def test_backfill_failure_still_repaints(monkeypatch):
-    def boom(sd, name):
+    def boom(sd, name, **kw):
         raise OSError('dataset closed')
     monkeypatch.setattr(napariGlados, '_backfill_missing_slices', boom)
     handler, bridge = _handler(store=object())
 
     napariHandler._finalise_mda_layer(handler, 'acquisition_1')
 
-    bridge.submit.assert_called_once()
+    # The last GUI-thread call is still the repaint.
+    layer = MagicMock()
+    monkeypatch.setattr(napariGlados, 'getLayerIdFromName', lambda name, v, sd: [0])
+    bridge.submit.call_args.args[0](SimpleNamespace(layers=[layer]))
+    layer.refresh.assert_called_once()

@@ -17,14 +17,19 @@ editing the source tree**.
 
 ## Decision
 
-`Analysis_Measurements/__init__.py`,
-`Real_Time_Analysis/__init__.py`, and `CustomFunctions/__init__.py`
-each do two things on import:
+Each of the node folders (`AutonomousMicroscopy/Analysis_Measurements`,
+`Real_Time_Analysis`, `CustomFunctions`) is scanned for `.py` files,
+and so is the matching per-user folder
+`appdirs.user_data_dir()/Glados-PycroManager/AutonomousMicroscopy/<subfolder>/`.
 
-1. `load_additional_modules` walks the folder, appends every
-   non-`__init__` `.py` to `__all__`, and `from .<module> import *`s it.
-2. Walks `appdirs.user_data_dir()/Glados-PycroManager/<subfolder>/`
-   and imports every `.py` file via `importlib`.
+*Update:* the scanning now lives in `plugins/discovery.py`
+(`load_node_modules`, `user_appdata_dir_for`), called by each folder's
+`__init__.py`. A module that fails to import is logged with its
+traceback instead of being silently skipped, and
+*Plugins → Reload Glados Custom Nodes* re-imports every node module
+(`reload_all_node_modules`). Callable node functions must also be
+registered with `@register("Module.Function")`
+(`autonomous/registry.py`).
 
 A node "ships" by being discoverable via either path. Source-tree
 nodes are shipped with the package; user nodes live under per-user
@@ -43,13 +48,12 @@ AppData.
 
 - **Security**: anything that can write to that AppData folder can
   execute code on next start. Documented in `SECURITY.md`.
-- **Opacity**: today the loader uses `exec("from .X import *")` and
-  silently swallows `ModuleNotFoundError`. Bad plugins fail invisibly.
-  Phase 6 (`reliability: log plugin load failures`) and Phase 10.5
-  (`validate plugin metadata`) address both halves.
+- **Opacity**: the original loader used `exec("from .X import *")`
+  and silently swallowed `ModuleNotFoundError`, so bad plugins failed
+  invisibly. Failures are now logged (see the update above).
 - **Testability**: the module-scope walk runs at import time. Tests
-  must either tolerate that or monkeypatch the AppData path. Phase 5.6
-  introduces a fixture for this.
+  either tolerate that or monkeypatch the AppData path
+  (`tests/test_plugin_discovery.py`).
 
 ## Alternatives considered
 
@@ -66,6 +70,5 @@ AppData.
 
 ## Related
 
-- `claude_project.md` — Phase 6 (refactor) + Phase 10.5 (validation).
 - `SECURITY.md` — threat-model notes for plugin discovery.
-- `CONTRIBUTING.md` — "Adding a new autonomous-microscopy node".
+- [Writing nodes](../developer/writing-nodes.md).

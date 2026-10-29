@@ -14,8 +14,6 @@ if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
 
 import glados_pycromanager.GUI.nodz.nodz_utils as utils
 import glados_pycromanager.GUI.utils as full_utils
-from glados_pycromanager.GUI.nodz.nodz_custom import *
-import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
 import glados_pycromanager.Core.MDAGlados as MDAGlados
 
 defaultConfigPath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_config.json')
@@ -268,7 +266,6 @@ class Nodz(QtWidgets.QGraphicsView):
             self.currentState = 'TOGGLE_SELECTION'
             self._initRubberband(event.pos())
             self.setInteractive(False)
-
 
 
         else:
@@ -1180,9 +1177,8 @@ class Nodz(QtWidgets.QGraphicsView):
             if 'slackReportInfo' in vars(nodeInst):
                 if nodeInst.slackReportInfo is not None:
                     data['NODES_SLACK_REPORT'][node] = nodeInst.slackReportInfo  
-            
-            
-            
+
+
             attrs = nodeInst.attrs
             for attr in attrs:
                 attrData = nodeInst.attrsData[attr]
@@ -1374,9 +1370,8 @@ class Nodz(QtWidgets.QGraphicsView):
                     if 'newGlobalVarInfo' in vars(node):
                         if data['NODES_NEW_GLOBAL_VAR'] is not None:
                             node.newGlobalVarInfo  = data['NODES_NEW_GLOBAL_VAR'][name] #type:ignore
-                            
-            
-                        
+
+
             if 'IF_STATEMENT' in data:
                 if name in data['IF_STATEMENT']:
                     if 'ifStatementInfo' in vars(node):
@@ -1888,7 +1883,6 @@ class NodeScene(QtWidgets.QGraphicsScene):
                 connection.updatePath()
             elif connection.target is None or connection.source is None:
                 connection._remove()
-                
 
 
 class NodeItem(QtWidgets.QGraphicsItem):
@@ -2749,23 +2743,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
         Emit a signal.
         """
         
-        # if self.nodePreset == 'acquisition':
-        #     dialog = nodz_openMDADialog(parentData=self.scene().views()[0])
-        #     if dialog.exec_() == QDialog.Accepted:
-        #         logging.info(dialog.getInputs())
-        #     logging.info('hmm')
-        # else:
-        #     #Open a Dialog on double click
-        #     dialog = FoVFindImaging_singleCh_configs(parentData=self.scene().views()[0])
-        #     #Get the outputs from the dialog
-        #     if dialog.exec_() == QDialog.Accepted:
-        #         logging.info(dialog.getInputs())
-        #     #     text, combo_value = dialog.getInputs()
-        #     #     logging.info("Text:", text)
-        #     #     logging.info("Combo Value:", combo_value)
-        
-        # # #Update the node text from this dialog output:
-        # self.scene().parent().editNodeDisplayText(self, newDisplayText=str(dialog.getInputs())) #type:ignore
         
         super(NodeItem, self).mouseDoubleClickEvent(event)
         self.scene().parent().signal_NodeDoubleClicked.emit(self.name,event.pos())#type:ignore

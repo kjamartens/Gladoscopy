@@ -7,8 +7,7 @@ How to run a live-mode profile, interpret the output, and what to do next.
 ## 1. Prerequisites
 
 ```
-conda activate GladosEnv        # or: source .venv/Scripts/activate
-make dev                        # editable install with dev extras
+make dev                        # creates .venv, editable install with dev extras
 ```
 
 No hardware is required — the pymmcore-plus bundled demo camera is used.

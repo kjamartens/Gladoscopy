@@ -81,6 +81,8 @@ def apply_to_shared_data(shared_data, token: str, secret: str, channel: str) -> 
     cfg.slack_token = token
     cfg.slack_secret = secret
     cfg.slack_channel = channel
+    from glados_pycromanager.notify.slack import make_slack_client
+    cfg.slack_client = make_slack_client(token)
     logger.info(
         "Slack settings updated (token=%s, channel=%s)",
         "set" if token else "empty",

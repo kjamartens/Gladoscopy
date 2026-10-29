@@ -11,24 +11,18 @@ import json
 import logging
 import os
 import random
-import re
 import sys
-import tempfile
 import time
-import webbrowser
 from datetime import datetime
 
 import appdirs
 import napari
 import numpy as np
 import pyperclip
-import tifffile
 from glados_pycromanager.lazy_imports import ndtiff  # imports on first use (dask)
-from PIL import Image
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import (
     QObject,
-    QRunnable,
     QSize,
     Qt,
     QThreadPool,
@@ -38,7 +32,6 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QColor, QFont, QIcon, QTextCursor
 from PyQt5.QtWidgets import (
     QAction,
-    QApplication,
     QCheckBox,
     QColorDialog,
     QComboBox,
@@ -54,7 +47,6 @@ from PyQt5.QtWidgets import (
     QLabel,
     QLineEdit,
     QMenu,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -77,15 +69,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 import glados_pycromanager.GUI.nodz.nodz_main as NodzMain
 import glados_pycromanager.GUI.nodz.nodz_utils as nodz_utils
 import glados_pycromanager.GUI.utils as utils
 from glados_pycromanager.autonomous import recipe_io
 from glados_pycromanager.autonomous.executor import (
     FlowchartExecutorMixin,
-    WorkerSignals,
-    generalNodzCallActionWorker,
 )
 from glados_pycromanager.autonomous.types import GladosGraph
 from glados_pycromanager.AutonomousMicroscopy.Analysis_Measurements import *
@@ -93,13 +82,6 @@ from glados_pycromanager.AutonomousMicroscopy.CustomFunctions import *
 from glados_pycromanager.AutonomousMicroscopy.Real_Time_Analysis import *
 from glados_pycromanager.Core.MDAGlados import MDAGlados
 from glados_pycromanager.GUI.MMcontrols import ConfigInfo, MMConfigUI
-from glados_pycromanager.GUI.nodz import nodz_utils
-from glados_pycromanager.GUI.slack_settings_dialog import (
-    SlackSettingsDialog,
-)
-from glados_pycromanager.GUI.slack_settings_dialog import (
-    apply_to_shared_data as _apply_slack_settings,
-)
 
 #endregion
 
@@ -351,17 +333,6 @@ class nodz_realTimeAnalysisDialog(AnalysisScoringVisualisationDialog):
                 self.visualisationBox.setChecked(True)
 
             utils.preLoadOptions_realtime(self.mainLayout,currentNode.real_time_analysis_currentData) #type:ignore
-
-class nodz_analysisMeasurementDialog(nodz_analysisDialog):
-    """
-    A Dialog that is created for analysis methods in the Nodz layout. Basically based on EVE's flexible file-finding function methodology.
-    """
-    def __init__(self, parent=None, currentNode=None):
-        """
-        Dummy init function.
-        """
-        super().__init__(parent, currentNode)
-        self.setWindowTitle("Analysis Measurement Options")
 
 class nodz_openInlineScriptDialog(QDialog):
     """
@@ -649,41 +620,6 @@ class nodz_openTimerDialog(nodz_generalAdvancedLineEditDialog):
                         internalName='timerDialog',
                         advLineEdits=[{'Time to wait (s):':['wait_time','Value']}],
                         storeVarName='timerInfo')
-    #     """
-    #     Initializes the TimerDialog.
-        
-    #     Args:
-    #         parentNode: The parent node of the TimerDialog. If provided, the timerInfo will be set to the timerInfo of the parentNode.
-        
-    #     Returns:
-    #         None
-    #     """
-    #     super().__init__(None)
-    #     self.setWindowTitle("Timer Dialog")
-    #     self.timerInfo = 0
-    #     if parentNode is not None:
-    #         from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow, QWidget
-    #         self.timerInfo = parentNode.timerInfo
-
-    #     button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-    #     button_box.accepted.connect(self.accept)
-    #     button_box.rejected.connect(self.reject)
-        
-    #     # Create the QVBoxLayout
-    #     layout = QVBoxLayout()
-
-    #     # Create a QWidget to contain the QGridLayout
-    #     entryVal = QDoubleSpinBox()
-    #     entryVal.setDecimals(2)
-    #     entryVal.setSingleStep(0.1)
-    #     entryVal.setValue(self.timerInfo)
-    #     entryVal.valueChanged.connect(lambda value: setattr(self, 'timerInfo', value))
-    #     # Add the QMainWindow to the QVBoxLayout
-    #     layout.addWidget(entryVal)
-
-    #     layout.addWidget(button_box)
-        
-    #     self.setLayout(layout)
 
 
 class nodz_openMMConfigDialog(QDialog):
@@ -1254,62 +1190,6 @@ class nodz_caseSwitchDialog(QDialog):
                 self.lineEdits.append(lineEdit)
 
 
-
-class FoVFindImaging_singleCh_configs(QDialog):
-    """
-    I BELIEVE DEPRECATED (may 2024)
-    Advanced dialog for user to input the configuration for a single channel single FOV imaging experiment.
-    """
-    def __init__(self, parent=None, parentData=None):
-        """
-        I BELIEVE DEPRECATED (may 2024)
-        Advanced dialog for user to input the configuration for a single channel single FOV imaging experiment.
-
-        Args:
-            parent (QWidget): The parent widget for this dialog. Defaults to None.
-            parentData: The data object for this app. Defaults to None.
-
-        Returns:
-            mdaData: The mdaData object with all the user input.
-        """
-        super().__init__(parent)
-        
-        self.setWindowTitle("Advanced Input Dialog")
-        if parentData is not None:
-            core = parentData.core
-            
-            
-            # Get all config groups
-            allConfigGroups={}
-            nrconfiggroups = np.size(self.core.get_available_config_groups())
-            for config_group_id in range(nrconfiggroups):
-                allConfigGroups[config_group_id] = ConfigInfo(core,config_group_id)
-            
-            #Create the MM config via all config groups
-            self.MMconfig = MMConfigUI(allConfigGroups, showConfigs = True,showStages=False,showROIoptions=False,showLiveSnapExposureButtons=False,number_config_columns=5,changes_update_MM = False, showCheckboxes=True,autoSaveLoad=False)
-            
-            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-            button_box.accepted.connect(self.accept)
-            button_box.rejected.connect(self.reject)
-                
-            #Set the layout
-            layout = QVBoxLayout()
-            layout.addLayout(self.MMconfig.mainLayout)
-            layout.addWidget(button_box)
-            
-            self.setLayout(layout)
-        
-    def getInputs(self):
-        """
-        Get the UI configuration information.
-        
-        Args:
-            onlyChecked (bool): A boolean flag indicating whether to return only the checked UI configuration information.
-        
-        Returns:
-            dict: A dictionary containing the UI configuration information.
-        """
-        return self.MMconfig.getUIConfigInfo(onlyChecked=True)
 #endregion
 
 #region NodzHelperClasses
@@ -1386,19 +1266,6 @@ class NodeSignalManager(QObject):
         setattr(self, signal_name, eval('self.new_signal'))
         self.signals.append(eval('self.new_signal'))
         
-
-    def print_signals(self):
-        """
-        Prints all the signals managed by this class.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-        for signal in self.signals:
-            logging.info(signal)
 
     def emit_all_signals(self):
         """
@@ -1532,15 +1399,6 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         self.buttonsArea.addWidget(self.slackSettingsButton)
         self.slackSettingsButton.clicked.connect(lambda _: self.openSlackSettingsDialog())
         
-        # self.runScoringPlusAcqButton = QPushButton('Run Scoring + Acq')
-        # self.buttonsArea.addWidget(self.runScoringPlusAcqButton)
-        # self.runScoringPlusAcqButton.clicked.connect(lambda index: self.runScoring())
-        
-        # self.debugScoringButton = QPushButton('Debug Scoring')
-        # self.buttonsArea.addWidget(self.debugScoringButton)
-        # self.debugScoringButton.clicked.connect(lambda index: self.debugScoring())
-        
-        #Push buttons to top
         self.buttonsArea.addStretch()
         
         self.globalVariables={}
@@ -1590,85 +1448,6 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         
         self.helpGroupBox = utils.HelpGroupBox(self.parent).helpGroupBox
         
-        # def quickStartMenu(self):
-        #     """
-        #     Shows the UserManual.md file
-        #     """
-        #     try:
-        #         quickStartWindow = utils.SmallWindow(self)
-        #         QApplication.processEvents()
-        #         quickStartWindow.setWindowTitle('Quick start / User Manual')
-        #         QApplication.processEvents()
-                
-        #         if is_pip_installed():
-        #             package_path = os.path.dirname(glados_pycromanager.__file__)
-        #             quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
-        #         else:
-        #             try:
-        #                 quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
-        #             except Exception as e:
-        #                 logging.info(f'TryException: {e}')
-        #                 quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
-        #         QApplication.processEvents()
-        #         quickStartWindow.show()
-        #     except Exception as e:
-        #         logging.error(f'Could not open quick start window. {e}')
-        
-        # def developerMenu(self):
-        #     """
-        #     Shows the DeveloperManual.md file
-        #     """
-        #     try:
-        #         quickStartWindow = utils.SmallWindow(self)
-        #         QApplication.processEvents()
-        #         quickStartWindow.setWindowTitle('Developer manual')
-        #         QApplication.processEvents()
-                
-        #         if is_pip_installed():
-        #             package_path = os.path.dirname(glados_pycromanager.__file__)
-        #             quickStartWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
-        #         else:
-        #             try:
-        #                 quickStartWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
-        #             except Exception as e:
-        #                 logging.info(f'TryException: {e}')
-        #                 quickStartWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
-        #         QApplication.processEvents()
-        #         quickStartWindow.show()
-        #     except Exception as e:
-        #         logging.error(f'Could not open developer menu. {e}')
-        
-        # def DeveloperAdvMenu(self):
-        #     """
-        #     Shows the Documentation .html files file
-        #     """
-        #     try:
-        #         if is_pip_installed():
-        #             package_path = os.path.dirname(glados_pycromanager.__file__)
-        #             htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
-        #         else:
-        #             htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
-                
-        #         webbrowser.open('file://' + os.path.realpath(htmlPath))
-        #     except Exception as e:
-        #         logging.error(f'Could not open the developer advanced info. {e}')
-                
-        # self.helpGroupBox = QGroupBox("Help")
-        # newgridlayout = QGridLayout()
-        # self.helpGroupBox.setLayout(newgridlayout)
-        # #Add a User Manual Button:
-        # newgridlayout.addWidget(QLabel('Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!'))
-        # button1 = QPushButton('User Manual')
-        # button1.clicked.connect(lambda index: quickStartMenu(self))
-        # newgridlayout.addWidget(button1)
-        # button2 = QPushButton('Developer Manual')
-        # button2.clicked.connect(lambda index: developerMenu(self))
-        # newgridlayout.addWidget(button2)
-        # button3 = QPushButton('Complete software info')
-        # button3.clicked.connect(lambda index: DeveloperAdvMenu(self))
-        # newgridlayout.addWidget(button3)
-        
-        # Create a QGraphicsView 
         self.graphics_view = CustomGraphicsView()
         super().__init__(parent=self.graphics_view)
         self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -1849,19 +1628,6 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         self.nodeInfo['customFunction']['startAttributes'] = ['Function start']
         self.nodeInfo['customFunction']['finishedAttributes'] = ['Finished']
         
-        # self.nodeInfo['analysisShapes'] = self.singleNodeTypeInit()
-        # self.nodeInfo['analysisShapes']['name'] = 'analysisShapes'
-        # self.nodeInfo['analysisShapes']['displayName'] = 'Analysis [Shapes]'
-        # self.nodeInfo['analysisShapes']['startAttributes'] = ['Analysis start']
-        # self.nodeInfo['analysisShapes']['finishedAttributes'] = ['Finished']
-        # self.nodeInfo['analysisShapes']['dataAttributes'] = ['Output']
-        
-        # self.nodeInfo['analysisImages'] = self.singleNodeTypeInit()
-        # self.nodeInfo['analysisImages']['name'] = 'analysisImages'
-        # self.nodeInfo['analysisImages']['displayName'] = 'Analysis [Images]'
-        # self.nodeInfo['analysisImages']['startAttributes'] = ['Analysis start']
-        # self.nodeInfo['analysisImages']['finishedAttributes'] = ['Finished']
-        # self.nodeInfo['analysisImages']['dataAttributes'] = ['Output']
         
         self.nodeInfo['scoringStart'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringStart']['name'] = 'scoringStart'
@@ -1870,13 +1636,6 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         self.nodeInfo['scoringStart']['MaxNodeCounter'] = 1
         self.nodeInfo['scoringStart']['NodeSize'] = 60
         
-        # self.nodeInfo['scoringEnd'] = self.singleNodeTypeInit()
-        # self.nodeInfo['scoringEnd']['name'] = 'scoringEnd'
-        # self.nodeInfo['scoringEnd']['displayName'] = 'Scoring end'
-        # self.nodeInfo['scoringEnd']['startAttributes'] = ['End']
-        # self.nodeInfo['scoringEnd']['bottomAttributes'] = ['Report']
-        # self.nodeInfo['scoringEnd']['MaxNodeCounter'] = 1
-        # self.nodeInfo['scoringEnd']['NodeSize'] = 60
         
         self.nodeInfo['scoringEndVar'] = self.singleNodeTypeInit()
         self.nodeInfo['scoringEndVar']['name'] = 'scoringEndVar'
@@ -2042,9 +1801,8 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             },
-            
-            
-            
+
+
             "acquisition": {
                 "bg": [79, 79, 183, 255],
                 "border": [50, 50, 50, 255],
@@ -2169,9 +1927,8 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 "border_sel": [170, 80, 80, 255],
                 "text": [180, 180, 240, 255]
             }
-            
-            
-            
+
+
         }''')
         self.addConfig(self.nodeLayout)
     
@@ -3357,15 +3114,6 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
         #crashed on the standalone app's MIL; the shared helper handles every backend.
         return utils.getCoreDevicesOfDeviceType(self.shared_data.MILcore, devicetype)
 
-    def PlugOrSocketConnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
-        """
-        Handle when a plug or socket is connected.
-
-        When a plug or socket is connected, this function is called. It will check if the destination
-        node should be marked as 'started' or 'finished' based on the attributes connected.
-        """
-        logging.debug(f"plug/socket connected start: {srcNodeName}, {plugAttribute}, {dstNodeName}, {socketAttribute}")
-    
     def PlugOrSocketDisconnected(self,srcNodeName, plugAttribute, dstNodeName, socketAttribute):
         """
         Handle when a plug or socket is disconnected.
@@ -3429,9 +3177,8 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                             if ndtiff.NDTiffDataset in inputOfFunction['type']: #type:ignore
                                 if ndtiff.NDTiffDataset in shortestConnectedAcquisition.variablesNodz['data']['type']:
                                     dstNode.scoring_analysis_currentData[lineEditVarName] = 'data@'+shortestConnectedAcquisition.name #type:ignore
-                                
-        
-        
+
+
         #Check if all are non-Nones:
         logging.debug('socket connected')
         self.checkNodesOnErrors()
@@ -3468,13 +3215,6 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                 except (TypeError, RuntimeError):
                     #Otherwise we FULLY reset the signal?
                     logging.debug('attempted to disconnect a disconnected signal')
-                    # nodeType = self.nodeLookupName_withoutCounter(node.name)
-                    # if len(self.nodeInfo[nodeType]['finishedAttributes']) > 0:
-                    #     node.customFinishedEmits = NodeSignalManager()
-                    #     for attr in self.nodeInfo[nodeType]['finishedAttributes']:
-                    #         node.customFinishedEmits.add_signal(attr) #type: ignore
-                    # else:
-                    #     node.customFinishedEmits = None
             
             if node.customDataEmits is not None and len(node.customDataEmits.signals)>0:
                 signal = node.customDataEmits.signals[0] #type: ignore
@@ -3483,15 +3223,6 @@ class GladosNodzFlowChart_dockWidget(FlowchartExecutorMixin, NodzMain.Nodz):
                     signal.disconnect()
                 except (TypeError, RuntimeError):
                     logging.warning('attempted to disconnect a disconnected signal')
-                    # nodeType = self.nodeLookupName_withoutCounter(node.name)
-                    # if len(self.nodeInfo[nodeType]['dataAttributes']) > 0:
-                    #     node.customDataEmits = NodeSignalManager()
-                    #     for attr in self.nodeInfo[nodeType]['dataAttributes']:
-                    #         node.customDataEmits.add_signal(attr) #type: ignore
-                    # else:
-                    #     node.customDataEmits = None
-            
-        #Create all required signal connections
         currentgraph = self.evaluateGraph()
         for connection in currentgraph:
             plugAttribute = connection[0][connection[0].rfind('.')+1:]
@@ -4795,9 +4526,6 @@ class VariablesBase(QWidget):
                 textEntry = 'None'
             self.selected_entry.append(textEntry)
     
-    def get_selected_entry(self):
-        return getattr(self, 'selected_entry', None)
-    
     def _acceptsType(self, variableTypes):
         """Does a variable of `variableTypes` pass this table's type filter?"""
         if self.typeInfo is None: #if no typing specified, accept everything
@@ -4877,9 +4605,8 @@ class VariablesDialog(QDialog, VariablesBase):
         #Update the variables
         variablesWidget.updateVariables()
         self.layout().addWidget(variablesWidget)
-        
-        
-        
+
+
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)

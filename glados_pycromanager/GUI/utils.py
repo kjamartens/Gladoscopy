@@ -1,7 +1,6 @@
 #region imports
 import ast
 import collections
-import datetime
 import importlib
 import importlib.machinery
 import importlib.util
@@ -10,25 +9,19 @@ import json
 import logging
 import os
 import re
-import shutil
 import sys
 import textwrap
 import time
 import warnings
-import webbrowser
 from dataclasses import dataclass, fields
-from typing import Any
 
-import appdirs
-import markdown
 import numpy as np
 from PyQt5.QtCore import QSize, Qt
 
 #Imports for PyQt5 (GUI)
 from PyQt5.QtGui import QColor, QFontMetrics, QIcon, QPainter, QPen
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebEngineWidgets import QWebEngineView  # noqa: F401 - must load before the QApplication exists
 from PyQt5.QtWidgets import (
-    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -36,7 +29,6 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLayout,
     QLineEdit,
     QMainWindow,
     QPushButton,
@@ -53,29 +45,16 @@ from PyQt5.QtWidgets import (
 if 'glados_pycromanager' not in sys.modules and 'site-packages' not in __file__:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import glados_pycromanager.AutonomousMicroscopy.MainScripts.HelperFunctions
-import glados_pycromanager.Core.microscopeInterfaceLayer as MIL
 from glados_pycromanager.autonomous import registry as _node_registry
+from glados_pycromanager.docs_links import (
+    API_REFERENCE_PAGE,
+    USER_GUIDE_PAGE,
+    WRITING_NODES_PAGE,
+    open_docs,
+)
 from glados_pycromanager.errors import NodeDispatchError
 
 #endregion
-
-# Phase 7.1/7.2: body moved to `glados_pycromanager.io.appdata`; shim
-# kept here for back-compat with one-time DeprecationWarning per call.
-import warnings as _shim_warnings_cleanup  # noqa: E402
-
-from glados_pycromanager.io import appdata as _appdata_cleanup  # noqa: E402
-
-
-def cleanUpTemporaryFiles(mainFolder="./", shared_data=None):
-    _shim_warnings_cleanup.warn(
-        "cleanUpTemporaryFiles() has moved to glados_pycromanager.io.appdata."
-        "cleanUpTemporaryFiles; the GUI.utils re-export is scheduled for "
-        "removal in Phase 18.1 of claude_project.md.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _appdata_cleanup.cleanUpTemporaryFiles(mainFolder, shared_data)
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -307,12 +286,6 @@ def optKwargsFromFunction(functionname):
     if entry is None:
         return []
     return [kwarg['name'] for kwarg in entry.get('optional_kwargs', [])]
-
-def classKwargValuesFromFittingFunction(functionname, class_type):
-    #Get all kwarg info
-    allkwarginfo = kwargsFromFunction(functionname)
-    derivedClasses = []
-    return derivedClasses
 
 #Obtain the kwargs from a function. Results in an array with entries
 def kwargsFromFunction(functionname):
@@ -547,19 +520,6 @@ def createFunctionWithArgs_str_for_display(functionname,*args):
     return fullstring
 
 
-def createFunctionWithArgs(functionname,*args):
-    """Deprecated. Use ``createFunctionWithArgs_str_for_display``."""
-    import warnings
-    warnings.warn(
-        "utils.createFunctionWithArgs is a display-only helper now; "
-        "eval'ing its result is unsafe — use "
-        "glados_pycromanager.autonomous.registry.dispatch_from_eval_text instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return createFunctionWithArgs_str_for_display(functionname, *args)
-
-
 #Build a display-only string for "Module.Function(kw1=v1, kw2=v2, ...)".
 #Phase 9.6: renamed from createFunctionWithKwargs. Same notes as above.
 def createFunctionWithKwargs_str_for_display(functionname,**kwargs):
@@ -572,19 +532,6 @@ def createFunctionWithKwargs_str_for_display(functionname,**kwargs):
         idloop+=1
     fullstring = fullstring+")"
     return fullstring
-
-
-def createFunctionWithKwargs(functionname,**kwargs):
-    """Deprecated. Use ``createFunctionWithKwargs_str_for_display``."""
-    import warnings
-    warnings.warn(
-        "utils.createFunctionWithKwargs is a display-only helper now; "
-        "eval'ing its result is unsafe — use "
-        "glados_pycromanager.autonomous.registry.dispatch_from_eval_text instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return createFunctionWithKwargs_str_for_display(functionname, **kwargs)
 
 
 def defaultValueFromKwarg(functionname,kwargname):
@@ -615,59 +562,6 @@ def motherFunctionFromFunctionName(functionname):
 
 def daughterFunctionsFromFunctionName(functionname):
     return functionname.split('.')[1]
-
-def createGridFromFunction(functionname):
-    #Idea: get all arg and kwarg info, and create a QGridLayout that contains these info, and line-edits, or dropdowns, or checkboxes, etc.
-    
-    #Create a gridLayout with labels and line-edits, dropdowns or checkboxes based on the function's metadata:
-    motherFunctionMetadata = _node_metadata(motherFunctionFromFunctionName(functionname))
-    functionMetadata = motherFunctionMetadata[daughterFunctionsFromFunctionName(functionname)]
-    gridLayout = QGridLayout()
-    current_row = 0
-    for k in range(0,len(functionMetadata["required_kwargs"])):
-        gridLayout.addWidget(QLabel(functionMetadata["required_kwargs"][k]["name"]),current_row,0)
-        #First check if there is a type key in this req kwargs metadata:
-        if "type" in functionMetadata["required_kwargs"][k]:
-            if functionMetadata["required_kwargs"][k]["type"] == "bool":
-                checkbox = QCheckBox()
-                defaultValue = defaultValueFromKwarg(functionname,functionMetadata["required_kwargs"][k])
-                if defaultValue != None:
-                    checkbox.setChecked(defaultValue)
-                gridLayout.addWidget(checkbox,current_row,1)
-            if functionMetadata["required_kwargs"][k]["type"] == "int" or functionMetadata["required_kwargs"][k]["type"] == "float":
-                lineEdit = QLineEdit()
-                gridLayout.addWidget(lineEdit,current_row,1)
-            if functionMetadata["required_kwargs"][k]["type"] == "str":
-                lineEdit = QLineEdit()
-                gridLayout.addWidget(lineEdit,current_row,1)
-        else: #if there is no type key, assume it is a string
-            lineEdit = QLineEdit()
-            gridLayout.addWidget(lineEdit,current_row,1)
-        current_row+=1
-    for k in range(0,len(functionMetadata["optional_kwargs"])):
-        gridLayout.addWidget(QLabel(functionMetadata["optional_kwargs"][k]["name"]),current_row,0)
-        if "type" in functionMetadata["optional_kwargs"][k]:
-            if functionMetadata["optional_kwargs"][k]["type"] == "bool":
-                checkbox = QCheckBox()
-                defaultValue = defaultValueFromKwarg(functionname,functionMetadata["optional_kwargs"][k])
-                if defaultValue != None:
-                    checkbox.setChecked(defaultValue)
-                gridLayout.addWidget(checkbox,current_row,1)
-            if functionMetadata["optional_kwargs"][k]["type"] == "int" or functionMetadata["optional_kwargs"][k]["type"] == "float":
-                lineEdit = QLineEdit()
-                defaultValue = defaultValueFromKwarg(functionname,functionMetadata["optional_kwargs"][k])
-                if defaultValue != None:
-                    lineEdit.setText(str(defaultValue))
-                gridLayout.addWidget(lineEdit,current_row,1)
-            else: #if there is no type key, assume it is a string
-                lineEdit = QLineEdit()
-                gridLayout.addWidget(lineEdit,current_row,1)
-            current_row+=1
-    return gridLayout
-
-
-
-
 
 def displayNamesFromFunctionNames(functionName, polval):
     displaynames = []
@@ -731,7 +625,7 @@ def createValueEditWidget(functionname,kwargname):
     in __function_metadata__) get a QCheckBox instead of a free-text QLineEdit; everything
     else is unchanged. The object name (LineEdit#function#kwarg) is kept identical for both
     widget kinds, since hideAdvVariables()/getFunctionEvalTextFromCurrentData_* only ever key
-    off that name, not the widget class - see docs/rt_analysis_parameters.md.
+    off that name, not the widget class - see docs/developer/rt-analysis-parameters.md.
     """
     if typeFromKwarg(functionname,kwargname) == bool:
         widget = QCheckBox()
@@ -800,16 +694,7 @@ def layout_changedDropdown(curr_layout,current_dropdown,displayNameToFunctionNam
                             # logging.debug(f"2Going to run hideAdvVariables with {child.objectName()}")
                             curr_layout.update()
                             hideAdvVariables(child,current_selected_function=current_selected_function)
-                        
-        
-        
-        # parentObject = curr_layout.parent().parent()
-        # currentSelectedFunction = None
-        # for entry in parentObject.currentData['__displayNameFunctionNameMap__']:
-        #     if entry[0] == parentObject.currentData['__selectedDropdownEntryAnalysis__']:
-        #         currentSelectedFunction = entry[1]
-        #                 if 'ComboBoxSwitch#'+currentSelectedFunction in child.objectName():
-        #                     hideAdvVariables(child)
+
 
 def attemptToEvaluateVariables(value,nodzInfo):
     """
@@ -1469,7 +1354,7 @@ class createGridFromCenterPopUpBox:
         layout = QVBoxLayout()
         #Add two of those rolling integer things to the layout:
         # Create a QSpinBox
-        from PyQt5.QtWidgets import QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QSpinBox
+        from PyQt5.QtWidgets import QDialogButtonBox, QHBoxLayout, QLabel, QSpinBox
         self.SpinBoxRows = QSpinBox()
         self.SpinBoxRows.setRange(1,1000)
         self.SpinBoxRows.setValue(parent.grid_n_rows)
@@ -2021,16 +1906,6 @@ def preLoadOptions_realtime(curr_layout,currentData):
     """
     
     preLoadOptions_analysis(curr_layout,currentData,functionName='comboBox_RTanalysisFunctions',analysisName='__selectedDropdownEntryAnalysis__')
-    # for i in range(curr_layout.count()):
-    #     item = curr_layout.itemAt(i)
-    #     if item.widget() is not None:
-            # child = item.widget()
-            # if child.objectName() in currentData:
-            #     child.setText(str(currentData[child.objectName()]))
-                
-            # #Also set the dropdown to the correct value:
-            # if 'comboBox_RTanalysisFunctions' in child.objectName() and '__selectedDropdownEntryRTAnalysis__' in currentData:
-            #     child.setCurrentText(currentData['__selectedDropdownEntryRTAnalysis__'])
 
 def hideAdvVariables(comboBox,current_selected_function=None,customParentChildren=None):
     """ 
@@ -2214,21 +2089,6 @@ def resetLayout(curr_layout,className):
                                 widget.show()
     
 
-def getMethodDropdownInfo(curr_layout,className):
-    curr_dropdown = []
-    #Look through all widgets in the current layout
-    for index in range(curr_layout.count()):
-        widget_item = curr_layout.itemAt(index)
-        #Check if it's fair to check
-        if widget_item.widget() is not None:
-            widget = widget_item.widget()
-            #If it's the dropdown segment, label it as such
-            if (className in widget.objectName()) and ("Dropdown" in widget.objectName()):
-                curr_dropdown = widget
-    #Return the dropdown
-    return curr_dropdown
-
-
 # Phase 7.3: file-dialog helpers moved to ui.widgets.builders. Shim.
 from glados_pycromanager.ui.widgets.builders import (  # noqa: F401
     generalFileSearchButtonAction,
@@ -2398,11 +2258,6 @@ def makeNodzVariableGetter(reference, nodzInfo, nodeDict=None):
     return lambda: container[variableName]['data']
 
 
-def resolveNodzVariable(reference, nodzInfo, nodeDict=None):
-    """Read the current value of a `name@Origin` Glados-variable reference once."""
-    return makeNodzVariableGetter(reference, nodzInfo, nodeDict)()
-
-
 @dataclass(frozen=True)
 class BoundKwargs:
     """A node's kwargs, resolved once at bind time (T-G2/T-G3).
@@ -2439,9 +2294,9 @@ def bindKwargsFromGUIFunction(methodName, methodKwargNames, methodKwargValues,
 
     ``methodKwargTypes`` is the per-kwarg Value/Variable/Advanced *mode* list
     (the same argument `getEvalTextFromGUIFunction` takes), not a list of Python
-    types. Variable-mode kwargs are resolved through :func:`resolveNodzVariable`;
-    Advanced mode is still unimplemented and falls back to the raw text, exactly
-    as the eval-text path does.
+    types. Variable-mode kwargs are resolved through :func:`makeNodzVariableGetter`;
+    Advanced mode is not implemented here (it is on the eval-text path, via
+    :func:`advancedKwargToEvalExpr`) and falls back to the raw text.
 
     Returns a :class:`BoundKwargs` (call ``.resolve()`` for the dict to splat into
     the node), or None when a required kwarg has no value — logging the same error
@@ -2524,7 +2379,7 @@ def _rtAnalysisKwargsFromCurrentData(function, currentData, modeAware=True):
 
     `currentData` is keyed by widget object name (`LineEdit#<function>#<kwarg>`,
     `LineEditVariable#...`, `LineEditAdv#...`, `ComboBoxSwitch#...`) - see
-    Documentation/rt_analysis_parameters.md. Which of the three parallel input
+    docs/developer/rt-analysis-parameters.md. Which of the three parallel input
     widgets is authoritative for a kwarg is decided by that kwarg's
     `ComboBoxSwitch` value (Value / Variable / Advanced).
 
@@ -2571,116 +2426,6 @@ def _rtAnalysisKwargsFromCurrentData(function, currentData, modeAware=True):
 
     return methodName, kwargNames, kwargValues, kwargModes
 
-
-def getFunctionEvalTextFromCurrentData_RTAnalysis_init(function,currentData):
-    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
-    if methodName_method == '':
-        return None
-    #note that RT analysis methods do not have an input, thus we skipInput.
-    return getEvalTextFromGUIFunction(methodName_method, names, values,
-                                      partialStringStart='core=core',
-                                      methodKwargTypes=modes, skipInput=True)
-
-
-def getFunctionEvalTextFromCurrentData_RTAnalysis_run(function,currentData,p1,p2,pshared_data,p3):
-    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
-    if methodName_method == '':
-        return None
-    evalText = getEvalTextFromGUIFunction(
-        methodName_method, names, values,
-        partialStringStart=str(p1) + ',' + str(p2) + ',' + str(pshared_data) + ',' + str(p3),
-        methodKwargTypes=modes, skipInput=True)
-    return evalText.replace(methodName_method, '.run') if evalText is not None else None
-
-
-def getFunctionEvalTextFromCurrentData_RTAnalysis_end(function,currentData,p1):
-    methodName_method, names, values, modes = _rtAnalysisKwargsFromCurrentData(function, currentData)
-    if methodName_method == '':
-        return None
-    evalText = getEvalTextFromGUIFunction(methodName_method, names, values,
-                                          partialStringStart=str(p1),
-                                          methodKwargTypes=modes, skipInput=True)
-    return evalText.replace(methodName_method, '.end') if evalText is not None else None
-
-
-def getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(function,currentData,p1,p2,p3,p4):
-    methodName_method, names, values, _modes = _rtAnalysisKwargsFromCurrentData(
-        function, currentData, modeAware=False)
-    if methodName_method == '':
-        return None
-    evalText = getEvalTextFromGUIFunction(
-        methodName_method, names, values,
-        partialStringStart=str(p1) + ',' + str(p2) + ',' + str(p3) + ',' + str(p4))
-    return evalText.replace(methodName_method, '.visualise') if evalText is not None else None
-
-
-def getFunctionEvalText(layout,p1,p2):
-    #Get the dropdown info
-    moduleMethodEvalTexts = []
-
-    methodKwargNames_method = []
-    methodKwargValues_method = []
-    methodName_method = ''
-    # Iterate over the items in the layout
-    for index in range(layout.count()):
-        item = layout.itemAt(index)
-        widget = item.widget()
-        if widget is not None:#Catching layouts rather than widgets....
-            if ("LineEdit" in widget.objectName()) and widget.isVisibleTo(layout):
-                # The objectName will be along the lines of foo#bar#str
-                #Check if the objectname is part of a method or part of a scoring
-                split_list = widget.objectName().split('#')
-                methodName_method = split_list[1]
-                methodKwargNames_method.append(split_list[2])
-
-                #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
-                methodKwargValues_method.append(widget.text().replace('\\','/'))
-        else:
-            #If the item is a layout instead...
-            if isinstance(item, QLayout):
-                for index2 in range(item.count()):
-                    item_sub = item.itemAt(index2)
-                    widget_sub = item_sub.widget()
-                    if ("LineEdit" in widget_sub.objectName()) and widget_sub.isVisibleTo(layout):
-                        # The objectName will be along the lines of foo#bar#str
-                        #Check if the objectname is part of a method or part of a scoring
-                        split_list = widget_sub.objectName().split('#')
-                        methodName_method = split_list[1]
-                        methodKwargNames_method.append(split_list[2])
-
-                        #Widget.text() could contain a file location. Thus, we need to swap out all \ for /:
-                        methodKwargValues_method.append(widget_sub.text().replace('\\','/'))
-
-                    # add distKwarg choice to Kwargs if given
-                    if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(layout) and 'dist_kwarg' in widget_sub.objectName():
-                        methodKwargNames_method.append('dist_kwarg')
-                        methodKwargValues_method.append(widget_sub.currentText())
-                    # add timeKwarg choice to Kwargs if given
-                    if ("ComboBox" in widget_sub.objectName()) and widget_sub.isVisibleTo(layout) and 'time_kwarg' in widget_sub.objectName():
-                        methodKwargNames_method.append('time_kwarg')
-                        methodKwargValues_method.append(widget_sub.currentText())
-
-    # #If at this point there is no methodName_method, it means that the method has exactly 0 req or opt kwargs. Thus, we simply find the value of the QComboBox which should be the methodName:
-    # if methodName_method == '':
-    #     for index in range(all_layouts.count()):
-    #         item = all_layouts.itemAt(index)
-    #         widget = item.widget()
-    #         if isinstance(widget,QComboBox) and widget.isVisibleTo(self.tab_processing) and className in widget.objectName():
-    #             if className == 'Finding':
-    #                 methodName_method = functionNameFromDisplayName(widget.currentText(),getattr(self,f"Finding_functionNameToDisplayNameMapping{polarity}"))
-    #             elif className == 'Fitting':
-    #                 methodName_method = functionNameFromDisplayName(widget.currentText(),getattr(self,f"Fitting_functionNameToDisplayNameMapping{polarity}"))
-
-    #Function call: get the to-be-evaluated text out, giving the methodName, method KwargNames, methodKwargValues, and 'function Type (i.e. cellSegmentScripts, etc)' - do the same with scoring as with method
-    if methodName_method != '':
-        EvalTextMethod = getEvalTextFromGUIFunction(methodName_method, methodKwargNames_method, methodKwargValues_method,partialStringStart=str(p1)+','+str(p2))
-        #append this to moduleEvalTexts
-        moduleMethodEvalTexts.append(EvalTextMethod)
-
-    if moduleMethodEvalTexts is not None and len(moduleMethodEvalTexts) > 0:
-        return moduleMethodEvalTexts[0]
-    else:
-        return None
 
 _ADVANCED_TOKEN_RE = re.compile(r"\{([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9._%+-]+)\}")
 
@@ -2789,12 +2534,6 @@ def getEvalTextFromGUIFunction(methodName, methodKwargNames, methodKwargValues, 
                         # kwargvalue = nodz_evaluateVar(kwargvalue, nodzInfo)
                         originNodeName = kwargvalue.split('@')[1]
                         variableName = kwargvalue.split('@')[0]
-                        # #Find the correct node
-                        # for node in nodzInfo.nodes:
-                        #     if node.name == originNodeName:
-                        #         #Find the correct variable data
-                        #         varData = node.variablesNodz[variableName]['data']
-                        #         #Set it to this kwarg value - str allways
                         
                         kwargvalue = nodzVariableRefExpr(variableName, originNodeName)
                         ignoreQuotes = True #ignore quotes - use it as a variable, not a string
@@ -2859,11 +2598,6 @@ def _rtAnalysisClassName(rt_analysis_info):
 # `BoundNode.signature` detects, cheaply, instead of re-deriving unconditionally.
 _BOUND_NODE_ATTR = '_glados_bound_node'
 
-# Escape hatch: GLADOS_RT_EVAL_DISPATCH=1 restores the pre-T-G4 eval() dispatch
-# for run/end/visualise. Read once, at import.
-RT_ANALYSIS_USE_EVAL_DISPATCH = os.environ.get('GLADOS_RT_EVAL_DISPATCH', '') == '1'
-
-
 @dataclass(frozen=True)
 class BoundNode:
     """Everything needed to call one RT-analysis node, resolved once.
@@ -2903,7 +2637,7 @@ def buildBoundNode(rt_analysis_info, nodzInfo=None, signature=None):
                                        nodzInfo=nodzInfo, nodeDict=nodeDict)
 
     #The visualisation path deliberately keeps its looser matching and its
-    #skipInput=False - see Documentation/rt_analysis_parameters.md section 4.
+    #skipInput=False - see docs/developer/rt-analysis-parameters.md section 4.
     visMethodName, visNames, visValues, visModes = _rtAnalysisKwargsFromCurrentData(
         className, rt_analysis_info, modeAware=False)
     try:
@@ -2975,8 +2709,6 @@ def realTimeAnalysis_init(rt_analysis_info,core=None, nodzInfo=None):
 
 
 def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
-    if RT_ANALYSIS_USE_EVAL_DISPATCH:
-        return _realTimeAnalysis_run_viaEval(RT_analysis_object, rt_analysis_info, v1, v2, vshared_data, v3, nodzInfo)
     bound = _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo)
     if bound.kwargs is None:
         raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
@@ -2984,8 +2716,6 @@ def realTimeAnalysis_run(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,
 
 
 def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None):
-    if RT_ANALYSIS_USE_EVAL_DISPATCH:
-        return _realTimeAnalysis_end_viaEval(RT_analysis_object, rt_analysis_info, v1, nodzInfo)
     bound = _boundNodeFor(RT_analysis_object, rt_analysis_info, nodzInfo)
     if bound.kwargs is None:
         raise NodeDispatchError(f"RT-analysis node {bound.className!r}: required kwargs are incomplete")
@@ -2993,8 +2723,6 @@ def realTimeAnalysis_end(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None)
 
 
 def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,v4):
-    if RT_ANALYSIS_USE_EVAL_DISPATCH:
-        return _realTimeAnalysis_visualisation_viaEval(RT_analysis_object, rt_analysis_info, v1, v2, v3, v4)
     logging.debug('Attempting to visualise RT Analysis')
     bound = _boundNodeFor(RT_analysis_object, rt_analysis_info)
     if bound.visualisationKwargs is None:
@@ -3002,33 +2730,6 @@ def realTimeAnalysis_visualisation(RT_analysis_object,rt_analysis_info,v1,v2,v3,
     result = RT_analysis_object.visualise(v1, v2, v3, v4, **bound.visualisationKwargs.resolve())
     logging.debug(result)
     return result
-
-
-#region T-G4 fallback: the pre-bind eval() dispatch, kept behind
-#GLADOS_RT_EVAL_DISPATCH=1 for one release so a node that misbehaves under bound
-#dispatch has an escape hatch that does not need a code change.
-def _realTimeAnalysis_run_viaEval(RT_analysis_object,rt_analysis_info,v1,v2,vshared_data,v3, nodzInfo=None):
-    className = _rtAnalysisClassName(rt_analysis_info)
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_run(className,rt_analysis_info,'v1','v2','vshared_data','v3')
-    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None  # noqa: F841 - read by eval
-    return eval("RT_analysis_object" + evalText)  #type:ignore
-
-
-def _realTimeAnalysis_end_viaEval(RT_analysis_object,rt_analysis_info,v1,nodzInfo = None):
-    className = _rtAnalysisClassName(rt_analysis_info)
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_end(className,rt_analysis_info,'v1')
-    nodeDict = createNodeDictFromNodes(nodzInfo.nodes) if nodzInfo is not None else None  # noqa: F841 - read by eval
-    return eval("RT_analysis_object" + evalText)  #type:ignore
-
-
-def _realTimeAnalysis_visualisation_viaEval(RT_analysis_object,rt_analysis_info,v1,v2,v3,v4):
-    className = _rtAnalysisClassName(rt_analysis_info)
-    evalText = getFunctionEvalTextFromCurrentData_RTAnalysis_visualisation(className,rt_analysis_info,'v1','v2','v3','v4')
-    logging.debug('Attempting to visualise RT Analysis')
-    result = eval("RT_analysis_object" + evalText)  #type:ignore
-    logging.debug(result)
-    return result
-#endregion
 
 
 def realTimeAnalysis_getDelay(rt_analysis_info,runOrVis='run'):
@@ -3281,18 +2982,6 @@ class SmallWindow(QMainWindow):
                 pass
         lineedit.setText(LineEditText)
     
-    def addDescription(self,description):
-        #Create a horizontal box layout:
-        layout = QHBoxLayout()
-        #add the description as text, allowing for multi-line text:
-        self.descriptionLabel = QLabel(description)
-        self.descriptionLabel.setWordWrap(True)
-        #Add the label to the layout:
-        layout.addWidget(self.descriptionLabel)
-        #Add the layout to the central widget:
-        self.centralWidget().layout().addLayout(layout) #type:ignore
-        return self.descriptionLabel
-    
     def addButton(self,buttonText="Button"):
         #Create a horizontal box layout:
         layout = QHBoxLayout()
@@ -3304,54 +2993,9 @@ class SmallWindow(QMainWindow):
         self.centralWidget().layout().addLayout(layout) #type:ignore
         return self.button
     
-    def addTextEdit(self,labelText = "Text edit:", preFilledText = ""):
-        #Create a horizontal box layout:
-        layout = QHBoxLayout()
-        #add a label and text edit:
-        self.textEdit = QLineEdit()
-        self.textEdit.setText(preFilledText)
-        #Add the label and text edit to the layout:
-        layout.addWidget(QLabel(labelText))
-        layout.addWidget(self.textEdit)
-        #Add the layout to the central widget:
-        self.centralWidget().layout().addLayout(layout) #type:ignore
-        return self.textEdit
-    
-    #Add a file information label/text/button:
-    def addFileLocation(self, labelText="File location:", textAddPrePeriod = ""):
-        #Create a horizontal box layout:
-        layout = QHBoxLayout()
-        #add a label, line edit and button:
-        self.fileLocationLabel = QLabel(labelText)
-        self.fileLocationLineEdit = QLineEdit()
-        LineEditText = self.parent.dataLocationInput.text()
-        
-        self.addTextPrePriod(self.fileLocationLineEdit,LineEditText,textAddPrePeriod)
-        
-        self.fileLocationButton = QPushButton("...")
-        self.fileLocationButton.clicked.connect(lambda: self.openFileDialog(fileArgs = "All Files (*)")) #type:ignore
-        
-        #Add the label, line edit and button to the layout:
-        layout.addWidget(self.fileLocationLabel)
-        layout.addWidget(self.fileLocationLineEdit)
-        layout.addWidget(self.fileLocationButton)
-        #Add the layout to the central widget:
-        self.centralWidget().layout().addLayout(layout) #type:ignore
-        return self.fileLocationLineEdit
-
-    def addHtml(self, htmlfile, width=700, height=800):
-        # Body moved to glados_pycromanager.ui.markdown_view (Phase 7.4).
-        from glados_pycromanager.ui.markdown_view import add_html_to_window
-
-        add_html_to_window(self, htmlfile, width=width, height=height)
-
-    def addMarkdown(self, mdfile, width=700, height=800):
-        # Body moved to glados_pycromanager.ui.markdown_view (Phase 7.4).
-        from glados_pycromanager.ui.markdown_view import add_markdown_to_window
-
-        add_markdown_to_window(self, mdfile, width=width, height=height)
     
 class HelpGroupBox:
+    """The Help box: author info plus buttons that open the docs site."""
     def __init__(self,parent):
         self.parent = parent
         self.helpGroupBox = QGroupBox("Help")
@@ -3360,89 +3004,15 @@ class HelpGroupBox:
         #Add a User Manual Button:
         newgridlayout.addWidget(QLabel('Glados-Pycromanager\n\nCreated by Dr. Koen J.A. Martens\nkoenjamartens{at}gmail.com\n\nAutonomous microscopy is very much a work in progress!'))
         button1 = QPushButton('User Manual')
-        button1.clicked.connect(lambda index: self.quickStartMenu())
+        button1.clicked.connect(lambda: open_docs(USER_GUIDE_PAGE))
         newgridlayout.addWidget(button1)
         button2 = QPushButton('Developer Manual')
-        button2.clicked.connect(lambda index: self.developerMenu())
+        button2.clicked.connect(lambda: open_docs(WRITING_NODES_PAGE))
         newgridlayout.addWidget(button2)
-        button3 = QPushButton('Complete software info')
-        button3.clicked.connect(lambda index: self.DeveloperAdvMenu())
+        button3 = QPushButton('API reference')
+        button3.clicked.connect(lambda: open_docs(API_REFERENCE_PAGE))
         newgridlayout.addWidget(button3)
-        
-        # I need to store references to the windows so they aren't garbage-collected
-        self.quick_start_window = None
-        self.devMenuWindow = None
-        
-    def quickStartMenu(self):
-        """
-        Shows the UserManual.md file
-        """
-        try:
-            self.quick_start_window = SmallWindow()
-            QApplication.processEvents()
-            self.quick_start_window.setWindowTitle('Quick start / User Manual')
-            QApplication.processEvents()
-            
-            #TODO: check that .MD help file still works
-            # if is_pip_installed():
-            package_path = os.path.dirname(glados_pycromanager.__file__)
-            self.quick_start_window.addMarkdown(os.path.join(package_path, 'Documentation', 'UserManual.md'))
-            # else:
-            #     try:
-            #         self.quick_start_window.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'UserManual.md'))
-            #     except Exception as e:
-            #         logging.info(f'TryException: {e}')
-            #         self.quick_start_window.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'UserManual.md'))
-            QApplication.processEvents()
-            self.quick_start_window.show() #Show
-            self.quick_start_window.raise_() # Bring to the front
-            self.quick_start_window.activateWindow() # Give focus
-        except Exception as e:
-            logging.error(f'Could not open quick start window. {e}')
-    
-    def developerMenu(self):
-        """
-        Shows the DeveloperManual.md file
-        """
-        try:
-            self.devMenuWindow = SmallWindow(self.parent)
-            QApplication.processEvents()
-            self.devMenuWindow.setWindowTitle('Developer manual')
-            QApplication.processEvents()
-            
-            #TODO check if .md help still works
-            # if is_pip_installed():
-            package_path = os.path.dirname(glados_pycromanager.__file__)
-            self.devMenuWindow.addMarkdown(os.path.join(package_path, 'Documentation', 'DeveloperManual.md'))
-            # else:
-            #     try:
-            #         self.devMenuWindow.addMarkdown(os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
-            #     except Exception as e:
-            #         logging.info(f'TryException: {e}')
-            #         self.devMenuWindow.addMarkdown(os.path.join('glados_pycromanager', 'Documentation', 'DeveloperManual.md'))
-            QApplication.processEvents()
-            self.devMenuWindow.show() #Show
-            self.devMenuWindow.raise_() # Bring to the front
-            self.devMenuWindow.activateWindow() # Give focus
-        except Exception as e:
-            logging.error(f'Could not open developer menu. {e}')
-    
-    def DeveloperAdvMenu(self):
-        """
-        Shows the Documentation .html files file in a proper external webbrowser
-        """
-        try:
-            #TODO check if .md help still works
-            # if is_pip_installed():
-            package_path = os.path.dirname(glados_pycromanager.__file__)
-            htmlPath = os.path.join(package_path, 'Documentation', 'index.html')
-            # else:
-            #     htmlPath = (os.path.join('glados-pycromanager', 'glados_pycromanager', 'Documentation', 'index.html'))
-            
-            webbrowser.open('file://' + os.path.realpath(htmlPath))
-        except Exception as e:
-            logging.error(f'Could not open the developer advanced info. {e}')
-    
+
 
 def PushButtonChooseVariableCallBack(line_edit,nodzInfo):
     from glados_pycromanager.GUI.FlowChart_dockWidgets import VariablesDialog
@@ -3511,7 +3081,7 @@ class CustomMainWindow(QWidget):
         # The two `_mda*Timer`s are MDAGlados' T-H1 debounce QTimers; `_mda` is the
         # backing store of its lazy `mda` property (T-H2) -- a JSON-encodable event
         # list, so without this it would be silently written into the state file.
-        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','sectionGrid','xypositionListEditor','channelListEditor','_mdaEventsUpdateTimer','_mdaStateSaveTimer','_mda','_pendingInitialMDAKwargs']
+        self.storingExceptions = ['core','layout','shared_data','gui','mda','mda_useq','data','config_groups','mainLayout','xypositionListWidget_XYGridManager','sectionGrid','xypositionListEditor','channelListEditor','_mdaEventsUpdateTimer','_mdaStateSaveTimer','_mda','_pendingInitialMDAKwargs','_storageBarLayout']
 
     def save_state_globalData(self,filename):
         if os.path.exists(filename):
@@ -3536,7 +3106,7 @@ class CustomMainWindow(QWidget):
         #     if key not in self.storingExceptions:
         #         state['GlobalData'][key] = value['value']
                 
-        from dataclasses import dataclass, fields
+        from dataclasses import fields
         cfg = self.shared_data.config
         for group_field in fields(cfg):
             group = getattr(cfg, group_field.name)
@@ -3799,22 +3369,6 @@ def forceReset(shared_data):
         except concurrent.futures.TimeoutError:
             logging.warning("Function did not complete within 5 seconds and thus quitted")
 
-# Phase 7.1/7.2: body moved to `glados_pycromanager.io.appdata`; shim
-# kept here for back-compat with one-time DeprecationWarning per call.
-import warnings as _shim_warnings_store  # noqa: E402
-
-from glados_pycromanager.io import appdata as _appdata_store  # noqa: E402
-
-
-def storeSharedData_GlobalData(shared_data):
-    _shim_warnings_store.warn(
-        "storeSharedData_GlobalData() has moved to glados_pycromanager.io."
-        "appdata.storeSharedData_GlobalData; the GUI.utils re-export is "
-        "scheduled for removal in Phase 18.1 of claude_project.md.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _appdata_store.storeSharedData_GlobalData(shared_data)
 
 def settingIsTrue(value) -> bool:
     """A boolean setting as stored: a real bool, or 'True'/'False' text from an
@@ -3857,26 +3411,7 @@ def openAdvancedSettings(shared_data):
                         logging.warning("Couldn't save global data of entry %s: %s", f, exc)
         
         
-        # for entry in shared_data.globalData:
-        #     if not 'hidden' in shared_data.globalData[entry] or shared_data.globalData[entry]['hidden'] == False:
-        #         try:
-        #             if shared_data.globalData[entry]['inputType'] == 'lineEdit':
-        #                 shared_data.globalData[entry]['value'] = dialog.findChild(QLineEdit, entry).text()
-        #             elif shared_data.globalData[entry]['inputType'] == 'dropdown':
-        #                 shared_data.globalData[entry]['value'] = dialog.findChild(QComboBox, entry).currentText()
-        #             #Try to make integer/float:
-        #             try:
-        #                 shared_data.globalData[entry]['value'] = float(shared_data.globalData[entry]['value'])
-        #             except:
-        #                 pass
-        #             try:
-        #                 shared_data.globalData[entry]['value'] = int(shared_data.globalData[entry]['value'])
-        #             except:
-        #                 pass
-        #         except:
-        #             logging.warning(f"Couldn't save global data of entry {entry}")
-        
-        #Store in appdata
+        from glados_pycromanager.io.appdata import storeSharedData_GlobalData
         storeSharedData_GlobalData(shared_data)
 
         # Apply log-level change immediately (no restart needed)
@@ -4101,7 +3636,6 @@ def customFunction_outputs_to_variableNodz(currentNode):
             else:
                 currentNode.variablesNodz[output['name']]['importance'] = 'Informative' #type:ignore
             currentNode.variablesNodz[output['name']]['lastUpdateTime'] = None
-            
 
 
 #Int-coded DeviceType -> name, mirroring MMcontrols.py's getDevicesOfDeviceType()
@@ -4218,31 +3752,6 @@ def updateAutonousErrorWarningInfo(shared_data,updateInfo='All'):
             setWarningErrorInfoIcon(warningIcon,'warning',findIconFolder(),alteration='grayscale')
         else:
             setWarningErrorInfoIcon(warningIcon,'warning',findIconFolder(),alteration='none')
-        # errorToolTip = ''
-        # errorToolTip = sharedData.warningErrorInfoInfo['Errors']
-        # if errorToolTip != '':
-        #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='none')
-        #     errorIcon.setToolTip(errorToolTip)
-        # else:
-        #     errorIcon.setToolTip(errorToolTip)
-        #     setWarningErrorInfoIcon(errorIcon,'error',findIconFolder(),alteration='grayscale')
-
-import warnings
-
-# Logger classes/functions moved to glados_pycromanager.observability.logger (Phase 11.1).
-# These shims keep existing callers working without modification.
-from glados_pycromanager.observability.logger import ColoredFormatter as ColoredFormatter
-from glados_pycromanager.observability.logger import set_up_logger as _set_up_logger
-
-
-def set_up_logger():  # type: ignore[override]
-    warnings.warn(
-        "utils.set_up_logger() is deprecated; use "
-        "glados_pycromanager.observability.logger.set_up_logger() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    _set_up_logger()
 
 
 #: Marks a metadata dict whose `Axes` have already been rebuilt from `mda_event`,
@@ -4256,33 +3765,6 @@ def metadata_refactor(metadata, shared_data=None):
     Refactor the metadata to be more consistent and easier to use.
     """
     #Metadata is a dict. This might be received from pycromanager, or from pymmc, or something else. We create a new, somewhat consistent metadata dict.
-    # new_metadata = dict()
-    # if shared_data.MILcore.MI() == MIL.MicroscopeInstance.PYCROMANAGER_JAVA or shared_data.MILcore.MI() == MIL.MicroscopeInstance.PYCROMANAGER_PYTHON:
-    #     new_metadata = metadata
-    # elif shared_data.MILcore.MI() == MIL.MicroscopeInstance.MMCORE_PLUS:
-    #     new_metadata['Time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
-    #     new_metadata['Exposure'] = shared_data.MILcore.core.getExposure()
-    #     new_metadata['ROI'] = shared_data.MILcore.core.getROI()
-    #     new_metadata['PixelSize_um'] = shared_data.MILcore.core.getPixelSizeUm()
-    #     new_metadata['Axes'] = metadata['Axes']
-    #     if 't' in metadata['Axes']:
-    #         new_metadata['Axes']['time'] = metadata['Axes']['t']
-    #         del new_metadata['Axes']['t']
-    # metadata_orig = metadata.copy()  # Keep original metadata for reference
-    # if 'mda_event' in metadata:
-    #     metadata['Axes'] = dict(metadata['mda_event'].index)
-    #     if 't' in metadata['Axes']:
-    #         metadata['Axes']['time'] = metadata['Axes']['t']
-    #         del metadata['Axes']['t']
-    #     if 'c' in metadata['Axes']:
-    #         metadata['Axes']['channel'] = metadata['Axes']['c']
-    #         del metadata['Axes']['c']
-    #     if 'Z' in metadata['Axes']:
-    #         metadata['Axes']['z'] = metadata['Axes']['Z']
-    #         del metadata['Axes']['Z']
-    #     if 'p' in metadata['Axes']:
-    #         metadata['Axes']['position'] = metadata['Axes']['p']
-    #         del metadata['Axes']['p']
     
     key_remapping = {
         't': 'time',

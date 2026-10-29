@@ -1,0 +1,79 @@
+site_name: Glados-pycromanager
+site_description: A napari interface for Micro-Manager, with node-graph autonomous microscopy.
+site_url: https://kjamartens.github.io/Gladoscopy/
+repo_url: https://github.com/kjamartens/Gladoscopy
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: { icon: material/weather-sunny, name: Light mode }
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            show_source: false
+            show_root_heading: true
+            heading_level: 2
+            members_order: source
+            docstring_style: google
+            show_if_no_docstring: false
+            filters: ["!^_"]
+
+# Planning archive and raw performance logs: kept in the repository, not published.
+exclude_docs: |
+  plans/
+  *.txt
+
+# Engineering notes referenced from code comments; reachable by URL, not listed in the nav.
+not_in_nav: |
+  bench-live-display.md
+  perf-runtime-recipe.md
+  lazy-import-strategy.md
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - User guide:
+      - Controls: user-guide/controls.md
+      - Multi-D acquisition: user-guide/mda.md
+      - Autonomous microscopy: user-guide/autonomous.md
+      - Troubleshooting: user-guide/troubleshooting.md
+  - Developer guide:
+      - Writing nodes: developer/writing-nodes.md
+      - Node parameters: developer/rt-analysis-parameters.md
+      - Module map: module-map.md
+      - Architecture decisions:
+          - MIL abstraction: adr/0001-mil-abstraction.md
+          - Plugin discovery: adr/0002-plugin-discovery.md
+          - Shared_data: adr/0003-shared-data.md
+          - Python 3.13: adr/0004-python-313.md
+          - Vendored Nodz: adr/0005-vendored-nodz.md
+      - API reference: developer/api.md
+      - Contributing: developer/contributing.md
+  - Changelog: changelog.md

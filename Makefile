@@ -67,7 +67,7 @@ PACKAGE := glados_pycromanager
 
 .PHONY: help venv install dev build ensure-uv \
         test test-fast test-cov \
-        lint lint-fix format mypy bandit \
+        lint lint-fix format mypy bandit         docs docs-serve \
         shortcuts shortcuts-uninstall \
         run run-dev run-prod run-mm run-demo run-demo-smlm profile-runtime profile-startup profile-startup-full bench-live-display bench-storage \
         ci verify \
@@ -95,8 +95,8 @@ install: .venv ensure-uv  ## Non-editable production install into .venv (no dev 
 	$(PIP) .
 	$(PYTHON) -m glados_pycromanager.install_check stamp
 
-dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .venv if absent).
-	$(PIP) -e ".[dev]"
+dev: .venv ensure-uv  ## Editable install with dev + docs extras into .venv (creates .venv if absent).
+	$(PIP) -e ".[dev,docs]"
 	@$(PYTHON) -c "import diplib" || ( \
 		echo "diplib failed to import after install -- this is usually a Windows locked-file pip reinstall (a stale python.exe, VSCode's Pylance, or an AV scan held PyDIP_bin*.pyd open, so pip renamed the old folder to '~iplib' and left diplib/ a stale/new mix); forcing a clean reinstall..." && \
 		$(PIP) --force-reinstall --no-cache-dir diplib==3.6.0 && \
@@ -108,6 +108,14 @@ dev: .venv ensure-uv  ## Editable install with dev extras into .venv (creates .v
 
 build: ensure-uv  ## Build wheel + sdist into dist/.
 	$(UV) build
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+
+docs:  ## Build the documentation site into site/ (strict: broken links fail).
+	NO_MKDOCS_2_WARNING=1 $(PYTHON) -m mkdocs build --strict
+
+docs-serve:  ## Serve the documentation site with live reload at http://127.0.0.1:8000.
+	NO_MKDOCS_2_WARNING=1 $(PYTHON) -m mkdocs serve
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -196,13 +204,14 @@ run-demo:  ## Launch Glados against the pymmcore-plus bundled demo install + MMC
 
 # run-demo-smlm: same headless-bypass mechanism as run-mm, but the values come from
 # demo_settings.mk instead of the command line — edit that file, not this recipe.
+# It is per-machine and git-ignored: copy demo_settings.mk.example to start one.
 # Leading `-` so a missing file is not a hard parse error; the guard below then
 # produces a message that names the real problem.
 -include demo_settings.mk
 
 run-demo-smlm:  ## Launch Glados straight into the local demo backend/config from demo_settings.mk (no popup).
 ifeq ($(strip $(DEMO_CONFIG)),)
-	$(error demo_settings.mk not found, or DEMO_CONFIG is unset in it — see demo_settings.mk for the expected variables)
+	$(error demo_settings.mk not found, or DEMO_CONFIG is unset in it — copy demo_settings.mk.example to demo_settings.mk and set your paths)
 endif
 	$(PYTHON) $(PYFLAGS) -m glados_pycromanager.GUI.GUI_napari \
 	    --backend "$(DEMO_BACKEND)" \

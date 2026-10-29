@@ -88,7 +88,7 @@ def register(name: str) -> Callable[[Callable], Callable]:
     return _decorator
 
 
-def dispatch(name: str, *args, **kwargs):
+def dispatch(name: str, *args: Any, **kwargs: Any):
     """Call the registered function ``name`` with the given arguments.
 
     Args:
@@ -239,7 +239,3 @@ def dispatch_from_eval_text(eval_text: str, scope: Mapping[str, Any] | None = No
     return dispatch(func_name, *args, **kwargs)
 
 
-def _reset_for_tests() -> None:
-    """Clear the registry. Test-only — never call from production code."""
-    _REGISTRY.clear()
-    _METADATA_CACHE.clear()

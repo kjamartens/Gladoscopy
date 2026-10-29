@@ -125,9 +125,12 @@ class TestLayerCreationDefaultsToContinuous:
 
         import glados_pycromanager.GUI.napariGlados as napariGlados
 
-        source = inspect.getsource(napariGlados._napariUpdateLive_locked)
-        assert source.count("layer._keep_auto_contrast = True") >= 2, (
-            "expected both the frameByFrame and multiDstack layer-creation "
-            "branches to default to continuous auto-contrast"
-        )
-        assert "layer._keep_auto_contrast = False" not in source
+        # The multiDstack layer is built in _build_mda_layer (at the Acquire
+        # click or on the first frame), the frameByFrame one inline.
+        for fn in (napariGlados._napariUpdateLive_locked, napariGlados._build_mda_layer):
+            source = inspect.getsource(fn)
+            assert "layer._keep_auto_contrast = True" in source, (
+                f"expected {fn.__name__} to default its new layer to continuous "
+                "auto-contrast"
+            )
+            assert "layer._keep_auto_contrast = False" not in source

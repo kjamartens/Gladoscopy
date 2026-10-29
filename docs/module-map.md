@@ -1,139 +1,95 @@
 # Module map
 
-One paragraph per top-level source file. Goal: fast "where do I look?"
-when starting a task. Update this file whenever a module's
-responsibility changes meaningfully. Vendored Nodz internals are
-deliberately not enumerated — see `glados_pycromanager/GUI/nodz/`,
-treated as third-party.
+One line or paragraph per source module: a quick answer to "where do I look?". Update it when a
+module's responsibility changes. The vendored Nodz editor (`GUI/nodz/`) is third-party and not
+listed (see [ADR 0005](adr/0005-vendored-nodz.md)). `CLAUDE.md` at the repository root has the
+architecture notes in depth: the threading model, the frame path, storage, and recipe execution.
 
-Read alongside `CLAUDE.md` (architecture overview), `claude_project.md`
-(active optimization plan), and `docs/adr/` (long-form decisions).
+## Entry points
 
-## Top of the tree
+- **`GUI/startup.py`**: what every console script (`glados`, `gladosw`, …) runs. Creates the only
+  `QApplication`, shows the splash (`GUI/startup_splash.py`), runs the single-instance check
+  (`GUI/single_instance.py`), then calls `GUI_napari.main()`.
+- **`GUI/GUI_napari.py`**: the standalone app. Command-line options, the backend start dialog
+  (`headlessGUI`, validated by `GUI/headless_validation.py`), backend start-up, the napari viewer
+  and the microscope service.
+- **`_dock_widget.py`**: the napari-plugin entry (`napari.yaml`). `MainWidget` connects to a
+  running Micro-Manager (Java backend) and adds the Controls, Multi-D acquisition, Autonomous
+  microscopy and Performance Mode docks, each a `GladosWidget`.
+- **`shortcuts.py`**, **`install_check.py`**, **`win_runtime.py`**: Start Menu shortcuts, the
+  "environment older than `pyproject.toml`" warning, and a Windows DLL-loading fix.
 
-- **`glados_pycromanager/__init__.py`** — package marker. Trivial.
-- **`glados_pycromanager/_dock_widget.py`** — napari-plugin entry point.
-  Constructs `Shared_data`, calls `pycromanager.Core()` directly
-  (assumes a running Java server on port 4827), and adds four dock
-  widgets (`MMConfigWidget`, `MDAWidget`, `AutonomousMicroscopyWidget`,
-  `GladosSlidersWidget`), each derived from `GladosWidget`. Sibling of
-  the standalone path in `GUI/GUI_napari.py`.
+## `Core/`: the microscope
 
-## `Core/` — backend abstraction
+- **`microscopeInterfaceLayer.py`**: `MicroscopeInterfaceLayer` (MIL), the one interface over the
+  three backends (`PYCROMANAGER_JAVA`, `PYCROMANAGER_PYTHON`, `MMCORE_PLUS`). All microscope access
+  goes through it; every hardware method holds a per-instance lock.
+- **`microscope_service.py`**: `MicroscopeService`, the single thread that owns the MIL, and
+  `MicroscopeProxy`, which keeps MIL's synchronous API for callers on other threads.
+- **`MDAGlados.py`**: the Multi-D acquisition panel and acquisition start (also used by the
+  recipe's Acquisition node).
 
-- **`Core/microscopeInterfaceLayer.py`** (~670 LOC). `MicroscopeInterfaceLayer`
-  (alias `MIL`) is the abstraction over the three backends
-  (`PYCROMANAGER_JAVA`, `PYCROMANAGER_PYTHON`, `MMCORE_PLUS`). Every
-  call into Micro-Manager from elsewhere in the codebase should go
-  through MIL. Backend choice is set once via `set_core()`.
-- **`Core/MDAGlados.py`** (~1 860 LOC). Multi-dimensional acquisition
-  layer; talks to MIL. Builds event lists, runs them, and emits
-  signals. Pure-Python event-list construction is a good target for
-  unit tests (Phase 5.7).
+## `GUI/`: Qt and napari
 
-## `GUI/` — Qt + napari surface
+- **`napariGlados.py`**: `napariHandler`, live mode and MDA display, the frame path into napari,
+  the zarr display store, and the startup window layout.
+- **`MMcontrols.py`**: the Controls dock (`MMConfigUI`, `ConfigInfo`): live/snap, shutter, ROI,
+  configuration groups, stages, scripts.
+- **`config_group_editor.py`**, **`device_property_browser.py`**: the two dialogs opened from the
+  Configurations section.
+- **`rt_analysis_panel.py`**: the Real-time analysis section of the Controls dock.
+- **`FlowChart_dockWidgets.py`**: the Autonomous microscopy dock: the Nodz graph, the node dialogs,
+  and the Decision, Scanning and Variables tabs.
+- **`AnalysisClass.py`**: real-time analysis threads, the subprocess-isolated variant, and their
+  visualisation threads. **`subprocess_pool.py`** pre-spawns a worker process.
+- **`layer_group.py`**: multi-layer output of real-time analysis nodes.
+  **`rt_history.py`** / **`rt_replay.py`**: stored results, replayed while scrolling a finished
+  acquisition.
+- **`frame_ring.py`**: bounded hand-off buffer from the camera callback to the consumer thread.
+  **`frame_writer.py`**: writer threads for the zarr display store and NDTiff files.
+- **`fast_image_layer.py`**: a napari `Image` layer with a fast path for same-shape 2-D updates.
+- **`napari_bridge.py`**: runs napari changes from worker threads on the GUI thread.
+- **`napariHelperFunctions.py`**: smaller napari helpers (album mode, scale bar).
+- **`sharedFunctions.py`**: `Shared_data`, the state object passed everywhere, and the settings
+  dataclasses (`MDAConfig`, `VisualisationConfig`, `MicroManagerConfig`, …).
+- **`utils.py`**: a large module of helpers: node-metadata access, kwarg widgets and binding, the
+  advanced-settings dialog, the Help box.
+- **`Analysis_dockWidgets.py`**: builds the Controls, Multi-D acquisition and Autonomous docks on
+  the napari-plugin path.
+- **`performance_mode_widget.py`** / **`performance_report_dialog.py`**: Performance Mode
+  (CPU/memory capture).
+- **`slack_settings_dialog.py`**: the Slack settings dialog.
+- **`window_focus.py`**: bring a Glados window to the front on Windows.
 
-- **`GUI/GUI_napari.py`**. Standalone entry (`glados` console
-  scripts). Builds a `headlessGUI` for backend choice, spawns napari,
-  runs `runNapariPycroManager` in a Worker/QThread. Sets
-  `NAPARI_ASYNC=1` / `NAPARI_OCTREE=1` *before* importing napari.
-- **`GUI/sharedFunctions.py`** (~520 LOC, after Phase 2 hygiene). Home
-  of `Shared_data` — the single cross-thread state object — plus the
-  `@dataclass` config groups (`MDAConfig`, `WebhookConfig`,
-  `VisualisationConfig`, `MicroManagerConfig`), the `setting(...)`
-  field factory, and JSON load/save (`load_config_from_json`,
-  `save_config_to_json`). Phase 7 splits this into `io/appdata.py`
-  + `config/`.
-- **`GUI/utils.py`** (~3 860 LOC — *god-file*). Junk drawer:
-  Qt widget builders, dataclass UI generation, plugin discovery
-  helpers, file cleanup, WebEngine markdown rendering, and most of the
-  `eval`-based metadata reflection. **Phase 7 carves it into**
-  `io/appdata.py`, `ui/widgets/builders.py`, `ui/markdown_view.py`,
-  `plugins/discovery.py`, `util/fs.py`.
-- **`GUI/FlowChart_dockWidgets.py`** (~6 285 LOC — *god-file*). Dock
-  widgets that drive the Nodz-based autonomous-microscopy graph: node
-  dialogs (`nodz_*Dialog`), the `GladosNodzFlowChart_dockWidget` itself,
-  the runtime executor (`fullAutonomousRunStart`, `runScoringOnly`,
-  `runAcquiring`, etc.), and per-node call actions. The Slack settings
-  button + `_slack_send_enabled` helper added in Phase 2 live here.
-  Phase 8 splits this along Init/Score/Acquire region lines.
-- **`GUI/napariGlados.py`** (~1 343 LOC). `napariHandler` plus the
-  real-time visualization and analysis loop (`napariUpdateLive`, …).
-  Uses `napari.qt.thread_worker` generators heavily — that is why some
-  update functions live at module scope. Contains the line-97 TODO
-  about a 2-second hot-path stall (Phase 13 target).
-- **`GUI/napariHelperFunctions.py`**. Smaller helpers around napari
-  layers and viewer events. Imported by `napariGlados.py` and by some
-  analysis nodes.
-- **`GUI/MMcontrols.py`** (~2 138 LOC). Micro-Manager config-group UI:
-  `MMConfigUI`, `ConfigInfo`, and the stage/ROI controls. Used by both
-  the standalone path and the napari-plugin path.
-- **`GUI/Analysis_dockWidgets.py`**. Dock widgets for offline /
-  post-hoc analysis. Smaller than the FlowChart dock; closely tied to
-  `AnalysisClass.py`.
-- **`GUI/AnalysisClass.py`** (~918 LOC). The analysis pipeline class
-  used outside the node-graph editor — deque-based, thread-friendly.
-- **`GUI/LaserControlScripts.py`** (~552 LOC). Standalone laser sliders
-  dock (`GladosSlidersWidget`). Site-specific in places — see the
-  `'SMIPC'`-hostname gate in `GUI_napari.py`.
-- **`GUI/custom_widget_ui.py`** (~711 LOC). Generated Qt Designer code
-  for the custom-widget surface. Don't hand-edit unless you also
-  re-source the `.ui`.
-- **`GUI/GUI.py`**. Older monolithic entry — left for reference; the
-  active entry is `GUI_napari.py`. Has known mypy issues
-  (`MainWindow` undefined name) that are not worth fixing if the file
-  is going away.
-- **`GUI/slack_settings_dialog.py`** (Phase 2). Small `QDialog` with
-  three line edits (token / signing secret / channel) and an
-  `apply_to_shared_data(...)` helper. Token + secret use password echo.
-- **`GUI/nodz/`** — *vendored Nodz graph editor*. Treated as
-  third-party; left untouched so we can re-sync upstream. Do not
-  refactor, type-annotate, lint-fix, or split files here. See
-  `claude_decisions.md` and ADR 0005.
+## `autonomous/`, `plugins/`, `AutonomousMicroscopy/`: recipes and nodes
 
-## `AutonomousMicroscopy/` — node-graph executor + nodes
+- **`autonomous/executor.py`**: runs a recipe (`FlowchartExecutorMixin`): node actions, run
+  lifecycle, abort.
+- **`autonomous/registry.py`**: `@register("Module.Function")` and dispatch of node functions.
+- **`autonomous/recipe_io.py`**, **`autonomous/types.py`**: recipe JSON load/save and data types.
+- **`plugins/discovery.py`**: imports node modules from the source folders and the user's AppData
+  folders, and reloads them.
+- **`AutonomousMicroscopy/Analysis_Measurements/`**, **`Real_Time_Analysis/`**,
+  **`CustomFunctions/`**: the shipped nodes (see [Writing nodes](developer/writing-nodes.md)).
+  **`MainScripts/FunctionHandling.py`**: kwarg checking used by nodes.
+- **`AutonomousMicroscopy/ExampleRecipes/`**: demo recipes and the script that generates them.
+- **`AutonomousMicroscopy/exploration_nena_frc/`**: NeNA/FRC exploration, not imported by the app.
 
-- **`AutonomousMicroscopy/__init__.py`** (and the three subpackage
-  `__init__.py` files). Walks the source tree + the user's AppData
-  folder, importing every `.py` and re-exporting its top-level
-  functions. **Important quirk**: failures are silently downgraded.
-  Phase 6 refactors discovery into `plugins/discovery.py` and makes
-  failures visible.
-- **`AutonomousMicroscopy/MainScripts/`**:
-  - `Main.py` — *dev scratch* that runs analyses against hardcoded
-    test TIFFs and calls `plt.show()` at module scope. Importing it
-    accidentally would block. Phase 6/ARCH-7 deletes or `__main__`-gates
-    it.
-  - `FunctionHandling.py` — function discovery / module inspection.
-  - `HelperFunctions.py` — kwarg introspection + string-building call
-    helpers (`createFunctionWithKwargs`, …). The `eval()` partner for
-    the run-time executor. Phase 9 replaces the eval path with a
-    `dispatch(name, **kwargs)` registry.
-- **`AutonomousMicroscopy/Analysis_Measurements/`** — segmentation /
-  scoring nodes (StarDist, AverageImage, RandomShapes, …). Each module
-  exposes top-level functions plus a `__function_metadata__()` that
-  the UI reads.
-- **`AutonomousMicroscopy/Real_Time_Analysis/`** — frame-by-frame
-  analysis nodes (FFT, pSMLM, sharpness, BioImageModelZoo, frame
-  counters, laser adjustment).
-- **`AutonomousMicroscopy/CustomFunctions/`** — site-defined helpers
-  (autofocus, stroboscopic lasers, example dice-roll node).
+## Support packages
 
-## `Documentation/`
+- **`io/appdata.py`**: per-user state (`glados_state.json`), settings load/save, temp cleanup.
+- **`observability/`**: logging setup, the uncaught-exception hook, Performance Mode capture,
+  Windows scheduling hints, the startup timeline.
+- **`notify/slack.py`**: Slack client and message sending.
+- **`ui/layout/`**: the dock layout toolkit (theme, sections, list editor, responsive grid).
+  **`ui/widgets/`**: icons and the XY stage dial.
+- **`docs_links.py`**: the documentation site URL used by the Help buttons.
+- **`errors.py`**, **`lazy_imports.py`**: typed exceptions; lazy stand-ins for heavy imports.
 
-- **`Documentation/_CreateDocumentation.py`** — generator that produces
-  `Documentation/*.html` from sources. Phase 17 will switch the
-  source-of-truth to markdown and treat the HTML as a build artifact.
-- The `*.html`, `*.md`, and `Images/` files are user-facing docs.
+## Outside the package
 
-## Tests, scripts, configs
-
-- **`tests/`** — pytest suite (34 tests as of Phase 2). Pure-logic
-  coverage; no hardware required. Uses fakes/mocks.
-- **`scratch/`** — local exploration (`Test.py`, `test.ipynb`).
-  Excluded from sdist/wheel via
-  `[tool.setuptools.exclude-package-data]`.
-- **`docs/`** — engineering docs: this map, ADRs (`adr/`), the bandit
-  baseline, the eval inventory, the test baseline.
-- **`Makefile`**, **`pyproject.toml`**, **`.github/workflows/ci.yml`**,
-  **`.pre-commit-config.yaml`** — tooling. See `CONTRIBUTING.md`.
+- **`tests/`**: the pytest suite. No hardware needed; some tests drive pymmcore-plus' demo
+  camera.
+- **`scripts/`**: benchmarks and profiling helpers.
+- **`docs/`**: this site (`mkdocs.yml`), plus performance logs (`*.txt`) and archived planning
+  documents (`plans/`), which are not published.

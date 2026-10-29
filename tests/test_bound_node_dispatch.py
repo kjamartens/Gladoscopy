@@ -150,17 +150,6 @@ def test_a_variable_kwarg_is_re_read_every_frame(fake_node):
     assert node.calls[-1][5]["Count"] == 7
 
 
-def test_the_eval_fallback_produces_the_same_call(fake_node):
-    """GLADOS_RT_EVAL_DISPATCH=1 restores the pre-T-G4 path; it must still work."""
-    info = _current_data()
-    node = utils.realTimeAnalysis_init(info, core=None)
-    assert utils._realTimeAnalysis_run_viaEval(node, info, "IMG", "META", "SHARED", None) == "ran"
-    # The eval path re-quotes every value as a string literal - that difference
-    # is exactly what T-G2 fixed, and why the fallback is a fallback.
-    assert node.calls[-1][1:5] == ("IMG", "META", "SHARED", None)
-    assert node.calls[-1][5] == {"Count": "3", "Enabled": "True"}
-
-
 def test_bound_node_never_crosses_the_subprocess_boundary(fake_node):
     """The binding is stashed on the node instance, and the subprocess worker
     pickles every plain-data attribute of that instance back per frame. A dict

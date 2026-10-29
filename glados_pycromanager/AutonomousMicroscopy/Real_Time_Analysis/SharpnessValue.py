@@ -9,8 +9,6 @@ import inspect
 import logging
 
 # from shapely import Polygon, affinity
-import math
-import time
 
 import numpy as np
 
